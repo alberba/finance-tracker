@@ -1,0 +1,7 @@
+.bg-layer {
+  display: none !important;
+}
+
+.progress-fill {
+  transition: none !important;
+}
