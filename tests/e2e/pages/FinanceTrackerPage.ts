@@ -201,17 +201,26 @@ export class FinanceTrackerPage {
 
   async setTransactionCategoryFilter(value: string) {
     await this.openTransactions();
-    await this.transactionsSection.locator("#tx-filter-category").fill(value);
+    const trigger = this.transactionsSection.locator('.tx-filter-trigger[data-column="category"]');
+    await trigger.click();
+    await this.transactionsSection.locator("#tx-header-filter-category").fill(value);
   }
 
   async setTransactionDescriptionFilter(value: string) {
     await this.openTransactions();
-    await this.transactionsSection.locator("#tx-filter-description").fill(value);
+    const trigger = this.transactionsSection.locator('.tx-filter-trigger[data-column="description"]');
+    await trigger.click();
+    await this.transactionsSection.locator("#tx-header-filter-description").fill(value);
   }
 
   async clearTransactionFilters() {
     await this.openTransactions();
-    await this.transactionsSection.getByRole("button", { name: "Limpiar filtros" }).click();
+    const clearColumns = ["date", "account", "type", "category", "description", "amount"];
+    for (const column of clearColumns) {
+      const trigger = this.transactionsSection.locator(`.tx-filter-trigger[data-column="${column}"]`);
+      await trigger.click();
+      await this.transactionsSection.locator(`.tx-header-clear-btn[data-column="${column}"]`).click();
+    }
   }
 
   async clickSortByDate() {

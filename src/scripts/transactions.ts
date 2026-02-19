@@ -3,8 +3,8 @@ import { type SortDirection, type Transaction, type TxSortColumn } from "./types
 
 export interface TransactionFilters {
   date: string;
-  accountId: string;
-  type: string;
+  accountIds: string[];
+  types: string[];
   category: string;
   description: string;
   amountMin: string;
@@ -41,10 +41,10 @@ export function filterAndSortTransactions(params: {
     if (filters.date && String(item.date) !== filters.date) {
       return false;
     }
-    if (filters.accountId && String(item.accountId) !== filters.accountId) {
+    if (filters.accountIds.length > 0 && !filters.accountIds.includes(String(item.accountId))) {
       return false;
     }
-    if (filters.type && String(item.type) !== filters.type) {
+    if (filters.types.length > 0 && !filters.types.includes(String(item.type))) {
       return false;
     }
     if (categoryQuery && !String(item.category || "").toLowerCase().includes(categoryQuery)) {

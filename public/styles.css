@@ -693,7 +693,7 @@ thead {
   background: #f3f8f6;
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 5;
 }
 
 th,
@@ -708,8 +708,56 @@ th {
   white-space: nowrap;
 }
 
+.tx-col-select {
+  width: 44px;
+  text-align: center;
+}
+
+#tx-select-all,
+#tx-table-body input[type="checkbox"][name="txSelectedIds"] {
+  inline-size: 16px;
+  block-size: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--primary);
+}
+
+.tx-head {
+  position: relative;
+}
+
+.tx-head-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tx-filter-trigger {
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.tx-filter-trigger:hover {
+  background: #e8f1ee;
+}
+
+.tx-head.is-filtered .tx-filter-trigger {
+  color: #0a5f55;
+}
+
+.tx-filter-trigger.is-filtered::after {
+  content: "•";
+  margin-left: 4px;
+  color: #0d8476;
+}
+
 .tx-sort-btn {
-  margin-left: 6px;
   min-height: 26px;
   min-width: 26px;
   padding: 0 5px;
@@ -724,7 +772,72 @@ th {
   color: #fff;
 }
 
-td input {
+.tx-filter-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 12;
+  min-width: 220px;
+  max-width: min(300px, 90vw);
+  display: grid;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #cfe0db;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(8, 28, 24, 0.18);
+  padding: 10px;
+}
+
+.tx-filter-popover[hidden] {
+  display: none;
+}
+
+.tx-filter-popover label {
+  font-size: 0.72rem;
+  color: #395955;
+}
+
+.tx-filter-popover input,
+.tx-filter-popover select {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.tx-checkbox-list {
+  display: grid;
+  gap: 6px;
+  max-height: 170px;
+  overflow: auto;
+  padding: 2px 0;
+}
+
+.tx-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  font-size: 0.82rem;
+  color: #214f49;
+}
+
+.tx-checkbox-option input[type="checkbox"] {
+  inline-size: 16px;
+  block-size: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.tx-header-clear-btn {
+  min-height: 30px;
+  border: 1px solid #d5e5e0;
+  background: #f2f7f5;
+  color: #214f49;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+td input:not([type="checkbox"]),
+td select {
   width: 100%;
   min-width: 90px;
 }

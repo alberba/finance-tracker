@@ -71,6 +71,7 @@ import {
       column: TxSortColumn;
       direction: SortDirection;
     };
+    txOpenHeaderFilter: TxSortColumn | "";
     txSelectedIds: string[];
     txFilters: TransactionFilters;
     txEditingId: string;
@@ -106,6 +107,55 @@ import {
     return target instanceof Element ? target : null;
   }
 
+  function hasSelectionWithin(container: Element): boolean {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      const range = selection.getRangeAt(0);
+      const ancestor = range.commonAncestorContainer;
+      if (ancestor && container.contains(ancestor)) {
+        return true;
+      }
+    }
+
+    const activeElement = document.activeElement;
+    if (
+      activeElement &&
+      container.contains(activeElement) &&
+      (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) &&
+      typeof activeElement.selectionStart === "number" &&
+      typeof activeElement.selectionEnd === "number"
+    ) {
+      return activeElement.selectionEnd > activeElement.selectionStart;
+    }
+
+    return false;
+  }
+
+  function getOpenTransactionHeaderFilterPopover(): HTMLElement | null {
+    if (!ui.txOpenHeaderFilter) {
+      return null;
+    }
+    const popover = document.querySelector<HTMLElement>(
+      `.tx-filter-popover[data-column="${ui.txOpenHeaderFilter}"]`
+    );
+    if (!popover || popover.hasAttribute("hidden")) {
+      return null;
+    }
+    return popover;
+  }
+
+  function getCheckedValuesFromContainer(container: HTMLElement): string[] {
+    return Array.from(
+      container.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]:checked')
+    ).map((input) => String(input.dataset.filterValue || "").trim()).filter(Boolean);
+  }
+
+  const TX_TYPE_FILTER_OPTIONS = [
+    { value: "income", label: "Ingreso" },
+    { value: "expense", label: "Gasto" },
+    { value: "investment", label: "Inversión" },
+  ] as const;
+
   let state: State = normalizeState(loadPersistedState() || clone(BASE_SEED));
   let toastTimer: number | undefined;
 
@@ -116,11 +166,12 @@ import {
     budgetMonth: Math.min(new Date().getMonth(), 11),
     txFilterMonth: Math.min(new Date().getMonth(), 11),
     txSort: { column: "date", direction: "desc" },
+    txOpenHeaderFilter: "",
     txSelectedIds: [],
     txFilters: {
       date: "",
-      accountId: "",
-      type: "",
+      accountIds: [],
+      types: [],
       category: "",
       description: "",
       amountMin: "",
@@ -153,14 +204,13 @@ import {
     txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
     txForm: getRequiredElement<TxForm>("tx-form"),
     txBody: getRequiredElement<HTMLElement>("tx-table-body"),
-    txFilterDate: getRequiredElement<HTMLInputElement>("tx-filter-date"),
-    txFilterAccount: getRequiredElement<HTMLSelectElement>("tx-filter-account"),
-    txFilterType: getRequiredElement<HTMLSelectElement>("tx-filter-type"),
-    txFilterCategory: getRequiredElement<HTMLInputElement>("tx-filter-category"),
-    txFilterDescription: getRequiredElement<HTMLInputElement>("tx-filter-description"),
-    txFilterAmountMin: getRequiredElement<HTMLInputElement>("tx-filter-amount-min"),
-    txFilterAmountMax: getRequiredElement<HTMLInputElement>("tx-filter-amount-max"),
-    txClearFilters: getRequiredElement<HTMLButtonElement>("tx-clear-filters"),
+    txHeaderFilterDate: getRequiredElement<HTMLInputElement>("tx-header-filter-date"),
+    txHeaderFilterAccount: getRequiredElement<HTMLElement>("tx-header-filter-account"),
+    txHeaderFilterType: getRequiredElement<HTMLElement>("tx-header-filter-type"),
+    txHeaderFilterCategory: getRequiredElement<HTMLInputElement>("tx-header-filter-category"),
+    txHeaderFilterDescription: getRequiredElement<HTMLInputElement>("tx-header-filter-description"),
+    txHeaderFilterAmountMin: getRequiredElement<HTMLInputElement>("tx-header-filter-amount-min"),
+    txHeaderFilterAmountMax: getRequiredElement<HTMLInputElement>("tx-header-filter-amount-max"),
     txOpenModal: getRequiredElement<HTMLButtonElement>("tx-open-modal"),
     txDialog: getRequiredElement<HTMLDialogElement>("tx-dialog"),
     txCloseModal: getRequiredElement<HTMLButtonElement>("tx-close-modal"),
@@ -289,30 +339,28 @@ import {
     el.txOpenModal.addEventListener("click", openTransactionModal);
     el.txCloseModal.addEventListener("click", closeTransactionModal);
     el.txDialog.addEventListener("cancel", (event) => {
+      if (hasSelectionWithin(el.txDialog)) {
+        event.preventDefault();
+        return;
+      }
       event.preventDefault();
       closeTransactionModal();
     });
 
-    [el.txFilterDate, el.txFilterAccount, el.txFilterType, el.txFilterCategory, el.txFilterDescription, el.txFilterAmountMin, el.txFilterAmountMax]
-      .forEach((input) => {
-        input.addEventListener("input", syncTransactionFiltersFromUI);
-        input.addEventListener("change", syncTransactionFiltersFromUI);
-      });
-
-    el.txClearFilters.addEventListener("click", () => {
-      ui.txFilters = {
-        date: "",
-        accountId: "",
-        type: "",
-        category: "",
-        description: "",
-        amountMin: "",
-        amountMax: "",
-      };
-      ui.txEditingId = "";
-      ui.txSelectedIds = [];
-      syncTransactionFilterUI();
-      renderTransactions();
+    [
+      el.txHeaderFilterDate,
+      el.txHeaderFilterCategory,
+      el.txHeaderFilterDescription,
+      el.txHeaderFilterAmountMin,
+      el.txHeaderFilterAmountMax,
+    ].forEach((input) => {
+      input.addEventListener("input", syncTransactionFiltersFromHeaderUI);
+      input.addEventListener("change", syncTransactionFiltersFromHeaderUI);
+      input.addEventListener("click", (event) => event.stopPropagation());
+    });
+    [el.txHeaderFilterAccount, el.txHeaderFilterType].forEach((container) => {
+      container.addEventListener("change", syncTransactionFiltersFromHeaderUI);
+      container.addEventListener("click", (event) => event.stopPropagation());
     });
 
     document.querySelectorAll<HTMLButtonElement>(".tx-sort-btn").forEach((button) => {
@@ -329,6 +377,52 @@ import {
         }
         renderTransactions();
       });
+    });
+    document.querySelectorAll<HTMLButtonElement>(".tx-filter-trigger").forEach((button) => {
+      button.addEventListener("pointerdown", (event) => event.stopPropagation());
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const column = button.dataset.column || "";
+        if (!isTxSortColumn(column)) {
+          return;
+        }
+        ui.txOpenHeaderFilter = ui.txOpenHeaderFilter === column ? "" : column;
+        renderTransactionHeaderFilterState();
+      });
+    });
+    document.querySelectorAll(".tx-filter-popover").forEach((popover) => {
+      popover.addEventListener("click", (event) => event.stopPropagation());
+    });
+    document.querySelectorAll<HTMLButtonElement>(".tx-header-clear-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        const column = button.dataset.column || "";
+        if (!isTxSortColumn(column)) {
+          return;
+        }
+        clearTransactionFilterByColumn(column);
+      });
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (!ui.txOpenHeaderFilter) {
+        return;
+      }
+      const openPopover = getOpenTransactionHeaderFilterPopover();
+      const target = getEventElement(event.target);
+      if (openPopover && target && openPopover.contains(target)) {
+        return;
+      }
+      if (openPopover && hasSelectionWithin(openPopover)) {
+        return;
+      }
+      ui.txOpenHeaderFilter = "";
+      renderTransactionHeaderFilterState();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || !ui.txOpenHeaderFilter) {
+        return;
+      }
+      ui.txOpenHeaderFilter = "";
+      renderTransactionHeaderFilterState();
     });
 
     el.txForm.elements.type.addEventListener("change", populateTransactionCategoryOptions);
@@ -851,6 +945,7 @@ import {
     syncTransactionFilterUI();
     syncTransactionFilterOptions();
     renderTransactionSortState();
+    renderTransactionHeaderFilterState();
 
     const tx = getFilteredAndSortedTransactions();
     const visibleIdSet = new Set(tx.map((item: any) => item.id));
@@ -874,7 +969,7 @@ import {
         return `
           <tr class="${ui.txSelectedIds.includes(item.id) ? "row-selected" : ""}">
             <td>
-              <input type="checkbox" data-select-tx-id="${escapeAttr(item.id)}" ${ui.txSelectedIds.includes(item.id) ? "checked" : ""} aria-label="Seleccionar movimiento del ${escapeAttr(String(item.date))}" />
+              <input type="checkbox" name="txSelectedIds" data-select-tx-id="${escapeAttr(item.id)}" ${ui.txSelectedIds.includes(item.id) ? "checked" : ""} aria-label="Seleccionar movimiento del ${escapeAttr(String(item.date))}" />
             </td>
             <td>${escapeHtml(String(item.date))}</td>
             <td>${escapeHtml(account)}</td>
@@ -905,24 +1000,34 @@ import {
   }
 
   function syncTransactionFilterUI() {
-    el.txFilterDate.value = ui.txFilters.date;
-    el.txFilterAccount.value = ui.txFilters.accountId;
-    el.txFilterType.value = ui.txFilters.type;
-    el.txFilterCategory.value = ui.txFilters.category;
-    el.txFilterDescription.value = ui.txFilters.description;
-    el.txFilterAmountMin.value = ui.txFilters.amountMin;
-    el.txFilterAmountMax.value = ui.txFilters.amountMax;
+    el.txHeaderFilterDate.value = ui.txFilters.date;
+    el.txHeaderFilterCategory.value = ui.txFilters.category;
+    el.txHeaderFilterDescription.value = ui.txFilters.description;
+    el.txHeaderFilterAmountMin.value = ui.txFilters.amountMin;
+    el.txHeaderFilterAmountMax.value = ui.txFilters.amountMax;
+    el.txHeaderFilterAccount
+      .querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]')
+      .forEach((input) => {
+        const value = String(input.dataset.filterValue || "").trim();
+        input.checked = ui.txFilters.accountIds.includes(value);
+      });
+    el.txHeaderFilterType
+      .querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]')
+      .forEach((input) => {
+        const value = String(input.dataset.filterValue || "").trim();
+        input.checked = ui.txFilters.types.includes(value);
+      });
   }
 
-  function syncTransactionFiltersFromUI() {
+  function syncTransactionFiltersFromHeaderUI() {
     ui.txFilters = {
-      date: String(el.txFilterDate.value || "").trim(),
-      accountId: String(el.txFilterAccount.value || "").trim(),
-      type: String(el.txFilterType.value || "").trim(),
-      category: String(el.txFilterCategory.value || "").trim(),
-      description: String(el.txFilterDescription.value || "").trim(),
-      amountMin: String(el.txFilterAmountMin.value || "").trim(),
-      amountMax: String(el.txFilterAmountMax.value || "").trim(),
+      date: String(el.txHeaderFilterDate.value || "").trim(),
+      accountIds: getCheckedValuesFromContainer(el.txHeaderFilterAccount),
+      types: getCheckedValuesFromContainer(el.txHeaderFilterType),
+      category: String(el.txHeaderFilterCategory.value || "").trim(),
+      description: String(el.txHeaderFilterDescription.value || "").trim(),
+      amountMin: String(el.txHeaderFilterAmountMin.value || "").trim(),
+      amountMax: String(el.txHeaderFilterAmountMax.value || "").trim(),
     };
     ui.txEditingId = "";
     ui.txSelectedIds = [];
@@ -935,15 +1040,97 @@ import {
       month: ui.txFilterMonth,
       getAccountName,
     });
-    const current = ui.txFilters.accountId;
-    const options = ['<option value="">Todas</option>'].concat(
-      allAccounts
-        .map((item) => `<option value="${escapeAttr(item.value)}">${escapeHtml(item.label)}</option>`)
-    );
-    el.txFilterAccount.innerHTML = options.join("");
-    if (current) {
-      el.txFilterAccount.value = current;
+    const current = ui.txFilters.accountIds;
+    el.txHeaderFilterAccount.innerHTML = allAccounts.length
+      ? allAccounts
+        .map(
+          (item) => `
+            <label class="tx-checkbox-option">
+              <input type="checkbox" data-filter-value="${escapeAttr(item.value)}" ${current.includes(item.value) ? "checked" : ""} />
+              <span>${escapeHtml(item.label)}</span>
+            </label>
+          `
+        )
+        .join("")
+      : "<small>Sin cuentas en este mes.</small>";
+
+    el.txHeaderFilterType.innerHTML = TX_TYPE_FILTER_OPTIONS
+      .map(
+        (item) => `
+          <label class="tx-checkbox-option">
+            <input type="checkbox" data-filter-value="${escapeAttr(item.value)}" ${ui.txFilters.types.includes(item.value) ? "checked" : ""} />
+            <span>${escapeHtml(item.label)}</span>
+          </label>
+        `
+      )
+      .join("");
+  }
+
+  function renderTransactionHeaderFilterState() {
+    document.querySelectorAll<HTMLElement>(".tx-head--filterable").forEach((header) => {
+      const column = header.dataset.filterColumn || "";
+      if (!isTxSortColumn(column)) {
+        return;
+      }
+      const isOpen = ui.txOpenHeaderFilter === column;
+      const trigger = header.querySelector<HTMLButtonElement>(".tx-filter-trigger");
+      const popover = header.querySelector<HTMLElement>(".tx-filter-popover");
+      const isFiltered = hasTransactionFilterForColumn(column);
+      header.classList.toggle("is-open", isOpen);
+      header.classList.toggle("is-filtered", isFiltered);
+      if (trigger) {
+        trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        trigger.classList.toggle("is-filtered", isFiltered);
+      }
+      if (popover) {
+        popover.hidden = !isOpen;
+      }
+    });
+  }
+
+  function hasTransactionFilterForColumn(column: TxSortColumn) {
+    if (column === "date") {
+      return Boolean(ui.txFilters.date);
     }
+    if (column === "account") {
+      return ui.txFilters.accountIds.length > 0;
+    }
+    if (column === "type") {
+      return ui.txFilters.types.length > 0;
+    }
+    if (column === "category") {
+      return Boolean(ui.txFilters.category);
+    }
+    if (column === "description") {
+      return Boolean(ui.txFilters.description);
+    }
+    return Boolean(ui.txFilters.amountMin || ui.txFilters.amountMax);
+  }
+
+  function clearTransactionFilterByColumn(column: TxSortColumn) {
+    if (column === "date") {
+      ui.txFilters.date = "";
+    } else if (column === "account") {
+      ui.txFilters.accountIds = [];
+    } else if (column === "type") {
+      ui.txFilters.types = [];
+    } else if (column === "category") {
+      ui.txFilters.category = "";
+    } else if (column === "description") {
+      ui.txFilters.description = "";
+    } else if (column === "amount") {
+      ui.txFilters.amountMin = "";
+      ui.txFilters.amountMax = "";
+    }
+    ui.txOpenHeaderFilter = "";
+    ui.txEditingId = "";
+    ui.txSelectedIds = [];
+    syncTransactionFilterUI();
+    renderTransactions();
+  }
+
+  function isTxSortColumn(value: string): value is TxSortColumn {
+    return ["date", "amount", "account", "type", "category", "description"].includes(value);
   }
 
   function renderTransactionSortState() {
@@ -988,12 +1175,12 @@ import {
     return `
       <tr data-editing-id="${escapeAttr(item.id)}">
         <td></td>
-        <td><input type="date" data-edit-field="date" value="${escapeAttr(String(item.date))}" /></td>
-        <td><select data-edit-field="accountId">${accountsOptions}</select></td>
-        <td><select data-edit-field="type">${typeOptions}</select></td>
-        <td><input type="text" data-edit-field="category" value="${escapeAttr(item.category || "")}" /></td>
-        <td><input type="text" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
-        <td><input type="number" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
+        <td><input type="date" name="editTxDate" autocomplete="off" data-edit-field="date" value="${escapeAttr(String(item.date))}" /></td>
+        <td><select name="editTxAccountId" data-edit-field="accountId">${accountsOptions}</select></td>
+        <td><select name="editTxType" data-edit-field="type">${typeOptions}</select></td>
+        <td><input type="text" name="editTxCategory" autocomplete="off" data-edit-field="category" value="${escapeAttr(item.category || "")}" /></td>
+        <td><input type="text" name="editTxDescription" autocomplete="off" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
+        <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
         <td>
           <div class="inline-actions">
             <button type="button" class="primary-btn" data-action="save-edit-tx" data-id="${escapeAttr(item.id)}">Guardar</button>
@@ -1167,7 +1354,7 @@ import {
         return `
           <tr>
             <td>${escapeHtml(category)}</td>
-            <td><input type="number" step="0.01" min="0" data-category="${escapeAttr(category)}" value="${planned}" aria-label="Presupuesto para ${escapeAttr(category)}" /></td>
+            <td><input type="number" name="budget-${escapeAttr(type)}-${escapeAttr(category)}" autocomplete="off" step="0.01" min="0" data-category="${escapeAttr(category)}" value="${planned}" aria-label="Presupuesto para ${escapeAttr(category)}" /></td>
             <td>${formatMoney(actual)}</td>
             <td class="${diffClass}">${formatMoney(diff)}</td>
           </tr>
@@ -1260,6 +1447,8 @@ import {
             <td>
               <input
                 type="number"
+                name="snapshot-${escapeAttr(kind)}-${escapeAttr(item.id)}"
+                autocomplete="off"
                 step="0.01"
                 data-snapshot-kind="${escapeAttr(kind)}"
                 data-snapshot-id="${escapeAttr(item.id)}"
@@ -1439,8 +1628,8 @@ import {
       .map(
         (item: any) => `
           <div class="list-item" data-entity="${escapeAttr(key)}" data-id="${escapeAttr(item.id)}">
-            <input type="text" data-field="name" value="${escapeAttr(item.name)}" aria-label="Nombre ${escapeAttr(item.name)}" />
-            <input type="number" data-field="openingBalance" step="0.01" value="${Number(item.openingBalance || 0)}" aria-label="Saldo inicial de ${escapeAttr(item.name)}" />
+            <input type="text" name="${escapeAttr(key)}-${escapeAttr(item.id)}-name" autocomplete="off" data-field="name" value="${escapeAttr(item.name)}" aria-label="Nombre ${escapeAttr(item.name)}" />
+            <input type="number" name="${escapeAttr(key)}-${escapeAttr(item.id)}-openingBalance" autocomplete="off" data-field="openingBalance" step="0.01" value="${Number(item.openingBalance || 0)}" aria-label="Saldo inicial de ${escapeAttr(item.name)}" />
             <button class="delete-btn" data-action="remove-entity" data-entity="${escapeAttr(key)}" data-id="${escapeAttr(item.id)}" aria-label="Eliminar ${escapeAttr(item.name)}">Eliminar</button>
           </div>
         `

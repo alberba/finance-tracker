@@ -1,0 +1,686 @@
+---
+export interface Props {
+  activeRoute?: "root" | "section";
+  sectionParam?: string;
+}
+
+const { activeRoute = "root", sectionParam = "" } = Astro.props;
+const canonicalUrl = new URL("/", Astro.url).toString();
+---
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance Tracker 2026</title>
+  <link rel="canonical" href={canonicalUrl} />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    import "../scripts/app";
+  </script>
+</head>
+<body data-route={activeRoute} data-section={sectionParam}>
+  <a class="skip-link" href="#app-main">Saltar al contenido</a>
+  <div class="bg-layer"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <header class="brand-block">
+        <p class="brand-kicker">Plan financiero</p>
+        <h1>Finance Tracker</h1>
+        <p class="brand-sub">Reemplazo completo de tu Excel con una experiencia más clara y rápida.</p>
+      </header>
+
+      <nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
+        <button type="button" class="nav-btn is-active" data-section="dashboard" aria-controls="dashboard" aria-current="page">Dashboard</button>
+        <button type="button" class="nav-btn" data-section="transactions" aria-controls="transactions">Movimientos</button>
+        <button type="button" class="nav-btn" data-section="budget" aria-controls="budget">Presupuesto</button>
+        <button type="button" class="nav-btn" data-section="wealth" aria-controls="wealth">Patrimonio</button>
+        <button type="button" class="nav-btn" data-section="investment" aria-controls="investment">Inversión</button>
+        <button type="button" class="nav-btn" data-section="goals" aria-controls="goals">Objetivos</button>
+        <button type="button" class="nav-btn" data-section="settings" aria-controls="settings">Configuración</button>
+        <button type="button" class="nav-btn" data-section="data" aria-controls="data">Datos</button>
+      </nav>
+
+      <footer class="sidebar-footer">
+        <p id="save-status">Sincronizado</p>
+      </footer>
+    </aside>
+
+    <main id="app-main" class="content">
+      <section id="dashboard" class="panel is-active" aria-labelledby="dashboard-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="dashboard-title">Resumen mensual y anual</h2>
+            <p>Visualización equivalente a RESUMEN MENSUAL + RESUMEN ANUAL.</p>
+          </div>
+          <div class="inline-controls">
+            <label>
+              Año
+              <input id="year-display" name="yearDisplay" type="number" min="2000" max="2100" autocomplete="off" />
+            </label>
+            <label>
+              Mes
+              <select id="dashboard-month" name="dashboardMonth"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="kpi-cards">
+          <article class="kpi-card">
+            <p>Ingresos del mes</p>
+            <strong id="kpi-income">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Gastos del mes</p>
+            <strong id="kpi-expense">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Inversión del mes</p>
+            <strong id="kpi-investment">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Patrimonio neto</p>
+            <strong id="kpi-net-worth">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Ahorro anual</p>
+            <strong id="kpi-annual-savings">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Crecimiento YTD</p>
+            <strong id="kpi-growth">0%</strong>
+          </article>
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-card">
+            <h3>Evolución patrimonio neto</h3>
+            <svg id="chart-networth" viewBox="0 0 720 280" aria-label="Evolución de patrimonio"></svg>
+          </article>
+          <article class="chart-card">
+            <h3>Ingresos vs Gastos vs Inversión</h3>
+            <svg id="chart-cashflow" viewBox="0 0 720 280" aria-label="Flujo mensual"></svg>
+          </article>
+          <article class="chart-card">
+            <h3>Distribución actual</h3>
+            <svg id="chart-distribution" viewBox="0 0 420 260" aria-label="Distribución de patrimonio"></svg>
+          </article>
+          <article class="chart-card">
+            <h3>Top gastos del mes</h3>
+            <div id="top-expense-list" class="list-stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="transactions" class="panel" aria-labelledby="transactions-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="transactions-title">Movimientos mensuales</h2>
+            <p>Registro diario de ingresos, gastos e inversión por mes.</p>
+          </div>
+          <div class="inline-controls">
+            <label>
+              Filtrar mes
+              <select id="tx-month-filter" name="txMonthFilter"></select>
+            </label>
+            <button id="tx-open-modal" type="button" class="primary-btn">Nuevo</button>
+          </div>
+        </div>
+
+        <article class="card tx-bulk-card">
+          <h3>Selección múltiple</h3>
+          <div class="tx-bulk-grid">
+            <p id="tx-selected-count" class="tx-selected-count">0 seleccionadas</p>
+            <label>
+              Tipo (lote)
+              <select id="tx-bulk-type" name="txBulkType">
+                <option value="">Sin cambio</option>
+                <option value="income">Ingreso</option>
+                <option value="expense">Gasto</option>
+                <option value="investment">Inversión</option>
+              </select>
+            </label>
+            <label>
+              Cuenta (lote)
+              <select id="tx-bulk-account" name="txBulkAccount">
+                <option value="">Sin cambio</option>
+              </select>
+            </label>
+            <label>
+              Categoría (lote)
+              <input id="tx-bulk-category" name="txBulkCategory" type="text" placeholder="Sin cambio" autocomplete="off" />
+            </label>
+            <button id="tx-bulk-apply" type="button" class="secondary-btn">Aplicar</button>
+            <button id="tx-bulk-delete" type="button" class="danger-btn">Eliminar</button>
+          </div>
+        </article>
+
+        <dialog id="tx-dialog" class="tx-dialog">
+          <form id="tx-form" class="tx-form-dialog" method="dialog" autocomplete="off">
+            <div class="tx-dialog-head">
+              <div class="tx-dialog-title">
+                <span class="tx-dialog-icon" aria-hidden="true">+</span>
+                <h3>Nuevo movimiento</h3>
+              </div>
+              <button id="tx-close-modal" type="button" class="tx-close-btn" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="tx-form-fields">
+              <label>
+                Fecha
+                <input type="date" name="date" required autocomplete="off" />
+              </label>
+              <label>
+                Mes
+                <select name="month" required></select>
+              </label>
+              <label>
+                Tipo
+                <select name="type" required id="tx-type-select">
+                  <option value="income">Ingreso</option>
+                  <option value="expense">Gasto</option>
+                  <option value="investment">Inversión</option>
+                </select>
+              </label>
+              <label>
+                Cuenta
+                <select name="accountId" required></select>
+              </label>
+              <label>
+                Categoría
+                <select name="category" required></select>
+              </label>
+              <label class="span-3">
+                Descripción
+                <input type="text" name="description" maxlength="140" placeholder="Detalle opcional" autocomplete="off" />
+              </label>
+              <label class="tx-amount-field">
+                Importe
+                <div class="tx-amount-wrap">
+                  <span class="tx-amount-currency">€</span>
+                  <input type="number" name="amount" min="0" step="0.01" required placeholder="0.00" autocomplete="off" />
+                </div>
+              </label>
+            </div>
+            <div class="tx-dialog-actions">
+              <button id="tx-submit-more" type="submit" class="tx-btn-secondary">Otro</button>
+              <button type="submit" class="tx-btn-primary">Guardar</button>
+            </div>
+          </form>
+        </dialog>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="tx-col-select">
+                  <input id="tx-select-all" name="txSelectAll" type="checkbox" aria-label="Seleccionar todas las filas visibles" />
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="date">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="date" aria-haspopup="true" aria-expanded="false">Fecha</button>
+                    <button type="button" class="tx-sort-btn" data-column="date" aria-label="Ordenar por fecha">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="date" hidden>
+                    <label for="tx-header-filter-date">Filtrar fecha</label>
+                    <input id="tx-header-filter-date" name="txHeaderFilterDate" type="date" autocomplete="off" />
+                    <button type="button" class="tx-header-clear-btn" data-column="date">Limpiar</button>
+                  </div>
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="account">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="account" aria-haspopup="true" aria-expanded="false">Cuenta</button>
+                    <button type="button" class="tx-sort-btn" data-column="account" aria-label="Ordenar por cuenta">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="account" hidden>
+                    <label>Cuenta</label>
+                    <div id="tx-header-filter-account" class="tx-checkbox-list" aria-label="Filtrar cuentas"></div>
+                    <button type="button" class="tx-header-clear-btn" data-column="account">Limpiar</button>
+                  </div>
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="type">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="type" aria-haspopup="true" aria-expanded="false">Tipo</button>
+                    <button type="button" class="tx-sort-btn" data-column="type" aria-label="Ordenar por tipo">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="type" hidden>
+                    <label>Tipo</label>
+                    <div id="tx-header-filter-type" class="tx-checkbox-list" aria-label="Filtrar tipos"></div>
+                    <button type="button" class="tx-header-clear-btn" data-column="type">Limpiar</button>
+                  </div>
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="category">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="category" aria-haspopup="true" aria-expanded="false">Categoría</button>
+                    <button type="button" class="tx-sort-btn" data-column="category" aria-label="Ordenar por categoría">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="category" hidden>
+                    <label for="tx-header-filter-category">Categoría</label>
+                    <input id="tx-header-filter-category" name="txHeaderFilterCategory" type="text" placeholder="Contiene..." autocomplete="off" />
+                    <button type="button" class="tx-header-clear-btn" data-column="category">Limpiar</button>
+                  </div>
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="description">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="description" aria-haspopup="true" aria-expanded="false">Descripción</button>
+                    <button type="button" class="tx-sort-btn" data-column="description" aria-label="Ordenar por descripción">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="description" hidden>
+                    <label for="tx-header-filter-description">Descripción</label>
+                    <input id="tx-header-filter-description" name="txHeaderFilterDescription" type="text" placeholder="Contiene..." autocomplete="off" />
+                    <button type="button" class="tx-header-clear-btn" data-column="description">Limpiar</button>
+                  </div>
+                </th>
+                <th class="tx-head tx-head--filterable" data-filter-column="amount">
+                  <div class="tx-head-main">
+                    <button type="button" class="tx-filter-trigger" data-column="amount" aria-haspopup="true" aria-expanded="false">Importe</button>
+                    <button type="button" class="tx-sort-btn" data-column="amount" aria-label="Ordenar por importe">↕</button>
+                  </div>
+                  <div class="tx-filter-popover" data-column="amount" hidden>
+                    <label for="tx-header-filter-amount-min">Importe mín</label>
+                    <input id="tx-header-filter-amount-min" name="txHeaderFilterAmountMin" type="number" min="0" step="0.01" autocomplete="off" />
+                    <label for="tx-header-filter-amount-max">Importe máx</label>
+                    <input id="tx-header-filter-amount-max" name="txHeaderFilterAmountMax" type="number" min="0" step="0.01" autocomplete="off" />
+                    <button type="button" class="tx-header-clear-btn" data-column="amount">Limpiar</button>
+                  </div>
+                </th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="budget" class="panel" aria-labelledby="budget-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="budget-title">Presupuesto</h2>
+            <p>Compara presupuestado vs real por categoría y mes.</p>
+          </div>
+          <div class="inline-controls">
+            <label>
+              Tipo
+              <select id="budget-type" name="budgetType">
+                <option value="income">Ingresos</option>
+                <option value="expense">Gastos</option>
+                <option value="investment">Inversión</option>
+              </select>
+            </label>
+            <label>
+              Mes
+              <select id="budget-month" name="budgetMonth"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="cards-grid slim">
+          <article class="kpi-card">
+            <p>Presupuestado mes</p>
+            <strong id="budget-total-planned">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Real mes</p>
+            <strong id="budget-total-actual">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Diferencia mes</p>
+            <strong id="budget-total-diff">€0</strong>
+          </article>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Presupuesto</th>
+                <th>Real</th>
+                <th>Diferencia</th>
+              </tr>
+            </thead>
+            <tbody id="budget-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="wealth" class="panel" aria-labelledby="wealth-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="wealth-title">Patrimonio total</h2>
+            <p>Liquidez + inversión - deuda, con snapshots mensuales manuales.</p>
+          </div>
+          <div class="inline-controls">
+            <label>
+              Mes snapshot
+              <select id="snapshot-month" name="snapshotMonth"></select>
+            </label>
+            <button id="save-snapshot" class="primary-btn" type="button">Guardar snapshot</button>
+          </div>
+        </div>
+
+        <div class="dual-grid">
+          <article class="card">
+            <h3>Liquidez</h3>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cuenta</th>
+                    <th>Apertura</th>
+                    <th>Calculado</th>
+                    <th>Snapshot</th>
+                  </tr>
+                </thead>
+                <tbody id="snapshot-accounts"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Inversión</h3>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Activo</th>
+                    <th>Apertura</th>
+                    <th>Calculado</th>
+                    <th>Snapshot</th>
+                  </tr>
+                </thead>
+                <tbody id="snapshot-investments"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Deuda / Pasivos</h3>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Apertura</th>
+                    <th>Calculado</th>
+                    <th>Snapshot</th>
+                  </tr>
+                </thead>
+                <tbody id="snapshot-liabilities"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="card">
+            <h3>Evolución mensual</h3>
+            <svg id="chart-wealth" viewBox="0 0 720 260" aria-label="Evolución mensual patrimonio"></svg>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mes</th>
+                    <th>Liquidez</th>
+                    <th>Inversión</th>
+                    <th>Deuda</th>
+                    <th>Neto</th>
+                  </tr>
+                </thead>
+                <tbody id="wealth-timeline-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="investment" class="panel" aria-labelledby="investment-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="investment-title">Inversión y aportes</h2>
+            <p>Evolución de cartera, distribución y registro de aportaciones.</p>
+          </div>
+          <div class="inline-controls">
+            <label>
+              Mes de análisis
+              <select id="investment-month" name="investmentMonth"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="cards-grid slim">
+          <article class="kpi-card">
+            <p>Valor cartera</p>
+            <strong id="inv-total-value">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Capital invertido</p>
+            <strong id="inv-capital">€0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Rentabilidad estimada</p>
+            <strong id="inv-return">0%</strong>
+          </article>
+        </div>
+
+        <div class="dual-grid">
+          <article class="card">
+            <h3>Distribución de activos</h3>
+            <svg id="investment-allocation" viewBox="0 0 720 300" aria-label="Distribución de cartera"></svg>
+          </article>
+          <article class="card">
+            <h3>Aportes y TWR aproximado</h3>
+            <form id="contribution-form" class="form-grid compact" autocomplete="off">
+              <label>
+                Fecha
+                <input type="date" name="date" required autocomplete="off" />
+              </label>
+              <label>
+                Aporte
+                <input type="number" name="amount" step="0.01" min="0" required autocomplete="off" />
+              </label>
+              <label>
+                Valor cartera
+                <input type="number" name="portfolioValue" step="0.01" min="0" required autocomplete="off" />
+              </label>
+              <label>
+                Flujo del día
+                <input type="number" name="flow" step="0.01" autocomplete="off" />
+              </label>
+              <button type="submit" class="primary-btn">Agregar aporte</button>
+            </form>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Aporte</th>
+                    <th>Valor cartera</th>
+                    <th>Flujo</th>
+                    <th>VLE</th>
+                    <th>Retorno</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="contribution-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="goals" class="panel" aria-labelledby="goals-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="goals-title">Objetivos</h2>
+            <p>Seguimiento de metas patrimoniales y de inversión.</p>
+          </div>
+        </div>
+
+        <div class="goal-edit-grid">
+          <article class="card">
+            <h3>Corto plazo</h3>
+            <label>Nombre <input type="text" name="goalShortName" data-goal="short" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalShortYear" data-goal="short" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalShortAmount" data-goal="short" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+          <article class="card">
+            <h3>Medio plazo</h3>
+            <label>Nombre <input type="text" name="goalMediumName" data-goal="medium" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalMediumYear" data-goal="medium" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalMediumAmount" data-goal="medium" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+          <article class="card">
+            <h3>Largo plazo</h3>
+            <label>Nombre <input type="text" name="goalLongName" data-goal="long" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalLongYear" data-goal="long" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalLongAmount" data-goal="long" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+          <article class="card">
+            <h3>Inversión total</h3>
+            <label>Nombre <input type="text" name="goalInvestmentTotalName" data-goal="investmentTotal" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalInvestmentTotalYear" data-goal="investmentTotal" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalInvestmentTotalAmount" data-goal="investmentTotal" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+          <article class="card">
+            <h3>Fondos indexados</h3>
+            <label>Nombre <input type="text" name="goalInvestmentFundsName" data-goal="investmentFunds" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalInvestmentFundsYear" data-goal="investmentFunds" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalInvestmentFundsAmount" data-goal="investmentFunds" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+          <article class="card">
+            <h3>Criptomonedas</h3>
+            <label>Nombre <input type="text" name="goalInvestmentCryptoName" data-goal="investmentCrypto" data-field="name" autocomplete="off" /></label>
+            <label>Año objetivo <input type="number" name="goalInvestmentCryptoYear" data-goal="investmentCrypto" data-field="targetYear" min="2000" max="2100" autocomplete="off" /></label>
+            <label>Monto objetivo <input type="number" name="goalInvestmentCryptoAmount" data-goal="investmentCrypto" data-field="targetAmount" min="0" step="0.01" autocomplete="off" /></label>
+          </article>
+        </div>
+
+        <div id="goals-progress" class="goal-progress"></div>
+      </section>
+
+      <section id="settings" class="panel" aria-labelledby="settings-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="settings-title">Configuración base</h2>
+            <p>Gestiona cuentas, activos, categorías y datos maestros.</p>
+          </div>
+        </div>
+
+        <div class="settings-head">
+            <label>
+              Año
+              <input id="settings-year" name="settingsYear" type="number" min="2000" max="2100" autocomplete="off" />
+            </label>
+            <label>
+              Moneda
+              <input id="settings-currency" name="settingsCurrency" type="text" maxlength="3" autocomplete="off" />
+            </label>
+          <button id="save-settings-main" type="button" class="primary-btn">Guardar ajustes</button>
+        </div>
+
+        <div class="dual-grid">
+          <article class="card">
+            <h3>Cuentas de liquidez</h3>
+            <form id="add-account-form" class="mini-form" autocomplete="off">
+              <input type="text" name="name" placeholder="Nombre cuenta" required autocomplete="off" />
+              <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Saldo inicial" required autocomplete="off" />
+              <button type="submit" class="secondary-btn">Agregar</button>
+            </form>
+            <div id="settings-accounts" class="list-stack"></div>
+          </article>
+
+          <article class="card">
+            <h3>Activos de inversión</h3>
+            <form id="add-investment-form" class="mini-form" autocomplete="off">
+              <input type="text" name="name" placeholder="Activo" required autocomplete="off" />
+              <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Valor inicial" required autocomplete="off" />
+              <button type="submit" class="secondary-btn">Agregar</button>
+            </form>
+            <div id="settings-investments" class="list-stack"></div>
+          </article>
+
+          <article class="card">
+            <h3>Pasivos / deudas</h3>
+            <form id="add-liability-form" class="mini-form" autocomplete="off">
+              <input type="text" name="name" placeholder="Pasivo" required autocomplete="off" />
+              <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Monto inicial" required autocomplete="off" />
+              <button type="submit" class="secondary-btn">Agregar</button>
+            </form>
+            <div id="settings-liabilities" class="list-stack"></div>
+          </article>
+
+          <article class="card">
+            <h3>Categorías</h3>
+            <div class="category-block">
+              <h4>Ingresos</h4>
+              <form id="add-income-category" class="mini-form compact-row" autocomplete="off">
+                <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+                <button type="submit" class="secondary-btn">Agregar</button>
+              </form>
+              <div id="settings-income-categories" class="tag-wrap"></div>
+            </div>
+
+            <div class="category-block">
+              <h4>Gastos</h4>
+              <form id="add-expense-category" class="mini-form compact-row" autocomplete="off">
+                <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+                <button type="submit" class="secondary-btn">Agregar</button>
+              </form>
+              <div id="settings-expense-categories" class="tag-wrap"></div>
+            </div>
+
+            <div class="category-block">
+              <h4>Inversión</h4>
+              <form id="add-investment-category" class="mini-form compact-row" autocomplete="off">
+                <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+                <button type="submit" class="secondary-btn">Agregar</button>
+              </form>
+              <div id="settings-investment-categories" class="tag-wrap"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="data" class="panel" aria-labelledby="data-title">
+        <div class="panel-head">
+          <div>
+            <h2 id="data-title">Datos y backups</h2>
+            <p>Exporta, importa y reinicia el tracker sin perder historial.</p>
+          </div>
+        </div>
+
+        <div class="cards-grid slim">
+          <article class="kpi-card">
+            <p>Movimientos</p>
+            <strong id="data-total-transactions">0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Snapshots</p>
+            <strong id="data-total-snapshots">0</strong>
+          </article>
+          <article class="kpi-card">
+            <p>Aportes</p>
+            <strong id="data-total-contributions">0</strong>
+          </article>
+        </div>
+
+        <div class="data-actions">
+          <button id="export-json" class="primary-btn" type="button">Exportar JSON</button>
+          <label class="file-btn">
+            Importar JSON
+            <input id="import-json" name="importJson" type="file" accept="application/json" aria-label="Importar archivo JSON" />
+          </label>
+          <button id="export-transactions-csv" class="secondary-btn" type="button">Exportar movimientos CSV</button>
+          <button id="reset-seed" class="danger-btn" type="button">Reiniciar con datos semilla</button>
+        </div>
+
+        <article class="card">
+          <h3>Estado</h3>
+          <p id="data-meta"></p>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
