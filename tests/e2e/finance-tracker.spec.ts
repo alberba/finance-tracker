@@ -185,6 +185,43 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getAccountSnapshotValue("Revolut")).toBe(999.99);
   });
 
+  test("patrimonio renderiza la gráfica de evolución mensual solo hasta el último mes con datos", async ({ page, tracker }) => {
+    await tracker.openWealth();
+
+    const chartDetails = await page.evaluate(() => {
+      const chart = document.getElementById("chart-wealth");
+      if (!chart) {
+        return null;
+      }
+      return {
+        points: chart.querySelectorAll("circle").length,
+        labels: chart.querySelectorAll("text").length,
+      };
+    });
+
+    expect(chartDetails).not.toBeNull();
+    if (!chartDetails) {
+      return;
+    }
+    expect(chartDetails.points).toBe(2);
+    expect(chartDetails.labels).toBeGreaterThan(0);
+  });
+
+  test("patrimonio permite calcular snapshot de inversión por fila y persistirlo", async ({ tracker }) => {
+    const calculated = await tracker.applyInvestmentSnapshotCalculation({
+      monthLabel: "MARZO",
+      assetName: "Fondos Indexados",
+      expression: "100+50*2",
+    });
+    expect(calculated).toBe(200);
+
+    await tracker.saveSnapshot();
+    await tracker.reload();
+    await tracker.openWealth();
+    await tracker.wealthSection.getByLabel("Mes snapshot").selectOption({ label: "MARZO" });
+    expect(await tracker.getInvestmentSnapshotValue("Fondos Indexados")).toBe(200);
+  });
+
   test("movimientos soporta filtrado, orden por columnas y edición inline", async ({ tracker }) => {
     await tracker.addCustomTransaction({
       date: "2026-02-03",
@@ -240,6 +277,31 @@ test.describe("Finance tracker E2E", () => {
     await dateFilterTrigger.click();
     await expect(tracker.transactionsSection.locator('.tx-filter-popover[data-column="date"]')).toBeVisible();
     await expect(tracker.transactionsSection.locator('.tx-filter-popover[data-column="account"]')).toBeHidden();
+  });
+
+  test("movimientos muestra resumen lateral con totales y desglose por categorías", async ({ page, tracker }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile-chrome", "En móvil el lateral baja debajo de la tabla.");
+    await page.goto("/movimientos");
+    await expect(page).toHaveURL(/\/movimientos$/);
+    await tracker.filterTransactionsMonth("FEBRERO");
+
+    await expect(tracker.transactionsSummarySection).toBeVisible();
+    await expect(tracker.transactionsSection.locator(".tx-summary-title", { hasText: "TOTAL" })).toBeVisible();
+    await expect(
+      tracker.transactionsSection.locator(".tx-summary-title", { hasText: "DESGLOSE POR CATEGORÍAS" })
+    ).toBeVisible();
+
+    expect(await tracker.getTransactionSummaryTotal("income")).toBeCloseTo(1808, 2);
+    expect(await tracker.getTransactionSummaryTotal("expense")).toBeCloseTo(752.1, 2);
+    expect(await tracker.getTransactionSummaryTotal("investment")).toBeCloseTo(360, 2);
+
+    expect(await tracker.getTransactionSummaryCategoryAmount("income", "Nómina")).toBeCloseTo(1508, 2);
+    expect(await tracker.getTransactionSummaryCategoryAmount("expense", "Viajes")).toBeCloseTo(436.63, 2);
+    expect(await tracker.getTransactionSummaryCategoryAmount("investment", "Crypto")).toBeCloseTo(160, 2);
+
+    await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("💼 Nómina");
+    await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("✈️ Viajes");
+    await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("₿ Crypto");
   });
 
   test("home no muestra bloque legacy de filtros en movimientos", async ({ page, tracker }) => {
@@ -322,6 +384,8 @@ test.describe("Finance tracker E2E", () => {
       amount: 11,
       description: "e2e-bulk-a",
     });
+    expect(await tracker.transactionModalDateValue()).toBe("2026-03-11");
+
     await tracker.addCustomTransaction({
       date: "2026-03-12",
       monthLabel: "MARZO",
@@ -339,6 +403,7 @@ test.describe("Finance tracker E2E", () => {
       type: "investment",
       category: "Fondos Indexados",
     });
+    await expect(tracker.transactionsSection.locator("#tx-table-body")).toContainText("📈 Fondos Indexados");
     await expect(tracker.transactionsSection.locator("#tx-table-body tr", { hasText: "Fondos Indexados" })).toHaveCount(2);
 
     await tracker.selectTransactionByDescription("e2e-bulk-a");

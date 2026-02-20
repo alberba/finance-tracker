@@ -1,5 +1,5 @@
-import { parseFloatSafe } from "./utils";
-import { type SortDirection, type Transaction, type TxSortColumn } from "./types";
+import { parseFloatSafe, round2 } from "./utils";
+import { type SortDirection, type Transaction, type TransactionType, type TxSortColumn } from "./types";
 
 export interface TransactionFilters {
   date: string;
@@ -19,6 +19,16 @@ export interface TransactionSort {
 export interface AccountOption {
   value: string;
   label: string;
+}
+
+export interface CategoryAmountRow {
+  category: string;
+  amount: number;
+}
+
+export interface MonthBreakdown {
+  totals: Record<TransactionType, number>;
+  byType: Record<TransactionType, CategoryAmountRow[]>;
 }
 
 export function filterAndSortTransactions(params: {
@@ -98,4 +108,73 @@ export function buildAccountFilterOptions(params: {
   return accountIds
     .map((accountId) => ({ value: accountId, label: getAccountName(accountId) }))
     .sort((a, b) => a.label.localeCompare(b.label, "es"));
+}
+
+export function buildMonthBreakdown(params: {
+  transactions: Transaction[];
+  month: number;
+  incomeCategories: string[];
+  expenseCategories: string[];
+  investmentCategories: string[];
+}): MonthBreakdown {
+  const { transactions, month, incomeCategories, expenseCategories, investmentCategories } = params;
+
+  const categoriesByType: Record<TransactionType, string[]> = {
+    income: incomeCategories,
+    expense: expenseCategories,
+    investment: investmentCategories,
+  };
+
+  const byTypeMap: Record<TransactionType, Map<string, number>> = {
+    income: createCategoryMap(categoriesByType.income),
+    expense: createCategoryMap(categoriesByType.expense),
+    investment: createCategoryMap(categoriesByType.investment),
+  };
+  const totals: Record<TransactionType, number> = {
+    income: 0,
+    expense: 0,
+    investment: 0,
+  };
+
+  transactions.forEach((item) => {
+    if (Number(item.month) !== month) {
+      return;
+    }
+    const type = item.type;
+    const category = String(item.category || "Sin categoría");
+    const amount = Number(item.amount || 0);
+    const map = byTypeMap[type];
+    map.set(category, round2((map.get(category) || 0) + amount));
+    totals[type] = round2(totals[type] + amount);
+  });
+
+  return {
+    totals,
+    byType: {
+      income: toSortedCategoryRows(byTypeMap.income),
+      expense: toSortedCategoryRows(byTypeMap.expense),
+      investment: toSortedCategoryRows(byTypeMap.investment),
+    },
+  };
+}
+
+function createCategoryMap(categories: string[]): Map<string, number> {
+  const map = new Map<string, number>();
+  categories.forEach((category) => {
+    const normalized = String(category || "").trim();
+    if (!normalized) {
+      return;
+    }
+    map.set(normalized, 0);
+  });
+  return map;
+}
+
+function toSortedCategoryRows(map: Map<string, number>): CategoryAmountRow[] {
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], "es"))
+    .map(([category, amount]) => ({
+      category,
+      amount: round2(amount),
+    }));
 }

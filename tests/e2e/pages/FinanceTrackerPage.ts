@@ -24,6 +24,10 @@ export class FinanceTrackerPage {
     return this.page.locator("#transactions");
   }
 
+  get transactionsSummarySection(): Locator {
+    return this.transactionsSection.locator(".tx-summary-side");
+  }
+
   get budgetSection(): Locator {
     return this.page.locator("#budget");
   }
@@ -148,6 +152,12 @@ export class FinanceTrackerPage {
     await form.getByLabel("Importe").fill(String(params.amount));
     await form.getByRole("button", { name: "Otro" }).click();
     await expect(this.page.getByRole("status")).toContainText("Guardado. Puedes añadir otro.");
+  }
+
+  async transactionModalDateValue(): Promise<string> {
+    await this.openTransactions();
+    await this.ensureTransactionModalOpen();
+    return this.transactionsSection.locator('#tx-form input[name="date"]').inputValue();
   }
 
   async selectTransactionByDescription(description: string) {
@@ -313,6 +323,60 @@ export class FinanceTrackerPage {
     return Number(value);
   }
 
+  async applyInvestmentSnapshotCalculation(params: {
+    monthLabel: string;
+    assetName: string;
+    expression: string;
+  }): Promise<number> {
+    await this.openWealth();
+    await this.wealthSection.getByLabel("Mes snapshot").selectOption({ label: params.monthLabel });
+    const row = this.wealthSection.locator(`#snapshot-investments tr:has(td:text-is("${params.assetName}"))`);
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: `Abrir cálculo de ${params.assetName}` }).click();
+
+    const modal = this.page.locator("#wealth-calc-dialog");
+    await expect(modal).toBeVisible();
+    await modal.getByLabel("Cálculo numérico").fill(params.expression);
+    await modal.getByRole("button", { name: "Aplicar al snapshot" }).click();
+    await expect(modal).toBeHidden();
+
+    const snapshotValue = await row.locator('input[data-snapshot-kind="investments"]').inputValue();
+    return Number(snapshotValue);
+  }
+
+  async saveSnapshot() {
+    await this.openWealth();
+    await this.wealthSection.getByRole("button", { name: "Guardar snapshot" }).click();
+    await expect(this.page.getByRole("status")).toContainText("Snapshot guardado.");
+  }
+
+  async getInvestmentSnapshotValue(assetName: string): Promise<number> {
+    const row = this.wealthSection.locator(`#snapshot-investments tr:has(td:text-is("${assetName}"))`);
+    const input = row.locator('input[data-snapshot-kind="investments"]');
+    const value = await input.inputValue();
+    return Number(value);
+  }
+
+  async getTransactionSummaryTotal(type: "income" | "expense" | "investment"): Promise<number> {
+    await this.openTransactions();
+    const selector =
+      type === "income" ? "#tx-total-income" : type === "expense" ? "#tx-total-expense" : "#tx-total-investment";
+    const text = (await this.transactionsSection.locator(selector).innerText()).trim();
+    return this.parseMoneyText(text);
+  }
+
+  async getTransactionSummaryCategoryAmount(column: "income" | "expense" | "investment", category: string): Promise<number> {
+    await this.openTransactions();
+    const row = this.transactionsSection.locator(
+      `#tx-category-breakdown-body tr[data-summary-type="${column}"][data-summary-category="${category}"]`
+    );
+    if ((await row.count()) === 0) {
+      throw new Error(`No se encontró la categoría ${category} en la columna ${column}.`);
+    }
+    const amountText = (await row.first().locator(".tx-summary-item > strong").innerText()).trim();
+    return this.parseMoneyText(amountText);
+  }
+
   async dashboardIncomeText(): Promise<string> {
     return this.dashboardSection.locator("#kpi-income").innerText();
   }
@@ -351,5 +415,19 @@ export class FinanceTrackerPage {
     if (!isOpen) {
       await this.transactionsSection.getByRole("button", { name: "Nuevo" }).click();
     }
+  }
+
+  private parseMoneyText(value: string): number {
+    const cleaned = value
+      .replace(/\u00a0/g, "")
+      .replace(/[€$£]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim();
+    const parsed = Number.parseFloat(cleaned);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`No se pudo parsear importe: ${value}`);
+    }
+    return parsed;
   }
 }

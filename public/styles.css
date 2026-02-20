@@ -414,6 +414,126 @@ svg {
   background: #fff;
 }
 
+.tx-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.4fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.tx-layout > .table-wrap {
+  min-height: 340px;
+}
+
+.tx-summary-side {
+  display: grid;
+  gap: 12px;
+}
+
+.tx-summary-card {
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  border: 1px solid #dce6e1;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.tx-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.tx-summary-table--breakdown {
+  table-layout: auto;
+}
+
+.tx-summary-breakdown-amount {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 1%;
+  padding-right: 10px;
+}
+
+.tx-summary-table th,
+.tx-summary-table td {
+  border: 1px solid #dce7e2;
+  padding: 6px 8px;
+  font-size: 0.86rem;
+}
+
+.tx-summary-title {
+  background: linear-gradient(135deg, #083c35 0%, #0d8476 100%);
+  color: #fff;
+  text-align: center;
+  font-family: "Fraunces", Georgia, serif;
+  letter-spacing: 0.03em;
+}
+
+.tx-summary-heading {
+  font-size: 0.78rem;
+  text-align: center;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.tx-summary-heading--income {
+  background: #d7f8e9;
+  color: #0a7d4f;
+}
+
+.tx-summary-heading--expense {
+  background: #ffe2e2;
+  color: #b63333;
+}
+
+.tx-summary-heading--investment {
+  background: #dbe7ff;
+  color: #1d4cb2;
+}
+
+.tx-summary-total-value {
+  background: #f3f8f6;
+  text-align: center;
+  font-weight: 700;
+}
+
+.tx-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.tx-summary-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-summary-item > strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-summary-empty {
+  color: #78888c;
+  padding: 4px 8px;
+  display: block;
+}
+
+.tx-summary-table--breakdown .tx-summary-title {
+  text-align: center;
+}
+
+.tx-summary-group-title {
+  text-align: center;
+  font-weight: 700;
+}
+
 .tx-query-card {
   gap: 10px;
 }
@@ -857,6 +977,54 @@ td select {
   min-width: 90px;
 }
 
+.snapshot-field-stack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.snapshot-calc-btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.wealth-calc-dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  width: min(460px, 92vw);
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(4, 16, 14, 0.3);
+}
+
+.wealth-calc-dialog::backdrop {
+  background: rgba(5, 18, 20, 0.52);
+  backdrop-filter: blur(4px);
+}
+
+.wealth-calc-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.wealth-calc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wealth-calc-head h3 {
+  font-size: 1.05rem;
+}
+
+.wealth-calc-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .badge {
   padding: 3px 8px;
   border-radius: 20px;
@@ -1002,6 +1170,33 @@ td select {
   gap: 6px;
 }
 
+.icon-action-btn {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.inline-save-btn {
+  color: #0d7a4a;
+  background: #dff7ea;
+  border-radius: 8px;
+}
+
+.inline-cancel-btn {
+  color: #c63a53;
+  background: #ffe8ee;
+  border-radius: 8px;
+}
+
 .data-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1098,6 +1293,7 @@ td select {
   }
 
   .chart-grid,
+  .tx-layout,
   .dual-grid,
   .goal-edit-grid,
   .goal-progress {

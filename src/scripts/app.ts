@@ -27,6 +27,7 @@ import {
 } from "./types";
 import {
   buildAccountFilterOptions,
+  buildMonthBreakdown,
   filterAndSortTransactions,
   type TransactionFilters,
 } from "./transactions";
@@ -49,6 +50,8 @@ import {
   todayISO,
   uid,
 } from "./utils";
+import { decorateCategoryLabel } from "./category-emoji";
+import { evaluateNumericExpression } from "./math-expression";
 import {
   BASE_SEED,
   loadPersistedState,
@@ -77,6 +80,8 @@ import {
     txEditingId: string;
     snapshotMonth: number;
     investmentMonth: number;
+    wealthCalcTargetId: string;
+    wealthCalcTargetName: string;
   }
 
   interface TxFormControls extends HTMLFormControlsCollection {
@@ -180,6 +185,8 @@ import {
     txEditingId: "",
     snapshotMonth: Math.min(new Date().getMonth(), 11),
     investmentMonth: Math.min(new Date().getMonth(), 11),
+    wealthCalcTargetId: "",
+    wealthCalcTargetName: "",
   };
 
   const el = {
@@ -222,6 +229,10 @@ import {
     txBulkCategory: getRequiredElement<HTMLInputElement>("tx-bulk-category"),
     txBulkApply: getRequiredElement<HTMLButtonElement>("tx-bulk-apply"),
     txBulkDelete: getRequiredElement<HTMLButtonElement>("tx-bulk-delete"),
+    txTotalIncome: getRequiredElement<HTMLElement>("tx-total-income"),
+    txTotalExpense: getRequiredElement<HTMLElement>("tx-total-expense"),
+    txTotalInvestment: getRequiredElement<HTMLElement>("tx-total-investment"),
+    txCategoryBreakdownBody: getRequiredElement<HTMLElement>("tx-category-breakdown-body"),
 
     budgetType: getRequiredElement<HTMLSelectElement>("budget-type"),
     budgetMonth: getRequiredElement<HTMLSelectElement>("budget-month"),
@@ -237,6 +248,11 @@ import {
     snapshotLiabilities: getRequiredElement<HTMLElement>("snapshot-liabilities"),
     wealthTimelineBody: getRequiredElement<HTMLElement>("wealth-timeline-body"),
     chartWealth: getRequiredElement<SVGSVGElement>("chart-wealth"),
+    wealthCalcDialog: getRequiredElement<HTMLDialogElement>("wealth-calc-dialog"),
+    wealthCalcForm: getRequiredElement<HTMLFormElement>("wealth-calc-form"),
+    wealthCalcTitle: getRequiredElement<HTMLElement>("wealth-calc-title"),
+    wealthCalcExpression: getRequiredElement<HTMLInputElement>("wealth-calc-expression"),
+    wealthCalcClose: getRequiredElement<HTMLButtonElement>("wealth-calc-close"),
 
     investmentMonth: getRequiredElement<HTMLSelectElement>("investment-month"),
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
@@ -464,6 +480,7 @@ import {
       sortTransactions();
       saveState();
       const persistedValues = {
+        date: String(form.get("date") || todayISO()),
         month: String(form.get("month") || ui.txFilterMonth),
         type: String(form.get("type") || "income"),
         accountId: String(form.get("accountId") || ""),
@@ -478,7 +495,7 @@ import {
       if (persistedValues.category) {
         el.txForm.elements.category.value = persistedValues.category;
       }
-      el.txForm.elements.date.value = todayISO();
+      el.txForm.elements.date.value = keepOpen ? persistedValues.date : todayISO();
       el.txForm.elements.amount.value = "";
       el.txForm.elements.description.value = "";
 
@@ -595,6 +612,16 @@ import {
       renderWealth();
     });
     el.saveSnapshot.addEventListener("click", saveSnapshotFromTable);
+    el.snapshotInvestments.addEventListener("click", onOpenInvestmentSnapshotCalcModal);
+    el.wealthCalcClose.addEventListener("click", closeWealthCalcModal);
+    el.wealthCalcDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeWealthCalcModal();
+    });
+    el.wealthCalcForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyWealthCalcModalResult();
+    });
   }
 
   function bindInvestmentEvents() {
@@ -918,7 +945,10 @@ import {
     const categorySelect = el.txForm.elements.category;
 
     categorySelect.innerHTML = categories
-      .map((name: any) => `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`)
+      .map(
+        (name: any) =>
+          `<option value="${escapeAttr(name)}">${escapeHtml(decorateCategoryLabel(type, name))}</option>`
+      )
       .join("");
 
     if (!categories.length) {
@@ -1007,6 +1037,7 @@ import {
     syncTransactionFilterOptions();
     renderTransactionSortState();
     renderTransactionHeaderFilterState();
+    renderTransactionBreakdownSummary();
 
     const tx = getFilteredAndSortedTransactions();
     const visibleIdSet = new Set(tx.map((item: any) => item.id));
@@ -1035,19 +1066,80 @@ import {
             <td>${escapeHtml(String(item.date))}</td>
             <td>${escapeHtml(account)}</td>
             <td><span class="badge ${typeClass}">${typeLabel}</span></td>
-            <td>${escapeHtml(item.category || "-")}</td>
+            <td>${escapeHtml(decorateCategoryLabel(item.type, item.category || "Sin categoría"))}</td>
             <td>${escapeHtml(item.description || "-")}</td>
             <td>${formatMoney(item.amount)}</td>
             <td>
               <div class="inline-actions">
-                <button class="edit-btn" data-action="edit-tx" data-id="${escapeAttr(item.id)}" aria-label="Editar movimiento del ${escapeAttr(String(item.date))}">Editar</button>
-                <button class="delete-btn" data-delete-id="${escapeAttr(item.id)}" aria-label="Eliminar movimiento del ${escapeAttr(String(item.date))}">Eliminar</button>
+                <button class="edit-btn icon-action-btn" data-action="edit-tx" data-id="${escapeAttr(item.id)}" aria-label="Editar movimiento del ${escapeAttr(String(item.date))}">
+                  <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25z"></path>
+                    <path d="M20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
+                  </svg>
+                </button>
+                <button class="delete-btn icon-action-btn" data-delete-id="${escapeAttr(item.id)}" aria-label="Eliminar movimiento del ${escapeAttr(String(item.date))}">
+                  <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 7h12l-1 14H7L6 7z"></path>
+                    <path d="M9 4h6l1 2H8l1-2z"></path>
+                  </svg>
+                </button>
               </div>
             </td>
           </tr>
         `;
       })
       .join("");
+  }
+
+  function renderTransactionBreakdownSummary() {
+    const monthBreakdown = buildMonthBreakdown({
+      transactions: state.transactions,
+      month: ui.txFilterMonth,
+      incomeCategories: state.incomeCategories,
+      expenseCategories: state.expenseCategories,
+      investmentCategories: state.investmentCategories,
+    });
+
+    el.txTotalIncome.textContent = formatMoney(monthBreakdown.totals.income);
+    el.txTotalExpense.textContent = formatMoney(monthBreakdown.totals.expense);
+    el.txTotalInvestment.textContent = formatMoney(monthBreakdown.totals.investment);
+
+    const sections = [
+      { type: "income", label: "INGRESOS", rows: monthBreakdown.byType.income, cssClass: "income" },
+      { type: "expense", label: "GASTOS", rows: monthBreakdown.byType.expense, cssClass: "expense" },
+      { type: "investment", label: "INVERSIONES", rows: monthBreakdown.byType.investment, cssClass: "investment" },
+    ] as const;
+
+    el.txCategoryBreakdownBody.innerHTML = sections
+      .map(({ type, label, rows, cssClass }) => {
+        const header = `<tr><td class="tx-summary-group-title tx-summary-heading tx-summary-heading--${cssClass}">${label}</td></tr>`;
+        if (!rows.length) {
+          return `${header}<tr><td class="tx-summary-empty">Sin movimientos</td></tr>`;
+        }
+        const body = rows
+          .map(
+            (row) => `
+              <tr data-summary-type="${type}" data-summary-category="${escapeAttr(row.category)}">
+                <td>${renderSummaryCategoryCell(type, row)}</td>
+              </tr>
+            `
+          )
+          .join("");
+        return header + body;
+      })
+      .join("");
+  }
+
+  function renderSummaryCategoryCell(
+    type: BudgetType,
+    row: { category: string; amount: number } | undefined
+  ) {
+    if (!row) {
+      return "<span class='tx-summary-empty'>-</span>";
+    }
+    return `<div class="tx-summary-item"><span>${escapeHtml(
+      decorateCategoryLabel(type, row.category)
+    )}</span><strong>${formatMoney(row.amount)}</strong></div>`;
   }
 
   function renderTransactionSelectionState(tx: any) {
@@ -1244,8 +1336,28 @@ import {
         <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
         <td>
           <div class="inline-actions">
-            <button type="button" class="primary-btn" data-action="save-edit-tx" data-id="${escapeAttr(item.id)}">Guardar</button>
-            <button type="button" class="secondary-btn" data-action="cancel-edit-tx" data-id="${escapeAttr(item.id)}">Cancelar</button>
+            <button
+              type="button"
+              class="inline-save-btn icon-action-btn"
+              data-action="save-edit-tx"
+              data-id="${escapeAttr(item.id)}"
+              aria-label="Guardar"
+            >
+              <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="inline-cancel-btn icon-action-btn"
+              data-action="cancel-edit-tx"
+              data-id="${escapeAttr(item.id)}"
+              aria-label="Cancelar"
+            >
+              <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"></path>
+              </svg>
+            </button>
           </div>
         </td>
       </tr>
@@ -1414,7 +1526,7 @@ import {
 
         return `
           <tr>
-            <td>${escapeHtml(category)}</td>
+            <td>${escapeHtml(decorateCategoryLabel(type, category))}</td>
             <td><input type="number" name="budget-${escapeAttr(type)}-${escapeAttr(category)}" autocomplete="off" step="0.01" min="0" data-category="${escapeAttr(category)}" value="${planned}" aria-label="Presupuesto para ${escapeAttr(category)}" /></td>
             <td>${formatMoney(actual)}</td>
             <td class="${diffClass}">${formatMoney(diff)}</td>
@@ -1463,13 +1575,16 @@ import {
     );
 
     const wealthSeries = getWealthSeries();
+    const latestDataMonth = getLatestDataMonth();
+    const chartMonths = MONTHS.slice(0, latestDataMonth + 1);
+    const chartWealthSeries = wealthSeries.slice(0, latestDataMonth + 1);
     renderLineChart(
       el.chartWealth,
-      wealthSeries.map((entry: any) => entry.net),
+      chartWealthSeries.map((entry: any) => entry.net),
       {
         color: "#1f6feb",
         fill: "rgba(37, 99, 235, 0.13)",
-        labels: MONTHS,
+        labels: chartMonths,
         formatValue: formatMoney,
         formatAxisValue: formatMoneyCompact,
       }
@@ -1507,22 +1622,101 @@ import {
             <td>${formatMoney(opening)}</td>
             <td>${formatMoney(calculated)}</td>
             <td>
-              <input
-                type="number"
-                name="snapshot-${escapeAttr(kind)}-${escapeAttr(item.id)}"
-                autocomplete="off"
-                step="0.01"
-                data-snapshot-kind="${escapeAttr(kind)}"
-                data-snapshot-id="${escapeAttr(item.id)}"
-                value="${currentSnapshot ?? ""}"
-                placeholder="Auto"
-                aria-label="Snapshot de ${escapeAttr(item.name)}"
-              />
+              <div class="snapshot-field-stack">
+                <input
+                  type="number"
+                  name="snapshot-${escapeAttr(kind)}-${escapeAttr(item.id)}"
+                  autocomplete="off"
+                  step="0.01"
+                  data-snapshot-kind="${escapeAttr(kind)}"
+                  data-snapshot-id="${escapeAttr(item.id)}"
+                  value="${currentSnapshot ?? ""}"
+                  placeholder="Auto"
+                  aria-label="Snapshot de ${escapeAttr(item.name)}"
+                />
+                ${renderInvestmentSnapshotCalcAction(kind, item.id, item.name)}
+              </div>
             </td>
           </tr>
         `;
       })
       .join("");
+  }
+
+  function renderInvestmentSnapshotCalcAction(kind: SnapshotKind, itemId: string, itemName: string) {
+    if (kind !== "investments") {
+      return "";
+    }
+    return `
+      <button
+        type="button"
+        class="tx-btn-secondary snapshot-calc-btn"
+        data-action="open-investment-calc-modal"
+        data-snapshot-id="${escapeAttr(itemId)}"
+        data-item-name="${escapeAttr(itemName)}"
+        aria-label="Abrir cálculo de ${escapeAttr(itemName)}"
+      >
+        Calcular
+      </button>
+    `;
+  }
+
+  function onOpenInvestmentSnapshotCalcModal(event: Event) {
+    const target = getEventElement(event.target);
+    const button = target?.closest<HTMLButtonElement>('button[data-action="open-investment-calc-modal"]');
+    if (!button) {
+      return;
+    }
+    const targetId = String(button.dataset.snapshotId || "").trim();
+    const targetName = String(button.dataset.itemName || "").trim();
+    if (!targetId || !targetName) {
+      return;
+    }
+
+    ui.wealthCalcTargetId = targetId;
+    ui.wealthCalcTargetName = targetName;
+    el.wealthCalcTitle.textContent = `Calcular snapshot · ${targetName}`;
+    el.wealthCalcExpression.value = "";
+    el.wealthCalcDialog.showModal();
+    window.setTimeout(() => {
+      el.wealthCalcExpression.focus();
+    }, 0);
+  }
+
+  function closeWealthCalcModal() {
+    if (el.wealthCalcDialog.open) {
+      el.wealthCalcDialog.close();
+    }
+    ui.wealthCalcTargetId = "";
+    ui.wealthCalcTargetName = "";
+    el.wealthCalcExpression.value = "";
+    el.wealthCalcTitle.textContent = "Calcular snapshot";
+  }
+
+  function applyWealthCalcModalResult() {
+    if (!ui.wealthCalcTargetId) {
+      closeWealthCalcModal();
+      return;
+    }
+    const evaluated = evaluateNumericExpression(el.wealthCalcExpression.value);
+    if (evaluated === null) {
+      showToast("El cálculo no es válido.");
+      el.wealthCalcExpression.focus();
+      return;
+    }
+
+    const snapshotInput = el.snapshotInvestments.querySelector<HTMLInputElement>(
+      `input[data-snapshot-kind="investments"][data-snapshot-id="${CSS.escape(ui.wealthCalcTargetId)}"]`
+    );
+    if (!snapshotInput) {
+      showToast("No se pudo aplicar el resultado.");
+      closeWealthCalcModal();
+      return;
+    }
+
+    snapshotInput.value = String(round2(evaluated));
+    showToast("Resultado aplicado al snapshot.");
+    closeWealthCalcModal();
   }
 
   function saveSnapshotFromTable() {
@@ -1709,12 +1903,22 @@ import {
       .map(
         (item: any) => `
           <span class="tag">
-            ${escapeHtml(item)}
+            ${escapeHtml(decorateCategoryLabel(categoryKeyToType(key), item))}
             <button class="icon-btn" data-action="remove-category" data-target="${escapeAttr(key)}" data-name="${escapeAttr(item)}" aria-label="Eliminar categoría ${escapeAttr(item)}">×</button>
           </span>
         `
       )
       .join("");
+  }
+
+  function categoryKeyToType(key: CategoryKey): BudgetType {
+    if (key === "incomeCategories") {
+      return "income";
+    }
+    if (key === "expenseCategories") {
+      return "expense";
+    }
+    return "investment";
   }
 
   function renderDataTab() {

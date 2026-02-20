@@ -216,86 +216,123 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           </form>
         </dialog>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="tx-col-select">
-                  <input id="tx-select-all" name="txSelectAll" type="checkbox" aria-label="Seleccionar todas las filas visibles" />
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="date">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="date" aria-haspopup="true" aria-expanded="false">Fecha</button>
-                    <button type="button" class="tx-sort-btn" data-column="date" aria-label="Ordenar por fecha">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="date" hidden>
-                    <label for="tx-header-filter-date">Filtrar fecha</label>
-                    <input id="tx-header-filter-date" name="txHeaderFilterDate" type="date" autocomplete="off" />
-                    <button type="button" class="tx-header-clear-btn" data-column="date">Limpiar</button>
-                  </div>
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="account">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="account" aria-haspopup="true" aria-expanded="false">Cuenta</button>
-                    <button type="button" class="tx-sort-btn" data-column="account" aria-label="Ordenar por cuenta">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="account" hidden>
-                    <label>Cuenta</label>
-                    <div id="tx-header-filter-account" class="tx-checkbox-list" aria-label="Filtrar cuentas"></div>
-                    <button type="button" class="tx-header-clear-btn" data-column="account">Limpiar</button>
-                  </div>
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="type">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="type" aria-haspopup="true" aria-expanded="false">Tipo</button>
-                    <button type="button" class="tx-sort-btn" data-column="type" aria-label="Ordenar por tipo">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="type" hidden>
-                    <label>Tipo</label>
-                    <div id="tx-header-filter-type" class="tx-checkbox-list" aria-label="Filtrar tipos"></div>
-                    <button type="button" class="tx-header-clear-btn" data-column="type">Limpiar</button>
-                  </div>
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="category">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="category" aria-haspopup="true" aria-expanded="false">Categoría</button>
-                    <button type="button" class="tx-sort-btn" data-column="category" aria-label="Ordenar por categoría">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="category" hidden>
-                    <label for="tx-header-filter-category">Categoría</label>
-                    <input id="tx-header-filter-category" name="txHeaderFilterCategory" type="text" placeholder="Contiene..." autocomplete="off" />
-                    <button type="button" class="tx-header-clear-btn" data-column="category">Limpiar</button>
-                  </div>
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="description">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="description" aria-haspopup="true" aria-expanded="false">Descripción</button>
-                    <button type="button" class="tx-sort-btn" data-column="description" aria-label="Ordenar por descripción">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="description" hidden>
-                    <label for="tx-header-filter-description">Descripción</label>
-                    <input id="tx-header-filter-description" name="txHeaderFilterDescription" type="text" placeholder="Contiene..." autocomplete="off" />
-                    <button type="button" class="tx-header-clear-btn" data-column="description">Limpiar</button>
-                  </div>
-                </th>
-                <th class="tx-head tx-head--filterable" data-filter-column="amount">
-                  <div class="tx-head-main">
-                    <button type="button" class="tx-filter-trigger" data-column="amount" aria-haspopup="true" aria-expanded="false">Importe</button>
-                    <button type="button" class="tx-sort-btn" data-column="amount" aria-label="Ordenar por importe">↕</button>
-                  </div>
-                  <div class="tx-filter-popover" data-column="amount" hidden>
-                    <label for="tx-header-filter-amount-min">Importe mín</label>
-                    <input id="tx-header-filter-amount-min" name="txHeaderFilterAmountMin" type="number" min="0" step="0.01" autocomplete="off" />
-                    <label for="tx-header-filter-amount-max">Importe máx</label>
-                    <input id="tx-header-filter-amount-max" name="txHeaderFilterAmountMax" type="number" min="0" step="0.01" autocomplete="off" />
-                    <button type="button" class="tx-header-clear-btn" data-column="amount">Limpiar</button>
-                  </div>
-                </th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tx-table-body"></tbody>
-          </table>
+        <div class="tx-layout">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="tx-col-select">
+                    <input id="tx-select-all" name="txSelectAll" type="checkbox" aria-label="Seleccionar todas las filas visibles" />
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="date">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="date" aria-haspopup="true" aria-expanded="false">Fecha</button>
+                      <button type="button" class="tx-sort-btn" data-column="date" aria-label="Ordenar por fecha">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="date" hidden>
+                      <label for="tx-header-filter-date">Filtrar fecha</label>
+                      <input id="tx-header-filter-date" name="txHeaderFilterDate" type="date" autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="date">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="account">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="account" aria-haspopup="true" aria-expanded="false">Cuenta</button>
+                      <button type="button" class="tx-sort-btn" data-column="account" aria-label="Ordenar por cuenta">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="account" hidden>
+                      <label>Cuenta</label>
+                      <div id="tx-header-filter-account" class="tx-checkbox-list" aria-label="Filtrar cuentas"></div>
+                      <button type="button" class="tx-header-clear-btn" data-column="account">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="type">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="type" aria-haspopup="true" aria-expanded="false">Tipo</button>
+                      <button type="button" class="tx-sort-btn" data-column="type" aria-label="Ordenar por tipo">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="type" hidden>
+                      <label>Tipo</label>
+                      <div id="tx-header-filter-type" class="tx-checkbox-list" aria-label="Filtrar tipos"></div>
+                      <button type="button" class="tx-header-clear-btn" data-column="type">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="category">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="category" aria-haspopup="true" aria-expanded="false">Categoría</button>
+                      <button type="button" class="tx-sort-btn" data-column="category" aria-label="Ordenar por categoría">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="category" hidden>
+                      <label for="tx-header-filter-category">Categoría</label>
+                      <input id="tx-header-filter-category" name="txHeaderFilterCategory" type="text" placeholder="Contiene..." autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="category">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="description">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="description" aria-haspopup="true" aria-expanded="false">Descripción</button>
+                      <button type="button" class="tx-sort-btn" data-column="description" aria-label="Ordenar por descripción">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="description" hidden>
+                      <label for="tx-header-filter-description">Descripción</label>
+                      <input id="tx-header-filter-description" name="txHeaderFilterDescription" type="text" placeholder="Contiene..." autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="description">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="amount">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="amount" aria-haspopup="true" aria-expanded="false">Importe</button>
+                      <button type="button" class="tx-sort-btn" data-column="amount" aria-label="Ordenar por importe">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="amount" hidden>
+                      <label for="tx-header-filter-amount-min">Importe mín</label>
+                      <input id="tx-header-filter-amount-min" name="txHeaderFilterAmountMin" type="number" min="0" step="0.01" autocomplete="off" />
+                      <label for="tx-header-filter-amount-max">Importe máx</label>
+                      <input id="tx-header-filter-amount-max" name="txHeaderFilterAmountMax" type="number" min="0" step="0.01" autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="amount">Limpiar</button>
+                    </div>
+                  </th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tx-table-body"></tbody>
+            </table>
+          </div>
+
+          <aside class="tx-summary-side" aria-label="Resumen de movimientos">
+            <article class="tx-summary-card">
+              <table class="tx-summary-table tx-summary-table--totals">
+                <thead>
+                  <tr>
+                    <th colspan="3" class="tx-summary-title">TOTAL</th>
+                  </tr>
+                  <tr>
+                    <th class="tx-summary-heading tx-summary-heading--income">INGRESOS</th>
+                    <th class="tx-summary-heading tx-summary-heading--expense">GASTOS</th>
+                    <th class="tx-summary-heading tx-summary-heading--investment">INVERSIÓN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td id="tx-total-income" class="tx-summary-total-value">0 €</td>
+                    <td id="tx-total-expense" class="tx-summary-total-value">0 €</td>
+                    <td id="tx-total-investment" class="tx-summary-total-value">0 €</td>
+                  </tr>
+                </tbody>
+              </table>
+            </article>
+
+            <article class="tx-summary-card">
+              <table class="tx-summary-table tx-summary-table--breakdown">
+                <thead>
+                  <tr>
+                    <th class="tx-summary-title">DESGLOSE POR CATEGORÍAS</th>
+                  </tr>
+                </thead>
+                <tbody id="tx-category-breakdown-body"></tbody>
+              </table>
+            </article>
+          </aside>
         </div>
       </section>
 
@@ -434,6 +471,28 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             </div>
           </article>
         </div>
+
+        <dialog id="wealth-calc-dialog" class="wealth-calc-dialog">
+          <form id="wealth-calc-form" class="wealth-calc-form" method="dialog" autocomplete="off">
+            <div class="wealth-calc-head">
+              <h3 id="wealth-calc-title">Calcular snapshot</h3>
+              <button id="wealth-calc-close" type="button" class="tx-close-btn" aria-label="Cerrar cálculo">✕</button>
+            </div>
+            <label>
+              Cálculo numérico
+              <input
+                id="wealth-calc-expression"
+                name="wealthCalcExpression"
+                type="text"
+                placeholder="Ej: 1200+35,5*2"
+                autocomplete="off"
+              />
+            </label>
+            <div class="wealth-calc-actions">
+              <button id="wealth-calc-apply" type="submit" class="tx-btn-primary">Aplicar al snapshot</button>
+            </div>
+          </form>
+        </dialog>
       </section>
 
       <section id="investment" class="panel" aria-labelledby="investment-title">

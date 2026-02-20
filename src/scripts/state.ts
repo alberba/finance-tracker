@@ -13,6 +13,10 @@ import {
 import { clamp, monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from "./utils";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
+export const INDEXED_DB_NAME = "finance-tracker-db-v1";
+export const INDEXED_DB_VERSION = 1;
+export const INDEXED_DB_STORE = "state";
+export const INDEXED_DB_RECORD_KEY = "current";
 
 const FALLBACK_BASE_SEED = {
   meta: {
@@ -61,6 +65,35 @@ export function persistState(state: State): string {
   state.meta.savedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   return state.meta.savedAt;
+}
+
+export async function loadIndexedDbState(): Promise<unknown | null> {
+  if (!supportsIndexedDb()) {
+    return null;
+  }
+
+  try {
+    const db = await openIndexedDb();
+    const value = await readIndexedDbValue(db, INDEXED_DB_RECORD_KEY);
+    db.close();
+    return value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function persistIndexedDbState(state: State): Promise<void> {
+  if (!supportsIndexedDb()) {
+    return;
+  }
+
+  try {
+    const db = await openIndexedDb();
+    await writeIndexedDbValue(db, INDEXED_DB_RECORD_KEY, state);
+    db.close();
+  } catch {
+    // No-op: localStorage remains the primary persistence mechanism.
+  }
 }
 
 export function normalizeState(candidate: unknown): State {
@@ -258,5 +291,60 @@ function syncBudgetFromCategories(targetState: State): void {
         round2(parseFloatSafe(targetState.budget[type][category][idx], 0))
       );
     });
+  });
+}
+
+function supportsIndexedDb(): boolean {
+  return typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
+}
+
+function openIndexedDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(INDEXED_DB_NAME, INDEXED_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(INDEXED_DB_STORE)) {
+        db.createObjectStore(INDEXED_DB_STORE);
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      reject(request.error || new Error("IndexedDB open error"));
+    };
+  });
+}
+
+function readIndexedDbValue(db: IDBDatabase, key: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(INDEXED_DB_STORE, "readonly");
+    const store = tx.objectStore(INDEXED_DB_STORE);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      reject(request.error || new Error("IndexedDB read error"));
+    };
+  });
+}
+
+function writeIndexedDbValue(db: IDBDatabase, key: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(INDEXED_DB_STORE, "readwrite");
+    const store = tx.objectStore(INDEXED_DB_STORE);
+    const request = store.put(value, key);
+
+    request.onsuccess = () => {
+      resolve();
+    };
+    request.onerror = () => {
+      reject(request.error || new Error("IndexedDB write error"));
+    };
   });
 }
