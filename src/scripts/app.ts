@@ -276,6 +276,7 @@ import {
     importJson: getRequiredElement<HTMLInputElement>("import-json"),
     exportTransactionsCsv: getRequiredElement<HTMLButtonElement>("export-transactions-csv"),
     resetSeed: getRequiredElement<HTMLButtonElement>("reset-seed"),
+    chartTooltip: getRequiredElement<HTMLElement>("chart-tooltip"),
   } as const;
 
   init();
@@ -297,6 +298,7 @@ import {
     bindGoalEvents();
     bindSettingsEvents();
     bindDataEvents();
+    bindChartTooltipEvents();
   }
 
   function bindNavigationEvents() {
@@ -723,6 +725,49 @@ import {
     });
   }
 
+  function bindChartTooltipEvents() {
+    const hideTooltip = () => {
+      el.chartTooltip.classList.remove("is-visible");
+      el.chartTooltip.setAttribute("aria-hidden", "true");
+    };
+
+    const showTooltip = (message: string, x: number, y: number) => {
+      el.chartTooltip.textContent = message;
+      el.chartTooltip.classList.add("is-visible");
+      el.chartTooltip.setAttribute("aria-hidden", "false");
+
+      const offset = 14;
+      const maxLeft = window.innerWidth - el.chartTooltip.offsetWidth - 8;
+      const maxTop = window.innerHeight - el.chartTooltip.offsetHeight - 8;
+      const left = Math.min(Math.max(8, x + offset), Math.max(8, maxLeft));
+      const top = Math.min(Math.max(8, y + offset), Math.max(8, maxTop));
+      el.chartTooltip.style.left = `${left}px`;
+      el.chartTooltip.style.top = `${top}px`;
+    };
+
+    document.addEventListener("pointermove", (event) => {
+      const target = getEventElement(event.target);
+      const withTooltip = target?.closest<SVGElement>("[data-chart-tooltip]");
+      if (!withTooltip) {
+        const insideChart = target?.closest("svg");
+        if (insideChart) {
+          return;
+        }
+        hideTooltip();
+        return;
+      }
+      const message = withTooltip.getAttribute("data-chart-tooltip");
+      if (!message) {
+        hideTooltip();
+        return;
+      }
+      showTooltip(message, event.clientX, event.clientY);
+    });
+
+    document.addEventListener("pointerdown", hideTooltip);
+    window.addEventListener("blur", hideTooltip);
+  }
+
   function renderAll() {
     populateMonthSelects();
     populateTransactionFormOptions();
@@ -886,6 +931,9 @@ import {
     const monthTotals = getMonthTotals(month);
     const yearTotals = getYearTotals();
     const wealthSeries = getWealthSeries();
+    const latestDataMonth = getLatestDataMonth();
+    const chartMonths = MONTHS.slice(0, latestDataMonth + 1);
+    const dashboardWealthSeries = wealthSeries.slice(0, latestDataMonth + 1);
     const currentWealth = wealthSeries[month] || { liquidity: 0, investment: 0, liabilities: 0, net: 0 };
     const firstNet = wealthSeries[0] ? wealthSeries[0].net : 0;
     const growth = firstNet === 0 ? 0 : ((currentWealth.net - firstNet) / Math.abs(firstNet)) * 100;
@@ -899,21 +947,34 @@ import {
 
     renderLineChart(
       el.chartNetWorth,
-      wealthSeries.map((item: any) => item.net),
+      dashboardWealthSeries.map((item: any) => item.net),
       {
         color: "#0d8476",
         fill: "rgba(13, 132, 118, 0.12)",
-        labels: MONTHS,
+        labels: chartMonths,
         formatValue: formatMoney,
+        formatAxisValue: formatMoneyCompact,
+        includeZeroBaseline: false,
+        yPaddingRatio: 0.12,
       }
     );
 
     const cashflowSeries = getMonthlyCashflowSeries();
-    renderGroupedBarChart(el.chartCashflow, MONTHS, [
-      { name: "Ingresos", color: "#059669", values: cashflowSeries.income },
-      { name: "Gastos", color: "#ef4444", values: cashflowSeries.expense },
-      { name: "Inversión", color: "#2563eb", values: cashflowSeries.investment },
-    ]);
+    const dashboardCashflowSeries = {
+      income: cashflowSeries.income.slice(0, latestDataMonth + 1),
+      expense: cashflowSeries.expense.slice(0, latestDataMonth + 1),
+      investment: cashflowSeries.investment.slice(0, latestDataMonth + 1),
+    };
+    renderGroupedBarChart(
+      el.chartCashflow,
+      chartMonths,
+      [
+        { name: "Ingresos", color: "#059669", values: dashboardCashflowSeries.income },
+        { name: "Gastos", color: "#ef4444", values: dashboardCashflowSeries.expense },
+        { name: "Inversión", color: "#2563eb", values: dashboardCashflowSeries.investment },
+      ],
+      formatMoney
+    );
 
     renderDonutChart(
       el.chartDistribution,
@@ -1410,6 +1471,7 @@ import {
         fill: "rgba(37, 99, 235, 0.13)",
         labels: MONTHS,
         formatValue: formatMoney,
+        formatAxisValue: formatMoneyCompact,
       }
     );
 
@@ -1895,6 +1957,39 @@ import {
     return MONTHS.map((_: any, month: any) => getWealthByMonth(month));
   }
 
+  function getLatestDataMonth() {
+    let latest = -1;
+
+    state.transactions.forEach((item: any) => {
+      const month = Number(item.month);
+      if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
+        latest = Math.max(latest, month);
+      }
+    });
+
+    Object.keys(state.snapshots || {}).forEach((monthKey: any) => {
+      const month = Number(monthKey);
+      if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
+        latest = Math.max(latest, month);
+      }
+    });
+
+    state.contributions.forEach((entry: any) => {
+      const month = monthFromISO(entry.portfolioDate || entry.date);
+      if (month !== null) {
+        latest = Math.max(latest, month);
+      }
+    });
+
+    if (latest >= 0) {
+      return latest;
+    }
+    if (MONTHS[ui.month]) {
+      return ui.month;
+    }
+    return 0;
+  }
+
   function computeInvestedCapital(month: any) {
     const openingCapital = state.investmentAssets.reduce((sum: any, item: any) => sum + Number(item.openingBalance || 0), 0);
     const contributions = state.transactions
@@ -2219,6 +2314,20 @@ import {
       }).format(Number(value || 0));
     } catch (_) {
       return `${Number(value || 0).toFixed(2)} ${currency}`;
+    }
+  }
+
+  function formatMoneyCompact(value: any) {
+    const currency = (state.currency || "EUR").toUpperCase();
+    try {
+      return new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency,
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(Number(value || 0));
+    } catch (_) {
+      return formatMoney(value);
     }
   }
 })();

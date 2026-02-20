@@ -97,22 +97,26 @@ const canonicalUrl = new URL("/", Astro.url).toString();
         </div>
 
         <div class="chart-grid">
-          <article class="chart-card">
-            <h3>Evolución patrimonio neto</h3>
-            <svg id="chart-networth" viewBox="0 0 720 280" aria-label="Evolución de patrimonio"></svg>
-          </article>
-          <article class="chart-card">
-            <h3>Ingresos vs Gastos vs Inversión</h3>
-            <svg id="chart-cashflow" viewBox="0 0 720 280" aria-label="Flujo mensual"></svg>
-          </article>
-          <article class="chart-card">
-            <h3>Distribución actual</h3>
-            <svg id="chart-distribution" viewBox="0 0 420 260" aria-label="Distribución de patrimonio"></svg>
-          </article>
-          <article class="chart-card">
-            <h3>Top gastos del mes</h3>
-            <div id="top-expense-list" class="list-stack"></div>
-          </article>
+          <div class="chart-stack">
+            <article class="chart-card">
+              <h3>Evolución patrimonio neto</h3>
+              <svg id="chart-networth" viewBox="0 0 720 280" aria-label="Evolución de patrimonio"></svg>
+            </article>
+            <article class="chart-card">
+              <h3>Ingresos vs Gastos vs Inversión</h3>
+              <svg id="chart-cashflow" viewBox="0 0 720 280" aria-label="Flujo mensual"></svg>
+            </article>
+            <article class="chart-card">
+              <h3>Distribución actual</h3>
+              <svg id="chart-distribution" viewBox="0 0 420 260" aria-label="Distribución de patrimonio"></svg>
+            </article>
+          </div>
+          <aside class="chart-side">
+            <article class="chart-card top-expense-card">
+              <h3>Top gastos del mes</h3>
+              <div id="top-expense-list" class="list-stack"></div>
+            </article>
+          </aside>
         </div>
       </section>
 
@@ -682,5 +686,6 @@ const canonicalUrl = new URL("/", Astro.url).toString();
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="chart-tooltip" class="chart-tooltip" role="tooltip" aria-hidden="true"></div>
 </body>
 </html>

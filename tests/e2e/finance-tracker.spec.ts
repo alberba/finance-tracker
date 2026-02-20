@@ -19,6 +19,119 @@ test.describe("Finance tracker E2E", () => {
     expect(incomeText).toContain("€");
   });
 
+  test("dashboard apila los 3 graficos principales en columnas de ancho completo", async ({ page, tracker }) => {
+    await tracker.openDashboard();
+
+    const chartLayout = await page.evaluate(() => {
+      const ids = ["chart-networth", "chart-cashflow", "chart-distribution"] as const;
+      const cards = ids
+        .map((id) => document.getElementById(id)?.closest("article"))
+        .filter((element): element is HTMLElement => element instanceof HTMLElement)
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            x: Math.round(rect.x),
+            y: Math.round(rect.y),
+            width: Math.round(rect.width),
+          };
+        });
+
+      return cards;
+    });
+
+    expect(chartLayout).toHaveLength(3);
+    expect(Math.abs(chartLayout[0].x - chartLayout[1].x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(chartLayout[1].x - chartLayout[2].x)).toBeLessThanOrEqual(2);
+    expect(Math.abs(chartLayout[0].width - chartLayout[1].width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(chartLayout[1].width - chartLayout[2].width)).toBeLessThanOrEqual(2);
+    expect(chartLayout[1].y).toBeGreaterThan(chartLayout[0].y);
+    expect(chartLayout[2].y).toBeGreaterThan(chartLayout[1].y);
+  });
+
+  test("dashboard mantiene top gastos a la derecha del bloque de graficas en desktop", async ({ page, tracker }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile-chrome", "En móvil el panel lateral baja debajo de las gráficas.");
+    await tracker.openDashboard();
+
+    const positions = await page.evaluate(() => {
+      const chartStack = document.querySelector<HTMLElement>(".chart-stack");
+      const topExpenseCard = document.querySelector<HTMLElement>(".top-expense-card");
+      if (!chartStack || !topExpenseCard) {
+        return null;
+      }
+      const stackRect = chartStack.getBoundingClientRect();
+      const topRect = topExpenseCard.getBoundingClientRect();
+      return {
+        stackRight: Math.round(stackRect.right),
+        stackTop: Math.round(stackRect.top),
+        topLeft: Math.round(topRect.left),
+        topTop: Math.round(topRect.top),
+      };
+    });
+
+    expect(positions).not.toBeNull();
+    if (!positions) {
+      return;
+    }
+    expect(positions.topLeft).toBeGreaterThan(positions.stackRight - 4);
+    expect(Math.abs(positions.topTop - positions.stackTop)).toBeLessThanOrEqual(8);
+  });
+
+  test("dashboard recorta evolucion y cashflow hasta el ultimo mes con datos", async ({ page, tracker }) => {
+    await tracker.openDashboard();
+
+    const chartDetails = await page.evaluate(() => {
+      const networth = document.getElementById("chart-networth");
+      const cashflow = document.getElementById("chart-cashflow");
+      if (!networth || !cashflow) {
+        return null;
+      }
+
+      return {
+        linePointCount: networth.querySelectorAll("circle").length,
+        barCount: cashflow.querySelectorAll("rect[data-chart-tooltip]").length,
+      };
+    });
+
+    expect(chartDetails).not.toBeNull();
+    if (!chartDetails) {
+      return;
+    }
+    expect(chartDetails.linePointCount).toBe(2);
+    expect(chartDetails.barCount).toBe(6);
+  });
+
+  test("dashboard muestra tooltip funcional al hacer hover en cada grafica", async ({ page, tracker }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile-chrome", "Mobile emula interacción táctil y no tiene hover fiable.");
+    await tracker.openDashboard();
+
+    const tooltip = page.locator("#chart-tooltip");
+    await expect(tooltip).toBeHidden();
+
+    await page.locator("#chart-networth circle").first().hover();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText("€");
+
+    await page.locator("#chart-cashflow rect[data-chart-tooltip]").first().hover();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText("Ingresos");
+
+    await page.evaluate(() => {
+      const segment = document.querySelector("#chart-distribution path[data-chart-tooltip]");
+      if (!segment) {
+        return;
+      }
+      segment.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: 220,
+          clientY: 180,
+        })
+      );
+    });
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText("%");
+  });
+
   test("permite crear movimiento y persiste tras recarga", async ({ tracker }) => {
     await tracker.filterTransactionsMonth("FEBRERO");
     const beforeCount = await tracker.getTransactionRowCount();

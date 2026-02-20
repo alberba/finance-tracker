@@ -5,6 +5,10 @@ export interface LineChartOptions {
   fill: string;
   labels?: readonly string[];
   formatValue: ValueFormatter;
+  formatAxisValue?: ValueFormatter;
+  yScale?: "linear" | "log";
+  includeZeroBaseline?: boolean;
+  yPaddingRatio?: number;
 }
 
 export interface GroupedBarSeriesItem {
@@ -22,19 +26,73 @@ export interface DonutChartItem {
 export function renderLineChart(svg: SVGSVGElement, values: number[], options: LineChartOptions): void {
   const width = 720;
   const height = 280;
-  const padX = 44;
+  const padX = 64;
   const padY = 26;
   const labels = options.labels || [];
+  const formatAxisValue = options.formatAxisValue || options.formatValue;
+  const yScale = options.yScale || "linear";
+  const includeZeroBaseline = options.includeZeroBaseline ?? true;
+  const yPaddingRatio = options.yPaddingRatio ?? 0.08;
 
   const safeValues = values.map((v) => Number(v || 0));
-  const max = Math.max(...safeValues, 0);
-  const min = Math.min(...safeValues, 0);
-  const span = max - min || 1;
+  const rawMax = Math.max(...safeValues);
+  const rawMin = Math.min(...safeValues);
+  let domainMax = includeZeroBaseline ? Math.max(rawMax, 0) : rawMax;
+  let domainMin = includeZeroBaseline ? Math.min(rawMin, 0) : rawMin;
+
+  if (!Number.isFinite(domainMax)) {
+    domainMax = 0;
+  }
+  if (!Number.isFinite(domainMin)) {
+    domainMin = 0;
+  }
+  if (domainMax === domainMin) {
+    const delta = Math.max(Math.abs(domainMax) * 0.1, 1);
+    domainMax += delta;
+    domainMin -= delta;
+  }
+
+  if (yScale === "linear") {
+    const pad = (domainMax - domainMin) * yPaddingRatio;
+    domainMax += pad;
+    domainMin -= pad;
+    if (includeZeroBaseline) {
+      if (rawMin >= 0) {
+        domainMin = Math.min(domainMin, 0);
+      }
+      if (rawMax <= 0) {
+        domainMax = Math.max(domainMax, 0);
+      }
+    }
+  }
+
+  const logOffset = yScale === "log" && domainMin <= 0 ? -domainMin : 0;
+  const toScale = (value: number) => {
+    if (yScale !== "log") {
+      return value;
+    }
+    return Math.log10(value + logOffset + 1);
+  };
+  const fromScale = (value: number) => {
+    if (yScale !== "log") {
+      return value;
+    }
+    return Math.pow(10, value) - logOffset - 1;
+  };
+  let scaledMax = toScale(domainMax);
+  let scaledMin = toScale(domainMin);
+  if (yScale === "log") {
+    const scaledPad = (scaledMax - scaledMin || 1) * yPaddingRatio;
+    scaledMax += scaledPad;
+    scaledMin -= scaledPad;
+  }
+  const scaledSpan = scaledMax - scaledMin || 1;
 
   const stepX = (width - padX * 2) / Math.max(safeValues.length - 1, 1);
   const points = safeValues.map((value, idx) => {
     const x = padX + idx * stepX;
-    const y = height - padY - ((value - min) / span) * (height - padY * 2);
+    const scaledValue = toScale(value);
+    const y = height - padY - ((scaledValue - scaledMin) / scaledSpan) * (height - padY * 2);
     return { x, y };
   });
 
@@ -49,16 +107,25 @@ export function renderLineChart(svg: SVGSVGElement, values: number[], options: L
     .join("");
 
   const yTicks = Array.from({ length: 4 }, (_, i) => {
-    const value = max - (span / 3) * i;
+    const scaledValue = scaledMax - (scaledSpan / 3) * i;
+    const value = fromScale(scaledValue);
     const y = padY + ((height - padY * 2) / 3) * i;
     return `
       <line x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}" stroke="#edf3f0" />
-      <text x="8" y="${y + 4}" font-size="10" fill="#7b8b8d">${options.formatValue(value)}</text>
+      <text x="${padX - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#7b8b8d">${formatAxisValue(value)}</text>
     `;
   }).join("");
 
   const circles = points
-    .map((point) => `<circle cx="${point.x}" cy="${point.y}" r="4" fill="${options.color}" stroke="#fff" stroke-width="2"></circle>`)
+    .map((point, idx) => {
+      const label = labels[idx] || `Punto ${idx + 1}`;
+      const value = safeValues[idx] || 0;
+      return `
+        <circle cx="${point.x}" cy="${point.y}" r="4" fill="${options.color}" stroke="#fff" stroke-width="2" data-chart-tooltip="${escapeSvgText(`${label}: ${options.formatValue(value)}`)}">
+          <title>${escapeSvgText(label)}: ${escapeSvgText(options.formatValue(value))}</title>
+        </circle>
+      `;
+    })
     .join("");
 
   svg.innerHTML = `
@@ -70,7 +137,12 @@ export function renderLineChart(svg: SVGSVGElement, values: number[], options: L
   `;
 }
 
-export function renderGroupedBarChart(svg: SVGSVGElement, labels: readonly string[], series: GroupedBarSeriesItem[]): void {
+export function renderGroupedBarChart(
+  svg: SVGSVGElement,
+  labels: readonly string[],
+  series: GroupedBarSeriesItem[],
+  formatValue: ValueFormatter = (value) => String(Number(value || 0).toFixed(2))
+): void {
   const width = 720;
   const height = 280;
   const padX = 48;
@@ -90,7 +162,12 @@ export function renderGroupedBarChart(svg: SVGSVGElement, labels: readonly strin
           const h = maxValue <= 0 ? 0 : (value / maxValue) * chartHeight;
           const x = xBase + index * (barWidth + 2);
           const y = height - padY - h;
-          return `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="4" fill="${item.color}"></rect>`;
+          const monthLabel = labels[monthIndex] || `Mes ${monthIndex + 1}`;
+          return `
+            <rect x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="4" fill="${item.color}" data-chart-tooltip="${escapeSvgText(`${monthLabel} · ${item.name}: ${formatValue(value)}`)}">
+              <title>${escapeSvgText(monthLabel)} · ${escapeSvgText(item.name)}: ${escapeSvgText(formatValue(value))}</title>
+            </rect>
+          `;
         })
         .join("");
     })
@@ -143,7 +220,12 @@ export function renderDonutChart(svg: SVGSVGElement, data: DonutChartItem[], for
       const angleEnd = angleStart + angle;
       const path = donutArcPath(cx, cy, radius, radius - thickness, angleStart, angleEnd);
       angleStart = angleEnd;
-      return `<path d="${path}" fill="${item.color}"></path>`;
+      const pct = total > 0 ? (item.value / total) * 100 : 0;
+      return `
+        <path d="${path}" fill="${item.color}" data-chart-tooltip="${escapeSvgText(`${item.label}: ${formatValue(item.value)} (${pct.toFixed(1)}%)`)}">
+          <title>${escapeSvgText(item.label)}: ${escapeSvgText(formatValue(item.value))} (${pct.toFixed(1)}%)</title>
+        </path>
+      `;
     })
     .join("");
 
@@ -195,7 +277,9 @@ export function renderHorizontalBarChart(
       const color = palette[idx % palette.length];
       return `
         <text x="16" y="${y + 14}" font-size="11" fill="#566669">${escapeSvgText(item.label)}</text>
-        <rect x="210" y="${y + 2}" width="${barWidth}" height="14" rx="7" fill="${color}"></rect>
+        <rect x="210" y="${y + 2}" width="${barWidth}" height="14" rx="7" fill="${color}" data-chart-tooltip="${escapeSvgText(`${item.label}: ${formatValue(item.value)}`)}">
+          <title>${escapeSvgText(item.label)}: ${escapeSvgText(formatValue(item.value))}</title>
+        </rect>
         <text x="${210 + barWidth + 10}" y="${y + 14}" font-size="11" fill="#1a2e31">${formatValue(item.value)}</text>
       `;
     })
