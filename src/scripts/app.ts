@@ -55,8 +55,10 @@ import { evaluateNumericExpression } from "./math-expression";
 import {
   BASE_SEED,
   loadPersistedState,
+  loadServerState,
   normalizeState,
   persistState,
+  persistServerState,
   sortContributionsInState,
   sortTransactionsInState,
 } from "./state";
@@ -161,7 +163,7 @@ import {
     { value: "investment", label: "Inversión" },
   ] as const;
 
-  let state: State = normalizeState(loadPersistedState() || clone(BASE_SEED));
+  let state: State = normalizeState(clone(BASE_SEED));
   let toastTimer: number | undefined;
 
   const ui: UiState = {
@@ -295,14 +297,46 @@ import {
     chartTooltip: getRequiredElement<HTMLElement>("chart-tooltip"),
   } as const;
 
-  init();
+  void init();
 
-  function init() {
+  async function init() {
+    await hydrateState();
     ui.activeSection = getSectionFromPath(window.location.pathname);
     populateMonthSelects();
     bindEvents();
     renderAll();
     switchSection(ui.activeSection, { updateHistory: false });
+  }
+
+  async function hydrateState() {
+    const localState = loadPersistedState();
+    const serverState = await loadServerState();
+    const preferredState = pickMostRecentState(localState, serverState) || clone(BASE_SEED);
+    state = normalizeState(preferredState);
+    persistState(state);
+  }
+
+  function pickMostRecentState(localState: unknown, serverState: unknown): unknown | null {
+    if (!localState && !serverState) {
+      return null;
+    }
+    if (localState && !serverState) {
+      return localState;
+    }
+    if (!localState && serverState) {
+      return serverState;
+    }
+
+    const localSavedAt = extractStateTimestamp(localState);
+    const serverSavedAt = extractStateTimestamp(serverState);
+    return localSavedAt >= serverSavedAt ? localState : serverState;
+  }
+
+  function extractStateTimestamp(candidate: unknown): number {
+    const rawMeta = (candidate as { meta?: { savedAt?: string; generatedAt?: string } } | null)?.meta;
+    const timestamp = String(rawMeta?.savedAt || rawMeta?.generatedAt || "");
+    const value = Date.parse(timestamp);
+    return Number.isFinite(value) ? value : 0;
   }
 
   function bindEvents() {
@@ -2485,6 +2519,7 @@ import {
 
   function saveState() {
     persistState(state);
+    void persistServerState(state);
     const time = new Date(state.meta.savedAt || Date.now());
     const hh = String(time.getHours()).padStart(2, "0");
     const mm = String(time.getMinutes()).padStart(2, "0");

@@ -153,6 +153,45 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getTransactionRowCount()).toBe(afterCount);
   });
 
+  test("mantiene datos cuando localStorage se borra porque persiste en SQLite", async ({ page, tracker }) => {
+    await tracker.filterTransactionsMonth("FEBRERO");
+    const beforeCount = await tracker.getTransactionRowCount();
+
+    await tracker.addIncomeTransaction({
+      date: "2026-02-11",
+      monthLabel: "FEBRERO",
+      categoryLabel: "Nómina",
+      amount: 888.11,
+      description: "sqlite-persist-e2e",
+    });
+
+    await tracker.filterTransactionsMonth("FEBRERO");
+    const afterCreateCount = await tracker.getTransactionRowCount();
+    expect(afterCreateCount).toBe(beforeCount + 1);
+
+    await page.waitForFunction(async () => {
+      const namespace = String((window as any).__FINANCE_NAMESPACE__ || "");
+      const response = await fetch("/api/state", {
+        headers: namespace ? { "x-finance-namespace": namespace } : {},
+      });
+      if (!response.ok) {
+        return false;
+      }
+      const payload = await response.json();
+      const transactions = Array.isArray(payload?.state?.transactions) ? payload.state.transactions : [];
+      return transactions.some((item: any) => item?.description === "sqlite-persist-e2e");
+    });
+
+    await page.evaluate(() => {
+      window.localStorage.clear();
+    });
+
+    await tracker.reload();
+    await tracker.filterTransactionsMonth("FEBRERO");
+    await tracker.setTransactionDescriptionFilter("sqlite-persist-e2e");
+    await tracker.expectTransactionDescriptionVisible("sqlite-persist-e2e");
+  });
+
   test("permite editar presupuesto mensual y conservarlo", async ({ tracker }) => {
     await tracker.setBudgetValue({
       typeValue: "expense",

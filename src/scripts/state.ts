@@ -13,10 +13,7 @@ import {
 import { clamp, monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from "./utils";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
-export const INDEXED_DB_NAME = "finance-tracker-db-v1";
-export const INDEXED_DB_VERSION = 1;
-export const INDEXED_DB_STORE = "state";
-export const INDEXED_DB_RECORD_KEY = "current";
+export const SERVER_STATE_ENDPOINT = "/api/state";
 
 const FALLBACK_BASE_SEED = {
   meta: {
@@ -67,32 +64,36 @@ export function persistState(state: State): string {
   return state.meta.savedAt;
 }
 
-export async function loadIndexedDbState(): Promise<unknown | null> {
-  if (!supportsIndexedDb()) {
+export async function loadServerState(): Promise<unknown | null> {
+  if (typeof fetch !== "function") {
     return null;
   }
 
   try {
-    const db = await openIndexedDb();
-    const value = await readIndexedDbValue(db, INDEXED_DB_RECORD_KEY);
-    db.close();
-    return value ?? null;
+    const response = await fetch(SERVER_STATE_ENDPOINT, {
+      method: "GET",
+      headers: buildServerHeaders(false),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const data = await response.json();
+    return data?.state ?? null;
   } catch {
     return null;
   }
 }
 
-export async function persistIndexedDbState(state: State): Promise<void> {
-  if (!supportsIndexedDb()) {
-    return;
-  }
-
+export async function persistServerState(state: State): Promise<boolean> {
   try {
-    const db = await openIndexedDb();
-    await writeIndexedDbValue(db, INDEXED_DB_RECORD_KEY, state);
-    db.close();
+    const response = await fetch(SERVER_STATE_ENDPOINT, {
+      method: "PUT",
+      headers: buildServerHeaders(true),
+      body: JSON.stringify({ state }),
+    });
+    return response.ok;
   } catch {
-    // No-op: localStorage remains the primary persistence mechanism.
+    return false;
   }
 }
 
@@ -294,57 +295,33 @@ function syncBudgetFromCategories(targetState: State): void {
   });
 }
 
-function supportsIndexedDb(): boolean {
-  return typeof window !== "undefined" && typeof window.indexedDB !== "undefined";
+function buildServerHeaders(withJsonBody: boolean): HeadersInit {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+
+  if (withJsonBody) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const namespace = resolveRuntimeNamespace();
+  if (namespace) {
+    headers["x-finance-namespace"] = namespace;
+  }
+
+  return headers;
 }
 
-function openIndexedDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(INDEXED_DB_NAME, INDEXED_DB_VERSION);
+function resolveRuntimeNamespace(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
 
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(INDEXED_DB_STORE)) {
-        db.createObjectStore(INDEXED_DB_STORE);
-      }
-    };
+  const candidate = String((window as any).__FINANCE_NAMESPACE__ || "").trim().toLowerCase();
+  if (!candidate) {
+    return "";
+  }
 
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-
-    request.onerror = () => {
-      reject(request.error || new Error("IndexedDB open error"));
-    };
-  });
-}
-
-function readIndexedDbValue(db: IDBDatabase, key: string): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(INDEXED_DB_STORE, "readonly");
-    const store = tx.objectStore(INDEXED_DB_STORE);
-    const request = store.get(key);
-
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      reject(request.error || new Error("IndexedDB read error"));
-    };
-  });
-}
-
-function writeIndexedDbValue(db: IDBDatabase, key: string, value: unknown): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(INDEXED_DB_STORE, "readwrite");
-    const store = tx.objectStore(INDEXED_DB_STORE);
-    const request = store.put(value, key);
-
-    request.onsuccess = () => {
-      resolve();
-    };
-    request.onerror = () => {
-      reject(request.error || new Error("IndexedDB write error"));
-    };
-  });
+  const safe = candidate.replace(/[^a-z0-9_-]/g, "").slice(0, 64);
+  return safe;
 }
