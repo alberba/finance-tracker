@@ -1,0 +1,77 @@
+name: Issue Enrichment (Haiku)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  enrich:
+    if: >-
+      contains(github.event.issue.body, '@claude') &&
+      contains(join(github.event.issue.labels.*.name, ','), 'source:web-report')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build issue context file
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            fs.mkdirSync('.tmp', { recursive: true });
+            fs.writeFileSync('.tmp/issue.json', JSON.stringify(context.payload.issue, null, 2), 'utf-8');
+
+      - name: Generate repository context
+        run: node .github/scripts/issue-context.mjs --issue-file .tmp/issue.json --out .tmp/issue-context.md
+
+      - name: Load context output
+        id: context
+        run: |
+          {
+            echo 'markdown<<EOF'
+            cat .tmp/issue-context.md
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Enrich issue with Claude Haiku
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          model: ${{ vars.CLAUDE_HAIKU_MODEL || 'claude-3-5-haiku-latest' }}
+          prompt: |
+            Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.
+
+            Requisitos:
+            1) Reescribir el título para que sea técnico y concreto.
+            2) Reescribir el cuerpo incluyendo:
+               - problema
+               - hipótesis técnica
+               - alcance
+               - criterios de aceptación verificables
+            3) Añadir labels de clasificación:
+               - una de prioridad: priority:low | priority:med | priority:high
+               - al menos una de área: area:frontend | area:backend | area:infra | area:data
+            4) Mantener etiquetas existentes.
+
+            Contexto del repo e issue:
+            ```md
+            ${{ steps.context.outputs.markdown }}
+            ```
+
+      - name: Add enriched marker label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              labels: ['enriched:haiku']
+            });

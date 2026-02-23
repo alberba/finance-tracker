@@ -11,6 +11,10 @@ test.describe("Finance tracker E2E", () => {
     await page.goto("/presupuesto");
     await expect(page).toHaveURL(/\/presupuesto$/);
     await expect(tracker.budgetSection.getByRole("heading", { name: "Presupuesto" })).toBeVisible();
+
+    await tracker.openReports();
+    await expect(page).toHaveURL(/\/reportes$/);
+    await expect(tracker.reportsSection.getByRole("heading", { name: "Reportes y automatización" })).toBeVisible();
   });
 
   test("renderiza dashboard con KPIs", async ({ tracker }) => {
@@ -509,5 +513,82 @@ test.describe("Finance tracker E2E", () => {
 
     const isOpen = await dialog.evaluate((element) => (element as HTMLDialogElement).open);
     expect(isOpen).toBe(true);
+  });
+
+  test("datos crea issue de bug y muestra confirmación", async ({ page, tracker }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          issueNumber: 321,
+          issueUrl: "https://github.com/example/repo/issues/321",
+        }),
+      });
+    });
+
+    await tracker.submitIssueReport({
+      type: "bug",
+      summary: "Error guardando datos",
+      description: "Después de guardar no persiste el estado.",
+      stepsToReproduce: "1. Ir a datos\n2. Guardar\n3. Recargar",
+    });
+
+    await expect(tracker.issueReportStatus()).toContainText("Issue creada:");
+    await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
+      "href",
+      "https://github.com/example/repo/issues/321"
+    );
+  });
+
+  test("datos crea issue de mejora y muestra confirmación", async ({ page, tracker }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          issueNumber: 654,
+          issueUrl: "https://github.com/example/repo/issues/654",
+        }),
+      });
+    });
+
+    await tracker.submitIssueReport({
+      type: "enhancement",
+      summary: "Mejorar feedback visual",
+      description: "Quiero ver un estado más claro al crear reportes.",
+      mentionClaude: true,
+    });
+
+    await expect(tracker.issueReportStatus()).toContainText("#654");
+  });
+
+  test("datos valida campos obligatorios del reporte", async ({ tracker }) => {
+    await tracker.openReports();
+    const form = tracker.reportsSection.locator("#issue-report-form");
+    await form.locator("#issue-report-summary").fill("abc");
+    await form.locator("#issue-report-description").fill("corta");
+    await form.getByRole("button", { name: "Crear issue" }).click();
+    await expect(tracker.issueReportStatus()).toContainText("Revisa el formulario");
+  });
+
+  test("datos muestra error cuando falla la API de reporte", async ({ page, tracker }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, error: "GitHub no disponible" }),
+      });
+    });
+
+    await tracker.submitIssueReport({
+      type: "bug",
+      summary: "Error en endpoint",
+      description: "Prueba de manejo de error al crear issue.",
+    });
+
+    await expect(tracker.issueReportStatus()).toContainText("No se pudo crear la issue: GitHub no disponible");
   });
 });
