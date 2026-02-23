@@ -99,6 +99,46 @@ Estructura de tests:
 - `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
 - `playwright.config.ts`: configuración de E2E y `webServer`
 
+## Reporte automático y flujo `@claude`
+
+Este repo incluye flujo web -> issue -> enriquecimiento -> intento de fix:
+
+1. Desde la sección **Reportes** puedes enviar un reporte (`error` o `mejora`).
+2. El backend crea una issue en GitHub con labels base:
+   - `source:web-report`
+   - `status:triage`
+   - `type:bug` o `type:enhancement`
+3. Si el reporte lleva mención `@claude`, se activa:
+   - `.github/workflows/issue-enrich-claude.yml` (Haiku): enriquece la issue.
+   - `.github/workflows/issue-fix-claude.yml` (Sonnet): intenta resolver y abrir PR.
+
+### Variables y secrets requeridos
+
+En Cloudflare runtime (`locals.runtime.env`):
+
+- `GITHUB_ISSUE_TOKEN`
+- `GITHUB_OWNER`
+- `GITHUB_REPO`
+
+En GitHub Actions:
+
+- `ANTHROPIC_API_KEY`
+- `GITHUB_ISSUE_TOKEN` (opcional si no quieres usar `GITHUB_TOKEN` para PR)
+
+Opcional (GitHub Variables):
+
+- `CLAUDE_HAIKU_MODEL`
+- `CLAUDE_SONNET_MODEL`
+
+### Labels recomendadas en GitHub
+
+- `source:web-report`, `status:triage`
+- `type:bug`, `type:enhancement`
+- `priority:low`, `priority:med`, `priority:high`
+- `area:frontend`, `area:backend`, `area:infra`, `area:data`
+- `enriched:haiku`
+- `autofix-attempted`, `autofix-opened-pr`, `autofix-nochange`, `autofix-failed`, `autofix:skip`
+
 ## Regenerar datos semilla desde Excel
 
 ```bash
