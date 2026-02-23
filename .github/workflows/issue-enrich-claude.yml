@@ -31,13 +31,12 @@ jobs:
 
       - name: Load context output
         id: context
-        run: |
-          delimiter="CTX_EOF_${RANDOM}_${RANDOM}"
-          {
-            echo "markdown<<${delimiter}"
-            cat .tmp/issue-context.md
-            echo "${delimiter}"
-          } >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const markdown = fs.readFileSync('.tmp/issue-context.md', 'utf-8');
+            core.setOutput('markdown', markdown);
 
       - name: Enrich issue with Claude Haiku
         uses: anthropics/claude-code-action@beta
