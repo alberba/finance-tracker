@@ -11,7 +11,6 @@ permissions:
 jobs:
   enrich:
     if: >-
-      contains(github.event.issue.body, '@claude') &&
       contains(join(github.event.issue.labels.*.name, ','), 'source:web-report')
     runs-on: ubuntu-latest
     steps:
