@@ -21,6 +21,17 @@ function requiredEnv(name: keyof RuntimeEnv, env: RuntimeEnv): string {
   return value;
 }
 
+function requiredAnyEnv(names: ReadonlyArray<keyof RuntimeEnv>, env: RuntimeEnv): string {
+  for (const name of names) {
+    const value = String(env[name] || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  throw new Error(`Falta variable de entorno requerida: ${names.join(" o ")}`);
+}
+
 function buildIssueBody(payload: IssueReportPayload): string {
   const baseLines = [
     "## Reporte desde la web",
@@ -82,9 +93,9 @@ async function requestWithRetry(
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   env: RuntimeEnv,
-  client: GithubIssueClient = { fetch }
+  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) }
 ): Promise<CreatedIssue> {
-  const token = requiredEnv("GITHUB_ISSUE_TOKEN", env);
+  const token = requiredAnyEnv(["GITHUB_ISSUE_TOKEN", "GITHUB_TOKEN"], env);
   const owner = requiredEnv("GITHUB_OWNER", env);
   const repo = requiredEnv("GITHUB_REPO", env);
   const title = payload.summary.slice(0, 140);

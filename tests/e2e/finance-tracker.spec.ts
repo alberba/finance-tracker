@@ -565,13 +565,13 @@ test.describe("Finance tracker E2E", () => {
     await expect(tracker.issueReportStatus()).toContainText("#654");
   });
 
-  test("datos valida campos obligatorios del reporte", async ({ tracker }) => {
+  test("datos muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({ tracker }) => {
     await tracker.openReports();
     const form = tracker.reportsSection.locator("#issue-report-form");
     await form.locator("#issue-report-summary").fill("abc");
     await form.locator("#issue-report-description").fill("corta");
     await form.getByRole("button", { name: "Crear issue" }).click();
-    await expect(tracker.issueReportStatus()).toContainText("Revisa el formulario");
+    await expect(tracker.issueReportStatus()).toContainText("el resumen debe tener al menos 5 caracteres");
   });
 
   test("datos muestra error cuando falla la API de reporte", async ({ page, tracker }) => {

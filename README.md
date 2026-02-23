@@ -116,7 +116,7 @@ Este repo incluye flujo web -> issue -> enriquecimiento -> intento de fix:
 
 En Cloudflare runtime (`locals.runtime.env`):
 
-- `GITHUB_ISSUE_TOKEN`
+- `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
 

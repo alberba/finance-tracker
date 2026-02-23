@@ -43,6 +43,19 @@ function normalizeText(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
+function getValidationError(summary: string, description: string): string | null {
+  if (!summary || !description) {
+    return "Revisa el formulario: resumen y descripción son obligatorios.";
+  }
+  if (summary.length < 5) {
+    return "Revisa el formulario: el resumen debe tener al menos 5 caracteres.";
+  }
+  if (description.length < 12) {
+    return "Revisa el formulario: la descripción debe tener al menos 12 caracteres.";
+  }
+  return null;
+}
+
 async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
   const response = await fetch("/api/issues/report", {
     method: "POST",
@@ -74,8 +87,9 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
     const formData = new FormData(form);
     const summary = normalizeText(String(formData.get("summary") || ""));
     const description = normalizeText(String(formData.get("description") || ""));
-    if (summary.length < 5 || description.length < 12) {
-      status.textContent = "Revisa el formulario: resumen y descripción son obligatorios.";
+    const validationError = getValidationError(summary, description);
+    if (validationError) {
+      status.textContent = validationError;
       return;
     }
 
