@@ -153,7 +153,7 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getTransactionRowCount()).toBe(afterCount);
   });
 
-  test("mantiene datos cuando localStorage se borra porque persiste en SQLite", async ({ page, tracker }) => {
+  test("mantiene datos cuando localStorage se borra porque persiste en servidor", async ({ page, tracker }) => {
     await tracker.filterTransactionsMonth("FEBRERO");
     const beforeCount = await tracker.getTransactionRowCount();
 
@@ -177,7 +177,7 @@ test.describe("Finance tracker E2E", () => {
       if (!response.ok) {
         return false;
       }
-      const payload = await response.json();
+      const payload = (await response.json()) as { state?: { transactions?: unknown[] } };
       const transactions = Array.isArray(payload?.state?.transactions) ? payload.state.transactions : [];
       return transactions.some((item: any) => item?.description === "sqlite-persist-e2e");
     });

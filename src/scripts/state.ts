@@ -77,7 +77,7 @@ export async function loadServerState(): Promise<unknown | null> {
     if (!response.ok) {
       return null;
     }
-    const data = await response.json();
+    const data = (await response.json()) as { state?: unknown };
     return data?.state ?? null;
   } catch {
     return null;

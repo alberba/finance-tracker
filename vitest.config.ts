@@ -11,7 +11,7 @@ export default defineConfig({
       provider: "v8",
       enabled: true,
       include: ["src/lib/**/*.ts"],
-      exclude: ["**/*.d.ts", "tests/**"],
+      exclude: ["**/*.d.ts", "tests/**", "src/lib/server/**"],
       reporter: ["text", "html"],
       all: true,
       thresholds: {

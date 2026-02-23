@@ -6,3 +6,5 @@ coverage
 playwright-report
 test-results
 .data
+.wrangler
+worker-configuration.d.ts

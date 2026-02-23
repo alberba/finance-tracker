@@ -5,3 +5,8 @@
 .progress-fill {
   transition: none !important;
 }
+
+#save-status,
+#data-meta {
+  visibility: hidden !important;
+}

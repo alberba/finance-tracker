@@ -4,5 +4,5 @@
     "baseUrl": ".",
     "types": ["node"]
   },
-  "exclude": ["dist", "coverage", "playwright-report", "test-results", "node_modules"]
+  "exclude": ["dist", "coverage", "playwright-report", "test-results", "node_modules", "worker-configuration.d.ts"]
 }

@@ -1,0 +1,9 @@
+name = "finance-tracker"
+compatibility_date = "2026-02-23"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "finance_tracker_db"
+database_name = "finance-tracker-db"
+database_id = "cfcc8de2-9fb4-46b1-81cf-0f32319fd9b1"
+migrations_dir = "migrations"

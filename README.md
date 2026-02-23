@@ -12,7 +12,7 @@ Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
 - Objetivos con barra de progreso y ritmo mensual necesario
 - Configuración editable de cuentas, activos y categorías
 - Exportación/importación JSON + exportación CSV de movimientos
-- Persistencia local en `localStorage`
+- Persistencia local en `localStorage` + backend (`/api/state`) para mantener datos entre sesiones/dispositivos
 
 ## Estructura principal
 
@@ -32,6 +32,41 @@ pnpm dev
 ```
 
 Luego abre `http://localhost:4321`.
+
+## Deploy en Cloudflare Pages + D1
+
+### 1) Configuración D1
+
+Este repo ya incluye:
+
+- `wrangler.toml` con binding `finance_tracker_db`
+- `migrations/0001_create_app_state.sql`
+- `migrations/0002_import_seeded_state.sql` (import de namespaces persistentes)
+
+Aplicar migraciones:
+
+```bash
+pnpm d1:migrate:local
+pnpm d1:migrate:remote
+```
+
+Si cambias `wrangler.toml`, regenera tipos:
+
+```bash
+pnpm cf:types
+```
+
+### 2) Build/Deploy en Pages
+
+- Build command: `pnpm build`
+- Output directory: `dist`
+- Binding D1 en Pages: `finance_tracker_db` (mismo nombre que `wrangler.toml`)
+
+### 3) Proteger acceso con Cloudflare Access
+
+- Crear app Access tipo **Self-hosted** sobre tu dominio de producción (`*.pages.dev` o custom).
+- Política `Allow` solo para tu email (OTP por email).
+- Sin reglas `Allow` adicionales (deny implícito al resto).
 
 ## Validación
 
