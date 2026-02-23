@@ -77,4 +77,43 @@ describe("github issues service", () => {
       )
     ).rejects.toThrowError(/GitHub API devolvió 403/);
   });
+
+  it("usa GITHUB_TOKEN cuando GITHUB_ISSUE_TOKEN no está definido", async () => {
+    const fakeFetch = vi.fn(async () =>
+      new Response(JSON.stringify({ number: 5, html_url: "https://github.com/org/repo/issues/5" }), {
+        status: 201,
+      })
+    );
+
+    await createIssueFromWebReport(
+      payload,
+      {
+        GITHUB_TOKEN: "fallback-token",
+        GITHUB_OWNER: "org",
+        GITHUB_REPO: "repo",
+      },
+      { fetch: fakeFetch as unknown as typeof fetch }
+    );
+
+    const [, init] = fakeFetch.mock.calls[0];
+    expect(init?.headers).toMatchObject({
+      Authorization: "Bearer fallback-token",
+    });
+  });
+
+  it("lanza error si no hay ningún token configurado", async () => {
+    const fakeFetch = vi.fn();
+
+    await expect(
+      createIssueFromWebReport(
+        payload,
+        {
+          GITHUB_OWNER: "org",
+          GITHUB_REPO: "repo",
+        },
+        { fetch: fakeFetch as unknown as typeof fetch }
+      )
+    ).rejects.toThrowError(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
 });

@@ -3,6 +3,7 @@ import type { D1DatabaseLike } from "./d1-state";
 export interface RuntimeEnv {
   finance_tracker_db?: D1DatabaseLike;
   GITHUB_ISSUE_TOKEN?: string;
+  GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
 }
