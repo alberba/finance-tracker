@@ -1098,11 +1098,11 @@ import {
               <input type="checkbox" name="txSelectedIds" data-select-tx-id="${escapeAttr(item.id)}" ${ui.txSelectedIds.includes(item.id) ? "checked" : ""} aria-label="Seleccionar movimiento del ${escapeAttr(String(item.date))}" />
             </td>
             <td>${escapeHtml(String(item.date))}</td>
+            <td>${escapeHtml(item.description || "-")}</td>
+            <td>${formatMoney(item.amount)}</td>
             <td>${escapeHtml(account)}</td>
             <td><span class="badge ${typeClass}">${typeLabel}</span></td>
             <td>${escapeHtml(decorateCategoryLabel(item.type, item.category || "Sin categoría"))}</td>
-            <td>${escapeHtml(item.description || "-")}</td>
-            <td>${formatMoney(item.amount)}</td>
             <td>
               <div class="inline-actions">
                 <button class="edit-btn icon-action-btn" data-action="edit-tx" data-id="${escapeAttr(item.id)}" aria-label="Editar movimiento del ${escapeAttr(String(item.date))}">
@@ -1363,11 +1363,11 @@ import {
       <tr data-editing-id="${escapeAttr(item.id)}">
         <td></td>
         <td><input type="date" name="editTxDate" autocomplete="off" data-edit-field="date" value="${escapeAttr(String(item.date))}" /></td>
+        <td><input type="text" name="editTxDescription" autocomplete="off" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
+        <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
         <td><select name="editTxAccountId" data-edit-field="accountId">${accountsOptions}</select></td>
         <td><select name="editTxType" data-edit-field="type">${typeOptions}</select></td>
         <td><input type="text" name="editTxCategory" autocomplete="off" data-edit-field="category" value="${escapeAttr(item.category || "")}" /></td>
-        <td><input type="text" name="editTxDescription" autocomplete="off" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
-        <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
         <td>
           <div class="inline-actions">
             <button
