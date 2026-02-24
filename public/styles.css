@@ -307,6 +307,12 @@ button {
   align-items: start;
 }
 
+.chart-grid-inv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .chart-stack {
   display: grid;
   grid-template-columns: 1fr;
