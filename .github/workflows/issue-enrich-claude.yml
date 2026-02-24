@@ -42,7 +42,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          mode: agent
+          mode: tag
           model: claude-haiku-4-5
           direct_prompt: |
             Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.

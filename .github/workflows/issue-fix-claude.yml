@@ -56,7 +56,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          mode: agent
+          mode: tag
           model: ${{ vars.CLAUDE_SONNET_MODEL || 'claude-3-7-sonnet-latest' }}
           direct_prompt: |
             Resuelve la issue #${{ github.event.issue.number }} con cambios pequeños y seguros.
