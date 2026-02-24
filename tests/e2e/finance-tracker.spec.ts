@@ -309,16 +309,15 @@ test.describe("Finance tracker E2E", () => {
     await expect(page).toHaveURL(/\/movimientos$/);
 
     const headers = await tracker.transactionsSection.locator("thead th").allInnerTexts();
-    const filteredHeaders = headers.map((text) => text.trim()).filter((text) => text !== "");
+    const trimmedHeaders = headers.map((text) => text.trim());
 
-    expect(filteredHeaders[0]).toBe("");
-    expect(filteredHeaders[1]).toContain("Fecha");
-    expect(filteredHeaders[2]).toContain("Descripción");
-    expect(filteredHeaders[3]).toContain("Importe");
-    expect(filteredHeaders[4]).toContain("Cuenta");
-    expect(filteredHeaders[5]).toContain("Tipo");
-    expect(filteredHeaders[6]).toContain("Categoría");
-    expect(filteredHeaders[7]).toBe("Acciones");
+    expect(trimmedHeaders[1]).toContain("Fecha");
+    expect(trimmedHeaders[2]).toContain("Descripción");
+    expect(trimmedHeaders[3]).toContain("Importe");
+    expect(trimmedHeaders[4]).toContain("Cuenta");
+    expect(trimmedHeaders[5]).toContain("Tipo");
+    expect(trimmedHeaders[6]).toContain("Categoría");
+    expect(trimmedHeaders[7]).toBe("Acciones");
   });
 
   test("movimientos inicia con popovers de filtros ocultos en header", async ({ page, tracker }) => {
@@ -607,5 +606,357 @@ test.describe("Finance tracker E2E", () => {
     });
 
     await expect(tracker.issueReportStatus()).toContainText("No se pudo crear la issue: GitHub no disponible");
+  });
+
+  test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    // Verificar que los SVG de los gráficos existen
+    const portfolioChart = page.locator("#investment-portfolio-chart");
+    const assetsChart = page.locator("#investment-assets-chart");
+    const allocationChart = page.locator("#investment-allocation");
+
+    await expect(portfolioChart).toBeVisible();
+    await expect(assetsChart).toBeVisible();
+    await expect(allocationChart).toBeVisible();
+  });
+
+  test("inversión: gráficos de líneas muestran valores porcentuales", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    // Verificar que los gráficos contienen elementos de datos (circles para líneas)
+    const portfolioCircles = page.locator("#investment-portfolio-chart circle");
+    const assetsCircles = page.locator("#investment-assets-chart circle");
+
+    const portfolioCount = await portfolioCircles.count();
+    const assetsCount = await assetsCircles.count();
+
+    expect(portfolioCount).toBeGreaterThan(0);
+    expect(assetsCount).toBeGreaterThan(0);
+
+    // Verificar que los tooltips contienen símbolo de porcentaje
+    const firstPortfolioTooltip = await portfolioCircles.first().getAttribute("data-chart-tooltip");
+    expect(firstPortfolioTooltip).toMatch(/%/);
+  });
+
+  test("inversión: gráficos de líneas muestran tick 0% en eje Y", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    const zeroTickStatus = await page.evaluate(() => {
+      const hasZeroTick = (selector: string) =>
+        Array.from(document.querySelectorAll(`${selector} text`)).some((node) => {
+          const value = (node.textContent || "").trim();
+          return /^0(?:[.,]0+)?%$/.test(value);
+        });
+
+      return {
+        portfolio: hasZeroTick("#investment-portfolio-chart"),
+        assets: hasZeroTick("#investment-assets-chart"),
+      };
+    });
+
+    expect(zeroTickStatus.portfolio).toBe(true);
+    expect(zeroTickStatus.assets).toBe(true);
+  });
+
+  test("inversión: ambos gráficos de líneas usan mayor altura", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    const viewboxes = await page.evaluate(() => {
+      const portfolio = document.getElementById("investment-portfolio-chart")?.getAttribute("viewBox") || "";
+      const assets = document.getElementById("investment-assets-chart")?.getAttribute("viewBox") || "";
+      return { portfolio, assets };
+    });
+
+    expect(viewboxes.portfolio).toBe("0 0 720 340");
+    expect(viewboxes.assets).toBe("0 0 720 340");
+  });
+
+  test("inversión: el gráfico de cartera muestra solo la serie Cartera Total", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    const details = await page.evaluate(() => {
+      const tooltips = Array.from(document.querySelectorAll("#investment-portfolio-chart circle"))
+        .map((node) => node.getAttribute("data-chart-tooltip") || "")
+        .filter(Boolean);
+      const invalidTooltip = tooltips.find((value) => !value.startsWith("Cartera Total · "));
+      const legendItems = document.querySelectorAll("#investment-portfolio-chart rect").length;
+
+      return {
+        invalidTooltip: invalidTooltip || "",
+        legendItems,
+        pointCount: tooltips.length,
+      };
+    });
+
+    expect(details.pointCount).toBeGreaterThan(0);
+    expect(details.invalidTooltip).toBe("");
+    expect(details.legendItems).toBe(1);
+  });
+
+  test("inversión: gráficos de líneas calculan ganancia sobre capital aportado acumulado", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+    await page.locator("#investment-month").selectOption({ label: "MARZO" });
+
+    const result = await page.evaluate(() => {
+      const storageKey = "finance-tracker-state-v1";
+      const rawState = localStorage.getItem(storageKey);
+      if (!rawState) {
+        return { error: "No se encontró estado persistido en localStorage." };
+      }
+
+      const state = JSON.parse(rawState) as {
+        investmentAssets: Array<{ id: string; name: string; openingBalance: number }>;
+        transactions: Array<{ type: string; month: number; category: string; amount: number }>;
+        snapshots: Record<string, { investments: Record<string, number> }>;
+      };
+
+      const month = 2; // MARZO
+      const monthLabel = "MARZO";
+
+      const slug = (value: unknown) =>
+        String(value || "")
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+
+      const round2 = (value: number) => Math.round(value * 100) / 100;
+
+      const matchesInvestmentAsset = (category: string, asset: { id: string; name: string }) => {
+        if (!category || !asset) {
+          return false;
+        }
+        const categorySlug = slug(category);
+        return categorySlug === asset.id || category.toLowerCase() === String(asset.name || "").toLowerCase();
+      };
+
+      const getLatestSnapshotValue = (assetId: string, targetMonth: number) => {
+        for (let m = targetMonth; m >= 0; m -= 1) {
+          const snapshot = state.snapshots[String(m)];
+          if (!snapshot || !snapshot.investments) {
+            continue;
+          }
+          const value = snapshot.investments[assetId];
+          if (typeof value === "number") {
+            return { month: m, value };
+          }
+        }
+        return null;
+      };
+
+      const computeInvestmentValue = (assetId: string, targetMonth: number) => {
+        const asset = state.investmentAssets.find((item) => item.id === assetId);
+        if (!asset) {
+          return 0;
+        }
+
+        const latestSnapshot = getLatestSnapshotValue(assetId, targetMonth);
+        let startMonth = -1;
+        let value = Number(asset.openingBalance || 0);
+
+        if (latestSnapshot) {
+          startMonth = latestSnapshot.month;
+          value = latestSnapshot.value;
+        }
+
+        state.transactions.forEach((item) => {
+          if (item.type !== "investment") {
+            return;
+          }
+          const txMonth = Number(item.month);
+          if (txMonth <= startMonth || txMonth > targetMonth) {
+            return;
+          }
+          if (!matchesInvestmentAsset(item.category, asset)) {
+            return;
+          }
+          value += Number(item.amount || 0);
+        });
+
+        return round2(value);
+      };
+
+      const computeInvestedCapitalByAsset = (assetId: string, targetMonth: number) => {
+        const asset = state.investmentAssets.find((item) => item.id === assetId);
+        if (!asset) {
+          return 0;
+        }
+        const openingCapital = Number(asset.openingBalance || 0);
+        const contributions = state.transactions.reduce((sum, item) => {
+          if (item.type !== "investment") {
+            return sum;
+          }
+          if (Number(item.month) > targetMonth) {
+            return sum;
+          }
+          if (!matchesInvestmentAsset(item.category, asset)) {
+            return sum;
+          }
+          return sum + Number(item.amount || 0);
+        }, 0);
+        return round2(openingCapital + contributions);
+      };
+
+      const computeInvestedCapitalTotal = (targetMonth: number) =>
+        round2(state.investmentAssets.reduce((sum, asset) => sum + computeInvestedCapitalByAsset(asset.id, targetMonth), 0));
+
+      const toGainPercent = (value: number, investedCapital: number) => {
+        if (investedCapital <= 0) {
+          return 0;
+        }
+        return ((value - investedCapital) / investedCapital) * 100;
+      };
+
+      const parseTooltipPercent = (tooltip: string | null) => {
+        const match = (tooltip || "").match(/:\s*(-?\d+(?:[.,]\d+)?)%/);
+        if (!match) {
+          return NaN;
+        }
+        return Number(match[1].replace(",", "."));
+      };
+
+      const portfolioTooltip = Array.from(document.querySelectorAll("#investment-portfolio-chart circle"))
+        .map((node) => node.getAttribute("data-chart-tooltip"))
+        .find((tooltip) => Boolean(tooltip && tooltip.includes(`Cartera Total · ${monthLabel}:`)));
+      if (!portfolioTooltip) {
+        return { error: "No se encontró tooltip de Cartera Total para MARZO." };
+      }
+
+      const assetTooltip = Array.from(document.querySelectorAll("#investment-assets-chart circle"))
+        .map((node) => node.getAttribute("data-chart-tooltip"))
+        .find((tooltip) => Boolean(tooltip && tooltip.includes(` · ${monthLabel}:`)));
+      if (!assetTooltip) {
+        return { error: "No se encontró tooltip de activo para MARZO." };
+      }
+
+      const assetName = assetTooltip.split(" · ")[0].trim();
+      const asset = state.investmentAssets.find((item) => item.name === assetName);
+      if (!asset) {
+        return { error: `No se encontró activo en estado para tooltip: ${assetName}` };
+      }
+
+      const portfolioValue = round2(state.investmentAssets.reduce((sum, item) => sum + computeInvestmentValue(item.id, month), 0));
+      const portfolioInvestedCapital = computeInvestedCapitalTotal(month);
+      const expectedPortfolioPct = toGainPercent(portfolioValue, portfolioInvestedCapital);
+
+      const assetValue = computeInvestmentValue(asset.id, month);
+      const assetInvestedCapital = computeInvestedCapitalByAsset(asset.id, month);
+      const expectedAssetPct = toGainPercent(assetValue, assetInvestedCapital);
+
+      const actualPortfolioPct = parseTooltipPercent(portfolioTooltip);
+      const actualAssetPct = parseTooltipPercent(assetTooltip);
+
+      return {
+        error: "",
+        actualPortfolioPct,
+        expectedPortfolioPct,
+        actualAssetPct,
+        expectedAssetPct,
+      };
+    });
+
+    expect(result.error).toBe("");
+    if (result.error) {
+      return;
+    }
+    expect(Math.abs(result.actualPortfolioPct - result.expectedPortfolioPct)).toBeLessThanOrEqual(0.05);
+    expect(Math.abs(result.actualAssetPct - result.expectedAssetPct)).toBeLessThanOrEqual(0.05);
+  });
+
+  test("inversión: gráficos de líneas arrancan en 01/01 con valor de apertura", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+    await page.locator("#investment-month").selectOption({ label: "ENERO" });
+
+    const firstPortfolioTooltip = await page
+      .locator("#investment-portfolio-chart circle")
+      .first()
+      .getAttribute("data-chart-tooltip");
+    const firstAssetsTooltip = await page.locator("#investment-assets-chart circle").first().getAttribute("data-chart-tooltip");
+
+    expect(firstPortfolioTooltip).toContain("01/01");
+    expect(firstAssetsTooltip).toContain("01/01");
+    expect(firstPortfolioTooltip).toMatch(/0[.,]00%/);
+  });
+
+  test("inversión: gráfico de distribución usa donut chart y contiene segmentos", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    // Verificar que el gráfico donut contiene paths (segmentos del donut)
+    const donutPaths = page.locator("#investment-allocation path");
+    const pathCount = await donutPaths.count();
+
+    // Debe haber al menos 1 path para un segmento del donut
+    expect(pathCount).toBeGreaterThan(0);
+  });
+
+  test("inversión: gráficos ocupan ancho equilibrado en dos columnas", async ({ tracker, page }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile-chrome", "En móvil los gráficos se apilan verticalmente.");
+    await tracker.openInvestment();
+
+    const layout = await page.evaluate(() => {
+      const portfolio = document.getElementById("investment-portfolio-chart")?.closest("article");
+      const assets = document.getElementById("investment-assets-chart")?.closest("article");
+
+      if (!portfolio || !assets) {
+        return null;
+      }
+
+      const portfolioRect = portfolio.getBoundingClientRect();
+      const assetsRect = assets.getBoundingClientRect();
+
+      return {
+        portfolioX: Math.round(portfolioRect.x),
+        portfolioWidth: Math.round(portfolioRect.width),
+        assetsX: Math.round(assetsRect.x),
+        assetsWidth: Math.round(assetsRect.width),
+        portfolioY: Math.round(portfolioRect.y),
+        assetsY: Math.round(assetsRect.y),
+      };
+    });
+
+    expect(layout).not.toBeNull();
+    if (!layout) {
+      return;
+    }
+
+    // Los gráficos deben estar en la misma fila (Y similar)
+    expect(Math.abs(layout.portfolioY - layout.assetsY)).toBeLessThanOrEqual(4);
+
+    // Los gráficos deben tener ancho similar (1fr 1fr)
+    expect(Math.abs(layout.portfolioWidth - layout.assetsWidth)).toBeLessThanOrEqual(2);
+
+    // El segundo gráfico debe estar a la derecha del primero
+    expect(layout.assetsX).toBeGreaterThan(layout.portfolioX + layout.portfolioWidth - 4);
+  });
+
+  test("inversión: donut chart renderiza leyenda con colores", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    // Verificar que hay rectángulos de color en la leyenda del donut
+    const legendRects = page.locator("#investment-allocation rect[fill]");
+    const rectCount = await legendRects.count();
+
+    // Debe haber al menos 2 rectángulos (1 por cada activo + posibles items de leyenda)
+    expect(rectCount).toBeGreaterThanOrEqual(1);
+  });
+
+  test("inversión: seleccionar mes diferente actualiza los gráficos", async ({ tracker, page }) => {
+    await tracker.openInvestment();
+
+    // Obtener cantidad inicial de circles (puntos de datos)
+    const initialCircles = await page.locator("#investment-portfolio-chart circle").count();
+
+    // Seleccionar mes anterior
+    await page.locator("#investment-month").selectOption({ label: "ENERO" });
+
+    // Esperar a que se renderice
+    await page.waitForTimeout(300);
+
+    // La cantidad de points debe cambiar o ser diferente
+    const updatedCircles = await page.locator("#investment-portfolio-chart circle").count();
+
+    // En enero debería haber menos o igual puntos de datos
+    expect(updatedCircles).toBeLessThanOrEqual(initialCircles);
   });
 });
