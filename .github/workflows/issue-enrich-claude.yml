@@ -52,8 +52,11 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: tag
           model: claude-haiku-4-5
+          max_turns: "2"
+          disallowed_tools: Read
           direct_prompt: |
             Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.
+            No uses herramientas. No leas imágenes ni archivos. Responde directamente con el formato solicitado.
 
             Devuelve EXCLUSIVAMENTE un bloque HTML comment con este formato exacto:
             <!-- ENRICHMENT_RESULT_V1
