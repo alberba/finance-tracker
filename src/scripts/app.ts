@@ -205,9 +205,9 @@ import {
     kpiNetWorth: getRequiredElement<HTMLElement>("kpi-net-worth"),
     kpiAnnualSavings: getRequiredElement<HTMLElement>("kpi-annual-savings"),
     kpiGrowth: getRequiredElement<HTMLElement>("kpi-growth"),
-    chartNetWorth: getRequiredElement<SVGSVGElement>("chart-networth"),
-    chartCashflow: getRequiredElement<SVGSVGElement>("chart-cashflow"),
-    chartDistribution: getRequiredElement<SVGSVGElement>("chart-distribution"),
+    chartNetWorth: getRequiredElement<HTMLElement>("chart-networth"),
+    chartCashflow: getRequiredElement<HTMLElement>("chart-cashflow"),
+    chartDistribution: getRequiredElement<HTMLElement>("chart-distribution"),
     topExpenseList: getRequiredElement<HTMLElement>("top-expense-list"),
 
     txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
@@ -249,7 +249,7 @@ import {
     snapshotInvestments: getRequiredElement<HTMLElement>("snapshot-investments"),
     snapshotLiabilities: getRequiredElement<HTMLElement>("snapshot-liabilities"),
     wealthTimelineBody: getRequiredElement<HTMLElement>("wealth-timeline-body"),
-    chartWealth: getRequiredElement<SVGSVGElement>("chart-wealth"),
+    chartWealth: getRequiredElement<HTMLElement>("chart-wealth"),
     wealthCalcDialog: getRequiredElement<HTMLDialogElement>("wealth-calc-dialog"),
     wealthCalcForm: getRequiredElement<HTMLFormElement>("wealth-calc-form"),
     wealthCalcTitle: getRequiredElement<HTMLElement>("wealth-calc-title"),
@@ -260,7 +260,7 @@ import {
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
-    investmentAllocation: getRequiredElement<SVGSVGElement>("investment-allocation"),
+    investmentAllocation: getRequiredElement<HTMLElement>("investment-allocation"),
     contributionForm: getRequiredElement<ContributionForm>("contribution-form"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
 
@@ -792,40 +792,14 @@ import {
       el.chartTooltip.setAttribute("aria-hidden", "true");
     };
 
-    const showTooltip = (message: string, x: number, y: number) => {
-      el.chartTooltip.textContent = message;
-      el.chartTooltip.classList.add("is-visible");
-      el.chartTooltip.setAttribute("aria-hidden", "false");
-
-      const offset = 14;
-      const maxLeft = window.innerWidth - el.chartTooltip.offsetWidth - 8;
-      const maxTop = window.innerHeight - el.chartTooltip.offsetHeight - 8;
-      const left = Math.min(Math.max(8, x + offset), Math.max(8, maxLeft));
-      const top = Math.min(Math.max(8, y + offset), Math.max(8, maxTop));
-      el.chartTooltip.style.left = `${left}px`;
-      el.chartTooltip.style.top = `${top}px`;
-    };
-
-    document.addEventListener("pointermove", (event) => {
+    // Chart.js external tooltips handle show/hide via plugin callbacks in charts.ts.
+    // We only need to hide the tooltip on pointer-down and window blur.
+    document.addEventListener("pointerdown", (event) => {
       const target = getEventElement(event.target);
-      const withTooltip = target?.closest<SVGElement>("[data-chart-tooltip]");
-      if (!withTooltip) {
-        const insideChart = target?.closest("svg");
-        if (insideChart) {
-          return;
-        }
+      if (!target?.closest("canvas")) {
         hideTooltip();
-        return;
       }
-      const message = withTooltip.getAttribute("data-chart-tooltip");
-      if (!message) {
-        hideTooltip();
-        return;
-      }
-      showTooltip(message, event.clientX, event.clientY);
     });
-
-    document.addEventListener("pointerdown", hideTooltip);
     window.addEventListener("blur", hideTooltip);
   }
 

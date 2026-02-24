@@ -1,11 +1,12 @@
-type ValueFormatter = (value: number) => string;
+// Chart.js is loaded via CDN in FinanceTrackerShell.astro and exposed as a global.
+declare const Chart: any;
 
 export interface LineChartOptions {
   color: string;
   fill: string;
   labels?: readonly string[];
-  formatValue: ValueFormatter;
-  formatAxisValue?: ValueFormatter;
+  formatValue: (value: number) => string;
+  formatAxisValue?: (value: number) => string;
   yScale?: "linear" | "log";
   includeZeroBaseline?: boolean;
   yPaddingRatio?: number;
@@ -23,241 +24,325 @@ export interface DonutChartItem {
   value: number;
 }
 
-export function renderLineChart(svg: SVGSVGElement, values: number[], options: LineChartOptions): void {
-  const width = 720;
-  const height = 280;
-  const padX = 64;
-  const padY = 26;
-  const labels = options.labels || [];
+function getOrCreateCanvas(container: HTMLElement): HTMLCanvasElement {
+  let canvas = container.querySelector<HTMLCanvasElement>("canvas");
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    container.appendChild(canvas);
+  }
+  return canvas;
+}
+
+function destroyExistingChart(canvas: HTMLCanvasElement): void {
+  const existing = (Chart as any).getChart(canvas);
+  if (existing) {
+    existing.destroy();
+  }
+}
+
+function getTooltipEl(): HTMLElement | null {
+  return document.getElementById("chart-tooltip");
+}
+
+function showExternalTooltip(context: any, getText: (dataPoints: any[]) => string): void {
+  const tooltipEl = getTooltipEl();
+  if (!tooltipEl) return;
+
+  const { tooltip } = context;
+  if (tooltip.opacity === 0) {
+    tooltipEl.classList.remove("is-visible");
+    tooltipEl.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  const dataPoints = tooltip.dataPoints || [];
+  if (!dataPoints.length) return;
+
+  tooltipEl.textContent = getText(dataPoints);
+  tooltipEl.classList.add("is-visible");
+  tooltipEl.setAttribute("aria-hidden", "false");
+
+  const canvasRect = context.chart.canvas.getBoundingClientRect();
+  const x = canvasRect.left + tooltip.caretX + 14;
+  const y = canvasRect.top + tooltip.caretY + 14;
+  const maxLeft = window.innerWidth - tooltipEl.offsetWidth - 8;
+  const maxTop = window.innerHeight - tooltipEl.offsetHeight - 8;
+  tooltipEl.style.left = `${Math.min(Math.max(8, x), Math.max(8, maxLeft))}px`;
+  tooltipEl.style.top = `${Math.min(Math.max(8, y), Math.max(8, maxTop))}px`;
+}
+
+export function renderLineChart(container: HTMLElement, values: number[], options: LineChartOptions): void {
+  const canvas = getOrCreateCanvas(container);
+  destroyExistingChart(canvas);
+
+  const labels = options.labels || values.map((_, i) => String(i + 1));
   const formatAxisValue = options.formatAxisValue || options.formatValue;
-  const yScale = options.yScale || "linear";
-  const includeZeroBaseline = options.includeZeroBaseline ?? true;
-  const yPaddingRatio = options.yPaddingRatio ?? 0.08;
 
-  const safeValues = values.map((v) => Number(v || 0));
-  const rawMax = Math.max(...safeValues);
-  const rawMin = Math.min(...safeValues);
-  let domainMax = includeZeroBaseline ? Math.max(rawMax, 0) : rawMax;
-  let domainMin = includeZeroBaseline ? Math.min(rawMin, 0) : rawMin;
+  // Store data count for E2E testing
+  container.dataset.chartPointCount = String(values.length);
 
-  if (!Number.isFinite(domainMax)) {
-    domainMax = 0;
-  }
-  if (!Number.isFinite(domainMin)) {
-    domainMin = 0;
-  }
-  if (domainMax === domainMin) {
-    const delta = Math.max(Math.abs(domainMax) * 0.1, 1);
-    domainMax += delta;
-    domainMin -= delta;
-  }
-
-  if (yScale === "linear") {
-    const pad = (domainMax - domainMin) * yPaddingRatio;
-    domainMax += pad;
-    domainMin -= pad;
-    if (includeZeroBaseline) {
-      if (rawMin >= 0) {
-        domainMin = Math.min(domainMin, 0);
-      }
-      if (rawMax <= 0) {
-        domainMax = Math.max(domainMax, 0);
-      }
-    }
-  }
-
-  const logOffset = yScale === "log" && domainMin <= 0 ? -domainMin : 0;
-  const toScale = (value: number) => {
-    if (yScale !== "log") {
-      return value;
-    }
-    return Math.log10(value + logOffset + 1);
-  };
-  const fromScale = (value: number) => {
-    if (yScale !== "log") {
-      return value;
-    }
-    return Math.pow(10, value) - logOffset - 1;
-  };
-  let scaledMax = toScale(domainMax);
-  let scaledMin = toScale(domainMin);
-  if (yScale === "log") {
-    const scaledPad = (scaledMax - scaledMin || 1) * yPaddingRatio;
-    scaledMax += scaledPad;
-    scaledMin -= scaledPad;
-  }
-  const scaledSpan = scaledMax - scaledMin || 1;
-
-  const stepX = (width - padX * 2) / Math.max(safeValues.length - 1, 1);
-  const points = safeValues.map((value, idx) => {
-    const x = padX + idx * stepX;
-    const scaledValue = toScale(value);
-    const y = height - padY - ((scaledValue - scaledMin) / scaledSpan) * (height - padY * 2);
-    return { x, y };
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: Array.from(labels),
+      datasets: [
+        {
+          data: values,
+          borderColor: options.color,
+          backgroundColor: options.fill,
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: options.color,
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          fill: true,
+          tension: 0.35,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.6,
+      animation: { duration: 300 },
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: (context: any) =>
+            showExternalTooltip(context, (pts) => {
+              const pt = pts[0];
+              return `${pt.label}: ${options.formatValue(pt.raw as number)}`;
+            }),
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(220,231,226,0.7)" },
+          ticks: {
+            color: "#7b8b8d",
+            font: { size: 11 },
+            maxRotation: 0,
+          },
+        },
+        y: {
+          beginAtZero: options.includeZeroBaseline ?? true,
+          grid: { color: "rgba(220,231,226,0.7)" },
+          ticks: {
+            color: "#7b8b8d",
+            font: { size: 11 },
+            callback: (value: number) => formatAxisValue(value),
+            maxTicksLimit: 5,
+          },
+        },
+      },
+    },
   });
-
-  const line = points.map((point, idx) => `${idx === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const area = `${line} L ${points[points.length - 1]?.x || padX},${height - padY} L ${points[0]?.x || padX},${height - padY} Z`;
-
-  const axis = labels
-    .map((label, idx) => {
-      const x = padX + idx * stepX;
-      return `<text x="${x}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#657478">${label.slice(0, 3)}</text>`;
-    })
-    .join("");
-
-  const yTicks = Array.from({ length: 4 }, (_, i) => {
-    const scaledValue = scaledMax - (scaledSpan / 3) * i;
-    const value = fromScale(scaledValue);
-    const y = padY + ((height - padY * 2) / 3) * i;
-    return `
-      <line x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}" stroke="#edf3f0" />
-      <text x="${padX - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#7b8b8d">${formatAxisValue(value)}</text>
-    `;
-  }).join("");
-
-  const circles = points
-    .map((point, idx) => {
-      const label = labels[idx] || `Punto ${idx + 1}`;
-      const value = safeValues[idx] || 0;
-      return `
-        <circle cx="${point.x}" cy="${point.y}" r="4" fill="${options.color}" stroke="#fff" stroke-width="2" data-chart-tooltip="${escapeSvgText(`${label}: ${options.formatValue(value)}`)}">
-          <title>${escapeSvgText(label)}: ${escapeSvgText(options.formatValue(value))}</title>
-        </circle>
-      `;
-    })
-    .join("");
-
-  svg.innerHTML = `
-    ${yTicks}
-    <path d="${area}" fill="${options.fill}"></path>
-    <path d="${line}" fill="none" stroke="${options.color}" stroke-width="3" stroke-linecap="round"></path>
-    ${circles}
-    ${axis}
-  `;
 }
 
 export function renderGroupedBarChart(
-  svg: SVGSVGElement,
+  container: HTMLElement,
   labels: readonly string[],
   series: GroupedBarSeriesItem[],
-  formatValue: ValueFormatter = (value) => String(Number(value || 0).toFixed(2))
+  formatValue: (value: number) => string = (v) => String(Number(v || 0).toFixed(2))
 ): void {
-  const width = 720;
-  const height = 280;
-  const padX = 48;
-  const padY = 30;
+  const canvas = getOrCreateCanvas(container);
+  destroyExistingChart(canvas);
 
-  const maxValue = Math.max(0, ...series.flatMap((item) => item.values.map((value) => Number(value || 0))));
-  const chartHeight = height - padY * 2;
-  const groupWidth = (width - padX * 2) / labels.length;
-  const barWidth = Math.max((groupWidth - 8) / series.length - 2, 6);
+  // Store bar count (labels × series) for E2E testing
+  container.dataset.chartBarCount = String(labels.length * series.length);
 
-  const bars = labels
-    .map((_, monthIndex) => {
-      const xBase = padX + monthIndex * groupWidth + 4;
-      return series
-        .map((item, index) => {
-          const value = Number(item.values[monthIndex] || 0);
-          const h = maxValue <= 0 ? 0 : (value / maxValue) * chartHeight;
-          const x = xBase + index * (barWidth + 2);
-          const y = height - padY - h;
-          const monthLabel = labels[monthIndex] || `Mes ${monthIndex + 1}`;
-          return `
-            <rect x="${x}" y="${y}" width="${barWidth}" height="${h}" rx="4" fill="${item.color}" data-chart-tooltip="${escapeSvgText(`${monthLabel} · ${item.name}: ${formatValue(value)}`)}">
-              <title>${escapeSvgText(monthLabel)} · ${escapeSvgText(item.name)}: ${escapeSvgText(formatValue(value))}</title>
-            </rect>
-          `;
-        })
-        .join("");
-    })
-    .join("");
-
-  const xLabels = labels
-    .map((label, idx) => {
-      const x = padX + idx * groupWidth + groupWidth / 2;
-      return `<text x="${x}" y="${height - 7}" text-anchor="middle" font-size="10" fill="#6b7b7f">${label.slice(0, 3)}</text>`;
-    })
-    .join("");
-
-  const legend = series
-    .map(
-      (item, idx) => `
-        <rect x="${padX + idx * 140}" y="6" width="12" height="12" rx="2" fill="${item.color}"></rect>
-        <text x="${padX + 18 + idx * 140}" y="16" font-size="11" fill="#516164">${item.name}</text>
-      `
-    )
-    .join("");
-
-  svg.innerHTML = `
-    <line x1="${padX}" y1="${height - padY}" x2="${width - padX}" y2="${height - padY}" stroke="#dce7e2"></line>
-    ${bars}
-    ${xLabels}
-    ${legend}
-  `;
+  new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: Array.from(labels),
+      datasets: series.map((item) => ({
+        label: item.name,
+        data: item.values,
+        backgroundColor: item.color,
+        borderRadius: 5,
+        borderSkipped: false,
+        barPercentage: 0.75,
+        categoryPercentage: 0.75,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.6,
+      animation: { duration: 300 },
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          align: "start",
+          labels: {
+            color: "#516164",
+            font: { size: 11 },
+            boxWidth: 12,
+            boxHeight: 12,
+            useBorderRadius: true,
+            borderRadius: 3,
+            padding: 14,
+          },
+        },
+        tooltip: {
+          enabled: false,
+          external: (context: any) =>
+            showExternalTooltip(context, (pts) => {
+              return pts.map((pt: any) => `${pt.dataset.label}: ${formatValue(pt.raw as number)}`).join(" · ");
+            }),
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: "#7b8b8d",
+            font: { size: 10 },
+            maxRotation: 0,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: "rgba(220,231,226,0.7)" },
+          ticks: {
+            color: "#7b8b8d",
+            font: { size: 11 },
+            callback: (value: number) => formatValue(value),
+            maxTicksLimit: 5,
+          },
+        },
+      },
+    },
+  });
 }
 
-export function renderDonutChart(svg: SVGSVGElement, data: DonutChartItem[], formatValue: ValueFormatter): void {
-  const width = 420;
-  const height = 260;
-  const cx = 130;
-  const cy = 130;
-  const radius = 74;
-  const thickness = 28;
+export function renderDonutChart(container: HTMLElement, data: DonutChartItem[], formatValue: (value: number) => string): void {
+  const canvas = getOrCreateCanvas(container);
+  destroyExistingChart(canvas);
 
   const clean = data.map((item) => ({ ...item, value: Math.max(Number(item.value || 0), 0) }));
   const total = clean.reduce((sum, item) => sum + item.value, 0);
 
+  // Store segment count for E2E testing
+  container.dataset.chartSegmentCount = String(clean.filter((item) => item.value > 0).length);
+
   if (total <= 0) {
-    svg.innerHTML = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="#6b7b7f">Sin datos</text>`;
+    canvas.style.display = "none";
+    let msg = container.querySelector<HTMLParagraphElement>(".chart-no-data");
+    if (!msg) {
+      msg = document.createElement("p");
+      msg.className = "chart-no-data";
+      msg.style.cssText = "text-align:center;color:#6b7b7f;padding:2rem 0;";
+      container.appendChild(msg);
+    }
+    msg.textContent = "Sin datos";
     return;
   }
 
-  let angleStart = -Math.PI / 2;
-  const segments = clean
-    .map((item) => {
-      const angle = (item.value / total) * Math.PI * 2;
-      const angleEnd = angleStart + angle;
-      const path = donutArcPath(cx, cy, radius, radius - thickness, angleStart, angleEnd);
-      angleStart = angleEnd;
-      const pct = total > 0 ? (item.value / total) * 100 : 0;
-      return `
-        <path d="${path}" fill="${item.color}" data-chart-tooltip="${escapeSvgText(`${item.label}: ${formatValue(item.value)} (${pct.toFixed(1)}%)`)}">
-          <title>${escapeSvgText(item.label)}: ${escapeSvgText(formatValue(item.value))} (${pct.toFixed(1)}%)</title>
-        </path>
-      `;
-    })
-    .join("");
+  canvas.style.display = "";
+  const noData = container.querySelector(".chart-no-data");
+  if (noData) noData.remove();
 
-  const legend = clean
-    .map(
-      (item, idx) => `
-        <rect x="240" y="${46 + idx * 28}" width="12" height="12" rx="2" fill="${item.color}"></rect>
-        <text x="258" y="${56 + idx * 28}" font-size="12" fill="#536366">${escapeSvgText(item.label)} (${formatValue(item.value)})</text>
-      `
-    )
-    .join("");
+  const centerTextPlugin = {
+    id: "donutCenterText",
+    beforeDraw(chart: any) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea) return;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.font = "700 15px 'Space Grotesk', sans-serif";
+      ctx.fillStyle = "#18363b";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(formatValue(total), cx, cy + 7);
+      ctx.font = "11px 'Space Grotesk', sans-serif";
+      ctx.fillStyle = "#6b7b7f";
+      ctx.fillText("Total", cx, cy - 9);
+      ctx.restore();
+    },
+  };
 
-  svg.innerHTML = `
-    ${segments}
-    <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="11" fill="#6b7b7f">Total</text>
-    <text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="16" font-weight="700" fill="#18363b">${formatValue(total)}</text>
-    ${legend}
-  `;
+  new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: clean.map((item) => item.label),
+      datasets: [
+        {
+          data: clean.map((item) => item.value),
+          backgroundColor: clean.map((item) => item.color),
+          borderColor: "#fff",
+          borderWidth: 3,
+          hoverBorderWidth: 3,
+          hoverOffset: 8,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1.7,
+      cutout: "62%",
+      animation: { duration: 300 },
+      plugins: {
+        legend: {
+          display: true,
+          position: "right",
+          labels: {
+            color: "#536366",
+            font: { size: 12 },
+            boxWidth: 13,
+            boxHeight: 13,
+            useBorderRadius: true,
+            borderRadius: 3,
+            padding: 12,
+            generateLabels: (chart: any) => {
+              const dataset = chart.data.datasets[0];
+              return (chart.data.labels as string[]).map((label: string, i: number) => ({
+                text: `${label} (${formatValue(dataset.data[i] as number)})`,
+                fillStyle: (dataset.backgroundColor as string[])[i],
+                strokeStyle: "#fff",
+                hidden: false,
+                index: i,
+              }));
+            },
+          },
+        },
+        tooltip: {
+          enabled: false,
+          external: (context: any) =>
+            showExternalTooltip(context, (pts) => {
+              const pt = pts[0];
+              const value = pt.raw as number;
+              const pct = total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
+              return `${pt.label}: ${formatValue(value)} (${pct}%)`;
+            }),
+        },
+      },
+    },
+    plugins: [centerTextPlugin],
+  });
 }
 
 export function renderHorizontalBarChart(
-  svg: SVGSVGElement,
+  container: HTMLElement,
   data: Array<{ label: string; value: number }>,
   palette: string[],
-  formatValue: ValueFormatter
+  formatValue: (value: number) => string
 ): void {
-  const width = 720;
-  const rowHeight = 26;
-  const startY = 24;
-  const maxRows = Math.max(data.length, 1);
-  const height = startY + maxRows * rowHeight + 20;
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const canvas = getOrCreateCanvas(container);
+  destroyExistingChart(canvas);
 
   const cleaned = data
     .map((item) => ({ label: item.label, value: Math.max(Number(item.value || 0), 0) }))
@@ -265,64 +350,75 @@ export function renderHorizontalBarChart(
     .sort((a, b) => b.value - a.value);
 
   if (!cleaned.length) {
-    svg.innerHTML = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="#6b7b7f">Sin datos de inversión</text>`;
+    canvas.style.display = "none";
+    let msg = container.querySelector<HTMLParagraphElement>(".chart-no-data");
+    if (!msg) {
+      msg = document.createElement("p");
+      msg.className = "chart-no-data";
+      msg.style.cssText = "text-align:center;color:#6b7b7f;padding:2rem 0;";
+      container.appendChild(msg);
+    }
+    msg.textContent = "Sin datos de inversión";
     return;
   }
 
-  const max = Math.max(...cleaned.map((item) => item.value), 1);
-  const rows = cleaned
-    .map((item, idx) => {
-      const y = startY + idx * rowHeight;
-      const barWidth = (item.value / max) * 390;
-      const color = palette[idx % palette.length];
-      return `
-        <text x="16" y="${y + 14}" font-size="11" fill="#566669">${escapeSvgText(item.label)}</text>
-        <rect x="210" y="${y + 2}" width="${barWidth}" height="14" rx="7" fill="${color}" data-chart-tooltip="${escapeSvgText(`${item.label}: ${formatValue(item.value)}`)}">
-          <title>${escapeSvgText(item.label)}: ${escapeSvgText(formatValue(item.value))}</title>
-        </rect>
-        <text x="${210 + barWidth + 10}" y="${y + 14}" font-size="11" fill="#1a2e31">${formatValue(item.value)}</text>
-      `;
-    })
-    .join("");
+  canvas.style.display = "";
+  const noData = container.querySelector(".chart-no-data");
+  if (noData) noData.remove();
 
-  svg.innerHTML = rows;
-}
+  // Dynamic height based on number of items
+  const itemHeight = 36;
+  const minHeight = 120;
+  canvas.style.height = `${Math.max(minHeight, cleaned.length * itemHeight + 40)}px`;
 
-function donutArcPath(
-  cx: number,
-  cy: number,
-  outerR: number,
-  innerR: number,
-  startAngle: number,
-  endAngle: number
-): string {
-  const startOuter = polar(cx, cy, outerR, endAngle);
-  const endOuter = polar(cx, cy, outerR, startAngle);
-  const startInner = polar(cx, cy, innerR, startAngle);
-  const endInner = polar(cx, cy, innerR, endAngle);
-  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
-
-  return [
-    `M ${startOuter.x} ${startOuter.y}`,
-    `A ${outerR} ${outerR} 0 ${largeArc} 0 ${endOuter.x} ${endOuter.y}`,
-    `L ${startInner.x} ${startInner.y}`,
-    `A ${innerR} ${innerR} 0 ${largeArc} 1 ${endInner.x} ${endInner.y}`,
-    "Z",
-  ].join(" ");
-}
-
-function polar(cx: number, cy: number, radius: number, angle: number): { x: number; y: number } {
-  return {
-    x: cx + Math.cos(angle) * radius,
-    y: cy + Math.sin(angle) * radius,
-  };
-}
-
-function escapeSvgText(input: string): string {
-  return String(input ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+  new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: cleaned.map((item) => item.label),
+      datasets: [
+        {
+          data: cleaned.map((item) => item.value),
+          backgroundColor: cleaned.map((_, i) => palette[i % palette.length]),
+          borderRadius: 7,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: (context: any) =>
+            showExternalTooltip(context, (pts) => {
+              const pt = pts[0];
+              return `${pt.label}: ${formatValue(pt.raw as number)}`;
+            }),
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: "rgba(220,231,226,0.7)" },
+          ticks: {
+            color: "#7b8b8d",
+            font: { size: 11 },
+            callback: (value: number) => formatValue(value),
+            maxTicksLimit: 5,
+          },
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: "#566669",
+            font: { size: 11 },
+          },
+        },
+      },
+    },
+  });
 }

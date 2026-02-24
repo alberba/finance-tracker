@@ -337,12 +337,23 @@ button {
   font-size: 1.05rem;
 }
 
-svg {
+.chart-canvas-wrap {
+  position: relative;
   width: 100%;
-  height: auto;
   background: #fcfefc;
   border: 1px solid #e2ece7;
   border-radius: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.chart-canvas-wrap--hbar {
+  min-height: 160px;
+}
+
+.chart-canvas-wrap canvas {
+  display: block;
+  width: 100% !important;
 }
 
 .list-stack {

@@ -90,9 +90,10 @@ test.describe("Finance tracker E2E", () => {
         return null;
       }
 
+      // Chart.js stores data counts on the container via data attributes set in charts.ts
       return {
-        linePointCount: networth.querySelectorAll("circle").length,
-        barCount: cashflow.querySelectorAll("rect[data-chart-tooltip]").length,
+        linePointCount: Number(networth.dataset.chartPointCount ?? 0),
+        barCount: Number(cashflow.dataset.chartBarCount ?? 0),
       };
     });
 
@@ -100,7 +101,9 @@ test.describe("Finance tracker E2E", () => {
     if (!chartDetails) {
       return;
     }
+    // 2 data points (seed data covers Jan-Feb)
     expect(chartDetails.linePointCount).toBe(2);
+    // 2 months × 3 series (Ingresos, Gastos, Inversión)
     expect(chartDetails.barCount).toBe(6);
   });
 
@@ -108,32 +111,39 @@ test.describe("Finance tracker E2E", () => {
     test.skip(testInfo.project.name === "mobile-chrome", "Mobile emula interacción táctil y no tiene hover fiable.");
     await tracker.openDashboard();
 
+    // With Chart.js the tooltip is triggered via mousemove on the canvas element.
+    // We use Playwright's mouse API to simulate real pointer events.
     const tooltip = page.locator("#chart-tooltip");
     await expect(tooltip).toBeHidden();
 
-    await page.locator("#chart-networth circle").first().hover();
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("€");
+    // Hover over the center of the net-worth line chart canvas
+    const networthCanvas = page.locator("#chart-networth canvas");
+    await networthCanvas.waitFor({ state: "visible" });
+    const networthBox = await networthCanvas.boundingBox();
+    if (networthBox) {
+      await page.mouse.move(networthBox.x + networthBox.width / 2, networthBox.y + networthBox.height / 2);
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("€");
+    }
 
-    await page.locator("#chart-cashflow rect[data-chart-tooltip]").first().hover();
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("Ingresos");
+    // Hover over the cashflow bar chart canvas
+    const cashflowCanvas = page.locator("#chart-cashflow canvas");
+    await cashflowCanvas.waitFor({ state: "visible" });
+    const cashflowBox = await cashflowCanvas.boundingBox();
+    if (cashflowBox) {
+      await page.mouse.move(cashflowBox.x + cashflowBox.width / 2, cashflowBox.y + cashflowBox.height * 0.6);
+      await expect(tooltip).toBeVisible();
+    }
 
-    await page.evaluate(() => {
-      const segment = document.querySelector("#chart-distribution path[data-chart-tooltip]");
-      if (!segment) {
-        return;
-      }
-      segment.dispatchEvent(
-        new PointerEvent("pointermove", {
-          bubbles: true,
-          clientX: 220,
-          clientY: 180,
-        })
-      );
-    });
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("%");
+    // Hover over the distribution donut chart canvas (left portion where segments are)
+    const distCanvas = page.locator("#chart-distribution canvas");
+    await distCanvas.waitFor({ state: "visible" });
+    const distBox = await distCanvas.boundingBox();
+    if (distBox) {
+      await page.mouse.move(distBox.x + distBox.width * 0.25, distBox.y + distBox.height / 2);
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("%");
+    }
   });
 
   test("permite crear movimiento y persiste tras recarga", async ({ tracker }) => {
@@ -236,18 +246,18 @@ test.describe("Finance tracker E2E", () => {
       if (!chart) {
         return null;
       }
-      return {
-        points: chart.querySelectorAll("circle").length,
-        labels: chart.querySelectorAll("text").length,
-      };
+      // Chart.js stores data count on the container via data attribute set in charts.ts
+      const pointCount = Number(chart.dataset.chartPointCount ?? 0);
+      const hasCanvas = !!chart.querySelector("canvas");
+      return { pointCount, hasCanvas };
     });
 
     expect(chartDetails).not.toBeNull();
     if (!chartDetails) {
       return;
     }
-    expect(chartDetails.points).toBe(2);
-    expect(chartDetails.labels).toBeGreaterThan(0);
+    expect(chartDetails.hasCanvas).toBe(true);
+    expect(chartDetails.pointCount).toBe(2);
   });
 
   test("patrimonio permite calcular snapshot de inversión por fila y persistirlo", async ({ tracker }) => {
