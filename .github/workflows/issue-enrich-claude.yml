@@ -107,13 +107,14 @@ jobs:
 
             const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
             const xmlRegex = /<(?:data-)?enrichment>([\s\S]*?)<\/(?:data-)?enrichment>/m;
+            const fencedJsonRegex = /```(?:json)?\s*([\s\S]*?)```/im;
             const candidate = [...comments]
               .reverse()
               .find((comment) => {
                 const login = String(comment?.user?.login || "");
                 const commentBody = String(comment.body || "");
                 return (login === "claude[bot]" || login === "github-actions[bot]") &&
-                  (markerRegex.test(commentBody) || xmlRegex.test(commentBody));
+                  (markerRegex.test(commentBody) || xmlRegex.test(commentBody) || fencedJsonRegex.test(commentBody));
               });
 
             function extractLastMatch(regex, text) {
@@ -129,12 +130,12 @@ jobs:
             let rawEnrichment = candidate ? String(candidate.body || "") : "";
             if (!rawEnrichment && executionFile && fs.existsSync(executionFile)) {
               const executionRaw = fs.readFileSync(executionFile, "utf-8");
-              const jsonFromExecution = extractLastMatch(markerRegex, executionRaw);
               const xmlFromExecution = extractLastMatch(xmlRegex, executionRaw);
-              if (jsonFromExecution) {
-                rawEnrichment = jsonFromExecution[0];
-              } else if (xmlFromExecution) {
+              const fencedFromExecution = extractLastMatch(/```(?:json)?\s*([\s\S]*?)```/gim, executionRaw);
+              if (xmlFromExecution) {
                 rawEnrichment = xmlFromExecution[0];
+              } else if (fencedFromExecution) {
+                rawEnrichment = fencedFromExecution[0];
               }
             }
 
@@ -149,7 +150,7 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>` o `<data-enrichment>`) ni en comentarios ni en `execution_file` de Claude."
+                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>`, `<data-enrichment>` o bloque ```json``` con payload) ni en comentarios ni en `execution_file` de Claude."
               });
               return;
             }
@@ -157,6 +158,7 @@ jobs:
             const commentBody = String(rawEnrichment || "");
             const jsonMatch = commentBody.match(markerRegex);
             const xmlMatch = commentBody.match(xmlRegex);
+            const fencedMatch = extractLastMatch(/```(?:json)?\s*([\s\S]*?)```/gim, commentBody);
 
             function extractXmlTag(content, tagName) {
               const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "m");
@@ -209,6 +211,24 @@ jobs:
                 labels_keep: parseStringArray(extractXmlTag(xml, "labels_keep")),
                 labels_remove: parseStringArray(extractXmlTag(xml, "labels_remove"))
               };
+            } else if (fencedMatch) {
+              try {
+                parsed = JSON.parse(String(fencedMatch[1] || "").trim());
+              } catch (error) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: ["enrich:failed"]
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: `JSON inválido en bloque \`\`\`json\`\`\`: ${error instanceof Error ? error.message : "error desconocido"}`
+                });
+                return;
+              }
             } else {
               await github.rest.issues.addLabels({
                 owner,
@@ -220,7 +240,7 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: "Formato inválido de salida: no se pudo parsear `ENRICHMENT_RESULT_V1` ni `<enrichment>`."
+                body: "Formato inválido de salida: no se pudo parsear `ENRICHMENT_RESULT_V1`, `<enrichment>`, `<data-enrichment>` ni bloque ```json```."
               });
               return;
             }
@@ -230,6 +250,22 @@ jobs:
             const labelsAdd = Array.isArray(parsed?.labels_add) ? parsed.labels_add.filter((v) => typeof v === "string" && v.trim()) : [];
             const labelsKeep = Array.isArray(parsed?.labels_keep) ? parsed.labels_keep.filter((v) => typeof v === "string" && v.trim()) : [];
             const labelsRemove = Array.isArray(parsed?.labels_remove) ? parsed.labels_remove.filter((v) => typeof v === "string" && v.trim()) : [];
+
+            if (title === "Título enriquecido" || bodyMarkdown === "Cuerpo markdown enriquecido") {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: se detectó payload de plantilla en lugar de enriquecimiento real."
+              });
+              return;
+            }
 
             if (!title || !bodyMarkdown || labelsAdd.length === 0) {
               await github.rest.issues.addLabels({
