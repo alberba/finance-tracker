@@ -37,10 +37,17 @@ jobs:
             const markdown = fs.readFileSync('.tmp/issue-context.md', 'utf-8');
             core.setOutput('markdown', markdown);
 
+      - name: Validate Claude credentials
+        run: |
+          if [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "::error::Falta CLAUDE_CODE_OAUTH_TOKEN en Secrets > Actions."
+            exit 1
+          fi
+
       - name: Enrich issue with Claude Haiku
         uses: anthropics/claude-code-action@beta
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: tag
           model: claude-haiku-4-5

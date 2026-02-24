@@ -51,10 +51,17 @@ jobs:
               labels: ['autofix-attempted']
             });
 
+      - name: Validate Claude credentials
+        run: |
+          if [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "::error::Falta CLAUDE_CODE_OAUTH_TOKEN en Secrets > Actions."
+            exit 1
+          fi
+
       - name: Apply fix with Claude Sonnet
         uses: anthropics/claude-code-action@beta
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           mode: tag
           model: ${{ vars.CLAUDE_SONNET_MODEL || 'claude-3-7-sonnet-latest' }}
