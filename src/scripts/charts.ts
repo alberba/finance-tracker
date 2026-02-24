@@ -288,6 +288,166 @@ export function renderHorizontalBarChart(
   svg.innerHTML = rows;
 }
 
+export interface MultiLineSeries {
+  name: string;
+  color: string;
+  values: number[];
+}
+
+export interface MultiLineChartOptions {
+  labels?: readonly string[];
+  formatValue: ValueFormatter;
+  formatAxisValue?: ValueFormatter;
+  yScale?: "linear" | "log";
+  includeZeroBaseline?: boolean;
+  forceZeroTick?: boolean;
+  yPaddingRatio?: number;
+}
+
+export function renderMultiLineChart(svg: SVGSVGElement, series: MultiLineSeries[], options: MultiLineChartOptions): void {
+  const width = 720;
+  const height = 340;
+  const padX = 64;
+  const padY = 26;
+  const labels = options.labels || [];
+  const formatAxisValue = options.formatAxisValue || options.formatValue;
+  const yScale = options.yScale || "linear";
+  const includeZeroBaseline = options.includeZeroBaseline ?? true;
+  const forceZeroTick = options.forceZeroTick ?? false;
+  const yPaddingRatio = options.yPaddingRatio ?? 0.08;
+
+  if (!series.length) {
+    svg.innerHTML = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="#6b7b7f">Sin datos</text>`;
+    return;
+  }
+
+  const allValues = series.flatMap((s) => s.values.map((v) => Number(v || 0)));
+  const rawMax = Math.max(...allValues);
+  const rawMin = Math.min(...allValues);
+  let domainMax = includeZeroBaseline ? Math.max(rawMax, 0) : rawMax;
+  let domainMin = includeZeroBaseline ? Math.min(rawMin, 0) : rawMin;
+
+  if (!Number.isFinite(domainMax)) {
+    domainMax = 0;
+  }
+  if (!Number.isFinite(domainMin)) {
+    domainMin = 0;
+  }
+  if (domainMax === domainMin) {
+    const delta = Math.max(Math.abs(domainMax) * 0.1, 1);
+    domainMax += delta;
+    domainMin -= delta;
+  }
+
+  if (yScale === "linear") {
+    const pad = (domainMax - domainMin) * yPaddingRatio;
+    domainMax += pad;
+    domainMin -= pad;
+    if (includeZeroBaseline) {
+      if (rawMin >= 0) {
+        domainMin = Math.min(domainMin, 0);
+      }
+      if (rawMax <= 0) {
+        domainMax = Math.max(domainMax, 0);
+      }
+    }
+  }
+
+  const logOffset = yScale === "log" && domainMin <= 0 ? -domainMin : 0;
+  const toScale = (value: number) => {
+    if (yScale !== "log") {
+      return value;
+    }
+    return Math.log10(value + logOffset + 1);
+  };
+  const fromScale = (value: number) => {
+    if (yScale !== "log") {
+      return value;
+    }
+    return Math.pow(10, value) - logOffset - 1;
+  };
+  let scaledMax = toScale(domainMax);
+  let scaledMin = toScale(domainMin);
+  if (yScale === "log") {
+    const scaledPad = (scaledMax - scaledMin || 1) * yPaddingRatio;
+    scaledMax += scaledPad;
+    scaledMin -= scaledPad;
+  }
+  const scaledSpan = scaledMax - scaledMin || 1;
+
+  const maxDataPoints = Math.max(...series.map((s) => s.values.length));
+  const stepX = (width - padX * 2) / Math.max(maxDataPoints - 1, 1);
+
+  const yTickValues = Array.from({ length: 4 }, (_, i) => {
+    const scaledValue = scaledMax - (scaledSpan / 3) * i;
+    return fromScale(scaledValue);
+  });
+  if (forceZeroTick && includeZeroBaseline) {
+    yTickValues.push(0);
+  }
+  const uniqueSortedTicks = Array.from(new Set(yTickValues.map((value) => value.toFixed(6))))
+    .map((value) => Number(value))
+    .sort((a, b) => b - a);
+
+  const yTicks = uniqueSortedTicks.map((value) => {
+    const scaledValue = toScale(value);
+    const y = height - padY - ((scaledValue - scaledMin) / scaledSpan) * (height - padY * 2);
+    return `
+      <line x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}" stroke="#edf3f0" />
+      <text x="${padX - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#7b8b8d">${formatAxisValue(value)}</text>
+    `;
+  }).join("");
+
+  const xLabels = labels
+    .map((label, idx) => {
+      const x = padX + idx * stepX;
+      return `<text x="${x}" y="${height - 6}" text-anchor="middle" font-size="11" fill="#657478">${label.slice(0, 3)}</text>`;
+    })
+    .join("");
+
+  const lines = series
+    .map((s) => {
+      const points = s.values.map((value, idx) => {
+        const x = padX + idx * stepX;
+        const scaledValue = toScale(Number(value || 0));
+        const y = height - padY - ((scaledValue - scaledMin) / scaledSpan) * (height - padY * 2);
+        return { x, y };
+      });
+
+      const line = points.map((point, idx) => `${idx === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+      const circles = points
+        .map((point, idx) => {
+          const label = labels[idx] || `Punto ${idx + 1}`;
+          const value = s.values[idx] || 0;
+          return `
+            <circle cx="${point.x}" cy="${point.y}" r="3.5" fill="${s.color}" stroke="#fff" stroke-width="1.5" data-chart-tooltip="${escapeSvgText(`${s.name} · ${label}: ${options.formatValue(value)}`)}">
+              <title>${escapeSvgText(s.name)} · ${escapeSvgText(label)}: ${escapeSvgText(options.formatValue(value))}</title>
+            </circle>
+          `;
+        })
+        .join("");
+
+      return `<path d="${line}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round"></path>${circles}`;
+    })
+    .join("");
+
+  const legend = series
+    .map(
+      (s, idx) => `
+        <rect x="${padX + idx * 140}" y="6" width="12" height="12" rx="2" fill="${s.color}"></rect>
+        <text x="${padX + 18 + idx * 140}" y="16" font-size="11" fill="#516164">${escapeSvgText(s.name)}</text>
+      `
+    )
+    .join("");
+
+  svg.innerHTML = `
+    ${yTicks}
+    ${lines}
+    ${xLabels}
+    ${legend}
+  `;
+}
+
 function donutArcPath(
   cx: number,
   cy: number,
