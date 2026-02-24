@@ -9,6 +9,7 @@ const SECTION_CONFIG = {
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
   data: { buttonLabel: "Datos", headingText: "Datos y backups" },
+  reports: { buttonLabel: "Reportes", headingText: "Reportes y automatización" },
 } as const;
 
 export type FinanceSectionId = keyof typeof SECTION_CONFIG;
@@ -34,6 +35,14 @@ export class FinanceTrackerPage {
 
   get wealthSection(): Locator {
     return this.page.locator("#wealth");
+  }
+
+  get dataSection(): Locator {
+    return this.page.locator("#data");
+  }
+
+  get reportsSection(): Locator {
+    return this.page.locator("#reports");
   }
 
   async goto() {
@@ -71,6 +80,47 @@ export class FinanceTrackerPage {
 
   async openData() {
     await this.open("data");
+  }
+
+  async openReports() {
+    await this.open("reports");
+  }
+
+  async submitIssueReport(params: {
+    type: "bug" | "enhancement";
+    summary: string;
+    description: string;
+    stepsToReproduce?: string;
+    expectedResult?: string;
+    actualResult?: string;
+    mentionClaude?: boolean;
+  }) {
+    await this.openReports();
+    const form = this.reportsSection.locator("#issue-report-form");
+    await form.locator("#issue-report-type").selectOption(params.type);
+    await form.locator("#issue-report-summary").fill(params.summary);
+    await form.locator("#issue-report-description").fill(params.description);
+    if (params.stepsToReproduce !== undefined) {
+      await form.locator("#issue-report-steps").fill(params.stepsToReproduce);
+    }
+    if (params.expectedResult !== undefined) {
+      await form.locator("#issue-report-expected").fill(params.expectedResult);
+    }
+    if (params.actualResult !== undefined) {
+      await form.locator("#issue-report-actual").fill(params.actualResult);
+    }
+    const mention = form.locator("#issue-report-mention-claude");
+    const shouldMention = params.mentionClaude ?? true;
+    if (shouldMention) {
+      await mention.check();
+    } else {
+      await mention.uncheck();
+    }
+    await form.getByRole("button", { name: "Crear issue" }).click();
+  }
+
+  issueReportStatus(): Locator {
+    return this.reportsSection.locator("#issue-report-status");
   }
 
   async open(sectionId: FinanceSectionId) {
