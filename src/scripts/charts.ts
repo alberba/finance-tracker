@@ -136,6 +136,7 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
             font: { size: 11 },
             color: "#657478",
             maxRotation: 0,
+            callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
           },
         },
         y: {
@@ -200,6 +201,7 @@ export function renderGroupedBarChart(
             font: { size: 10 },
             color: "#6b7b7f",
             maxRotation: 0,
+            callback: (_value: any, index: number) => (Array.from(labels)[index] || "").slice(0, 3),
           },
         },
         y: {
@@ -464,6 +466,7 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
             font: { size: 11 },
             color: "#657478",
             maxRotation: 0,
+            callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
           },
         },
         y: {
