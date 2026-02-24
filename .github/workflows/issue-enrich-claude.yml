@@ -100,11 +100,14 @@ jobs:
             });
 
             const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
+            const xmlRegex = /<enrichment>([\s\S]*?)<\/enrichment>/m;
             const candidate = [...comments]
               .reverse()
               .find((comment) => {
                 const login = String(comment?.user?.login || "");
-                return (login === "claude[bot]" || login === "github-actions[bot]") && markerRegex.test(String(comment.body || ""));
+                const commentBody = String(comment.body || "");
+                return (login === "claude[bot]" || login === "github-actions[bot]") &&
+                  (markerRegex.test(commentBody) || xmlRegex.test(commentBody));
               });
 
             if (!candidate) {
@@ -118,33 +121,62 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: "No se encontró bloque `ENRICHMENT_RESULT_V1` en comentarios de Claude."
+                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1` o `<enrichment>`) en comentarios de Claude."
               });
               return;
             }
 
-            const body = String(candidate.body || "");
-            const match = body.match(markerRegex);
-            if (!match) {
-              await github.rest.issues.addLabels({
-                owner,
-                repo,
-                issue_number,
-                labels: ["enrich:failed"]
-              });
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body: "Formato inválido de salida: bloque `ENRICHMENT_RESULT_V1` no parseable."
-              });
-              return;
+            const commentBody = String(candidate.body || "");
+            const jsonMatch = commentBody.match(markerRegex);
+            const xmlMatch = commentBody.match(xmlRegex);
+
+            function extractXmlTag(content, tagName) {
+              const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "m");
+              const match = content.match(regex);
+              return match ? match[1].trim() : "";
+            }
+
+            function parseStringArray(raw) {
+              if (!raw) {
+                return [];
+              }
+              try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string" && value.trim()) : [];
+              } catch {
+                return [];
+              }
             }
 
             let parsed;
-            try {
-              parsed = JSON.parse(match[1].trim());
-            } catch (error) {
+            if (jsonMatch) {
+              try {
+                parsed = JSON.parse(jsonMatch[1].trim());
+              } catch (error) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: ["enrich:failed"]
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: `JSON inválido en ENRICHMENT_RESULT_V1: ${error instanceof Error ? error.message : "error desconocido"}`
+                });
+                return;
+              }
+            } else if (xmlMatch) {
+              const xml = xmlMatch[1];
+              parsed = {
+                title: extractXmlTag(xml, "title"),
+                body_markdown: extractXmlTag(xml, "body_markdown"),
+                labels_add: parseStringArray(extractXmlTag(xml, "labels_add")),
+                labels_keep: parseStringArray(extractXmlTag(xml, "labels_keep")),
+                labels_remove: parseStringArray(extractXmlTag(xml, "labels_remove"))
+              };
+            } else {
               await github.rest.issues.addLabels({
                 owner,
                 repo,
@@ -155,7 +187,7 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: `JSON inválido en ENRICHMENT_RESULT_V1: ${error instanceof Error ? error.message : "error desconocido"}`
+                body: "Formato inválido de salida: no se pudo parsear `ENRICHMENT_RESULT_V1` ni `<enrichment>`."
               });
               return;
             }
