@@ -1,6 +1,5 @@
 name = "finance-tracker"
 compatibility_date = "2026-02-23"
-main = "dist/_worker.js"
 pages_build_output_dir = "dist"
 
 [[d1_databases]]
