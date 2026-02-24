@@ -1,0 +1,167 @@
+name: Issue Auto Fix (Sonnet)
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: issue-fix-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  autofix:
+    if: >-
+      github.event.label.name == 'enriched:haiku' &&
+      !contains(join(github.event.issue.labels.*.name, ','), 'autofix-attempted') &&
+      !contains(join(github.event.issue.labels.*.name, ','), 'autofix:skip')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Mark attempt started
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['autofix-attempted']
+            });
+
+      - name: Apply fix with Claude Sonnet
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          model: ${{ vars.CLAUDE_SONNET_MODEL || 'claude-3-7-sonnet-latest' }}
+          prompt: |
+            Resuelve la issue #${{ github.event.issue.number }} con cambios pequeños y seguros.
+
+            Restricciones obligatorias:
+            - No modificar archivos en `migrations/`.
+            - No hacer refactors amplios.
+            - Mantener estilo del repo.
+            - Añadir/actualizar tests si cambias frontend.
+
+            Debes implementar el fix en el árbol de trabajo actual.
+
+      - name: Enforce migration guard
+        run: |
+          if git diff --name-only | grep -E '^migrations/'; then
+            echo "Se detectaron cambios en migrations/, no permitido." >&2
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: pnpm test:unit
+
+      - name: Install Playwright browser
+        run: pnpm test:e2e:install
+
+      - name: Run e2e tests
+        run: pnpm test:e2e
+
+      - name: Detect pending changes
+        id: changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        id: cpr
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_ISSUE_TOKEN || secrets.GITHUB_TOKEN }}
+          commit-message: "fix(issue-${{ github.event.issue.number }}): resolución automática con Claude"
+          title: "fix: issue #${{ github.event.issue.number }}"
+          body: |
+            PR automática para issue #${{ github.event.issue.number }}.
+
+            - Enriquecida con Haiku
+            - Implementación con Sonnet
+            - Gate de calidad: unit + e2e
+          branch: claude/issue-${{ github.event.issue.number }}
+          labels: autofix-opened-pr
+
+      - name: Comment issue with PR
+        if: steps.changes.outputs.has_changes == 'true' && steps.cpr.outputs.pull-request-number
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = '${{ steps.cpr.outputs.pull-request-number }}';
+            const prUrl = '${{ steps.cpr.outputs.pull-request-url }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `He creado una PR automática: #${prNumber}\n${prUrl}`
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['autofix-opened-pr']
+            });
+
+      - name: Mark no changes
+        if: steps.changes.outputs.has_changes == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'No se generaron cambios aplicables tras el intento automático.'
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['autofix-nochange']
+            });
+
+      - name: Mark failed attempt
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'El intento automático falló. Revisa logs del workflow para diagnóstico.'
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['autofix-failed']
+            });
