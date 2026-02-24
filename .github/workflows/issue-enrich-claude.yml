@@ -107,15 +107,7 @@ jobs:
 
             const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
             const xmlRegex = /<(?:data-)?enrichment>([\s\S]*?)<\/(?:data-)?enrichment>/m;
-            const fencedJsonRegex = /```(?:json)?\s*([\s\S]*?)```/im;
-            const candidate = [...comments]
-              .reverse()
-              .find((comment) => {
-                const login = String(comment?.user?.login || "");
-                const commentBody = String(comment.body || "");
-                return (login === "claude[bot]" || login === "github-actions[bot]") &&
-                  (markerRegex.test(commentBody) || xmlRegex.test(commentBody) || fencedJsonRegex.test(commentBody));
-              });
+            const fencedBlockRegex = /```(?:([a-zA-Z0-9_-]+))?\s*([\s\S]*?)```/gm;
 
             function extractLastMatch(regex, text) {
               const globalRegex = new RegExp(regex.source, regex.flags.includes("g") ? regex.flags : `${regex.flags}g`);
@@ -127,15 +119,103 @@ jobs:
               return last;
             }
 
-            let rawEnrichment = candidate ? String(candidate.body || "") : "";
-            if (!rawEnrichment && executionFile && fs.existsSync(executionFile)) {
+            function extractFencedPayload(text) {
+              const source = String(text || "");
+              let match;
+              let last = null;
+              const regex = new RegExp(fencedBlockRegex.source, fencedBlockRegex.flags);
+              while ((match = regex.exec(source)) !== null) {
+                const language = String(match[1] || "").toLowerCase();
+                const content = String(match[2] || "");
+                const looksLikePayload = /ENRICHMENT_RESULT_V1/.test(content) || /"title"\s*:/.test(content);
+                const allowedLanguage = !language || language === "json" || language === "html" || language === "xml";
+                if (allowedLanguage && looksLikePayload) {
+                  last = { full: match[0], content };
+                }
+              }
+              return last;
+            }
+
+            function extractPayloadBlock(text) {
+              const source = String(text || "");
+              if (!source.trim()) {
+                return null;
+              }
+              const marker = extractLastMatch(markerRegex, source);
+              if (marker) {
+                return { kind: "marker", raw: marker[0] };
+              }
+              const xml = extractLastMatch(xmlRegex, source);
+              if (xml) {
+                return { kind: "xml", raw: xml[0] };
+              }
+              const fenced = extractFencedPayload(source);
+              if (fenced) {
+                return { kind: "fenced", raw: fenced.full };
+              }
+              return null;
+            }
+
+            const candidateComment = [...comments]
+              .reverse()
+              .find((comment) => {
+                const login = String(comment?.user?.login || "");
+                const commentBody = String(comment.body || "");
+                return (login === "claude[bot]" || login === "github-actions[bot]") &&
+                  extractPayloadBlock(commentBody);
+              });
+
+            const sourceCandidates = [];
+            if (candidateComment) {
+              sourceCandidates.push(String(candidateComment.body || ""));
+            }
+
+            if (executionFile && fs.existsSync(executionFile)) {
               const executionRaw = fs.readFileSync(executionFile, "utf-8");
-              const xmlFromExecution = extractLastMatch(xmlRegex, executionRaw);
-              const fencedFromExecution = extractLastMatch(/```(?:json)?\s*([\s\S]*?)```/gim, executionRaw);
-              if (xmlFromExecution) {
-                rawEnrichment = xmlFromExecution[0];
-              } else if (fencedFromExecution) {
-                rawEnrichment = fencedFromExecution[0];
+              const executionCandidates = [];
+              try {
+                const parsedExecution = JSON.parse(executionRaw);
+                if (typeof parsedExecution?.result === "string") {
+                  executionCandidates.push(parsedExecution.result);
+                }
+                if (typeof parsedExecution?.output === "string") {
+                  executionCandidates.push(parsedExecution.output);
+                }
+              } catch {
+                // `execution_file` can be NDJSON; we'll parse line by line below.
+              }
+
+              for (const line of executionRaw.split(/\r?\n/)) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+                  continue;
+                }
+                try {
+                  const event = JSON.parse(trimmed);
+                  if (typeof event?.result === "string") {
+                    executionCandidates.push(event.result);
+                  }
+                  if (event?.type === "assistant" && Array.isArray(event?.message?.content)) {
+                    for (const part of event.message.content) {
+                      if (part?.type === "text" && typeof part?.text === "string") {
+                        executionCandidates.push(part.text);
+                      }
+                    }
+                  }
+                } catch {
+                  // Ignore invalid lines.
+                }
+              }
+
+              sourceCandidates.push(...executionCandidates, executionRaw);
+            }
+
+            let rawEnrichment = "";
+            for (const source of sourceCandidates) {
+              const block = extractPayloadBlock(source);
+              if (block) {
+                rawEnrichment = block.raw;
+                break;
               }
             }
 
@@ -156,9 +236,9 @@ jobs:
             }
 
             const commentBody = String(rawEnrichment || "");
-            const jsonMatch = commentBody.match(markerRegex);
-            const xmlMatch = commentBody.match(xmlRegex);
-            const fencedMatch = extractLastMatch(/```(?:json)?\s*([\s\S]*?)```/gim, commentBody);
+            const jsonMatch = extractLastMatch(markerRegex, commentBody);
+            const xmlMatch = extractLastMatch(xmlRegex, commentBody);
+            const fencedMatch = extractFencedPayload(commentBody);
 
             function extractXmlTag(content, tagName) {
               const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "m");
@@ -213,7 +293,7 @@ jobs:
               };
             } else if (fencedMatch) {
               try {
-                parsed = JSON.parse(String(fencedMatch[1] || "").trim());
+                parsed = JSON.parse(String(fencedMatch.content || "").trim());
               } catch (error) {
                 await github.rest.issues.addLabels({
                   owner,
