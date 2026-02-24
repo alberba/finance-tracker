@@ -19,6 +19,7 @@ const canonicalUrl = new URL("/", Astro.url).toString();
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script>
     import "../scripts/app";
     import "../scripts/issue-report";
@@ -102,15 +103,15 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           <div class="chart-stack">
             <article class="chart-card">
               <h3>Evolución patrimonio neto</h3>
-              <svg id="chart-networth" viewBox="0 0 720 280" aria-label="Evolución de patrimonio"></svg>
+              <div class="chart-canvas-wrap"><canvas id="chart-networth" aria-label="Evolución de patrimonio"></canvas></div>
             </article>
             <article class="chart-card">
               <h3>Ingresos vs Gastos vs Inversión</h3>
-              <svg id="chart-cashflow" viewBox="0 0 720 280" aria-label="Flujo mensual"></svg>
+              <div class="chart-canvas-wrap"><canvas id="chart-cashflow" aria-label="Flujo mensual"></canvas></div>
             </article>
             <article class="chart-card">
               <h3>Distribución actual</h3>
-              <svg id="chart-distribution" viewBox="0 0 420 260" aria-label="Distribución de patrimonio"></svg>
+              <div class="chart-canvas-wrap"><canvas id="chart-distribution" aria-label="Distribución de patrimonio"></canvas></div>
             </article>
           </div>
           <aside class="chart-side">
@@ -456,7 +457,7 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           </article>
           <article class="card">
             <h3>Evolución mensual</h3>
-            <svg id="chart-wealth" viewBox="0 0 720 260" aria-label="Evolución mensual patrimonio"></svg>
+            <div class="chart-canvas-wrap"><canvas id="chart-wealth" aria-label="Evolución mensual patrimonio"></canvas></div>
             <div class="table-wrap compact">
               <table>
                 <thead>
@@ -529,18 +530,18 @@ const canonicalUrl = new URL("/", Astro.url).toString();
         <div class="chart-grid-inv">
           <article class="card">
             <h3>Evolución de la cartera</h3>
-            <svg id="investment-portfolio-chart" viewBox="0 0 720 340" aria-label="Evolución cartera total"></svg>
+            <div class="chart-canvas-wrap"><canvas id="investment-portfolio-chart" aria-label="Evolución cartera total"></canvas></div>
           </article>
           <article class="card">
             <h3>Evolución por activo</h3>
-            <svg id="investment-assets-chart" viewBox="0 0 720 340" aria-label="Evolución por activo"></svg>
+            <div class="chart-canvas-wrap"><canvas id="investment-assets-chart" aria-label="Evolución por activo"></canvas></div>
           </article>
         </div>
 
         <div class="dual-grid">
           <article class="card">
             <h3>Distribución de activos</h3>
-            <svg id="investment-allocation" viewBox="0 0 420 260" aria-label="Distribución de cartera"></svg>
+            <div class="chart-canvas-wrap"><canvas id="investment-allocation" aria-label="Distribución de cartera"></canvas></div>
           </article>
           <article class="card">
             <h3>Aportes y TWR aproximado</h3>

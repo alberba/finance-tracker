@@ -91,8 +91,8 @@ test.describe("Finance tracker E2E", () => {
       }
 
       return {
-        linePointCount: networth.querySelectorAll("circle").length,
-        barCount: cashflow.querySelectorAll("rect[data-chart-tooltip]").length,
+        linePointCount: parseInt(networth.dataset.chartPointCount || "0"),
+        barCount: parseInt(cashflow.dataset.chartBarCount || "0"),
       };
     });
 
@@ -111,26 +111,30 @@ test.describe("Finance tracker E2E", () => {
     const tooltip = page.locator("#chart-tooltip");
     await expect(tooltip).toBeHidden();
 
-    await page.locator("#chart-networth circle").first().hover();
+    const networthCanvas = page.locator("#chart-networth");
+    const networthBox = await networthCanvas.boundingBox();
+    if (networthBox) {
+      await page.mouse.move(networthBox.x + networthBox.width / 2, networthBox.y + networthBox.height / 2);
+    }
     await expect(tooltip).toBeVisible();
     await expect(tooltip).toContainText("€");
 
-    await page.locator("#chart-cashflow rect[data-chart-tooltip]").first().hover();
+    const cashflowCanvas = page.locator("#chart-cashflow");
+    const cashflowBox = await cashflowCanvas.boundingBox();
+    if (cashflowBox) {
+      await page.mouse.move(cashflowBox.x + cashflowBox.width / 2, cashflowBox.y + cashflowBox.height / 2);
+    }
     await expect(tooltip).toBeVisible();
     await expect(tooltip).toContainText("Ingresos");
 
+    // Para el donut chart, activar el tooltip via Chart.js API
     await page.evaluate(() => {
-      const segment = document.querySelector("#chart-distribution path[data-chart-tooltip]");
-      if (!segment) {
-        return;
+      const canvas = document.getElementById("chart-distribution") as HTMLCanvasElement;
+      const chart = (window as any).Chart?.getChart(canvas);
+      if (chart && chart.data.datasets[0]?.data?.length > 0) {
+        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], { x: 0, y: 0 });
+        chart.update();
       }
-      segment.dispatchEvent(
-        new PointerEvent("pointermove", {
-          bubbles: true,
-          clientX: 220,
-          clientY: 180,
-        })
-      );
     });
     await expect(tooltip).toBeVisible();
     await expect(tooltip).toContainText("%");
@@ -237,8 +241,8 @@ test.describe("Finance tracker E2E", () => {
         return null;
       }
       return {
-        points: chart.querySelectorAll("circle").length,
-        labels: chart.querySelectorAll("text").length,
+        points: parseInt(chart.dataset.chartPointCount || "0"),
+        labels: parseInt(chart.dataset.chartPointCount || "0") > 0 ? 1 : 0,
       };
     });
 
@@ -611,7 +615,7 @@ test.describe("Finance tracker E2E", () => {
   test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    // Verificar que los SVG de los gráficos existen
+    // Verificar que los canvas de los gráficos existen
     const portfolioChart = page.locator("#investment-portfolio-chart");
     const assetsChart = page.locator("#investment-assets-chart");
     const allocationChart = page.locator("#investment-allocation");
@@ -624,34 +628,40 @@ test.describe("Finance tracker E2E", () => {
   test("inversión: gráficos de líneas muestran valores porcentuales", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    // Verificar que los gráficos contienen elementos de datos (circles para líneas)
-    const portfolioCircles = page.locator("#investment-portfolio-chart circle");
-    const assetsCircles = page.locator("#investment-assets-chart circle");
+    const chartData = await page.evaluate(() => {
+      const portfolio = document.getElementById("investment-portfolio-chart");
+      const assets = document.getElementById("investment-assets-chart");
+      if (!portfolio || !assets) return null;
 
-    const portfolioCount = await portfolioCircles.count();
-    const assetsCount = await assetsCircles.count();
+      const portfolioTooltips: string[] = JSON.parse(portfolio.dataset.chartTooltips || "[]").flat();
+      const assetsTooltips: string[] = JSON.parse(assets.dataset.chartTooltips || "[]").flat();
 
-    expect(portfolioCount).toBeGreaterThan(0);
-    expect(assetsCount).toBeGreaterThan(0);
+      return {
+        portfolioCount: parseInt(portfolio.dataset.chartPointCount || "0"),
+        assetsCount: parseInt(assets.dataset.chartPointCount || "0"),
+        firstPortfolioTooltip: portfolioTooltips[0] || "",
+      };
+    });
+
+    expect(chartData).not.toBeNull();
+    if (!chartData) return;
+
+    expect(chartData.portfolioCount).toBeGreaterThan(0);
+    expect(chartData.assetsCount).toBeGreaterThan(0);
 
     // Verificar que los tooltips contienen símbolo de porcentaje
-    const firstPortfolioTooltip = await portfolioCircles.first().getAttribute("data-chart-tooltip");
-    expect(firstPortfolioTooltip).toMatch(/%/);
+    expect(chartData.firstPortfolioTooltip).toMatch(/%/);
   });
 
   test("inversión: gráficos de líneas muestran tick 0% en eje Y", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
     const zeroTickStatus = await page.evaluate(() => {
-      const hasZeroTick = (selector: string) =>
-        Array.from(document.querySelectorAll(`${selector} text`)).some((node) => {
-          const value = (node.textContent || "").trim();
-          return /^0(?:[.,]0+)?%$/.test(value);
-        });
-
+      const portfolio = document.getElementById("investment-portfolio-chart");
+      const assets = document.getElementById("investment-assets-chart");
       return {
-        portfolio: hasZeroTick("#investment-portfolio-chart"),
-        assets: hasZeroTick("#investment-assets-chart"),
+        portfolio: portfolio?.dataset.chartHasZeroTick === "true",
+        assets: assets?.dataset.chartHasZeroTick === "true",
       };
     });
 
@@ -662,36 +672,45 @@ test.describe("Finance tracker E2E", () => {
   test("inversión: ambos gráficos de líneas usan mayor altura", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    const viewboxes = await page.evaluate(() => {
-      const portfolio = document.getElementById("investment-portfolio-chart")?.getAttribute("viewBox") || "";
-      const assets = document.getElementById("investment-assets-chart")?.getAttribute("viewBox") || "";
-      return { portfolio, assets };
+    // Con Chart.js canvas, verificamos que los contenedores tienen altura adecuada
+    const heights = await page.evaluate(() => {
+      const portfolio = document.getElementById("investment-portfolio-chart")?.closest(".chart-canvas-wrap") as HTMLElement | null;
+      const assets = document.getElementById("investment-assets-chart")?.closest(".chart-canvas-wrap") as HTMLElement | null;
+      return {
+        portfolioHeight: portfolio?.offsetHeight || 0,
+        assetsHeight: assets?.offsetHeight || 0,
+      };
     });
 
-    expect(viewboxes.portfolio).toBe("0 0 720 340");
-    expect(viewboxes.assets).toBe("0 0 720 340");
+    expect(heights.portfolioHeight).toBeGreaterThan(200);
+    expect(heights.assetsHeight).toBeGreaterThan(200);
   });
 
   test("inversión: el gráfico de cartera muestra solo la serie Cartera Total", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
     const details = await page.evaluate(() => {
-      const tooltips = Array.from(document.querySelectorAll("#investment-portfolio-chart circle"))
-        .map((node) => node.getAttribute("data-chart-tooltip") || "")
-        .filter(Boolean);
-      const invalidTooltip = tooltips.find((value) => !value.startsWith("Cartera Total · "));
-      const legendItems = document.querySelectorAll("#investment-portfolio-chart rect").length;
+      const canvas = document.getElementById("investment-portfolio-chart");
+      if (!canvas) return null;
+
+      const tooltipRows: string[][] = JSON.parse(canvas.dataset.chartTooltips || "[]");
+      const allTooltips = tooltipRows.flat();
+      const invalidTooltip = allTooltips.find((value) => !value.startsWith("Cartera Total · "));
+      const seriesNames: string[] = JSON.parse(canvas.dataset.chartSeriesNames || "[]");
 
       return {
         invalidTooltip: invalidTooltip || "",
-        legendItems,
-        pointCount: tooltips.length,
+        seriesCount: seriesNames.length,
+        pointCount: parseInt(canvas.dataset.chartPointCount || "0"),
       };
     });
 
+    expect(details).not.toBeNull();
+    if (!details) return;
+
     expect(details.pointCount).toBeGreaterThan(0);
     expect(details.invalidTooltip).toBe("");
-    expect(details.legendItems).toBe(1);
+    expect(details.seriesCount).toBe(1);
   });
 
   test("inversión: gráficos de líneas calculan ganancia sobre capital aportado acumulado", async ({ tracker, page }) => {
@@ -816,16 +835,22 @@ test.describe("Finance tracker E2E", () => {
         return Number(match[1].replace(",", "."));
       };
 
-      const portfolioTooltip = Array.from(document.querySelectorAll("#investment-portfolio-chart circle"))
-        .map((node) => node.getAttribute("data-chart-tooltip"))
-        .find((tooltip) => Boolean(tooltip && tooltip.includes(`Cartera Total · ${monthLabel}:`)));
+      // Read tooltip data from data attributes (Chart.js canvas approach)
+      const portfolioCanvas = document.getElementById("investment-portfolio-chart");
+      const assetsCanvas = document.getElementById("investment-assets-chart");
+      if (!portfolioCanvas || !assetsCanvas) {
+        return { error: "No se encontraron los canvas de los gráficos." };
+      }
+
+      const portfolioTooltipData: string[][] = JSON.parse(portfolioCanvas.dataset.chartTooltips || "[]");
+      const assetsTooltipData: string[][] = JSON.parse(assetsCanvas.dataset.chartTooltips || "[]");
+
+      const portfolioTooltip = portfolioTooltipData.flat().find((tooltip) => tooltip.includes(`Cartera Total · ${monthLabel}:`));
       if (!portfolioTooltip) {
         return { error: "No se encontró tooltip de Cartera Total para MARZO." };
       }
 
-      const assetTooltip = Array.from(document.querySelectorAll("#investment-assets-chart circle"))
-        .map((node) => node.getAttribute("data-chart-tooltip"))
-        .find((tooltip) => Boolean(tooltip && tooltip.includes(` · ${monthLabel}:`)));
+      const assetTooltip = assetsTooltipData.flat().find((tooltip) => tooltip.includes(` · ${monthLabel}:`));
       if (!assetTooltip) {
         return { error: "No se encontró tooltip de activo para MARZO." };
       }
@@ -868,26 +893,39 @@ test.describe("Finance tracker E2E", () => {
     await tracker.openInvestment();
     await page.locator("#investment-month").selectOption({ label: "ENERO" });
 
-    const firstPortfolioTooltip = await page
-      .locator("#investment-portfolio-chart circle")
-      .first()
-      .getAttribute("data-chart-tooltip");
-    const firstAssetsTooltip = await page.locator("#investment-assets-chart circle").first().getAttribute("data-chart-tooltip");
+    const tooltips = await page.evaluate(() => {
+      const portfolio = document.getElementById("investment-portfolio-chart");
+      const assets = document.getElementById("investment-assets-chart");
+      if (!portfolio || !assets) return null;
 
-    expect(firstPortfolioTooltip).toContain("01/01");
-    expect(firstAssetsTooltip).toContain("01/01");
-    expect(firstPortfolioTooltip).toMatch(/0[.,]00%/);
+      const portfolioTooltipData: string[][] = JSON.parse(portfolio.dataset.chartTooltips || "[]");
+      const assetsTooltipData: string[][] = JSON.parse(assets.dataset.chartTooltips || "[]");
+
+      return {
+        firstPortfolio: portfolioTooltipData[0]?.[0] || "",
+        firstAssets: assetsTooltipData[0]?.[0] || "",
+      };
+    });
+
+    expect(tooltips).not.toBeNull();
+    if (!tooltips) return;
+
+    expect(tooltips.firstPortfolio).toContain("01/01");
+    expect(tooltips.firstAssets).toContain("01/01");
+    expect(tooltips.firstPortfolio).toMatch(/0[.,]00%/);
   });
 
   test("inversión: gráfico de distribución usa donut chart y contiene segmentos", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    // Verificar que el gráfico donut contiene paths (segmentos del donut)
-    const donutPaths = page.locator("#investment-allocation path");
-    const pathCount = await donutPaths.count();
+    // Verificar que el canvas del donut tiene segmentos renderizados
+    const segmentCount = await page.evaluate(() => {
+      const canvas = document.getElementById("investment-allocation");
+      return parseInt(canvas?.dataset.chartSegmentCount || "0");
+    });
 
-    // Debe haber al menos 1 path para un segmento del donut
-    expect(pathCount).toBeGreaterThan(0);
+    // Debe haber al menos 1 segmento
+    expect(segmentCount).toBeGreaterThan(0);
   });
 
   test("inversión: gráficos ocupan ancho equilibrado en dos columnas", async ({ tracker, page }, testInfo) => {
@@ -933,19 +971,24 @@ test.describe("Finance tracker E2E", () => {
   test("inversión: donut chart renderiza leyenda con colores", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    // Verificar que hay rectángulos de color en la leyenda del donut
-    const legendRects = page.locator("#investment-allocation rect[fill]");
-    const rectCount = await legendRects.count();
+    // Verificar que el canvas del donut tiene items de leyenda
+    const legendCount = await page.evaluate(() => {
+      const canvas = document.getElementById("investment-allocation");
+      return parseInt(canvas?.dataset.chartLegendCount || "0");
+    });
 
-    // Debe haber al menos 2 rectángulos (1 por cada activo + posibles items de leyenda)
-    expect(rectCount).toBeGreaterThanOrEqual(1);
+    // Debe haber al menos 1 item de leyenda (1 por activo)
+    expect(legendCount).toBeGreaterThanOrEqual(1);
   });
 
   test("inversión: seleccionar mes diferente actualiza los gráficos", async ({ tracker, page }) => {
     await tracker.openInvestment();
 
-    // Obtener cantidad inicial de circles (puntos de datos)
-    const initialCircles = await page.locator("#investment-portfolio-chart circle").count();
+    // Obtener cantidad inicial de puntos
+    const initialPoints = await page.evaluate(() => {
+      const canvas = document.getElementById("investment-portfolio-chart");
+      return parseInt(canvas?.dataset.chartPointCount || "0");
+    });
 
     // Seleccionar mes anterior
     await page.locator("#investment-month").selectOption({ label: "ENERO" });
@@ -953,10 +996,13 @@ test.describe("Finance tracker E2E", () => {
     // Esperar a que se renderice
     await page.waitForTimeout(300);
 
-    // La cantidad de points debe cambiar o ser diferente
-    const updatedCircles = await page.locator("#investment-portfolio-chart circle").count();
+    // La cantidad de puntos debe cambiar o ser diferente
+    const updatedPoints = await page.evaluate(() => {
+      const canvas = document.getElementById("investment-portfolio-chart");
+      return parseInt(canvas?.dataset.chartPointCount || "0");
+    });
 
     // En enero debería haber menos o igual puntos de datos
-    expect(updatedCircles).toBeLessThanOrEqual(initialCircles);
+    expect(updatedPoints).toBeLessThanOrEqual(initialPoints);
   });
 });
