@@ -65,7 +65,7 @@ function buildIssueBody(payload: IssueReportPayload): string {
 }
 
 function buildLabels(type: IssueReportPayload["type"]): string[] {
-  return ["source:web-report", "status:triage", `type:${type}`];
+  return ["source:web-report", "status:triage", "enrich:pending", `type:${type}`];
 }
 
 async function requestWithRetry(

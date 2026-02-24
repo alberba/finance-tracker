@@ -11,7 +11,8 @@ permissions:
 jobs:
   enrich:
     if: >-
-      contains(join(github.event.issue.labels.*.name, ','), 'source:web-report')
+      contains(join(github.event.issue.labels.*.name, ','), 'source:web-report') &&
+      contains(join(github.event.issue.labels.*.name, ','), 'enrich:pending')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,31 +55,202 @@ jobs:
           direct_prompt: |
             Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.
 
-            Requisitos:
-            1) Reescribir el título para que sea técnico y concreto.
-            2) Reescribir el cuerpo incluyendo:
-               - problema
-               - hipótesis técnica
-               - alcance
-               - criterios de aceptación verificables
-            3) Añadir labels de clasificación:
-               - una de prioridad: priority:low | priority:med | priority:high
-               - al menos una de área: area:frontend | area:backend | area:infra | area:data
-            4) Mantener etiquetas existentes.
+            Devuelve EXCLUSIVAMENTE un bloque HTML comment con este formato exacto:
+            <!-- ENRICHMENT_RESULT_V1
+            {
+              "title": "Título enriquecido",
+              "body_markdown": "Cuerpo markdown enriquecido",
+              "labels_add": ["priority:med", "area:frontend"],
+              "labels_keep": ["source:web-report", "status:triage", "type:enhancement"],
+              "labels_remove": ["enrich:pending"]
+            }
+            -->
+
+            Reglas:
+            - title: string no vacío y técnico.
+            - body_markdown: markdown en español con secciones:
+              - Problema
+              - Hipótesis técnica
+              - Alcance
+              - Criterios de aceptación (verificables)
+            - labels_add: incluir exactamente 1 prioridad (priority:low|priority:med|priority:high)
+              y al menos 1 área (area:frontend|area:backend|area:infra|area:data).
+            - labels_keep: incluir siempre source:web-report, status:triage y el type:* actual.
+            - labels_remove: incluir enrich:pending.
+            - No incluyas texto fuera del bloque ENRICHMENT_RESULT_V1.
 
             Contexto del repo e issue:
             ```md
             ${{ steps.context.outputs.markdown }}
             ```
 
-      - name: Add enriched marker label
+      - name: Apply enrichment to issue
         uses: actions/github-script@v7
         with:
           script: |
             const issue_number = context.issue.number;
-            await github.rest.issues.addLabels({
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+
+            const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
+            const candidate = [...comments]
+              .reverse()
+              .find((comment) => {
+                const login = String(comment?.user?.login || "");
+                return (login === "claude[bot]" || login === "github-actions[bot]") && markerRegex.test(String(comment.body || ""));
+              });
+
+            if (!candidate) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "No se encontró bloque `ENRICHMENT_RESULT_V1` en comentarios de Claude."
+              });
+              return;
+            }
+
+            const body = String(candidate.body || "");
+            const match = body.match(markerRegex);
+            if (!match) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Formato inválido de salida: bloque `ENRICHMENT_RESULT_V1` no parseable."
+              });
+              return;
+            }
+
+            let parsed;
+            try {
+              parsed = JSON.parse(match[1].trim());
+            } catch (error) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: `JSON inválido en ENRICHMENT_RESULT_V1: ${error instanceof Error ? error.message : "error desconocido"}`
+              });
+              return;
+            }
+
+            const title = typeof parsed?.title === "string" ? parsed.title.trim() : "";
+            const bodyMarkdown = typeof parsed?.body_markdown === "string" ? parsed.body_markdown.trim() : "";
+            const labelsAdd = Array.isArray(parsed?.labels_add) ? parsed.labels_add.filter((v) => typeof v === "string" && v.trim()) : [];
+            const labelsKeep = Array.isArray(parsed?.labels_keep) ? parsed.labels_keep.filter((v) => typeof v === "string" && v.trim()) : [];
+            const labelsRemove = Array.isArray(parsed?.labels_remove) ? parsed.labels_remove.filter((v) => typeof v === "string" && v.trim()) : [];
+
+            if (!title || !bodyMarkdown || labelsAdd.length === 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: se requieren `title`, `body_markdown` y `labels_add`."
+              });
+              return;
+            }
+
+            const hasPriority = labelsAdd.some((label) => /^priority:(low|med|high)$/.test(label));
+            const hasArea = labelsAdd.some((label) => /^area:(frontend|backend|infra|data)$/.test(label));
+            if (!hasPriority || !hasArea) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: falta prioridad o área en `labels_add`."
+              });
+              return;
+            }
+
+            const { data: issue } = await github.rest.issues.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
+              issue_number
+            });
+
+            const currentLabels = Array.isArray(issue.labels)
+              ? issue.labels.map((label) => typeof label === "string" ? label : String(label?.name || "")).filter(Boolean)
+              : [];
+
+            const finalLabels = Array.from(
+              new Set([
+                ...currentLabels,
+                ...labelsKeep,
+                ...labelsAdd,
+                "enriched:haiku"
+              ])
+            ).filter((label) => !new Set([...labelsRemove, "enrich:pending", "enrich:failed"]).has(label));
+
+            await github.rest.issues.update({
+              owner,
+              repo,
               issue_number,
-              labels: ['enriched:haiku']
+              title,
+              body: bodyMarkdown
+            });
+
+            await github.rest.issues.setLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: finalLabels
+            });
+
+      - name: Mark enrichment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: ["enrich:failed"]
+            });
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: "El enriquecimiento automático falló. Revisa logs del workflow `Issue Enrichment (Haiku)`."
             });

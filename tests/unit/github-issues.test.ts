@@ -38,7 +38,9 @@ describe("github issues service", () => {
     expect(fakeFetch).toHaveBeenCalledTimes(1);
     const [, init] = fakeFetch.mock.calls[0];
     const body = JSON.parse(String(init?.body || "{}"));
-    expect(body.labels).toEqual(expect.arrayContaining(["source:web-report", "status:triage", "type:bug"]));
+    expect(body.labels).toEqual(
+      expect.arrayContaining(["source:web-report", "status:triage", "enrich:pending", "type:bug"])
+    );
     expect(body.body).toContain("@claude");
   });
 
