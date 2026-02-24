@@ -36,6 +36,8 @@ import {
   renderGroupedBarChart,
   renderHorizontalBarChart,
   renderLineChart,
+  renderMultiLineChart,
+  type MultiLineSeries,
 } from "./charts";
 import {
   clone,
@@ -260,6 +262,8 @@ import {
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
+    investmentPortfolioChart: getRequiredElement<SVGSVGElement>("investment-portfolio-chart"),
+    investmentAssetsChart: getRequiredElement<SVGSVGElement>("investment-assets-chart"),
     investmentAllocation: getRequiredElement<SVGSVGElement>("investment-allocation"),
     contributionForm: getRequiredElement<ContributionForm>("contribution-form"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
@@ -1800,17 +1804,102 @@ import {
     el.invReturn.textContent = formatPercent(estimatedReturn);
     el.invReturn.className = estimatedReturn >= 0 ? "text-good" : "text-bad";
 
-    const allocation = state.investmentAssets.map((asset: any) => ({
-      label: asset.name,
-      value: computeInvestmentValue(asset.id, month),
-    }));
+    const COLORS = ["#0d8476", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#84cc16", "#ec4899", "#64748b"];
 
-    renderHorizontalBarChart(
-      el.investmentAllocation,
-      allocation,
-      ["#0d8476", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#84cc16", "#ec4899", "#64748b"],
-      formatMoney
-    );
+    const toGainPercent = (value: number, investedCapitalValue: number): number => {
+      if (investedCapitalValue <= 0) {
+        return 0;
+      }
+      return ((value - investedCapitalValue) / investedCapitalValue) * 100;
+    };
+
+    const computeInvestedCapitalByAsset = (assetId: string, targetMonth: number): number => {
+      const asset = state.investmentAssets.find((item: any) => item.id === assetId);
+      if (!asset) {
+        return 0;
+      }
+
+      const openingCapital = Number(asset.openingBalance || 0);
+      const contributions = state.transactions.reduce((sum: number, item: any) => {
+        if (item.type !== "investment") {
+          return sum;
+        }
+        if (Number(item.month) > targetMonth) {
+          return sum;
+        }
+        if (!matchesInvestmentAsset(item.category, asset)) {
+          return sum;
+        }
+        return sum + Number(item.amount || 0);
+      }, 0);
+
+      return round2(openingCapital + contributions);
+    };
+
+    const computeInvestedCapitalTotal = (targetMonth: number): number => {
+      return round2(
+        state.investmentAssets.reduce((sum: number, asset: any) => {
+          return sum + computeInvestedCapitalByAsset(asset.id, targetMonth);
+        }, 0)
+      );
+    };
+
+    // Render portfolio evolution chart (cartera total)
+    const monthIndexes = Array.from({ length: month + 1 }, (_, i) => i);
+    const chartPoints = [-1, ...monthIndexes];
+    const monthLabels = ["01/01", ...monthIndexes.map((m) => MONTHS[m])];
+
+    // Portfolio total series
+    const portfolioTotalValues = chartPoints.map((m) => getWealthByMonth(m).investment);
+    const portfolioInvestedCapital = chartPoints.map((m) => computeInvestedCapitalTotal(m));
+    const portfolioPercentages = portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]));
+    const portfolioSeries: MultiLineSeries[] = [
+      {
+        name: "Cartera Total",
+        color: COLORS[0],
+        values: portfolioPercentages,
+      },
+    ];
+
+    renderMultiLineChart(el.investmentPortfolioChart, portfolioSeries, {
+      labels: monthLabels,
+      formatValue: (v) => formatPercent(v),
+      forceZeroTick: true,
+    });
+
+    // Render individual assets evolution chart
+    const assetsSeries: MultiLineSeries[] = state.investmentAssets
+      .filter((asset: any) => computeInvestmentValue(asset.id, month) > 0)
+      .map((asset: any, idx: any) => {
+        const values = chartPoints.map((m) => computeInvestmentValue(asset.id, m));
+        const investedCapitalValues = chartPoints.map((m) => computeInvestedCapitalByAsset(asset.id, m));
+        const percentages = values.map((value, valueIdx) => toGainPercent(value, investedCapitalValues[valueIdx]));
+        return {
+          name: asset.name,
+          color: COLORS[idx % COLORS.length],
+          values: percentages,
+        };
+      });
+
+    renderMultiLineChart(el.investmentAssetsChart, assetsSeries, {
+      labels: monthLabels,
+      formatValue: (v) => formatPercent(v),
+      forceZeroTick: true,
+    });
+
+    // Render distribution donut
+    const allocation = state.investmentAssets
+      .map((asset: any, idx: any) => {
+        const value = computeInvestmentValue(asset.id, month);
+        return {
+          label: asset.name,
+          color: COLORS[idx % COLORS.length],
+          value,
+        };
+      })
+      .filter((item) => item.value > 0);
+
+    renderDonutChart(el.investmentAllocation, allocation, formatMoney);
 
     renderContributionsTable();
   }

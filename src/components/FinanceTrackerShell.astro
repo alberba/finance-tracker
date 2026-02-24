@@ -526,10 +526,21 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           </article>
         </div>
 
+        <div class="chart-grid-inv">
+          <article class="card">
+            <h3>Evolución de la cartera</h3>
+            <svg id="investment-portfolio-chart" viewBox="0 0 720 340" aria-label="Evolución cartera total"></svg>
+          </article>
+          <article class="card">
+            <h3>Evolución por activo</h3>
+            <svg id="investment-assets-chart" viewBox="0 0 720 340" aria-label="Evolución por activo"></svg>
+          </article>
+        </div>
+
         <div class="dual-grid">
           <article class="card">
             <h3>Distribución de activos</h3>
-            <svg id="investment-allocation" viewBox="0 0 720 300" aria-label="Distribución de cartera"></svg>
+            <svg id="investment-allocation" viewBox="0 0 420 260" aria-label="Distribución de cartera"></svg>
           </article>
           <article class="card">
             <h3>Aportes y TWR aproximado</h3>
