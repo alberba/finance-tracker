@@ -207,9 +207,9 @@ import {
     kpiNetWorth: getRequiredElement<HTMLElement>("kpi-net-worth"),
     kpiAnnualSavings: getRequiredElement<HTMLElement>("kpi-annual-savings"),
     kpiGrowth: getRequiredElement<HTMLElement>("kpi-growth"),
-    chartNetWorth: getRequiredElement<SVGSVGElement>("chart-networth"),
-    chartCashflow: getRequiredElement<SVGSVGElement>("chart-cashflow"),
-    chartDistribution: getRequiredElement<SVGSVGElement>("chart-distribution"),
+    chartNetWorth: getRequiredElement<HTMLCanvasElement>("chart-networth"),
+    chartCashflow: getRequiredElement<HTMLCanvasElement>("chart-cashflow"),
+    chartDistribution: getRequiredElement<HTMLCanvasElement>("chart-distribution"),
     topExpenseList: getRequiredElement<HTMLElement>("top-expense-list"),
 
     txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
@@ -251,7 +251,7 @@ import {
     snapshotInvestments: getRequiredElement<HTMLElement>("snapshot-investments"),
     snapshotLiabilities: getRequiredElement<HTMLElement>("snapshot-liabilities"),
     wealthTimelineBody: getRequiredElement<HTMLElement>("wealth-timeline-body"),
-    chartWealth: getRequiredElement<SVGSVGElement>("chart-wealth"),
+    chartWealth: getRequiredElement<HTMLCanvasElement>("chart-wealth"),
     wealthCalcDialog: getRequiredElement<HTMLDialogElement>("wealth-calc-dialog"),
     wealthCalcForm: getRequiredElement<HTMLFormElement>("wealth-calc-form"),
     wealthCalcTitle: getRequiredElement<HTMLElement>("wealth-calc-title"),
@@ -262,9 +262,9 @@ import {
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
-    investmentPortfolioChart: getRequiredElement<SVGSVGElement>("investment-portfolio-chart"),
-    investmentAssetsChart: getRequiredElement<SVGSVGElement>("investment-assets-chart"),
-    investmentAllocation: getRequiredElement<SVGSVGElement>("investment-allocation"),
+    investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>("investment-portfolio-chart"),
+    investmentAssetsChart: getRequiredElement<HTMLCanvasElement>("investment-assets-chart"),
+    investmentAllocation: getRequiredElement<HTMLCanvasElement>("investment-allocation"),
     contributionForm: getRequiredElement<ContributionForm>("contribution-form"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
 
@@ -814,7 +814,7 @@ import {
       const target = getEventElement(event.target);
       const withTooltip = target?.closest<SVGElement>("[data-chart-tooltip]");
       if (!withTooltip) {
-        const insideChart = target?.closest("svg");
+        const insideChart = target?.closest("svg") || target?.closest("canvas");
         if (insideChart) {
           return;
         }
