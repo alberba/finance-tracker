@@ -304,6 +304,23 @@ test.describe("Finance tracker E2E", () => {
     await tracker.clearTransactionFilters();
   });
 
+  test("movimientos muestra columnas en orden: fecha, descripción, importe, cuenta, tipo, categoría", async ({ page, tracker }) => {
+    await page.goto("/movimientos");
+    await expect(page).toHaveURL(/\/movimientos$/);
+
+    const headers = await tracker.transactionsSection.locator("thead th").allInnerTexts();
+    const filteredHeaders = headers.map((text) => text.trim()).filter((text) => text !== "");
+
+    expect(filteredHeaders[0]).toBe("");
+    expect(filteredHeaders[1]).toContain("Fecha");
+    expect(filteredHeaders[2]).toContain("Descripción");
+    expect(filteredHeaders[3]).toContain("Importe");
+    expect(filteredHeaders[4]).toContain("Cuenta");
+    expect(filteredHeaders[5]).toContain("Tipo");
+    expect(filteredHeaders[6]).toContain("Categoría");
+    expect(filteredHeaders[7]).toBe("Acciones");
+  });
+
   test("movimientos inicia con popovers de filtros ocultos en header", async ({ page, tracker }) => {
     await page.goto("/movimientos");
     await expect(page).toHaveURL(/\/movimientos$/);

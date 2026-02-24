@@ -237,6 +237,30 @@ const canonicalUrl = new URL("/", Astro.url).toString();
                       <button type="button" class="tx-header-clear-btn" data-column="date">Limpiar</button>
                     </div>
                   </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="description">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="description" aria-haspopup="true" aria-expanded="false">Descripción</button>
+                      <button type="button" class="tx-sort-btn" data-column="description" aria-label="Ordenar por descripción">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="description" hidden>
+                      <label for="tx-header-filter-description">Descripción</label>
+                      <input id="tx-header-filter-description" name="txHeaderFilterDescription" type="text" placeholder="Contiene..." autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="description">Limpiar</button>
+                    </div>
+                  </th>
+                  <th class="tx-head tx-head--filterable" data-filter-column="amount">
+                    <div class="tx-head-main">
+                      <button type="button" class="tx-filter-trigger" data-column="amount" aria-haspopup="true" aria-expanded="false">Importe</button>
+                      <button type="button" class="tx-sort-btn" data-column="amount" aria-label="Ordenar por importe">↕</button>
+                    </div>
+                    <div class="tx-filter-popover" data-column="amount" hidden>
+                      <label for="tx-header-filter-amount-min">Importe mín</label>
+                      <input id="tx-header-filter-amount-min" name="txHeaderFilterAmountMin" type="number" min="0" step="0.01" autocomplete="off" />
+                      <label for="tx-header-filter-amount-max">Importe máx</label>
+                      <input id="tx-header-filter-amount-max" name="txHeaderFilterAmountMax" type="number" min="0" step="0.01" autocomplete="off" />
+                      <button type="button" class="tx-header-clear-btn" data-column="amount">Limpiar</button>
+                    </div>
+                  </th>
                   <th class="tx-head tx-head--filterable" data-filter-column="account">
                     <div class="tx-head-main">
                       <button type="button" class="tx-filter-trigger" data-column="account" aria-haspopup="true" aria-expanded="false">Cuenta</button>
@@ -268,30 +292,6 @@ const canonicalUrl = new URL("/", Astro.url).toString();
                       <label for="tx-header-filter-category">Categoría</label>
                       <input id="tx-header-filter-category" name="txHeaderFilterCategory" type="text" placeholder="Contiene..." autocomplete="off" />
                       <button type="button" class="tx-header-clear-btn" data-column="category">Limpiar</button>
-                    </div>
-                  </th>
-                  <th class="tx-head tx-head--filterable" data-filter-column="description">
-                    <div class="tx-head-main">
-                      <button type="button" class="tx-filter-trigger" data-column="description" aria-haspopup="true" aria-expanded="false">Descripción</button>
-                      <button type="button" class="tx-sort-btn" data-column="description" aria-label="Ordenar por descripción">↕</button>
-                    </div>
-                    <div class="tx-filter-popover" data-column="description" hidden>
-                      <label for="tx-header-filter-description">Descripción</label>
-                      <input id="tx-header-filter-description" name="txHeaderFilterDescription" type="text" placeholder="Contiene..." autocomplete="off" />
-                      <button type="button" class="tx-header-clear-btn" data-column="description">Limpiar</button>
-                    </div>
-                  </th>
-                  <th class="tx-head tx-head--filterable" data-filter-column="amount">
-                    <div class="tx-head-main">
-                      <button type="button" class="tx-filter-trigger" data-column="amount" aria-haspopup="true" aria-expanded="false">Importe</button>
-                      <button type="button" class="tx-sort-btn" data-column="amount" aria-label="Ordenar por importe">↕</button>
-                    </div>
-                    <div class="tx-filter-popover" data-column="amount" hidden>
-                      <label for="tx-header-filter-amount-min">Importe mín</label>
-                      <input id="tx-header-filter-amount-min" name="txHeaderFilterAmountMin" type="number" min="0" step="0.01" autocomplete="off" />
-                      <label for="tx-header-filter-amount-max">Importe máx</label>
-                      <input id="tx-header-filter-amount-max" name="txHeaderFilterAmountMax" type="number" min="0" step="0.01" autocomplete="off" />
-                      <button type="button" class="tx-header-clear-btn" data-column="amount">Limpiar</button>
                     </div>
                   </th>
                   <th>Acciones</th>
