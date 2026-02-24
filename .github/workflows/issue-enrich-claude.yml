@@ -100,7 +100,7 @@ jobs:
             });
 
             const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
-            const xmlRegex = /<enrichment>([\s\S]*?)<\/enrichment>/m;
+            const xmlRegex = /<(?:data-)?enrichment>([\s\S]*?)<\/(?:data-)?enrichment>/m;
             const candidate = [...comments]
               .reverse()
               .find((comment) => {
@@ -121,7 +121,7 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1` o `<enrichment>`) en comentarios de Claude."
+                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>` o `<data-enrichment>`) en comentarios de Claude."
               });
               return;
             }
@@ -144,7 +144,12 @@ jobs:
                 const parsed = JSON.parse(raw);
                 return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string" && value.trim()) : [];
               } catch {
-                return [];
+                const normalized = String(raw)
+                  .replace(/^\[|\]$/g, "")
+                  .split(",")
+                  .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+                  .filter(Boolean);
+                return normalized;
               }
             }
 
