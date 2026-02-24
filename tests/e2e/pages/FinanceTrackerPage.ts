@@ -70,6 +70,21 @@ export class FinanceTrackerPage {
     await this.open("investment");
   }
 
+  async openInvestmentDashboardTab() {
+    await this.openInvestment();
+    await this.investmentSection().getByRole("button", { name: "Dashboard" }).click();
+  }
+
+  async openInvestmentMovementsTab() {
+    await this.openInvestment();
+    await this.investmentSection().getByRole("button", { name: "Movimientos" }).click();
+  }
+
+  async openInvestmentContributionsTab() {
+    await this.openInvestment();
+    await this.investmentSection().getByRole("button", { name: "Aportes" }).click();
+  }
+
   async openGoals() {
     await this.open("goals");
   }
@@ -429,6 +444,73 @@ export class FinanceTrackerPage {
 
   async dashboardIncomeText(): Promise<string> {
     return this.dashboardSection.locator("#kpi-income").innerText();
+  }
+
+  async editInvestmentMovementByDescription(
+    description: string,
+    payload: { amount?: number; category?: string; newDescription?: string; date?: string }
+  ) {
+    await this.openInvestmentMovementsTab();
+    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: description }).first();
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: "Editar" }).click();
+
+    const editRow = this.investmentSection().locator("tr[data-investment-editing-id]").first();
+    await expect(editRow).toBeVisible();
+
+    if (payload.date) {
+      await editRow.locator('[data-edit-field="date"]').fill(payload.date);
+    }
+    if (typeof payload.amount === "number") {
+      await editRow.locator('[data-edit-field="amount"]').fill(String(payload.amount));
+    }
+    if (typeof payload.category === "string") {
+      await editRow.locator('[data-edit-field="category"]').fill(payload.category);
+    }
+    if (typeof payload.newDescription === "string") {
+      await editRow.locator('[data-edit-field="description"]').fill(payload.newDescription);
+    }
+
+    await editRow.getByRole("button", { name: "Guardar" }).click();
+    await expect(this.page.getByRole("status")).toContainText("Movimiento de inversión actualizado.");
+  }
+
+  async deleteInvestmentMovementByDescription(description: string) {
+    await this.openInvestmentMovementsTab();
+    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: description }).first();
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: "Eliminar" }).click();
+    await expect(this.page.getByRole("status")).toContainText("Movimiento eliminado.");
+  }
+
+  async setContributionFlowByDate(date: string, flow: number) {
+    await this.openInvestmentContributionsTab();
+    const input = this.investmentSection().locator(`input[data-contribution-flow-date="${date}"]`);
+    await expect(input).toBeVisible();
+    await input.fill(String(flow));
+  }
+
+  async getContributionRowTexts(date: string): Promise<string[]> {
+    await this.openInvestmentContributionsTab();
+    const row = this.investmentSection().locator("#contribution-body tr", { hasText: date }).first();
+    await expect(row).toBeVisible();
+    return row.locator("td").allInnerTexts();
+  }
+
+  async getInvestmentMovementsTypes(): Promise<string[]> {
+    await this.openInvestmentMovementsTab();
+    const rows = this.investmentSection().locator("#investment-tx-table-body tr");
+    const count = await rows.count();
+    const types: string[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const type = (await rows.nth(index).locator("td").nth(4).innerText()).trim();
+      types.push(type);
+    }
+    return types;
+  }
+
+  investmentSection(): Locator {
+    return this.page.locator("#investment");
   }
 
   async reload() {

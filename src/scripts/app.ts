@@ -17,6 +17,7 @@ import {
   type EntityKey,
   type Goal,
   type GoalKey,
+  type InvestmentSubTab,
   type MonthTotals,
   type SectionId,
   type SnapshotKind,
@@ -64,6 +65,7 @@ import {
   sortContributionsInState,
   sortTransactionsInState,
 } from "./state";
+import { computeContributionMetrics as computeContributionMetricsCore } from "../lib/finance-core";
 
 (() => {
   "use strict";
@@ -86,6 +88,8 @@ import {
     investmentMonth: number;
     wealthCalcTargetId: string;
     wealthCalcTargetName: string;
+    investmentTab: InvestmentSubTab;
+    investmentTxEditingId: string;
   }
 
   interface TxFormControls extends HTMLFormControlsCollection {
@@ -101,8 +105,6 @@ import {
   interface TxForm extends HTMLFormElement {
     elements: TxFormControls;
   }
-
-  type ContributionForm = HTMLFormElement;
 
   function getRequiredElement<T extends Element>(id: string): T {
     const element = document.getElementById(id);
@@ -191,6 +193,8 @@ import {
     investmentMonth: Math.min(new Date().getMonth(), 11),
     wealthCalcTargetId: "",
     wealthCalcTargetName: "",
+    investmentTab: "dashboard",
+    investmentTxEditingId: "",
   };
 
   const el = {
@@ -259,13 +263,15 @@ import {
     wealthCalcClose: getRequiredElement<HTMLButtonElement>("wealth-calc-close"),
 
     investmentMonth: getRequiredElement<HTMLSelectElement>("investment-month"),
+    investmentSubtabButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-investment-tab]")),
+    investmentSubtabPanels: Array.from(document.querySelectorAll<HTMLElement>("[data-investment-tab-panel]")),
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
     investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>("investment-portfolio-chart"),
     investmentAssetsChart: getRequiredElement<HTMLCanvasElement>("investment-assets-chart"),
     investmentAllocation: getRequiredElement<HTMLCanvasElement>("investment-allocation"),
-    contributionForm: getRequiredElement<ContributionForm>("contribution-form"),
+    investmentTxBody: getRequiredElement<HTMLElement>("investment-tx-table-body"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
 
     goalsProgress: getRequiredElement<HTMLElement>("goals-progress"),
@@ -567,7 +573,11 @@ import {
           return;
         }
         if (action === "save-edit-tx") {
-          saveEditedTransactionRow(id);
+          saveEditedTransactionRow(id, {
+            tableBody: el.txBody,
+            editingRowAttr: "data-editing-id",
+            successMessage: "Movimiento actualizado.",
+          });
           return;
         }
       }
@@ -663,52 +673,78 @@ import {
   }
 
   function bindInvestmentEvents() {
+    el.investmentSubtabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextTab = String(button.dataset.investmentTab || "");
+        if (!isInvestmentSubTab(nextTab)) {
+          return;
+        }
+        ui.investmentTab = nextTab;
+        renderInvestmentTabState();
+      });
+    });
+
     el.investmentMonth.addEventListener("change", () => {
       ui.investmentMonth = parseIntSafe(el.investmentMonth.value, ui.investmentMonth);
       renderInvestment();
       renderGoals();
     });
 
-    el.contributionForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = new FormData(el.contributionForm);
-      const date = String(form.get("date") || "");
-      const amount = round2(parseFloatSafe(form.get("amount"), 0));
-      const portfolioValue = round2(parseFloatSafe(form.get("portfolioValue"), 0));
-      const flow = round2(parseFloatSafe(form.get("flow"), amount));
-
-      if (!date || portfolioValue <= 0) {
-        showToast("Completa fecha y valor de cartera.");
-        return;
+    el.investmentTxBody.addEventListener("click", (event) => {
+      const target = getEventElement(event.target);
+      const actionButton = target?.closest<HTMLButtonElement>("button[data-action]");
+      if (actionButton) {
+        const action = actionButton.dataset.action;
+        const id = actionButton.dataset.id;
+        if (!id) {
+          return;
+        }
+        if (action === "edit-investment-tx") {
+          ui.investmentTxEditingId = id;
+          renderInvestmentTransactionsTable();
+          return;
+        }
+        if (action === "cancel-edit-investment-tx") {
+          ui.investmentTxEditingId = "";
+          renderInvestmentTransactionsTable();
+          return;
+        }
+        if (action === "save-edit-investment-tx") {
+          saveEditedTransactionRow(id, {
+            tableBody: el.investmentTxBody,
+            editingRowAttr: "data-investment-editing-id",
+            successMessage: "Movimiento de inversión actualizado.",
+          });
+          return;
+        }
       }
 
-      state.contributions.push({
-        id: uid("contrib"),
-        date,
-        amount,
-        portfolioDate: date,
-        portfolioValue,
-        flow,
-      });
-
-      sortContributions();
+      const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-id]");
+      if (!deleteButton) {
+        return;
+      }
+      const id = deleteButton.dataset.deleteId;
+      state.transactions = state.transactions.filter((item: any) => item.id !== id);
+      ui.investmentTxEditingId = "";
       saveState();
-      el.contributionForm.reset();
       renderAll();
-      showToast("Aporte agregado.");
+      showToast("Movimiento eliminado.");
     });
 
-    el.contributionBody.addEventListener("click", (event) => {
+    el.contributionBody.addEventListener("input", (event) => {
       const target = getEventElement(event.target);
-      const button = target?.closest<HTMLButtonElement>("button[data-delete-contrib]");
-      if (!button) {
+      const input = target?.closest<HTMLInputElement>("input[data-contribution-flow-date]");
+      if (!input) {
         return;
       }
-      const id = button.dataset.deleteContrib;
-      state.contributions = state.contributions.filter((item: any) => item.id !== id);
+      const date = String(input.dataset.contributionFlowDate || "");
+      if (!date) {
+        return;
+      }
+      const flow = round2(parseFloatSafe(input.value, 0));
+      upsertContributionFlowForDate(date, flow);
       saveState();
-      renderAll();
-      showToast("Aporte eliminado.");
+      renderContributionsTable();
     });
   }
 
@@ -1324,6 +1360,10 @@ import {
     return ["date", "amount", "account", "type", "category", "description"].includes(value);
   }
 
+  function isInvestmentSubTab(value: string): value is InvestmentSubTab {
+    return ["dashboard", "movements", "contributions"].includes(value);
+  }
+
   function renderTransactionSortState() {
     document.querySelectorAll(".tx-sort-btn").forEach((button: any) => {
       const column = button.dataset.column;
@@ -1347,7 +1387,14 @@ import {
     });
   }
 
-  function renderEditingTransactionRow(item: any) {
+  function renderEditingTransactionRow(
+    item: any,
+    editingRowAttr = "data-editing-id",
+    actions: { saveAction: string; cancelAction: string } = {
+      saveAction: "save-edit-tx",
+      cancelAction: "cancel-edit-tx",
+    }
+  ) {
     const accountsOptions = state.accounts
       .map((entry: any) => {
         const selected = entry.id === item.accountId ? "selected" : "";
@@ -1364,7 +1411,7 @@ import {
       .join("");
 
     return `
-      <tr data-editing-id="${escapeAttr(item.id)}">
+      <tr ${editingRowAttr}="${escapeAttr(item.id)}">
         <td></td>
         <td><input type="date" name="editTxDate" autocomplete="off" data-edit-field="date" value="${escapeAttr(String(item.date))}" /></td>
         <td><input type="text" name="editTxDescription" autocomplete="off" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
@@ -1377,7 +1424,7 @@ import {
             <button
               type="button"
               class="inline-save-btn icon-action-btn"
-              data-action="save-edit-tx"
+              data-action="${escapeAttr(actions.saveAction)}"
               data-id="${escapeAttr(item.id)}"
               aria-label="Guardar"
             >
@@ -1388,7 +1435,7 @@ import {
             <button
               type="button"
               class="inline-cancel-btn icon-action-btn"
-              data-action="cancel-edit-tx"
+              data-action="${escapeAttr(actions.cancelAction)}"
               data-id="${escapeAttr(item.id)}"
               aria-label="Cancelar"
             >
@@ -1402,8 +1449,15 @@ import {
     `;
   }
 
-  function saveEditedTransactionRow(id: any) {
-    const row = el.txBody.querySelector(`tr[data-editing-id="${id}"]`);
+  function saveEditedTransactionRow(
+    id: any,
+    options: { tableBody: HTMLElement; editingRowAttr: string; successMessage: string } = {
+      tableBody: el.txBody,
+      editingRowAttr: "data-editing-id",
+      successMessage: "Movimiento actualizado.",
+    }
+  ) {
+    const row = options.tableBody.querySelector(`tr[${options.editingRowAttr}="${id}"]`);
     if (!row) {
       return;
     }
@@ -1444,10 +1498,11 @@ import {
     tx.amount = round2(amount);
 
     ui.txEditingId = "";
+    ui.investmentTxEditingId = "";
     sortTransactions();
     saveState();
     renderAll();
-    showToast("Movimiento actualizado.");
+    showToast(options.successMessage);
   }
 
   function openTransactionModal() {
@@ -1794,6 +1849,29 @@ import {
   }
 
   function renderInvestment() {
+    renderInvestmentTabState();
+    renderInvestmentDashboard();
+    renderInvestmentTransactionsTable();
+    renderContributionsTable();
+  }
+
+  function renderInvestmentTabState() {
+    el.investmentSubtabButtons.forEach((button) => {
+      const tabId = String(button.dataset.investmentTab || "");
+      const isActive = tabId === ui.investmentTab;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    el.investmentSubtabPanels.forEach((panel) => {
+      const tabId = String(panel.dataset.investmentTabPanel || "");
+      const isActive = tabId === ui.investmentTab;
+      panel.classList.toggle("is-active", isActive);
+      panel.hidden = !isActive;
+    });
+  }
+
+  function renderInvestmentDashboard() {
     const month = ui.investmentMonth;
     const wealth = getWealthByMonth(month);
     const investedCapital = computeInvestedCapital(month);
@@ -1900,33 +1978,160 @@ import {
       .filter((item) => item.value > 0);
 
     renderDonutChart(el.investmentAllocation, allocation, formatMoney);
+  }
 
-    renderContributionsTable();
+  function renderInvestmentTransactionsTable() {
+    const rows = state.transactions
+      .filter((item: any) => item.type === "investment" && Number(item.month) === ui.investmentMonth)
+      .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date)));
+
+    if (!rows.length) {
+      el.investmentTxBody.innerHTML = "<tr><td colspan='7'>Sin movimientos de inversión para este mes.</td></tr>";
+      return;
+    }
+
+    el.investmentTxBody.innerHTML = rows
+      .map((item: any) => {
+        if (ui.investmentTxEditingId === item.id) {
+          return renderEditingTransactionRow(item, "data-investment-editing-id", {
+            saveAction: "save-edit-investment-tx",
+            cancelAction: "cancel-edit-investment-tx",
+          });
+        }
+
+        const account = getAccountName(item.accountId);
+        return `
+          <tr>
+            <td>${escapeHtml(String(item.date))}</td>
+            <td>${escapeHtml(item.description || "-")}</td>
+            <td>${formatMoney(item.amount)}</td>
+            <td>${escapeHtml(account)}</td>
+            <td><span class="badge badge-investment">Inversión</span></td>
+            <td>${escapeHtml(decorateCategoryLabel("investment", item.category || "Sin categoría"))}</td>
+            <td>
+              <div class="inline-actions">
+                <button class="edit-btn icon-action-btn" data-action="edit-investment-tx" data-id="${escapeAttr(item.id)}" aria-label="Editar movimiento del ${escapeAttr(String(item.date))}">
+                  <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25z"></path>
+                    <path d="M20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path>
+                  </svg>
+                </button>
+                <button class="delete-btn icon-action-btn" data-delete-id="${escapeAttr(item.id)}" aria-label="Eliminar movimiento del ${escapeAttr(String(item.date))}">
+                  <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 7h12l-1 14H7L6 7z"></path>
+                    <path d="M9 4h6l1 2H8l1-2z"></path>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
   }
 
   function renderContributionsTable() {
-    const rows = computeContributionMetrics(state.contributions);
+    const entries = getContributionEntriesFromSnapshots();
+    const rows = computeContributionMetricsCore(entries) as ContributionMetricRow[];
 
     if (!rows.length) {
-      el.contributionBody.innerHTML = "<tr><td colspan='7'>Sin aportes registrados.</td></tr>";
+      el.contributionBody.innerHTML = "<tr><td colspan='8'>Sin snapshots de inversión disponibles.</td></tr>";
       return;
     }
 
     el.contributionBody.innerHTML = rows
-      .map(
-        (row: any) => `
+      .map((row: ContributionMetricRow, index: number) => {
+        const periodText = row.periodReturn === null ? "--" : formatPercent(row.periodReturn * 100);
+        const cumulativeText = row.cumulativeReturn === null ? "--" : formatPercent(row.cumulativeReturn * 100);
+        const periodClass = row.periodReturn === null ? "" : row.periodReturn >= 0 ? "text-good" : "text-bad";
+        const cumulativeClass =
+          row.cumulativeReturn === null ? "" : row.cumulativeReturn >= 0 ? "text-good" : "text-bad";
+
+        return `
           <tr>
             <td>${escapeHtml(row.date)}</td>
-            <td>${formatMoney(row.amount)}</td>
             <td>${formatMoney(row.portfolioValue)}</td>
-            <td>${formatMoney(row.flow)}</td>
-            <td>${row.nav.toFixed(2)}</td>
-            <td class="${row.cumulativeReturn >= 0 ? "text-good" : "text-bad"}">${formatPercent(row.cumulativeReturn * 100)}</td>
-            <td><button class="delete-btn" data-delete-contrib="${escapeAttr(row.id)}" aria-label="Eliminar aporte del ${escapeAttr(row.date)}">Eliminar</button></td>
+            <td>
+              <input
+                class="contribution-flow-input"
+                type="number"
+                step="0.01"
+                value="${row.flow}"
+                data-contribution-flow-date="${escapeAttr(row.date)}"
+                aria-label="Flujo del día ${escapeAttr(row.date)}"
+              />
+            </td>
+            <td>${index === 0 ? "100" : row.nav.toFixed(6)}</td>
+            <td>${row.unitsBefore.toFixed(4)}</td>
+            <td>${row.unitsAfter.toFixed(7)}</td>
+            <td class="${periodClass}">${periodText}</td>
+            <td class="${cumulativeClass}">${cumulativeText}</td>
           </tr>
-        `
-      )
+        `;
+      })
       .join("");
+  }
+
+  function getContributionEntriesFromSnapshots(): Contribution[] {
+    const snapshotRows = Object.entries(state.snapshots || {})
+      .map(([monthKey, snapshot]: any) => {
+        const month = parseIntSafe(monthKey, -1);
+        if (!Number.isInteger(month) || month < 0 || month > 11) {
+          return null;
+        }
+
+        const investments = snapshot?.investments || {};
+        const portfolioValue = round2(
+          Object.values(investments).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
+        );
+        if (portfolioValue <= 0) {
+          return null;
+        }
+
+        const date = toSnapshotDate(month);
+        const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
+        const flow = round2(parseFloatSafe(existing?.flow, 0));
+
+        return {
+          id: existing?.id || `contrib-snapshot-${state.year}-${month + 1}`,
+          date,
+          amount: flow,
+          portfolioDate: date,
+          portfolioValue,
+          flow,
+        };
+      })
+      .filter(Boolean) as Contribution[];
+
+    return snapshotRows.sort((a, b) => String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)));
+  }
+
+  function toSnapshotDate(month: number): string {
+    const day = new Date(state.year, month + 1, 0).getDate();
+    return `${state.year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  function upsertContributionFlowForDate(date: string, flow: number) {
+    const entries = getContributionEntriesFromSnapshots();
+    const current = entries.find((item: any) => item.date === date || item.portfolioDate === date);
+    if (!current) {
+      return;
+    }
+    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const payload = {
+      id: current.id,
+      date,
+      amount: flow,
+      portfolioDate: date,
+      portfolioValue: current.portfolioValue,
+      flow,
+    };
+    if (existingIndex >= 0) {
+      state.contributions[existingIndex] = payload;
+      return;
+    }
+    state.contributions.push(payload);
+    sortContributions();
   }
 
   function renderGoals() {
@@ -2324,66 +2529,6 @@ import {
       .reduce((sum: any, item: any) => sum + Number(item.amount || 0), 0);
 
     return round2(openingCapital + contributions);
-  }
-
-  function computeContributionMetrics(entries: Contribution[]): ContributionMetricRow[] {
-    const sorted = [...entries].sort((a: any, b: any) => String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)));
-    if (!sorted.length) {
-      return [];
-    }
-
-    const rows: ContributionMetricRow[] = [];
-    let baseNav = 100;
-    let prevNav = 100;
-    let prevUnits = 0;
-
-    sorted.forEach((item: any, index: any) => {
-      const portfolioValue = Number(item.portfolioValue || 0);
-      const flow = Number.isFinite(Number(item.flow)) ? Number(item.flow) : Number(item.amount || 0);
-      const amount = Number(item.amount || 0);
-
-      let nav;
-      let unitsBefore;
-      let unitsAfter;
-      let periodReturn;
-
-      if (index === 0) {
-        nav = baseNav;
-        unitsBefore = portfolioValue > 0 ? portfolioValue / nav : 0;
-        unitsAfter = nav > 0 ? unitsBefore + flow / nav : unitsBefore;
-        periodReturn = 0;
-      } else {
-        unitsBefore = prevUnits;
-        nav = unitsBefore > 0 ? portfolioValue / unitsBefore : prevNav;
-        if (!Number.isFinite(nav) || nav <= 0) {
-          nav = prevNav;
-        }
-        unitsAfter = nav > 0 ? unitsBefore + flow / nav : unitsBefore;
-        periodReturn = prevNav > 0 ? nav / prevNav - 1 : 0;
-      }
-
-      if (!Number.isFinite(unitsAfter)) {
-        unitsAfter = unitsBefore;
-      }
-
-      const cumulativeReturn = baseNav > 0 ? nav / baseNav - 1 : 0;
-
-      rows.push({
-        id: item.id,
-        date: item.portfolioDate || item.date,
-        amount: round2(amount),
-        portfolioValue: round2(portfolioValue),
-        flow: round2(flow),
-        nav,
-        periodReturn,
-        cumulativeReturn,
-      });
-
-      prevNav = nav;
-      prevUnits = unitsAfter;
-    });
-
-    return rows;
   }
 
   function monthsUntilGoal(targetYear: any) {

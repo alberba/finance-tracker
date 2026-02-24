@@ -118,6 +118,11 @@ describe("finance-core helpers", () => {
     expect(cryptoMonth1).toBe(380);
   });
 
+  it("devuelve 0 para activos o pasivos inexistentes", () => {
+    expect(computeInvestmentValue("asset-missing", 1, investments, transactions, snapshots)).toBe(0);
+    expect(computeLiabilityValue("liability-missing", 1, liabilities, snapshots)).toBe(0);
+  });
+
   it("calcula pasivos usando snapshot cuando existe", () => {
     const liabilityMonth0 = computeLiabilityValue("hipoteca", 0, liabilities, snapshots);
     expect(liabilityMonth0).toBe(90000);
@@ -137,30 +142,46 @@ describe("finance-core helpers", () => {
     });
   });
 
-  it("calcula métricas de aportes TWR aproximadas", () => {
+  it("calcula métricas TWR con VLE base y participaciones según plantilla", () => {
     const metrics = computeContributionMetrics([
       {
-        id: "c1",
+        id: "c-1",
         date: "2026-01-01",
         portfolioDate: "2026-01-01",
-        amount: 1000,
-        flow: 1000,
-        portfolioValue: 5000,
+        amount: 0,
+        flow: 0,
+        portfolioValue: 11088.94,
       },
       {
-        id: "c2",
-        date: "2026-02-01",
-        portfolioDate: "2026-02-01",
-        amount: 300,
-        flow: 300,
-        portfolioValue: 6300,
+        id: "c-2",
+        date: "2026-01-31",
+        portfolioDate: "2026-01-31",
+        amount: 580,
+        flow: 580,
+        portfolioValue: 11462.83,
+      },
+      {
+        id: "c-3",
+        date: "2026-02-08",
+        portfolioDate: "2026-02-08",
+        amount: 562,
+        flow: 562,
+        portfolioValue: 11800.15,
       },
     ]);
 
-    expect(metrics).toHaveLength(2);
+    expect(metrics).toHaveLength(3);
     expect(metrics[0].nav).toBe(100);
-    expect(metrics[1].nav).toBeGreaterThan(80);
-    expect(metrics[1].cumulativeReturn).toBeGreaterThan(0);
+    expect(metrics[0].periodReturn).toBeNull();
+    expect(metrics[0].cumulativeReturn).toBeNull();
+    expect(metrics[1].nav).toBeCloseTo(103.371738, 6);
+    expect(metrics[1].periodReturn).toBeCloseTo(0.03371738, 8);
+    expect(metrics[1].cumulativeReturn).toBeCloseTo(0.03371738, 8);
+    expect(metrics[1].unitsAfter).toBeCloseTo(116.5002179, 7);
+    expect(metrics[2].nav).toBeCloseTo(101.2886517, 7);
+    expect(metrics[2].periodReturn).toBeCloseTo(-0.02015126, 6);
+    expect(metrics[2].cumulativeReturn).toBeCloseTo(0.012886517, 8);
+    expect(metrics[2].unitsAfter).toBeCloseTo(122.0487171, 7);
   });
 
   it("soporta edge-cases en aportes sin romper cálculos", () => {
@@ -195,6 +216,6 @@ describe("finance-core helpers", () => {
 
     expect(edgeMetrics).toHaveLength(3);
     expect(edgeMetrics[1].nav).toBe(100);
-    expect(Number.isFinite(edgeMetrics[2].periodReturn)).toBe(true);
+    expect(Number.isFinite(edgeMetrics[2].periodReturn || 0)).toBe(true);
   });
 });
