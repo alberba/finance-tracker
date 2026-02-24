@@ -814,7 +814,7 @@ import {
       const target = getEventElement(event.target);
       const withTooltip = target?.closest<SVGElement>("[data-chart-tooltip]");
       if (!withTooltip) {
-        const insideChart = target?.closest("svg");
+        const insideChart = target?.closest("svg") || target?.closest("canvas");
         if (insideChart) {
           return;
         }
