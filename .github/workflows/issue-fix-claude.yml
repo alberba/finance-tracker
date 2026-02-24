@@ -17,6 +17,7 @@ jobs:
   autofix:
     if: >-
       github.event.label.name == 'enriched:haiku' &&
+      !contains(join(github.event.issue.labels.*.name, ','), 'enrich:failed') &&
       !contains(join(github.event.issue.labels.*.name, ','), 'autofix-attempted') &&
       !contains(join(github.event.issue.labels.*.name, ','), 'autofix:skip')
     runs-on: ubuntu-latest

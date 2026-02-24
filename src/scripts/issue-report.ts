@@ -20,6 +20,7 @@ interface ReportResponseOk {
   ok: true;
   issueNumber: number;
   issueUrl: string;
+  enrichmentStatus?: "pending" | "completed";
 }
 
 interface ReportResponseError {
@@ -119,14 +120,17 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
         return;
       }
 
-      status.textContent = "";
       const prefix = document.createTextNode("Issue creada: ");
       const link = document.createElement("a");
       link.href = result.issueUrl;
       link.target = "_blank";
       link.rel = "noreferrer";
       link.textContent = `#${result.issueNumber}`;
+      status.textContent = "";
       status.append(prefix, link);
+      if (result.enrichmentStatus === "pending") {
+        status.append(" (enriquecimiento en curso)");
+      }
       form.reset();
       const mentionCheckbox = requiredElement<HTMLInputElement>("issue-report-mention-claude");
       if (mentionCheckbox) {

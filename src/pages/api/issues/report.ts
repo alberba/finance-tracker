@@ -63,7 +63,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const payload = parseIssueReportPayload(body);
     const env = getRuntimeEnvFromLocals(locals);
     const created = await createIssueFromWebReport(payload, env);
-    return jsonResponse({ ok: true, issueNumber: created.number, issueUrl: created.url }, 201);
+    return jsonResponse(
+      { ok: true, issueNumber: created.number, issueUrl: created.url, enrichmentStatus: "pending" },
+      201
+    );
   } catch (error) {
     if (error instanceof ZodError) {
       return jsonResponse({ ok: false, error: "Payload inválido.", details: error.issues }, 400);

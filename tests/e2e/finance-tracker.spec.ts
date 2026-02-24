@@ -544,6 +544,7 @@ test.describe("Finance tracker E2E", () => {
           ok: true,
           issueNumber: 321,
           issueUrl: "https://github.com/example/repo/issues/321",
+          enrichmentStatus: "pending",
         }),
       });
     });
@@ -556,6 +557,7 @@ test.describe("Finance tracker E2E", () => {
     });
 
     await expect(tracker.issueReportStatus()).toContainText("Issue creada:");
+    await expect(tracker.issueReportStatus()).toContainText("enriquecimiento en curso");
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
       "https://github.com/example/repo/issues/321"
@@ -571,6 +573,7 @@ test.describe("Finance tracker E2E", () => {
           ok: true,
           issueNumber: 654,
           issueUrl: "https://github.com/example/repo/issues/654",
+          enrichmentStatus: "pending",
         }),
       });
     });
@@ -583,6 +586,7 @@ test.describe("Finance tracker E2E", () => {
     });
 
     await expect(tracker.issueReportStatus()).toContainText("#654");
+    await expect(tracker.issueReportStatus()).toContainText("enriquecimiento en curso");
   });
 
   test("datos muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({ tracker }) => {
