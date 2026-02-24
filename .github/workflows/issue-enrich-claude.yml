@@ -46,6 +46,7 @@ jobs:
           fi
 
       - name: Enrich issue with Claude Haiku
+        id: claude_enrich
         uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -54,7 +55,7 @@ jobs:
           model: claude-haiku-4-5
           max_turns: "8"
           disallowed_tools: Read
-          override_prompt: |
+          direct_prompt: |
             Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.
             No uses herramientas. No leas imágenes ni archivos. No respondas texto libre.
 
@@ -94,6 +95,8 @@ jobs:
             const issue_number = context.issue.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const fs = require("node:fs");
+            const executionFile = String('${{ steps.claude_enrich.outputs.execution_file }}' || "").trim();
 
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner,
@@ -113,7 +116,29 @@ jobs:
                   (markerRegex.test(commentBody) || xmlRegex.test(commentBody));
               });
 
-            if (!candidate) {
+            function extractLastMatch(regex, text) {
+              const globalRegex = new RegExp(regex.source, regex.flags.includes("g") ? regex.flags : `${regex.flags}g`);
+              let last = null;
+              let match;
+              while ((match = globalRegex.exec(text)) !== null) {
+                last = match;
+              }
+              return last;
+            }
+
+            let rawEnrichment = candidate ? String(candidate.body || "") : "";
+            if (!rawEnrichment && executionFile && fs.existsSync(executionFile)) {
+              const executionRaw = fs.readFileSync(executionFile, "utf-8");
+              const jsonFromExecution = extractLastMatch(markerRegex, executionRaw);
+              const xmlFromExecution = extractLastMatch(xmlRegex, executionRaw);
+              if (jsonFromExecution) {
+                rawEnrichment = jsonFromExecution[0];
+              } else if (xmlFromExecution) {
+                rawEnrichment = xmlFromExecution[0];
+              }
+            }
+
+            if (!rawEnrichment) {
               await github.rest.issues.addLabels({
                 owner,
                 repo,
@@ -124,12 +149,12 @@ jobs:
                 owner,
                 repo,
                 issue_number,
-                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>` o `<data-enrichment>`) en comentarios de Claude."
+                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>` o `<data-enrichment>`) ni en comentarios ni en `execution_file` de Claude."
               });
               return;
             }
 
-            const commentBody = String(candidate.body || "");
+            const commentBody = String(rawEnrichment || "");
             const jsonMatch = commentBody.match(markerRegex);
             const xmlMatch = commentBody.match(xmlRegex);
 
