@@ -3,6 +3,7 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export type BudgetType = TransactionType;
 export type TxSortColumn = "date" | "amount" | "account" | "type" | "category" | "description";
 export type SortDirection = "asc" | "desc";
+export type InvestmentSubTab = "dashboard" | "movements" | "contributions";
 export type SnapshotKind = "accounts" | "investments" | "liabilities";
 export type EntityKey = "accounts" | "investmentAssets" | "liabilities";
 export type CategoryKey = "incomeCategories" | "expenseCategories" | "investmentCategories";
@@ -86,8 +87,10 @@ export interface ContributionMetricRow {
   portfolioValue: number;
   flow: number;
   nav: number;
-  periodReturn: number;
-  cumulativeReturn: number;
+  unitsBefore: number;
+  unitsAfter: number;
+  periodReturn: number | null;
+  cumulativeReturn: number | null;
 }
 
 export const MONTHS = [

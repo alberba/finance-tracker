@@ -433,58 +433,84 @@
           </div>
         </div>
 
-        <div class="cards-grid slim">
-          <article class="kpi-card">
-            <p>Valor cartera</p>
-            <strong id="inv-total-value">€0</strong>
-          </article>
-          <article class="kpi-card">
-            <p>Capital invertido</p>
-            <strong id="inv-capital">€0</strong>
-          </article>
-          <article class="kpi-card">
-            <p>Rentabilidad estimada</p>
-            <strong id="inv-return">0%</strong>
-          </article>
+        <div class="investment-subtabs" role="tablist" aria-label="Subsecciones de inversión">
+          <button type="button" class="investment-subtab-btn is-active" data-investment-tab="dashboard" role="tab" aria-selected="true" aria-controls="investment-tab-dashboard">Dashboard</button>
+          <button type="button" class="investment-subtab-btn" data-investment-tab="movements" role="tab" aria-selected="false" aria-controls="investment-tab-movements">Movimientos</button>
+          <button type="button" class="investment-subtab-btn" data-investment-tab="contributions" role="tab" aria-selected="false" aria-controls="investment-tab-contributions">Aportes</button>
         </div>
 
-        <div class="dual-grid">
+        <div id="investment-tab-dashboard" class="investment-subtab-panel is-active" data-investment-tab-panel="dashboard" role="tabpanel">
+          <div class="cards-grid slim">
+            <article class="kpi-card">
+              <p>Valor cartera</p>
+              <strong id="inv-total-value">€0</strong>
+            </article>
+            <article class="kpi-card">
+              <p>Capital invertido</p>
+              <strong id="inv-capital">€0</strong>
+            </article>
+            <article class="kpi-card">
+              <p>Rentabilidad estimada</p>
+              <strong id="inv-return">0%</strong>
+            </article>
+          </div>
+
+          <div class="chart-grid-inv">
+            <article class="card">
+              <h3>Evolución de la cartera</h3>
+              <div class="chart-canvas-wrap"><canvas id="investment-portfolio-chart" aria-label="Evolución cartera total"></canvas></div>
+            </article>
+            <article class="card">
+              <h3>Evolución por activo</h3>
+              <div class="chart-canvas-wrap"><canvas id="investment-assets-chart" aria-label="Evolución por activo"></canvas></div>
+            </article>
+          </div>
+
+          <div class="dual-grid">
+            <article class="card">
+              <h3>Distribución de activos</h3>
+              <div class="chart-canvas-wrap"><canvas id="investment-allocation" aria-label="Distribución de cartera"></canvas></div>
+            </article>
+          </div>
+        </div>
+
+        <div id="investment-tab-movements" class="investment-subtab-panel" data-investment-tab-panel="movements" role="tabpanel" hidden>
           <article class="card">
-            <h3>Distribución de activos</h3>
-            <svg id="investment-allocation" viewBox="0 0 720 300" aria-label="Distribución de cartera"></svg>
-          </article>
-          <article class="card">
-            <h3>Aportes y TWR aproximado</h3>
-            <form id="contribution-form" class="form-grid compact">
-              <label>
-                Fecha
-                <input type="date" name="date" required />
-              </label>
-              <label>
-                Aporte
-                <input type="number" name="amount" step="0.01" min="0" required />
-              </label>
-              <label>
-                Valor cartera
-                <input type="number" name="portfolioValue" step="0.01" min="0" required />
-              </label>
-              <label>
-                Flujo del día
-                <input type="number" name="flow" step="0.01" />
-              </label>
-              <button type="submit" class="primary-btn">Agregar aporte</button>
-            </form>
+            <h3>Movimientos de inversión</h3>
             <div class="table-wrap compact">
               <table>
                 <thead>
                   <tr>
                     <th>Fecha</th>
-                    <th>Aporte</th>
-                    <th>Valor cartera</th>
-                    <th>Flujo</th>
-                    <th>VLE</th>
-                    <th>Retorno</th>
+                    <th>Descripción</th>
+                    <th>Importe</th>
+                    <th>Cuenta</th>
+                    <th>Tipo</th>
+                    <th>Categoría</th>
                     <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="investment-tx-table-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <div id="investment-tab-contributions" class="investment-subtab-panel" data-investment-tab-panel="contributions" role="tabpanel" hidden>
+          <article class="card">
+            <h3>Aportes y TWR</h3>
+            <div class="table-wrap compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Valor cartera (cierre)</th>
+                    <th>Flujo del día</th>
+                    <th>VLE</th>
+                    <th>Participaciones antes</th>
+                    <th>Participaciones después</th>
+                    <th>Retorno período</th>
+                    <th>Retorno acumulado</th>
                   </tr>
                 </thead>
                 <tbody id="contribution-body"></tbody>

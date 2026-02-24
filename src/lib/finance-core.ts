@@ -35,8 +35,10 @@ export interface ContributionEntry {
 
 export interface ContributionMetric extends ContributionEntry {
   nav: number;
-  periodReturn: number;
-  cumulativeReturn: number;
+  unitsBefore: number;
+  unitsAfter: number;
+  periodReturn: number | null;
+  cumulativeReturn: number | null;
 }
 
 export interface WealthSnapshot {
@@ -288,23 +290,25 @@ export function computeContributionMetrics(entries: ContributionEntry[]): Contri
 
   const rows: ContributionMetric[] = [];
   const baseNav = 100;
-  let prevNav = 100;
+  let prevNav = baseNav;
   let prevUnits = 0;
 
   sorted.forEach((item, index) => {
-    const portfolioValue = Number(item.portfolioValue || 0);
+    const portfolioValue = Number.isFinite(Number(item.portfolioValue)) ? Number(item.portfolioValue) : 0;
     const flow = Number.isFinite(Number(item.flow)) ? Number(item.flow) : Number(item.amount || 0);
 
     let nav: number;
     let unitsBefore: number;
     let unitsAfter: number;
-    let periodReturn: number;
+    let periodReturn: number | null;
+    let cumulativeReturn: number | null;
 
     if (index === 0) {
       nav = baseNav;
       unitsBefore = portfolioValue > 0 ? portfolioValue / nav : 0;
       unitsAfter = nav > 0 ? unitsBefore + flow / nav : unitsBefore;
-      periodReturn = 0;
+      periodReturn = null;
+      cumulativeReturn = null;
     } else {
       unitsBefore = prevUnits;
       nav = unitsBefore > 0 ? portfolioValue / unitsBefore : prevNav;
@@ -313,13 +317,12 @@ export function computeContributionMetrics(entries: ContributionEntry[]): Contri
       }
       unitsAfter = nav > 0 ? unitsBefore + flow / nav : unitsBefore;
       periodReturn = prevNav > 0 ? nav / prevNav - 1 : 0;
+      cumulativeReturn = baseNav > 0 ? nav / baseNav - 1 : 0;
     }
 
     if (!Number.isFinite(unitsAfter)) {
       unitsAfter = unitsBefore;
     }
-
-    const cumulativeReturn = baseNav > 0 ? nav / baseNav - 1 : 0;
 
     rows.push({
       ...item,
@@ -327,6 +330,8 @@ export function computeContributionMetrics(entries: ContributionEntry[]): Contri
       portfolioValue: round2(portfolioValue),
       flow: round2(flow),
       nav,
+      unitsBefore,
+      unitsAfter,
       periodReturn,
       cumulativeReturn,
     });
