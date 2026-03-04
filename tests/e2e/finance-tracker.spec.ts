@@ -161,6 +161,52 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getTransactionRowCount()).toBe(afterCount);
   });
 
+  test("nuevo movimiento usa gasto por defecto y ordena categorías de gasto por uso", async ({ page, tracker }) => {
+    await tracker.openTransactions();
+    await tracker.transactionsSection.getByRole("button", { name: "Nuevo" }).click();
+
+    const form = tracker.transactionsSection.locator("#tx-form");
+    await expect(form.getByLabel("Tipo")).toHaveValue("expense");
+
+    const uiExpenseCategories = await form
+      .getByLabel("Categoría")
+      .locator("option")
+      .evaluateAll((options) => options.map((option) => option.getAttribute("value") || ""));
+
+    const expectedExpenseCategories = await page.evaluate(() => {
+      const raw = window.localStorage.getItem("finance-tracker-state-v1");
+      const parsed = raw ? JSON.parse(raw) : {};
+      const categories = Array.isArray(parsed?.expenseCategories) ? parsed.expenseCategories : [];
+      const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+
+      const usageByCategory = transactions.reduce(
+        (acc: Record<string, number>, tx: { type?: string; category?: string }) => {
+          if (tx?.type !== "expense") {
+            return acc;
+          }
+          const category = String(tx?.category || "").trim();
+          if (!category) {
+            return acc;
+          }
+          acc[category] = (acc[category] || 0) + 1;
+          return acc;
+        },
+        {}
+      );
+
+      return [...categories].sort((a, b) => {
+        const usageA = usageByCategory[a] || 0;
+        const usageB = usageByCategory[b] || 0;
+        if (usageA !== usageB) {
+          return usageB - usageA;
+        }
+        return categories.indexOf(a) - categories.indexOf(b);
+      });
+    });
+
+    expect(uiExpenseCategories).toEqual(expectedExpenseCategories);
+  });
+
   test("mantiene datos cuando localStorage se borra porque persiste en servidor", async ({ page, tracker }) => {
     await tracker.filterTransactionsMonth("FEBRERO");
     const beforeCount = await tracker.getTransactionRowCount();
