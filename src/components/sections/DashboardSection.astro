@@ -1,0 +1,68 @@
+<section id="dashboard" class="panel is-active" aria-labelledby="dashboard-title">
+  <div class="panel-head">
+    <div>
+      <h2 id="dashboard-title">Resumen mensual y anual</h2>
+      <p>Visualización equivalente a RESUMEN MENSUAL + RESUMEN ANUAL.</p>
+    </div>
+    <div class="inline-controls">
+      <label>
+        Año
+        <input id="year-display" name="yearDisplay" type="number" min="2000" max="2100" autocomplete="off" />
+      </label>
+      <label>
+        Mes
+        <select id="dashboard-month" name="dashboardMonth"></select>
+      </label>
+    </div>
+  </div>
+
+  <div class="cards-grid" id="kpi-cards">
+    <article class="kpi-card">
+      <p>Ingresos del mes</p>
+      <strong id="kpi-income">€0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Gastos del mes</p>
+      <strong id="kpi-expense">€0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Inversión del mes</p>
+      <strong id="kpi-investment">€0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Patrimonio neto</p>
+      <strong id="kpi-net-worth">€0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Ahorro anual</p>
+      <strong id="kpi-annual-savings">€0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Crecimiento YTD</p>
+      <strong id="kpi-growth">0%</strong>
+    </article>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-stack">
+      <article class="chart-card">
+        <h3>Evolución patrimonio neto</h3>
+        <div class="chart-canvas-wrap"><canvas id="chart-networth" aria-label="Evolución de patrimonio"></canvas></div>
+      </article>
+      <article class="chart-card">
+        <h3>Ingresos vs Gastos vs Inversión</h3>
+        <div class="chart-canvas-wrap"><canvas id="chart-cashflow" aria-label="Flujo mensual"></canvas></div>
+      </article>
+      <article class="chart-card">
+        <h3>Distribución actual</h3>
+        <div class="chart-canvas-wrap"><canvas id="chart-distribution" aria-label="Distribución de patrimonio"></canvas></div>
+      </article>
+    </div>
+    <aside class="chart-side">
+      <article class="chart-card top-expense-card">
+        <h3>Top gastos del mes</h3>
+        <div id="top-expense-list" class="list-stack"></div>
+      </article>
+    </aside>
+  </div>
+</section>

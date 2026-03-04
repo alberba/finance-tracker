@@ -17,6 +17,26 @@ test.describe("Finance tracker E2E", () => {
     await expect(tracker.reportsSection.getByRole("heading", { name: "Reportes y automatización" })).toBeVisible();
   });
 
+  test("navega por todas las tabs principales y mantiene su heading visible", async ({ page, tracker }) => {
+    const tabs = [
+      { open: () => tracker.openDashboard(), path: /\/$/, heading: "Resumen mensual y anual" },
+      { open: () => tracker.openTransactions(), path: /\/movimientos$/, heading: "Movimientos mensuales" },
+      { open: () => tracker.openBudget(), path: /\/presupuesto$/, heading: "Presupuesto" },
+      { open: () => tracker.openWealth(), path: /\/patrimonio$/, heading: "Patrimonio total" },
+      { open: () => tracker.openInvestment(), path: /\/inversion$/, heading: "Inversión y aportes" },
+      { open: () => tracker.openGoals(), path: /\/objetivos$/, heading: "Objetivos" },
+      { open: () => tracker.openSettings(), path: /\/configuracion$/, heading: "Configuración base" },
+      { open: () => tracker.openData(), path: /\/datos$/, heading: "Datos y backups" },
+      { open: () => tracker.openReports(), path: /\/reportes$/, heading: "Reportes y automatización" },
+    ];
+
+    for (const tab of tabs) {
+      await tab.open();
+      await expect(page).toHaveURL(tab.path);
+      await expect(page.getByRole("heading", { name: tab.heading })).toBeVisible();
+    }
+  });
+
   test("renderiza dashboard con KPIs", async ({ tracker }) => {
     await tracker.openDashboard();
     const incomeText = await tracker.dashboardIncomeText();
@@ -608,6 +628,13 @@ test.describe("Finance tracker E2E", () => {
       "href",
       "https://github.com/example/repo/issues/321"
     );
+  });
+
+  test("reportes renderiza bloques desacoplados de formulario y guía", async ({ tracker }) => {
+    await tracker.openReports();
+    await expect(tracker.reportsSection.locator(".reports-form-card h3")).toHaveText("Reportar error o mejora");
+    await expect(tracker.reportsSection.locator(".reports-guide-card h3")).toHaveText("Qué pasará después");
+    await expect(tracker.reportsSection.locator(".reports-guide-list li")).toHaveCount(3);
   });
 
   test("datos crea issue de mejora y muestra confirmación", async ({ page, tracker }) => {
