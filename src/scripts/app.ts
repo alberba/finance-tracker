@@ -2278,7 +2278,7 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     }
 
     const usageByCategory = state.transactions.reduce(
-      (acc: Record<string, number>, tx: any) => {
+      (acc: Record<string, number>, tx: { type?: TransactionType; category?: string }) => {
         if (tx.type !== "expense") {
           return acc;
         }
