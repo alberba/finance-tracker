@@ -1,4 +1,6 @@
 ---
+import ReportsSection from "./reports/ReportsSection.astro";
+
 export interface Props {
   activeRoute?: "root" | "section";
   sectionParam?: string;
@@ -772,93 +774,7 @@ const canonicalUrl = new URL("/", Astro.url).toString();
 
       </section>
 
-      <section id="reports" class="panel" aria-labelledby="reports-title">
-        <div class="panel-head">
-          <div>
-            <h2 id="reports-title">Reportes y automatización</h2>
-            <p>Crea issues con contexto para activar el flujo automático con Claude.</p>
-          </div>
-        </div>
-
-        <div class="reports-layout">
-          <article class="card reports-form-card">
-            <header class="reports-form-head">
-              <p class="reports-kicker">Issue generator</p>
-              <h3>Reportar error o mejora</h3>
-              <p>Describe el problema con detalle y lo enviamos como issue para activar flujo automático.</p>
-            </header>
-
-            <form id="issue-report-form" autocomplete="off" novalidate>
-              <label>
-                Tipo
-                <select id="issue-report-type" name="type" required>
-                  <option value="bug">Error</option>
-                  <option value="enhancement">Mejora</option>
-                </select>
-              </label>
-              <label class="span-3">
-                Resumen
-                <input
-                  id="issue-report-summary"
-                  name="summary"
-                  type="text"
-                  minlength="5"
-                  maxlength="140"
-                  required
-                  placeholder="Ej. El filtro de movimientos no guarda el valor"
-                  autocomplete="off"
-                />
-              </label>
-              <label class="span-3">
-                Descripción
-                <textarea
-                  id="issue-report-description"
-                  name="description"
-                  minlength="12"
-                  maxlength="8000"
-                  required
-                  rows="4"
-                  placeholder="Describe el error o mejora con el mayor detalle posible."
-                ></textarea>
-              </label>
-              <label>
-                Resultado esperado (opcional)
-                <textarea id="issue-report-expected" name="expectedResult" maxlength="4000" rows="3"></textarea>
-              </label>
-              <label>
-                Resultado actual (opcional)
-                <textarea id="issue-report-actual" name="actualResult" maxlength="4000" rows="3"></textarea>
-              </label>
-              <label class="span-3">
-                Pasos para reproducir (opcional)
-                <textarea
-                  id="issue-report-steps"
-                  name="stepsToReproduce"
-                  maxlength="5000"
-                  rows="3"
-                  placeholder="1. Ir a ... 2. Pulsar ... 3. Ocurre ..."
-                ></textarea>
-              </label>
-              <label class="span-3">
-                <input id="issue-report-mention-claude" name="mentionClaude" type="checkbox" checked />
-                Añadir mención a @claude para activar automatización
-              </label>
-              <button id="issue-report-submit" class="primary-btn" type="submit">Crear issue</button>
-            </form>
-            <p id="issue-report-status" role="status" aria-live="polite"></p>
-          </article>
-
-          <aside class="card reports-guide-card">
-            <h3>Qué pasará después</h3>
-            <ol class="reports-guide-list">
-              <li>Se crea una issue en GitHub con tu texto literal y metadatos del contexto.</li>
-              <li>Haiku enriquece la issue (hipótesis técnica, alcance y criterios).</li>
-              <li>Sonnet intenta un fix pequeño, ejecuta tests y propone una PR.</li>
-            </ol>
-            <p class="reports-guide-note">La PR no se fusiona automáticamente; revisión manual obligatoria.</p>
-          </aside>
-        </div>
-      </section>
+      <ReportsSection />
     </main>
   </div>
 
