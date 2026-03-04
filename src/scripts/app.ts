@@ -526,7 +526,7 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
       const persistedValues = {
         date: String(form.get("date") || todayISO()),
         month: String(form.get("month") || ui.txFilterMonth),
-        type: String(form.get("type") || "income"),
+        type: String(form.get("type") || "expense"),
         accountId: String(form.get("accountId") || ""),
         category: String(form.get("category") || ""),
       };
@@ -1013,9 +1013,9 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
   }
 
   function populateTransactionCategoryOptions() {
-    const rawType = String(el.txForm.elements.type.value || "income");
-    const type: BudgetType = isBudgetType(rawType) ? rawType : "income";
-    const categories = getCategoriesForType(type);
+    const rawType = String(el.txForm.elements.type.value || "expense");
+    const type: BudgetType = isBudgetType(rawType) ? rawType : "expense";
+    const categories = getOrderedCategoriesForType(type);
     const categorySelect = el.txForm.elements.category;
 
     categorySelect.innerHTML = categories
@@ -2269,6 +2269,37 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
       return state.expenseCategories;
     }
     return state.investmentCategories;
+  }
+
+  function getOrderedCategoriesForType(type: BudgetType): string[] {
+    const categories = getCategoriesForType(type);
+    if (type !== "expense") {
+      return categories;
+    }
+
+    const usageByCategory = state.transactions.reduce(
+      (acc: Record<string, number>, tx: { type?: TransactionType; category?: string }) => {
+        if (tx.type !== "expense") {
+          return acc;
+        }
+        const category = String(tx.category || "").trim();
+        if (!category) {
+          return acc;
+        }
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    return [...categories].sort((a, b) => {
+      const usageA = usageByCategory[a] || 0;
+      const usageB = usageByCategory[b] || 0;
+      if (usageA !== usageB) {
+        return usageB - usageA;
+      }
+      return categories.indexOf(a) - categories.indexOf(b);
+    });
   }
 
   function getMonthTotals(month: number): MonthTotals {
