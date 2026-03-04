@@ -1,6 +1,5 @@
 name = "finance-tracker"
 compatibility_date = "2026-02-23"
-pages_build_output_dir = "dist"
 
 [[d1_databases]]
 binding = "finance_tracker_db"
