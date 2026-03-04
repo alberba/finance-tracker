@@ -428,6 +428,21 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getTransactionSummaryCategoryAmount("expense", "Viajes")).toBeCloseTo(436.63, 2);
     expect(await tracker.getTransactionSummaryCategoryAmount("investment", "Crypto")).toBeCloseTo(160, 2);
 
+    const assertSummarySortedDescByAmount = async (type: "income" | "expense" | "investment") => {
+      const amountTexts = await tracker.transactionsSection
+        .locator(`#tx-category-breakdown-body tr[data-summary-type="${type}"] .tx-summary-item > strong`)
+        .allInnerTexts();
+      const amounts = amountTexts.map((text) =>
+        Number.parseFloat(text.replace(/[^\d,-]/g, "").replace(/\./g, "").replace(",", "."))
+      );
+      const sortedAmounts = [...amounts].sort((a, b) => b - a);
+      expect(amounts).toEqual(sortedAmounts);
+    };
+
+    await assertSummarySortedDescByAmount("income");
+    await assertSummarySortedDescByAmount("expense");
+    await assertSummarySortedDescByAmount("investment");
+
     await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("💼 Nómina");
     await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("✈️ Viajes");
     await expect(tracker.transactionsSection.locator("#tx-category-breakdown-body")).toContainText("₿ Crypto");
