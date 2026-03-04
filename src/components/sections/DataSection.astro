@@ -1,0 +1,38 @@
+<section id="data" class="panel" aria-labelledby="data-title">
+  <div class="panel-head">
+    <div>
+      <h2 id="data-title">Datos y backups</h2>
+      <p>Exporta, importa y reinicia el tracker sin perder historial.</p>
+    </div>
+  </div>
+
+  <div class="cards-grid slim">
+    <article class="kpi-card">
+      <p>Movimientos</p>
+      <strong id="data-total-transactions">0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Snapshots</p>
+      <strong id="data-total-snapshots">0</strong>
+    </article>
+    <article class="kpi-card">
+      <p>Aportes</p>
+      <strong id="data-total-contributions">0</strong>
+    </article>
+  </div>
+
+  <div class="data-actions">
+    <button id="export-json" class="primary-btn" type="button">Exportar JSON</button>
+    <label class="file-btn">
+      Importar JSON
+      <input id="import-json" name="importJson" type="file" accept="application/json" aria-label="Importar archivo JSON" />
+    </label>
+    <button id="export-transactions-csv" class="secondary-btn" type="button">Exportar movimientos CSV</button>
+    <button id="reset-seed" class="danger-btn" type="button">Reiniciar con datos semilla</button>
+  </div>
+
+  <article class="card">
+    <h3>Estado</h3>
+    <p id="data-meta"></p>
+  </article>
+</section>
