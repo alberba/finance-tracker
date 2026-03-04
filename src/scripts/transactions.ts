@@ -151,9 +151,9 @@ export function buildMonthBreakdown(params: {
   return {
     totals,
     byType: {
-      income: toSortedCategoryRows(byTypeMap.income),
-      expense: toSortedCategoryRows(byTypeMap.expense),
-      investment: toSortedCategoryRows(byTypeMap.investment),
+      income: toSortedCategoryRows(byTypeMap.income, "amount-desc"),
+      expense: toSortedCategoryRows(byTypeMap.expense, "amount-desc"),
+      investment: toSortedCategoryRows(byTypeMap.investment, "amount-desc"),
     },
   };
 }
@@ -170,9 +170,20 @@ function createCategoryMap(categories: string[]): Map<string, number> {
   return map;
 }
 
-function toSortedCategoryRows(map: Map<string, number>): CategoryAmountRow[] {
+function toSortedCategoryRows(
+  map: Map<string, number>,
+  sortMode: "alpha" | "amount-desc"
+): CategoryAmountRow[] {
   return Array.from(map.entries())
-    .sort((a, b) => a[0].localeCompare(b[0], "es"))
+    .sort((a, b) => {
+      if (sortMode === "amount-desc") {
+        const amountDiff = b[1] - a[1];
+        if (amountDiff !== 0) {
+          return amountDiff;
+        }
+      }
+      return a[0].localeCompare(b[0], "es");
+    })
     .map(([category, amount]) => ({
       category,
       amount: round2(amount),

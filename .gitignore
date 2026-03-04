@@ -8,3 +8,4 @@ test-results
 .data
 .wrangler
 worker-configuration.d.ts
+package-lock.json
