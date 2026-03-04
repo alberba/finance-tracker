@@ -610,6 +610,13 @@ test.describe("Finance tracker E2E", () => {
     );
   });
 
+  test("reportes renderiza bloques desacoplados de formulario y guía", async ({ tracker }) => {
+    await tracker.openReports();
+    await expect(tracker.reportsSection.locator(".reports-form-card h3")).toHaveText("Reportar error o mejora");
+    await expect(tracker.reportsSection.locator(".reports-guide-card h3")).toHaveText("Qué pasará después");
+    await expect(tracker.reportsSection.locator(".reports-guide-list li")).toHaveCount(3);
+  });
+
   test("datos crea issue de mejora y muestra confirmación", async ({ page, tracker }) => {
     await page.route("**/api/issues/report", async (route) => {
       await route.fulfill({
