@@ -72,17 +72,17 @@ export class FinanceTrackerPage {
 
   async openInvestmentDashboardTab() {
     await this.openInvestment();
-    await this.investmentSection().getByRole("button", { name: "Dashboard" }).click();
+    await this.investmentSection().getByRole("tab", { name: "Dashboard" }).click();
   }
 
   async openInvestmentMovementsTab() {
     await this.openInvestment();
-    await this.investmentSection().getByRole("button", { name: "Movimientos" }).click();
+    await this.investmentSection().getByRole("tab", { name: "Movimientos" }).click();
   }
 
   async openInvestmentContributionsTab() {
     await this.openInvestment();
-    await this.investmentSection().getByRole("button", { name: "Aportes" }).click();
+    await this.investmentSection().getByRole("tab", { name: "Aportes" }).click();
   }
 
   async openGoals() {
@@ -217,6 +217,59 @@ export class FinanceTrackerPage {
     await form.getByLabel("Importe").fill(String(params.amount));
     await form.getByRole("button", { name: "Otro" }).click();
     await expect(this.page.getByRole("status")).toContainText("Guardado. Puedes añadir otro.");
+  }
+
+  async addInvestmentMovement(params: {
+    date: string;
+    time: string;
+    side: "buy" | "sell";
+    symbol: string;
+    category?: string;
+    unitPrice: number;
+    units: number;
+    fee: number;
+    movementCurrency?: string;
+    brokerName?: string;
+    declared?: boolean;
+  }) {
+    await this.openInvestmentMovementsTab();
+    const section = this.investmentSection();
+    await section.locator("#investment-movement-date").fill(params.date);
+    await section.locator("#investment-movement-time").fill(params.time);
+    await section.locator("#investment-movement-side").selectOption(params.side);
+    await section.locator("#investment-movement-symbol").fill(params.symbol);
+    if (params.category !== undefined) {
+      const categorySelect = section.locator("#investment-movement-category");
+      if (!(await categorySelect.isDisabled())) {
+        await this.selectByLabelOrFirst(categorySelect, params.category);
+      }
+    }
+    await section.locator("#investment-movement-unit-price").fill(String(params.unitPrice));
+    await section.locator("#investment-movement-units").fill(String(params.units));
+    await section.locator("#investment-movement-fee").fill(String(params.fee));
+    if (params.movementCurrency) {
+      await section.locator("#investment-movement-currency").fill(params.movementCurrency);
+    }
+    await this.selectByLabelOrFirst(section.locator("#investment-movement-broker"), params.brokerName || "Revolut");
+
+    const declaredInput = section.locator("#investment-movement-declared");
+    if (params.declared) {
+      await declaredInput.check();
+    } else {
+      await declaredInput.uncheck();
+    }
+
+    await section.getByRole("button", { name: "Guardar movimiento" }).click();
+    await expect(this.page.getByRole("status")).toContainText("Movimiento de inversión guardado.");
+  }
+
+  async addAccount(params: { name: string; openingBalance?: number }) {
+    await this.openSettings();
+    const form = this.page.locator("#add-account-form");
+    await form.locator('input[name="name"]').fill(params.name);
+    await form.locator('input[name="openingBalance"]').fill(String(params.openingBalance ?? 0));
+    await form.getByRole("button", { name: "Agregar" }).click();
+    await expect(this.page.getByRole("status")).toContainText("Elemento agregado.");
   }
 
   async transactionModalDateValue(): Promise<string> {
@@ -446,12 +499,22 @@ export class FinanceTrackerPage {
     return this.dashboardSection.locator("#kpi-income").innerText();
   }
 
-  async editInvestmentMovementByDescription(
-    description: string,
-    payload: { amount?: number; category?: string; newDescription?: string; date?: string }
+  async editInvestmentMovementBySymbol(
+    symbol: string,
+    payload: {
+      date?: string;
+      time?: string;
+      side?: "buy" | "sell";
+      newSymbol?: string;
+      unitPrice?: number;
+      units?: number;
+      fee?: number;
+      movementCurrency?: string;
+      declared?: boolean;
+    }
   ) {
     await this.openInvestmentMovementsTab();
-    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: description }).first();
+    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: symbol }).first();
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Editar" }).click();
 
@@ -461,26 +524,61 @@ export class FinanceTrackerPage {
     if (payload.date) {
       await editRow.locator('[data-edit-field="date"]').fill(payload.date);
     }
-    if (typeof payload.amount === "number") {
-      await editRow.locator('[data-edit-field="amount"]').fill(String(payload.amount));
+    if (payload.time) {
+      await editRow.locator('[data-edit-field="time"]').fill(payload.time);
     }
-    if (typeof payload.category === "string") {
-      await editRow.locator('[data-edit-field="category"]').fill(payload.category);
+    if (payload.side) {
+      await editRow.locator('[data-edit-field="side"]').selectOption(payload.side);
     }
-    if (typeof payload.newDescription === "string") {
-      await editRow.locator('[data-edit-field="description"]').fill(payload.newDescription);
+    if (typeof payload.newSymbol === "string") {
+      await editRow.locator('[data-edit-field="symbol"]').fill(payload.newSymbol);
+    }
+    if (typeof payload.unitPrice === "number") {
+      await editRow.locator('[data-edit-field="unitPrice"]').fill(String(payload.unitPrice));
+    }
+    if (typeof payload.units === "number") {
+      await editRow.locator('[data-edit-field="units"]').fill(String(payload.units));
+    }
+    if (typeof payload.fee === "number") {
+      await editRow.locator('[data-edit-field="fee"]').fill(String(payload.fee));
+    }
+    if (typeof payload.movementCurrency === "string") {
+      await editRow.locator('[data-edit-field="movementCurrency"]').fill(payload.movementCurrency);
+    }
+    if (typeof payload.declared === "boolean") {
+      const checkbox = editRow.locator('[data-edit-field="declared"]');
+      if (payload.declared) {
+        await checkbox.check();
+      } else {
+        await checkbox.uncheck();
+      }
     }
 
     await editRow.getByRole("button", { name: "Guardar" }).click();
     await expect(this.page.getByRole("status")).toContainText("Movimiento de inversión actualizado.");
   }
 
-  async deleteInvestmentMovementByDescription(description: string) {
+  async deleteInvestmentMovementBySymbol(symbol: string) {
     await this.openInvestmentMovementsTab();
-    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: description }).first();
+    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: symbol }).first();
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Eliminar" }).click();
     await expect(this.page.getByRole("status")).toContainText("Movimiento eliminado.");
+  }
+
+  async filterInvestmentYear(year: number) {
+    await this.openInvestmentMovementsTab();
+    await this.investmentSection().locator("#investment-year-filter").selectOption(String(year));
+  }
+
+  async setInvestmentOnlyUndeclared(enabled: boolean) {
+    await this.openInvestmentMovementsTab();
+    const input = this.investmentSection().locator("#investment-only-undeclared");
+    if (enabled) {
+      await input.check();
+    } else {
+      await input.uncheck();
+    }
   }
 
   async setContributionFlowByDate(date: string, flow: number) {
@@ -497,16 +595,16 @@ export class FinanceTrackerPage {
     return row.locator("td").allInnerTexts();
   }
 
-  async getInvestmentMovementsTypes(): Promise<string[]> {
+  async getInvestmentMovementsOperations(): Promise<string[]> {
     await this.openInvestmentMovementsTab();
     const rows = this.investmentSection().locator("#investment-tx-table-body tr");
     const count = await rows.count();
-    const types: string[] = [];
+    const operations: string[] = [];
     for (let index = 0; index < count; index += 1) {
-      const type = (await rows.nth(index).locator("td").nth(4).innerText()).trim();
-      types.push(type);
+      const operation = (await rows.nth(index).locator("td").nth(2).innerText()).trim();
+      operations.push(operation);
     }
-    return types;
+    return operations;
   }
 
   investmentSection(): Locator {

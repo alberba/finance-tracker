@@ -1,6 +1,7 @@
 import { FINANCE_TRACKER_SEED } from "../data/seed";
 import {
   DEFAULT_GOALS,
+  isInvestmentSide,
   isTransactionType,
   type BudgetType,
   type Contribution,
@@ -180,17 +181,81 @@ function normalizeStringList(list: unknown): string[] {
 function normalizeTransactions(list: unknown): Transaction[] {
   const items = Array.isArray(list) ? list : [];
   return items
-    .map((item: any) => ({
-      id: String(item.id || uid("tx")),
-      date: String(item.date || todayISO()),
-      month: clamp(parseIntSafe(item.month, monthFromISO(item.date) ?? 0), 0, 11),
-      type: isTransactionType(item.type) ? item.type : "expense",
-      accountId: String(item.accountId || ""),
-      category: String(item.category || "Sin categoría"),
-      description: String(item.description || ""),
-      amount: round2(parseFloatSafe(item.amount, 0)),
-    }))
-    .filter((item) => item.amount >= 0);
+    .map((item: any) => {
+      const type = isTransactionType(item.type) ? item.type : "expense";
+      const amount = round2(parseFloatSafe(item.amount, 0));
+      const safe: Transaction = {
+        id: String(item.id || uid("tx")),
+        date: String(item.date || todayISO()),
+        month: clamp(parseIntSafe(item.month, monthFromISO(item.date) ?? 0), 0, 11),
+        type,
+        accountId: String(item.accountId || ""),
+        category: String(item.category || "Sin categoría"),
+        description: String(item.description || ""),
+        amount,
+      };
+
+      if (type === "investment") {
+        const time = normalizeTime(item.time);
+        const symbol = String(item.symbol || "").trim().toUpperCase();
+        const sideCandidate = String(item.side || "").trim();
+        const side = isInvestmentSide(sideCandidate) ? sideCandidate : amount < 0 ? "sell" : "buy";
+        const unitPrice = normalizeNonNegativeNumber(item.unitPrice, 6);
+        const units = normalizeNonNegativeNumber(item.units, 8);
+        const fee = normalizeNonNegativeNumber(item.fee, 2);
+        const movementCurrency = String(item.movementCurrency || "").trim().toUpperCase().slice(0, 3);
+
+        if (time) {
+          safe.time = time;
+        }
+        if (symbol) {
+          safe.symbol = symbol;
+        }
+        safe.side = side;
+        if (unitPrice !== null) {
+          safe.unitPrice = unitPrice;
+        }
+        if (units !== null) {
+          safe.units = units;
+        }
+        if (fee !== null) {
+          safe.fee = fee;
+        }
+        if (movementCurrency) {
+          safe.movementCurrency = movementCurrency;
+        }
+        safe.declared = Boolean(item.declared);
+      }
+
+      return safe;
+    })
+    .filter((item) => Number.isFinite(item.amount) && item.amount !== 0);
+}
+
+function normalizeNonNegativeNumber(value: unknown, decimals: number): number | null {
+  const parsed = roundWithPrecision(parseFloatSafe(value, NaN), decimals);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function roundWithPrecision(value: number, decimals: number): number {
+  const safeDecimals = Math.max(0, Math.min(10, Math.floor(decimals)));
+  const factor = 10 ** safeDecimals;
+  return Math.round((Number(value) || 0) * factor) / factor;
+}
+
+function normalizeTime(value: unknown): string {
+  const input = String(value || "").trim();
+  if (!/^\d{2}:\d{2}$/.test(input)) {
+    return "";
+  }
+  const [hours, minutes] = input.split(":").map((item) => parseIntSafe(item, -1));
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return "";
+  }
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function normalizeSnapshots(input: unknown): Record<string, SnapshotRow> {

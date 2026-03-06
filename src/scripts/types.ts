@@ -1,5 +1,7 @@
 export const TRANSACTION_TYPES = ["income", "expense", "investment"] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+export const INVESTMENT_SIDES = ["buy", "sell"] as const;
+export type InvestmentSide = (typeof INVESTMENT_SIDES)[number];
 export type BudgetType = TransactionType;
 export type TxSortColumn = "date" | "amount" | "account" | "type" | "category" | "description";
 export type SortDirection = "asc" | "desc";
@@ -24,6 +26,14 @@ export interface Transaction {
   category: string;
   description: string;
   amount: number;
+  time?: string;
+  symbol?: string;
+  side?: InvestmentSide;
+  unitPrice?: number;
+  units?: number;
+  fee?: number;
+  movementCurrency?: string;
+  declared?: boolean;
 }
 
 export interface SnapshotRow {
@@ -163,6 +173,10 @@ export function isSnapshotKind(value: string): value is SnapshotKind {
 
 export function isTransactionType(value: string): value is TransactionType {
   return (TRANSACTION_TYPES as readonly string[]).includes(value);
+}
+
+export function isInvestmentSide(value: string): value is InvestmentSide {
+  return (INVESTMENT_SIDES as readonly string[]).includes(value);
 }
 
 export function isGoalKey(value: string): value is GoalKey {

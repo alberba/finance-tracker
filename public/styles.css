@@ -457,6 +457,33 @@ svg {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.investment-form {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.investment-form > button[type="submit"] {
+  justify-self: end;
+  align-self: end;
+}
+
+.investment-declared-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.investment-declared-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.investment-table-controls {
+  margin-bottom: 10px;
+}
+
 .form-grid .grow-2 {
   grid-column: span 2;
 }
@@ -1522,6 +1549,10 @@ td select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .investment-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   #contribution-form > button[type="submit"] {
     justify-self: stretch;
   }
@@ -1575,6 +1606,7 @@ td select {
   .cards-grid.slim,
   .form-grid,
   .form-grid.compact,
+  .investment-form,
   .tx-query-grid,
   .tx-bulk-grid,
   .tx-form-dialog {

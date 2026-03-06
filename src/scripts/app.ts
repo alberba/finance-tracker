@@ -17,10 +17,12 @@ import {
   type EntityKey,
   type Goal,
   type GoalKey,
+  type InvestmentSide,
   type InvestmentSubTab,
   type MonthTotals,
   type SectionId,
   type SnapshotKind,
+  type Transaction,
   type SortDirection,
   type State,
   type TransactionType,
@@ -66,6 +68,12 @@ import {
   sortTransactionsInState,
 } from "./state";
 import { computeContributionMetrics as computeContributionMetricsCore } from "../lib/finance-core";
+import {
+  computeInvestmentMovement,
+  normalizeInvestmentSide,
+  normalizeInvestmentSymbol,
+  parseTransactionYear,
+} from "./investment-movements";
 
 (() => {
   "use strict";
@@ -90,6 +98,8 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     wealthCalcTargetName: string;
     investmentTab: InvestmentSubTab;
     investmentTxEditingId: string;
+    investmentYearFilter: number;
+    investmentOnlyUndeclared: boolean;
   }
 
   interface TxFormControls extends HTMLFormControlsCollection {
@@ -104,6 +114,25 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
 
   interface TxForm extends HTMLFormElement {
     elements: TxFormControls;
+  }
+
+  interface InvestmentMovementFormControls extends HTMLFormControlsCollection {
+    date: HTMLInputElement;
+    time: HTMLInputElement;
+    side: HTMLSelectElement;
+    symbol: HTMLInputElement;
+    category: HTMLSelectElement;
+    unitPrice: HTMLInputElement;
+    units: HTMLInputElement;
+    fee: HTMLInputElement;
+    total: HTMLInputElement;
+    movementCurrency: HTMLInputElement;
+    accountId: HTMLSelectElement;
+    declared: HTMLInputElement;
+  }
+
+  interface InvestmentMovementForm extends HTMLFormElement {
+    elements: InvestmentMovementFormControls;
   }
 
   function getRequiredElement<T extends Element>(id: string): T {
@@ -195,6 +224,8 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     wealthCalcTargetName: "",
     investmentTab: "dashboard",
     investmentTxEditingId: "",
+    investmentYearFilter: new Date().getFullYear(),
+    investmentOnlyUndeclared: false,
   };
 
   const el = {
@@ -271,7 +302,22 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>("investment-portfolio-chart"),
     investmentAssetsChart: getRequiredElement<HTMLCanvasElement>("investment-assets-chart"),
     investmentAllocation: getRequiredElement<HTMLCanvasElement>("investment-allocation"),
+    investmentYearFilter: getRequiredElement<HTMLSelectElement>("investment-year-filter"),
+    investmentOnlyUndeclared: getRequiredElement<HTMLInputElement>("investment-only-undeclared"),
+    investmentMovementForm: getRequiredElement<InvestmentMovementForm>("investment-movement-form"),
     investmentTxBody: getRequiredElement<HTMLElement>("investment-tx-table-body"),
+    investmentMovementDate: getRequiredElement<HTMLInputElement>("investment-movement-date"),
+    investmentMovementTime: getRequiredElement<HTMLInputElement>("investment-movement-time"),
+    investmentMovementSide: getRequiredElement<HTMLSelectElement>("investment-movement-side"),
+    investmentMovementSymbol: getRequiredElement<HTMLInputElement>("investment-movement-symbol"),
+    investmentMovementCategory: getRequiredElement<HTMLSelectElement>("investment-movement-category"),
+    investmentMovementUnitPrice: getRequiredElement<HTMLInputElement>("investment-movement-unit-price"),
+    investmentMovementUnits: getRequiredElement<HTMLInputElement>("investment-movement-units"),
+    investmentMovementFee: getRequiredElement<HTMLInputElement>("investment-movement-fee"),
+    investmentMovementTotal: getRequiredElement<HTMLInputElement>("investment-movement-total"),
+    investmentMovementCurrency: getRequiredElement<HTMLInputElement>("investment-movement-currency"),
+    investmentMovementBroker: getRequiredElement<HTMLSelectElement>("investment-movement-broker"),
+    investmentMovementDeclared: getRequiredElement<HTMLInputElement>("investment-movement-declared"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
 
     goalsProgress: getRequiredElement<HTMLElement>("goals-progress"),
@@ -690,6 +736,111 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
       renderGoals();
     });
 
+    el.investmentYearFilter.addEventListener("change", () => {
+      ui.investmentYearFilter = parseIntSafe(el.investmentYearFilter.value, state.year);
+      ui.investmentTxEditingId = "";
+      renderInvestmentTransactionsTable();
+    });
+
+    el.investmentOnlyUndeclared.addEventListener("change", () => {
+      ui.investmentOnlyUndeclared = Boolean(el.investmentOnlyUndeclared.checked);
+      ui.investmentTxEditingId = "";
+      renderInvestmentTransactionsTable();
+    });
+
+    [
+      el.investmentMovementSide,
+      el.investmentMovementSymbol,
+      el.investmentMovementCategory,
+      el.investmentMovementUnitPrice,
+      el.investmentMovementUnits,
+      el.investmentMovementFee,
+    ].forEach((control) => {
+      control.addEventListener("input", syncInvestmentMovementComputedAmount);
+      control.addEventListener("change", syncInvestmentMovementComputedAmount);
+    });
+
+    el.investmentMovementBroker.addEventListener("change", () => {
+      syncInvestmentMovementCategoryField();
+      syncInvestmentMovementComputedAmount();
+    });
+
+    el.investmentMovementForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const form = new FormData(el.investmentMovementForm);
+      const side = normalizeInvestmentSide(form.get("side"));
+      const symbol = normalizeInvestmentSymbol(form.get("symbol"));
+      const rawCategory = String(form.get("category") || "").trim();
+      const date = String(form.get("date") || "").trim() || todayISO();
+      const accountId = String(form.get("accountId") || "").trim();
+      const time = String(form.get("time") || "").trim();
+      const movementCurrency = String(form.get("movementCurrency") || state.currency || "EUR")
+        .trim()
+        .toUpperCase()
+        .slice(0, 3);
+      const declared = Boolean(form.get("declared"));
+
+      if (!accountId || !symbol || !time) {
+        showToast("Completa broker, hora y símbolo.");
+        return;
+      }
+
+      const computed = computeInvestmentMovement({
+        side,
+        symbol,
+        units: parseFloatSafe(form.get("units"), 0),
+        unitPrice: parseFloatSafe(form.get("unitPrice"), 0),
+        fee: parseFloatSafe(form.get("fee"), 0),
+      });
+      const category = resolveInvestmentCategory(accountId, rawCategory, computed.normalizedSymbol);
+
+      if (computed.normalizedUnits <= 0 || computed.normalizedUnitPrice <= 0 || computed.signedAmount === 0) {
+        showToast("Precio, títulos y gasto deben ser válidos.");
+        return;
+      }
+
+      state.transactions.push({
+        id: uid("tx"),
+        date,
+        month: monthFromISO(date) ?? ui.investmentMonth,
+        type: "investment",
+        accountId,
+        category,
+        description: computed.description,
+        amount: computed.signedAmount,
+        time,
+        symbol: computed.normalizedSymbol,
+        side,
+        unitPrice: computed.normalizedUnitPrice,
+        units: computed.normalizedUnits,
+        fee: computed.normalizedFee,
+        movementCurrency,
+        declared,
+      });
+
+      sortTransactions();
+      saveState();
+
+      const selectedDate = date;
+      const selectedTime = time;
+      const selectedBroker = accountId;
+      const selectedCurrency = movementCurrency || (state.currency || "EUR");
+
+      el.investmentMovementForm.reset();
+      el.investmentMovementDate.value = selectedDate;
+      el.investmentMovementTime.value = selectedTime;
+      el.investmentMovementBroker.value = selectedBroker;
+      el.investmentMovementCurrency.value = selectedCurrency;
+      el.investmentMovementSide.value = side;
+      el.investmentMovementFee.value = "0";
+      el.investmentMovementDeclared.checked = false;
+      syncInvestmentMovementCategoryField();
+      syncInvestmentMovementComputedAmount();
+
+      renderAll();
+      showToast("Movimiento de inversión guardado.");
+    });
+
     el.investmentTxBody.addEventListener("click", (event) => {
       const target = getEventElement(event.target);
       const actionButton = target?.closest<HTMLButtonElement>("button[data-action]");
@@ -710,11 +861,18 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
           return;
         }
         if (action === "save-edit-investment-tx") {
-          saveEditedTransactionRow(id, {
-            tableBody: el.investmentTxBody,
-            editingRowAttr: "data-investment-editing-id",
-            successMessage: "Movimiento de inversión actualizado.",
-          });
+          saveEditedInvestmentTransactionRow(id);
+          return;
+        }
+        if (action === "toggle-investment-declared") {
+          const tx = state.transactions.find((item: any) => item.id === id && item.type === "investment");
+          if (!tx) {
+            return;
+          }
+          tx.declared = !Boolean(tx.declared);
+          saveState();
+          renderInvestmentTransactionsTable();
+          showToast(tx.declared ? "Movimiento marcado como declarado." : "Movimiento marcado como no declarado.");
           return;
         }
       }
@@ -983,6 +1141,19 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     if (!el.txForm.elements.date.value) {
       el.txForm.elements.date.value = todayISO();
     }
+    if (!el.investmentMovementDate.value) {
+      el.investmentMovementDate.value = todayISO();
+    }
+    if (!el.investmentMovementTime.value) {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      el.investmentMovementTime.value = `${hh}:${mm}`;
+    }
+    if (!el.investmentMovementCurrency.value) {
+      el.investmentMovementCurrency.value = String(state.currency || "EUR").toUpperCase();
+    }
+    el.investmentOnlyUndeclared.checked = ui.investmentOnlyUndeclared;
     el.budgetType.value = ui.budgetType;
     el.budgetMonth.value = String(ui.budgetMonth);
     el.snapshotMonth.value = String(ui.snapshotMonth);
@@ -1010,6 +1181,100 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     }
 
     populateTransactionCategoryOptions();
+    populateInvestmentMovementCategoryOptions();
+    populateInvestmentMovementBrokerOptions();
+  }
+
+  function populateInvestmentMovementCategoryOptions() {
+    const categorySelect = el.investmentMovementCategory;
+    const currentValue = String(categorySelect.value || "").trim();
+    const categories = getOrderedCategoriesForType("investment");
+
+    categorySelect.innerHTML = categories
+      .map((name: string) => `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`)
+      .join("");
+
+    if (!categories.length) {
+      categorySelect.innerHTML = '<option value="Sin categoría">Sin categoría</option>';
+      return;
+    }
+
+    if (currentValue && categories.includes(currentValue)) {
+      categorySelect.value = currentValue;
+      return;
+    }
+
+    categorySelect.value = categories[0];
+  }
+
+  function populateInvestmentMovementBrokerOptions() {
+    const brokerSelect = el.investmentMovementBroker;
+    const currentValue = String(brokerSelect.value || "").trim();
+
+    brokerSelect.innerHTML = state.accounts
+      .map((item: any) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+      .join("");
+
+    if (!state.accounts.length) {
+      brokerSelect.innerHTML = '<option value="">Sin brokers</option>';
+      return;
+    }
+
+    if (currentValue && state.accounts.some((item: any) => item.id === currentValue)) {
+      brokerSelect.value = currentValue;
+    } else {
+      brokerSelect.value = state.accounts[0].id;
+    }
+
+    syncInvestmentMovementCategoryField();
+  }
+
+  function syncInvestmentMovementComputedAmount() {
+    const side = normalizeInvestmentSide(el.investmentMovementSide.value);
+    const computed = computeInvestmentMovement({
+      side,
+      symbol: el.investmentMovementSymbol.value,
+      units: parseFloatSafe(el.investmentMovementUnits.value, 0),
+      unitPrice: parseFloatSafe(el.investmentMovementUnitPrice.value, 0),
+      fee: parseFloatSafe(el.investmentMovementFee.value, 0),
+    });
+    el.investmentMovementTotal.value = String(computed.signedAmount);
+    el.investmentMovementSymbol.value = computed.normalizedSymbol;
+  }
+
+  function syncInvestmentMovementCategoryField() {
+    const isBitvavo = isBitvavoBrokerAccount(el.investmentMovementBroker.value);
+    const categorySelect = el.investmentMovementCategory;
+
+    if (isBitvavo) {
+      const hasCryptoOption = Array.from(categorySelect.options).some((option) => option.value === "Crypto");
+      if (!hasCryptoOption) {
+        categorySelect.insertAdjacentHTML(
+          "afterbegin",
+          '<option value="Crypto" data-temporary-bitvavo-option="true">Crypto</option>'
+        );
+      }
+      categorySelect.value = "Crypto";
+      categorySelect.disabled = true;
+      categorySelect.setAttribute("aria-disabled", "true");
+      return;
+    }
+
+    const wasDisabled = categorySelect.disabled;
+    const temporaryCryptoOption = categorySelect.querySelector<HTMLOptionElement>(
+      'option[data-temporary-bitvavo-option="true"]'
+    );
+    if (temporaryCryptoOption) {
+      temporaryCryptoOption.remove();
+    }
+    categorySelect.disabled = false;
+    categorySelect.removeAttribute("aria-disabled");
+    if (wasDisabled && categorySelect.value === "Crypto") {
+      const firstOption = categorySelect.options[0];
+      if (firstOption) {
+        categorySelect.value = firstOption.value;
+      }
+    }
   }
 
   function populateTransactionCategoryOptions() {
@@ -1415,7 +1680,7 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
         <td></td>
         <td><input type="date" name="editTxDate" autocomplete="off" data-edit-field="date" value="${escapeAttr(String(item.date))}" /></td>
         <td><input type="text" name="editTxDescription" autocomplete="off" data-edit-field="description" value="${escapeAttr(item.description || "")}" /></td>
-        <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" min="0" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
+        <td><input type="number" name="editTxAmount" autocomplete="off" step="0.01" data-edit-field="amount" value="${Number(item.amount || 0)}" /></td>
         <td><select name="editTxAccountId" data-edit-field="accountId">${accountsOptions}</select></td>
         <td><select name="editTxType" data-edit-field="type">${typeOptions}</select></td>
         <td><input type="text" name="editTxCategory" autocomplete="off" data-edit-field="category" value="${escapeAttr(item.category || "")}" /></td>
@@ -1484,7 +1749,10 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     const description = String(descriptionInput.value || "").trim();
     const amount = parseFloatSafe(amountInput.value, 0);
 
-    if (!date || !accountId || !type || !category || amount <= 0 || !isTransactionType(type)) {
+    const requiresPositiveAmount = type !== "investment";
+    const invalidAmount = requiresPositiveAmount ? amount <= 0 : amount === 0;
+
+    if (!date || !accountId || !type || !category || invalidAmount || !isTransactionType(type)) {
       showToast("Completa fecha, cuenta, tipo, categoría e importe válido.");
       return;
     }
@@ -1503,6 +1771,91 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     saveState();
     renderAll();
     showToast(options.successMessage);
+  }
+
+  function saveEditedInvestmentTransactionRow(id: string) {
+    const row = el.investmentTxBody.querySelector(`tr[data-investment-editing-id="${id}"]`);
+    if (!row) {
+      return;
+    }
+
+    const tx = state.transactions.find((item: any): item is Transaction => item.id === id && item.type === "investment");
+    if (!tx) {
+      return;
+    }
+
+    const dateInput = row.querySelector<HTMLInputElement>('[data-edit-field="date"]');
+    const timeInput = row.querySelector<HTMLInputElement>('[data-edit-field="time"]');
+    const sideInput = row.querySelector<HTMLSelectElement>('[data-edit-field="side"]');
+    const symbolInput = row.querySelector<HTMLInputElement>('[data-edit-field="symbol"]');
+    const unitPriceInput = row.querySelector<HTMLInputElement>('[data-edit-field="unitPrice"]');
+    const unitsInput = row.querySelector<HTMLInputElement>('[data-edit-field="units"]');
+    const feeInput = row.querySelector<HTMLInputElement>('[data-edit-field="fee"]');
+    const currencyInput = row.querySelector<HTMLInputElement>('[data-edit-field="movementCurrency"]');
+    const accountInput = row.querySelector<HTMLSelectElement>('[data-edit-field="accountId"]');
+    const declaredInput = row.querySelector<HTMLInputElement>('[data-edit-field="declared"]');
+
+    if (
+      !dateInput ||
+      !timeInput ||
+      !sideInput ||
+      !symbolInput ||
+      !unitPriceInput ||
+      !unitsInput ||
+      !feeInput ||
+      !currencyInput ||
+      !accountInput ||
+      !declaredInput
+    ) {
+      return;
+    }
+
+    const date = String(dateInput.value || "").trim();
+    const time = String(timeInput.value || "").trim();
+    const side: InvestmentSide = normalizeInvestmentSide(sideInput.value);
+    const symbol = normalizeInvestmentSymbol(symbolInput.value);
+    const movementCurrency = String(currencyInput.value || state.currency || "EUR").trim().toUpperCase().slice(0, 3);
+    const accountId = String(accountInput.value || "").trim();
+    const declared = Boolean(declaredInput.checked);
+
+    if (!date || !time || !symbol || !accountId) {
+      showToast("Completa fecha, hora, símbolo y broker.");
+      return;
+    }
+
+    const computed = computeInvestmentMovement({
+      side,
+      symbol,
+      units: parseFloatSafe(unitsInput.value, 0),
+      unitPrice: parseFloatSafe(unitPriceInput.value, 0),
+      fee: parseFloatSafe(feeInput.value, 0),
+    });
+
+    if (computed.normalizedUnits <= 0 || computed.normalizedUnitPrice <= 0 || computed.signedAmount === 0) {
+      showToast("Precio, títulos y gasto deben ser válidos.");
+      return;
+    }
+
+    tx.date = date;
+    tx.month = monthFromISO(date) ?? tx.month;
+    tx.time = time;
+    tx.accountId = accountId;
+    tx.side = side;
+    tx.symbol = computed.normalizedSymbol;
+    tx.category = resolveInvestmentCategory(accountId, tx.category, computed.normalizedSymbol);
+    tx.unitPrice = computed.normalizedUnitPrice;
+    tx.units = computed.normalizedUnits;
+    tx.fee = computed.normalizedFee;
+    tx.movementCurrency = movementCurrency;
+    tx.description = computed.description;
+    tx.amount = computed.signedAmount;
+    tx.declared = declared;
+
+    ui.investmentTxEditingId = "";
+    sortTransactions();
+    saveState();
+    renderAll();
+    showToast("Movimiento de inversión actualizado.");
   }
 
   function openTransactionModal() {
@@ -1849,10 +2202,37 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
   }
 
   function renderInvestment() {
+    renderInvestmentYearFilterOptions();
+    syncInvestmentMovementComputedAmount();
     renderInvestmentTabState();
     renderInvestmentDashboard();
     renderInvestmentTransactionsTable();
     renderContributionsTable();
+  }
+
+  function renderInvestmentYearFilterOptions() {
+    const years = Array.from(
+      new Set(
+        state.transactions
+          .filter((item: any) => item.type === "investment")
+          .map((item: any) => parseTransactionYear(item.date))
+          .filter((year): year is number => typeof year === "number" && Number.isInteger(year))
+          .concat(state.year)
+      )
+    ).sort((a, b) => b - a);
+
+    if (!years.length) {
+      years.push(state.year);
+    }
+
+    if (!years.includes(ui.investmentYearFilter)) {
+      ui.investmentYearFilter = years[0];
+    }
+
+    el.investmentYearFilter.innerHTML = years
+      .map((year) => `<option value="${year}">${year}</option>`)
+      .join("");
+    el.investmentYearFilter.value = String(ui.investmentYearFilter);
   }
 
   function renderInvestmentTabState() {
@@ -1982,32 +2362,63 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
 
   function renderInvestmentTransactionsTable() {
     const rows = state.transactions
-      .filter((item: any) => item.type === "investment" && Number(item.month) === ui.investmentMonth)
-      .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date)));
+      .filter((item: any): item is Transaction => item.type === "investment")
+      .filter((item) => {
+        const year = parseTransactionYear(item.date);
+        if (year === null || year !== ui.investmentYearFilter) {
+          return false;
+        }
+        if (ui.investmentOnlyUndeclared && item.declared) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const byDate = String(b.date).localeCompare(String(a.date));
+        if (byDate !== 0) {
+          return byDate;
+        }
+        return String(b.time || "").localeCompare(String(a.time || ""));
+      });
 
     if (!rows.length) {
-      el.investmentTxBody.innerHTML = "<tr><td colspan='7'>Sin movimientos de inversión para este mes.</td></tr>";
+      el.investmentTxBody.innerHTML = "<tr><td colspan='12'>Sin movimientos de inversión para este filtro.</td></tr>";
       return;
     }
 
     el.investmentTxBody.innerHTML = rows
-      .map((item: any) => {
+      .map((item) => {
         if (ui.investmentTxEditingId === item.id) {
-          return renderEditingTransactionRow(item, "data-investment-editing-id", {
-            saveAction: "save-edit-investment-tx",
-            cancelAction: "cancel-edit-investment-tx",
-          });
+          return renderInvestmentEditingTransactionRow(item);
         }
 
         const account = getAccountName(item.accountId);
+        const sideLabel = item.side === "sell" ? "Venta" : "Compra";
+        const declaredLabel = item.declared ? "Sí" : "No";
+        const declaredClass = item.declared ? "text-good" : "text-bad";
         return `
           <tr>
             <td>${escapeHtml(String(item.date))}</td>
-            <td>${escapeHtml(item.description || "-")}</td>
+            <td>${escapeHtml(item.time || "--:--")}</td>
+            <td>${escapeHtml(sideLabel)}</td>
+            <td>${escapeHtml(item.symbol || item.category || "-")}</td>
+            <td>${Number.isFinite(item.unitPrice) ? Number(item.unitPrice).toFixed(4) : "-"}</td>
+            <td>${Number.isFinite(item.units) ? Number(item.units).toFixed(4) : "-"}</td>
+            <td>${Number.isFinite(item.fee) ? Number(item.fee).toFixed(2) : "0.00"}</td>
             <td>${formatMoney(item.amount)}</td>
+            <td>${escapeHtml(item.movementCurrency || state.currency || "EUR")}</td>
             <td>${escapeHtml(account)}</td>
-            <td><span class="badge badge-investment">Inversión</span></td>
-            <td>${escapeHtml(decorateCategoryLabel("investment", item.category || "Sin categoría"))}</td>
+            <td>
+              <button
+                type="button"
+                class="secondary-btn"
+                data-action="toggle-investment-declared"
+                data-id="${escapeAttr(item.id)}"
+                aria-label="Cambiar declarado"
+              >
+                <span class="${declaredClass}">${escapeHtml(declaredLabel)}</span>
+              </button>
+            </td>
             <td>
               <div class="inline-actions">
                 <button class="edit-btn icon-action-btn" data-action="edit-investment-tx" data-id="${escapeAttr(item.id)}" aria-label="Editar movimiento del ${escapeAttr(String(item.date))}">
@@ -2028,6 +2439,78 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
         `;
       })
       .join("");
+  }
+
+  function renderInvestmentEditingTransactionRow(item: Transaction) {
+    const accountOptions = state.accounts
+      .map((account: any) => {
+        const selected = account.id === item.accountId ? "selected" : "";
+        return `<option value="${escapeAttr(account.id)}" ${selected}>${escapeHtml(account.name)}</option>`;
+      })
+      .join("");
+
+    const side = item.side === "sell" ? "sell" : "buy";
+    const symbol = item.symbol || item.category || "";
+    const unitPrice = Number.isFinite(item.unitPrice) ? Number(item.unitPrice) : 0;
+    const units = Number.isFinite(item.units) ? Number(item.units) : 0;
+    const fee = Number.isFinite(item.fee) ? Number(item.fee) : 0;
+    const movementCurrency = String(item.movementCurrency || state.currency || "EUR").toUpperCase().slice(0, 3);
+    const declared = Boolean(item.declared);
+
+    return `
+      <tr data-investment-editing-id="${escapeAttr(item.id)}">
+        <td><input type="date" name="editInvestmentDate" data-edit-field="date" value="${escapeAttr(item.date)}" /></td>
+        <td><input type="time" name="editInvestmentTime" data-edit-field="time" value="${escapeAttr(item.time || "00:00")}" /></td>
+        <td>
+          <select name="editInvestmentSide" data-edit-field="side">
+            <option value="buy" ${side === "buy" ? "selected" : ""}>Compra</option>
+            <option value="sell" ${side === "sell" ? "selected" : ""}>Venta</option>
+          </select>
+        </td>
+        <td><input type="text" name="editInvestmentSymbol" data-edit-field="symbol" value="${escapeAttr(symbol)}" /></td>
+        <td><input type="number" name="editInvestmentUnitPrice" step="0.0001" min="0" data-edit-field="unitPrice" value="${unitPrice}" /></td>
+        <td><input type="number" name="editInvestmentUnits" step="0.00000001" min="0" data-edit-field="units" value="${units}" /></td>
+        <td><input type="number" name="editInvestmentFee" step="0.01" min="0" data-edit-field="fee" value="${fee}" /></td>
+        <td><input type="number" name="editInvestmentAmount" step="0.01" data-edit-field="amount" value="${item.amount}" readonly /></td>
+        <td><input type="text" name="editInvestmentCurrency" maxlength="3" data-edit-field="movementCurrency" value="${escapeAttr(movementCurrency)}" /></td>
+        <td><select name="editInvestmentBroker" data-edit-field="accountId">${accountOptions}</select></td>
+        <td>
+          <input
+            type="checkbox"
+            name="editInvestmentDeclared"
+            data-edit-field="declared"
+            ${declared ? "checked" : ""}
+            aria-label="Movimiento declarado"
+          />
+        </td>
+        <td>
+          <div class="inline-actions">
+            <button
+              type="button"
+              class="inline-save-btn icon-action-btn"
+              data-action="save-edit-investment-tx"
+              data-id="${escapeAttr(item.id)}"
+              aria-label="Guardar"
+            >
+              <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="inline-cancel-btn icon-action-btn"
+              data-action="cancel-edit-investment-tx"
+              data-id="${escapeAttr(item.id)}"
+              aria-label="Cancelar"
+            >
+              <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"></path>
+              </svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
   }
 
   function renderContributionsTable() {
@@ -2414,6 +2897,25 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
     return account ? account.name : accountId || "-";
   }
 
+  function isBitvavoBrokerAccount(accountId: string): boolean {
+    const account = state.accounts.find((item: any) => item.id === accountId);
+    const accountName = String(account?.name || "").trim().toLowerCase();
+    return accountName === "bitvavo";
+  }
+
+  function resolveInvestmentCategory(accountId: string, rawCategory: string, fallbackCategory: string): string {
+    if (isBitvavoBrokerAccount(accountId)) {
+      return "Crypto";
+    }
+
+    const normalized = String(rawCategory || "").trim();
+    if (normalized) {
+      return normalized;
+    }
+
+    return String(fallbackCategory || "Sin categoría").trim() || "Sin categoría";
+  }
+
   function computeAccountBalance(accountId: any, month: any) {
     const account = state.accounts.find((item: any) => item.id === accountId);
     if (!account) {
@@ -2752,7 +3254,24 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
   }
 
   function exportTransactionsCsv() {
-    const header = ["id", "date", "month", "type", "accountId", "category", "description", "amount"];
+    const header = [
+      "id",
+      "date",
+      "month",
+      "type",
+      "accountId",
+      "category",
+      "description",
+      "amount",
+      "time",
+      "symbol",
+      "side",
+      "unitPrice",
+      "units",
+      "fee",
+      "movementCurrency",
+      "declared",
+    ];
     const rows = state.transactions.map((item: any) => [
       item.id,
       item.date,
@@ -2762,6 +3281,14 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
       item.category,
       item.description,
       item.amount,
+      item.time || "",
+      item.symbol || "",
+      item.side || "",
+      Number.isFinite(item.unitPrice) ? item.unitPrice : "",
+      Number.isFinite(item.units) ? item.units : "",
+      Number.isFinite(item.fee) ? item.fee : "",
+      item.movementCurrency || "",
+      item.declared ? "true" : "false",
     ]);
 
     const csv = [header, ...rows]
