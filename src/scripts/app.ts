@@ -74,6 +74,13 @@ import {
   normalizeInvestmentSymbol,
   parseTransactionYear,
 } from "./investment-movements";
+import {
+  deriveContributionFlow,
+  findLiquidityTargets,
+  getFlowFromAllocations,
+  sanitizeFlowAllocations,
+  toSnapshotDate,
+} from "./contribution-workflow";
 
 (() => {
   "use strict";
@@ -101,6 +108,13 @@ import {
     investmentYearFilter: number;
     investmentOnlyUndeclared: boolean;
     investmentReturnMode: "simple" | "twr";
+    contributionWorkflowStep: 1 | 2;
+    contributionWorkflowMonth: number;
+    contributionWorkflowDate: string;
+    contributionWorkflowAmount: number;
+    contributionCalcTargetKind: SnapshotKind | "";
+    contributionCalcTargetId: string;
+    contributionCalcTargetName: string;
   }
 
   interface TxFormControls extends HTMLFormControlsCollection {
@@ -228,6 +242,13 @@ import {
     investmentYearFilter: new Date().getFullYear(),
     investmentOnlyUndeclared: false,
     investmentReturnMode: "simple",
+    contributionWorkflowStep: 1,
+    contributionWorkflowMonth: Math.min(new Date().getMonth(), 11),
+    contributionWorkflowDate: "",
+    contributionWorkflowAmount: 0,
+    contributionCalcTargetKind: "",
+    contributionCalcTargetId: "",
+    contributionCalcTargetName: "",
   };
 
   const el = {
@@ -323,6 +344,28 @@ import {
     investmentMovementBroker: getRequiredElement<HTMLSelectElement>("investment-movement-broker"),
     investmentMovementDeclared: getRequiredElement<HTMLInputElement>("investment-movement-declared"),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
+    openContributionWorkflow: getRequiredElement<HTMLButtonElement>("open-contribution-workflow"),
+    contributionWorkflowDialog: getRequiredElement<HTMLDialogElement>("contribution-workflow-dialog"),
+    contributionWorkflowForm: getRequiredElement<HTMLFormElement>("contribution-workflow-form"),
+    contributionWorkflowClose: getRequiredElement<HTMLButtonElement>("contribution-workflow-close"),
+    contributionWorkflowMonth: getRequiredElement<HTMLSelectElement>("contribution-workflow-month"),
+    contributionWorkflowDate: getRequiredElement<HTMLInputElement>("contribution-workflow-date"),
+    contributionWorkflowStepSnapshot: getRequiredElement<HTMLElement>("contribution-workflow-step-snapshot"),
+    contributionWorkflowStepAllocation: getRequiredElement<HTMLElement>("contribution-workflow-step-allocation"),
+    contributionWorkflowInvestmentsBody: getRequiredElement<HTMLElement>("contribution-workflow-investments-body"),
+    contributionWorkflowLiquidityBody: getRequiredElement<HTMLElement>("contribution-workflow-liquidity-body"),
+    contributionWorkflowAllocationBody: getRequiredElement<HTMLElement>("contribution-workflow-allocation-body"),
+    contributionWorkflowTotal: getRequiredElement<HTMLInputElement>("contribution-workflow-total"),
+    contributionWorkflowSnapshotWarning: getRequiredElement<HTMLElement>("contribution-workflow-snapshot-warning"),
+    contributionWorkflowAllocationWarning: getRequiredElement<HTMLElement>("contribution-workflow-allocation-warning"),
+    contributionWorkflowPrev: getRequiredElement<HTMLButtonElement>("contribution-workflow-prev"),
+    contributionWorkflowNext: getRequiredElement<HTMLButtonElement>("contribution-workflow-next"),
+    contributionWorkflowSave: getRequiredElement<HTMLButtonElement>("contribution-workflow-save"),
+    contributionCalcDialog: getRequiredElement<HTMLDialogElement>("contribution-calc-dialog"),
+    contributionCalcForm: getRequiredElement<HTMLFormElement>("contribution-calc-form"),
+    contributionCalcTitle: getRequiredElement<HTMLElement>("contribution-calc-title"),
+    contributionCalcClose: getRequiredElement<HTMLButtonElement>("contribution-calc-close"),
+    contributionCalcExpression: getRequiredElement<HTMLInputElement>("contribution-calc-expression"),
 
     goalsProgress: getRequiredElement<HTMLElement>("goals-progress"),
 
@@ -920,6 +963,101 @@ import {
       saveState();
       renderContributionsTable();
     });
+
+    el.openContributionWorkflow.addEventListener("click", () => {
+      openContributionWorkflowModal();
+    });
+
+    el.contributionWorkflowClose.addEventListener("click", () => {
+      closeContributionWorkflowModal();
+    });
+
+    el.contributionWorkflowDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeContributionWorkflowModal();
+    });
+
+    el.contributionWorkflowMonth.addEventListener("change", () => {
+      ui.contributionWorkflowMonth = parseIntSafe(el.contributionWorkflowMonth.value, ui.contributionWorkflowMonth);
+      ui.contributionWorkflowDate = toSnapshotDate(state.year, ui.contributionWorkflowMonth);
+      el.contributionWorkflowDate.value = ui.contributionWorkflowDate;
+      renderContributionWorkflowModal();
+    });
+
+    el.contributionWorkflowDate.addEventListener("change", () => {
+      ui.contributionWorkflowDate = String(el.contributionWorkflowDate.value || "").trim();
+      const month = monthFromISO(ui.contributionWorkflowDate);
+      if (month !== null) {
+        ui.contributionWorkflowMonth = month;
+        el.contributionWorkflowMonth.value = String(month);
+      }
+      renderContributionWorkflowModal();
+    });
+
+    el.contributionWorkflowPrev.addEventListener("click", () => {
+      ui.contributionWorkflowStep = 1;
+      renderContributionWorkflowStepState();
+      renderContributionWorkflowModalWarnings();
+    });
+
+    el.contributionWorkflowNext.addEventListener("click", () => {
+      ui.contributionWorkflowStep = 2;
+      renderContributionWorkflowStepState();
+      renderContributionWorkflowModalWarnings();
+    });
+
+    el.contributionWorkflowTotal.addEventListener("input", () => {
+      ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
+      renderContributionWorkflowModalWarnings();
+    });
+
+    el.contributionWorkflowDialog.addEventListener("input", (event) => {
+      const target = getEventElement(event.target);
+      const snapshotInput = target?.closest<HTMLInputElement>("input[data-contribution-snapshot-kind]");
+      if (snapshotInput) {
+        renderContributionWorkflowModalWarnings();
+        return;
+      }
+
+      const allocationInput = target?.closest<HTMLInputElement>("input[data-contribution-allocation-account-id]");
+      if (allocationInput) {
+        renderContributionWorkflowModalWarnings();
+      }
+    });
+
+    el.contributionWorkflowDialog.addEventListener("click", (event) => {
+      const target = getEventElement(event.target);
+      const calcButton = target?.closest<HTMLButtonElement>('button[data-action="open-contribution-snapshot-calc"]');
+      if (!calcButton) {
+        return;
+      }
+      const kind = String(calcButton.dataset.snapshotKind || "");
+      const itemId = String(calcButton.dataset.snapshotId || "");
+      const itemName = String(calcButton.dataset.itemName || "");
+      if (!kind || !itemId || !itemName || !isSnapshotKind(kind)) {
+        return;
+      }
+      openContributionCalcModal(kind, itemId, itemName);
+    });
+
+    el.contributionCalcClose.addEventListener("click", () => {
+      closeContributionCalcModal();
+    });
+
+    el.contributionCalcDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeContributionCalcModal();
+    });
+
+    el.contributionCalcForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      applyContributionCalcModalResult();
+    });
+
+    el.contributionWorkflowForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveContributionFromWorkflowModal();
+    });
   }
 
   function bindGoalEvents() {
@@ -1119,6 +1257,7 @@ import {
       el.budgetMonth,
       el.snapshotMonth,
       el.investmentMonth,
+      el.contributionWorkflowMonth,
     ];
 
     monthSelects.forEach((select: any) => {
@@ -1150,6 +1289,9 @@ import {
     if (!MONTHS[ui.investmentMonth]) {
       ui.investmentMonth = ui.month;
     }
+    if (!MONTHS[ui.contributionWorkflowMonth]) {
+      ui.contributionWorkflowMonth = ui.investmentMonth;
+    }
 
     el.dashboardMonth.value = String(ui.month);
     el.txMonthFilter.value = String(ui.txFilterMonth);
@@ -1169,11 +1311,20 @@ import {
     if (!el.investmentMovementCurrency.value) {
       el.investmentMovementCurrency.value = String(state.currency || "EUR").toUpperCase();
     }
+    if (!ui.contributionWorkflowDate) {
+      ui.contributionWorkflowDate = todayISO();
+      const contributionMonthFromToday = monthFromISO(ui.contributionWorkflowDate);
+      if (contributionMonthFromToday !== null) {
+        ui.contributionWorkflowMonth = contributionMonthFromToday;
+      }
+    }
+    el.contributionWorkflowDate.value = ui.contributionWorkflowDate;
     el.investmentOnlyUndeclared.checked = ui.investmentOnlyUndeclared;
     el.budgetType.value = ui.budgetType;
     el.budgetMonth.value = String(ui.budgetMonth);
     el.snapshotMonth.value = String(ui.snapshotMonth);
     el.investmentMonth.value = String(ui.investmentMonth);
+    el.contributionWorkflowMonth.value = String(ui.contributionWorkflowMonth);
   }
 
   function populateTransactionFormOptions() {
@@ -2134,7 +2285,6 @@ import {
     if (!targetId || !targetName) {
       return;
     }
-
     ui.wealthCalcTargetId = targetId;
     ui.wealthCalcTargetName = targetName;
     el.wealthCalcTitle.textContent = `Calcular snapshot · ${targetName}`;
@@ -2355,7 +2505,7 @@ import {
     if (isTWR) {
       portfolioPercentages = chartPoints.map((m) => {
         if (m < 0) return 0;
-        const date = toSnapshotDate(m);
+        const date = toSnapshotDate(state.year, m);
         return twrByDate.get(date) ?? 0;
       });
     } else {
@@ -2621,9 +2771,10 @@ import {
           return null;
         }
 
-        const date = toSnapshotDate(month);
+        const date = toSnapshotDate(state.year, month);
         const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
-        const flow = round2(parseFloatSafe(existing?.flow, 0));
+        const derived = deriveContributionFlow(existing || {});
+        const flow = round2(derived.flow);
 
         return {
           id: existing?.id || `contrib-snapshot-${state.year}-${month + 1}`,
@@ -2632,6 +2783,11 @@ import {
           portfolioDate: date,
           portfolioValue,
           flow,
+          flowAllocations: derived.allocations,
+          flowSource: derived.flowSource,
+          warnings: Array.isArray(existing?.warnings)
+            ? existing.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+            : [],
         };
       })
       .filter(Boolean) as Contribution[];
@@ -2639,9 +2795,365 @@ import {
     return snapshotRows.sort((a, b) => String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)));
   }
 
-  function toSnapshotDate(month: number): string {
-    const day = new Date(state.year, month + 1, 0).getDate();
-    return `${state.year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  function openContributionWorkflowModal() {
+    ui.contributionWorkflowStep = 1;
+    ui.contributionWorkflowDate = todayISO();
+    ui.contributionWorkflowMonth = monthFromISO(ui.contributionWorkflowDate) ?? ui.investmentMonth;
+
+    const existing = state.contributions.find(
+      (item: any) => String(item.portfolioDate || item.date) === ui.contributionWorkflowDate
+    );
+    const derived = deriveContributionFlow(existing || {});
+    ui.contributionWorkflowAmount = round2(derived.flow);
+
+    el.contributionWorkflowMonth.value = String(ui.contributionWorkflowMonth);
+    el.contributionWorkflowDate.value = ui.contributionWorkflowDate;
+    renderContributionWorkflowModal();
+    el.contributionWorkflowDialog.showModal();
+  }
+
+  function closeContributionWorkflowModal() {
+    closeContributionCalcModal();
+    if (el.contributionWorkflowDialog.open) {
+      el.contributionWorkflowDialog.close();
+    }
+  }
+
+  function renderContributionWorkflowModal() {
+    renderContributionWorkflowStepState();
+
+    const month = ui.contributionWorkflowMonth;
+    const date = ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
+    const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
+    const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || []);
+    const { matched: liquidityAccounts, missing } = findLiquidityTargets(state.accounts);
+    const snapshot = state.snapshots[String(month)];
+
+    el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets.length
+      ? state.investmentAssets
+          .map((asset: any) => {
+            const snapshotValue = snapshot?.investments?.[asset.id];
+            return `
+              <tr>
+                <td>${escapeHtml(asset.name)}</td>
+                <td>
+                  <div class="snapshot-field-stack">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value="${snapshotValue ?? ""}"
+                      data-contribution-snapshot-kind="investments"
+                      data-contribution-snapshot-id="${escapeAttr(asset.id)}"
+                      aria-label="Snapshot inversión ${escapeAttr(asset.name)}"
+                    />
+                    <button
+                      type="button"
+                      class="tx-btn-secondary snapshot-calc-btn"
+                      data-action="open-contribution-snapshot-calc"
+                      data-snapshot-kind="investments"
+                      data-snapshot-id="${escapeAttr(asset.id)}"
+                      data-item-name="${escapeAttr(asset.name)}"
+                      aria-label="Calcular snapshot de ${escapeAttr(asset.name)}"
+                    >
+                      Calcular
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("")
+      : "<tr><td colspan='2'>No hay activos de inversión configurados.</td></tr>";
+
+    const liquidityRows = liquidityAccounts
+      .map((account) => {
+        const snapshotValue = snapshot?.accounts?.[account.id];
+        return `
+          <tr>
+            <td>${escapeHtml(account.name)}</td>
+            <td>
+              <div class="snapshot-field-stack">
+                <input
+                  type="number"
+                  step="0.01"
+                  value="${snapshotValue ?? ""}"
+                  data-contribution-snapshot-kind="accounts"
+                  data-contribution-snapshot-id="${escapeAttr(account.id)}"
+                  aria-label="Snapshot liquidez ${escapeAttr(account.name)}"
+                />
+                <button
+                  type="button"
+                  class="tx-btn-secondary snapshot-calc-btn"
+                  data-action="open-contribution-snapshot-calc"
+                  data-snapshot-kind="accounts"
+                  data-snapshot-id="${escapeAttr(account.id)}"
+                  data-item-name="${escapeAttr(account.name)}"
+                  aria-label="Calcular snapshot de ${escapeAttr(account.name)}"
+                >
+                  Calcular
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const missingRows = missing
+      .map((targetName) => {
+        return `
+          <tr>
+            <td>${escapeHtml(targetName)}</td>
+            <td class="text-bad">Cuenta no configurada</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    el.contributionWorkflowLiquidityBody.innerHTML =
+      liquidityRows || missingRows
+        ? `${liquidityRows}${missingRows}`
+        : "<tr><td colspan='2'>No hay cuentas de liquidez configuradas.</td></tr>";
+
+    const allocationsByAccountId = new Map(existingAllocations.map((item) => [item.accountId, item.amount]));
+    el.contributionWorkflowAllocationBody.innerHTML =
+      liquidityAccounts.length > 0
+        ? liquidityAccounts
+            .map((account) => {
+              const currentAllocation = allocationsByAccountId.get(account.id) ?? 0;
+              return `
+                <tr>
+                  <td>${escapeHtml(account.name)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value="${currentAllocation}"
+                      data-contribution-allocation-account-id="${escapeAttr(account.id)}"
+                      aria-label="Asignación aporte ${escapeAttr(account.name)}"
+                    />
+                  </td>
+                </tr>
+              `;
+            })
+            .join("")
+        : "<tr><td colspan='2'>No hay cuentas objetivo para repartir el aporte.</td></tr>";
+
+    if (ui.contributionWorkflowAmount <= 0) {
+      ui.contributionWorkflowAmount = round2(
+        getFlowFromAllocations(existingAllocations.length > 0 ? existingAllocations : existing?.flowAllocations || [])
+      );
+    }
+    el.contributionWorkflowTotal.value = String(ui.contributionWorkflowAmount);
+    renderContributionWorkflowModalWarnings();
+  }
+
+  function renderContributionWorkflowStepState() {
+    const isStepOne = ui.contributionWorkflowStep === 1;
+    el.contributionWorkflowStepSnapshot.hidden = !isStepOne;
+    el.contributionWorkflowStepAllocation.hidden = isStepOne;
+    el.contributionWorkflowPrev.hidden = isStepOne;
+    el.contributionWorkflowNext.hidden = !isStepOne;
+    el.contributionWorkflowSave.hidden = isStepOne;
+  }
+
+  function openContributionCalcModal(kind: SnapshotKind, targetId: string, targetName: string) {
+    ui.contributionCalcTargetKind = kind;
+    ui.contributionCalcTargetId = targetId;
+    ui.contributionCalcTargetName = targetName;
+    el.contributionCalcTitle.textContent = `Calcular snapshot · ${targetName}`;
+    el.contributionCalcExpression.value = "";
+    el.contributionCalcDialog.showModal();
+    window.setTimeout(() => {
+      el.contributionCalcExpression.focus();
+    }, 0);
+  }
+
+  function closeContributionCalcModal() {
+    if (el.contributionCalcDialog.open) {
+      el.contributionCalcDialog.close();
+    }
+    ui.contributionCalcTargetKind = "";
+    ui.contributionCalcTargetId = "";
+    ui.contributionCalcTargetName = "";
+    el.contributionCalcExpression.value = "";
+    el.contributionCalcTitle.textContent = "Calcular snapshot";
+  }
+
+  function applyContributionCalcModalResult() {
+    if (!ui.contributionCalcTargetKind || !ui.contributionCalcTargetId) {
+      closeContributionCalcModal();
+      return;
+    }
+
+    const evaluated = evaluateNumericExpression(el.contributionCalcExpression.value);
+    if (evaluated === null) {
+      showToast("El cálculo no es válido.");
+      el.contributionCalcExpression.focus();
+      return;
+    }
+
+    const snapshotInput = el.contributionWorkflowDialog.querySelector<HTMLInputElement>(
+      `input[data-contribution-snapshot-kind="${CSS.escape(ui.contributionCalcTargetKind)}"][data-contribution-snapshot-id="${CSS.escape(ui.contributionCalcTargetId)}"]`
+    );
+    if (!snapshotInput) {
+      showToast("No se pudo aplicar el resultado.");
+      closeContributionCalcModal();
+      return;
+    }
+
+    snapshotInput.value = String(round2(evaluated));
+    renderContributionWorkflowModalWarnings();
+    showToast("Resultado aplicado al snapshot.");
+    closeContributionCalcModal();
+  }
+
+  function getContributionWorkflowWarnings(): string[] {
+    const warnings: string[] = [];
+    const snapshotInputs = Array.from(
+      el.contributionWorkflowDialog.querySelectorAll<HTMLInputElement>("input[data-contribution-snapshot-kind]")
+    );
+
+    const missingInvestment = snapshotInputs.filter((input) => {
+      if (input.dataset.contributionSnapshotKind !== "investments") {
+        return false;
+      }
+      return Number.isNaN(parseFloatSafe(input.value, Number.NaN));
+    }).length;
+    if (missingInvestment > 0) {
+      warnings.push(`Faltan snapshots de inversión: ${missingInvestment}`);
+    }
+
+    const missingLiquidity = snapshotInputs.filter((input) => {
+      if (input.dataset.contributionSnapshotKind !== "accounts") {
+        return false;
+      }
+      return Number.isNaN(parseFloatSafe(input.value, Number.NaN));
+    }).length;
+    if (missingLiquidity > 0) {
+      warnings.push(`Faltan snapshots de liquidez: ${missingLiquidity}`);
+    }
+
+    const { missing } = findLiquidityTargets(state.accounts);
+    if (missing.length > 0) {
+      warnings.push(`Cuentas de liquidez no configuradas: ${missing.join(", ")}`);
+    }
+
+    const total = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
+    const allocationInputs = Array.from(
+      el.contributionWorkflowDialog.querySelectorAll<HTMLInputElement>("input[data-contribution-allocation-account-id]")
+    );
+    const allocated = round2(
+      allocationInputs.reduce((sum, input) => {
+        const value = round2(parseFloatSafe(input.value, 0));
+        if (value <= 0 || Number.isNaN(value)) {
+          return sum;
+        }
+        return sum + value;
+      }, 0)
+    );
+    const delta = round2(total - allocated);
+
+    if (delta > 0) {
+      warnings.push(`Importe sin asignar: ${formatMoney(delta)}`);
+    }
+    if (delta < 0) {
+      warnings.push(`Importe sobreasignado: ${formatMoney(Math.abs(delta))}`);
+    }
+
+    return warnings;
+  }
+
+  function renderContributionWorkflowModalWarnings() {
+    const warnings = getContributionWorkflowWarnings();
+    const snapshotWarnings = warnings.filter((message) => /snapshot|liquidez no configuradas/i.test(message));
+    const allocationWarnings = warnings.filter((message) => /asignar|sobreasignado/i.test(message));
+    el.contributionWorkflowSnapshotWarning.textContent = snapshotWarnings.join("\n");
+    el.contributionWorkflowAllocationWarning.textContent = allocationWarnings.join("\n");
+  }
+
+  function saveContributionFromWorkflowModal() {
+    const month = ui.contributionWorkflowMonth;
+    const date = String(el.contributionWorkflowDate.value || "").trim() || toSnapshotDate(state.year, month);
+    ui.contributionWorkflowDate = date;
+    const monthFromDate = monthFromISO(date);
+    if (monthFromDate !== null) {
+      ui.contributionWorkflowMonth = monthFromDate;
+    }
+
+    if (!state.snapshots[String(ui.contributionWorkflowMonth)]) {
+      state.snapshots[String(ui.contributionWorkflowMonth)] = {
+        month: ui.contributionWorkflowMonth,
+        accounts: {},
+        investments: {},
+        liabilities: {},
+      };
+    }
+
+    const snapshot = state.snapshots[String(ui.contributionWorkflowMonth)];
+    const snapshotInputs = Array.from(
+      el.contributionWorkflowDialog.querySelectorAll<HTMLInputElement>("input[data-contribution-snapshot-kind]")
+    );
+    snapshotInputs.forEach((input) => {
+      const kind = input.dataset.contributionSnapshotKind;
+      const itemId = input.dataset.contributionSnapshotId;
+      if (!kind || !itemId || !isSnapshotKind(kind)) {
+        return;
+      }
+      const parsed = parseFloatSafe(input.value, Number.NaN);
+      if (Number.isNaN(parsed)) {
+        delete snapshot[kind][itemId];
+        return;
+      }
+      snapshot[kind][itemId] = round2(parsed);
+    });
+
+    const portfolioValue = round2(
+      Object.values(snapshot.investments || {}).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
+    );
+    if (portfolioValue <= 0) {
+      showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
+      return;
+    }
+
+    const allocationInputs = Array.from(
+      el.contributionWorkflowDialog.querySelectorAll<HTMLInputElement>("input[data-contribution-allocation-account-id]")
+    );
+    const flowAllocations = sanitizeFlowAllocations(
+      allocationInputs.map((input) => ({
+        accountId: String(input.dataset.contributionAllocationAccountId || ""),
+        amount: round2(parseFloatSafe(input.value, 0)),
+      }))
+    );
+    const flow = getFlowFromAllocations(flowAllocations);
+    ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
+    const warnings = getContributionWorkflowWarnings();
+
+    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const payload: Contribution = {
+      id: existingIndex >= 0 ? state.contributions[existingIndex].id : `contrib-snapshot-${state.year}-${ui.contributionWorkflowMonth + 1}`,
+      date,
+      amount: flow,
+      portfolioDate: date,
+      portfolioValue,
+      flow,
+      flowAllocations,
+      flowSource: "allocations",
+      warnings,
+    };
+
+    if (existingIndex >= 0) {
+      state.contributions[existingIndex] = payload;
+    } else {
+      state.contributions.push(payload);
+      sortContributions();
+    }
+
+    saveState();
+    renderAll();
+    closeContributionWorkflowModal();
+    showToast(warnings.length > 0 ? "Aporte guardado con avisos." : "Aporte guardado.");
   }
 
   function upsertContributionFlowForDate(date: string, flow: number) {
@@ -2651,13 +3163,16 @@ import {
       return;
     }
     const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
-    const payload = {
+    const payload: Contribution = {
       id: current.id,
       date,
       amount: flow,
       portfolioDate: date,
       portfolioValue: current.portfolioValue,
       flow,
+      flowAllocations: [],
+      flowSource: "legacy",
+      warnings: [],
     };
     if (existingIndex >= 0) {
       state.contributions[existingIndex] = payload;

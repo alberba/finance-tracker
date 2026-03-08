@@ -595,6 +595,98 @@ export class FinanceTrackerPage {
     return row.locator("td").allInnerTexts();
   }
 
+  async getContributionFlowByDate(date: string): Promise<number> {
+    await this.openInvestmentContributionsTab();
+    const input = this.investmentSection().locator(`input[data-contribution-flow-date="${date}"]`);
+    await expect(input).toBeVisible();
+    return Number(await input.inputValue());
+  }
+
+  async openContributionWorkflowModal() {
+    await this.openInvestmentContributionsTab();
+    await this.investmentSection().getByRole("button", { name: "Añadir aporte" }).click();
+    await expect(this.page.locator("#contribution-workflow-dialog")).toBeVisible();
+  }
+
+  async contributionWorkflowSelectMonth(monthLabel: string) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    await modal.locator("#contribution-workflow-month").selectOption({ label: monthLabel });
+  }
+
+  async contributionWorkflowSetDate(date: string) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    await modal.locator("#contribution-workflow-date").fill(date);
+  }
+
+  async contributionWorkflowDateValue(): Promise<string> {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    return modal.locator("#contribution-workflow-date").inputValue();
+  }
+
+  async contributionWorkflowSetInvestmentSnapshot(assetName: string, value: number) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    const row = modal.locator("#contribution-workflow-investments-body tr", { hasText: assetName });
+    await expect(row).toBeVisible();
+    await row.locator('input[data-contribution-snapshot-kind="investments"]').fill(String(value));
+  }
+
+  async contributionWorkflowApplySnapshotCalculator(params: {
+    type: "investment" | "liquidity";
+    rowName: string;
+    expression: string;
+  }) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    const tbodySelector =
+      params.type === "investment" ? "#contribution-workflow-investments-body" : "#contribution-workflow-liquidity-body";
+    const row = modal.locator(`${tbodySelector} tr`, { hasText: params.rowName });
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: `Calcular snapshot de ${params.rowName}` }).click();
+    const calc = this.page.locator("#contribution-calc-dialog");
+    await expect(calc).toHaveJSProperty("open", true);
+    await calc.locator("#contribution-calc-expression").fill(params.expression);
+    await calc.getByRole("button", { name: "Aplicar al snapshot" }).click();
+    await expect(calc).toHaveJSProperty("open", false);
+    await expect(this.page.locator("#contribution-workflow-dialog")).toBeVisible();
+  }
+
+  async contributionWorkflowSetLiquiditySnapshot(accountName: string, value: number) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    const row = modal.locator("#contribution-workflow-liquidity-body tr", { hasText: accountName });
+    await expect(row).toBeVisible();
+    await row.locator('input[data-contribution-snapshot-kind="accounts"]').fill(String(value));
+  }
+
+  async contributionWorkflowGoToAllocationStep() {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    await modal.getByRole("button", { name: "Siguiente" }).click();
+    await expect(modal.locator("#contribution-workflow-step-allocation")).toBeVisible();
+  }
+
+  async contributionWorkflowSetTotal(value: number) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    await modal.locator("#contribution-workflow-total").fill(String(value));
+  }
+
+  async contributionWorkflowSetAllocation(accountName: string, value: number) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    const row = modal.locator("#contribution-workflow-allocation-body tr", { hasText: accountName });
+    await expect(row).toBeVisible();
+    await row.locator('input[data-contribution-allocation-account-id]').fill(String(value));
+  }
+
+  contributionWorkflowSnapshotWarning(): Locator {
+    return this.page.locator("#contribution-workflow-snapshot-warning");
+  }
+
+  contributionWorkflowAllocationWarning(): Locator {
+    return this.page.locator("#contribution-workflow-allocation-warning");
+  }
+
+  async contributionWorkflowSave() {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    await modal.getByRole("button", { name: "Guardar aporte (con avisos)" }).click();
+  }
+
   async getInvestmentMovementsOperations(): Promise<string[]> {
     await this.openInvestmentMovementsTab();
     const rows = this.investmentSection().locator("#investment-tx-table-body tr");

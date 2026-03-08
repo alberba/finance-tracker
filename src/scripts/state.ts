@@ -12,6 +12,7 @@ import {
   type Transaction,
 } from "./types";
 import { clamp, monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from "./utils";
+import { deriveContributionFlow, sanitizeFlowAllocations } from "./contribution-workflow";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
 export const SERVER_STATE_ENDPOINT = "/api/state";
@@ -326,14 +327,27 @@ function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {
 function normalizeContributions(list: unknown): Contribution[] {
   const items = Array.isArray(list) ? list : [];
   return items
-    .map((item: any) => ({
-      id: String(item.id || uid("contrib")),
-      date: String(item.date || todayISO()),
-      amount: round2(parseFloatSafe(item.amount, 0)),
-      portfolioDate: String(item.portfolioDate || item.date || todayISO()),
-      portfolioValue: round2(parseFloatSafe(item.portfolioValue, 0)),
-      flow: round2(parseFloatSafe(item.flow, parseFloatSafe(item.amount, 0))),
-    }))
+    .map((item: any) => {
+      const normalizedAllocations = sanitizeFlowAllocations(item?.flowAllocations || []);
+      const derived = deriveContributionFlow({
+        ...item,
+        flowAllocations: normalizedAllocations,
+      });
+
+      return {
+        id: String(item.id || uid("contrib")),
+        date: String(item.date || todayISO()),
+        amount: round2(parseFloatSafe(item.amount, 0)),
+        portfolioDate: String(item.portfolioDate || item.date || todayISO()),
+        portfolioValue: round2(parseFloatSafe(item.portfolioValue, 0)),
+        flow: round2(derived.flow),
+        flowAllocations: normalizedAllocations,
+        flowSource: derived.flowSource,
+        warnings: Array.isArray(item?.warnings)
+          ? item.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+          : [],
+      } satisfies Contribution;
+    })
     .filter((item) => item.portfolioValue > 0);
 }
 
