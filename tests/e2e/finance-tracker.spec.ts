@@ -977,8 +977,16 @@ test.describe("Finance tracker E2E", () => {
     if (result.error) {
       return;
     }
-    expect(Math.abs(result.actualPortfolioPct - result.expectedPortfolioPct)).toBeLessThanOrEqual(0.05);
-    expect(Math.abs(result.actualAssetPct - result.expectedAssetPct)).toBeLessThanOrEqual(0.05);
+
+    const { actualPortfolioPct, expectedPortfolioPct, actualAssetPct, expectedAssetPct } = result as {
+      actualPortfolioPct: number;
+      expectedPortfolioPct: number;
+      actualAssetPct: number;
+      expectedAssetPct: number;
+    };
+
+    expect(Math.abs(actualPortfolioPct - expectedPortfolioPct)).toBeLessThanOrEqual(0.05);
+    expect(Math.abs(actualAssetPct - expectedAssetPct)).toBeLessThanOrEqual(0.05);
   });
 
   test("inversión: gráficos de líneas arrancan en 01/01 con valor de apertura", async ({ tracker, page }) => {
