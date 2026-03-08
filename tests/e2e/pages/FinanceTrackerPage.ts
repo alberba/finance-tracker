@@ -700,6 +700,26 @@ export class FinanceTrackerPage {
     await modal.getByRole("button", { name: "Guardar aporte (con avisos)" }).click();
   }
 
+  async contributionWorkflowPressEnterInInvestmentSnapshot(assetName: string) {
+    const modal = this.page.locator("#contribution-workflow-dialog");
+    const row = modal.locator("#contribution-workflow-investments-body tr", { hasText: assetName });
+    await expect(row).toBeVisible();
+    await row.locator('input[data-contribution-snapshot-kind="investments"]').press("Enter");
+  }
+
+  async deleteManualContributionByDate(date: string) {
+    await this.openInvestmentContributionsTab();
+    const row = this.investmentSection().locator("#contribution-body tr", { hasText: date });
+    await expect(row).toBeVisible();
+    await row.locator(`button[data-delete-contribution-date="${date}"]`).click();
+    await expect(this.page.locator("#contribution-delete-dialog")).toBeVisible();
+  }
+
+  async confirmDeleteManualContribution() {
+    const dialog = this.page.locator("#contribution-delete-dialog");
+    await dialog.getByRole("button", { name: "Eliminar aporte" }).click();
+  }
+
   async getInvestmentMovementsOperations(): Promise<string[]> {
     await this.openInvestmentMovementsTab();
     const rows = this.investmentSection().locator("#investment-tx-table-body tr");
