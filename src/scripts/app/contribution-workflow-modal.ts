@@ -1,4 +1,4 @@
-import { type Contribution, type ContributionMetricRow, type SnapshotKind, type State } from "../types";
+import { type Contribution, type ContributionMetricRow, type SnapshotKind, type SnapshotRow, type State } from "../types";
 import {
   deriveContributionFlow,
   findLiquidityTargets,
@@ -26,6 +26,25 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
   const { ui, el } = deps;
   const workflowDialog = el.contributionWorkflowDialog as HTMLDialogElement;
 
+  function getInvestmentValueFromSnapshot(snapshot: SnapshotRow | undefined): number {
+    return round2(
+      Object.values(snapshot?.investments || {}).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
+    );
+  }
+
+  function getPortfolioValueFromSnapshot(snapshot: SnapshotRow | undefined, liquidityAccountIds: Set<string>): number {
+    const investmentValue = getInvestmentValueFromSnapshot(snapshot);
+    const liquidityValue = round2(
+      Object.entries(snapshot?.accounts || {}).reduce((sum: number, [accountId, value]) => {
+        if (!liquidityAccountIds.has(String(accountId))) {
+          return sum;
+        }
+        return sum + parseFloatSafe(value, 0);
+      }, 0)
+    );
+    return round2(investmentValue + liquidityValue);
+  }
+
   function isAutomaticContributionDate(date: string): boolean {
     const month = monthFromISO(date);
     if (month === null) {
@@ -51,19 +70,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
           return null;
         }
 
-        const investments = snapshot?.investments || {};
-        const investmentValue = round2(
-          Object.values(investments).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
-        );
-        const liquidityValue = round2(
-          Object.entries(snapshot?.accounts || {}).reduce((sum: number, [accountId, value]) => {
-            if (!liquidityTargetIds.has(String(accountId))) {
-              return sum;
-            }
-            return sum + parseFloatSafe(value, 0);
-          }, 0)
-        );
-        const portfolioValue = round2(investmentValue + liquidityValue);
+        const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds);
         if (portfolioValue <= 0) {
           return null;
         }
@@ -88,7 +95,10 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       })
       .filter(Boolean)
       .forEach((row) => {
-        rowsByDate.set(String(row.portfolioDate || row.date), row as Contribution);
+        if (!row) {
+          return;
+        }
+        rowsByDate.set(String(row.portfolioDate || row.date), row);
       });
 
     state.contributions.forEach((item: Contribution) => {
@@ -506,11 +516,18 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       snapshot[kind][itemId] = round2(parsed);
     });
 
-    const portfolioValue = round2(
-      Object.values(snapshot.investments || {}).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
-    );
-    if (portfolioValue <= 0) {
+    const investmentValue = getInvestmentValueFromSnapshot(snapshot);
+    if (investmentValue <= 0) {
       deps.showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
+      return;
+    }
+
+    const liquidityTargetIds = new Set(
+      findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched.map((account) => String(account.id))
+    );
+    const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds);
+    if (portfolioValue <= 0) {
+      deps.showToast("El valor de cartera debe ser mayor que cero para registrar el aporte.");
       return;
     }
 
