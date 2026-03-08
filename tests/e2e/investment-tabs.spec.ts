@@ -202,4 +202,13 @@ test.describe("inversión tabs y TWR", () => {
     await expect(manualRow).toBeVisible();
     await expect(manualRow.locator('input[data-contribution-flow-date="2026-02-08"]')).toHaveValue("562");
   });
+
+  test("aportes automáticos de cierre mensual incluyen la liquidez del mes en valor cartera", async ({ tracker }) => {
+    await tracker.openInvestmentContributionsTab();
+    const section = tracker.investmentSection();
+
+    const monthEndRow = section.locator("#contribution-body tr", { hasText: "2026-01-31" });
+    await expect(monthEndRow).toBeVisible();
+    await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.556,39 €");
+  });
 });
