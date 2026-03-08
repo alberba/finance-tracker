@@ -529,16 +529,37 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const previousAllocations =
       existingIndex >= 0 ? sanitizeFlowAllocations(state.contributions[existingIndex].flowAllocations || []) : [];
 
+    const investmentValue = getInvestmentValueFromSnapshot(snapshot);
+    if (investmentValue <= 0) {
+      deps.showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
+      return;
+    }
+
+    const liquidityTargetIds = new Set(
+      findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched.map((account) => String(account.id))
+    );
+    const previousFlow = round2(
+      previousAllocations.reduce((sum, item) => {
+        if (!liquidityTargetIds.has(item.accountId)) {
+          return sum;
+        }
+        return sum + item.amount;
+      }, 0)
+    );
+    const portfolioValue = round2(getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds) - previousFlow);
+    if (portfolioValue <= 0) {
+      deps.showToast("El valor de cartera debe ser mayor que cero para registrar el aporte.");
+      return;
+    }
+
     const previousByAccount = new Map(previousAllocations.map((item) => [item.accountId, item.amount]));
     flowAllocations.forEach((item) => {
       const previous = previousByAccount.get(item.accountId) ?? 0;
       const delta = round2(item.amount - previous);
-      if (delta === 0) {
-        previousByAccount.delete(item.accountId);
-        return;
+      if (delta !== 0) {
+        const currentValue = round2(parseFloatSafe(snapshot.accounts[item.accountId], 0));
+        snapshot.accounts[item.accountId] = round2(currentValue + delta);
       }
-      const currentValue = round2(parseFloatSafe(snapshot.accounts[item.accountId], 0));
-      snapshot.accounts[item.accountId] = round2(currentValue + delta);
       previousByAccount.delete(item.accountId);
     });
 
@@ -549,21 +570,6 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       const currentValue = round2(parseFloatSafe(snapshot.accounts[accountId], 0));
       snapshot.accounts[accountId] = round2(currentValue - amount);
     });
-
-    const investmentValue = getInvestmentValueFromSnapshot(snapshot);
-    if (investmentValue <= 0) {
-      deps.showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
-      return;
-    }
-
-    const liquidityTargetIds = new Set(
-      findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched.map((account) => String(account.id))
-    );
-    const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds);
-    if (portfolioValue <= 0) {
-      deps.showToast("El valor de cartera debe ser mayor que cero para registrar el aporte.");
-      return;
-    }
 
     const flow = getFlowFromAllocations(flowAllocations);
     ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
