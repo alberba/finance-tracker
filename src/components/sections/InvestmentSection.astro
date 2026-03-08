@@ -5,6 +5,11 @@
       <p>Evolución de cartera, distribución y registro de aportaciones.</p>
     </div>
     <div class="inline-controls">
+      <div class="return-mode-toggle" role="group" aria-label="Modo de cálculo de rentabilidad">
+        <span class="return-mode-toggle__label">Rentabilidad</span>
+        <button type="button" class="return-mode-btn is-active" data-return-mode="simple" aria-pressed="true">Simple</button>
+        <button type="button" class="return-mode-btn" data-return-mode="twr" aria-pressed="false">TWR</button>
+      </div>
       <label>
         Mes de análisis
         <select id="investment-month" name="investmentMonth"></select>
@@ -29,7 +34,7 @@
         <strong id="inv-capital">€0</strong>
       </article>
       <article class="kpi-card">
-        <p>Rentabilidad estimada</p>
+        <p id="inv-return-label">Rentabilidad estimada</p>
         <strong id="inv-return">0%</strong>
       </article>
     </div>

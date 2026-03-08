@@ -218,4 +218,30 @@ describe("finance-core helpers", () => {
     expect(edgeMetrics[1].nav).toBe(100);
     expect(Number.isFinite(edgeMetrics[2].periodReturn || 0)).toBe(true);
   });
+
+  it("TWR no se infla por aportaciones grandes en malos momentos (invarianza clave)", () => {
+    // Escenario: cartera sube +10% (10000→11000), el usuario aporta 10000 más (→21000),
+    // luego baja -10% (→18900).
+    // TWR mide la gestión pura: +10% × -10% = -1%
+    // El retorno simple penaliza el timing: (18900-20000)/20000 = -5.5%
+    const metrics = computeContributionMetrics([
+      { id: "t1", date: "2026-01-31", portfolioDate: "2026-01-31", amount: 0, flow: 0, portfolioValue: 10000 },
+      { id: "t2", date: "2026-02-28", portfolioDate: "2026-02-28", amount: 10000, flow: 10000, portfolioValue: 11000 },
+      { id: "t3", date: "2026-03-31", portfolioDate: "2026-03-31", amount: 0, flow: 0, portfolioValue: 18900 },
+    ]);
+
+    // Retornos por período correctos
+    expect(metrics[1].periodReturn).toBeCloseTo(0.10, 6);
+    expect(metrics[2].periodReturn).toBeCloseTo(-0.10, 6);
+
+    // TWR acumulado: gestión real = -1%
+    expect(metrics[2].cumulativeReturn).toBeCloseTo(-0.01, 6);
+
+    // Retorno simple: (18900 - 20000) / 20000 = -5.5% ← sesgado por la aportación grande
+    const simpleReturn = (18900 - 20000) / 20000;
+    expect(simpleReturn).toBeCloseTo(-0.055, 6);
+
+    // La divergencia entre TWR y simple es el problema que resuelve el modo TWR
+    expect(metrics[2].cumulativeReturn).not.toBeCloseTo(simpleReturn, 3);
+  });
 });
