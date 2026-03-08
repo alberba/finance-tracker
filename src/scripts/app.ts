@@ -100,6 +100,7 @@ import {
     investmentTxEditingId: string;
     investmentYearFilter: number;
     investmentOnlyUndeclared: boolean;
+    investmentReturnMode: "simple" | "twr";
   }
 
   interface TxFormControls extends HTMLFormControlsCollection {
@@ -226,6 +227,7 @@ import {
     investmentTxEditingId: "",
     investmentYearFilter: new Date().getFullYear(),
     investmentOnlyUndeclared: false,
+    investmentReturnMode: "simple",
   };
 
   const el = {
@@ -296,9 +298,11 @@ import {
     investmentMonth: getRequiredElement<HTMLSelectElement>("investment-month"),
     investmentSubtabButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-investment-tab]")),
     investmentSubtabPanels: Array.from(document.querySelectorAll<HTMLElement>("[data-investment-tab-panel]")),
+    investmentReturnModeButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-return-mode]")),
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
+    invReturnLabel: getRequiredElement<HTMLElement>("inv-return-label"),
     investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>("investment-portfolio-chart"),
     investmentAssetsChart: getRequiredElement<HTMLCanvasElement>("investment-assets-chart"),
     investmentAllocation: getRequiredElement<HTMLCanvasElement>("investment-allocation"),
@@ -727,6 +731,18 @@ import {
         }
         ui.investmentTab = nextTab;
         renderInvestmentTabState();
+      });
+    });
+
+    el.investmentReturnModeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const mode = String(button.dataset.returnMode || "");
+        if (mode !== "simple" && mode !== "twr") {
+          return;
+        }
+        ui.investmentReturnMode = mode;
+        renderInvestmentReturnModeToggle();
+        renderInvestmentDashboard();
       });
     });
 
@@ -2205,6 +2221,7 @@ import {
     renderInvestmentYearFilterOptions();
     syncInvestmentMovementComputedAmount();
     renderInvestmentTabState();
+    renderInvestmentReturnModeToggle();
     renderInvestmentDashboard();
     renderInvestmentTransactionsTable();
     renderContributionsTable();
@@ -2251,16 +2268,39 @@ import {
     });
   }
 
+  function renderInvestmentReturnModeToggle() {
+    el.investmentReturnModeButtons.forEach((button) => {
+      const mode = String(button.dataset.returnMode || "");
+      const isActive = mode === ui.investmentReturnMode;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
   function renderInvestmentDashboard() {
     const month = ui.investmentMonth;
     const wealth = getWealthByMonth(month);
     const investedCapital = computeInvestedCapital(month);
-    const estimatedReturn = investedCapital <= 0 ? 0 : ((wealth.investment - investedCapital) / investedCapital) * 100;
+    const isTWR = ui.investmentReturnMode === "twr";
+
+    // TWR metrics (reusado por KPI y serie temporal)
+    const twrEntries = isTWR ? getContributionEntriesFromSnapshots() : [];
+    const twrMetrics = isTWR ? (computeContributionMetricsCore(twrEntries) as ContributionMetricRow[]) : [];
+    const twrByDate = new Map<string, number>();
+    twrMetrics.forEach((m) => {
+      twrByDate.set(m.date, (m.cumulativeReturn ?? 0) * 100);
+    });
+
+    // KPI: rentabilidad
+    const simpleReturn = investedCapital <= 0 ? 0 : ((wealth.investment - investedCapital) / investedCapital) * 100;
+    const lastTWR = twrMetrics.length > 0 ? (twrMetrics[twrMetrics.length - 1].cumulativeReturn ?? 0) * 100 : 0;
+    const displayReturn = isTWR ? lastTWR : simpleReturn;
 
     el.invTotalValue.textContent = formatMoney(wealth.investment);
     el.invCapital.textContent = formatMoney(investedCapital);
-    el.invReturn.textContent = formatPercent(estimatedReturn);
-    el.invReturn.className = estimatedReturn >= 0 ? "text-good" : "text-bad";
+    el.invReturn.textContent = formatPercent(displayReturn);
+    el.invReturn.className = displayReturn >= 0 ? "text-good" : "text-bad";
+    el.invReturnLabel.textContent = isTWR ? "Rentabilidad TWR" : "Rentabilidad estimada";
 
     const COLORS = ["#0d8476", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#84cc16", "#ec4899", "#64748b"];
 
@@ -2310,10 +2350,20 @@ import {
     // Portfolio total series
     const portfolioTotalValues = chartPoints.map((m) => getWealthByMonth(m).investment);
     const portfolioInvestedCapital = chartPoints.map((m) => computeInvestedCapitalTotal(m));
-    const portfolioPercentages = portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]));
+
+    let portfolioPercentages: number[];
+    if (isTWR) {
+      portfolioPercentages = chartPoints.map((m) => {
+        if (m < 0) return 0;
+        const date = toSnapshotDate(m);
+        return twrByDate.get(date) ?? 0;
+      });
+    } else {
+      portfolioPercentages = portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]));
+    }
     const portfolioSeries: MultiLineSeries[] = [
       {
-        name: "Cartera Total",
+        name: isTWR ? "Cartera Total (TWR)" : "Cartera Total",
         color: COLORS[0],
         values: portfolioPercentages,
       },
