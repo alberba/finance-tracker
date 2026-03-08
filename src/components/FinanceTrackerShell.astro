@@ -17,66 +17,350 @@ export interface Props {
 const { activeRoute = "root", sectionParam = "" } = Astro.props;
 const canonicalUrl = new URL("/", Astro.url).toString();
 ---
+
 <!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finance Tracker 2026</title>
-  <link rel="canonical" href={canonicalUrl} />
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script>
-    import "../scripts/app";
-    import "../scripts/issue-report";
-  </script>
-</head>
-<body data-route={activeRoute} data-section={sectionParam}>
-  <a class="skip-link" href="#app-main">Saltar al contenido</a>
-  <div class="bg-layer"></div>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <header class="brand-block">
-        <p class="brand-kicker">Plan financiero</p>
-        <h1>Finance Tracker</h1>
-        <p class="brand-sub">Reemplazo completo de tu Excel con una experiencia más clara y rápida.</p>
-      </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Tracker 2026</title>
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+    ></script>
+    <script>
+      import "../scripts/app";
+      import "../scripts/issue-report";
+    </script>
+    <script is:inline>
+      (function () {
+        const STORAGE_KEY = "sidebar-collapsed";
+        const stored = localStorage.getItem(STORAGE_KEY) === "true";
 
-      <nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
-        <button type="button" class="nav-btn is-active" data-section="dashboard" aria-controls="dashboard" aria-current="page">Dashboard</button>
-        <button type="button" class="nav-btn" data-section="transactions" aria-controls="transactions">Movimientos</button>
-        <button type="button" class="nav-btn" data-section="budget" aria-controls="budget">Presupuesto</button>
-        <button type="button" class="nav-btn" data-section="wealth" aria-controls="wealth">Patrimonio</button>
-        <button type="button" class="nav-btn" data-section="investment" aria-controls="investment">Inversión</button>
-        <button type="button" class="nav-btn" data-section="goals" aria-controls="goals">Objetivos</button>
-        <button type="button" class="nav-btn" data-section="settings" aria-controls="settings">Configuración</button>
-        <button type="button" class="nav-btn" data-section="data" aria-controls="data">Datos</button>
-        <button type="button" class="nav-btn" data-section="reports" aria-controls="reports">Reportes</button>
-      </nav>
+        function applyState(collapsed, body, toggleBtn) {
+          body.classList.toggle("is-sidebar-collapsed", collapsed);
+          if (toggleBtn) {
+            toggleBtn.setAttribute(
+              "aria-label",
+              collapsed ? "Expandir barra lateral" : "Colapsar barra lateral",
+            );
+            toggleBtn.setAttribute(
+              "aria-expanded",
+              collapsed ? "false" : "true",
+            );
+            const label = toggleBtn.querySelector(".sidebar-toggle-label");
+            if (label) label.textContent = collapsed ? "Expandir" : "Colapsar";
+          }
+        }
 
-      <footer class="sidebar-footer">
-        <p id="save-status">Sincronizado</p>
-      </footer>
-    </aside>
+        function initSidebarState() {
+          const body = document.body;
+          if (!body) {
+            return;
+          }
 
-    <main id="app-main" class="content">
-      <DashboardSection />
-      <TransactionsSection />
-      <BudgetSection />
-      <WealthSection />
-      <InvestmentSection />
-      <GoalsSection />
-      <SettingsSection />
-      <DataSection />
-      <ReportsSection />
-    </main>
-  </div>
+          const toggleBtn = document.getElementById("sidebar-toggle");
+          applyState(stored, body, toggleBtn);
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div id="chart-tooltip" class="chart-tooltip" role="tooltip" aria-hidden="true"></div>
-</body>
+          if (toggleBtn) {
+            toggleBtn.addEventListener("click", function () {
+              const willCollapse = !body.classList.contains(
+                "is-sidebar-collapsed",
+              );
+              applyState(willCollapse, body, toggleBtn);
+              localStorage.setItem(
+                STORAGE_KEY,
+                willCollapse ? "true" : "false",
+              );
+            });
+          }
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", initSidebarState, {
+            once: true,
+          });
+        } else {
+          initSidebarState();
+        }
+      })();
+    </script>
+  </head>
+  <body data-route={activeRoute} data-section={sectionParam}>
+    <a class="skip-link" href="#app-main">Saltar al contenido</a>
+    <div class="bg-layer"></div>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <header class="brand-block">
+          <p class="brand-kicker">Plan financiero</p>
+          <h1>Finance Tracker</h1>
+        </header>
+        <div class="sidebar-collapsed-brand" aria-hidden="true">
+          <img src="/favicon.svg" alt="" />
+        </div>
+
+        <nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
+          <button
+            type="button"
+            class="nav-btn is-active"
+            data-section="dashboard"
+            aria-controls="dashboard"
+            aria-current="page"
+            aria-label="Dashboard">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><rect x="3" y="3" width="6" height="6" rx="1.2"></rect><rect
+                  x="11"
+                  y="3"
+                  width="6"
+                  height="6"
+                  rx="1.2"></rect><rect
+                  x="3"
+                  y="11"
+                  width="6"
+                  height="6"
+                  rx="1.2"></rect><rect
+                  x="11"
+                  y="11"
+                  width="6"
+                  height="6"
+                  rx="1.2"></rect></svg
+              >
+            </span>
+            <span class="nav-label">Dashboard</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="transactions"
+            aria-controls="transactions"
+            aria-label="Movimientos">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><path d="M7 3v14M7 17l-3-3m3 3 3-3M13 17V3M13 3l-3 3m3-3 3 3"
+                ></path></svg
+              >
+            </span>
+            <span class="nav-label">Movimientos</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="budget"
+            aria-controls="budget"
+            aria-label="Presupuesto">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><circle cx="10" cy="10" r="7"></circle><path
+                  d="M10 3v7l4.5 2.6"></path></svg
+              >
+            </span>
+            <span class="nav-label">Presupuesto</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="wealth"
+            aria-controls="wealth"
+            aria-label="Patrimonio">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><path d="M2 9.5 10 4l8 5.5"></path><rect
+                  x="4"
+                  y="9.5"
+                  width="12"
+                  height="7"
+                  rx="1"></rect><rect x="8" y="13" width="4" height="3.5"
+                ></rect></svg
+              >
+            </span>
+            <span class="nav-label">Patrimonio</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="investment"
+            aria-controls="investment"
+            aria-label="Inversión">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><polyline points="2,14 7,9 11,12 18,5"></polyline><polyline
+                  points="14,5 18,5 18,9"></polyline></svg
+              >
+            </span>
+            <span class="nav-label">Inversión</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="goals"
+            aria-controls="goals"
+            aria-label="Objetivos">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><circle cx="10" cy="10" r="7"></circle><circle
+                  cx="10"
+                  cy="10"
+                  r="3.5"></circle><circle
+                  cx="10"
+                  cy="10"
+                  r="1"
+                  fill="currentColor"
+                  stroke="none"></circle></svg
+              >
+            </span>
+            <span class="nav-label">Objetivos</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="settings"
+            aria-controls="settings"
+            aria-label="Configuración">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><circle cx="10" cy="10" r="2.5"></circle><path
+                  d="M10 3v1.5M10 15.5V17M3 10h1.5M15.5 10H17M4.93 4.93l1.06 1.06M14 14l1.07 1.07M4.93 15.07l1.06-1.06M14 6l1.07-1.07"
+                ></path></svg
+              >
+            </span>
+            <span class="nav-label">Configuración</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="data"
+            aria-controls="data"
+            aria-label="Datos">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                ><ellipse cx="10" cy="6" rx="7" ry="2.5"></ellipse><path
+                  d="M3 6v4c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V6"></path><path
+                  d="M3 10v4c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-4"></path></svg
+              >
+            </span>
+            <span class="nav-label">Datos</span>
+          </button>
+          <button
+            type="button"
+            class="nav-btn"
+            data-section="reports"
+            aria-controls="reports"
+            aria-label="Reportes">
+            <span class="nav-icon" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+                ><path
+                  d="M5 3h7l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"
+                ></path><path d="M12 3v4h4"></path><line
+                  x1="7"
+                  y1="10"
+                  x2="13"
+                  y2="10"></line><line x1="7" y1="13" x2="11" y2="13"
+                ></line></svg
+              >
+            </span>
+            <span class="nav-label">Reportes</span>
+          </button>
+        </nav>
+
+        <button
+          id="sidebar-toggle"
+          class="sidebar-toggle"
+          type="button"
+          aria-label="Colapsar barra lateral"
+          aria-expanded="true">
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true">
+            <polyline points="13,4 7,10 13,16"></polyline>
+            <polyline points="8,4 2,10 8,16"></polyline>
+          </svg>
+          <span class="sidebar-toggle-label">Colapsar</span>
+        </button>
+
+        <footer class="sidebar-footer">
+          <span class="nav-icon sidebar-footer-icon" aria-hidden="true">
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              ><path
+                d="M10 2a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm6.07 3.93a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM18 10a1 1 0 0 1-1 1h-1a1 1 0 0 1 0-2h1a1 1 0 0 1 1 1zM10 17a1 1 0 0 1-1-1v-1a1 1 0 0 1 2 0v1a1 1 0 0 1-1 1zm-6.07-1.93a1 1 0 0 1 0-1.41l.71-.71a1 1 0 1 1 1.41 1.41l-.71.71a1 1 0 0 1-1.41 0zM3 10a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H4a1 1 0 0 1-1-1z"
+              ></path><circle cx="10" cy="10" r="3"></circle></svg
+            >
+          </span>
+          <p id="save-status" class="sidebar-footer-text">Sincronizado</p>
+        </footer>
+      </aside>
+
+      <main id="app-main" class="content">
+        <DashboardSection />
+        <TransactionsSection />
+        <BudgetSection />
+        <WealthSection />
+        <InvestmentSection />
+        <GoalsSection />
+        <SettingsSection />
+        <DataSection />
+        <ReportsSection />
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div
+      id="chart-tooltip"
+      class="chart-tooltip"
+      role="tooltip"
+      aria-hidden="true">
+    </div>
+  </body>
 </html>
