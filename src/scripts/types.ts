@@ -58,6 +58,12 @@ export interface Contribution {
   portfolioDate: string;
   portfolioValue: number;
   flow: number;
+  flowAllocations?: Array<{
+    accountId: string;
+    amount: number;
+  }>;
+  flowSource?: "legacy" | "allocations";
+  warnings?: string[];
 }
 
 export interface StateMeta {

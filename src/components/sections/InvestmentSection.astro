@@ -155,7 +155,10 @@
 
   <div id="investment-tab-contributions" class="investment-subtab-panel" data-investment-tab-panel="contributions" role="tabpanel" hidden>
     <article class="card">
-      <h3>Aportes y TWR</h3>
+      <div class="contribution-head">
+        <h3>Aportes y TWR</h3>
+        <button id="open-contribution-workflow" type="button" class="primary-btn">Añadir aporte</button>
+      </div>
       <div class="table-wrap compact">
         <table>
           <thead>
@@ -175,4 +178,111 @@
       </div>
     </article>
   </div>
+
+  <dialog id="contribution-workflow-dialog" class="contribution-workflow-dialog">
+    <form id="contribution-workflow-form" class="contribution-workflow-form" method="dialog" autocomplete="off">
+      <div class="contribution-workflow-head">
+        <h3 id="contribution-workflow-title">Nuevo aporte guiado</h3>
+        <button id="contribution-workflow-close" type="button" class="tx-close-btn" aria-label="Cerrar recorrido">✕</button>
+      </div>
+
+      <p class="contribution-workflow-intro">
+        Antes de registrar el aporte, completa snapshots de inversión y liquidez. Después reparte el importe entre cuentas de liquidez.
+      </p>
+
+      <div class="contribution-workflow-date">
+        <label>
+          Mes del aporte
+          <select id="contribution-workflow-month" name="contributionWorkflowMonth"></select>
+        </label>
+        <label>
+          Fecha del aporte
+          <input id="contribution-workflow-date" name="contributionWorkflowDate" type="date" required />
+        </label>
+      </div>
+
+      <div id="contribution-workflow-step-snapshot" data-contribution-step="snapshot">
+        <h4>Paso 1 · Snapshot previo</h4>
+        <p>Actualiza el snapshot de inversiones y liquidez objetivo para el mes seleccionado.</p>
+        <div id="contribution-workflow-snapshot-warning" class="workflow-warning" role="status" aria-live="polite"></div>
+
+        <div class="table-wrap compact contribution-workflow-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Activo</th>
+                <th>Snapshot inversión</th>
+              </tr>
+            </thead>
+            <tbody id="contribution-workflow-investments-body"></tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap compact contribution-workflow-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Cuenta liquidez</th>
+                <th>Snapshot liquidez</th>
+              </tr>
+            </thead>
+            <tbody id="contribution-workflow-liquidity-body"></tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <div id="contribution-workflow-step-allocation" data-contribution-step="allocation" hidden>
+        <h4>Paso 2 · Reparto del aporte</h4>
+        <p>Indica el importe total y reparte cuánto entra en cada cuenta de liquidez.</p>
+
+        <label>
+          Importe total del aporte
+          <input id="contribution-workflow-total" name="contributionWorkflowTotal" type="number" min="0" step="0.01" value="0" />
+        </label>
+
+        <div class="table-wrap compact contribution-workflow-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Cuenta liquidez</th>
+                <th>Importe asignado</th>
+              </tr>
+            </thead>
+            <tbody id="contribution-workflow-allocation-body"></tbody>
+          </table>
+        </div>
+
+        <div id="contribution-workflow-allocation-warning" class="workflow-warning" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="contribution-workflow-actions">
+        <button id="contribution-workflow-prev" type="button" class="tx-btn-secondary">Anterior</button>
+        <button id="contribution-workflow-next" type="button" class="tx-btn-secondary">Siguiente</button>
+        <button id="contribution-workflow-save" type="submit" class="tx-btn-primary">Guardar aporte (con avisos)</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="contribution-calc-dialog" class="wealth-calc-dialog">
+    <form id="contribution-calc-form" class="wealth-calc-form" method="dialog" autocomplete="off">
+      <div class="wealth-calc-head">
+        <h3 id="contribution-calc-title">Calcular snapshot</h3>
+        <button id="contribution-calc-close" type="button" class="tx-close-btn" aria-label="Cerrar cálculo">✕</button>
+      </div>
+      <label>
+        Cálculo numérico
+        <input
+          id="contribution-calc-expression"
+          name="contributionCalcExpression"
+          type="text"
+          placeholder="Ej: 1200+35,5*2"
+          autocomplete="off"
+        />
+      </label>
+      <div class="wealth-calc-actions">
+        <button id="contribution-calc-apply" type="submit" class="tx-btn-primary">Aplicar al snapshot</button>
+      </div>
+    </form>
+  </dialog>
 </section>

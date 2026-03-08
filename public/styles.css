@@ -744,6 +744,76 @@ svg {
   max-width: 100%;
 }
 
+.contribution-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.contribution-workflow-dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  width: min(840px, 94vw);
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(4, 16, 14, 0.3);
+}
+
+.contribution-workflow-dialog::backdrop {
+  background: rgba(5, 18, 20, 0.52);
+  backdrop-filter: blur(4px);
+}
+
+.contribution-workflow-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.contribution-workflow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.contribution-workflow-intro {
+  margin: 0;
+  color: #214f49;
+}
+
+.contribution-workflow-date {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contribution-workflow-table {
+  margin-top: 8px;
+}
+
+.workflow-warning {
+  border: 1px solid #f5d8a2;
+  border-radius: 10px;
+  background: #fff7e6;
+  color: #7c4a00;
+  min-height: 24px;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+  white-space: pre-line;
+}
+
+.workflow-warning:empty {
+  display: none;
+}
+
+.contribution-workflow-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid #dce7e2;
@@ -1867,5 +1937,18 @@ td select {
   #issue-report-submit {
     justify-self: stretch;
     min-width: 0;
+  }
+
+  .contribution-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .contribution-workflow-date {
+    grid-template-columns: 1fr;
+  }
+
+  .contribution-workflow-actions {
+    flex-direction: column;
   }
 }
