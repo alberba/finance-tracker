@@ -516,6 +516,40 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       snapshot[kind][itemId] = round2(parsed);
     });
 
+    const allocationInputs = Array.from(
+      workflowDialog.querySelectorAll("input[data-contribution-allocation-account-id]")
+    ) as HTMLInputElement[];
+    const flowAllocations = sanitizeFlowAllocations(
+      allocationInputs.map((input) => ({
+        accountId: String(input.dataset.contributionAllocationAccountId || ""),
+        amount: round2(parseFloatSafe(input.value, 0)),
+      }))
+    );
+    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const previousAllocations =
+      existingIndex >= 0 ? sanitizeFlowAllocations(state.contributions[existingIndex].flowAllocations || []) : [];
+
+    const previousByAccount = new Map(previousAllocations.map((item) => [item.accountId, item.amount]));
+    flowAllocations.forEach((item) => {
+      const previous = previousByAccount.get(item.accountId) ?? 0;
+      const delta = round2(item.amount - previous);
+      if (delta === 0) {
+        previousByAccount.delete(item.accountId);
+        return;
+      }
+      const currentValue = round2(parseFloatSafe(snapshot.accounts[item.accountId], 0));
+      snapshot.accounts[item.accountId] = round2(currentValue + delta);
+      previousByAccount.delete(item.accountId);
+    });
+
+    previousByAccount.forEach((amount, accountId) => {
+      if (amount === 0) {
+        return;
+      }
+      const currentValue = round2(parseFloatSafe(snapshot.accounts[accountId], 0));
+      snapshot.accounts[accountId] = round2(currentValue - amount);
+    });
+
     const investmentValue = getInvestmentValueFromSnapshot(snapshot);
     if (investmentValue <= 0) {
       deps.showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
@@ -531,20 +565,9 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       return;
     }
 
-    const allocationInputs = Array.from(
-      workflowDialog.querySelectorAll("input[data-contribution-allocation-account-id]")
-    ) as HTMLInputElement[];
-    const flowAllocations = sanitizeFlowAllocations(
-      allocationInputs.map((input) => ({
-        accountId: String(input.dataset.contributionAllocationAccountId || ""),
-        amount: round2(parseFloatSafe(input.value, 0)),
-      }))
-    );
     const flow = getFlowFromAllocations(flowAllocations);
     ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
     const warnings = getContributionWorkflowWarnings();
-
-    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
     const payload: Contribution = {
       id: existingIndex >= 0 ? state.contributions[existingIndex].id : `contrib-snapshot-${state.year}-${ui.contributionWorkflowMonth + 1}`,
       date,
