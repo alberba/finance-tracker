@@ -180,7 +180,7 @@
   </div>
 
   <dialog id="contribution-workflow-dialog" class="contribution-workflow-dialog">
-    <form id="contribution-workflow-form" class="contribution-workflow-form" method="dialog" autocomplete="off">
+    <form id="contribution-workflow-form" class="contribution-workflow-form" method="dialog" autocomplete="off" novalidate>
       <div class="contribution-workflow-head">
         <h3 id="contribution-workflow-title">Nuevo aporte guiado</h3>
         <button id="contribution-workflow-close" type="button" class="tx-close-btn" aria-label="Cerrar recorrido">✕</button>
@@ -259,7 +259,7 @@
       <div class="contribution-workflow-actions">
         <button id="contribution-workflow-prev" type="button" class="tx-btn-secondary">Anterior</button>
         <button id="contribution-workflow-next" type="button" class="tx-btn-secondary">Siguiente</button>
-        <button id="contribution-workflow-save" type="submit" class="tx-btn-primary">Guardar aporte (con avisos)</button>
+        <button id="contribution-workflow-save" type="submit" class="tx-btn-primary" formnovalidate>Guardar aporte (con avisos)</button>
       </div>
     </form>
   </dialog>
