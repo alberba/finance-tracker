@@ -13,6 +13,7 @@ interface InvestmentRenderersDeps {
   formatMoneyCompact: (value: number) => string;
   getWealthByMonth: (month: number) => { investment: number };
   getWealthSeries: () => Array<{ liquidity: number; investment: number; liabilities: number; net: number }>;
+  computeInvestmentPortfolioValueForReturnMode: (month: number, mode: "simple" | "twr") => number;
   getLatestDataMonth: () => number;
   computeInvestedCapital: (month: number) => number;
   computeInvestmentValue: (assetId: string, month: number) => number;
@@ -104,19 +105,19 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
   function renderInvestmentDashboard() {
     const state = deps.getState();
     const month = ui.investmentMonth;
-    const wealth = deps.getWealthByMonth(month);
     const investedCapital = deps.computeInvestedCapital(month);
     const isTWR = ui.investmentReturnMode === "twr";
+    const portfolioValue = deps.computeInvestmentPortfolioValueForReturnMode(month, ui.investmentReturnMode);
     const twrEntries = isTWR ? deps.getContributionEntriesFromSnapshots() : [];
     const twrMetrics = isTWR ? (computeContributionMetricsCore(twrEntries) as ContributionMetricRow[]) : [];
     const twrByDate = new Map<string, number>();
     twrMetrics.forEach((m) => twrByDate.set(m.date, (m.cumulativeReturn ?? 0) * 100));
 
-    const simpleReturn = investedCapital <= 0 ? 0 : ((wealth.investment - investedCapital) / investedCapital) * 100;
+    const simpleReturn = investedCapital <= 0 ? 0 : ((portfolioValue - investedCapital) / investedCapital) * 100;
     const lastTWR = twrMetrics.length > 0 ? (twrMetrics[twrMetrics.length - 1].cumulativeReturn ?? 0) * 100 : 0;
     const displayReturn = isTWR ? lastTWR : simpleReturn;
 
-    el.invTotalValue.textContent = deps.formatMoney(wealth.investment);
+    el.invTotalValue.textContent = deps.formatMoney(portfolioValue);
     el.invCapital.textContent = deps.formatMoney(investedCapital);
     el.invReturn.textContent = formatPercent(displayReturn);
     el.invReturn.className = displayReturn >= 0 ? "text-good" : "text-bad";
@@ -143,7 +144,9 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     const monthIndexes = Array.from({ length: month + 1 }, (_, i) => i);
     const chartPoints = [-1, ...monthIndexes];
     const monthLabels = ["01/01", ...monthIndexes.map((m) => MONTHS[m])];
-    const portfolioTotalValues = chartPoints.map((m) => deps.getWealthByMonth(m).investment);
+    const portfolioTotalValues = chartPoints.map((m) =>
+      deps.computeInvestmentPortfolioValueForReturnMode(m, isTWR ? "twr" : "simple")
+    );
     const portfolioInvestedCapital = chartPoints.map((m) => computeInvestedCapitalTotal(m));
     const portfolioPercentages = isTWR
       ? chartPoints.map((m) => {

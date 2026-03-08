@@ -25,10 +25,51 @@ export function getLiquidityTargetLabel(key: string): string {
   return LIQUIDITY_TARGET_LABELS[normalized] || String(key || "");
 }
 
-export function findLiquidityTargets(accounts: Entity[]): {
+function resolveLiquidityAccountsFromConfiguredIds(accounts: Entity[], configuredAccountIds: string[]): {
   matched: Entity[];
   missing: string[];
 } {
+  const uniqueIds = Array.from(
+    new Set(
+      configuredAccountIds
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+    )
+  );
+  const byId = new Map(accounts.map((account) => [String(account.id), account] as const));
+  const matched: Entity[] = [];
+  const missing: string[] = [];
+
+  uniqueIds.forEach((accountId) => {
+    const account = byId.get(accountId);
+    if (!account) {
+      missing.push(getLiquidityTargetLabel(accountId));
+      return;
+    }
+    matched.push(account);
+  });
+
+  return { matched, missing };
+}
+
+export function findLiquidityTargets(accounts: Entity[]): {
+  matched: Entity[];
+  missing: string[];
+};
+
+export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: string[]): {
+  matched: Entity[];
+  missing: string[];
+};
+
+export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: string[] = []): {
+  matched: Entity[];
+  missing: string[];
+} {
+  if (configuredAccountIds.length > 0) {
+    return resolveLiquidityAccountsFromConfiguredIds(accounts, configuredAccountIds);
+  }
+
   const byKey = new Map<string, Entity>();
 
   accounts.forEach((account) => {
@@ -59,6 +100,10 @@ export function findLiquidityTargets(accounts: Entity[]): {
   });
 
   return { matched, missing };
+}
+
+export function deriveDefaultLiquidityAccountIds(accounts: Entity[]): string[] {
+  return findLiquidityTargets(accounts).matched.map((account) => String(account.id));
 }
 
 export function sanitizeFlowAllocations(list: unknown): ContributionFlowAllocation[] {

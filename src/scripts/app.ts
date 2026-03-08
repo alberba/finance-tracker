@@ -315,6 +315,7 @@ import {
     settingsAccounts: getRequiredElement<HTMLElement>("settings-accounts"),
     settingsInvestments: getRequiredElement<HTMLElement>("settings-investments"),
     settingsLiabilities: getRequiredElement<HTMLElement>("settings-liabilities"),
+    settingsTwrLiquidity: getRequiredElement<HTMLElement>("settings-twr-liquidity"),
 
     addIncomeCategory: getRequiredElement<HTMLFormElement>("add-income-category"),
     addExpenseCategory: getRequiredElement<HTMLFormElement>("add-expense-category"),
@@ -369,6 +370,7 @@ import {
     matchesInvestmentAsset,
     getWealthByMonth,
     getWealthSeries,
+    computeInvestmentPortfolioValueForReturnMode,
     getLatestDataMonth,
     computeInvestedCapital,
   } = appCalculationHelpers;
@@ -473,6 +475,7 @@ import {
     formatMoneyCompact,
     getWealthByMonth,
     getWealthSeries,
+    computeInvestmentPortfolioValueForReturnMode,
     getLatestDataMonth,
     computeInvestedCapital,
     computeInvestmentValue,

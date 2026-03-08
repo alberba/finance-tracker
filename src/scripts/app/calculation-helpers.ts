@@ -1,5 +1,6 @@
 import { MONTHS, type BudgetType, type MonthTotals, type SnapshotKind, type State, type TransactionType } from "../types";
 import { monthFromISO, round2, slug } from "../utils";
+import { findLiquidityTargets } from "../contribution-workflow";
 
 interface AppCalculationHelpersDeps {
   getState: () => State;
@@ -298,6 +299,24 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return MONTHS.map((_, month) => getWealthByMonth(month));
   }
 
+  function getTwrLiquidityAccounts() {
+    const state = deps.getState();
+    return findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched;
+  }
+
+  function computeTwrLiquidityValue(month: number): number {
+    const matchedAccounts = getTwrLiquidityAccounts();
+    return round2(matchedAccounts.reduce((sum, account) => sum + computeAccountBalance(account.id, month), 0));
+  }
+
+  function computeInvestmentPortfolioValueForReturnMode(month: number, mode: "simple" | "twr"): number {
+    const wealth = getWealthByMonth(month);
+    if (mode !== "twr") {
+      return round2(wealth.investment);
+    }
+    return round2(wealth.investment + computeTwrLiquidityValue(month));
+  }
+
   function getLatestDataMonth() {
     const state = deps.getState();
     let latest = -1;
@@ -362,6 +381,9 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     matchesInvestmentAsset,
     getWealthByMonth,
     getWealthSeries,
+    getTwrLiquidityAccounts,
+    computeTwrLiquidityValue,
+    computeInvestmentPortfolioValueForReturnMode,
     getLatestDataMonth,
     computeInvestedCapital,
   };

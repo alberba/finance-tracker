@@ -272,6 +272,19 @@ export class FinanceTrackerPage {
     await expect(this.page.getByRole("status")).toContainText("Elemento agregado.");
   }
 
+  async setTwrLiquidityAccountEnabled(accountName: string, enabled: boolean) {
+    await this.openSettings();
+    const row = this.page.locator("#settings-twr-liquidity label", { hasText: accountName }).first();
+    await expect(row).toBeVisible();
+    const checkbox = row.locator('input[type="checkbox"]');
+    if (enabled) {
+      await checkbox.check();
+    } else {
+      await checkbox.uncheck();
+    }
+    await expect(this.page.getByRole("status")).toContainText("Configuración TWR actualizada.");
+  }
+
   async transactionModalDateValue(): Promise<string> {
     await this.openTransactions();
     await this.ensureTransactionModalOpen();
