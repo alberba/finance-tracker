@@ -60,6 +60,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
       container.addEventListener("change", onEntityEditorInput);
       container.addEventListener("click", onEntityEditorDelete);
     });
+    el.settingsTwrLiquidity.addEventListener("change", onTwrLiquiditySelectionChange);
     [el.incomeTags, el.expenseTags, el.investmentTags].forEach((container: HTMLElement) => {
       container.addEventListener("click", onCategoryDelete);
     });
@@ -90,6 +91,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     renderEntityEditor("accounts", el.settingsAccounts);
     renderEntityEditor("investmentAssets", el.settingsInvestments);
     renderEntityEditor("liabilities", el.settingsLiabilities);
+    renderTwrLiquiditySelector();
 
     el.incomeTags.innerHTML = renderCategoryTags("incomeCategories");
     el.expenseTags.innerHTML = renderCategoryTags("expenseCategories");
@@ -126,6 +128,28 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
           </div>
         `
       )
+      .join("");
+  }
+
+  function renderTwrLiquiditySelector() {
+    const state = deps.getState();
+    const selected = new Set(state.twrLiquidityAccountIds || []);
+    const accounts = state.accounts || [];
+    if (!accounts.length) {
+      el.settingsTwrLiquidity.innerHTML = "<small>Sin cuentas disponibles.</small>";
+      return;
+    }
+
+    el.settingsTwrLiquidity.innerHTML = accounts
+      .map((account: any) => {
+        const checked = selected.has(account.id) ? "checked" : "";
+        return `
+          <label class="tx-checkbox-option">
+            <input type="checkbox" data-action="toggle-twr-liquidity-account" data-account-id="${escapeAttr(account.id)}" ${checked} />
+            <span>${escapeHtml(account.name)}</span>
+          </label>
+        `;
+      })
       .join("");
   }
 
@@ -241,6 +265,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
     if (entity === "accounts") {
       state.transactions = state.transactions.filter((tx: any) => tx.accountId !== id);
+      state.twrLiquidityAccountIds = (state.twrLiquidityAccountIds || []).filter(
+        (accountId: string) => accountId !== id
+      );
     }
     if (entity === "investmentAssets") {
       syncInvestmentCategoriesWithAssets();
@@ -249,6 +276,32 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     deps.saveState();
     deps.renderAll();
     deps.showToast("Elemento eliminado.");
+  }
+
+  function onTwrLiquiditySelectionChange(event: Event) {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+    if (target.dataset.action !== "toggle-twr-liquidity-account") {
+      return;
+    }
+    const accountId = String(target.dataset.accountId || "").trim();
+    if (!accountId) {
+      return;
+    }
+
+    const state = deps.getState();
+    const nextSelection = new Set((state.twrLiquidityAccountIds || []).map((item: any) => String(item)));
+    if (target.checked) {
+      nextSelection.add(accountId);
+    } else {
+      nextSelection.delete(accountId);
+    }
+    state.twrLiquidityAccountIds = Array.from(nextSelection);
+    deps.saveState();
+    deps.renderAll();
+    deps.showToast("Configuración TWR actualizada.");
   }
 
   function bindCategoryAddForm(formElement: HTMLFormElement, key: CategoryKey) {

@@ -52,6 +52,20 @@ describe("contribution-workflow helpers", () => {
     expect(result.matched.map((account) => account.id)).toEqual(["acc-1", "acc-2", "acc-3"]);
   });
 
+  it("respeta la configuración explícita de cuentas de liquidez", () => {
+    const result = findLiquidityTargets(
+      [
+        { id: "acc-1", name: "MyInvestor", openingBalance: 0 },
+        { id: "acc-2", name: "Trading212", openingBalance: 0 },
+        { id: "acc-3", name: "Trade Republic", openingBalance: 0 },
+      ],
+      ["acc-2", "acc-1"]
+    );
+
+    expect(result.missing).toEqual([]);
+    expect(result.matched.map((account) => account.id)).toEqual(["acc-2", "acc-1"]);
+  });
+
   it("normaliza contributions nuevos sin romper legacy", () => {
     const normalized = normalizeState({
       year: 2026,

@@ -105,7 +105,7 @@ test.describe("recorrido guiado de aportes", () => {
     expect(summary.allocations).toBeGreaterThan(0);
   });
 
-  test("si falta una cuenta objetivo de liquidez muestra aviso no bloqueante", async ({ tracker, page }) => {
+  test("si falta una cuenta de liquidez mantiene el flujo con cuentas restantes", async ({ tracker, page }) => {
     await page.evaluate(() => {
       const raw = window.localStorage.getItem("finance-tracker-state-v1");
       if (!raw) {
@@ -120,7 +120,7 @@ test.describe("recorrido guiado de aportes", () => {
     await tracker.reload();
 
     await tracker.openContributionWorkflowModal();
-    await expect(tracker.contributionWorkflowSnapshotWarning()).toContainText("Cuentas de liquidez no configuradas");
+    await expect(page.locator("#contribution-workflow-liquidity-body")).not.toContainText("Trade Republic");
 
     await tracker.contributionWorkflowSelectMonth("JUNIO");
     await tracker.contributionWorkflowSetDate("2026-06-30");

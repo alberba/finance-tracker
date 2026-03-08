@@ -77,6 +77,7 @@ export interface State {
   meta: StateMeta;
   year: number;
   currency: string;
+  twrLiquidityAccountIds: string[];
   accounts: Entity[];
   investmentAssets: Entity[];
   liabilities: Entity[];

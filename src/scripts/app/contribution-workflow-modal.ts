@@ -28,6 +28,8 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
   function getContributionEntriesFromSnapshots(): Contribution[] {
     const state = deps.getState();
+    const liquidityTargetAccounts = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched;
+    const liquidityTargetIds = new Set(liquidityTargetAccounts.map((account) => String(account.id)));
     const snapshotRows = Object.entries(state.snapshots || {})
       .map(([monthKey, snapshot]: any) => {
         const month = parseIntSafe(monthKey, -1);
@@ -36,9 +38,18 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         }
 
         const investments = snapshot?.investments || {};
-        const portfolioValue = round2(
+        const investmentValue = round2(
           Object.values(investments).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
         );
+        const liquidityValue = round2(
+          Object.entries(snapshot?.accounts || {}).reduce((sum: number, [accountId, value]) => {
+            if (!liquidityTargetIds.has(String(accountId))) {
+              return sum;
+            }
+            return sum + parseFloatSafe(value, 0);
+          }, 0)
+        );
+        const portfolioValue = round2(investmentValue + liquidityValue);
         if (portfolioValue <= 0) {
           return null;
         }
@@ -141,7 +152,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const date = ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
     const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
     const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || []);
-    const { matched: liquidityAccounts, missing } = findLiquidityTargets(state.accounts);
+    const { matched: liquidityAccounts, missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds);
     const snapshot = state.snapshots[String(month)];
 
     el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets.length
@@ -351,7 +362,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       warnings.push(`Faltan snapshots de liquidez: ${missingLiquidity}`);
     }
 
-    const { missing } = findLiquidityTargets(state.accounts);
+    const { missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds);
     if (missing.length > 0) {
       warnings.push(`Cuentas de liquidez no configuradas: ${missing.join(", ")}`);
     }

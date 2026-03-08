@@ -12,7 +12,7 @@ import {
   type Transaction,
 } from "./types";
 import { clamp, monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from "./utils";
-import { deriveContributionFlow, sanitizeFlowAllocations } from "./contribution-workflow";
+import { deriveContributionFlow, deriveDefaultLiquidityAccountIds, sanitizeFlowAllocations } from "./contribution-workflow";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
 export const SERVER_STATE_ENDPOINT = "/api/state";
@@ -26,6 +26,7 @@ const FALLBACK_BASE_SEED = {
   },
   year: new Date().getFullYear(),
   currency: "EUR",
+  twrLiquidityAccountIds: [],
   accounts: [],
   investmentAssets: [],
   liabilities: [],
@@ -102,6 +103,11 @@ export async function persistServerState(state: State): Promise<boolean> {
 export function normalizeState(candidate: unknown): State {
   const input = (candidate || {}) as any;
   const base = (BASE_SEED || {}) as any;
+  const accounts = normalizeEntities(input?.accounts || base.accounts || []);
+  const twrLiquidityAccountIds = normalizeTwrLiquidityAccountIds(
+    input?.twrLiquidityAccountIds ?? base?.twrLiquidityAccountIds,
+    accounts
+  );
 
   const year = parseIntSafe(input?.year, base.year || new Date().getFullYear());
   const safe: State = {
@@ -113,7 +119,8 @@ export function normalizeState(candidate: unknown): State {
     },
     year,
     currency: String(input?.currency || base.currency || "EUR").toUpperCase().slice(0, 3),
-    accounts: normalizeEntities(input?.accounts || base.accounts || []),
+    twrLiquidityAccountIds,
+    accounts,
     investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),
     liabilities: normalizeEntities(input?.liabilities || base.liabilities || []),
     incomeCategories: normalizeStringList(input?.incomeCategories || base.incomeCategories || []),
@@ -135,6 +142,24 @@ export function normalizeState(candidate: unknown): State {
   sortContributionsInState(safe);
 
   return safe;
+}
+
+function normalizeTwrLiquidityAccountIds(input: unknown, accounts: State["accounts"]): string[] {
+  const validAccountIds = new Set(accounts.map((account) => String(account.id)));
+  const configured = Array.isArray(input) ? input : [];
+  const normalizedConfigured = Array.from(
+    new Set(
+      configured
+        .map((item) => String(item || "").trim())
+        .filter((item) => validAccountIds.has(item))
+    )
+  );
+
+  if (normalizedConfigured.length > 0) {
+    return normalizedConfigured;
+  }
+
+  return deriveDefaultLiquidityAccountIds(accounts).filter((accountId) => validAccountIds.has(accountId));
 }
 
 export function sortTransactionsInState(targetState: State): void {
