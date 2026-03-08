@@ -66,6 +66,28 @@ test.describe("recorrido guiado de aportes", () => {
     expect(await tracker.getContributionFlowByDate("2026-04-30")).toBe(300);
   });
 
+  test("aporte manual suma la liquidez al valor de cartera", async ({ tracker, page }) => {
+    await tracker.openContributionWorkflowModal();
+    await tracker.contributionWorkflowSelectMonth("ABRIL");
+    await tracker.contributionWorkflowSetDate("2026-04-15");
+    await tracker.contributionWorkflowSetInvestmentSnapshot("Fondos Indexados", 13000);
+    await tracker.contributionWorkflowSetLiquiditySnapshot("MyInvestor", 1200);
+    await tracker.contributionWorkflowSetLiquiditySnapshot("Trading 212", 900);
+    await tracker.contributionWorkflowSetLiquiditySnapshot("Trade Republic", 750);
+
+    await tracker.contributionWorkflowGoToAllocationStep();
+    await tracker.contributionWorkflowSetTotal(300);
+    await tracker.contributionWorkflowSetAllocation("MyInvestor", 100);
+    await tracker.contributionWorkflowSetAllocation("Trading 212", 100);
+    await tracker.contributionWorkflowSetAllocation("Trade Republic", 100);
+    await tracker.contributionWorkflowSave();
+
+    await expect(page.getByRole("status")).toContainText("Aporte guardado");
+    const row = tracker.investmentSection().locator("#contribution-body tr", { hasText: "2026-04-15" });
+    await expect(row).toBeVisible();
+    await expect(row.locator("td").nth(1)).toHaveText("15.850,00 €");
+  });
+
   test("compatibilidad mixta: legacy + allocations", async ({ tracker, page }) => {
     await tracker.setContributionFlowByDate("2026-01-31", 123.45);
 
