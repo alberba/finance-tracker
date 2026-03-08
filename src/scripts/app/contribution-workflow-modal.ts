@@ -60,15 +60,12 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
         const derived = deriveContributionFlow(existing || {});
         const flow = round2(derived.flow);
-        const existingPortfolioValue = round2(parseFloatSafe(existing?.portfolioValue, portfolioValue));
-        const normalizedPortfolioValue = existingPortfolioValue > 0 ? existingPortfolioValue : portfolioValue;
-
         return {
           id: existing?.id || `contrib-snapshot-${state.year}-${month + 1}`,
           date,
           amount: round2(parseFloatSafe(existing?.amount, flow)),
           portfolioDate: date,
-          portfolioValue: normalizedPortfolioValue,
+          portfolioValue,
           flow,
           flowAllocations: derived.allocations,
           flowSource: derived.flowSource,
@@ -90,10 +87,16 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
       const derived = deriveContributionFlow(item || {});
       const existing = rowsByDate.get(date);
+      const keepsSnapshotPortfolioValue = Boolean(existing);
       const normalizedPortfolioValue = round2(
-        parseFloatSafe(item.portfolioValue, existing?.portfolioValue ?? 0)
+        parseFloatSafe(item.portfolioValue, keepsSnapshotPortfolioValue ? existing?.portfolioValue ?? 0 : 0)
       );
-      const portfolioValue = normalizedPortfolioValue > 0 ? normalizedPortfolioValue : round2(parseFloatSafe(existing?.portfolioValue, 0));
+      const portfolioValue =
+        keepsSnapshotPortfolioValue && existing
+          ? round2(parseFloatSafe(existing.portfolioValue, 0))
+          : normalizedPortfolioValue > 0
+            ? normalizedPortfolioValue
+            : round2(parseFloatSafe(existing?.portfolioValue, 0));
 
       if (portfolioValue <= 0) {
         return;
