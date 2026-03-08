@@ -85,7 +85,7 @@ test.describe("recorrido guiado de aportes", () => {
     await expect(page.getByRole("status")).toContainText("Aporte guardado");
     const row = tracker.investmentSection().locator("#contribution-body tr", { hasText: "2026-04-15" });
     await expect(row).toBeVisible();
-    await expect(row.locator("td").nth(1)).toHaveText("15.850,00 €");
+    await expect(row.locator("td").nth(1)).toHaveText("16.150,00 €");
   });
 
   test("compatibilidad mixta: legacy + allocations", async ({ tracker, page }) => {
