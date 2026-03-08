@@ -17,7 +17,7 @@ const payload: IssueReportPayload = {
 
 describe("github issues service", () => {
   it("crea issue y devuelve número/url", async () => {
-    const fakeFetch = vi.fn(async () =>
+    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) =>
       new Response(JSON.stringify({ number: 99, html_url: "https://github.com/org/repo/issues/99" }), {
         status: 201,
       })
@@ -46,7 +46,7 @@ describe("github issues service", () => {
 
   it("reintenta errores transitorios", async () => {
     const fakeFetch = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response("busy", { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ number: 7, html_url: "https://x/issues/7" }), { status: 201 }));
 
@@ -65,7 +65,7 @@ describe("github issues service", () => {
   });
 
   it("lanza error en fallo no recuperable", async () => {
-    const fakeFetch = vi.fn(async () => new Response("forbidden", { status: 403 }));
+    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) => new Response("forbidden", { status: 403 }));
 
     await expect(
       createIssueFromWebReport(
@@ -81,7 +81,7 @@ describe("github issues service", () => {
   });
 
   it("usa GITHUB_TOKEN cuando GITHUB_ISSUE_TOKEN no está definido", async () => {
-    const fakeFetch = vi.fn(async () =>
+    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) =>
       new Response(JSON.stringify({ number: 5, html_url: "https://github.com/org/repo/issues/5" }), {
         status: 201,
       })
@@ -104,7 +104,7 @@ describe("github issues service", () => {
   });
 
   it("lanza error si no hay ningún token configurado", async () => {
-    const fakeFetch = vi.fn();
+    const fakeFetch = vi.fn<typeof fetch>();
 
     await expect(
       createIssueFromWebReport(
