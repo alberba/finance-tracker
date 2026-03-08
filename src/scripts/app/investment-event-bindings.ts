@@ -41,10 +41,43 @@ interface InvestmentEventBindingsDeps {
   closeContributionCalcModal: () => void;
   applyContributionCalcModalResult: () => void;
   saveContributionFromWorkflowModal: () => void;
+  isManualContributionDate: (date: string) => boolean;
 }
 
 export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) {
   const { ui, el } = deps;
+  let pendingContributionDeleteDate = "";
+
+  function openContributionDeleteDialog(date: string) {
+    pendingContributionDeleteDate = date;
+    el.contributionDeleteMessage.textContent = `¿Seguro que quieres eliminar el aporte manual del ${date}?`;
+    el.contributionDeleteDialog.showModal();
+  }
+
+  function closeContributionDeleteDialog() {
+    pendingContributionDeleteDate = "";
+    if (el.contributionDeleteDialog.open) {
+      el.contributionDeleteDialog.close();
+    }
+  }
+
+  function confirmContributionDelete() {
+    const state = deps.getState();
+    const date = String(pendingContributionDeleteDate || "").trim();
+    if (!date || !deps.isManualContributionDate(date)) {
+      closeContributionDeleteDialog();
+      return;
+    }
+
+    state.contributions = state.contributions.filter((item: any) => {
+      const itemDate = String(item.portfolioDate || item.date || "").trim();
+      return itemDate !== date;
+    });
+    deps.saveState();
+    closeContributionDeleteDialog();
+    deps.renderAll();
+    deps.showToast("Aporte manual eliminado.");
+  }
 
   function bindWealthEvents() {
     el.snapshotMonth.addEventListener("change", () => {
@@ -219,6 +252,20 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       deps.renderContributionsTable();
     });
 
+    el.contributionBody.addEventListener("click", (event: Event) => {
+      const target = deps.getEventElement(event.target);
+      const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-contribution-date]");
+      if (!deleteButton) {
+        return;
+      }
+
+      const date = String(deleteButton.dataset.deleteContributionDate || "").trim();
+      if (!date || !deps.isManualContributionDate(date)) {
+        return;
+      }
+      openContributionDeleteDialog(date);
+    });
+
     el.openContributionWorkflow.addEventListener("click", deps.openContributionWorkflowModal);
     el.contributionWorkflowClose.addEventListener("click", deps.closeContributionWorkflowModal);
 
@@ -295,7 +342,20 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
     });
     el.contributionWorkflowForm.addEventListener("submit", (event: Event) => {
       event.preventDefault();
+      if (ui.contributionWorkflowStep !== 2) {
+        return;
+      }
       deps.saveContributionFromWorkflowModal();
+    });
+    el.contributionDeleteClose.addEventListener("click", closeContributionDeleteDialog);
+    el.contributionDeleteCancel.addEventListener("click", closeContributionDeleteDialog);
+    el.contributionDeleteDialog.addEventListener("cancel", (event: Event) => {
+      event.preventDefault();
+      closeContributionDeleteDialog();
+    });
+    el.contributionDeleteForm.addEventListener("submit", (event: Event) => {
+      event.preventDefault();
+      confirmContributionDelete();
     });
   }
 

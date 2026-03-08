@@ -155,6 +155,7 @@ test.describe("inversión tabs y TWR", () => {
       "Participaciones después",
       "Retorno período",
       "Retorno acumulado",
+      "Acciones",
     ]);
 
     const firstRow = section.locator("#contribution-body tr").first();
@@ -210,5 +211,14 @@ test.describe("inversión tabs y TWR", () => {
     const monthEndRow = section.locator("#contribution-body tr", { hasText: "2026-01-31" });
     await expect(monthEndRow).toBeVisible();
     await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.556,39 €");
+    await expect(monthEndRow.locator('button[data-delete-contribution-date="2026-01-31"]')).toHaveCount(0);
+  });
+
+  test("aportes manuales se pueden eliminar desde la tabla", async ({ tracker, page }) => {
+    await tracker.deleteManualContributionByDate("2026-02-08");
+    await expect(page.locator("#contribution-delete-dialog")).toContainText("2026-02-08");
+    await tracker.confirmDeleteManualContribution();
+    await expect(page.getByRole("status")).toContainText("Aporte manual eliminado.");
+    await expect(tracker.investmentSection().locator("#contribution-body tr", { hasText: "2026-02-08" })).toHaveCount(0);
   });
 });

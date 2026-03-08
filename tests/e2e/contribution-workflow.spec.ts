@@ -134,4 +134,19 @@ test.describe("recorrido guiado de aportes", () => {
 
     await expect(page.getByRole("status")).toContainText("Aporte guardado con avisos.");
   });
+
+  test("enter en el paso 1 no guarda el aporte", async ({ tracker, page }) => {
+    await tracker.openContributionWorkflowModal();
+    await tracker.contributionWorkflowSelectMonth("ABRIL");
+    await tracker.contributionWorkflowSetDate("2026-04-30");
+    await tracker.contributionWorkflowSetInvestmentSnapshot("Fondos Indexados", 13000);
+
+    const modal = page.locator("#contribution-workflow-dialog");
+    await tracker.contributionWorkflowPressEnterInInvestmentSnapshot("Fondos Indexados");
+
+    await expect(modal).toBeVisible();
+    await expect(modal.locator("#contribution-workflow-step-snapshot")).toBeVisible();
+    await expect(page.locator("#toast")).not.toContainText("Aporte guardado con avisos.");
+    await expect(tracker.investmentSection().locator("#contribution-body tr", { hasText: "2026-04-30" })).toHaveCount(0);
+  });
 });

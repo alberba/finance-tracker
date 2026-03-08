@@ -171,6 +171,7 @@
               <th>Participaciones después</th>
               <th>Retorno período</th>
               <th>Retorno acumulado</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="contribution-body"></tbody>
@@ -260,6 +261,22 @@
         <button id="contribution-workflow-prev" type="button" class="tx-btn-secondary">Anterior</button>
         <button id="contribution-workflow-next" type="button" class="tx-btn-secondary">Siguiente</button>
         <button id="contribution-workflow-save" type="submit" class="tx-btn-primary" formnovalidate>Guardar aporte (con avisos)</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="contribution-delete-dialog" class="contribution-workflow-dialog contribution-delete-dialog">
+    <form id="contribution-delete-form" class="contribution-workflow-form" method="dialog" autocomplete="off">
+      <div class="contribution-workflow-head">
+        <h3 id="contribution-delete-title">Eliminar aporte manual</h3>
+        <button id="contribution-delete-close" type="button" class="tx-close-btn" aria-label="Cerrar confirmación">✕</button>
+      </div>
+      <p id="contribution-delete-message" class="contribution-workflow-intro">
+        ¿Seguro que quieres eliminar este aporte manual?
+      </p>
+      <div class="contribution-workflow-actions">
+        <button id="contribution-delete-cancel" type="button" class="tx-btn-secondary">Cancelar</button>
+        <button id="contribution-delete-confirm" type="submit" class="tx-btn-primary">Eliminar aporte</button>
       </div>
     </form>
   </dialog>

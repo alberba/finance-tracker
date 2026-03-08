@@ -296,6 +296,13 @@ import {
     contributionWorkflowPrev: getRequiredElement<HTMLButtonElement>("contribution-workflow-prev"),
     contributionWorkflowNext: getRequiredElement<HTMLButtonElement>("contribution-workflow-next"),
     contributionWorkflowSave: getRequiredElement<HTMLButtonElement>("contribution-workflow-save"),
+    contributionDeleteDialog: getRequiredElement<HTMLDialogElement>("contribution-delete-dialog"),
+    contributionDeleteForm: getRequiredElement<HTMLFormElement>("contribution-delete-form"),
+    contributionDeleteTitle: getRequiredElement<HTMLElement>("contribution-delete-title"),
+    contributionDeleteMessage: getRequiredElement<HTMLElement>("contribution-delete-message"),
+    contributionDeleteClose: getRequiredElement<HTMLButtonElement>("contribution-delete-close"),
+    contributionDeleteCancel: getRequiredElement<HTMLButtonElement>("contribution-delete-cancel"),
+    contributionDeleteConfirm: getRequiredElement<HTMLButtonElement>("contribution-delete-confirm"),
     contributionCalcDialog: getRequiredElement<HTMLDialogElement>("contribution-calc-dialog"),
     contributionCalcForm: getRequiredElement<HTMLFormElement>("contribution-calc-form"),
     contributionCalcTitle: getRequiredElement<HTMLElement>("contribution-calc-title"),
@@ -420,6 +427,7 @@ import {
   const saveContributionFromWorkflowModal = () => contributionWorkflowSection.saveContributionFromWorkflowModal();
   const upsertContributionFlowForDate = (date: string, flow: number) =>
     contributionWorkflowSection.upsertContributionFlowForDate(date, flow);
+  const isManualContributionDate = (date: string) => contributionWorkflowSection.isManualContributionDate(date);
 
   const dashboardBudgetGoalsSection = setupDashboardBudgetGoalsSection({
     getState: () => state,
@@ -533,6 +541,7 @@ import {
     closeContributionCalcModal,
     applyContributionCalcModalResult,
     saveContributionFromWorkflowModal,
+    isManualContributionDate,
   });
 
   const settingsDataSection = setupSettingsDataSection({

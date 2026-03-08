@@ -26,6 +26,18 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
   const { ui, el } = deps;
   const workflowDialog = el.contributionWorkflowDialog as HTMLDialogElement;
 
+  function isAutomaticContributionDate(date: string): boolean {
+    const month = monthFromISO(date);
+    if (month === null) {
+      return false;
+    }
+    return date === toSnapshotDate(deps.getState().year, month);
+  }
+
+  function isManualContributionDate(date: string): boolean {
+    return !isAutomaticContributionDate(date);
+  }
+
   function getContributionEntriesFromSnapshots(): Contribution[] {
     const state = deps.getState();
     const liquidityTargetAccounts = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched;
@@ -126,7 +138,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const rows = computeContributionMetricsCore(getContributionEntriesFromSnapshots()) as ContributionMetricRow[];
 
     if (!rows.length) {
-      el.contributionBody.innerHTML = "<tr><td colspan='8'>Sin snapshots de inversión disponibles.</td></tr>";
+      el.contributionBody.innerHTML = "<tr><td colspan='9'>Sin snapshots de inversión disponibles.</td></tr>";
       return;
     }
 
@@ -137,6 +149,18 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         const periodClass = row.periodReturn === null ? "" : row.periodReturn >= 0 ? "text-good" : "text-bad";
         const cumulativeClass =
           row.cumulativeReturn === null ? "" : row.cumulativeReturn >= 0 ? "text-good" : "text-bad";
+        const manualActions = isManualContributionDate(row.date)
+          ? `
+              <button
+                type="button"
+                class="delete-btn icon-action-btn"
+                data-delete-contribution-date="${escapeAttr(row.date)}"
+                aria-label="Eliminar aporte manual del ${escapeAttr(row.date)}"
+              >
+                <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 7h12l-1 14H7L6 7z"></path><path d="M9 4h6l1 2H8l1-2z"></path></svg>
+              </button>
+            `
+          : '<span class="muted">-</span>';
 
         return `
           <tr>
@@ -157,6 +181,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
             <td>${row.unitsAfter.toFixed(7)}</td>
             <td class="${periodClass}">${periodText}</td>
             <td class="${cumulativeClass}">${cumulativeText}</td>
+            <td>${manualActions}</td>
           </tr>
         `;
       })
@@ -569,5 +594,6 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     renderContributionWorkflowModalWarnings,
     saveContributionFromWorkflowModal,
     upsertContributionFlowForDate,
+    isManualContributionDate,
   };
 }
