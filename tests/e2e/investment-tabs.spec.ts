@@ -168,21 +168,38 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentContributionsTab();
     const section = tracker.investmentSection();
 
-    const firstRow = section.locator("#contribution-body tr").first();
-    const firstDate = (await firstRow.locator("td").nth(0).innerText()).trim();
+    const editableRow = section.locator("#contribution-body tr", { hasText: "2026-01-31" });
+    await expect(editableRow).toBeVisible();
+    const editableDate = (await editableRow.locator("td").nth(0).innerText()).trim();
 
-    const secondRow = section.locator("#contribution-body tr").nth(1);
-    await expect(secondRow).toBeVisible();
-    const previousVle = (await secondRow.locator("td").nth(3).innerText()).trim();
+    const downstreamRow = section.locator("#contribution-body tr", { hasText: "2026-02-08" });
+    await expect(downstreamRow).toBeVisible();
+    const previousVle = (await downstreamRow.locator("td").nth(3).innerText()).trim();
 
-    await tracker.setContributionFlowByDate(firstDate, 0);
+    await tracker.setContributionFlowByDate(editableDate, 0);
 
-    const nextVle = (await secondRow.locator("td").nth(3).innerText()).trim();
+    const nextVle = (await downstreamRow.locator("td").nth(3).innerText()).trim();
     expect(nextVle).not.toBe(previousVle);
 
     await tracker.reload();
     await tracker.openInvestmentContributionsTab();
-    const persistedVle = (await tracker.investmentSection().locator("#contribution-body tr").nth(1).locator("td").nth(3).innerText()).trim();
+    const persistedVle = (
+      await tracker
+        .investmentSection()
+        .locator("#contribution-body tr", { hasText: "2026-02-08" })
+        .locator("td")
+        .nth(3)
+        .innerText()
+    ).trim();
     expect(persistedVle).toBe(nextVle);
+  });
+
+  test("aportes muestra también fechas manuales fuera de cierre mensual", async ({ tracker }) => {
+    await tracker.openInvestmentContributionsTab();
+    const section = tracker.investmentSection();
+
+    const manualRow = section.locator("#contribution-body tr", { hasText: "2026-02-08" });
+    await expect(manualRow).toBeVisible();
+    await expect(manualRow.locator('input[data-contribution-flow-date="2026-02-08"]')).toHaveValue("562");
   });
 });

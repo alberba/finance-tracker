@@ -30,7 +30,9 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const state = deps.getState();
     const liquidityTargetAccounts = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched;
     const liquidityTargetIds = new Set(liquidityTargetAccounts.map((account) => String(account.id)));
-    const snapshotRows = Object.entries(state.snapshots || {})
+    const rowsByDate = new Map<string, Contribution>();
+
+    Object.entries(state.snapshots || {})
       .map(([monthKey, snapshot]: any) => {
         const month = parseIntSafe(monthKey, -1);
         if (!Number.isInteger(month) || month < 0 || month > 11) {
@@ -58,13 +60,15 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
         const derived = deriveContributionFlow(existing || {});
         const flow = round2(derived.flow);
+        const existingPortfolioValue = round2(parseFloatSafe(existing?.portfolioValue, portfolioValue));
+        const normalizedPortfolioValue = existingPortfolioValue > 0 ? existingPortfolioValue : portfolioValue;
 
         return {
           id: existing?.id || `contrib-snapshot-${state.year}-${month + 1}`,
           date,
-          amount: flow,
+          amount: round2(parseFloatSafe(existing?.amount, flow)),
           portfolioDate: date,
-          portfolioValue,
+          portfolioValue: normalizedPortfolioValue,
           flow,
           flowAllocations: derived.allocations,
           flowSource: derived.flowSource,
@@ -73,9 +77,46 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
             : [],
         };
       })
-      .filter(Boolean) as Contribution[];
+      .filter(Boolean)
+      .forEach((row) => {
+        rowsByDate.set(String(row.portfolioDate || row.date), row as Contribution);
+      });
 
-    return snapshotRows.sort((a, b) => String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)));
+    state.contributions.forEach((item: Contribution) => {
+      const date = String(item.portfolioDate || item.date || "").trim();
+      if (!date) {
+        return;
+      }
+
+      const derived = deriveContributionFlow(item || {});
+      const existing = rowsByDate.get(date);
+      const normalizedPortfolioValue = round2(
+        parseFloatSafe(item.portfolioValue, existing?.portfolioValue ?? 0)
+      );
+      const portfolioValue = normalizedPortfolioValue > 0 ? normalizedPortfolioValue : round2(parseFloatSafe(existing?.portfolioValue, 0));
+
+      if (portfolioValue <= 0) {
+        return;
+      }
+
+      rowsByDate.set(date, {
+        id: String(item.id || existing?.id || `contrib-${date}`),
+        date,
+        amount: round2(parseFloatSafe(item.amount, derived.flow)),
+        portfolioDate: date,
+        portfolioValue,
+        flow: round2(derived.flow),
+        flowAllocations: derived.allocations,
+        flowSource: derived.flowSource,
+        warnings: Array.isArray(item?.warnings)
+          ? item.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+          : [],
+      });
+    });
+
+    return Array.from(rowsByDate.values()).sort((a, b) =>
+      String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date))
+    );
   }
 
   function renderContributionsTable() {
