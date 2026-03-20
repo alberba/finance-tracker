@@ -36,8 +36,6 @@ interface DashboardBudgetGoalsElements {
   dashboardMonth: HTMLSelectElement;
   txMonthFilter: HTMLSelectElement;
   txForm: HTMLFormElement & { elements: HTMLFormControlsCollection & { date: HTMLInputElement; month: HTMLSelectElement } };
-  budgetType: HTMLSelectElement;
-  budgetMonth: HTMLSelectElement;
   budgetBody: HTMLElement;
   budgetPlanned: HTMLElement;
   budgetActual: HTMLElement;
@@ -87,6 +85,12 @@ interface DashboardBudgetGoalsDeps {
 
 export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps) {
   const { ui, el } = deps;
+  const budgetTypes: BudgetType[] = ["income", "expense", "investment"];
+  const budgetTypeMeta: Record<BudgetType, { title: string; description: string }> = {
+    income: { title: "Ingresos", description: "Planifica cuánto esperas ingresar cada mes." },
+    expense: { title: "Gastos", description: "Controla el gasto previsto y el real acumulado por categoría." },
+    investment: { title: "Inversión", description: "Ajusta las aportaciones mensuales y compara la ejecución real." },
+  };
 
   function bindNavigationEvents() {
     el.navTabs.addEventListener("click", (event) => {
@@ -119,26 +123,19 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
   }
 
   function bindBudgetEvents() {
-    el.budgetType.addEventListener("change", () => {
-      ui.budgetType = el.budgetType.value === "expense" || el.budgetType.value === "investment" ? el.budgetType.value : "income";
-      renderBudget();
-    });
-
-    el.budgetMonth.addEventListener("change", () => {
-      ui.budgetMonth = parseIntSafe(el.budgetMonth.value, ui.budgetMonth);
-      renderBudget();
-    });
-
     el.budgetBody.addEventListener("input", (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLInputElement) || !target.dataset.category) {
+      const rawType = target instanceof HTMLInputElement ? target.dataset.type : "";
+      const rawMonth = target instanceof HTMLInputElement ? target.dataset.month : "";
+      if (!(target instanceof HTMLInputElement) || !target.dataset.category || !rawType) {
         return;
       }
+      const type = rawType === "expense" || rawType === "investment" ? rawType : "income";
+      const month = parseIntSafe(rawMonth, 0);
       const state = deps.getState();
       const category = target.dataset.category;
-      const type = ui.budgetType;
       deps.ensureBudgetCategory(type, category);
-      state.budget[type][category][ui.budgetMonth] = round2(parseFloatSafe(target.value, 0));
+      state.budget[type][category][month] = round2(parseFloatSafe(target.value, 0));
       deps.saveState();
       renderBudget();
     });
@@ -209,7 +206,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
       el.dashboardMonth,
       el.txMonthFilter,
       el.txForm.elements.month,
-      el.budgetMonth,
       el.snapshotMonth,
       el.investmentMonth,
       el.contributionWorkflowMonth,
@@ -226,7 +222,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     el.yearDisplay.value = String(state.year);
     if (!MONTHS[ui.month]) ui.month = 0;
     if (!MONTHS[ui.txFilterMonth]) ui.txFilterMonth = ui.month;
-    if (!MONTHS[ui.budgetMonth]) ui.budgetMonth = ui.month;
     if (!MONTHS[ui.snapshotMonth]) ui.snapshotMonth = ui.month;
     if (!MONTHS[ui.investmentMonth]) ui.investmentMonth = ui.month;
     if (!MONTHS[ui.contributionWorkflowMonth]) ui.contributionWorkflowMonth = ui.investmentMonth;
@@ -254,8 +249,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     }
     el.contributionWorkflowDate.value = ui.contributionWorkflowDate;
     el.investmentOnlyUndeclared.checked = ui.investmentOnlyUndeclared;
-    el.budgetType.value = ui.budgetType;
-    el.budgetMonth.value = String(ui.budgetMonth);
     el.snapshotMonth.value = String(ui.snapshotMonth);
     el.investmentMonth.value = String(ui.investmentMonth);
     el.contributionWorkflowMonth.value = String(ui.contributionWorkflowMonth);
@@ -334,47 +327,148 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
   }
 
   function renderBudget() {
-    const month = ui.budgetMonth;
-    const type = ui.budgetType;
-    const categories = deps.getCategoriesForType(type);
-    const actuals = deps.getCategoryActuals(type, month);
-    let totalPlanned = 0;
-    let totalActual = 0;
+    let annualPlanned = 0;
+    let annualActual = 0;
 
-    if (!categories.length) {
-      el.budgetBody.innerHTML = "<tr><td colspan='4'>No hay categorías para este bloque.</td></tr>";
-      el.budgetPlanned.textContent = deps.formatMoney(0);
-      el.budgetActual.textContent = deps.formatMoney(0);
-      el.budgetDiff.textContent = deps.formatMoney(0);
-      return;
-    }
+    el.budgetBody.innerHTML = budgetTypes
+      .map((type) => {
+        const categories = deps.getCategoriesForType(type);
+        if (!categories.length) {
+          return `
+            <article class="budget-block" data-budget-type="${escapeAttr(type)}">
+              <header class="budget-block-head">
+                <div>
+                  <h3>${budgetTypeMeta[type].title}</h3>
+                  <p>${budgetTypeMeta[type].description}</p>
+                </div>
+              </header>
+              <p class="budget-empty">No hay categorías para este bloque.</p>
+            </article>
+          `;
+        }
 
-    el.budgetBody.innerHTML = categories
-      .map((category) => {
-        const planned = deps.getBudgetValue(type, category, month);
-        const actual = round2(actuals[category] || 0);
-        const diff = round2(actual - planned);
-        totalPlanned += planned;
-        totalActual += actual;
-        const diffClass =
-          type === "income" ? (diff >= 0 ? "text-good" : "text-bad") : diff > 0 ? "text-bad" : "text-good";
+        let blockPlanned = 0;
+        let blockActual = 0;
+
+        const rows = categories
+          .map((category) => {
+            const monthlyCells = MONTHS.map((monthName, monthIndex) => {
+              const planned = deps.getBudgetValue(type, category, monthIndex);
+              const actual = round2(deps.getCategoryActuals(type, monthIndex)[category] || 0);
+              const diff = round2(actual - planned);
+              const diffClass =
+                type === "income" ? (diff >= 0 ? "text-good" : "text-bad") : diff > 0 ? "text-bad" : "text-good";
+              blockPlanned += planned;
+              blockActual += actual;
+              return `
+                <td class="budget-month-cell" data-month="${monthIndex}">
+                  <label class="budget-cell-input">
+                    <span class="sr-only">${monthName} para ${escapeHtml(category)}</span>
+                    <input
+                      type="number"
+                      name="budget-${escapeAttr(type)}-${escapeAttr(category)}-${monthIndex}"
+                      autocomplete="off"
+                      step="0.01"
+                      min="0"
+                      data-category="${escapeAttr(category)}"
+                      data-type="${escapeAttr(type)}"
+                      data-month="${monthIndex}"
+                      value="${planned}"
+                      aria-label="Presupuesto ${monthName} para ${escapeAttr(category)}"
+                    />
+                  </label>
+                  <div class="budget-cell-meta">
+                    <span class="budget-cell-actual">${deps.formatMoney(actual)}</span>
+                    <span class="${diffClass}">${deps.formatMoney(diff)}</span>
+                  </div>
+                </td>
+              `;
+            }).join("");
+
+            const categoryPlanned = round2(MONTHS.reduce((sum, _item, monthIndex) => sum + deps.getBudgetValue(type, category, monthIndex), 0));
+            const categoryActual = round2(
+              MONTHS.reduce((sum, _item, monthIndex) => sum + round2(deps.getCategoryActuals(type, monthIndex)[category] || 0), 0)
+            );
+            const categoryDiff = round2(categoryActual - categoryPlanned);
+            const categoryDiffClass =
+              type === "income"
+                ? categoryDiff >= 0
+                  ? "text-good"
+                  : "text-bad"
+                : categoryDiff > 0
+                  ? "text-bad"
+                  : "text-good";
+
+            return `
+              <tr>
+                <th scope="row">${escapeHtml(decorateCategoryLabel(type, category))}</th>
+                ${monthlyCells}
+                <td class="budget-total-cell">
+                  <strong>${deps.formatMoney(categoryPlanned)}</strong>
+                  <div class="budget-cell-meta">
+                    <span class="budget-cell-actual">${deps.formatMoney(categoryActual)}</span>
+                    <span class="${categoryDiffClass}">${deps.formatMoney(categoryDiff)}</span>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+
+        annualPlanned += blockPlanned;
+        annualActual += blockActual;
+
+        const blockDiff = round2(blockActual - blockPlanned);
+        const blockDiffClass =
+          type === "income" ? (blockDiff >= 0 ? "text-good" : "text-bad") : blockDiff > 0 ? "text-bad" : "text-good";
+
         return `
-          <tr>
-            <td>${escapeHtml(decorateCategoryLabel(type, category))}</td>
-            <td><input type="number" name="budget-${escapeAttr(type)}-${escapeAttr(category)}" autocomplete="off" step="0.01" min="0" data-category="${escapeAttr(category)}" value="${planned}" aria-label="Presupuesto para ${escapeAttr(category)}" /></td>
-            <td>${deps.formatMoney(actual)}</td>
-            <td class="${diffClass}">${deps.formatMoney(diff)}</td>
-          </tr>
+          <article class="budget-block" data-budget-type="${escapeAttr(type)}">
+            <header class="budget-block-head">
+              <div>
+                <h3>${budgetTypeMeta[type].title}</h3>
+                <p>${budgetTypeMeta[type].description}</p>
+              </div>
+              <dl class="budget-block-totals">
+                <div>
+                  <dt>Presupuestado</dt>
+                  <dd>${deps.formatMoney(blockPlanned)}</dd>
+                </div>
+                <div>
+                  <dt>Real</dt>
+                  <dd>${deps.formatMoney(blockActual)}</dd>
+                </div>
+                <div>
+                  <dt>Diferencia</dt>
+                  <dd class="${blockDiffClass}">${deps.formatMoney(blockDiff)}</dd>
+                </div>
+              </dl>
+            </header>
+            <div class="table-wrap budget-table-wrap">
+              <table class="budget-table">
+                <thead>
+                  <tr>
+                    <th>Categoría</th>
+                    ${MONTHS.map((monthName) => `<th>${monthName.slice(0, 3)}</th>`).join("")}
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+          </article>
         `;
       })
       .join("");
 
-    const totalDiff = round2(totalActual - totalPlanned);
-    const totalDiffClass = type === "income" ? (totalDiff >= 0 ? "text-good" : "text-bad") : totalDiff > 0 ? "text-bad" : "text-good";
-    el.budgetPlanned.textContent = deps.formatMoney(totalPlanned);
-    el.budgetActual.textContent = deps.formatMoney(totalActual);
-    el.budgetDiff.textContent = deps.formatMoney(totalDiff);
-    el.budgetDiff.className = totalDiffClass;
+    const annualDiff = round2(annualActual - annualPlanned);
+    const annualDiffClass = annualDiff > 0 ? "text-bad" : "text-good";
+    el.budgetPlanned.textContent = deps.formatMoney(annualPlanned);
+    el.budgetActual.textContent = deps.formatMoney(annualActual);
+    el.budgetDiff.textContent = deps.formatMoney(annualDiff);
+    el.budgetDiff.className = annualDiffClass;
   }
 
   function renderGoals() {

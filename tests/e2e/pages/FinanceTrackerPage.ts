@@ -410,20 +410,55 @@ export class FinanceTrackerPage {
     plannedValue: number;
   }) {
     await this.openBudget();
-    await this.budgetSection.getByLabel("Tipo").selectOption(params.typeValue);
-    await this.budgetSection.getByLabel("Mes").selectOption({ label: params.monthLabel });
-
-    const row = this.budgetSection.locator("#budget-table-body tr", {
+    const monthIndex = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ].indexOf(params.monthLabel);
+    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`);
+    const row = block.locator("tbody tr", {
       hasText: params.categoryLabel,
     });
     await expect(row).toBeVisible();
-    const input = row.locator(`input[data-category="${params.categoryLabel}"]`);
+    const input = row.locator(
+      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`
+    );
     await input.fill(String(params.plannedValue));
   }
 
-  async getBudgetValue(categoryLabel: string): Promise<number> {
-    const row = this.budgetSection.locator("#budget-table-body tr", { hasText: categoryLabel });
-    const input = row.locator(`input[data-category="${categoryLabel}"]`);
+  async getBudgetValue(params: {
+    typeValue: "income" | "expense" | "investment";
+    monthLabel: string;
+    categoryLabel: string;
+  }): Promise<number> {
+    const monthIndex = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ].indexOf(params.monthLabel);
+    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`);
+    const row = block.locator("tbody tr", { hasText: params.categoryLabel });
+    const input = row.locator(
+      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`
+    );
     const value = await input.inputValue();
     return Number(value);
   }
