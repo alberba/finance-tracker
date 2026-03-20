@@ -9,7 +9,7 @@ const SECTION_CONFIG = {
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
   data: { buttonLabel: "Datos", headingText: "Datos y backups" },
-  reports: { buttonLabel: "Reportes", headingText: "Reportes y automatización" },
+  reports: { buttonLabel: "Reportes", headingText: "Reportes" },
 } as const;
 
 export type FinanceSectionId = keyof typeof SECTION_CONFIG;
@@ -125,13 +125,13 @@ export class FinanceTrackerPage {
       await form.locator("#issue-report-actual").fill(params.actualResult);
     }
     const mention = form.locator("#issue-report-mention-claude");
-    const shouldMention = params.mentionClaude ?? true;
+    const shouldMention = params.mentionClaude ?? false;
     if (shouldMention) {
       await mention.check();
     } else {
       await mention.uncheck();
     }
-    await form.getByRole("button", { name: "Crear issue" }).click();
+    await form.getByRole("button", { name: "Crear reporte" }).click();
   }
 
   issueReportStatus(): Locator {

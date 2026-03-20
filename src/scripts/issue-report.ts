@@ -111,7 +111,7 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
     };
 
     submitButton.disabled = true;
-    status.textContent = "Creando issue...";
+    status.textContent = "Creando reporte...";
 
     try {
       const result = await submitReport(payload);
@@ -120,7 +120,7 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
         return;
       }
 
-      const prefix = document.createTextNode("Issue creada: ");
+      const prefix = document.createTextNode("Reporte creado: ");
       const link = document.createElement("a");
       link.href = result.issueUrl;
       link.target = "_blank";
@@ -128,13 +128,13 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
       link.textContent = `#${result.issueNumber}`;
       status.textContent = "";
       status.append(prefix, link);
-      if (result.enrichmentStatus === "pending") {
-        status.append(" (enriquecimiento en curso)");
+      if (payload.mentionClaude && result.enrichmentStatus === "pending") {
+        status.append(" (automatización en curso)");
       }
       form.reset();
       const mentionCheckbox = requiredElement<HTMLInputElement>("issue-report-mention-claude");
       if (mentionCheckbox) {
-        mentionCheckbox.checked = true;
+        mentionCheckbox.checked = false;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error inesperado.";

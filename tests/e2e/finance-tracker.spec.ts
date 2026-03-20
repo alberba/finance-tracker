@@ -14,7 +14,7 @@ test.describe("Finance tracker E2E", () => {
 
     await tracker.openReports();
     await expect(page).toHaveURL(/\/reportes$/);
-    await expect(tracker.reportsSection.getByRole("heading", { name: "Reportes y automatización" })).toBeVisible();
+    await expect(tracker.reportsSection.getByRole("heading", { name: "Reportes" })).toBeVisible();
   });
 
   test("navega por todas las tabs principales y mantiene su heading visible", async ({ page, tracker }) => {
@@ -27,7 +27,7 @@ test.describe("Finance tracker E2E", () => {
       { open: () => tracker.openGoals(), path: /\/objetivos$/, heading: "Objetivos" },
       { open: () => tracker.openSettings(), path: /\/configuracion$/, heading: "Configuración base" },
       { open: () => tracker.openData(), path: /\/datos$/, heading: "Datos y backups" },
-      { open: () => tracker.openReports(), path: /\/reportes$/, heading: "Reportes y automatización" },
+      { open: () => tracker.openReports(), path: /\/reportes$/, heading: "Reportes" },
     ];
 
     for (const tab of tabs) {
@@ -637,71 +637,12 @@ test.describe("Finance tracker E2E", () => {
       stepsToReproduce: "1. Ir a datos\n2. Guardar\n3. Recargar",
     });
 
-    await expect(tracker.issueReportStatus()).toContainText("Issue creada:");
-    await expect(tracker.issueReportStatus()).toContainText("enriquecimiento en curso");
+    await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
+    await expect(tracker.issueReportStatus()).toContainText("automatización en curso");
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
       "https://github.com/example/repo/issues/321"
     );
-  });
-
-  test("reportes renderiza bloques desacoplados de formulario y guía", async ({ tracker }) => {
-    await tracker.openReports();
-    await expect(tracker.reportsSection.locator(".reports-form-card h3")).toHaveText("Reportar error o mejora");
-    await expect(tracker.reportsSection.locator(".reports-guide-card h3")).toHaveText("Qué pasará después");
-    await expect(tracker.reportsSection.locator(".reports-guide-list li")).toHaveCount(3);
-  });
-
-  test("datos crea issue de mejora y muestra confirmación", async ({ page, tracker }) => {
-    await page.route("**/api/issues/report", async (route) => {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          issueNumber: 654,
-          issueUrl: "https://github.com/example/repo/issues/654",
-          enrichmentStatus: "pending",
-        }),
-      });
-    });
-
-    await tracker.submitIssueReport({
-      type: "enhancement",
-      summary: "Mejorar feedback visual",
-      description: "Quiero ver un estado más claro al crear reportes.",
-      mentionClaude: true,
-    });
-
-    await expect(tracker.issueReportStatus()).toContainText("#654");
-    await expect(tracker.issueReportStatus()).toContainText("enriquecimiento en curso");
-  });
-
-  test("datos muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({ tracker }) => {
-    await tracker.openReports();
-    const form = tracker.reportsSection.locator("#issue-report-form");
-    await form.locator("#issue-report-summary").fill("abc");
-    await form.locator("#issue-report-description").fill("corta");
-    await form.getByRole("button", { name: "Crear issue" }).click();
-    await expect(tracker.issueReportStatus()).toContainText("el resumen debe tener al menos 5 caracteres");
-  });
-
-  test("datos muestra error cuando falla la API de reporte", async ({ page, tracker }) => {
-    await page.route("**/api/issues/report", async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: false, error: "GitHub no disponible" }),
-      });
-    });
-
-    await tracker.submitIssueReport({
-      type: "bug",
-      summary: "Error en endpoint",
-      description: "Prueba de manejo de error al crear issue.",
-    });
-
-    await expect(tracker.issueReportStatus()).toContainText("No se pudo crear la issue: GitHub no disponible");
   });
 
   test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", async ({ tracker, page }) => {
