@@ -2,50 +2,24 @@
   <div class="panel-head">
     <div>
       <h2 id="budget-title">Presupuesto</h2>
-      <p>Compara presupuestado vs real por categoría y mes.</p>
-    </div>
-    <div class="inline-controls">
-      <label>
-        Tipo
-        <select id="budget-type" name="budgetType">
-          <option value="income">Ingresos</option>
-          <option value="expense">Gastos</option>
-          <option value="investment">Inversión</option>
-        </select>
-      </label>
-      <label>
-        Mes
-        <select id="budget-month" name="budgetMonth"></select>
-      </label>
+      <p>Revisa todo el año de una vez y edita el presupuesto mensual por categoría en tablas separadas.</p>
     </div>
   </div>
 
   <div class="cards-grid slim">
     <article class="kpi-card">
-      <p>Presupuestado mes</p>
+      <p>Presupuestado anual</p>
       <strong id="budget-total-planned">€0</strong>
     </article>
     <article class="kpi-card">
-      <p>Real mes</p>
+      <p>Real anual</p>
       <strong id="budget-total-actual">€0</strong>
     </article>
     <article class="kpi-card">
-      <p>Diferencia mes</p>
+      <p>Diferencia anual</p>
       <strong id="budget-total-diff">€0</strong>
     </article>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Categoría</th>
-          <th>Presupuesto</th>
-          <th>Real</th>
-          <th>Diferencia</th>
-        </tr>
-      </thead>
-      <tbody id="budget-table-body"></tbody>
-    </table>
-  </div>
+  <div id="budget-tables" class="budget-tables"></div>
 </section>

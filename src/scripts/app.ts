@@ -231,9 +231,7 @@ import {
     txTotalInvestment: getRequiredElement<HTMLElement>("tx-total-investment"),
     txCategoryBreakdownBody: getRequiredElement<HTMLElement>("tx-category-breakdown-body"),
 
-    budgetType: getRequiredElement<HTMLSelectElement>("budget-type"),
-    budgetMonth: getRequiredElement<HTMLSelectElement>("budget-month"),
-    budgetBody: getRequiredElement<HTMLElement>("budget-table-body"),
+    budgetBody: getRequiredElement<HTMLElement>("budget-tables"),
     budgetPlanned: getRequiredElement<HTMLElement>("budget-total-planned"),
     budgetActual: getRequiredElement<HTMLElement>("budget-total-actual"),
     budgetDiff: getRequiredElement<HTMLElement>("budget-total-diff"),

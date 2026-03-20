@@ -821,6 +821,18 @@ svg {
   background: #fff;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .tx-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(310px, 0.4fr);
@@ -862,6 +874,150 @@ svg {
   white-space: nowrap;
   width: 1%;
   padding-right: 10px;
+}
+
+.budget-tables {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+#budget {
+  overflow-x: hidden;
+}
+
+.budget-block {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid #d9e7e1;
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 153, 0.22), transparent 28%),
+    linear-gradient(180deg, #fffdfa 0%, #f7fbf9 100%);
+  box-shadow: var(--shadow-soft);
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.budget-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.budget-block-head h3 {
+  margin: 0;
+}
+
+.budget-block-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  max-width: 56ch;
+}
+
+.budget-block-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.budget-block-totals div {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #dbe6e1;
+}
+
+.budget-block-totals dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #58706b;
+}
+
+.budget-block-totals dd {
+  margin: 6px 0 0;
+  font-weight: 800;
+}
+
+.budget-empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.budget-table-wrap {
+  border-radius: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.budget-table {
+  width: 100%;
+  min-width: 1220px;
+  border-collapse: collapse;
+}
+
+.budget-table th,
+.budget-table td {
+  border-bottom: 1px solid #e7efeb;
+  vertical-align: top;
+  padding: 10px;
+}
+
+.budget-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f6faf8;
+  z-index: 1;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #58706b;
+}
+
+.budget-table tbody th {
+  min-width: 180px;
+  background: #fbfdfc;
+  text-align: left;
+}
+
+.budget-month-cell,
+.budget-total-cell {
+  min-width: 110px;
+}
+
+.budget-cell-input {
+  display: block;
+}
+
+.budget-cell-input input {
+  width: 100%;
+  border: 1px solid #cfe0d9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 9px;
+  font-weight: 700;
+  color: #173c36;
+}
+
+.budget-cell-input input:focus-visible {
+  outline: 2px solid #9bd9cd;
+  outline-offset: 1px;
+}
+
+.budget-cell-meta {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 0.78rem;
+}
+
+.budget-cell-actual {
+  color: #5d6f6b;
 }
 
 .tx-summary-table th,
@@ -1939,6 +2095,14 @@ td select {
   .reports-layout {
     grid-template-columns: 1fr;
   }
+
+  .budget-block-head {
+    flex-direction: column;
+  }
+
+  .budget-block-totals {
+    width: 100%;
+  }
 }
 
 @media (max-width: 980px) {
@@ -1977,6 +2141,14 @@ td select {
 
   .form-grid .grow-2 {
     grid-column: span 1;
+  }
+
+  .budget-block {
+    padding: 14px;
+  }
+
+  .budget-block-totals {
+    grid-template-columns: 1fr;
   }
 
   .mini-form,
