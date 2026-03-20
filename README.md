@@ -99,16 +99,16 @@ Estructura de tests:
 - `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
 - `playwright.config.ts`: configuración de E2E y `webServer`
 
-## Reporte automático y flujo `@claude`
+## Reportes web y automatización opcional
 
-Este repo incluye flujo web -> issue -> enriquecimiento -> intento de fix:
+Este repo permite enviar reportes desde la web y convertirlos en issues de GitHub:
 
 1. Desde la sección **Reportes** puedes enviar un reporte (`error` o `mejora`).
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
    - `status:triage`
    - `type:bug` o `type:enhancement`
-3. Si el reporte lleva mención `@claude`, se activa:
+3. Si activas la automatización opcional, el reporte añade mención `@claude` y se activa:
    - `.github/workflows/issue-enrich-claude.yml` (Haiku): enriquece la issue.
    - `.github/workflows/issue-fix-claude.yml` (Sonnet): intenta resolver y abrir PR.
 

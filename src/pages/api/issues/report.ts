@@ -64,7 +64,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const env = getRuntimeEnvFromLocals(locals);
     const created = await createIssueFromWebReport(payload, env);
     return jsonResponse(
-      { ok: true, issueNumber: created.number, issueUrl: created.url, enrichmentStatus: "pending" },
+      {
+        ok: true,
+        issueNumber: created.number,
+        issueUrl: created.url,
+        ...(payload.mentionClaude ? { enrichmentStatus: "pending" as const } : {}),
+      },
       201
     );
   } catch (error) {

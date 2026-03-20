@@ -21,6 +21,18 @@ describe("issue report schema", () => {
     expect(parsed.mentionClaude).toBe(true);
   });
 
+  it("usa automatización desactivada por defecto", () => {
+    const parsed = parseIssueReportPayload({
+      type: "enhancement",
+      summary: "Mejorar mensajes",
+      description: "Conviene separar el reporte simple del flujo automático.",
+      section: "reports",
+      context: {},
+    });
+
+    expect(parsed.mentionClaude).toBe(false);
+  });
+
   it("rechaza payload inválido", () => {
     expect(() =>
       parseIssueReportPayload({
