@@ -48,9 +48,10 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
       activePanel,
       ...Array.from(
         activePanel.querySelectorAll<HTMLElement>(
-          [
-            ".cards-grid",
-            ".chart-grid",
+            [
+              ".cards-grid",
+              ".dashboard-kpi-layout",
+              ".chart-grid",
             ".dual-grid",
             ".goal-edit-grid",
             ".goal-progress",

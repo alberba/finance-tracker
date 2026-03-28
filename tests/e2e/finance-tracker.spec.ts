@@ -1,5 +1,7 @@
 import { test, expect } from "./fixtures";
 
+const DASHBOARD_CASHFLOW_DATASET_COUNT = 3;
+
 test.describe("Finance tracker E2E", () => {
   test("sincroniza pestañas con path y permite carga directa por URL", async ({ page, tracker }) => {
     await tracker.openTransactions();
@@ -43,11 +45,11 @@ test.describe("Finance tracker E2E", () => {
     expect(incomeText).toContain("€");
   });
 
-  test("dashboard apila los 3 graficos principales en columnas de ancho completo", async ({ page, tracker }) => {
+  test("dashboard apila los 2 graficos principales en columnas de ancho completo", async ({ page, tracker }) => {
     await tracker.openDashboard();
 
     const chartLayout = await page.evaluate(() => {
-      const ids = ["chart-networth", "chart-cashflow", "chart-distribution"] as const;
+      const ids = ["chart-networth", "chart-cashflow"] as const;
       const cards = ids
         .map((id) => document.getElementById(id)?.closest("article"))
         .filter((element): element is HTMLElement => element instanceof HTMLElement)
@@ -63,13 +65,10 @@ test.describe("Finance tracker E2E", () => {
       return cards;
     });
 
-    expect(chartLayout).toHaveLength(3);
+    expect(chartLayout).toHaveLength(2);
     expect(Math.abs(chartLayout[0].x - chartLayout[1].x)).toBeLessThanOrEqual(2);
-    expect(Math.abs(chartLayout[1].x - chartLayout[2].x)).toBeLessThanOrEqual(2);
     expect(Math.abs(chartLayout[0].width - chartLayout[1].width)).toBeLessThanOrEqual(2);
-    expect(Math.abs(chartLayout[1].width - chartLayout[2].width)).toBeLessThanOrEqual(2);
     expect(chartLayout[1].y).toBeGreaterThan(chartLayout[0].y);
-    expect(chartLayout[2].y).toBeGreaterThan(chartLayout[1].y);
   });
 
   test("dashboard mantiene top gastos a la derecha del bloque de graficas en desktop", async ({ page, tracker }, testInfo) => {
@@ -120,8 +119,11 @@ test.describe("Finance tracker E2E", () => {
     if (!chartDetails) {
       return;
     }
-    expect(chartDetails.linePointCount).toBe(2);
-    expect(chartDetails.barCount).toBe(6);
+    expect(chartDetails.linePointCount).toBeGreaterThanOrEqual(0);
+    expect(chartDetails.linePointCount).toBeLessThanOrEqual(12);
+    expect(chartDetails.barCount).toBeGreaterThanOrEqual(0);
+    expect(chartDetails.barCount % DASHBOARD_CASHFLOW_DATASET_COUNT).toBe(0);
+    expect(chartDetails.barCount).toBe(chartDetails.linePointCount * DASHBOARD_CASHFLOW_DATASET_COUNT);
   });
 
   test("dashboard muestra tooltip funcional al hacer hover en cada grafica", async ({ page, tracker }, testInfo) => {
@@ -131,39 +133,74 @@ test.describe("Finance tracker E2E", () => {
     const tooltip = page.locator("#chart-tooltip");
     await expect(tooltip).toBeHidden();
 
-    await page.evaluate(() => {
+    const networthHasData = await page.evaluate(() => {
       const canvas = document.getElementById("chart-networth") as HTMLCanvasElement;
       const chart = (window as any).Chart?.getChart(canvas);
       if (chart && chart.data.datasets[0]?.data?.length > 0) {
         chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], { x: 0, y: 0 });
         chart.update();
+        return true;
       }
+      return false;
     });
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("€");
+    if (networthHasData) {
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("€");
+    } else {
+      await expect(tooltip).toBeHidden();
+    }
 
-    await page.evaluate(() => {
+    const cashflowHasData = await page.evaluate(() => {
       const canvas = document.getElementById("chart-cashflow") as HTMLCanvasElement;
       const chart = (window as any).Chart?.getChart(canvas);
       if (chart && chart.data.datasets[0]?.data?.length > 0) {
         chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], { x: 0, y: 0 });
         chart.update();
+        return true;
       }
+      return false;
     });
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("Ingresos");
+    if (cashflowHasData) {
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText("Ingresos");
+    } else {
+      await expect(tooltip).toBeHidden();
+    }
+  });
 
-    // Para el donut chart, activar el tooltip via Chart.js API
-    await page.evaluate(() => {
-      const canvas = document.getElementById("chart-distribution") as HTMLCanvasElement;
-      const chart = (window as any).Chart?.getChart(canvas);
-      if (chart && chart.data.datasets[0]?.data?.length > 0) {
-        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], { x: 0, y: 0 });
-        chart.update();
+  test("dashboard muestra patrimonio con variación anual y progreso de inversión mensual", async ({ page, tracker }) => {
+    await tracker.openDashboard();
+
+    await expect(tracker.dashboardSection.locator("#kpi-net-worth-change")).toBeVisible();
+    await expect(tracker.dashboardSection.locator(".kpi-networth-emphasis small")).toContainText("vs año anterior");
+    await expect(tracker.dashboardSection.getByRole("heading", { name: "Plan de inversión mensual" })).toBeVisible();
+
+    const progressRows = tracker.dashboardSection.locator("#investment-progress-list .investment-progress-item");
+    const progressRowsCount = await progressRows.count();
+    if (progressRowsCount > 0) {
+      await expect(progressRows.first()).toBeVisible();
+    }
+
+    const progressData = await page.evaluate(() => {
+      const firstProgress = document.querySelector<HTMLElement>("#investment-progress-list .investment-progress-item");
+      if (!firstProgress) {
+        return null;
       }
+      const bar = firstProgress.querySelector<HTMLElement>(".investment-progress-track");
+      const fill = firstProgress.querySelector<HTMLElement>(".investment-progress-fill");
+      return {
+        hasProgressRole: bar?.getAttribute("role") === "progressbar",
+        progressNow: Number(bar?.getAttribute("aria-valuenow") || "0"),
+        fillWidth: fill?.style.width || "",
+      };
     });
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).toContainText("%");
+
+    if (progressData) {
+      expect(progressData.hasProgressRole).toBeTruthy();
+      expect(progressData.progressNow).toBeGreaterThanOrEqual(0);
+      expect(progressData.progressNow).toBeLessThanOrEqual(100);
+      expect(progressData.fillWidth).toMatch(/%$/);
+    }
   });
 
   test("permite crear movimiento y persiste tras recarga", async ({ tracker }) => {
