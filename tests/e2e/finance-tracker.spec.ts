@@ -71,21 +71,23 @@ test.describe("Finance tracker E2E", () => {
     expect(chartLayout[1].y).toBeGreaterThan(chartLayout[0].y);
   });
 
-  test("dashboard mantiene top gastos a la derecha del bloque de graficas en desktop", async ({ page, tracker }, testInfo) => {
-    test.skip(testInfo.project.name === "mobile-chrome", "En móvil el panel lateral baja debajo de las gráficas.");
+  test("dashboard mantiene top gastos a la izquierda del bloque de graficas en desktop", async ({ page, tracker }, testInfo) => {
+    test.skip(testInfo.project.name === "mobile-chrome", "En móvil los bloques se apilan.");
     await tracker.openDashboard();
 
     const positions = await page.evaluate(() => {
-      const chartStack = document.querySelector<HTMLElement>(".chart-stack");
-      const topExpenseCard = document.querySelector<HTMLElement>(".top-expense-card");
+      const chartStack = document.querySelector<HTMLElement>("[data-dashboard-chart-stack]");
+      const topExpenseCard = document.querySelector<HTMLElement>("[data-dashboard-top-expenses]");
       if (!chartStack || !topExpenseCard) {
         return null;
       }
       const stackRect = chartStack.getBoundingClientRect();
       const topRect = topExpenseCard.getBoundingClientRect();
       return {
+        stackLeft: Math.round(stackRect.left),
         stackRight: Math.round(stackRect.right),
         stackTop: Math.round(stackRect.top),
+        topRight: Math.round(topRect.right),
         topLeft: Math.round(topRect.left),
         topTop: Math.round(topRect.top),
       };
@@ -95,7 +97,7 @@ test.describe("Finance tracker E2E", () => {
     if (!positions) {
       return;
     }
-    expect(positions.topLeft).toBeGreaterThan(positions.stackRight - 4);
+    expect(positions.topRight).toBeLessThanOrEqual(positions.stackLeft + 4);
     expect(Math.abs(positions.topTop - positions.stackTop)).toBeLessThanOrEqual(8);
   });
 
@@ -175,19 +177,19 @@ test.describe("Finance tracker E2E", () => {
     await expect(tracker.dashboardSection.locator(".kpi-networth-emphasis small")).toContainText("vs año anterior");
     await expect(tracker.dashboardSection.getByRole("heading", { name: "Plan de inversión mensual" })).toBeVisible();
 
-    const progressRows = tracker.dashboardSection.locator("#investment-progress-list .investment-progress-item");
+    const progressRows = tracker.dashboardSection.locator("#investment-progress-list [data-investment-progress-item]");
     const progressRowsCount = await progressRows.count();
     if (progressRowsCount > 0) {
       await expect(progressRows.first()).toBeVisible();
     }
 
     const progressData = await page.evaluate(() => {
-      const firstProgress = document.querySelector<HTMLElement>("#investment-progress-list .investment-progress-item");
+      const firstProgress = document.querySelector<HTMLElement>("#investment-progress-list [data-investment-progress-item]");
       if (!firstProgress) {
         return null;
       }
-      const bar = firstProgress.querySelector<HTMLElement>(".investment-progress-track");
-      const fill = firstProgress.querySelector<HTMLElement>(".investment-progress-fill");
+      const bar = firstProgress.querySelector<HTMLElement>("[data-investment-progress-track]");
+      const fill = firstProgress.querySelector<HTMLElement>("[data-investment-progress-fill]");
       return {
         hasProgressRole: bar?.getAttribute("role") === "progressbar",
         progressNow: Number(bar?.getAttribute("aria-valuenow") || "0"),

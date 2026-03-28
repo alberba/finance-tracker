@@ -334,19 +334,28 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
         const planned = round2(deps.getBudgetValue("investment", category, month));
         const diff = round2(actual - planned);
         const progress = calculateInvestmentCompletionPercent(actual, planned);
-        const diffClass = diff >= 0 ? "text-good" : "text-bad";
         return `
-          <article class="investment-progress-item">
-            <div class="investment-progress-item__head">
+          <article data-investment-progress-item class="grid gap-1 rounded-[10px] border border-[#dce7e2] bg-white p-2">
+            <div class="flex items-baseline justify-between gap-2">
               <span>${escapeHtml(decorateCategoryLabel("investment", category))}</span>
-              <strong class="${diffClass}">${deps.formatMoney(diff)}</strong>
+              <small class="text-right text-[0.8rem] leading-tight tracking-tight text-gray-900">${deps.formatMoney(actual)} / ${deps.formatMoney(planned)} (${progress.toFixed(0)}%)</small>
             </div>
-            <div class="investment-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(
-              progress
-            )}">
-              <div class="investment-progress-fill" style="width:${progress.toFixed(2)}%"></div>
+            <div class="grid gap-1">
+              <div
+                data-investment-progress-track
+                class="relative h-2 overflow-hidden rounded-full bg-[#e6efeb]"
+                role="progressbar"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="${Math.round(progress)}"
+              >
+                <div
+                  data-investment-progress-fill
+                  class="h-full rounded-[inherit] bg-[linear-gradient(90deg,#0d8476_0%,#1fa593_100%)]"
+                  style="width:${progress.toFixed(2)}%"
+                ></div>
+              </div>
             </div>
-            <small>${deps.formatMoney(actual)} / ${deps.formatMoney(planned)} (${progress.toFixed(1)}%)</small>
           </article>
         `;
       })
