@@ -12,7 +12,7 @@ import {
   type SectionId,
   type State,
 } from "../types";
-import { renderDonutChart, renderGroupedBarChart, renderLineChart } from "../charts";
+import { renderGroupedBarChart, renderLineChart } from "../charts";
 import { decorateCategoryLabel } from "../category-emoji";
 import { escapeAttr, escapeHtml, formatPercent, monthFromISO, parseFloatSafe, parseIntSafe, round2, todayISO } from "../utils";
 
@@ -53,12 +53,12 @@ interface DashboardBudgetGoalsElements {
   kpiExpense: HTMLElement;
   kpiInvestment: HTMLElement;
   kpiNetWorth: HTMLElement;
+  kpiNetWorthChange: HTMLElement;
   kpiAnnualSavings: HTMLElement;
-  kpiGrowth: HTMLElement;
   chartNetWorth: HTMLCanvasElement;
   chartCashflow: HTMLCanvasElement;
-  chartDistribution: HTMLCanvasElement;
   topExpenseList: HTMLElement;
+  investmentProgressList: HTMLElement;
   settingsYear: HTMLInputElement;
 }
 
@@ -82,6 +82,8 @@ interface DashboardBudgetGoalsDeps {
   formatMoney: (value: number) => string;
   formatMoneyCompact: (value: number) => string;
 }
+
+const MONTHS_PER_YEAR = 12;
 
 export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps) {
   const { ui, el } = deps;
@@ -263,15 +265,18 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     const chartMonths = MONTHS.slice(0, latestDataMonth + 1);
     const dashboardWealthSeries = wealthSeries.slice(0, latestDataMonth + 1);
     const currentWealth = wealthSeries[month] || { liquidity: 0, investment: 0, liabilities: 0, net: 0 };
-    const firstNet = wealthSeries[0] ? wealthSeries[0].net : 0;
-    const growth = firstNet === 0 ? 0 : ((currentWealth.net - firstNet) / Math.abs(firstNet)) * 100;
+    const previousYearIndex = month - MONTHS_PER_YEAR;
+    const previousYearNet = previousYearIndex >= 0 ? (wealthSeries[previousYearIndex]?.net ?? 0) : 0;
+    const hasPreviousYearData = previousYearNet !== 0;
+    const netWorthChange = hasPreviousYearData ? ((currentWealth.net - previousYearNet) / Math.abs(previousYearNet)) * 100 : null;
 
     el.kpiIncome.textContent = deps.formatMoney(monthTotals.income);
     el.kpiExpense.textContent = deps.formatMoney(monthTotals.expense);
     el.kpiInvestment.textContent = deps.formatMoney(monthTotals.investment);
     el.kpiNetWorth.textContent = deps.formatMoney(currentWealth.net);
+    el.kpiNetWorthChange.textContent = netWorthChange === null ? "--" : formatPercent(netWorthChange);
+    el.kpiNetWorthChange.className = `kpi-networth-change ${netWorthChange === null ? "" : netWorthChange >= 0 ? "text-good" : "text-bad"}`;
     el.kpiAnnualSavings.textContent = deps.formatMoney(yearTotals.income - yearTotals.expense - yearTotals.investment);
-    el.kpiGrowth.textContent = formatPercent(growth);
 
     renderLineChart(el.chartNetWorth, dashboardWealthSeries.map((item) => item.net), {
       color: "#0d8476",
@@ -300,16 +305,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
       deps.formatMoney
     );
 
-    renderDonutChart(
-      el.chartDistribution,
-      [
-        { label: "Liquidez", color: "#0d8476", value: currentWealth.liquidity },
-        { label: "Inversión", color: "#2563eb", value: currentWealth.investment },
-        { label: "Deuda", color: "#ef4444", value: currentWealth.liabilities },
-      ],
-      deps.formatMoney
-    );
-
     const topExpenses = Object.entries(deps.getCategoryActuals("expense", month))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 8);
@@ -324,6 +319,45 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
         )
         .join("");
     }
+
+    const investmentGoals = Object.entries(deps.getCategoryActuals("investment", month))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    if (!investmentGoals.length) {
+      el.investmentProgressList.innerHTML = "<p class='list-item'><small>Sin inversión registrada en este mes.</small></p>";
+      return;
+    }
+
+    el.investmentProgressList.innerHTML = investmentGoals
+      .map(([category, actual]) => {
+        const planned = round2(deps.getBudgetValue("investment", category, month));
+        const diff = round2(actual - planned);
+        const progress = calculateInvestmentCompletionPercent(actual, planned);
+        const diffClass = diff >= 0 ? "text-good" : "text-bad";
+        return `
+          <article class="investment-progress-item">
+            <div class="investment-progress-item__head">
+              <span>${escapeHtml(decorateCategoryLabel("investment", category))}</span>
+              <strong class="${diffClass}">${deps.formatMoney(diff)}</strong>
+            </div>
+            <div class="investment-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(
+              progress
+            )}">
+              <div class="investment-progress-fill" style="width:${progress.toFixed(2)}%"></div>
+            </div>
+            <small>${deps.formatMoney(actual)} / ${deps.formatMoney(planned)} (${progress.toFixed(1)}%)</small>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  function calculateInvestmentCompletionPercent(actual: number, planned: number) {
+    if (planned <= 0) {
+      return actual > 0 ? 100 : 0;
+    }
+    return Math.min((actual / planned) * 100, 100);
   }
 
   function renderBudget() {
