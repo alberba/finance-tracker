@@ -16,30 +16,35 @@
     </div>
   </div>
 
-  <div class="cards-grid" id="kpi-cards">
-    <article class="kpi-card">
-      <p>Ingresos del mes</p>
-      <strong id="kpi-income">€0</strong>
+  <div class="dashboard-kpi-layout" id="kpi-cards">
+    <article class="kpi-card kpi-group-card">
+      <h3>Resumen del mes</h3>
+      <div class="kpi-month-grid">
+        <div class="kpi-month-item">
+          <p>Ingresos</p>
+          <strong id="kpi-income">€0</strong>
+        </div>
+        <div class="kpi-month-item">
+          <p>Gastos</p>
+          <strong id="kpi-expense">€0</strong>
+        </div>
+        <div class="kpi-month-item">
+          <p>Inversión</p>
+          <strong id="kpi-investment">€0</strong>
+        </div>
+      </div>
     </article>
-    <article class="kpi-card">
-      <p>Gastos del mes</p>
-      <strong id="kpi-expense">€0</strong>
-    </article>
-    <article class="kpi-card">
-      <p>Inversión del mes</p>
-      <strong id="kpi-investment">€0</strong>
-    </article>
-    <article class="kpi-card">
-      <p>Patrimonio neto</p>
+    <article class="kpi-card kpi-networth-emphasis">
+      <div class="kpi-networth-head">
+        <p>Patrimonio neto</p>
+        <span id="kpi-net-worth-change" class="kpi-networth-change">0%</span>
+      </div>
       <strong id="kpi-net-worth">€0</strong>
+      <small>vs año anterior</small>
     </article>
     <article class="kpi-card">
       <p>Ahorro anual</p>
       <strong id="kpi-annual-savings">€0</strong>
-    </article>
-    <article class="kpi-card">
-      <p>Crecimiento YTD</p>
-      <strong id="kpi-growth">0%</strong>
     </article>
   </div>
 
@@ -53,15 +58,15 @@
         <h3>Ingresos vs Gastos vs Inversión</h3>
         <div class="chart-canvas-wrap"><canvas id="chart-cashflow" aria-label="Flujo mensual"></canvas></div>
       </article>
-      <article class="chart-card">
-        <h3>Distribución actual</h3>
-        <div class="chart-canvas-wrap"><canvas id="chart-distribution" aria-label="Distribución de patrimonio"></canvas></div>
-      </article>
     </div>
     <aside class="chart-side">
       <article class="chart-card top-expense-card">
         <h3>Top gastos del mes</h3>
         <div id="top-expense-list" class="list-stack"></div>
+      </article>
+      <article class="chart-card investment-progress-card">
+        <h3>Plan de inversión mensual</h3>
+        <div id="investment-progress-list" class="list-stack"></div>
       </article>
     </aside>
   </div>
