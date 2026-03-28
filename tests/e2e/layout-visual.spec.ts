@@ -51,7 +51,7 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
             [
               ".cards-grid",
               ".dashboard-kpi-layout",
-              ".chart-grid",
+              "[data-dashboard-chart-grid]",
             ".dual-grid",
             ".goal-edit-grid",
             ".goal-progress",
