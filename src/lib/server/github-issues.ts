@@ -39,8 +39,8 @@ function buildIssueBody(payload: IssueReportPayload): string {
     payload.description,
     "",
     `- Tipo: ${payload.type}`,
-    `- Sección: ${payload.section}`,
-    `- Ruta: ${payload.context.pathname || "n/a"}`,
+    `- Se envió desde la sección: ${payload.section}`,
+    `- Se envió desde la ruta: ${payload.context.pathname || "n/a"}`,
     `- Navegador: ${payload.context.userAgent || "n/a"}`,
     `- Fecha cliente: ${payload.context.timestamp || "n/a"}`,
   ];

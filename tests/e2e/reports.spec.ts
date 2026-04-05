@@ -1,4 +1,24 @@
+import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
+
+async function expectModalCentered(page: Page, selector: string, tolerance = 24) {
+  const dialog = page.locator(selector);
+  await expect(dialog).toBeVisible();
+
+  const viewport = page.viewportSize();
+  const box = await dialog.boundingBox();
+  if (!viewport || !box) {
+    throw new Error(`No se pudo medir el modal ${selector}.`);
+  }
+
+  const dialogCenterX = box.x + box.width / 2;
+  const dialogCenterY = box.y + box.height / 2;
+  const viewportCenterX = viewport.width / 2;
+  const viewportCenterY = viewport.height / 2;
+
+  expect(Math.abs(dialogCenterX - viewportCenterX)).toBeLessThanOrEqual(tolerance);
+  expect(Math.abs(dialogCenterY - viewportCenterY)).toBeLessThanOrEqual(tolerance);
+}
 
 test.describe("Reports E2E", () => {
   test("reportes muestra el flujo simple como camino principal", async ({ tracker }) => {
@@ -90,5 +110,24 @@ test.describe("Reports E2E", () => {
     });
 
     await expect(tracker.issueReportStatus()).toContainText("No se pudo crear la issue: GitHub no disponible");
+  });
+
+  test("los modales principales se abren centrados en pantalla", async ({ page, tracker }) => {
+    await tracker.openTransactions();
+    await tracker.transactionsSection.getByRole("button", { name: "Nuevo" }).click();
+    await expectModalCentered(page, "#tx-dialog");
+
+    await tracker.openWealth();
+    await tracker.wealthSection.getByRole("button", { name: /^Calcular$/ }).first().click();
+    await expectModalCentered(page, "#wealth-calc-dialog");
+    await page.locator("#wealth-calc-close").click();
+
+    await tracker.openContributionWorkflowModal();
+    await expectModalCentered(page, "#contribution-workflow-dialog");
+
+    const workflowModal = page.locator("#contribution-workflow-dialog");
+    const investmentSnapshotButton = workflowModal.getByRole("button", { name: /^Calcular snapshot de / }).first();
+    await investmentSnapshotButton.click();
+    await expectModalCentered(page, "#contribution-calc-dialog");
   });
 });

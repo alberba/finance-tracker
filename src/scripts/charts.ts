@@ -280,10 +280,15 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
       {
         id: "center-text",
         afterDraw(chart: any) {
-          const { width, height, ctx } = chart;
+          const { ctx } = chart;
+          const firstArc = chart.getDatasetMeta(0)?.data?.[0];
+          const cx = Number(firstArc?.x);
+          const cy = Number(firstArc?.y);
+          if (!Number.isFinite(cx) || !Number.isFinite(cy)) {
+            return;
+          }
+
           ctx.save();
-          const cx = width / 2;
-          const cy = height / 2;
           ctx.fillStyle = "#6b7b7f";
           ctx.font = "11px Space Grotesk, sans-serif";
           ctx.textAlign = "center";

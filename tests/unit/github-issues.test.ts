@@ -41,6 +41,8 @@ describe("github issues service", () => {
     expect(body.labels).toEqual(
       expect.arrayContaining(["source:web-report", "status:triage", "enrich:pending", "type:bug"])
     );
+    expect(body.body).toContain("- Se envió desde la sección: transactions");
+    expect(body.body).toContain("- Se envió desde la ruta: /movimientos");
     expect(body.body).toContain("@claude");
   });
 
