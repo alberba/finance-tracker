@@ -291,6 +291,12 @@ export class FinanceTrackerPage {
     return this.transactionsSection.locator('#tx-form input[name="date"]').inputValue();
   }
 
+  async transactionModalCategoryValue(): Promise<string> {
+    await this.openTransactions();
+    await this.ensureTransactionModalOpen();
+    return this.transactionsSection.locator('#tx-form select[name="category"]').inputValue();
+  }
+
   async selectTransactionByDescription(description: string) {
     await this.openTransactions();
     const row = this.transactionsSection.locator("#tx-table-body tr", { hasText: description }).first();

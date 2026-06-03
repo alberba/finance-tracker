@@ -604,6 +604,7 @@ test.describe("Finance tracker E2E", () => {
       description: "e2e-bulk-a",
     });
     expect(await tracker.transactionModalDateValue()).toBe("2026-03-11");
+    expect(await tracker.transactionModalCategoryValue()).toBe("Comida");
 
     await tracker.addCustomTransaction({
       date: "2026-03-12",
