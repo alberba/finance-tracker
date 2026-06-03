@@ -240,6 +240,36 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       deps.showToast("Movimiento eliminado.");
     });
 
+    el.investmentTxBody.addEventListener("change", (event: Event) => {
+      const target = deps.getEventElement(event.target);
+      const accountSelect = target?.closest<HTMLSelectElement>('select[data-edit-field="accountId"]');
+      if (!accountSelect) {
+        return;
+      }
+
+      const row = accountSelect.closest<HTMLTableRowElement>("tr[data-investment-editing-id]");
+      const categorySelect = row?.querySelector<HTMLSelectElement>('select[data-edit-field="category"]');
+      if (!row || !categorySelect) {
+        return;
+      }
+
+      const accountId = String(accountSelect.value || "").trim();
+      const resolvedCategory = deps.resolveInvestmentCategory(accountId, categorySelect.value, "Sin categoría");
+      const isCryptoOnly = resolvedCategory === "Crypto";
+
+      if (isCryptoOnly && !Array.from(categorySelect.options).some((option) => option.value === "Crypto")) {
+        categorySelect.insertAdjacentHTML("afterbegin", '<option value="Crypto">Crypto</option>');
+      }
+
+      categorySelect.value = resolvedCategory;
+      categorySelect.disabled = isCryptoOnly;
+      if (isCryptoOnly) {
+        categorySelect.setAttribute("aria-disabled", "true");
+      } else {
+        categorySelect.removeAttribute("aria-disabled");
+      }
+    });
+
     el.contributionBody.addEventListener("input", (event: Event) => {
       const target = deps.getEventElement(event.target);
       const input = target?.closest<HTMLInputElement>("input[data-contribution-flow-date]");
