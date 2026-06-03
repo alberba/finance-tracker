@@ -45,8 +45,11 @@ test.describe("inversión tabs y TWR", () => {
       units: 2,
       fee: 1,
       newSymbol: "E2EEDIT",
+      category: "Fondos Indexados",
       declared: true,
     });
+
+    await tracker.expectInvestmentMovementCategory("E2EEDIT", "Fondos Indexados");
 
     await tracker.openTransactions();
     await tracker.filterTransactionsMonth("FEBRERO");
