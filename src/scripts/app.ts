@@ -826,6 +826,7 @@ import {
     const type: BudgetType = isBudgetType(rawType) ? rawType : "expense";
     const categories = getOrderedCategoriesForType(type);
     const categorySelect = el.txForm.elements.category;
+    const currentValue = String(categorySelect.value || "").trim();
 
     categorySelect.innerHTML = categories
       .map(
@@ -836,7 +837,15 @@ import {
 
     if (!categories.length) {
       categorySelect.innerHTML = '<option value="Sin categoría">Sin categoría</option>';
+      return;
     }
+
+    if (currentValue && categories.includes(currentValue)) {
+      categorySelect.value = currentValue;
+      return;
+    }
+
+    categorySelect.value = categories[0];
   }
 
   function renderTransactions() {
