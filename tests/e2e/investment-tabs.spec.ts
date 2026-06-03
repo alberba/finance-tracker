@@ -144,6 +144,32 @@ test.describe("inversión tabs y TWR", () => {
     ).toContainText("Fondos Indexados");
   });
 
+  test("el símbolo en movimientos de inversión conserva espacios mientras se escribe", async ({ tracker }) => {
+    await tracker.openInvestmentMovementsTab();
+
+    const symbolInput = tracker.investmentSection().locator("#investment-movement-symbol");
+    await symbolInput.click();
+    await symbolInput.pressSequentially("MSCI WORLD");
+    await expect(symbolInput).toHaveValue("MSCI WORLD");
+
+    await tracker.addInvestmentMovement({
+      date: "2026-03-12",
+      time: "11:15",
+      side: "buy",
+      symbol: "MSCI WORLD",
+      unitPrice: 10,
+      units: 1,
+      fee: 0,
+      brokerName: "Revolut",
+    });
+
+    await expect(
+      tracker.investmentSection().locator("#investment-tx-table-body tr", {
+        hasText: "MSCI WORLD",
+      })
+    ).toHaveCount(1);
+  });
+
   test("aportes renderiza tabla TWR con base 100 y retornos iniciales vacíos", async ({ tracker }) => {
     await tracker.openInvestmentContributionsTab();
     const section = tracker.investmentSection();
