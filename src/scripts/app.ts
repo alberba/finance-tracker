@@ -41,6 +41,7 @@ import {
 import {
   computeInvestmentMovement,
   normalizeInvestmentSide,
+  normalizeInvestmentSymbol,
 } from "./investment-movements";
 
 (() => {
@@ -521,6 +522,7 @@ import {
     renderGoals,
     renderInvestmentTransactionsTable,
     syncInvestmentMovementComputedAmount,
+    normalizeInvestmentMovementSymbolField,
     syncInvestmentMovementCategoryField,
     resolveInvestmentCategory,
     sortTransactions,
@@ -783,7 +785,10 @@ import {
       fee: parseFloatSafe(el.investmentMovementFee.value, 0),
     });
     el.investmentMovementTotal.value = String(computed.signedAmount);
-    el.investmentMovementSymbol.value = computed.normalizedSymbol;
+  }
+
+  function normalizeInvestmentMovementSymbolField() {
+    el.investmentMovementSymbol.value = normalizeInvestmentSymbol(el.investmentMovementSymbol.value);
   }
 
   function syncInvestmentMovementCategoryField() {
