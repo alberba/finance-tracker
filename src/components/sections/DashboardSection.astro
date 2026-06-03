@@ -1,83 +1,76 @@
-<section id="dashboard" class="panel is-active" aria-labelledby="dashboard-title">
-  <div class="panel-head">
-    <div>
+<section id="dashboard" class="panel is-active dash" aria-labelledby="dashboard-title">
+  <header class="dash-masthead">
+    <div class="dash-masthead-titles">
+      <p class="dash-eyebrow">Tu resumen financiero</p>
       <h2 id="dashboard-title">Resumen mensual y anual</h2>
-      <p>Visualización equivalente a RESUMEN MENSUAL + RESUMEN ANUAL.</p>
     </div>
-    <div class="inline-controls">
-      <label>
-        Año
+    <div class="dash-period">
+      <label class="dash-period-field">
+        <span>Año</span>
         <input id="year-display" name="yearDisplay" type="number" min="2000" max="2100" autocomplete="off" />
       </label>
-      <label>
-        Mes
+      <label class="dash-period-field">
+        <span>Mes</span>
         <select id="dashboard-month" name="dashboardMonth"></select>
       </label>
     </div>
-  </div>
+  </header>
 
-  <div class="dashboard-kpi-layout" id="kpi-cards">
-    <article class="kpi-card kpi-group-card">
-      <h3>Resumen del mes</h3>
-      <div class="kpi-month-grid">
-        <div class="kpi-month-item">
-          <p>Ingresos</p>
-          <strong id="kpi-income">€0</strong>
-        </div>
-        <div class="kpi-month-item">
-          <p>Gastos</p>
-          <strong id="kpi-expense">€0</strong>
-        </div>
-        <div class="kpi-month-item">
-          <p>Inversión</p>
-          <strong id="kpi-investment">€0</strong>
-        </div>
-      </div>
-    </article>
-    <article class="kpi-card kpi-networth-emphasis">
-      <div class="kpi-networth-head">
-        <p>Patrimonio neto</p>
+  <!-- HERO · Patrimonio neto -->
+  <section class="dash-hero" aria-label="Patrimonio neto">
+    <div class="dash-hero-main">
+      <p class="dash-hero-label">Patrimonio neto</p>
+      <div class="dash-hero-figure">
+        <strong id="kpi-net-worth" class="dash-hero-number">€0</strong>
         <span id="kpi-net-worth-change" class="kpi-networth-change">0%</span>
       </div>
-      <strong id="kpi-net-worth">€0</strong>
-      <small>vs año anterior</small>
-    </article>
-    <article class="kpi-card">
-      <p>Ahorro anual</p>
-      <strong id="kpi-annual-savings">€0</strong>
-    </article>
-  </div>
+      <p class="dash-hero-sub">
+        <span>vs año anterior</span>
+        <span class="dash-hero-dot" aria-hidden="true">·</span>
+        <span>Ahorro anual <strong id="kpi-annual-savings">€0</strong></span>
+      </p>
+    </div>
+    <div class="dash-hero-chart">
+      <canvas id="chart-networth" aria-label="Evolución de patrimonio neto"></canvas>
+    </div>
+  </section>
 
-  <div
-    data-dashboard-chart-grid
-    class="grid items-start gap-3 xl:grid-cols-2"
-  >
-    <div class="grid min-w-0 gap-3 lg:grid-cols-2">
-      <article
-        data-dashboard-top-expenses
-        class="grid h-full content-start gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]"
-      >
-        <h3 class="text-[1.05rem]">Top gastos del mes</h3>
-        <div id="top-expense-list" class="grid gap-2 items-start"></div>
-      </article>
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
-        <h3 class="text-[1.05rem]">Plan de inversión mensual</h3>
-        <div id="investment-progress-list" class="grid gap-2.5"></div>
-      </article>
-    </div>
-    <div data-dashboard-chart-stack class="grid min-w-0 gap-3">
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
-        <h3 class="text-[1.05rem]">Evolución patrimonio neto</h3>
-        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-subtle)] p-3">
-          <canvas id="chart-networth" class="block !h-full !w-full" aria-label="Evolución de patrimonio"></canvas>
-        </div>
-      </article>
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
-        <h3 class="text-[1.05rem]">Ingresos vs Gastos vs Inversión</h3>
-        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-subtle)] p-3">
-          <canvas id="chart-cashflow" class="block !h-full !w-full" aria-label="Flujo mensual"></canvas>
-        </div>
-      </article>
-    </div>
-  </div>
+  <!-- TRES CIFRAS EDITORIALES -->
+  <section class="dash-stats" aria-label="Resumen del mes">
+    <article class="dash-stat dash-stat--income">
+      <p class="dash-stat-label">Ingresos</p>
+      <strong id="kpi-income" class="dash-stat-number">€0</strong>
+      <span class="dash-stat-rule" aria-hidden="true"></span>
+    </article>
+    <article class="dash-stat dash-stat--expense">
+      <p class="dash-stat-label">Gastos</p>
+      <strong id="kpi-expense" class="dash-stat-number">€0</strong>
+      <span class="dash-stat-rule" aria-hidden="true"></span>
+    </article>
+    <article class="dash-stat dash-stat--investment">
+      <p class="dash-stat-label">Inversión</p>
+      <strong id="kpi-investment" class="dash-stat-number">€0</strong>
+      <span class="dash-stat-rule" aria-hidden="true"></span>
+    </article>
+  </section>
+
+  <!-- CONTENIDO -->
+  <section class="dash-columns">
+    <article class="dash-panel">
+      <h3 class="dash-panel-title">Top gastos del mes</h3>
+      <div id="top-expense-list" class="dash-list"></div>
+    </article>
+
+    <article class="dash-panel">
+      <h3 class="dash-panel-title">Plan de inversión mensual</h3>
+      <div id="investment-progress-list" class="dash-list dash-list--progress"></div>
+    </article>
+
+    <article class="dash-panel dash-panel--chart">
+      <h3 class="dash-panel-title">Ingresos · Gastos · Inversión</h3>
+      <div class="dash-chart-wrap">
+        <canvas id="chart-cashflow" aria-label="Flujo mensual de ingresos, gastos e inversión"></canvas>
+      </div>
+    </article>
+  </section>
 </section>

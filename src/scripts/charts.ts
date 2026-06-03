@@ -3,8 +3,13 @@ declare const Chart: any;
 
 type ValueFormatter = (value: number) => string;
 
-// Theme-aware chart colors. Read from CSS custom properties at render time so
-// charts follow the active light/dark theme (re-rendered on theme switch).
+/* ──────────────────────────────────────────────────────────────────
+   "Editorial" chart language: minimal chrome, hairline grids with no
+   axis borders, thin smooth lines with gradient fills and no resting
+   point markers, slim rounded bars, fine donut ring, refined legends.
+   Colors are read from CSS custom properties at render time so charts
+   follow the active light/dark theme (re-rendered on theme switch).
+   ────────────────────────────────────────────────────────────────── */
 function cssVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -17,6 +22,96 @@ const pointBorderColorVar = () => cssVar("--chart-point-border", "#ffffff");
 const emptyColor = () => cssVar("--chart-empty", "#e2ece7");
 const centerLabelColor = () => cssVar("--chart-center-label", "#6b7b7f");
 const centerValueColor = () => cssVar("--chart-center-value", "#18363b");
+
+const FONT_FAMILY = "'DM Sans', system-ui, sans-serif";
+
+// Append 8-bit alpha to a 6-digit hex color (e.g. "#3B6BF0" + 0.2 -> "#3B6BF033").
+function withAlpha(color: string, alpha: number): string {
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) {
+    const a = Math.round(Math.min(Math.max(alpha, 0), 1) * 255)
+      .toString(16)
+      .padStart(2, "0");
+    return color + a;
+  }
+  return color;
+}
+
+// Scriptable vertical gradient fill for area lines: solid-ish at the top of
+// the plot, fading to transparent at the baseline.
+function areaFill(color: string) {
+  return (context: any) => {
+    const chart = context.chart;
+    const area = chart?.chartArea;
+    if (!area) return withAlpha(color, 0);
+    const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    gradient.addColorStop(0, withAlpha(color, 0.22));
+    gradient.addColorStop(0.55, withAlpha(color, 0.07));
+    gradient.addColorStop(1, withAlpha(color, 0));
+    return gradient;
+  };
+}
+
+// Show a small dot only when the series is short enough that a bare line
+// would read poorly; otherwise the line stays clean until hover.
+function restingPointRadius(context: any): number {
+  const count = context?.chart?.data?.labels?.length ?? 0;
+  return count <= 3 ? 2.5 : 0;
+}
+
+const lineCommon = {
+  borderWidth: 2,
+  tension: 0.35,
+  pointRadius: restingPointRadius,
+  pointHoverRadius: 4,
+  pointBorderWidth: 2,
+  pointHoverBorderWidth: 2,
+  borderJoinStyle: "round" as const,
+  borderCapStyle: "round" as const,
+};
+
+function baseScales(formatAxisValue: ValueFormatter, labels: readonly string[], beginAtZero: boolean) {
+  return {
+    x: {
+      grid: { display: false },
+      border: { display: false },
+      ticks: {
+        font: { size: 10, family: FONT_FAMILY },
+        color: axisColor(),
+        maxRotation: 0,
+        autoSkipPadding: 16,
+        padding: 6,
+        callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
+      },
+    },
+    y: {
+      grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
+      border: { display: false },
+      ticks: {
+        font: { size: 10, family: FONT_FAMILY },
+        color: axisColor(),
+        maxTicksLimit: 5,
+        padding: 10,
+        callback: (value: number) => formatAxisValue(value),
+      },
+      beginAtZero,
+    },
+  };
+}
+
+const refinedLegend = (display: boolean) => ({
+  display,
+  position: "top" as const,
+  align: "end" as const,
+  labels: {
+    font: { size: 11, family: FONT_FAMILY },
+    color: legendColor(),
+    usePointStyle: true,
+    pointStyle: "circle",
+    boxWidth: 7,
+    boxHeight: 7,
+    padding: 16,
+  },
+});
 
 export interface LineChartOptions {
   color: string;
@@ -116,15 +211,11 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
         {
           data: safeValues,
           borderColor: options.color,
-          backgroundColor: options.fill,
-          borderWidth: 3,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          backgroundColor: areaFill(options.color),
           pointBackgroundColor: options.color,
           pointBorderColor: pointBorderColorVar(),
-          pointBorderWidth: 2,
           fill: true,
-          tension: 0.3,
+          ...lineCommon,
         },
       ],
     },
@@ -132,6 +223,7 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: { padding: { top: 6, right: 4, bottom: 0, left: 0 } },
       interaction: { mode: "nearest", intersect: false },
       plugins: {
         legend: { display: false },
@@ -144,26 +236,7 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
           }),
         },
       },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            font: { size: 11 },
-            color: axisColor(),
-            maxRotation: 0,
-            callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
-          },
-        },
-        y: {
-          grid: { color: gridColor() },
-          ticks: {
-            font: { size: 10 },
-            color: axisColor(),
-            callback: (value: number) => formatAxisValue(value),
-          },
-          beginAtZero: options.includeZeroBaseline ?? true,
-        },
-      },
+      scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true),
     },
   });
 }
@@ -187,21 +260,22 @@ export function renderGroupedBarChart(
         label: item.name,
         data: item.values.map((v) => Number(v || 0)),
         backgroundColor: item.color,
-        borderRadius: 4,
+        hoverBackgroundColor: item.color,
+        borderRadius: 6,
         borderSkipped: false,
+        maxBarThickness: 30,
+        barPercentage: 0.74,
+        categoryPercentage: 0.62,
       })),
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: { padding: { top: 4 } },
       interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: {
-          display: true,
-          position: "top" as const,
-          labels: { font: { size: 11 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
-        },
+        legend: refinedLegend(true),
         tooltip: {
           enabled: false,
           external: makeExternalTooltip((tooltip) => {
@@ -211,19 +285,25 @@ export function renderGroupedBarChart(
       },
       scales: {
         x: {
+          stacked: false,
           grid: { display: false },
+          border: { display: false },
           ticks: {
-            font: { size: 10 },
+            font: { size: 10, family: FONT_FAMILY },
             color: axisColor(),
             maxRotation: 0,
+            padding: 6,
             callback: (_value: any, index: number) => (Array.from(labels)[index] || "").slice(0, 3),
           },
         },
         y: {
-          grid: { color: gridColor() },
+          grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
+          border: { display: false },
           ticks: {
-            font: { size: 10 },
+            font: { size: 10, family: FONT_FAMILY },
             color: axisColor(),
+            maxTicksLimit: 5,
+            padding: 10,
             callback: (value: number) => formatValue(value),
           },
           beginAtZero: true,
@@ -245,11 +325,12 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
   if (total <= 0) {
     new Chart(canvas, {
       type: "doughnut",
-      data: { labels: ["Sin datos"], datasets: [{ data: [1], backgroundColor: [emptyColor()] }] },
+      data: { labels: ["Sin datos"], datasets: [{ data: [1], backgroundColor: [emptyColor()], borderWidth: 0 }] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
+        cutout: "74%",
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
       },
     });
@@ -264,9 +345,11 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
         {
           data: clean.map((item) => item.value),
           backgroundColor: clean.map((item) => item.color),
-          hoverOffset: 8,
-          borderWidth: 2,
+          hoverOffset: 6,
+          borderWidth: 3,
           borderColor: pointBorderColorVar(),
+          borderRadius: 4,
+          spacing: 1,
         },
       ],
     },
@@ -274,12 +357,21 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      cutout: "62%",
+      cutout: "74%",
+      layout: { padding: 6 },
       plugins: {
         legend: {
           display: true,
           position: "right" as const,
-          labels: { font: { size: 12 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
+          labels: {
+            font: { size: 11, family: FONT_FAMILY },
+            color: legendColor(),
+            usePointStyle: true,
+            pointStyle: "circle",
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 12,
+          },
         },
         tooltip: {
           enabled: false,
@@ -305,12 +397,12 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
 
           ctx.save();
           ctx.fillStyle = centerLabelColor();
-          ctx.font = "11px 'DM Sans', sans-serif";
+          ctx.font = `600 10px ${FONT_FAMILY}`;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("Total", cx, cy - 12);
+          ctx.fillText("TOTAL", cx, cy - 12);
           ctx.fillStyle = centerValueColor();
-          ctx.font = "bold 15px 'DM Sans', sans-serif";
+          ctx.font = `500 16px 'DM Mono', ${FONT_FAMILY}`;
           ctx.fillText(formatValue(total), cx, cy + 8);
           ctx.restore();
         },
@@ -357,8 +449,10 @@ export function renderHorizontalBarChart(
         {
           data: cleaned.map((item) => item.value),
           backgroundColor: cleaned.map((_, idx) => palette[idx % palette.length]),
-          borderRadius: 7,
+          borderRadius: 6,
           borderSkipped: false,
+          maxBarThickness: 22,
+          categoryPercentage: 0.72,
         },
       ],
     },
@@ -379,17 +473,21 @@ export function renderHorizontalBarChart(
       },
       scales: {
         x: {
-          grid: { color: gridColor() },
+          grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
+          border: { display: false },
           ticks: {
-            font: { size: 11 },
+            font: { size: 10, family: FONT_FAMILY },
             color: axisColor(),
+            maxTicksLimit: 5,
+            padding: 8,
             callback: (value: number) => formatValue(value),
           },
           beginAtZero: true,
         },
         y: {
           grid: { display: false },
-          ticks: { font: { size: 11 }, color: axisColor() },
+          border: { display: false },
+          ticks: { font: { size: 11, family: FONT_FAMILY }, color: axisColor(), padding: 6 },
         },
       },
     },
@@ -448,28 +546,20 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
         label: s.name,
         data: s.values.map((v) => Number(v || 0)),
         borderColor: s.color,
-        backgroundColor: s.color + "22",
-        borderWidth: 2.5,
-        pointRadius: 3.5,
-        pointHoverRadius: 5,
+        backgroundColor: s.color,
         pointBackgroundColor: s.color,
         pointBorderColor: pointBorderColorVar(),
-        pointBorderWidth: 1.5,
-        fill: false,
-        tension: 0.3,
+        ...lineCommon,
       })),
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      layout: { padding: { top: 6, right: 4 } },
       interaction: { mode: "nearest", intersect: false },
       plugins: {
-        legend: {
-          display: series.length > 1,
-          position: "top" as const,
-          labels: { font: { size: 11 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
-        },
+        legend: refinedLegend(series.length > 1),
         tooltip: {
           enabled: false,
           external: makeExternalTooltip((tooltip) => {
@@ -479,26 +569,7 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
           }),
         },
       },
-      scales: {
-        x: {
-          grid: { display: false },
-          ticks: {
-            font: { size: 11 },
-            color: axisColor(),
-            maxRotation: 0,
-            callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
-          },
-        },
-        y: {
-          grid: { color: gridColor() },
-          ticks: {
-            font: { size: 10 },
-            color: axisColor(),
-            callback: (value: number) => formatAxisValue(value),
-          },
-          beginAtZero: forceZeroTick,
-        },
-      },
+      scales: baseScales(formatAxisValue, labels, forceZeroTick),
     },
   });
 }

@@ -278,9 +278,13 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     el.kpiNetWorthChange.className = `kpi-networth-change ${netWorthChange === null ? "" : netWorthChange >= 0 ? "text-good" : "text-bad"}`;
     el.kpiAnnualSavings.textContent = deps.formatMoney(yearTotals.income - yearTotals.expense - yearTotals.investment);
 
+    const netWorthAccent =
+      (typeof document !== "undefined"
+        ? getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()
+        : "") || "#3B6BF0";
     renderLineChart(el.chartNetWorth, dashboardWealthSeries.map((item) => item.net), {
-      color: "#0d8476",
-      fill: "rgba(13, 132, 118, 0.12)",
+      color: netWorthAccent,
+      fill: netWorthAccent + "22",
       labels: chartMonths,
       formatValue: deps.formatMoney,
       formatAxisValue: deps.formatMoneyCompact,
