@@ -1,6 +1,20 @@
 import { test, expect } from "./fixtures";
 
 const DASHBOARD_CASHFLOW_DATASET_COUNT = 3;
+const MONTH_NAMES = [
+  "ENERO",
+  "FEBRERO",
+  "MARZO",
+  "ABRIL",
+  "MAYO",
+  "JUNIO",
+  "JULIO",
+  "AGOSTO",
+  "SEPTIEMBRE",
+  "OCTUBRE",
+  "NOVIEMBRE",
+  "DICIEMBRE",
+] as const;
 
 test.describe("Finance tracker E2E", () => {
   test("sincroniza pestañas con path y permite carga directa por URL", async ({ page, tracker }) => {
@@ -326,17 +340,21 @@ test.describe("Finance tracker E2E", () => {
     expect(await tracker.getAccountSnapshotValue("Revolut")).toBe(999.99);
   });
 
-  test("patrimonio renderiza la gráfica de evolución mensual solo hasta el último mes con datos", async ({ page, tracker }) => {
+  test("patrimonio renderiza la evolución mensual hasta el mes actual YTD", async ({ page, tracker }) => {
     await tracker.openWealth();
 
     const chartDetails = await page.evaluate(() => {
       const chart = document.getElementById("chart-wealth");
+      const yearDisplay = Number((document.getElementById("year-display") as HTMLInputElement | null)?.value || 0);
+      const now = new Date();
       if (!chart) {
         return null;
       }
       return {
         points: parseInt(chart.dataset.chartPointCount || "0"),
-        labels: parseInt(chart.dataset.chartPointCount || "0") > 0 ? 1 : 0,
+        currentYear: now.getFullYear(),
+        currentMonth: now.getMonth(),
+        yearDisplay,
       };
     });
 
@@ -344,8 +362,29 @@ test.describe("Finance tracker E2E", () => {
     if (!chartDetails) {
       return;
     }
-    expect(chartDetails.points).toBe(2);
-    expect(chartDetails.labels).toBeGreaterThan(0);
+    const expectedPoints = chartDetails.yearDisplay === chartDetails.currentYear ? chartDetails.currentMonth + 1 : 12;
+    expect(chartDetails.points).toBe(expectedPoints);
+  });
+
+  test("patrimonio recorta la tabla de evolución al YTD actual", async ({ page, tracker }) => {
+    await tracker.openWealth();
+
+    const details = await page.evaluate(() => {
+      const chart = document.getElementById("chart-wealth");
+      const rows = Array.from(document.querySelectorAll("#wealth-timeline-body tr"));
+      return {
+        chartPoints: Number(chart?.dataset.chartPointCount || 0),
+        rowCount: rows.length,
+        lastLabel: rows.length ? rows[rows.length - 1].querySelector("td")?.textContent?.trim() || "" : "",
+        yearDisplay: Number((document.getElementById("year-display") as HTMLInputElement | null)?.value || 0),
+        currentYear: new Date().getFullYear(),
+        currentMonth: new Date().getMonth(),
+      };
+    });
+
+    expect(details.rowCount).toBe(details.chartPoints);
+    const expectedLastMonth = details.yearDisplay === details.currentYear ? MONTH_NAMES[details.currentMonth] : "DICIEMBRE";
+    expect(details.lastLabel).toBe(expectedLastMonth);
   });
 
   test("patrimonio permite calcular snapshot de inversión por fila y persistirlo", async ({ tracker }) => {
