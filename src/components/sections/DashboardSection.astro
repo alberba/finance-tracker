@@ -55,26 +55,26 @@
     <div class="grid min-w-0 gap-3 lg:grid-cols-2">
       <article
         data-dashboard-top-expenses
-        class="grid h-full content-start gap-3 rounded-[var(--radius-lg)] border border-[#dce6e1] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]"
+        class="grid h-full content-start gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]"
       >
         <h3 class="text-[1.05rem]">Top gastos del mes</h3>
         <div id="top-expense-list" class="grid gap-2 items-start"></div>
       </article>
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[#dce6e1] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
+      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
         <h3 class="text-[1.05rem]">Plan de inversión mensual</h3>
         <div id="investment-progress-list" class="grid gap-2.5"></div>
       </article>
     </div>
     <div data-dashboard-chart-stack class="grid min-w-0 gap-3">
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[#dce6e1] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
+      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
         <h3 class="text-[1.05rem]">Evolución patrimonio neto</h3>
-        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[#e2ece7] bg-[#fcfefc] p-3">
+        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-subtle)] p-3">
           <canvas id="chart-networth" class="block !h-full !w-full" aria-label="Evolución de patrimonio"></canvas>
         </div>
       </article>
-      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[#dce6e1] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
+      <article class="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--bg-panel)] p-3.5 shadow-[var(--shadow-soft)]">
         <h3 class="text-[1.05rem]">Ingresos vs Gastos vs Inversión</h3>
-        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[#e2ece7] bg-[#fcfefc] p-3">
+        <div class="relative h-[220px] w-full overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--bg-subtle)] p-3">
           <canvas id="chart-cashflow" class="block !h-full !w-full" aria-label="Flujo mensual"></canvas>
         </div>
       </article>
