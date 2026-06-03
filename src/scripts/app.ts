@@ -566,6 +566,9 @@ import {
     bindEvents();
     renderAll();
     dashboardBudgetGoalsSection.switchSection(ui.activeSection, { updateHistory: false });
+    // Expose a re-render hook so the theme toggle can repaint charts with
+    // the active theme's colors (charts read CSS variables at render time).
+    (window as typeof window & { __ftRenderAll?: () => void }).__ftRenderAll = renderAll;
   }
 
   async function hydrateState() {
