@@ -23,6 +23,7 @@ interface InvestmentEventBindingsDeps {
   renderGoals: () => void;
   renderInvestmentTransactionsTable: () => void;
   syncInvestmentMovementComputedAmount: () => void;
+  normalizeInvestmentMovementSymbolField: () => void;
   syncInvestmentMovementCategoryField: () => void;
   resolveInvestmentCategory: (accountId: string, rawCategory: string, fallbackCategory: string) => string;
   sortTransactions: () => void;
@@ -136,10 +137,13 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       deps.renderInvestmentTransactionsTable();
     });
 
-    [el.investmentMovementSide, el.investmentMovementSymbol, el.investmentMovementCategory, el.investmentMovementUnitPrice, el.investmentMovementUnits, el.investmentMovementFee].forEach((control: HTMLElement) => {
+    [el.investmentMovementSide, el.investmentMovementCategory, el.investmentMovementUnitPrice, el.investmentMovementUnits, el.investmentMovementFee].forEach((control: HTMLElement) => {
       control.addEventListener("input", deps.syncInvestmentMovementComputedAmount);
       control.addEventListener("change", deps.syncInvestmentMovementComputedAmount);
     });
+    el.investmentMovementSymbol.addEventListener("input", deps.syncInvestmentMovementComputedAmount);
+    el.investmentMovementSymbol.addEventListener("change", deps.normalizeInvestmentMovementSymbolField);
+    el.investmentMovementSymbol.addEventListener("blur", deps.normalizeInvestmentMovementSymbolField);
 
     el.investmentMovementBroker.addEventListener("change", () => {
       deps.syncInvestmentMovementCategoryField();
