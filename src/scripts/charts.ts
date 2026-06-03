@@ -3,6 +3,21 @@ declare const Chart: any;
 
 type ValueFormatter = (value: number) => string;
 
+// Theme-aware chart colors. Read from CSS custom properties at render time so
+// charts follow the active light/dark theme (re-rendered on theme switch).
+function cssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+const axisColor = () => cssVar("--chart-axis", "#7b8b8d");
+const gridColor = () => cssVar("--chart-grid", "#edf3f0");
+const legendColor = () => cssVar("--chart-legend", "#516164");
+const pointBorderColorVar = () => cssVar("--chart-point-border", "#ffffff");
+const emptyColor = () => cssVar("--chart-empty", "#e2ece7");
+const centerLabelColor = () => cssVar("--chart-center-label", "#6b7b7f");
+const centerValueColor = () => cssVar("--chart-center-value", "#18363b");
+
 export interface LineChartOptions {
   color: string;
   fill: string;
@@ -106,7 +121,7 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
           pointRadius: 4,
           pointHoverRadius: 6,
           pointBackgroundColor: options.color,
-          pointBorderColor: "#fff",
+          pointBorderColor: pointBorderColorVar(),
           pointBorderWidth: 2,
           fill: true,
           tension: 0.3,
@@ -134,16 +149,16 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
           grid: { display: false },
           ticks: {
             font: { size: 11 },
-            color: "#657478",
+            color: axisColor(),
             maxRotation: 0,
             callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
           },
         },
         y: {
-          grid: { color: "#edf3f0" },
+          grid: { color: gridColor() },
           ticks: {
             font: { size: 10 },
-            color: "#7b8b8d",
+            color: axisColor(),
             callback: (value: number) => formatAxisValue(value),
           },
           beginAtZero: options.includeZeroBaseline ?? true,
@@ -185,7 +200,7 @@ export function renderGroupedBarChart(
         legend: {
           display: true,
           position: "top" as const,
-          labels: { font: { size: 11 }, color: "#516164", boxWidth: 12, boxHeight: 12 },
+          labels: { font: { size: 11 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
         },
         tooltip: {
           enabled: false,
@@ -199,16 +214,16 @@ export function renderGroupedBarChart(
           grid: { display: false },
           ticks: {
             font: { size: 10 },
-            color: "#6b7b7f",
+            color: axisColor(),
             maxRotation: 0,
             callback: (_value: any, index: number) => (Array.from(labels)[index] || "").slice(0, 3),
           },
         },
         y: {
-          grid: { color: "#edf3f0" },
+          grid: { color: gridColor() },
           ticks: {
             font: { size: 10 },
-            color: "#7b8b8d",
+            color: axisColor(),
             callback: (value: number) => formatValue(value),
           },
           beginAtZero: true,
@@ -230,7 +245,7 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
   if (total <= 0) {
     new Chart(canvas, {
       type: "doughnut",
-      data: { labels: ["Sin datos"], datasets: [{ data: [1], backgroundColor: ["#e2ece7"] }] },
+      data: { labels: ["Sin datos"], datasets: [{ data: [1], backgroundColor: [emptyColor()] }] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -251,7 +266,7 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
           backgroundColor: clean.map((item) => item.color),
           hoverOffset: 8,
           borderWidth: 2,
-          borderColor: "#fff",
+          borderColor: pointBorderColorVar(),
         },
       ],
     },
@@ -264,7 +279,7 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
         legend: {
           display: true,
           position: "right" as const,
-          labels: { font: { size: 12 }, color: "#536366", boxWidth: 12, boxHeight: 12 },
+          labels: { font: { size: 12 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
         },
         tooltip: {
           enabled: false,
@@ -289,13 +304,13 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
           }
 
           ctx.save();
-          ctx.fillStyle = "#6b7b7f";
-          ctx.font = "11px Space Grotesk, sans-serif";
+          ctx.fillStyle = centerLabelColor();
+          ctx.font = "11px 'DM Sans', sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText("Total", cx, cy - 12);
-          ctx.fillStyle = "#18363b";
-          ctx.font = "bold 15px Space Grotesk, sans-serif";
+          ctx.fillStyle = centerValueColor();
+          ctx.font = "bold 15px 'DM Sans', sans-serif";
           ctx.fillText(formatValue(total), cx, cy + 8);
           ctx.restore();
         },
@@ -322,7 +337,7 @@ export function renderHorizontalBarChart(
   if (!cleaned.length) {
     new Chart(canvas, {
       type: "bar",
-      data: { labels: ["Sin datos"], datasets: [{ data: [0], backgroundColor: ["#e2ece7"] }] },
+      data: { labels: ["Sin datos"], datasets: [{ data: [0], backgroundColor: [emptyColor()] }] },
       options: {
         indexAxis: "y" as const,
         responsive: true,
@@ -364,17 +379,17 @@ export function renderHorizontalBarChart(
       },
       scales: {
         x: {
-          grid: { color: "#edf3f0" },
+          grid: { color: gridColor() },
           ticks: {
             font: { size: 11 },
-            color: "#7b8b8d",
+            color: axisColor(),
             callback: (value: number) => formatValue(value),
           },
           beginAtZero: true,
         },
         y: {
           grid: { display: false },
-          ticks: { font: { size: 11 }, color: "#566669" },
+          ticks: { font: { size: 11 }, color: axisColor() },
         },
       },
     },
@@ -438,7 +453,7 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
         pointRadius: 3.5,
         pointHoverRadius: 5,
         pointBackgroundColor: s.color,
-        pointBorderColor: "#fff",
+        pointBorderColor: pointBorderColorVar(),
         pointBorderWidth: 1.5,
         fill: false,
         tension: 0.3,
@@ -453,7 +468,7 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
         legend: {
           display: series.length > 1,
           position: "top" as const,
-          labels: { font: { size: 11 }, color: "#516164", boxWidth: 12, boxHeight: 12 },
+          labels: { font: { size: 11 }, color: legendColor(), boxWidth: 12, boxHeight: 12 },
         },
         tooltip: {
           enabled: false,
@@ -469,16 +484,16 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
           grid: { display: false },
           ticks: {
             font: { size: 11 },
-            color: "#657478",
+            color: axisColor(),
             maxRotation: 0,
             callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
           },
         },
         y: {
-          grid: { color: "#edf3f0" },
+          grid: { color: gridColor() },
           ticks: {
             font: { size: 10 },
-            color: "#7b8b8d",
+            color: axisColor(),
             callback: (value: number) => formatAxisValue(value),
           },
           beginAtZero: forceZeroTick,

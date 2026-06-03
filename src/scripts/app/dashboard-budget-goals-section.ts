@@ -335,15 +335,15 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
         const diff = round2(actual - planned);
         const progress = calculateInvestmentCompletionPercent(actual, planned);
         return `
-          <article data-investment-progress-item class="grid gap-1 rounded-[10px] border border-[#dce7e2] bg-white p-2">
+          <article data-investment-progress-item class="grid gap-1 rounded-[10px] border border-[var(--line)] bg-[var(--bg-card)] p-2">
             <div class="flex items-baseline justify-between gap-2">
               <span>${escapeHtml(decorateCategoryLabel("investment", category))}</span>
-              <small class="text-right text-[0.8rem] leading-tight tracking-tight text-gray-900">${deps.formatMoney(actual)} / ${deps.formatMoney(planned)} (${progress.toFixed(0)}%)</small>
+              <small class="text-right text-[0.8rem] leading-tight tracking-tight text-[var(--text-main)]">${deps.formatMoney(actual)} / ${deps.formatMoney(planned)} (${progress.toFixed(0)}%)</small>
             </div>
             <div class="grid gap-1">
               <div
                 data-investment-progress-track
-                class="relative h-2 overflow-hidden rounded-full bg-[#e6efeb]"
+                class="progress-track relative h-2 overflow-hidden rounded-full"
                 role="progressbar"
                 aria-valuemin="0"
                 aria-valuemax="100"
@@ -351,7 +351,7 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
               >
                 <div
                   data-investment-progress-fill
-                  class="h-full rounded-[inherit] bg-[linear-gradient(90deg,#0d8476_0%,#1fa593_100%)]"
+                  class="progress-fill h-full rounded-[inherit]"
                   style="width:${progress.toFixed(2)}%"
                 ></div>
               </div>
