@@ -560,6 +560,7 @@ export class FinanceTrackerPage {
       time?: string;
       side?: "buy" | "sell";
       newSymbol?: string;
+      category?: string;
       unitPrice?: number;
       units?: number;
       fee?: number;
@@ -587,6 +588,9 @@ export class FinanceTrackerPage {
     if (typeof payload.newSymbol === "string") {
       await editRow.locator('[data-edit-field="symbol"]').fill(payload.newSymbol);
     }
+    if (typeof payload.category === "string") {
+      await this.selectByLabelOrFirst(editRow.locator('[data-edit-field="category"]'), payload.category);
+    }
     if (typeof payload.unitPrice === "number") {
       await editRow.locator('[data-edit-field="unitPrice"]').fill(String(payload.unitPrice));
     }
@@ -610,6 +614,13 @@ export class FinanceTrackerPage {
 
     await editRow.getByRole("button", { name: "Guardar" }).click();
     await expect(this.page.getByRole("status")).toContainText("Movimiento de inversión actualizado.");
+  }
+
+  async expectInvestmentMovementCategory(symbol: string, category: string) {
+    await this.openInvestmentMovementsTab();
+    const row = this.investmentSection().locator("#investment-tx-table-body tr", { hasText: symbol }).first();
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(category);
   }
 
   async deleteInvestmentMovementBySymbol(symbol: string) {

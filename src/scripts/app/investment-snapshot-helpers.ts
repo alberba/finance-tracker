@@ -33,6 +33,7 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     const timeInput = row.querySelector<HTMLInputElement>('[data-edit-field="time"]');
     const sideInput = row.querySelector<HTMLSelectElement>('[data-edit-field="side"]');
     const symbolInput = row.querySelector<HTMLInputElement>('[data-edit-field="symbol"]');
+    const categoryInput = row.querySelector<HTMLSelectElement>('[data-edit-field="category"]');
     const unitPriceInput = row.querySelector<HTMLInputElement>('[data-edit-field="unitPrice"]');
     const unitsInput = row.querySelector<HTMLInputElement>('[data-edit-field="units"]');
     const feeInput = row.querySelector<HTMLInputElement>('[data-edit-field="fee"]');
@@ -40,7 +41,7 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     const accountInput = row.querySelector<HTMLSelectElement>('[data-edit-field="accountId"]');
     const declaredInput = row.querySelector<HTMLInputElement>('[data-edit-field="declared"]');
 
-    if (!dateInput || !timeInput || !sideInput || !symbolInput || !unitPriceInput || !unitsInput || !feeInput || !currencyInput || !accountInput || !declaredInput) {
+    if (!dateInput || !timeInput || !sideInput || !symbolInput || !categoryInput || !unitPriceInput || !unitsInput || !feeInput || !currencyInput || !accountInput || !declaredInput) {
       return;
     }
 
@@ -50,6 +51,7 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     const symbol = normalizeInvestmentSymbol(symbolInput.value);
     const movementCurrency = String(currencyInput.value || state.currency || "EUR").trim().toUpperCase().slice(0, 3);
     const accountId = String(accountInput.value || "").trim();
+    const rawCategory = String(categoryInput.value || "").trim();
     const declared = Boolean(declaredInput.checked);
 
     if (!date || !time || !symbol || !accountId) {
@@ -76,7 +78,7 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     tx.accountId = accountId;
     tx.side = side;
     tx.symbol = computed.normalizedSymbol;
-    tx.category = deps.resolveInvestmentCategory(accountId, tx.category, computed.normalizedSymbol);
+    tx.category = deps.resolveInvestmentCategory(accountId, rawCategory, computed.normalizedSymbol);
     tx.unitPrice = computed.normalizedUnitPrice;
     tx.units = computed.normalizedUnits;
     tx.fee = computed.normalizedFee;
@@ -94,12 +96,19 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
 
   function renderInvestmentEditingTransactionRow(item: Transaction) {
     const state = deps.getState();
+    const selectedAccount = state.accounts.find((account: any) => account.id === item.accountId);
+    const isBitvavoBroker = String(selectedAccount?.name || "").trim().toLowerCase() === "bitvavo";
     const accountOptions = state.accounts
       .map((account: any) => {
         const selected = account.id === item.accountId ? "selected" : "";
         return `<option value="${escapeAttr(account.id)}" ${selected}>${escapeHtml(account.name)}</option>`;
       })
       .join("");
+    const availableCategories = Array.from(new Set([...state.investmentCategories, item.category || "Sin categoría", "Crypto"])).filter(Boolean);
+    const categoryOptions = availableCategories.map((category) => {
+      const selected = category === item.category ? "selected" : "";
+      return `<option value="${escapeAttr(category)}" ${selected}>${escapeHtml(category)}</option>`;
+    }).join("");
 
     const side = item.side === "sell" ? "sell" : "buy";
     const symbol = item.symbol || item.category || "";
@@ -115,6 +124,7 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
         <td><input type="time" name="editInvestmentTime" data-edit-field="time" value="${escapeAttr(item.time || "00:00")}" /></td>
         <td><select name="editInvestmentSide" data-edit-field="side"><option value="buy" ${side === "buy" ? "selected" : ""}>Compra</option><option value="sell" ${side === "sell" ? "selected" : ""}>Venta</option></select></td>
         <td><input type="text" name="editInvestmentSymbol" data-edit-field="symbol" value="${escapeAttr(symbol)}" /></td>
+        <td><select name="editInvestmentCategory" data-edit-field="category" ${isBitvavoBroker ? 'disabled aria-disabled="true"' : ""}>${categoryOptions}</select></td>
         <td><input type="number" name="editInvestmentUnitPrice" step="0.0001" min="0" data-edit-field="unitPrice" value="${unitPrice}" /></td>
         <td><input type="number" name="editInvestmentUnits" step="0.00000001" min="0" data-edit-field="units" value="${units}" /></td>
         <td><input type="number" name="editInvestmentFee" step="0.01" min="0" data-edit-field="fee" value="${fee}" /></td>
