@@ -43,9 +43,11 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     el.snapshotLiabilities.innerHTML = deps.renderSnapshotRows(state.liabilities, "liabilities", month, (itemId: string) => deps.computeLiabilityValue(itemId, month));
 
     const wealthSeries = deps.getWealthSeries();
-    const latestDataMonth = deps.getLatestDataMonth();
-    const chartMonths = MONTHS.slice(0, latestDataMonth + 1);
-    const chartWealthSeries = wealthSeries.slice(0, latestDataMonth + 1);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const visibleMonthLimit = state.year === currentYear ? Math.min(now.getMonth(), MONTHS.length - 1) : MONTHS.length - 1;
+    const chartMonths = MONTHS.slice(0, visibleMonthLimit + 1);
+    const chartWealthSeries = wealthSeries.slice(0, visibleMonthLimit + 1);
     renderLineChart(el.chartWealth, chartWealthSeries.map((entry: any) => entry.net), {
       color: "#1f6feb",
       fill: "rgba(37, 99, 235, 0.13)",
@@ -55,6 +57,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     });
 
     el.wealthTimelineBody.innerHTML = wealthSeries
+      .slice(0, visibleMonthLimit + 1)
       .map((entry: any, monthIndex: number) => `<tr><td>${MONTHS[monthIndex]}</td><td>${deps.formatMoney(entry.liquidity)}</td><td>${deps.formatMoney(entry.investment)}</td><td>${deps.formatMoney(entry.liabilities)}</td><td><strong>${deps.formatMoney(entry.net)}</strong></td></tr>`)
       .join("");
   }
