@@ -225,4 +225,3 @@ Para mantener un archivo de contexto por pestaña, esta estructura escala bien:
 - `docs/context/tabs/configuracion.md`
 - `docs/context/tabs/datos.md`
 - `docs/context/tabs/reportes.md`
-

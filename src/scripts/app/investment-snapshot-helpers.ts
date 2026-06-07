@@ -1,15 +1,38 @@
-import { type InvestmentSide, type SnapshotKind, type State, type Transaction } from "../types";
-import { computeInvestmentMovement, normalizeInvestmentSide, normalizeInvestmentSymbol } from "../investment-movements";
+import {
+  type InvestmentSide,
+  type SnapshotKind,
+  type State,
+  type Transaction,
+} from "../types";
+import {
+  computeInvestmentMovement,
+  normalizeInvestmentSide,
+  normalizeInvestmentSymbol,
+} from "../investment-movements";
 import { evaluateNumericExpression } from "../math-expression";
-import { escapeAttr, escapeHtml, monthFromISO, parseFloatSafe, round2 } from "../utils";
+import {
+  escapeAttr,
+  escapeHtml,
+  monthFromISO,
+  parseFloatSafe,
+  round2,
+} from "../utils";
 
 interface InvestmentSnapshotHelpersDeps {
   getState: () => State;
   ui: any;
   el: any;
   getEventElement: (target: EventTarget | null) => Element | null;
-  getSnapshotValue: (kind: SnapshotKind, month: number, itemId: string) => number | null;
-  resolveInvestmentCategory: (accountId: string, rawCategory: string, fallbackCategory: string) => string;
+  getSnapshotValue: (
+    kind: SnapshotKind,
+    month: number,
+    itemId: string,
+  ) => number | null;
+  resolveInvestmentCategory: (
+    accountId: string,
+    rawCategory: string,
+    fallbackCategory: string,
+  ) => string;
   sortTransactions: () => void;
   saveState: () => void;
   renderAll: () => void;
@@ -18,30 +41,71 @@ interface InvestmentSnapshotHelpersDeps {
   isSnapshotKind: (value: string) => value is SnapshotKind;
 }
 
-export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDeps) {
+export function setupInvestmentSnapshotHelpers(
+  deps: InvestmentSnapshotHelpersDeps,
+) {
   const { ui, el } = deps;
 
   function saveEditedInvestmentTransactionRow(id: string) {
     const state = deps.getState();
-    const row = (el.investmentTxBody as HTMLElement).querySelector(`tr[data-investment-editing-id="${id}"]`);
+    const row = (el.investmentTxBody as HTMLElement).querySelector(
+      `tr[data-investment-editing-id="${id}"]`,
+    );
     if (!row) return;
 
-    const tx = state.transactions.find((item: any): item is Transaction => item.id === id && item.type === "investment");
+    const tx = state.transactions.find(
+      (item: any): item is Transaction =>
+        item.id === id && item.type === "investment",
+    );
     if (!tx) return;
 
-    const dateInput = row.querySelector<HTMLInputElement>('[data-edit-field="date"]');
-    const timeInput = row.querySelector<HTMLInputElement>('[data-edit-field="time"]');
-    const sideInput = row.querySelector<HTMLSelectElement>('[data-edit-field="side"]');
-    const symbolInput = row.querySelector<HTMLInputElement>('[data-edit-field="symbol"]');
-    const categoryInput = row.querySelector<HTMLSelectElement>('[data-edit-field="category"]');
-    const unitPriceInput = row.querySelector<HTMLInputElement>('[data-edit-field="unitPrice"]');
-    const unitsInput = row.querySelector<HTMLInputElement>('[data-edit-field="units"]');
-    const feeInput = row.querySelector<HTMLInputElement>('[data-edit-field="fee"]');
-    const currencyInput = row.querySelector<HTMLInputElement>('[data-edit-field="movementCurrency"]');
-    const accountInput = row.querySelector<HTMLSelectElement>('[data-edit-field="accountId"]');
-    const declaredInput = row.querySelector<HTMLInputElement>('[data-edit-field="declared"]');
+    const dateInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="date"]',
+    );
+    const timeInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="time"]',
+    );
+    const sideInput = row.querySelector<HTMLSelectElement>(
+      '[data-edit-field="side"]',
+    );
+    const symbolInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="symbol"]',
+    );
+    const categoryInput = row.querySelector<HTMLSelectElement>(
+      '[data-edit-field="category"]',
+    );
+    const unitPriceInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="unitPrice"]',
+    );
+    const unitsInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="units"]',
+    );
+    const feeInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="fee"]',
+    );
+    const currencyInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="movementCurrency"]',
+    );
+    const accountInput = row.querySelector<HTMLSelectElement>(
+      '[data-edit-field="accountId"]',
+    );
+    const declaredInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="declared"]',
+    );
 
-    if (!dateInput || !timeInput || !sideInput || !symbolInput || !categoryInput || !unitPriceInput || !unitsInput || !feeInput || !currencyInput || !accountInput || !declaredInput) {
+    if (
+      !dateInput ||
+      !timeInput ||
+      !sideInput ||
+      !symbolInput ||
+      !categoryInput ||
+      !unitPriceInput ||
+      !unitsInput ||
+      !feeInput ||
+      !currencyInput ||
+      !accountInput ||
+      !declaredInput
+    ) {
       return;
     }
 
@@ -49,7 +113,12 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     const time = String(timeInput.value || "").trim();
     const side: InvestmentSide = normalizeInvestmentSide(sideInput.value);
     const symbol = normalizeInvestmentSymbol(symbolInput.value);
-    const movementCurrency = String(currencyInput.value || state.currency || "EUR").trim().toUpperCase().slice(0, 3);
+    const movementCurrency = String(
+      currencyInput.value || state.currency || "EUR",
+    )
+      .trim()
+      .toUpperCase()
+      .slice(0, 3);
     const accountId = String(accountInput.value || "").trim();
     const rawCategory = String(categoryInput.value || "").trim();
     const declared = Boolean(declaredInput.checked);
@@ -67,7 +136,11 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
       fee: parseFloatSafe(feeInput.value, 0),
     });
 
-    if (computed.normalizedUnits <= 0 || computed.normalizedUnitPrice <= 0 || computed.signedAmount === 0) {
+    if (
+      computed.normalizedUnits <= 0 ||
+      computed.normalizedUnitPrice <= 0 ||
+      computed.signedAmount === 0
+    ) {
       deps.showToast("Precio, títulos y gasto deben ser válidos.");
       return;
     }
@@ -78,7 +151,11 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     tx.accountId = accountId;
     tx.side = side;
     tx.symbol = computed.normalizedSymbol;
-    tx.category = deps.resolveInvestmentCategory(accountId, rawCategory, computed.normalizedSymbol);
+    tx.category = deps.resolveInvestmentCategory(
+      accountId,
+      rawCategory,
+      computed.normalizedSymbol,
+    );
     tx.unitPrice = computed.normalizedUnitPrice;
     tx.units = computed.normalizedUnits;
     tx.fee = computed.normalizedFee;
@@ -96,26 +173,45 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
 
   function renderInvestmentEditingTransactionRow(item: Transaction) {
     const state = deps.getState();
-    const selectedAccount = state.accounts.find((account: any) => account.id === item.accountId);
-    const isBitvavoBroker = String(selectedAccount?.name || "").trim().toLowerCase() === "bitvavo";
+    const selectedAccount = state.accounts.find(
+      (account: any) => account.id === item.accountId,
+    );
+    const isBitvavoBroker =
+      String(selectedAccount?.name || "")
+        .trim()
+        .toLowerCase() === "bitvavo";
     const accountOptions = state.accounts
       .map((account: any) => {
         const selected = account.id === item.accountId ? "selected" : "";
         return `<option value="${escapeAttr(account.id)}" ${selected}>${escapeHtml(account.name)}</option>`;
       })
       .join("");
-    const availableCategories = Array.from(new Set([...state.investmentCategories, item.category || "Sin categoría", "Crypto"])).filter(Boolean);
-    const categoryOptions = availableCategories.map((category) => {
-      const selected = category === item.category ? "selected" : "";
-      return `<option value="${escapeAttr(category)}" ${selected}>${escapeHtml(category)}</option>`;
-    }).join("");
+    const availableCategories = Array.from(
+      new Set([
+        ...state.investmentCategories,
+        item.category || "Sin categoría",
+        "Crypto",
+      ]),
+    ).filter(Boolean);
+    const categoryOptions = availableCategories
+      .map((category) => {
+        const selected = category === item.category ? "selected" : "";
+        return `<option value="${escapeAttr(category)}" ${selected}>${escapeHtml(category)}</option>`;
+      })
+      .join("");
 
     const side = item.side === "sell" ? "sell" : "buy";
     const symbol = item.symbol || item.category || "";
-    const unitPrice = Number.isFinite(item.unitPrice) ? Number(item.unitPrice) : 0;
+    const unitPrice = Number.isFinite(item.unitPrice)
+      ? Number(item.unitPrice)
+      : 0;
     const units = Number.isFinite(item.units) ? Number(item.units) : 0;
     const fee = Number.isFinite(item.fee) ? Number(item.fee) : 0;
-    const movementCurrency = String(item.movementCurrency || state.currency || "EUR").toUpperCase().slice(0, 3);
+    const movementCurrency = String(
+      item.movementCurrency || state.currency || "EUR",
+    )
+      .toUpperCase()
+      .slice(0, 3);
     const declared = Boolean(item.declared);
 
     return `
@@ -137,8 +233,14 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     `;
   }
 
-  function renderSnapshotRows(items: any[], kind: SnapshotKind, month: number, computeFn: (itemId: string) => number) {
-    if (!items.length) return "<tr><td colspan='4'>No hay elementos configurados.</td></tr>";
+  function renderSnapshotRows(
+    items: any[],
+    kind: SnapshotKind,
+    month: number,
+    computeFn: (itemId: string) => number,
+  ) {
+    if (!items.length)
+      return "<tr><td colspan='4'>No hay elementos configurados.</td></tr>";
     return items
       .map((item: any) => {
         const opening = round2(item.openingBalance || 0);
@@ -161,14 +263,20 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
       .join("");
   }
 
-  function renderInvestmentSnapshotCalcAction(kind: SnapshotKind, itemId: string, itemName: string) {
+  function renderInvestmentSnapshotCalcAction(
+    kind: SnapshotKind,
+    itemId: string,
+    itemName: string,
+  ) {
     if (kind !== "investments") return "";
     return `<button type="button" class="tx-btn-secondary snapshot-calc-btn" data-action="open-investment-calc-modal" data-snapshot-id="${escapeAttr(itemId)}" data-item-name="${escapeAttr(itemName)}" aria-label="Abrir cálculo de ${escapeAttr(itemName)}">Calcular</button>`;
   }
 
   function onOpenInvestmentSnapshotCalcModal(event: Event) {
     const target = deps.getEventElement(event.target);
-    const button = target?.closest<HTMLButtonElement>('button[data-action="open-investment-calc-modal"]');
+    const button = target?.closest<HTMLButtonElement>(
+      'button[data-action="open-investment-calc-modal"]',
+    );
     if (!button) return;
     const targetId = String(button.dataset.snapshotId || "").trim();
     const targetName = String(button.dataset.itemName || "").trim();
@@ -200,8 +308,10 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
       el.wealthCalcExpression.focus();
       return;
     }
-    const snapshotInput = (el.snapshotInvestments as HTMLElement).querySelector<HTMLInputElement>(
-      `input[data-snapshot-kind="investments"][data-snapshot-id="${CSS.escape(ui.wealthCalcTargetId)}"]`
+    const snapshotInput = (
+      el.snapshotInvestments as HTMLElement
+    ).querySelector<HTMLInputElement>(
+      `input[data-snapshot-kind="investments"][data-snapshot-id="${CSS.escape(ui.wealthCalcTargetId)}"]`,
     );
     if (!snapshotInput) {
       deps.showToast("No se pudo aplicar el resultado.");
@@ -216,9 +326,16 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
   function saveSnapshotFromTable() {
     const state = deps.getState();
     const month = ui.snapshotMonth;
-    const rows = document.querySelectorAll<HTMLInputElement>("[data-snapshot-kind]");
+    const rows = document.querySelectorAll<HTMLInputElement>(
+      "[data-snapshot-kind]",
+    );
     if (!state.snapshots[String(month)]) {
-      state.snapshots[String(month)] = { month, accounts: {}, investments: {}, liabilities: {} };
+      state.snapshots[String(month)] = {
+        month,
+        accounts: {},
+        investments: {},
+        liabilities: {},
+      };
     }
     const snapshot = state.snapshots[String(month)];
     rows.forEach((input) => {
@@ -234,5 +351,13 @@ export function setupInvestmentSnapshotHelpers(deps: InvestmentSnapshotHelpersDe
     deps.showToast("Snapshot guardado.");
   }
 
-  return { saveEditedInvestmentTransactionRow, renderInvestmentEditingTransactionRow, renderSnapshotRows, onOpenInvestmentSnapshotCalcModal, closeWealthCalcModal, applyWealthCalcModalResult, saveSnapshotFromTable };
+  return {
+    saveEditedInvestmentTransactionRow,
+    renderInvestmentEditingTransactionRow,
+    renderSnapshotRows,
+    onOpenInvestmentSnapshotCalcModal,
+    closeWealthCalcModal,
+    applyWealthCalcModalResult,
+    saveSnapshotFromTable,
+  };
 }

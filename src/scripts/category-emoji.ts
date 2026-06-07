@@ -34,14 +34,26 @@ const TYPE_FALLBACK_EMOJI: Record<BudgetType, string> = {
   investment: "📈",
 };
 
-export function decorateCategoryLabel(type: BudgetType, category: string): string {
+export function getCategoryEmoji(type: BudgetType, category: string): string {
+  const cleanCategory = String(category || "").trim();
+  if (!cleanCategory) {
+    return TYPE_FALLBACK_EMOJI[type];
+  }
+  return (
+    CATEGORY_EMOJI_MAP[normalizeKey(cleanCategory)] || TYPE_FALLBACK_EMOJI[type]
+  );
+}
+
+export function decorateCategoryLabel(
+  type: BudgetType,
+  category: string,
+): string {
   const cleanCategory = String(category || "").trim();
   if (!cleanCategory) {
     return `${TYPE_FALLBACK_EMOJI[type]} Sin categoría`;
   }
 
-  const emoji = CATEGORY_EMOJI_MAP[normalizeKey(cleanCategory)] || TYPE_FALLBACK_EMOJI[type];
-  return `${emoji} ${cleanCategory}`;
+  return `${getCategoryEmoji(type, cleanCategory)} ${cleanCategory}`;
 }
 
 function normalizeKey(value: string): string {

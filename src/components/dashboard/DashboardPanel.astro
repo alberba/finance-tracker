@@ -1,0 +1,31 @@
+---
+import RightArrowIcon from '../../assets/icons/right-arrow.svg'
+interface Props {
+  title: string
+  actionLabel: string
+  actionTarget: string
+  class?: string
+}
+
+const { title, actionLabel, actionTarget, class: className } = Astro.props
+---
+
+<article
+  class:list={[
+    'flex flex-col rounded-lg bg-(--bg-panel) p-4 [box-shadow:var(--shadow-soft)]',
+    className,
+  ]}>
+  <h3 class="font-bold text-(--text-main)">
+    {title}
+  </h3>
+
+  <slot />
+
+  <button
+    type="button"
+    class="mt-auto inline-flex items-center gap-1.5 bg-transparent text-(--primary)"
+    data-goto={actionTarget}>
+    {actionLabel}
+    <RightArrowIcon class="h-4 w-4 transition-transform hover:translate-x-0.75" />
+  </button>
+</article>

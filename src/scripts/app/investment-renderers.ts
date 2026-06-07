@@ -1,8 +1,20 @@
 import { computeContributionMetrics as computeContributionMetricsCore } from "../../lib/finance-core";
 import { parseTransactionYear } from "../investment-movements";
-import { renderDonutChart, renderLineChart, renderMultiLineChart, type MultiLineSeries } from "../charts";
+import {
+  renderDonutChart,
+  renderLineChart,
+  renderMultiLineChart,
+  type MultiLineSeries,
+} from "../charts";
 import { toSnapshotDate } from "../contribution-workflow";
-import { MONTHS, type ContributionMetricRow, type InvestmentSubTab, type SnapshotKind, type State, type Transaction } from "../types";
+import {
+  MONTHS,
+  type ContributionMetricRow,
+  type InvestmentSubTab,
+  type SnapshotKind,
+  type State,
+  type Transaction,
+} from "../types";
 import { escapeAttr, escapeHtml, formatPercent, round2 } from "../utils";
 
 interface InvestmentRenderersDeps {
@@ -12,8 +24,16 @@ interface InvestmentRenderersDeps {
   formatMoney: (value: number) => string;
   formatMoneyCompact: (value: number) => string;
   getWealthByMonth: (month: number) => { investment: number };
-  getWealthSeries: () => Array<{ liquidity: number; investment: number; liabilities: number; net: number }>;
-  computeInvestmentPortfolioValueForReturnMode: (month: number, mode: "simple" | "twr") => number;
+  getWealthSeries: () => Array<{
+    liquidity: number;
+    investment: number;
+    liabilities: number;
+    net: number;
+  }>;
+  computeInvestmentPortfolioValueForReturnMode: (
+    month: number,
+    mode: "simple" | "twr",
+  ) => number;
   getLatestDataMonth: () => number;
   computeInvestedCapital: (month: number) => number;
   computeInvestmentValue: (assetId: string, month: number) => number;
@@ -23,7 +43,12 @@ interface InvestmentRenderersDeps {
   getAccountName: (accountId: string) => string;
   syncInvestmentMovementComputedAmount: () => void;
   renderInvestmentEditingTransactionRow: (item: Transaction) => string;
-  renderSnapshotRows: (items: any[], kind: SnapshotKind, month: number, computeFn: (itemId: string) => number) => string;
+  renderSnapshotRows: (
+    items: any[],
+    kind: SnapshotKind,
+    month: number,
+    computeFn: (itemId: string) => number,
+  ) => string;
   renderContributionsTable: () => void;
   getContributionEntriesFromSnapshots: () => any[];
 }
@@ -38,27 +63,52 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
   function renderWealth() {
     const state = deps.getState();
     const month = ui.snapshotMonth;
-    el.snapshotAccounts.innerHTML = deps.renderSnapshotRows(state.accounts, "accounts", month, (itemId: string) => deps.computeAccountBalance(itemId, month));
-    el.snapshotInvestments.innerHTML = deps.renderSnapshotRows(state.investmentAssets, "investments", month, (itemId: string) => deps.computeInvestmentValue(itemId, month));
-    el.snapshotLiabilities.innerHTML = deps.renderSnapshotRows(state.liabilities, "liabilities", month, (itemId: string) => deps.computeLiabilityValue(itemId, month));
+    el.snapshotAccounts.innerHTML = deps.renderSnapshotRows(
+      state.accounts,
+      "accounts",
+      month,
+      (itemId: string) => deps.computeAccountBalance(itemId, month),
+    );
+    el.snapshotInvestments.innerHTML = deps.renderSnapshotRows(
+      state.investmentAssets,
+      "investments",
+      month,
+      (itemId: string) => deps.computeInvestmentValue(itemId, month),
+    );
+    el.snapshotLiabilities.innerHTML = deps.renderSnapshotRows(
+      state.liabilities,
+      "liabilities",
+      month,
+      (itemId: string) => deps.computeLiabilityValue(itemId, month),
+    );
 
     const wealthSeries = deps.getWealthSeries();
     const now = new Date();
     const currentYear = now.getFullYear();
-    const visibleMonthLimit = state.year === currentYear ? Math.min(now.getMonth(), MONTHS.length - 1) : MONTHS.length - 1;
+    const visibleMonthLimit =
+      state.year === currentYear
+        ? Math.min(now.getMonth(), MONTHS.length - 1)
+        : MONTHS.length - 1;
     const chartMonths = MONTHS.slice(0, visibleMonthLimit + 1);
     const chartWealthSeries = wealthSeries.slice(0, visibleMonthLimit + 1);
-    renderLineChart(el.chartWealth, chartWealthSeries.map((entry: any) => entry.net), {
-      color: "#1f6feb",
-      fill: "rgba(37, 99, 235, 0.13)",
-      labels: chartMonths,
-      formatValue: deps.formatMoney,
-      formatAxisValue: deps.formatMoneyCompact,
-    });
+    renderLineChart(
+      el.chartWealth,
+      chartWealthSeries.map((entry: any) => entry.net),
+      {
+        color: "#1f6feb",
+        fill: "rgba(37, 99, 235, 0.13)",
+        labels: chartMonths,
+        formatValue: deps.formatMoney,
+        formatAxisValue: deps.formatMoneyCompact,
+      },
+    );
 
     el.wealthTimelineBody.innerHTML = wealthSeries
       .slice(0, visibleMonthLimit + 1)
-      .map((entry: any, monthIndex: number) => `<tr><td>${MONTHS[monthIndex]}</td><td>${deps.formatMoney(entry.liquidity)}</td><td>${deps.formatMoney(entry.investment)}</td><td>${deps.formatMoney(entry.liabilities)}</td><td><strong>${deps.formatMoney(entry.net)}</strong></td></tr>`)
+      .map(
+        (entry: any, monthIndex: number) =>
+          `<tr><td>${MONTHS[monthIndex]}</td><td>${deps.formatMoney(entry.liquidity)}</td><td>${deps.formatMoney(entry.investment)}</td><td>${deps.formatMoney(entry.liabilities)}</td><td><strong>${deps.formatMoney(entry.net)}</strong></td></tr>`,
+      )
       .join("");
   }
 
@@ -74,10 +124,24 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
 
   function renderInvestmentYearFilterOptions() {
     const state = deps.getState();
-    const years = Array.from(new Set(state.transactions.filter((item: any) => item.type === "investment").map((item: any) => parseTransactionYear(item.date)).filter((year): year is number => typeof year === "number" && Number.isInteger(year)).concat(state.year))).sort((a, b) => b - a);
+    const years = Array.from(
+      new Set(
+        state.transactions
+          .filter((item: any) => item.type === "investment")
+          .map((item: any) => parseTransactionYear(item.date))
+          .filter(
+            (year): year is number =>
+              typeof year === "number" && Number.isInteger(year),
+          )
+          .concat(state.year),
+      ),
+    ).sort((a, b) => b - a);
     if (!years.length) years.push(state.year);
-    if (!years.includes(ui.investmentYearFilter)) ui.investmentYearFilter = years[0];
-    el.investmentYearFilter.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join("");
+    if (!years.includes(ui.investmentYearFilter))
+      ui.investmentYearFilter = years[0];
+    el.investmentYearFilter.innerHTML = years
+      .map((year) => `<option value="${year}">${year}</option>`)
+      .join("");
     el.investmentYearFilter.value = String(ui.investmentYearFilter);
   }
 
@@ -110,68 +174,150 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     const month = ui.investmentMonth;
     const investedCapital = deps.computeInvestedCapital(month);
     const isTWR = ui.investmentReturnMode === "twr";
-    const portfolioValue = deps.computeInvestmentPortfolioValueForReturnMode(month, ui.investmentReturnMode);
+    const portfolioValue = deps.computeInvestmentPortfolioValueForReturnMode(
+      month,
+      ui.investmentReturnMode,
+    );
     const twrEntries = isTWR ? deps.getContributionEntriesFromSnapshots() : [];
-    const twrMetrics = isTWR ? (computeContributionMetricsCore(twrEntries) as ContributionMetricRow[]) : [];
+    const twrMetrics = isTWR
+      ? (computeContributionMetricsCore(twrEntries) as ContributionMetricRow[])
+      : [];
     const twrByDate = new Map<string, number>();
-    twrMetrics.forEach((m) => twrByDate.set(m.date, (m.cumulativeReturn ?? 0) * 100));
+    twrMetrics.forEach((m) =>
+      twrByDate.set(m.date, (m.cumulativeReturn ?? 0) * 100),
+    );
 
-    const simpleReturn = investedCapital <= 0 ? 0 : ((portfolioValue - investedCapital) / investedCapital) * 100;
-    const lastTWR = twrMetrics.length > 0 ? (twrMetrics[twrMetrics.length - 1].cumulativeReturn ?? 0) * 100 : 0;
+    const simpleReturn =
+      investedCapital <= 0
+        ? 0
+        : ((portfolioValue - investedCapital) / investedCapital) * 100;
+    const lastTWR =
+      twrMetrics.length > 0
+        ? (twrMetrics[twrMetrics.length - 1].cumulativeReturn ?? 0) * 100
+        : 0;
     const displayReturn = isTWR ? lastTWR : simpleReturn;
 
     el.invTotalValue.textContent = deps.formatMoney(portfolioValue);
     el.invCapital.textContent = deps.formatMoney(investedCapital);
     el.invReturn.textContent = formatPercent(displayReturn);
     el.invReturn.className = displayReturn >= 0 ? "text-good" : "text-bad";
-    el.invReturnLabel.textContent = isTWR ? "Rentabilidad TWR" : "Rentabilidad estimada";
+    el.invReturnLabel.textContent = isTWR
+      ? "Rentabilidad TWR"
+      : "Rentabilidad estimada";
 
-    const COLORS = ["#0d8476", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#84cc16", "#ec4899", "#64748b"];
-    const toGainPercent = (value: number, investedCapitalValue: number) => (investedCapitalValue <= 0 ? 0 : ((value - investedCapitalValue) / investedCapitalValue) * 100);
+    const COLORS = [
+      "#0d8476",
+      "#2563eb",
+      "#f59e0b",
+      "#ef4444",
+      "#8b5cf6",
+      "#14b8a6",
+      "#84cc16",
+      "#ec4899",
+      "#64748b",
+    ];
+    const toGainPercent = (value: number, investedCapitalValue: number) =>
+      investedCapitalValue <= 0
+        ? 0
+        : ((value - investedCapitalValue) / investedCapitalValue) * 100;
 
-    const computeInvestedCapitalByAsset = (assetId: string, targetMonth: number): number => {
-      const asset = state.investmentAssets.find((item: any) => item.id === assetId);
+    const computeInvestedCapitalByAsset = (
+      assetId: string,
+      targetMonth: number,
+    ): number => {
+      const asset = state.investmentAssets.find(
+        (item: any) => item.id === assetId,
+      );
       if (!asset) return 0;
       const openingCapital = Number(asset.openingBalance || 0);
-      const contributions = state.transactions.reduce((sum: number, item: any) => {
-        if (item.type !== "investment") return sum;
-        if (Number(item.month) > targetMonth) return sum;
-        if (!deps.matchesInvestmentAsset(item.category, asset)) return sum;
-        return sum + Number(item.amount || 0);
-      }, 0);
+      const contributions = state.transactions.reduce(
+        (sum: number, item: any) => {
+          if (item.type !== "investment") return sum;
+          if (Number(item.month) > targetMonth) return sum;
+          if (!deps.matchesInvestmentAsset(item.category, asset)) return sum;
+          return sum + Number(item.amount || 0);
+        },
+        0,
+      );
       return round2(openingCapital + contributions);
     };
 
-    const computeInvestedCapitalTotal = (targetMonth: number): number => round2(state.investmentAssets.reduce((sum: number, asset: any) => sum + computeInvestedCapitalByAsset(asset.id, targetMonth), 0));
+    const computeInvestedCapitalTotal = (targetMonth: number): number =>
+      round2(
+        state.investmentAssets.reduce(
+          (sum: number, asset: any) =>
+            sum + computeInvestedCapitalByAsset(asset.id, targetMonth),
+          0,
+        ),
+      );
 
     const monthIndexes = Array.from({ length: month + 1 }, (_, i) => i);
     const chartPoints = [-1, ...monthIndexes];
     const monthLabels = ["01/01", ...monthIndexes.map((m) => MONTHS[m])];
     const portfolioTotalValues = chartPoints.map((m) =>
-      deps.computeInvestmentPortfolioValueForReturnMode(m, isTWR ? "twr" : "simple")
+      deps.computeInvestmentPortfolioValueForReturnMode(
+        m,
+        isTWR ? "twr" : "simple",
+      ),
     );
-    const portfolioInvestedCapital = chartPoints.map((m) => computeInvestedCapitalTotal(m));
+    const portfolioInvestedCapital = chartPoints.map((m) =>
+      computeInvestedCapitalTotal(m),
+    );
     const portfolioPercentages = isTWR
       ? chartPoints.map((m) => {
           if (m < 0) return 0;
           const date = toSnapshotDate(state.year, m);
           return twrByDate.get(date) ?? 0;
         })
-      : portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]));
+      : portfolioTotalValues.map((value, idx) =>
+          toGainPercent(value, portfolioInvestedCapital[idx]),
+        );
 
-    renderMultiLineChart(el.investmentPortfolioChart, [{ name: isTWR ? "Cartera Total (TWR)" : "Cartera Total", color: COLORS[0], values: portfolioPercentages }], { labels: monthLabels, formatValue: (v) => formatPercent(v), forceZeroTick: true });
+    renderMultiLineChart(
+      el.investmentPortfolioChart,
+      [
+        {
+          name: isTWR ? "Cartera Total (TWR)" : "Cartera Total",
+          color: COLORS[0],
+          values: portfolioPercentages,
+        },
+      ],
+      {
+        labels: monthLabels,
+        formatValue: (v) => formatPercent(v),
+        forceZeroTick: true,
+      },
+    );
 
     const assetsSeries: MultiLineSeries[] = state.investmentAssets
       .filter((asset: any) => deps.computeInvestmentValue(asset.id, month) > 0)
       .map((asset: any, idx: number) => {
-        const values = chartPoints.map((m) => deps.computeInvestmentValue(asset.id, m));
-        const investedCapitalValues = chartPoints.map((m) => computeInvestedCapitalByAsset(asset.id, m));
-        return { name: asset.name, color: COLORS[idx % COLORS.length], values: values.map((value, valueIdx) => toGainPercent(value, investedCapitalValues[valueIdx])) };
+        const values = chartPoints.map((m) =>
+          deps.computeInvestmentValue(asset.id, m),
+        );
+        const investedCapitalValues = chartPoints.map((m) =>
+          computeInvestedCapitalByAsset(asset.id, m),
+        );
+        return {
+          name: asset.name,
+          color: COLORS[idx % COLORS.length],
+          values: values.map((value, valueIdx) =>
+            toGainPercent(value, investedCapitalValues[valueIdx]),
+          ),
+        };
       });
-    renderMultiLineChart(el.investmentAssetsChart, assetsSeries, { labels: monthLabels, formatValue: (v) => formatPercent(v), forceZeroTick: true });
+    renderMultiLineChart(el.investmentAssetsChart, assetsSeries, {
+      labels: monthLabels,
+      formatValue: (v) => formatPercent(v),
+      forceZeroTick: true,
+    });
 
     const allocation = state.investmentAssets
-      .map((asset: any, idx: number) => ({ label: asset.name, color: COLORS[idx % COLORS.length], value: deps.computeInvestmentValue(asset.id, month) }))
+      .map((asset: any, idx: number) => ({
+        label: asset.name,
+        color: COLORS[idx % COLORS.length],
+        value: deps.computeInvestmentValue(asset.id, month),
+      }))
       .filter((item) => item.value > 0);
     renderDonutChart(el.investmentAllocation, allocation, deps.formatMoney);
   }
@@ -193,13 +339,15 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
       });
 
     if (!rows.length) {
-      el.investmentTxBody.innerHTML = "<tr><td colspan='13'>Sin movimientos de inversión para este filtro.</td></tr>";
+      el.investmentTxBody.innerHTML =
+        "<tr><td colspan='13'>Sin movimientos de inversión para este filtro.</td></tr>";
       return;
     }
 
     el.investmentTxBody.innerHTML = rows
       .map((item) => {
-        if (ui.investmentTxEditingId === item.id) return deps.renderInvestmentEditingTransactionRow(item);
+        if (ui.investmentTxEditingId === item.id)
+          return deps.renderInvestmentEditingTransactionRow(item);
         const account = deps.getAccountName(item.accountId);
         const sideLabel = item.side === "sell" ? "Venta" : "Compra";
         const declaredLabel = item.declared ? "Sí" : "No";
@@ -209,5 +357,14 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
       .join("");
   }
 
-  return { isInvestmentSubTab, renderWealth, renderInvestment, renderInvestmentYearFilterOptions, renderInvestmentTabState, renderInvestmentReturnModeToggle, renderInvestmentDashboard, renderInvestmentTransactionsTable };
+  return {
+    isInvestmentSubTab,
+    renderWealth,
+    renderInvestment,
+    renderInvestmentYearFilterOptions,
+    renderInvestmentTabState,
+    renderInvestmentReturnModeToggle,
+    renderInvestmentDashboard,
+    renderInvestmentTransactionsTable,
+  };
 }

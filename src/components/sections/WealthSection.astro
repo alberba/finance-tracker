@@ -10,7 +10,9 @@
         Mes snapshot
         <select id="snapshot-month" name="snapshotMonth"></select>
       </label>
-      <button id="save-snapshot" class="primary-btn" type="button">Guardar snapshot</button>
+      <button id="save-snapshot" class="primary-btn" type="button"
+        >Guardar snapshot</button
+      >
     </div>
   </div>
 
@@ -65,7 +67,10 @@
     </article>
     <article class="card">
       <h3>Evolución mensual</h3>
-      <div class="chart-canvas-wrap"><canvas id="chart-wealth" aria-label="Evolución mensual patrimonio"></canvas></div>
+      <div class="chart-canvas-wrap">
+        <canvas id="chart-wealth" aria-label="Evolución mensual patrimonio"
+        ></canvas>
+      </div>
       <div class="table-wrap compact">
         <table>
           <thead>
@@ -84,10 +89,20 @@
   </div>
 
   <dialog id="wealth-calc-dialog" class="wealth-calc-dialog">
-    <form id="wealth-calc-form" class="wealth-calc-form" method="dialog" autocomplete="off">
+    <form
+      id="wealth-calc-form"
+      class="wealth-calc-form"
+      method="dialog"
+      autocomplete="off"
+    >
       <div class="wealth-calc-head">
         <h3 id="wealth-calc-title">Calcular snapshot</h3>
-        <button id="wealth-calc-close" type="button" class="tx-close-btn" aria-label="Cerrar cálculo">✕</button>
+        <button
+          id="wealth-calc-close"
+          type="button"
+          class="tx-close-btn"
+          aria-label="Cerrar cálculo">✕</button
+        >
       </div>
       <label>
         Cálculo numérico
@@ -100,7 +115,9 @@
         />
       </label>
       <div class="wealth-calc-actions">
-        <button id="wealth-calc-apply" type="submit" class="tx-btn-primary">Aplicar al snapshot</button>
+        <button id="wealth-calc-apply" type="submit" class="tx-btn-primary"
+          >Aplicar al snapshot</button
+        >
       </div>
     </form>
   </dialog>

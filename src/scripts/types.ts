@@ -3,13 +3,28 @@ export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export const INVESTMENT_SIDES = ["buy", "sell"] as const;
 export type InvestmentSide = (typeof INVESTMENT_SIDES)[number];
 export type BudgetType = TransactionType;
-export type TxSortColumn = "date" | "amount" | "account" | "type" | "category" | "description";
+export type TxSortColumn =
+  | "date"
+  | "amount"
+  | "account"
+  | "type"
+  | "category"
+  | "description";
 export type SortDirection = "asc" | "desc";
 export type InvestmentSubTab = "dashboard" | "movements" | "contributions";
 export type SnapshotKind = "accounts" | "investments" | "liabilities";
 export type EntityKey = "accounts" | "investmentAssets" | "liabilities";
-export type CategoryKey = "incomeCategories" | "expenseCategories" | "investmentCategories";
-export type GoalKey = "short" | "medium" | "long" | "investmentTotal" | "investmentFunds" | "investmentCrypto";
+export type CategoryKey =
+  | "incomeCategories"
+  | "expenseCategories"
+  | "investmentCategories";
+export type GoalKey =
+  | "short"
+  | "medium"
+  | "long"
+  | "investmentTotal"
+  | "investmentFunds"
+  | "investmentCrypto";
 
 export interface Entity {
   id: string;
@@ -140,22 +155,60 @@ export const SECTION_ROUTE_MAP = {
 export type SectionId = keyof typeof SECTION_ROUTE_MAP;
 
 export const ROUTE_SECTION_MAP: Record<string, SectionId> = Object.fromEntries(
-  Object.entries(SECTION_ROUTE_MAP).map(([sectionId, routePath]) => [routePath, sectionId])
+  Object.entries(SECTION_ROUTE_MAP).map(([sectionId, routePath]) => [
+    routePath,
+    sectionId,
+  ]),
 ) as Record<string, SectionId>;
 
-const GOAL_KEYS = ["short", "medium", "long", "investmentTotal", "investmentFunds", "investmentCrypto"] as const;
+const GOAL_KEYS = [
+  "short",
+  "medium",
+  "long",
+  "investmentTotal",
+  "investmentFunds",
+  "investmentCrypto",
+] as const;
 const GOAL_FIELDS = ["name", "targetYear", "targetAmount"] as const;
 const ENTITY_KEYS = ["accounts", "investmentAssets", "liabilities"] as const;
-const CATEGORY_KEYS = ["incomeCategories", "expenseCategories", "investmentCategories"] as const;
+const CATEGORY_KEYS = [
+  "incomeCategories",
+  "expenseCategories",
+  "investmentCategories",
+] as const;
 const SNAPSHOT_KINDS = ["accounts", "investments", "liabilities"] as const;
 
 export const DEFAULT_GOALS = (year: number): Record<GoalKey, Goal> => ({
-  short: { name: "Objetivo corto plazo", targetYear: year, targetAmount: 10000 },
-  medium: { name: "Objetivo medio plazo", targetYear: year + 1, targetAmount: 50000 },
-  long: { name: "Objetivo largo plazo", targetYear: year + 4, targetAmount: 150000 },
-  investmentTotal: { name: "Objetivo inversión total", targetYear: year + 1, targetAmount: 50000 },
-  investmentFunds: { name: "Objetivo fondos indexados", targetYear: year + 1, targetAmount: 50000 },
-  investmentCrypto: { name: "Objetivo criptomonedas", targetYear: year + 1, targetAmount: 15000 },
+  short: {
+    name: "Objetivo corto plazo",
+    targetYear: year,
+    targetAmount: 10000,
+  },
+  medium: {
+    name: "Objetivo medio plazo",
+    targetYear: year + 1,
+    targetAmount: 50000,
+  },
+  long: {
+    name: "Objetivo largo plazo",
+    targetYear: year + 4,
+    targetAmount: 150000,
+  },
+  investmentTotal: {
+    name: "Objetivo inversión total",
+    targetYear: year + 1,
+    targetAmount: 50000,
+  },
+  investmentFunds: {
+    name: "Objetivo fondos indexados",
+    targetYear: year + 1,
+    targetAmount: 50000,
+  },
+  investmentCrypto: {
+    name: "Objetivo criptomonedas",
+    targetYear: year + 1,
+    targetAmount: 15000,
+  },
 });
 
 export function isSectionId(value: string): value is SectionId {

@@ -36,7 +36,9 @@ function requiredElement<T extends HTMLElement>(id: string): T | null {
 }
 
 function currentSectionId(): string {
-  const activeButton = document.querySelector<HTMLButtonElement>("#nav-tabs .nav-btn.is-active");
+  const activeButton = document.querySelector<HTMLButtonElement>(
+    "#nav-tabs .nav-btn.is-active",
+  );
   return String(activeButton?.dataset.section || "dashboard");
 }
 
@@ -44,7 +46,10 @@ function normalizeText(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
-function getValidationError(summary: string, description: string): string | null {
+function getValidationError(
+  summary: string,
+  description: string,
+): string | null {
   if (!summary || !description) {
     return "Revisa el formulario: resumen y descripción son obligatorios.";
   }
@@ -69,7 +74,8 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
 
   const data = (await response.json()) as ReportResponse;
   if (!response.ok) {
-    const errorMessage = "error" in data ? data.error : "No se pudo crear la issue.";
+    const errorMessage =
+      "error" in data ? data.error : "No se pudo crear la issue.";
     return { ok: false, error: errorMessage };
   }
   return data;
@@ -78,7 +84,9 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
 (() => {
   const form = requiredElement<HTMLFormElement>("issue-report-form");
   const status = requiredElement<HTMLElement>("issue-report-status");
-  const submitButton = requiredElement<HTMLButtonElement>("issue-report-submit");
+  const submitButton = requiredElement<HTMLButtonElement>(
+    "issue-report-submit",
+  );
   if (!form || !status || !submitButton) {
     return;
   }
@@ -87,7 +95,9 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
     event.preventDefault();
     const formData = new FormData(form);
     const summary = normalizeText(String(formData.get("summary") || ""));
-    const description = normalizeText(String(formData.get("description") || ""));
+    const description = normalizeText(
+      String(formData.get("description") || ""),
+    );
     const validationError = getValidationError(summary, description);
     if (validationError) {
       status.textContent = validationError;
@@ -95,7 +105,9 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
     }
 
     const payload: ReportPayload = {
-      type: (String(formData.get("type")) === "enhancement" ? "enhancement" : "bug") as ReportType,
+      type: (String(formData.get("type")) === "enhancement"
+        ? "enhancement"
+        : "bug") as ReportType,
       summary,
       description,
       mentionClaude: formData.get("mentionClaude") === "on",
@@ -105,9 +117,14 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
         pathname: window.location.pathname,
         timestamp: new Date().toISOString(),
       },
-      stepsToReproduce: normalizeText(String(formData.get("stepsToReproduce") || "")) || undefined,
-      expectedResult: normalizeText(String(formData.get("expectedResult") || "")) || undefined,
-      actualResult: normalizeText(String(formData.get("actualResult") || "")) || undefined,
+      stepsToReproduce:
+        normalizeText(String(formData.get("stepsToReproduce") || "")) ||
+        undefined,
+      expectedResult:
+        normalizeText(String(formData.get("expectedResult") || "")) ||
+        undefined,
+      actualResult:
+        normalizeText(String(formData.get("actualResult") || "")) || undefined,
     };
 
     submitButton.disabled = true;
@@ -132,12 +149,15 @@ async function submitReport(payload: ReportPayload): Promise<ReportResponse> {
         status.append(" (automatización en curso)");
       }
       form.reset();
-      const mentionCheckbox = requiredElement<HTMLInputElement>("issue-report-mention-claude");
+      const mentionCheckbox = requiredElement<HTMLInputElement>(
+        "issue-report-mention-claude",
+      );
       if (mentionCheckbox) {
         mentionCheckbox.checked = false;
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Error inesperado.";
+      const message =
+        error instanceof Error ? error.message : "Error inesperado.";
       status.textContent = `No se pudo crear la issue: ${message}`;
     } finally {
       submitButton.disabled = false;

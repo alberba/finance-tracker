@@ -28,7 +28,9 @@ function seedClone(): unknown {
 }
 
 function normalizeNamespace(value: string | null | undefined): string {
-  const input = String(value || "").trim().toLowerCase();
+  const input = String(value || "")
+    .trim()
+    .toLowerCase();
   if (!input) {
     return DEFAULT_NAMESPACE;
   }
@@ -53,7 +55,11 @@ async function ensureSchema(db: D1DatabaseLike): Promise<void> {
   await db.prepare(CREATE_TABLE_SQL).run();
 }
 
-async function upsertState(db: D1DatabaseLike, namespace: string, value: unknown): Promise<void> {
+async function upsertState(
+  db: D1DatabaseLike,
+  namespace: string,
+  value: unknown,
+): Promise<void> {
   const sql = `
     INSERT INTO app_state (id, payload, updated_at)
     VALUES (?, ?, ?)
@@ -61,10 +67,20 @@ async function upsertState(db: D1DatabaseLike, namespace: string, value: unknown
       payload = excluded.payload,
       updated_at = excluded.updated_at;
   `;
-  await db.prepare(sql).bind(normalizeNamespace(namespace), toPayload(value), new Date().toISOString()).run();
+  await db
+    .prepare(sql)
+    .bind(
+      normalizeNamespace(namespace),
+      toPayload(value),
+      new Date().toISOString(),
+    )
+    .run();
 }
 
-export async function loadStateFromD1(db: D1DatabaseLike, namespace?: string): Promise<unknown> {
+export async function loadStateFromD1(
+  db: D1DatabaseLike,
+  namespace?: string,
+): Promise<unknown> {
   await ensureSchema(db);
   const key = normalizeNamespace(namespace);
   const row = (await db
@@ -85,13 +101,16 @@ export async function loadStateFromD1(db: D1DatabaseLike, namespace?: string): P
 export async function saveStateToD1(
   db: D1DatabaseLike,
   namespace: string | undefined,
-  value: unknown
+  value: unknown,
 ): Promise<void> {
   await ensureSchema(db);
   await upsertState(db, normalizeNamespace(namespace), value);
 }
 
-export async function resetStateInD1(db: D1DatabaseLike, namespace?: string): Promise<unknown> {
+export async function resetStateInD1(
+  db: D1DatabaseLike,
+  namespace?: string,
+): Promise<unknown> {
   await ensureSchema(db);
   const key = normalizeNamespace(namespace);
   const seed = seedClone();

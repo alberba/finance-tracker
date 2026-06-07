@@ -1,4 +1,10 @@
-import { type Contribution, type ContributionMetricRow, type SnapshotKind, type SnapshotRow, type State } from "../types";
+import {
+  type Contribution,
+  type ContributionMetricRow,
+  type SnapshotKind,
+  type SnapshotRow,
+  type State,
+} from "../types";
 import {
   deriveContributionFlow,
   findLiquidityTargets,
@@ -8,7 +14,16 @@ import {
 } from "../contribution-workflow";
 import { computeContributionMetrics as computeContributionMetricsCore } from "../../lib/finance-core";
 import { evaluateNumericExpression } from "../math-expression";
-import { escapeAttr, escapeHtml, formatPercent, monthFromISO, parseFloatSafe, parseIntSafe, round2, todayISO } from "../utils";
+import {
+  escapeAttr,
+  escapeHtml,
+  formatPercent,
+  monthFromISO,
+  parseFloatSafe,
+  parseIntSafe,
+  round2,
+  todayISO,
+} from "../utils";
 
 interface ContributionWorkflowSectionDeps {
   getState: () => State;
@@ -22,25 +37,38 @@ interface ContributionWorkflowSectionDeps {
   isSnapshotKind: (value: string) => value is SnapshotKind;
 }
 
-export function setupContributionWorkflowSection(deps: ContributionWorkflowSectionDeps) {
+export function setupContributionWorkflowSection(
+  deps: ContributionWorkflowSectionDeps,
+) {
   const { ui, el } = deps;
   const workflowDialog = el.contributionWorkflowDialog as HTMLDialogElement;
 
-  function getInvestmentValueFromSnapshot(snapshot: SnapshotRow | undefined): number {
+  function getInvestmentValueFromSnapshot(
+    snapshot: SnapshotRow | undefined,
+  ): number {
     return round2(
-      Object.values(snapshot?.investments || {}).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
+      Object.values(snapshot?.investments || {}).reduce(
+        (sum: number, value: any) => sum + parseFloatSafe(value, 0),
+        0,
+      ),
     );
   }
 
-  function getPortfolioValueFromSnapshot(snapshot: SnapshotRow | undefined, liquidityAccountIds: Set<string>): number {
+  function getPortfolioValueFromSnapshot(
+    snapshot: SnapshotRow | undefined,
+    liquidityAccountIds: Set<string>,
+  ): number {
     const investmentValue = getInvestmentValueFromSnapshot(snapshot);
     const liquidityValue = round2(
-      Object.entries(snapshot?.accounts || {}).reduce((sum: number, [accountId, value]) => {
-        if (!liquidityAccountIds.has(String(accountId))) {
-          return sum;
-        }
-        return sum + parseFloatSafe(value, 0);
-      }, 0)
+      Object.entries(snapshot?.accounts || {}).reduce(
+        (sum: number, [accountId, value]) => {
+          if (!liquidityAccountIds.has(String(accountId))) {
+            return sum;
+          }
+          return sum + parseFloatSafe(value, 0);
+        },
+        0,
+      ),
     );
     return round2(investmentValue + liquidityValue);
   }
@@ -59,8 +87,13 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
   function getContributionEntriesFromSnapshots(): Contribution[] {
     const state = deps.getState();
-    const liquidityTargetAccounts = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched;
-    const liquidityTargetIds = new Set(liquidityTargetAccounts.map((account) => String(account.id)));
+    const liquidityTargetAccounts = findLiquidityTargets(
+      state.accounts,
+      state.twrLiquidityAccountIds,
+    ).matched;
+    const liquidityTargetIds = new Set(
+      liquidityTargetAccounts.map((account) => String(account.id)),
+    );
     const rowsByDate = new Map<string, Contribution>();
 
     Object.entries(state.snapshots || {})
@@ -70,13 +103,18 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
           return null;
         }
 
-        const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds);
+        const portfolioValue = getPortfolioValueFromSnapshot(
+          snapshot,
+          liquidityTargetIds,
+        );
         if (portfolioValue <= 0) {
           return null;
         }
 
         const date = toSnapshotDate(state.year, month);
-        const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
+        const existing = state.contributions.find(
+          (item: any) => String(item.portfolioDate || item.date) === date,
+        );
         const derived = deriveContributionFlow(existing || {});
         const flow = round2(derived.flow);
         return {
@@ -89,7 +127,9 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
           flowAllocations: derived.allocations,
           flowSource: derived.flowSource,
           warnings: Array.isArray(existing?.warnings)
-            ? existing.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+            ? existing.warnings
+                .map((entry: unknown) => String(entry || "").trim())
+                .filter(Boolean)
             : [],
         };
       })
@@ -111,7 +151,10 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       const existing = rowsByDate.get(date);
       const keepsSnapshotPortfolioValue = Boolean(existing);
       const normalizedPortfolioValue = round2(
-        parseFloatSafe(item.portfolioValue, keepsSnapshotPortfolioValue ? existing?.portfolioValue ?? 0 : 0)
+        parseFloatSafe(
+          item.portfolioValue,
+          keepsSnapshotPortfolioValue ? (existing?.portfolioValue ?? 0) : 0,
+        ),
       );
       const portfolioValue =
         keepsSnapshotPortfolioValue && existing
@@ -134,31 +177,53 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         flowAllocations: derived.allocations,
         flowSource: derived.flowSource,
         warnings: Array.isArray(item?.warnings)
-          ? item.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+          ? item.warnings
+              .map((entry: unknown) => String(entry || "").trim())
+              .filter(Boolean)
           : [],
       });
     });
 
     return Array.from(rowsByDate.values()).sort((a, b) =>
-      String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date))
+      String(a.portfolioDate || a.date).localeCompare(
+        String(b.portfolioDate || b.date),
+      ),
     );
   }
 
   function renderContributionsTable() {
-    const rows = computeContributionMetricsCore(getContributionEntriesFromSnapshots()) as ContributionMetricRow[];
+    const rows = computeContributionMetricsCore(
+      getContributionEntriesFromSnapshots(),
+    ) as ContributionMetricRow[];
 
     if (!rows.length) {
-      el.contributionBody.innerHTML = "<tr><td colspan='9'>Sin snapshots de inversión disponibles.</td></tr>";
+      el.contributionBody.innerHTML =
+        "<tr><td colspan='9'>Sin snapshots de inversión disponibles.</td></tr>";
       return;
     }
 
     el.contributionBody.innerHTML = rows
       .map((row: ContributionMetricRow, index: number) => {
-        const periodText = row.periodReturn === null ? "--" : formatPercent(row.periodReturn * 100);
-        const cumulativeText = row.cumulativeReturn === null ? "--" : formatPercent(row.cumulativeReturn * 100);
-        const periodClass = row.periodReturn === null ? "" : row.periodReturn >= 0 ? "text-good" : "text-bad";
+        const periodText =
+          row.periodReturn === null
+            ? "--"
+            : formatPercent(row.periodReturn * 100);
+        const cumulativeText =
+          row.cumulativeReturn === null
+            ? "--"
+            : formatPercent(row.cumulativeReturn * 100);
+        const periodClass =
+          row.periodReturn === null
+            ? ""
+            : row.periodReturn >= 0
+              ? "text-good"
+              : "text-bad";
         const cumulativeClass =
-          row.cumulativeReturn === null ? "" : row.cumulativeReturn >= 0 ? "text-good" : "text-bad";
+          row.cumulativeReturn === null
+            ? ""
+            : row.cumulativeReturn >= 0
+              ? "text-good"
+              : "text-bad";
         const manualActions = isManualContributionDate(row.date)
           ? `
               <button
@@ -202,10 +267,12 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const state = deps.getState();
     ui.contributionWorkflowStep = 1;
     ui.contributionWorkflowDate = todayISO();
-    ui.contributionWorkflowMonth = monthFromISO(ui.contributionWorkflowDate) ?? ui.investmentMonth;
+    ui.contributionWorkflowMonth =
+      monthFromISO(ui.contributionWorkflowDate) ?? ui.investmentMonth;
 
     const existing = state.contributions.find(
-      (item: any) => String(item.portfolioDate || item.date) === ui.contributionWorkflowDate
+      (item: any) =>
+        String(item.portfolioDate || item.date) === ui.contributionWorkflowDate,
     );
     const derived = deriveContributionFlow(existing || {});
     ui.contributionWorkflowAmount = round2(derived.flow);
@@ -228,13 +295,22 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     renderContributionWorkflowStepState();
 
     const month = ui.contributionWorkflowMonth;
-    const date = ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
-    const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
-    const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || []);
-    const { matched: liquidityAccounts, missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds);
+    const date =
+      ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
+    const existing = state.contributions.find(
+      (item: any) => String(item.portfolioDate || item.date) === date,
+    );
+    const existingAllocations = sanitizeFlowAllocations(
+      existing?.flowAllocations || [],
+    );
+    const { matched: liquidityAccounts, missing } = findLiquidityTargets(
+      state.accounts,
+      state.twrLiquidityAccountIds,
+    );
     const snapshot = state.snapshots[String(month)];
 
-    el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets.length
+    el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets
+      .length
       ? state.investmentAssets
           .map((asset: any) => {
             const snapshotValue = snapshot?.investments?.[asset.id];
@@ -320,12 +396,15 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         ? `${liquidityRows}${missingRows}`
         : "<tr><td colspan='2'>No hay cuentas de liquidez configuradas.</td></tr>";
 
-    const allocationsByAccountId = new Map(existingAllocations.map((item) => [item.accountId, item.amount]));
+    const allocationsByAccountId = new Map(
+      existingAllocations.map((item) => [item.accountId, item.amount]),
+    );
     el.contributionWorkflowAllocationBody.innerHTML =
       liquidityAccounts.length > 0
         ? liquidityAccounts
             .map((account) => {
-              const currentAllocation = allocationsByAccountId.get(account.id) ?? 0;
+              const currentAllocation =
+                allocationsByAccountId.get(account.id) ?? 0;
               return `
                 <tr>
                   <td>${escapeHtml(account.name)}</td>
@@ -347,7 +426,11 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
     if (ui.contributionWorkflowAmount <= 0) {
       ui.contributionWorkflowAmount = round2(
-        getFlowFromAllocations(existingAllocations.length > 0 ? existingAllocations : existing?.flowAllocations || [])
+        getFlowFromAllocations(
+          existingAllocations.length > 0
+            ? existingAllocations
+            : existing?.flowAllocations || [],
+        ),
       );
     }
     el.contributionWorkflowTotal.value = String(ui.contributionWorkflowAmount);
@@ -363,7 +446,11 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     el.contributionWorkflowSave.hidden = isStepOne;
   }
 
-  function openContributionCalcModal(kind: SnapshotKind, targetId: string, targetName: string) {
+  function openContributionCalcModal(
+    kind: SnapshotKind,
+    targetId: string,
+    targetName: string,
+  ) {
     ui.contributionCalcTargetKind = kind;
     ui.contributionCalcTargetId = targetId;
     ui.contributionCalcTargetName = targetName;
@@ -392,7 +479,9 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       return;
     }
 
-    const evaluated = evaluateNumericExpression(el.contributionCalcExpression.value);
+    const evaluated = evaluateNumericExpression(
+      el.contributionCalcExpression.value,
+    );
     if (evaluated === null) {
       deps.showToast("El cálculo no es válido.");
       el.contributionCalcExpression.focus();
@@ -400,7 +489,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     }
 
     const snapshotInput = workflowDialog.querySelector<HTMLInputElement>(
-      `input[data-contribution-snapshot-kind="${CSS.escape(ui.contributionCalcTargetKind)}"][data-contribution-snapshot-id="${CSS.escape(ui.contributionCalcTargetId)}"]`
+      `input[data-contribution-snapshot-kind="${CSS.escape(ui.contributionCalcTargetKind)}"][data-contribution-snapshot-id="${CSS.escape(ui.contributionCalcTargetId)}"]`,
     );
     if (!snapshotInput) {
       deps.showToast("No se pudo aplicar el resultado.");
@@ -418,7 +507,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const state = deps.getState();
     const warnings: string[] = [];
     const snapshotInputs = Array.from(
-      workflowDialog.querySelectorAll("input[data-contribution-snapshot-kind]")
+      workflowDialog.querySelectorAll("input[data-contribution-snapshot-kind]"),
     ) as HTMLInputElement[];
 
     const missingInvestment = snapshotInputs.filter((input) => {
@@ -441,14 +530,21 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       warnings.push(`Faltan snapshots de liquidez: ${missingLiquidity}`);
     }
 
-    const { missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds);
+    const { missing } = findLiquidityTargets(
+      state.accounts,
+      state.twrLiquidityAccountIds,
+    );
     if (missing.length > 0) {
-      warnings.push(`Cuentas de liquidez no configuradas: ${missing.join(", ")}`);
+      warnings.push(
+        `Cuentas de liquidez no configuradas: ${missing.join(", ")}`,
+      );
     }
 
     const total = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
     const allocationInputs = Array.from(
-      workflowDialog.querySelectorAll("input[data-contribution-allocation-account-id]")
+      workflowDialog.querySelectorAll(
+        "input[data-contribution-allocation-account-id]",
+      ),
     ) as HTMLInputElement[];
     const allocated = round2(
       allocationInputs.reduce((sum: number, input: HTMLInputElement) => {
@@ -457,7 +553,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
           return sum;
         }
         return sum + value;
-      }, 0)
+      }, 0),
     );
     const delta = round2(total - allocated);
 
@@ -465,7 +561,9 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       warnings.push(`Importe sin asignar: ${deps.formatMoney(delta)}`);
     }
     if (delta < 0) {
-      warnings.push(`Importe sobreasignado: ${deps.formatMoney(Math.abs(delta))}`);
+      warnings.push(
+        `Importe sobreasignado: ${deps.formatMoney(Math.abs(delta))}`,
+      );
     }
 
     return warnings;
@@ -473,16 +571,24 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
   function renderContributionWorkflowModalWarnings() {
     const warnings = getContributionWorkflowWarnings();
-    const snapshotWarnings = warnings.filter((message) => /snapshot|liquidez no configuradas/i.test(message));
-    const allocationWarnings = warnings.filter((message) => /asignar|sobreasignado/i.test(message));
-    el.contributionWorkflowSnapshotWarning.textContent = snapshotWarnings.join("\n");
-    el.contributionWorkflowAllocationWarning.textContent = allocationWarnings.join("\n");
+    const snapshotWarnings = warnings.filter((message) =>
+      /snapshot|liquidez no configuradas/i.test(message),
+    );
+    const allocationWarnings = warnings.filter((message) =>
+      /asignar|sobreasignado/i.test(message),
+    );
+    el.contributionWorkflowSnapshotWarning.textContent =
+      snapshotWarnings.join("\n");
+    el.contributionWorkflowAllocationWarning.textContent =
+      allocationWarnings.join("\n");
   }
 
   function saveContributionFromWorkflowModal() {
     const state = deps.getState();
     const month = ui.contributionWorkflowMonth;
-    const date = String(el.contributionWorkflowDate.value || "").trim() || toSnapshotDate(state.year, month);
+    const date =
+      String(el.contributionWorkflowDate.value || "").trim() ||
+      toSnapshotDate(state.year, month);
     ui.contributionWorkflowDate = date;
     const monthFromDate = monthFromISO(date);
     if (monthFromDate !== null) {
@@ -500,7 +606,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
     const snapshot = state.snapshots[String(ui.contributionWorkflowMonth)];
     const snapshotInputs = Array.from(
-      workflowDialog.querySelectorAll("input[data-contribution-snapshot-kind]")
+      workflowDialog.querySelectorAll("input[data-contribution-snapshot-kind]"),
     ) as HTMLInputElement[];
     snapshotInputs.forEach((input: HTMLInputElement) => {
       const kind = input.dataset.contributionSnapshotKind;
@@ -517,26 +623,39 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     });
 
     const allocationInputs = Array.from(
-      workflowDialog.querySelectorAll("input[data-contribution-allocation-account-id]")
+      workflowDialog.querySelectorAll(
+        "input[data-contribution-allocation-account-id]",
+      ),
     ) as HTMLInputElement[];
     const flowAllocations = sanitizeFlowAllocations(
       allocationInputs.map((input) => ({
         accountId: String(input.dataset.contributionAllocationAccountId || ""),
         amount: round2(parseFloatSafe(input.value, 0)),
-      }))
+      })),
     );
-    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const existingIndex = state.contributions.findIndex(
+      (item: any) => String(item.portfolioDate || item.date) === date,
+    );
     const previousAllocations =
-      existingIndex >= 0 ? sanitizeFlowAllocations(state.contributions[existingIndex].flowAllocations || []) : [];
+      existingIndex >= 0
+        ? sanitizeFlowAllocations(
+            state.contributions[existingIndex].flowAllocations || [],
+          )
+        : [];
 
     const investmentValue = getInvestmentValueFromSnapshot(snapshot);
     if (investmentValue <= 0) {
-      deps.showToast("Debes indicar al menos un snapshot de inversión para registrar el aporte.");
+      deps.showToast(
+        "Debes indicar al menos un snapshot de inversión para registrar el aporte.",
+      );
       return;
     }
 
     const liquidityTargetIds = new Set(
-      findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds).matched.map((account) => String(account.id))
+      findLiquidityTargets(
+        state.accounts,
+        state.twrLiquidityAccountIds,
+      ).matched.map((account) => String(account.id)),
     );
     const previousFlow = round2(
       previousAllocations.reduce((sum, item) => {
@@ -544,20 +663,29 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
           return sum;
         }
         return sum + item.amount;
-      }, 0)
+      }, 0),
     );
-    const portfolioValue = round2(getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds) - previousFlow);
+    const portfolioValue = round2(
+      getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds) -
+        previousFlow,
+    );
     if (portfolioValue <= 0) {
-      deps.showToast("El valor de cartera debe ser mayor que cero para registrar el aporte.");
+      deps.showToast(
+        "El valor de cartera debe ser mayor que cero para registrar el aporte.",
+      );
       return;
     }
 
-    const previousByAccount = new Map(previousAllocations.map((item) => [item.accountId, item.amount]));
+    const previousByAccount = new Map(
+      previousAllocations.map((item) => [item.accountId, item.amount]),
+    );
     flowAllocations.forEach((item) => {
       const previous = previousByAccount.get(item.accountId) ?? 0;
       const delta = round2(item.amount - previous);
       if (delta !== 0) {
-        const currentValue = round2(parseFloatSafe(snapshot.accounts[item.accountId], 0));
+        const currentValue = round2(
+          parseFloatSafe(snapshot.accounts[item.accountId], 0),
+        );
         snapshot.accounts[item.accountId] = round2(currentValue + delta);
       }
       previousByAccount.delete(item.accountId);
@@ -567,15 +695,22 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
       if (amount === 0) {
         return;
       }
-      const currentValue = round2(parseFloatSafe(snapshot.accounts[accountId], 0));
+      const currentValue = round2(
+        parseFloatSafe(snapshot.accounts[accountId], 0),
+      );
       snapshot.accounts[accountId] = round2(currentValue - amount);
     });
 
     const flow = getFlowFromAllocations(flowAllocations);
-    ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
+    ui.contributionWorkflowAmount = round2(
+      parseFloatSafe(el.contributionWorkflowTotal.value, 0),
+    );
     const warnings = getContributionWorkflowWarnings();
     const payload: Contribution = {
-      id: existingIndex >= 0 ? state.contributions[existingIndex].id : `contrib-snapshot-${state.year}-${ui.contributionWorkflowMonth + 1}`,
+      id:
+        existingIndex >= 0
+          ? state.contributions[existingIndex].id
+          : `contrib-snapshot-${state.year}-${ui.contributionWorkflowMonth + 1}`,
       date,
       amount: flow,
       portfolioDate: date,
@@ -596,17 +731,23 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     deps.saveState();
     deps.renderAll();
     closeContributionWorkflowModal();
-    deps.showToast(warnings.length > 0 ? "Aporte guardado con avisos." : "Aporte guardado.");
+    deps.showToast(
+      warnings.length > 0 ? "Aporte guardado con avisos." : "Aporte guardado.",
+    );
   }
 
   function upsertContributionFlowForDate(date: string, flow: number) {
     const state = deps.getState();
     const entries = getContributionEntriesFromSnapshots();
-    const current = entries.find((item: any) => item.date === date || item.portfolioDate === date);
+    const current = entries.find(
+      (item: any) => item.date === date || item.portfolioDate === date,
+    );
     if (!current) {
       return;
     }
-    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const existingIndex = state.contributions.findIndex(
+      (item: any) => String(item.portfolioDate || item.date) === date,
+    );
     const payload: Contribution = {
       id: current.id,
       date,

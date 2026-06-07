@@ -7,7 +7,14 @@ import {
   type State,
 } from "../types";
 import { decorateCategoryLabel } from "../category-emoji";
-import { escapeAttr, escapeHtml, parseFloatSafe, parseIntSafe, round2, slug } from "../utils";
+import {
+  escapeAttr,
+  escapeHtml,
+  parseFloatSafe,
+  parseIntSafe,
+  round2,
+  slug,
+} from "../utils";
 
 interface SettingsDataSectionDeps {
   getState: () => State;
@@ -29,7 +36,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     el.saveSettingsMain.addEventListener("click", () => {
       const state = deps.getState();
       state.year = parseIntSafe(el.settingsYear.value, state.year);
-      state.currency = String(el.settingsCurrency.value || state.currency || "EUR")
+      state.currency = String(
+        el.settingsCurrency.value || state.currency || "EUR",
+      )
         .toUpperCase()
         .slice(0, 3);
       el.yearDisplay.value = String(state.year);
@@ -44,7 +53,10 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     });
     el.addInvestmentForm.addEventListener("submit", (event: Event) => {
       event.preventDefault();
-      addEntityFromForm(event.currentTarget as HTMLFormElement, "investmentAssets");
+      addEntityFromForm(
+        event.currentTarget as HTMLFormElement,
+        "investmentAssets",
+      );
       syncInvestmentCategoriesWithAssets();
     });
     el.addLiabilityForm.addEventListener("submit", (event: Event) => {
@@ -56,14 +68,23 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     bindCategoryAddForm(el.addExpenseCategory, "expenseCategories");
     bindCategoryAddForm(el.addInvestmentCategory, "investmentCategories");
 
-    [el.settingsAccounts, el.settingsInvestments, el.settingsLiabilities].forEach((container: HTMLElement) => {
+    [
+      el.settingsAccounts,
+      el.settingsInvestments,
+      el.settingsLiabilities,
+    ].forEach((container: HTMLElement) => {
       container.addEventListener("change", onEntityEditorInput);
       container.addEventListener("click", onEntityEditorDelete);
     });
-    el.settingsTwrLiquidity.addEventListener("change", onTwrLiquiditySelectionChange);
-    [el.incomeTags, el.expenseTags, el.investmentTags].forEach((container: HTMLElement) => {
-      container.addEventListener("click", onCategoryDelete);
-    });
+    el.settingsTwrLiquidity.addEventListener(
+      "change",
+      onTwrLiquiditySelectionChange,
+    );
+    [el.incomeTags, el.expenseTags, el.investmentTags].forEach(
+      (container: HTMLElement) => {
+        container.addEventListener("click", onCategoryDelete);
+      },
+    );
   }
 
   function bindDataEvents() {
@@ -72,7 +93,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     el.exportTransactionsCsv.addEventListener("click", exportTransactionsCsv);
 
     el.resetSeed.addEventListener("click", () => {
-      const confirmed = window.confirm("Se reiniciará todo y se cargará el seed original. ¿Continuar?");
+      const confirmed = window.confirm(
+        "Se reiniciará todo y se cargará el seed original. ¿Continuar?",
+      );
       if (!confirmed) {
         return;
       }
@@ -101,7 +124,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
   function renderDataTab() {
     const state = deps.getState();
     el.dataTotalTransactions.textContent = String(state.transactions.length);
-    el.dataTotalSnapshots.textContent = String(Object.keys(state.snapshots || {}).length);
+    el.dataTotalSnapshots.textContent = String(
+      Object.keys(state.snapshots || {}).length,
+    );
     el.dataTotalContributions.textContent = String(state.contributions.length);
 
     const source = state.meta?.source || "desconocido";
@@ -114,7 +139,8 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     const state = deps.getState();
     const list = state[key];
     if (!list.length) {
-      container.innerHTML = "<p class='list-item'><small>Sin elementos.</small></p>";
+      container.innerHTML =
+        "<p class='list-item'><small>Sin elementos.</small></p>";
       return;
     }
 
@@ -126,7 +152,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
             <input type="number" name="${escapeAttr(key)}-${escapeAttr(item.id)}-openingBalance" autocomplete="off" data-field="openingBalance" step="0.01" value="${Number(item.openingBalance || 0)}" aria-label="Saldo inicial de ${escapeAttr(item.name)}" />
             <button class="delete-btn" data-action="remove-entity" data-entity="${escapeAttr(key)}" data-id="${escapeAttr(item.id)}" aria-label="Eliminar ${escapeAttr(item.name)}">Eliminar</button>
           </div>
-        `
+        `,
       )
       .join("");
   }
@@ -136,7 +162,8 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     const selected = new Set(state.twrLiquidityAccountIds || []);
     const accounts = state.accounts || [];
     if (!accounts.length) {
-      el.settingsTwrLiquidity.innerHTML = "<small>Sin cuentas disponibles.</small>";
+      el.settingsTwrLiquidity.innerHTML =
+        "<small>Sin cuentas disponibles.</small>";
       return;
     }
 
@@ -167,7 +194,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
             ${escapeHtml(decorateCategoryLabel(categoryKeyToType(key), item))}
             <button class="icon-btn" data-action="remove-category" data-target="${escapeAttr(key)}" data-name="${escapeAttr(item)}" aria-label="Eliminar categoría ${escapeAttr(item)}">×</button>
           </span>
-        `
+        `,
       )
       .join("");
   }
@@ -182,11 +209,16 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     return "investment";
   }
 
-  function addEntityFromForm(formElement: HTMLFormElement, targetKey: EntityKey) {
+  function addEntityFromForm(
+    formElement: HTMLFormElement,
+    targetKey: EntityKey,
+  ) {
     const state = deps.getState();
     const form = new FormData(formElement);
     const name = String(form.get("name") || "").trim();
-    const openingBalance = round2(parseFloatSafe(form.get("openingBalance"), 0));
+    const openingBalance = round2(
+      parseFloatSafe(form.get("openingBalance"), 0),
+    );
 
     if (!name) {
       deps.showToast("Indica un nombre.");
@@ -248,7 +280,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
   function onEntityEditorDelete(event: Event) {
     const target = deps.getEventElement(event.target);
-    const button = target?.closest<HTMLElement>("button[data-action='remove-entity']");
+    const button = target?.closest<HTMLElement>(
+      "button[data-action='remove-entity']",
+    );
     if (!button) {
       return;
     }
@@ -264,10 +298,12 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     state[entity] = list.filter((item: any) => item.id !== id);
 
     if (entity === "accounts") {
-      state.transactions = state.transactions.filter((tx: any) => tx.accountId !== id);
-      state.twrLiquidityAccountIds = (state.twrLiquidityAccountIds || []).filter(
-        (accountId: string) => accountId !== id
+      state.transactions = state.transactions.filter(
+        (tx: any) => tx.accountId !== id,
       );
+      state.twrLiquidityAccountIds = (
+        state.twrLiquidityAccountIds || []
+      ).filter((accountId: string) => accountId !== id);
     }
     if (entity === "investmentAssets") {
       syncInvestmentCategoriesWithAssets();
@@ -292,7 +328,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     }
 
     const state = deps.getState();
-    const nextSelection = new Set((state.twrLiquidityAccountIds || []).map((item: any) => String(item)));
+    const nextSelection = new Set(
+      (state.twrLiquidityAccountIds || []).map((item: any) => String(item)),
+    );
     if (target.checked) {
       nextSelection.add(accountId);
     } else {
@@ -327,7 +365,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
   function onCategoryDelete(event: Event) {
     const target = deps.getEventElement(event.target);
-    const button = target?.closest<HTMLElement>("button[data-action='remove-category']");
+    const button = target?.closest<HTMLElement>(
+      "button[data-action='remove-category']",
+    );
     if (!button) {
       return;
     }
@@ -352,7 +392,9 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
   function syncInvestmentCategoriesWithAssets() {
     const state = deps.getState();
     const assetNames = state.investmentAssets.map((item: any) => item.name);
-    const merged = Array.from(new Set([...(state.investmentCategories || []), ...assetNames]));
+    const merged = Array.from(
+      new Set([...(state.investmentCategories || []), ...assetNames]),
+    );
     state.investmentCategories = merged;
   }
 
@@ -433,7 +475,11 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     ]);
 
     const csv = [header, ...rows]
-      .map((row: any) => row.map((field: any) => `"${String(field ?? "").replace(/"/g, '""')}"`).join(","))
+      .map((row: any) =>
+        row
+          .map((field: any) => `"${String(field ?? "").replace(/"/g, '""')}"`)
+          .join(","),
+      )
       .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
