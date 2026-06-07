@@ -36,7 +36,7 @@ onUnmounted(() => {
           </span>
         </div>
         <div class="flex items-center gap-1">
-          <strong class="font-['DM_Mono',monospace] text-xs">
+          <strong class="font-['DM_Mono',monospace] text-xs font-medium">
             {{ item.amount }}
           </strong>
           <small class="text-xs text-(--text-faint)">{{ item.pct }}</small>

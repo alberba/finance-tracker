@@ -1,6 +1,7 @@
 ---
 import DashboardStatCard from '../dashboard/DashboardStatCard.vue'
 import DashboardPanel from '../dashboard/DashboardPanel.astro'
+import DashboardWealthSplitPanel from '../dashboard/DashboardWealthSplitPanel.vue'
 import TopExpenseList from '../dashboard/TopExpenseList.vue'
 import DashboardStatExpenseIcon from '../../assets/icons/dashboard-stat-expense.svg'
 import DashboardStatIncomeIcon from '../../assets/icons/dashboard-stat-income.svg'
@@ -201,16 +202,10 @@ const statIconClass = 'h-6 w-6 xl:h-8 xl:w-8'
   <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <DashboardPanel
       title="Distribución de patrimonio"
-      actionLabel="Ver detalle de patrimonio"
+      actionLabel="Ver detalle del patrimonio"
       actionTarget="wealth"
-      class="gap-3.5">
-      <div class="dash-donut-wrap relative h-[clamp(136px,12vw,158px)]">
-        <canvas
-          id="chart-wealth-split"
-          class="absolute inset-0 h-full! w-full!"
-          aria-label="Distribución del patrimonio"></canvas>
-      </div>
-      <div id="wealth-split-legend" class="wealth-legend grid gap-2.25"></div>
+      class="gap-3">
+      <DashboardWealthSplitPanel client:load />
     </DashboardPanel>
 
     <DashboardPanel

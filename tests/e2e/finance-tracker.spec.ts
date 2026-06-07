@@ -107,6 +107,34 @@ test.describe("Finance tracker E2E", () => {
     expect(incomeText).toContain("€");
   });
 
+  test("dashboard muestra el panel de distribución de patrimonio y navega al detalle", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openDashboard();
+
+    await expect(
+      tracker.dashboardSection.getByRole("heading", {
+        name: "Distribución de patrimonio",
+      }),
+    ).toBeVisible();
+    await expect(
+      tracker.dashboardSection.getByLabel("Distribución del patrimonio"),
+    ).toBeVisible();
+    await expect(
+      tracker.dashboardSection.locator("#wealth-split-legend"),
+    ).toBeVisible();
+
+    await tracker.dashboardSection
+      .getByRole("button", { name: "Ver detalle de patrimonio" })
+      .click();
+
+    await expect(page).toHaveURL(/\/patrimonio$/);
+    await expect(
+      tracker.wealthSection.getByRole("heading", { name: "Patrimonio total" }),
+    ).toBeVisible();
+  });
+
   test("dashboard muestra el patrimonio sobre el gráfico de cashflow", async ({
     page,
     tracker,
