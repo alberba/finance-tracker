@@ -4,14 +4,10 @@ import {
   type BudgetType,
   type Contribution,
   type InvestmentSubTab,
-  type SectionId,
   type SnapshotKind,
   type Transaction,
-  type SortDirection,
   type State,
-  type TxSortColumn,
 } from "./types";
-import { type TransactionFilters } from "./transactions";
 import { setupTransactionSection } from "./app/transactions-section";
 import { setupContributionWorkflowSection } from "./app/contribution-workflow-modal";
 import { setupInvestmentSnapshotHelpers } from "./app/investment-snapshot-helpers";
@@ -21,6 +17,14 @@ import { setupSettingsDataSection } from "./app/settings-data-section";
 import { setupAppCalculationHelpers } from "./app/calculation-helpers";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
+import {
+  getEventElement,
+  getRequiredElement,
+  hasSelectionWithin,
+  type InvestmentMovementForm,
+  type TxForm,
+} from "./app/dom-helpers";
+import { type UiState } from "./app/ui-state";
 import { clone, escapeAttr, escapeHtml, parseFloatSafe } from "./utils";
 import { decorateCategoryLabel } from "./category-emoji";
 import {
@@ -41,108 +45,6 @@ import {
 
 (() => {
   "use strict";
-
-  interface UiState {
-    activeSection: SectionId;
-    month: number;
-    budgetType: BudgetType;
-    budgetMonth: number;
-    txFilterMonth: number;
-    txSort: {
-      column: TxSortColumn;
-      direction: SortDirection;
-    };
-    txOpenHeaderFilter: TxSortColumn | "";
-    txSelectedIds: string[];
-    txFilters: TransactionFilters;
-    txEditingId: string;
-    snapshotMonth: number;
-    investmentMonth: number;
-    wealthCalcTargetId: string;
-    wealthCalcTargetName: string;
-    investmentTab: InvestmentSubTab;
-    investmentTxEditingId: string;
-    investmentYearFilter: number;
-    investmentOnlyUndeclared: boolean;
-    investmentReturnMode: "simple" | "twr";
-    contributionWorkflowStep: 1 | 2;
-    contributionWorkflowMonth: number;
-    contributionWorkflowDate: string;
-    contributionWorkflowAmount: number;
-    contributionCalcTargetKind: SnapshotKind | "";
-    contributionCalcTargetId: string;
-    contributionCalcTargetName: string;
-  }
-
-  interface TxFormControls extends HTMLFormControlsCollection {
-    date: HTMLInputElement;
-    month: HTMLSelectElement;
-    type: HTMLSelectElement;
-    accountId: HTMLSelectElement;
-    category: HTMLSelectElement;
-    description: HTMLInputElement;
-    amount: HTMLInputElement;
-  }
-
-  interface TxForm extends HTMLFormElement {
-    elements: TxFormControls;
-  }
-
-  interface InvestmentMovementFormControls extends HTMLFormControlsCollection {
-    date: HTMLInputElement;
-    time: HTMLInputElement;
-    side: HTMLSelectElement;
-    symbol: HTMLInputElement;
-    category: HTMLSelectElement;
-    unitPrice: HTMLInputElement;
-    units: HTMLInputElement;
-    fee: HTMLInputElement;
-    total: HTMLInputElement;
-    movementCurrency: HTMLInputElement;
-    accountId: HTMLSelectElement;
-    declared: HTMLInputElement;
-  }
-
-  interface InvestmentMovementForm extends HTMLFormElement {
-    elements: InvestmentMovementFormControls;
-  }
-
-  function getRequiredElement<T extends Element>(id: string): T {
-    const element = document.getElementById(id);
-    if (!element) {
-      throw new Error(`Elemento requerido no encontrado: #${id}`);
-    }
-    return element as unknown as T;
-  }
-
-  function getEventElement(target: EventTarget | null): Element | null {
-    return target instanceof Element ? target : null;
-  }
-
-  function hasSelectionWithin(container: Element): boolean {
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-      const range = selection.getRangeAt(0);
-      const ancestor = range.commonAncestorContainer;
-      if (ancestor && container.contains(ancestor)) {
-        return true;
-      }
-    }
-
-    const activeElement = document.activeElement;
-    if (
-      activeElement &&
-      container.contains(activeElement) &&
-      (activeElement instanceof HTMLInputElement ||
-        activeElement instanceof HTMLTextAreaElement) &&
-      typeof activeElement.selectionStart === "number" &&
-      typeof activeElement.selectionEnd === "number"
-    ) {
-      return activeElement.selectionEnd > activeElement.selectionStart;
-    }
-
-    return false;
-  }
 
   let state: State = normalizeState(clone(BASE_SEED));
 
@@ -188,29 +90,6 @@ import {
     panels: Array.from(document.querySelectorAll<HTMLElement>(".panel")),
     toast: getRequiredElement<HTMLElement>("toast"),
     saveStatus: getRequiredElement<HTMLElement>("save-status"),
-
-    yearDisplay: getRequiredElement<HTMLInputElement>("year-display"),
-    dashboardMonth: getRequiredElement<HTMLSelectElement>("dashboard-month"),
-    kpiIncome: getRequiredElement<HTMLElement>("kpi-income"),
-    kpiExpense: getRequiredElement<HTMLElement>("kpi-expense"),
-    kpiInvestment: getRequiredElement<HTMLElement>("kpi-investment"),
-    kpiNetWorth: getRequiredElement<HTMLElement>("kpi-net-worth"),
-    kpiNetWorthChange: getRequiredElement<HTMLElement>("kpi-net-worth-change"),
-    kpiAnnualSavings: getRequiredElement<HTMLElement>("kpi-annual-savings"),
-    kpiIncomeDelta: getRequiredElement<HTMLElement>("kpi-income-delta"),
-    kpiExpenseDelta: getRequiredElement<HTMLElement>("kpi-expense-delta"),
-    kpiInvestmentDelta: getRequiredElement<HTMLElement>("kpi-investment-delta"),
-    sparkIncome: getRequiredElement<HTMLCanvasElement>("spark-income"),
-    sparkExpense: getRequiredElement<HTMLCanvasElement>("spark-expense"),
-    sparkInvestment: getRequiredElement<HTMLCanvasElement>("spark-investment"),
-    chartNetWorth: getRequiredElement<HTMLCanvasElement>("chart-networth"),
-    chartCashflow: getRequiredElement<HTMLCanvasElement>("chart-cashflow"),
-    networthEndpoint: getRequiredElement<HTMLElement>("networth-endpoint"),
-    investmentProgressList: getRequiredElement<HTMLElement>(
-      "investment-progress-list",
-    ),
-    recentTxBody: getRequiredElement<HTMLElement>("recent-tx-body"),
-    savingsGoal: getRequiredElement<HTMLElement>("savings-goal"),
 
     txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
     txForm: getRequiredElement<TxForm>("tx-form"),
@@ -624,7 +503,6 @@ import {
     getWealthByMonth,
     computeInvestmentValue,
     formatMoney,
-    formatMoneyCompact,
   });
   const renderGoals = () => dashboardBudgetGoalsSection.renderGoals();
 
@@ -897,7 +775,7 @@ import {
   function renderAll() {
     dashboardBudgetGoalsSection.populateMonthSelects();
     populateTransactionFormOptions();
-    dashboardBudgetGoalsSection.renderDashboard();
+    dashboardBudgetGoalsSection.publishDashboard();
     renderTransactions();
     dashboardBudgetGoalsSection.renderBudget();
     renderWealth();

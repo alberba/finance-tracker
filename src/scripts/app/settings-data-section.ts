@@ -41,7 +41,6 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
       )
         .toUpperCase()
         .slice(0, 3);
-      el.yearDisplay.value = String(state.year);
       deps.saveState();
       deps.renderAll();
       deps.showToast("Configuración general guardada.");

@@ -19,6 +19,10 @@ const scopedTsConfigs = tseslint.configs.recommended.map((config) => ({
   ...config,
   files: scriptFiles,
 }))
+const scopedVueConfigs = vue.configs['flat/recommended'].map((config) => ({
+  ...config,
+  files: vueFiles,
+}))
 
 export default defineConfig([
   {
@@ -36,7 +40,7 @@ export default defineConfig([
   },
   ...scopedTsConfigs,
   ...astro.configs['flat/recommended'],
-  ...vue.configs['flat/recommended'],
+  ...scopedVueConfigs,
   {
     files: vueFiles,
     languageOptions: {
