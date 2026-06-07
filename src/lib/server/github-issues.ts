@@ -21,7 +21,10 @@ function requiredEnv(name: keyof RuntimeEnv, env: RuntimeEnv): string {
   return value;
 }
 
-function requiredAnyEnv(names: ReadonlyArray<keyof RuntimeEnv>, env: RuntimeEnv): string {
+function requiredAnyEnv(
+  names: ReadonlyArray<keyof RuntimeEnv>,
+  env: RuntimeEnv,
+): string {
   for (const name of names) {
     const value = String(env[name] || "").trim();
     if (value) {
@@ -46,7 +49,12 @@ function buildIssueBody(payload: IssueReportPayload): string {
   ];
 
   if (payload.stepsToReproduce) {
-    baseLines.push("", "## Pasos para reproducir", "", payload.stepsToReproduce);
+    baseLines.push(
+      "",
+      "## Pasos para reproducir",
+      "",
+      payload.stepsToReproduce,
+    );
   }
 
   if (payload.expectedResult) {
@@ -71,7 +79,7 @@ function buildLabels(type: IssueReportPayload["type"]): string[] {
 async function requestWithRetry(
   requestFn: () => Promise<Response>,
   retries: number,
-  retryDelayMs: number
+  retryDelayMs: number,
 ): Promise<Response> {
   let lastResponse: Response | null = null;
 
@@ -83,7 +91,9 @@ async function requestWithRetry(
     lastResponse = response;
 
     if (attempt < retries) {
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)));
+      await new Promise((resolve) =>
+        setTimeout(resolve, retryDelayMs * (attempt + 1)),
+      );
     }
   }
 
@@ -93,7 +103,7 @@ async function requestWithRetry(
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   env: RuntimeEnv,
-  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) }
+  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CreatedIssue> {
   const token = requiredAnyEnv(["GITHUB_ISSUE_TOKEN", "GITHUB_TOKEN"], env);
   const owner = requiredEnv("GITHUB_OWNER", env);
@@ -119,15 +129,20 @@ export async function createIssueFromWebReport(
         }),
       }),
     2,
-    500
+    500,
   );
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`GitHub API devolvió ${response.status}: ${details.slice(0, 500)}`);
+    throw new Error(
+      `GitHub API devolvió ${response.status}: ${details.slice(0, 500)}`,
+    );
   }
 
-  const data = (await response.json()) as { number?: number; html_url?: string };
+  const data = (await response.json()) as {
+    number?: number;
+    html_url?: string;
+  };
   const issueNumber = Number(data.number);
   const issueUrl = String(data.html_url || "");
   if (!Number.isFinite(issueNumber) || !issueUrl) {

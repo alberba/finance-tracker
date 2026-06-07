@@ -27,10 +27,10 @@ const canonicalUrl = new URL("/", Astro.url).toString();
     <script is:inline>
       (function () {
         try {
-          var stored = localStorage.getItem("theme");
-          var prefersDark =
-            window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const stored = localStorage.getItem("theme");
+          const prefersDark =
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches;
           document.documentElement.dataset.theme =
             stored || (prefersDark ? "dark" : "light");
         } catch (e) {
@@ -38,8 +38,16 @@ const canonicalUrl = new URL("/", Astro.url).toString();
         }
       })();
     </script>
-    <meta name="theme-color" content="#07080B" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#EEF1F6" media="(prefers-color-scheme: light)" />
+    <meta
+      name="theme-color"
+      content="#07080B"
+      media="(prefers-color-scheme: dark)"
+    />
+    <meta
+      name="theme-color"
+      content="#EEF1F6"
+      media="(prefers-color-scheme: light)"
+    />
     <title>Finance Tracker 2026</title>
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -113,28 +121,28 @@ const canonicalUrl = new URL("/", Astro.url).toString();
     <script is:inline>
       (function () {
         function syncLabel(btn) {
-          var isDark = document.documentElement.dataset.theme === "dark";
+          const isDark = document.documentElement.dataset.theme === "dark";
           btn.setAttribute(
             "aria-label",
             isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro",
           );
-          var label = btn.querySelector(".theme-toggle-label");
+          const label = btn.querySelector(".theme-toggle-label");
           if (label) label.textContent = isDark ? "Modo claro" : "Modo oscuro";
         }
 
         function initThemeToggle() {
-          var btn = document.getElementById("theme-toggle");
+          const btn = document.getElementById("theme-toggle");
           if (!btn) return;
           syncLabel(btn);
           btn.addEventListener("click", function () {
-            var isDark = document.documentElement.dataset.theme === "dark";
-            var next = isDark ? "light" : "dark";
+            const isDark = document.documentElement.dataset.theme === "dark";
+            const next = isDark ? "light" : "dark";
             document.documentElement.dataset.theme = next;
             try {
               localStorage.setItem("theme", next);
             } catch (e) {}
             syncLabel(btn);
-            var repaint = window.__ftRenderAll;
+            const repaint = window.__ftRenderAll;
             if (typeof repaint === "function") {
               requestAnimationFrame(function () {
                 repaint();
@@ -159,8 +167,20 @@ const canonicalUrl = new URL("/", Astro.url).toString();
     <div class="app-shell">
       <aside class="sidebar">
         <header class="brand-block">
-          <p class="brand-kicker">Plan financiero</p>
-          <h1>Finance Tracker</h1>
+          <span class="brand-logo" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 16l4.5-4.5 3 3L20 7"></path>
+              <path d="M15 7h5v5"></path>
+            </svg>
+          </span>
+          <h1>Finance<br />Tracker</h1>
         </header>
         <div class="sidebar-collapsed-brand" aria-hidden="true">
           <img src="/favicon.svg" alt="" />
@@ -173,7 +193,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             data-section="dashboard"
             aria-controls="dashboard"
             aria-current="page"
-            aria-label="Dashboard">
+            aria-label="Dashboard"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -205,7 +226,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="transactions"
             aria-controls="transactions"
-            aria-label="Movimientos">
+            aria-label="Movimientos"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -223,7 +245,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="budget"
             aria-controls="budget"
-            aria-label="Presupuesto">
+            aria-label="Presupuesto"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -241,7 +264,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="wealth"
             aria-controls="wealth"
-            aria-label="Patrimonio">
+            aria-label="Patrimonio"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -264,7 +288,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="investment"
             aria-controls="investment"
-            aria-label="Inversión">
+            aria-label="Inversión"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -282,7 +307,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="goals"
             aria-controls="goals"
-            aria-label="Objetivos">
+            aria-label="Objetivos"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -307,7 +333,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="settings"
             aria-controls="settings"
-            aria-label="Configuración">
+            aria-label="Configuración"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -326,7 +353,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="data"
             aria-controls="data"
-            aria-label="Datos">
+            aria-label="Datos"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -345,7 +373,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             class="nav-btn"
             data-section="reports"
             aria-controls="reports"
-            aria-label="Reportes">
+            aria-label="Reportes"
+          >
             <span class="nav-icon" aria-hidden="true">
               <svg
                 viewBox="0 0 20 20"
@@ -371,14 +400,16 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           id="theme-toggle"
           class="theme-toggle"
           type="button"
-          aria-label="Cambiar tema">
+          aria-label="Cambiar tema"
+        >
           <svg
             class="theme-toggle-icon-moon"
             viewBox="0 0 20 20"
             fill="none"
             stroke="currentColor"
             stroke-width="1.6"
-            aria-hidden="true">
+            aria-hidden="true"
+          >
             <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
           </svg>
           <svg
@@ -387,13 +418,15 @@ const canonicalUrl = new URL("/", Astro.url).toString();
             fill="none"
             stroke="currentColor"
             stroke-width="1.6"
-            aria-hidden="true">
+            aria-hidden="true"
+          >
             <circle cx="10" cy="10" r="3.4"></circle>
             <path
               d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"
             ></path>
           </svg>
           <span class="theme-toggle-label">Modo oscuro</span>
+          <span class="theme-toggle-switch" aria-hidden="true"></span>
         </button>
 
         <button
@@ -401,13 +434,15 @@ const canonicalUrl = new URL("/", Astro.url).toString();
           class="sidebar-toggle"
           type="button"
           aria-label="Colapsar barra lateral"
-          aria-expanded="true">
+          aria-expanded="true"
+        >
           <svg
             viewBox="0 0 20 20"
             fill="none"
             stroke="currentColor"
             stroke-width="1.8"
-            aria-hidden="true">
+            aria-hidden="true"
+          >
             <polyline points="13,4 7,10 13,16"></polyline>
             <polyline points="8,4 2,10 8,16"></polyline>
           </svg>
@@ -415,18 +450,24 @@ const canonicalUrl = new URL("/", Astro.url).toString();
         </button>
 
         <footer class="sidebar-footer">
-          <span class="nav-icon sidebar-footer-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              ><path
-                d="M10 2a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm6.07 3.93a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM18 10a1 1 0 0 1-1 1h-1a1 1 0 0 1 0-2h1a1 1 0 0 1 1 1zM10 17a1 1 0 0 1-1-1v-1a1 1 0 0 1 2 0v1a1 1 0 0 1-1 1zm-6.07-1.93a1 1 0 0 1 0-1.41l.71-.71a1 1 0 1 1 1.41 1.41l-.71.71a1 1 0 0 1-1.41 0zM3 10a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H4a1 1 0 0 1-1-1z"
-              ></path><circle cx="10" cy="10" r="3"></circle></svg
+          <span class="sidebar-user-avatar" aria-hidden="true">U</span>
+          <span class="sidebar-user-text">
+            <span class="sidebar-user-name">Usuario</span>
+            <span
+              id="save-status"
+              class="sidebar-footer-text sidebar-user-status">Sincronizado</span
             >
           </span>
-          <p id="save-status" class="sidebar-footer-text">Sincronizado</p>
+          <svg
+            class="sidebar-user-chevron"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            aria-hidden="true"
+          >
+            <path d="M7 8l3 3 3-3"></path>
+          </svg>
         </footer>
       </aside>
 
@@ -448,7 +489,8 @@ const canonicalUrl = new URL("/", Astro.url).toString();
       id="chart-tooltip"
       class="chart-tooltip"
       role="tooltip"
-      aria-hidden="true">
+      aria-hidden="true"
+    >
     </div>
   </body>
 </html>

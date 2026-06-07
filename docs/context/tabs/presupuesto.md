@@ -165,4 +165,3 @@ Antes de tocar esta pestaña, revisar:
 5. `public/styles.css`
 6. `tests/e2e/budget.spec.ts`
 7. `tests/e2e/pages/FinanceTrackerPage.ts`
-

@@ -11,8 +11,21 @@ import {
   type State,
   type Transaction,
 } from "./types";
-import { clamp, monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from "./utils";
-import { deriveContributionFlow, deriveDefaultLiquidityAccountIds, sanitizeFlowAllocations } from "./contribution-workflow";
+import {
+  clamp,
+  monthFromISO,
+  parseFloatSafe,
+  parseIntSafe,
+  round2,
+  slug,
+  todayISO,
+  uid,
+} from "./utils";
+import {
+  deriveContributionFlow,
+  deriveDefaultLiquidityAccountIds,
+  sanitizeFlowAllocations,
+} from "./contribution-workflow";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
 export const SERVER_STATE_ENDPOINT = "/api/state";
@@ -106,35 +119,56 @@ export function normalizeState(candidate: unknown): State {
   const accounts = normalizeEntities(input?.accounts || base.accounts || []);
   const twrLiquidityAccountIds = normalizeTwrLiquidityAccountIds(
     input?.twrLiquidityAccountIds ?? base?.twrLiquidityAccountIds,
-    accounts
+    accounts,
   );
 
   const year = parseIntSafe(input?.year, base.year || new Date().getFullYear());
   const safe: State = {
     meta: {
       source: input?.meta?.source || base.meta?.source || "manual",
-      generatedAt: input?.meta?.generatedAt || base.meta?.generatedAt || new Date().toISOString(),
+      generatedAt:
+        input?.meta?.generatedAt ||
+        base.meta?.generatedAt ||
+        new Date().toISOString(),
       version: 1,
       savedAt: input?.meta?.savedAt || null,
     },
     year,
-    currency: String(input?.currency || base.currency || "EUR").toUpperCase().slice(0, 3),
+    currency: String(input?.currency || base.currency || "EUR")
+      .toUpperCase()
+      .slice(0, 3),
     twrLiquidityAccountIds,
     accounts,
-    investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),
-    liabilities: normalizeEntities(input?.liabilities || base.liabilities || []),
-    incomeCategories: normalizeStringList(input?.incomeCategories || base.incomeCategories || []),
-    expenseCategories: normalizeStringList(input?.expenseCategories || base.expenseCategories || []),
-    investmentCategories: normalizeStringList(input?.investmentCategories || base.investmentCategories || []),
-    transactions: normalizeTransactions(input?.transactions || base.transactions || []),
+    investmentAssets: normalizeEntities(
+      input?.investmentAssets || base.investmentAssets || [],
+    ),
+    liabilities: normalizeEntities(
+      input?.liabilities || base.liabilities || [],
+    ),
+    incomeCategories: normalizeStringList(
+      input?.incomeCategories || base.incomeCategories || [],
+    ),
+    expenseCategories: normalizeStringList(
+      input?.expenseCategories || base.expenseCategories || [],
+    ),
+    investmentCategories: normalizeStringList(
+      input?.investmentCategories || base.investmentCategories || [],
+    ),
+    transactions: normalizeTransactions(
+      input?.transactions || base.transactions || [],
+    ),
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
-    contributions: normalizeContributions(input?.contributions || base.contributions || []),
+    contributions: normalizeContributions(
+      input?.contributions || base.contributions || [],
+    ),
   };
 
   if (!safe.investmentCategories.length) {
-    safe.investmentCategories = safe.investmentAssets.map((asset) => asset.name);
+    safe.investmentCategories = safe.investmentAssets.map(
+      (asset) => asset.name,
+    );
   }
 
   syncBudgetFromCategories(safe);
@@ -144,22 +178,29 @@ export function normalizeState(candidate: unknown): State {
   return safe;
 }
 
-function normalizeTwrLiquidityAccountIds(input: unknown, accounts: State["accounts"]): string[] {
-  const validAccountIds = new Set(accounts.map((account) => String(account.id)));
+function normalizeTwrLiquidityAccountIds(
+  input: unknown,
+  accounts: State["accounts"],
+): string[] {
+  const validAccountIds = new Set(
+    accounts.map((account) => String(account.id)),
+  );
   const configured = Array.isArray(input) ? input : [];
   const normalizedConfigured = Array.from(
     new Set(
       configured
         .map((item) => String(item || "").trim())
-        .filter((item) => validAccountIds.has(item))
-    )
+        .filter((item) => validAccountIds.has(item)),
+    ),
   );
 
   if (normalizedConfigured.length > 0) {
     return normalizedConfigured;
   }
 
-  return deriveDefaultLiquidityAccountIds(accounts).filter((accountId) => validAccountIds.has(accountId));
+  return deriveDefaultLiquidityAccountIds(accounts).filter((accountId) =>
+    validAccountIds.has(accountId),
+  );
 }
 
 export function sortTransactionsInState(targetState: State): void {
@@ -174,7 +215,9 @@ export function sortTransactionsInState(targetState: State): void {
 
 export function sortContributionsInState(targetState: State): void {
   targetState.contributions.sort((a, b) => {
-    const byDate = String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date));
+    const byDate = String(a.portfolioDate || a.date).localeCompare(
+      String(b.portfolioDate || b.date),
+    );
     if (byDate !== 0) {
       return byDate;
     }
@@ -199,8 +242,8 @@ function normalizeStringList(list: unknown): string[] {
     new Set(
       items
         .map((item: any) => String(item || "").trim())
-        .filter((item: string) => Boolean(item))
-    )
+        .filter((item: string) => Boolean(item)),
+    ),
   );
 }
 
@@ -213,7 +256,11 @@ function normalizeTransactions(list: unknown): Transaction[] {
       const safe: Transaction = {
         id: String(item.id || uid("tx")),
         date: String(item.date || todayISO()),
-        month: clamp(parseIntSafe(item.month, monthFromISO(item.date) ?? 0), 0, 11),
+        month: clamp(
+          parseIntSafe(item.month, monthFromISO(item.date) ?? 0),
+          0,
+          11,
+        ),
         type,
         accountId: String(item.accountId || ""),
         category: String(item.category || "Sin categoría"),
@@ -223,13 +270,22 @@ function normalizeTransactions(list: unknown): Transaction[] {
 
       if (type === "investment") {
         const time = normalizeTime(item.time);
-        const symbol = String(item.symbol || "").trim().toUpperCase();
+        const symbol = String(item.symbol || "")
+          .trim()
+          .toUpperCase();
         const sideCandidate = String(item.side || "").trim();
-        const side = isInvestmentSide(sideCandidate) ? sideCandidate : amount < 0 ? "sell" : "buy";
+        const side = isInvestmentSide(sideCandidate)
+          ? sideCandidate
+          : amount < 0
+            ? "sell"
+            : "buy";
         const unitPrice = normalizeNonNegativeNumber(item.unitPrice, 6);
         const units = normalizeNonNegativeNumber(item.units, 8);
         const fee = normalizeNonNegativeNumber(item.fee, 2);
-        const movementCurrency = String(item.movementCurrency || "").trim().toUpperCase().slice(0, 3);
+        const movementCurrency = String(item.movementCurrency || "")
+          .trim()
+          .toUpperCase()
+          .slice(0, 3);
 
         if (time) {
           safe.time = time;
@@ -258,7 +314,10 @@ function normalizeTransactions(list: unknown): Transaction[] {
     .filter((item) => Number.isFinite(item.amount) && item.amount !== 0);
 }
 
-function normalizeNonNegativeNumber(value: unknown, decimals: number): number | null {
+function normalizeNonNegativeNumber(
+  value: unknown,
+  decimals: number,
+): number | null {
   const parsed = roundWithPrecision(parseFloatSafe(value, NaN), decimals);
   if (!Number.isFinite(parsed) || parsed < 0) {
     return null;
@@ -277,7 +336,9 @@ function normalizeTime(value: unknown): string {
   if (!/^\d{2}:\d{2}$/.test(input)) {
     return "";
   }
-  const [hours, minutes] = input.split(":").map((item) => parseIntSafe(item, -1));
+  const [hours, minutes] = input
+    .split(":")
+    .map((item) => parseIntSafe(item, -1));
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
     return "";
   }
@@ -304,12 +365,14 @@ function normalizeSnapshots(input: unknown): Record<string, SnapshotRow> {
 
 function normalizeNumberMap(map: unknown): Record<string, number> {
   const output: Record<string, number> = {};
-  Object.entries((map || {}) as Record<string, unknown>).forEach(([key, value]) => {
-    const number = parseFloatSafe(value, NaN);
-    if (!Number.isNaN(number)) {
-      output[String(key)] = round2(number);
-    }
-  });
+  Object.entries((map || {}) as Record<string, unknown>).forEach(
+    ([key, value]) => {
+      const number = parseFloatSafe(value, NaN);
+      if (!Number.isNaN(number)) {
+        output[String(key)] = round2(number);
+      }
+    },
+  );
   return output;
 }
 
@@ -325,7 +388,7 @@ function normalizeBudget(budget: unknown): State["budget"] {
     Object.entries(rawBudget[type] || {}).forEach(([category, values]) => {
       const monthlyValues = values as any[];
       safe[type][category] = Array.from({ length: 12 }, (_, month) =>
-        round2(parseFloatSafe(monthlyValues?.[month], 0))
+        round2(parseFloatSafe(monthlyValues?.[month], 0)),
       );
     });
   });
@@ -341,8 +404,16 @@ function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {
   (Object.keys(defaults) as GoalKey[]).forEach((key) => {
     safe[key] = {
       name: String(rawGoals?.[key]?.name || defaults[key].name),
-      targetYear: parseIntSafe(rawGoals?.[key]?.targetYear, defaults[key].targetYear),
-      targetAmount: round2(parseFloatSafe(rawGoals?.[key]?.targetAmount, defaults[key].targetAmount)),
+      targetYear: parseIntSafe(
+        rawGoals?.[key]?.targetYear,
+        defaults[key].targetYear,
+      ),
+      targetAmount: round2(
+        parseFloatSafe(
+          rawGoals?.[key]?.targetAmount,
+          defaults[key].targetAmount,
+        ),
+      ),
     };
   });
 
@@ -353,7 +424,9 @@ function normalizeContributions(list: unknown): Contribution[] {
   const items = Array.isArray(list) ? list : [];
   return items
     .map((item: any) => {
-      const normalizedAllocations = sanitizeFlowAllocations(item?.flowAllocations || []);
+      const normalizedAllocations = sanitizeFlowAllocations(
+        item?.flowAllocations || [],
+      );
       const derived = deriveContributionFlow({
         ...item,
         flowAllocations: normalizedAllocations,
@@ -369,7 +442,9 @@ function normalizeContributions(list: unknown): Contribution[] {
         flowAllocations: normalizedAllocations,
         flowSource: derived.flowSource,
         warnings: Array.isArray(item?.warnings)
-          ? item.warnings.map((entry: unknown) => String(entry || "").trim()).filter(Boolean)
+          ? item.warnings
+              .map((entry: unknown) => String(entry || "").trim())
+              .filter(Boolean)
           : [],
       } satisfies Contribution;
     })
@@ -387,13 +462,18 @@ function syncBudgetFromCategories(targetState: State): void {
 
     categories.forEach((category) => {
       if (!targetState.budget[type][category]) {
-        targetState.budget[type][category] = Array.from({ length: 12 }, () => 0);
+        targetState.budget[type][category] = Array.from(
+          { length: 12 },
+          () => 0,
+        );
       }
     });
 
     Object.keys(targetState.budget[type]).forEach((category) => {
-      targetState.budget[type][category] = Array.from({ length: 12 }, (_, idx) =>
-        round2(parseFloatSafe(targetState.budget[type][category][idx], 0))
+      targetState.budget[type][category] = Array.from(
+        { length: 12 },
+        (_, idx) =>
+          round2(parseFloatSafe(targetState.budget[type][category][idx], 0)),
       );
     });
   });
@@ -421,7 +501,9 @@ function resolveRuntimeNamespace(): string {
     return "";
   }
 
-  const candidate = String((window as any).__FINANCE_NAMESPACE__ || "").trim().toLowerCase();
+  const candidate = String((window as any).__FINANCE_NAMESPACE__ || "")
+    .trim()
+    .toLowerCase();
   if (!candidate) {
     return "";
   }

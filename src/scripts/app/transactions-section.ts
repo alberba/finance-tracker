@@ -13,7 +13,16 @@ import {
   type TransactionFilters,
 } from "../transactions";
 import { decorateCategoryLabel } from "../category-emoji";
-import { escapeAttr, escapeHtml, monthFromISO, parseFloatSafe, parseIntSafe, round2, todayISO, uid } from "../utils";
+import {
+  escapeAttr,
+  escapeHtml,
+  monthFromISO,
+  parseFloatSafe,
+  parseIntSafe,
+  round2,
+  todayISO,
+  uid,
+} from "../utils";
 
 interface TxFormControls extends HTMLFormControlsCollection {
   date: HTMLInputElement;
@@ -96,12 +105,21 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
   const { ui, el } = deps;
 
   function isTxSortColumn(value: string): value is TxSortColumn {
-    return ["date", "amount", "account", "type", "category", "description"].includes(value);
+    return [
+      "date",
+      "amount",
+      "account",
+      "type",
+      "category",
+      "description",
+    ].includes(value);
   }
 
   function getCheckedValuesFromContainer(container: HTMLElement): string[] {
     return Array.from(
-      container.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]:checked')
+      container.querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"][data-filter-value]:checked',
+      ),
     )
       .map((input) => String(input.dataset.filterValue || "").trim())
       .filter(Boolean);
@@ -111,7 +129,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     if (!ui.txOpenHeaderFilter) {
       return null;
     }
-    const popover = document.querySelector<HTMLElement>(`.tx-filter-popover[data-column="${ui.txOpenHeaderFilter}"]`);
+    const popover = document.querySelector<HTMLElement>(
+      `.tx-filter-popover[data-column="${ui.txOpenHeaderFilter}"]`,
+    );
     if (!popover || popover.hasAttribute("hidden")) {
       return null;
     }
@@ -131,13 +151,13 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
 
   function renderSummaryCategoryCell(
     type: TransactionType,
-    row: { category: string; amount: number } | undefined
+    row: { category: string; amount: number } | undefined,
   ): string {
     if (!row) {
       return "<span class='tx-summary-empty'>-</span>";
     }
     return `<div class="tx-summary-item"><span>${escapeHtml(
-      decorateCategoryLabel(type, row.category)
+      decorateCategoryLabel(type, row.category),
     )}</span><strong>${deps.formatMoney(row.amount)}</strong></div>`;
   }
 
@@ -151,14 +171,35 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       investmentCategories: state.investmentCategories,
     });
 
-    el.txTotalIncome.textContent = deps.formatMoney(monthBreakdown.totals.income);
-    el.txTotalExpense.textContent = deps.formatMoney(monthBreakdown.totals.expense);
-    el.txTotalInvestment.textContent = deps.formatMoney(monthBreakdown.totals.investment);
+    el.txTotalIncome.textContent = deps.formatMoney(
+      monthBreakdown.totals.income,
+    );
+    el.txTotalExpense.textContent = deps.formatMoney(
+      monthBreakdown.totals.expense,
+    );
+    el.txTotalInvestment.textContent = deps.formatMoney(
+      monthBreakdown.totals.investment,
+    );
 
     const sections = [
-      { type: "income", label: "INGRESOS", rows: monthBreakdown.byType.income, cssClass: "income" },
-      { type: "expense", label: "GASTOS", rows: monthBreakdown.byType.expense, cssClass: "expense" },
-      { type: "investment", label: "INVERSIONES", rows: monthBreakdown.byType.investment, cssClass: "investment" },
+      {
+        type: "income",
+        label: "INGRESOS",
+        rows: monthBreakdown.byType.income,
+        cssClass: "income",
+      },
+      {
+        type: "expense",
+        label: "GASTOS",
+        rows: monthBreakdown.byType.expense,
+        cssClass: "expense",
+      },
+      {
+        type: "investment",
+        label: "INVERSIONES",
+        rows: monthBreakdown.byType.investment,
+        cssClass: "investment",
+      },
     ] as const;
 
     el.txCategoryBreakdownBody.innerHTML = sections
@@ -173,7 +214,7 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
               <tr data-summary-type="${type}" data-summary-category="${escapeAttr(row.category)}">
                 <td>${renderSummaryCategoryCell(type, row)}</td>
               </tr>
-            `
+            `,
           )
           .join("");
         return header + body;
@@ -182,7 +223,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
   }
 
   function renderTransactionSelectionState(tx: Transaction[]) {
-    const selectedVisible = tx.filter((item) => ui.txSelectedIds.includes(item.id)).length;
+    const selectedVisible = tx.filter((item) =>
+      ui.txSelectedIds.includes(item.id),
+    ).length;
     const allVisibleSelected = tx.length > 0 && selectedVisible === tx.length;
 
     el.txSelectAll.checked = allVisibleSelected;
@@ -198,13 +241,17 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     el.txHeaderFilterAmountMin.value = ui.txFilters.amountMin;
     el.txHeaderFilterAmountMax.value = ui.txFilters.amountMax;
     el.txHeaderFilterAccount
-      .querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]')
+      .querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"][data-filter-value]',
+      )
       .forEach((input) => {
         const value = String(input.dataset.filterValue || "").trim();
         input.checked = ui.txFilters.accountIds.includes(value);
       });
     el.txHeaderFilterType
-      .querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-filter-value]')
+      .querySelectorAll<HTMLInputElement>(
+        'input[type="checkbox"][data-filter-value]',
+      )
       .forEach((input) => {
         const value = String(input.dataset.filterValue || "").trim();
         input.checked = ui.txFilters.types.includes(value);
@@ -227,21 +274,19 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
                 <input type="checkbox" data-filter-value="${escapeAttr(item.value)}" ${current.includes(item.value) ? "checked" : ""} />
                 <span>${escapeHtml(item.label)}</span>
               </label>
-            `
+            `,
           )
           .join("")
       : "<small>Sin cuentas en este mes.</small>";
 
-    el.txHeaderFilterType.innerHTML = TX_TYPE_FILTER_OPTIONS
-      .map(
-        (item) => `
+    el.txHeaderFilterType.innerHTML = TX_TYPE_FILTER_OPTIONS.map(
+      (item) => `
           <label class="tx-checkbox-option">
             <input type="checkbox" data-filter-value="${escapeAttr(item.value)}" ${ui.txFilters.types.includes(item.value) ? "checked" : ""} />
             <span>${escapeHtml(item.label)}</span>
           </label>
-        `
-      )
-      .join("");
+        `,
+    ).join("");
   }
 
   function hasTransactionFilterForColumn(column: TxSortColumn): boolean {
@@ -264,38 +309,43 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
   }
 
   function renderTransactionHeaderFilterState() {
-    document.querySelectorAll<HTMLElement>(".tx-head--filterable").forEach((header) => {
-      const column = header.dataset.filterColumn || "";
-      if (!isTxSortColumn(column)) {
-        return;
-      }
-      const isOpen = ui.txOpenHeaderFilter === column;
-      const trigger = header.querySelector<HTMLButtonElement>(".tx-filter-trigger");
-      const popover = header.querySelector<HTMLElement>(".tx-filter-popover");
-      const isFiltered = hasTransactionFilterForColumn(column);
-      header.classList.toggle("is-open", isOpen);
-      header.classList.toggle("is-filtered", isFiltered);
-      if (trigger) {
-        trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
-        trigger.classList.toggle("is-filtered", isFiltered);
-      }
-      if (popover) {
-        popover.hidden = !isOpen;
-      }
-    });
+    document
+      .querySelectorAll<HTMLElement>(".tx-head--filterable")
+      .forEach((header) => {
+        const column = header.dataset.filterColumn || "";
+        if (!isTxSortColumn(column)) {
+          return;
+        }
+        const isOpen = ui.txOpenHeaderFilter === column;
+        const trigger =
+          header.querySelector<HTMLButtonElement>(".tx-filter-trigger");
+        const popover = header.querySelector<HTMLElement>(".tx-filter-popover");
+        const isFiltered = hasTransactionFilterForColumn(column);
+        header.classList.toggle("is-open", isOpen);
+        header.classList.toggle("is-filtered", isFiltered);
+        if (trigger) {
+          trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+          trigger.classList.toggle("is-filtered", isFiltered);
+        }
+        if (popover) {
+          popover.hidden = !isOpen;
+        }
+      });
   }
 
   function renderTransactionSortState() {
-    document.querySelectorAll<HTMLButtonElement>(".tx-sort-btn").forEach((button) => {
-      const column = button.dataset.column;
-      const isActive = column === ui.txSort.column;
-      button.classList.toggle("active", isActive);
-      if (!isActive) {
-        button.textContent = "↕";
-      } else {
-        button.textContent = ui.txSort.direction === "asc" ? "↑" : "↓";
-      }
-    });
+    document
+      .querySelectorAll<HTMLButtonElement>(".tx-sort-btn")
+      .forEach((button) => {
+        const column = button.dataset.column;
+        const isActive = column === ui.txSort.column;
+        button.classList.toggle("active", isActive);
+        if (!isActive) {
+          button.textContent = "↕";
+        } else {
+          button.textContent = ui.txSort.direction === "asc" ? "↑" : "↓";
+        }
+      });
   }
 
   function clearTransactionFilterByColumn(column: TxSortColumn) {
@@ -341,7 +391,7 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     actions: { saveAction: string; cancelAction: string } = {
       saveAction: "save-edit-tx",
       cancelAction: "cancel-edit-tx",
-    }
+    },
   ): string {
     const state = deps.getState();
     const accountsOptions = state.accounts
@@ -353,7 +403,12 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
 
     const typeOptions = ["income", "expense", "investment"]
       .map((typeValue) => {
-        const label = typeValue === "income" ? "Ingreso" : typeValue === "expense" ? "Gasto" : "Inversión";
+        const label =
+          typeValue === "income"
+            ? "Ingreso"
+            : typeValue === "expense"
+              ? "Gasto"
+              : "Inversión";
         const selected = typeValue === item.type ? "selected" : "";
         return `<option value="${typeValue}" ${selected}>${label}</option>`;
       })
@@ -405,18 +460,39 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       return;
     }
 
-    const tx = state.transactions.find((item): item is Transaction => item.id === id);
+    const tx = state.transactions.find(
+      (item): item is Transaction => item.id === id,
+    );
     if (!tx) {
       return;
     }
 
-    const dateInput = row.querySelector<HTMLInputElement>('[data-edit-field="date"]');
-    const accountInput = row.querySelector<HTMLSelectElement>('[data-edit-field="accountId"]');
-    const typeInput = row.querySelector<HTMLSelectElement>('[data-edit-field="type"]');
-    const categoryInput = row.querySelector<HTMLInputElement>('[data-edit-field="category"]');
-    const descriptionInput = row.querySelector<HTMLInputElement>('[data-edit-field="description"]');
-    const amountInput = row.querySelector<HTMLInputElement>('[data-edit-field="amount"]');
-    if (!dateInput || !accountInput || !typeInput || !categoryInput || !descriptionInput || !amountInput) {
+    const dateInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="date"]',
+    );
+    const accountInput = row.querySelector<HTMLSelectElement>(
+      '[data-edit-field="accountId"]',
+    );
+    const typeInput = row.querySelector<HTMLSelectElement>(
+      '[data-edit-field="type"]',
+    );
+    const categoryInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="category"]',
+    );
+    const descriptionInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="description"]',
+    );
+    const amountInput = row.querySelector<HTMLInputElement>(
+      '[data-edit-field="amount"]',
+    );
+    if (
+      !dateInput ||
+      !accountInput ||
+      !typeInput ||
+      !categoryInput ||
+      !descriptionInput ||
+      !amountInput
+    ) {
       return;
     }
 
@@ -430,8 +506,17 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     const requiresPositiveAmount = type !== "investment";
     const invalidAmount = requiresPositiveAmount ? amount <= 0 : amount === 0;
 
-    if (!date || !accountId || !type || !category || invalidAmount || !isTransactionType(type)) {
-      deps.showToast("Completa fecha, cuenta, tipo, categoría e importe válido.");
+    if (
+      !date ||
+      !accountId ||
+      !type ||
+      !category ||
+      invalidAmount ||
+      !isTransactionType(type)
+    ) {
+      deps.showToast(
+        "Completa fecha, cuenta, tipo, categoría e importe válido.",
+      );
       return;
     }
 
@@ -523,7 +608,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     }
 
     const selectedSet = new Set(ui.txSelectedIds);
-    state.transactions = state.transactions.filter((item) => !selectedSet.has(item.id));
+    state.transactions = state.transactions.filter(
+      (item) => !selectedSet.has(item.id),
+    );
     ui.txSelectedIds = [];
     deps.saveState();
     deps.renderAll();
@@ -565,48 +652,59 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       container.addEventListener("click", (event) => event.stopPropagation());
     });
 
-    document.querySelectorAll<HTMLButtonElement>(".tx-sort-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const column = button.dataset.column;
-        if (!column) {
-          return;
-        }
-        if (ui.txSort.column === column) {
-          ui.txSort.direction = ui.txSort.direction === "asc" ? "desc" : "asc";
-        } else {
-          ui.txSort.column = column as TxSortColumn;
-          ui.txSort.direction = column === "date" || column === "amount" ? "desc" : "asc";
-        }
-        renderTransactions();
+    document
+      .querySelectorAll<HTMLButtonElement>(".tx-sort-btn")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          const column = button.dataset.column;
+          if (!column) {
+            return;
+          }
+          if (ui.txSort.column === column) {
+            ui.txSort.direction =
+              ui.txSort.direction === "asc" ? "desc" : "asc";
+          } else {
+            ui.txSort.column = column as TxSortColumn;
+            ui.txSort.direction =
+              column === "date" || column === "amount" ? "desc" : "asc";
+          }
+          renderTransactions();
+        });
       });
-    });
 
-    document.querySelectorAll<HTMLButtonElement>(".tx-filter-trigger").forEach((button) => {
-      button.addEventListener("pointerdown", (event) => event.stopPropagation());
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const column = button.dataset.column || "";
-        if (!isTxSortColumn(column)) {
-          return;
-        }
-        ui.txOpenHeaderFilter = ui.txOpenHeaderFilter === column ? "" : column;
-        renderTransactionHeaderFilterState();
+    document
+      .querySelectorAll<HTMLButtonElement>(".tx-filter-trigger")
+      .forEach((button) => {
+        button.addEventListener("pointerdown", (event) =>
+          event.stopPropagation(),
+        );
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const column = button.dataset.column || "";
+          if (!isTxSortColumn(column)) {
+            return;
+          }
+          ui.txOpenHeaderFilter =
+            ui.txOpenHeaderFilter === column ? "" : column;
+          renderTransactionHeaderFilterState();
+        });
       });
-    });
 
     document.querySelectorAll(".tx-filter-popover").forEach((popover) => {
       popover.addEventListener("click", (event) => event.stopPropagation());
     });
 
-    document.querySelectorAll<HTMLButtonElement>(".tx-header-clear-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const column = button.dataset.column || "";
-        if (!isTxSortColumn(column)) {
-          return;
-        }
-        clearTransactionFilterByColumn(column);
+    document
+      .querySelectorAll<HTMLButtonElement>(".tx-header-clear-btn")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          const column = button.dataset.column || "";
+          if (!isTxSortColumn(column)) {
+            return;
+          }
+          clearTransactionFilterByColumn(column);
+        });
       });
-    });
 
     document.addEventListener("pointerdown", (event) => {
       if (!ui.txOpenHeaderFilter) {
@@ -632,7 +730,10 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       renderTransactionHeaderFilterState();
     });
 
-    el.txForm.elements.type.addEventListener("change", deps.populateTransactionCategoryOptions);
+    el.txForm.elements.type.addEventListener(
+      "change",
+      deps.populateTransactionCategoryOptions,
+    );
     el.txForm.elements.date.addEventListener("change", () => {
       const month = monthFromISO(el.txForm.elements.date.value);
       if (month !== null) {
@@ -647,7 +748,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       const amount = parseFloatSafe(form.get("amount"), 0);
       const month = parseIntSafe(form.get("month"), 0);
       const rawType = String(form.get("type") || "expense");
-      const txType: TransactionType = isTransactionType(rawType) ? rawType : "expense";
+      const txType: TransactionType = isTransactionType(rawType)
+        ? rawType
+        : "expense";
       const submitter = (event as SubmitEvent).submitter;
       const keepOpen = submitter === el.txSubmitMore;
 
@@ -686,7 +789,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       if (persistedValues.category) {
         el.txForm.elements.category.value = persistedValues.category;
       }
-      el.txForm.elements.date.value = keepOpen ? persistedValues.date : todayISO();
+      el.txForm.elements.date.value = keepOpen
+        ? persistedValues.date
+        : todayISO();
       el.txForm.elements.amount.value = "";
       el.txForm.elements.description.value = "";
 
@@ -695,13 +800,17 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
       }
 
       deps.renderAll();
-      deps.showToast(keepOpen ? "Guardado. Puedes añadir otro." : "Movimiento guardado.");
+      deps.showToast(
+        keepOpen ? "Guardado. Puedes añadir otro." : "Movimiento guardado.",
+      );
     });
 
     el.txBody.addEventListener("click", (event) => {
       const state = deps.getState();
       const target = deps.getEventElement(event.target);
-      const actionButton = target?.closest<HTMLButtonElement>("button[data-action]");
+      const actionButton = target?.closest<HTMLButtonElement>(
+        "button[data-action]",
+      );
       if (actionButton) {
         const action = actionButton.dataset.action;
         const id = actionButton.dataset.id;
@@ -726,7 +835,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
         }
       }
 
-      const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-id]");
+      const deleteButton = target?.closest<HTMLButtonElement>(
+        "button[data-delete-id]",
+      );
       if (!deleteButton) {
         return;
       }
@@ -740,7 +851,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
 
     el.txBody.addEventListener("change", (event) => {
       const target = deps.getEventElement(event.target);
-      const input = target?.closest<HTMLInputElement>('input[data-select-tx-id]');
+      const input = target?.closest<HTMLInputElement>(
+        "input[data-select-tx-id]",
+      );
       if (!input) {
         return;
       }
@@ -759,7 +872,9 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     });
 
     el.txSelectAll.addEventListener("change", () => {
-      const visibleIds = getFilteredAndSortedTransactions().map((item) => item.id);
+      const visibleIds = getFilteredAndSortedTransactions().map(
+        (item) => item.id,
+      );
       if (!visibleIds.length) {
         ui.txSelectedIds = [];
         renderTransactions();
@@ -786,7 +901,8 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
     renderTransactionSelectionState(tx);
 
     if (!tx.length) {
-      el.txBody.innerHTML = "<tr><td colspan='8'>Sin movimientos para este mes.</td></tr>";
+      el.txBody.innerHTML =
+        "<tr><td colspan='8'>Sin movimientos para este mes.</td></tr>";
       return;
     }
 
@@ -796,8 +912,18 @@ export function setupTransactionSection(deps: TransactionsSectionDeps) {
           return renderEditingTransactionRow(item);
         }
 
-        const typeLabel = item.type === "income" ? "Ingreso" : item.type === "expense" ? "Gasto" : "Inversión";
-        const typeClass = item.type === "income" ? "badge-income" : item.type === "expense" ? "badge-expense" : "badge-investment";
+        const typeLabel =
+          item.type === "income"
+            ? "Ingreso"
+            : item.type === "expense"
+              ? "Gasto"
+              : "Inversión";
+        const typeClass =
+          item.type === "income"
+            ? "badge-income"
+            : item.type === "expense"
+              ? "badge-expense"
+              : "badge-investment";
         const account = deps.getAccountName(item.accountId);
 
         return `

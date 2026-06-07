@@ -8,23 +8,52 @@
   </div>
 
   <div class="settings-head">
-      <label>
-        Año
-        <input id="settings-year" name="settingsYear" type="number" min="2000" max="2100" autocomplete="off" />
-      </label>
-      <label>
-        Moneda
-        <input id="settings-currency" name="settingsCurrency" type="text" maxlength="3" autocomplete="off" />
-      </label>
-    <button id="save-settings-main" type="button" class="primary-btn">Guardar ajustes</button>
+    <label>
+      Año
+      <input
+        id="settings-year"
+        name="settingsYear"
+        type="number"
+        min="2000"
+        max="2100"
+        autocomplete="off"
+      />
+    </label>
+    <label>
+      Moneda
+      <input
+        id="settings-currency"
+        name="settingsCurrency"
+        type="text"
+        maxlength="3"
+        autocomplete="off"
+      />
+    </label>
+    <button id="save-settings-main" type="button" class="primary-btn"
+      >Guardar ajustes</button
+    >
   </div>
 
   <div class="dual-grid">
     <article class="card">
       <h3>Cuentas de liquidez</h3>
       <form id="add-account-form" class="mini-form" autocomplete="off">
-        <input type="text" name="name" placeholder="Nombre cuenta" required autocomplete="off" />
-        <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Saldo inicial" required autocomplete="off" />
+        <input
+          type="text"
+          name="name"
+          placeholder="Nombre cuenta"
+          required
+          autocomplete="off"
+        />
+        <input
+          type="number"
+          name="openingBalance"
+          step="0.01"
+          min="0"
+          placeholder="Saldo inicial"
+          required
+          autocomplete="off"
+        />
         <button type="submit" class="secondary-btn">Agregar</button>
       </form>
       <div id="settings-accounts" class="list-stack"></div>
@@ -33,8 +62,22 @@
     <article class="card">
       <h3>Activos de inversión</h3>
       <form id="add-investment-form" class="mini-form" autocomplete="off">
-        <input type="text" name="name" placeholder="Activo" required autocomplete="off" />
-        <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Valor inicial" required autocomplete="off" />
+        <input
+          type="text"
+          name="name"
+          placeholder="Activo"
+          required
+          autocomplete="off"
+        />
+        <input
+          type="number"
+          name="openingBalance"
+          step="0.01"
+          min="0"
+          placeholder="Valor inicial"
+          required
+          autocomplete="off"
+        />
         <button type="submit" class="secondary-btn">Agregar</button>
       </form>
       <div id="settings-investments" class="list-stack"></div>
@@ -43,8 +86,22 @@
     <article class="card">
       <h3>Pasivos / deudas</h3>
       <form id="add-liability-form" class="mini-form" autocomplete="off">
-        <input type="text" name="name" placeholder="Pasivo" required autocomplete="off" />
-        <input type="number" name="openingBalance" step="0.01" min="0" placeholder="Monto inicial" required autocomplete="off" />
+        <input
+          type="text"
+          name="name"
+          placeholder="Pasivo"
+          required
+          autocomplete="off"
+        />
+        <input
+          type="number"
+          name="openingBalance"
+          step="0.01"
+          min="0"
+          placeholder="Monto inicial"
+          required
+          autocomplete="off"
+        />
         <button type="submit" class="secondary-btn">Agregar</button>
       </form>
       <div id="settings-liabilities" class="list-stack"></div>
@@ -54,8 +111,18 @@
       <h3>Categorías</h3>
       <div class="category-block">
         <h4>Ingresos</h4>
-        <form id="add-income-category" class="mini-form compact-row" autocomplete="off">
-          <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+        <form
+          id="add-income-category"
+          class="mini-form compact-row"
+          autocomplete="off"
+        >
+          <input
+            type="text"
+            name="name"
+            placeholder="Nueva categoría"
+            required
+            autocomplete="off"
+          />
           <button type="submit" class="secondary-btn">Agregar</button>
         </form>
         <div id="settings-income-categories" class="tag-wrap"></div>
@@ -63,8 +130,18 @@
 
       <div class="category-block">
         <h4>Gastos</h4>
-        <form id="add-expense-category" class="mini-form compact-row" autocomplete="off">
-          <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+        <form
+          id="add-expense-category"
+          class="mini-form compact-row"
+          autocomplete="off"
+        >
+          <input
+            type="text"
+            name="name"
+            placeholder="Nueva categoría"
+            required
+            autocomplete="off"
+          />
           <button type="submit" class="secondary-btn">Agregar</button>
         </form>
         <div id="settings-expense-categories" class="tag-wrap"></div>
@@ -72,8 +149,18 @@
 
       <div class="category-block">
         <h4>Inversión</h4>
-        <form id="add-investment-category" class="mini-form compact-row" autocomplete="off">
-          <input type="text" name="name" placeholder="Nueva categoría" required autocomplete="off" />
+        <form
+          id="add-investment-category"
+          class="mini-form compact-row"
+          autocomplete="off"
+        >
+          <input
+            type="text"
+            name="name"
+            placeholder="Nueva categoría"
+            required
+            autocomplete="off"
+          />
           <button type="submit" class="secondary-btn">Agregar</button>
         </form>
         <div id="settings-investment-categories" class="tag-wrap"></div>
@@ -82,7 +169,10 @@
 
     <article class="card">
       <h3>Liquidez para TWR</h3>
-      <p>Selecciona qué cuentas de brokers se incluyen como liquidez en el cálculo de cartera para TWR.</p>
+      <p>
+        Selecciona qué cuentas de brokers se incluyen como liquidez en el
+        cálculo de cartera para TWR.
+      </p>
       <div id="settings-twr-liquidity" class="list-stack"></div>
     </article>
   </div>

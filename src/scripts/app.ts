@@ -21,12 +21,7 @@ import { setupSettingsDataSection } from "./app/settings-data-section";
 import { setupAppCalculationHelpers } from "./app/calculation-helpers";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
-import {
-  clone,
-  escapeAttr,
-  escapeHtml,
-  parseFloatSafe,
-} from "./utils";
+import { clone, escapeAttr, escapeHtml, parseFloatSafe } from "./utils";
 import { decorateCategoryLabel } from "./category-emoji";
 import {
   BASE_SEED,
@@ -138,7 +133,8 @@ import {
     if (
       activeElement &&
       container.contains(activeElement) &&
-      (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) &&
+      (activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement) &&
       typeof activeElement.selectionStart === "number" &&
       typeof activeElement.selectionEnd === "number"
     ) {
@@ -201,21 +197,48 @@ import {
     kpiNetWorth: getRequiredElement<HTMLElement>("kpi-net-worth"),
     kpiNetWorthChange: getRequiredElement<HTMLElement>("kpi-net-worth-change"),
     kpiAnnualSavings: getRequiredElement<HTMLElement>("kpi-annual-savings"),
+    kpiIncomeDelta: getRequiredElement<HTMLElement>("kpi-income-delta"),
+    kpiExpenseDelta: getRequiredElement<HTMLElement>("kpi-expense-delta"),
+    kpiInvestmentDelta: getRequiredElement<HTMLElement>("kpi-investment-delta"),
+    sparkIncome: getRequiredElement<HTMLCanvasElement>("spark-income"),
+    sparkExpense: getRequiredElement<HTMLCanvasElement>("spark-expense"),
+    sparkInvestment: getRequiredElement<HTMLCanvasElement>("spark-investment"),
     chartNetWorth: getRequiredElement<HTMLCanvasElement>("chart-networth"),
     chartCashflow: getRequiredElement<HTMLCanvasElement>("chart-cashflow"),
-    topExpenseList: getRequiredElement<HTMLElement>("top-expense-list"),
-    investmentProgressList: getRequiredElement<HTMLElement>("investment-progress-list"),
+    chartWealthSplit:
+      getRequiredElement<HTMLCanvasElement>("chart-wealth-split"),
+    wealthSplitLegend: getRequiredElement<HTMLElement>("wealth-split-legend"),
+    networthEndpoint: getRequiredElement<HTMLElement>("networth-endpoint"),
+    investmentProgressList: getRequiredElement<HTMLElement>(
+      "investment-progress-list",
+    ),
+    recentTxBody: getRequiredElement<HTMLElement>("recent-tx-body"),
+    savingsGoal: getRequiredElement<HTMLElement>("savings-goal"),
 
     txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
     txForm: getRequiredElement<TxForm>("tx-form"),
     txBody: getRequiredElement<HTMLElement>("tx-table-body"),
-    txHeaderFilterDate: getRequiredElement<HTMLInputElement>("tx-header-filter-date"),
-    txHeaderFilterAccount: getRequiredElement<HTMLElement>("tx-header-filter-account"),
-    txHeaderFilterType: getRequiredElement<HTMLElement>("tx-header-filter-type"),
-    txHeaderFilterCategory: getRequiredElement<HTMLInputElement>("tx-header-filter-category"),
-    txHeaderFilterDescription: getRequiredElement<HTMLInputElement>("tx-header-filter-description"),
-    txHeaderFilterAmountMin: getRequiredElement<HTMLInputElement>("tx-header-filter-amount-min"),
-    txHeaderFilterAmountMax: getRequiredElement<HTMLInputElement>("tx-header-filter-amount-max"),
+    txHeaderFilterDate: getRequiredElement<HTMLInputElement>(
+      "tx-header-filter-date",
+    ),
+    txHeaderFilterAccount: getRequiredElement<HTMLElement>(
+      "tx-header-filter-account",
+    ),
+    txHeaderFilterType: getRequiredElement<HTMLElement>(
+      "tx-header-filter-type",
+    ),
+    txHeaderFilterCategory: getRequiredElement<HTMLInputElement>(
+      "tx-header-filter-category",
+    ),
+    txHeaderFilterDescription: getRequiredElement<HTMLInputElement>(
+      "tx-header-filter-description",
+    ),
+    txHeaderFilterAmountMin: getRequiredElement<HTMLInputElement>(
+      "tx-header-filter-amount-min",
+    ),
+    txHeaderFilterAmountMax: getRequiredElement<HTMLInputElement>(
+      "tx-header-filter-amount-max",
+    ),
     txOpenModal: getRequiredElement<HTMLButtonElement>("tx-open-modal"),
     txDialog: getRequiredElement<HTMLDialogElement>("tx-dialog"),
     txCloseModal: getRequiredElement<HTMLButtonElement>("tx-close-modal"),
@@ -230,7 +253,9 @@ import {
     txTotalIncome: getRequiredElement<HTMLElement>("tx-total-income"),
     txTotalExpense: getRequiredElement<HTMLElement>("tx-total-expense"),
     txTotalInvestment: getRequiredElement<HTMLElement>("tx-total-investment"),
-    txCategoryBreakdownBody: getRequiredElement<HTMLElement>("tx-category-breakdown-body"),
+    txCategoryBreakdownBody: getRequiredElement<HTMLElement>(
+      "tx-category-breakdown-body",
+    ),
 
     budgetBody: getRequiredElement<HTMLElement>("budget-tables"),
     budgetPlanned: getRequiredElement<HTMLElement>("budget-total-planned"),
@@ -240,104 +265,236 @@ import {
     snapshotMonth: getRequiredElement<HTMLSelectElement>("snapshot-month"),
     saveSnapshot: getRequiredElement<HTMLButtonElement>("save-snapshot"),
     snapshotAccounts: getRequiredElement<HTMLElement>("snapshot-accounts"),
-    snapshotInvestments: getRequiredElement<HTMLElement>("snapshot-investments"),
-    snapshotLiabilities: getRequiredElement<HTMLElement>("snapshot-liabilities"),
+    snapshotInvestments: getRequiredElement<HTMLElement>(
+      "snapshot-investments",
+    ),
+    snapshotLiabilities: getRequiredElement<HTMLElement>(
+      "snapshot-liabilities",
+    ),
     wealthTimelineBody: getRequiredElement<HTMLElement>("wealth-timeline-body"),
     chartWealth: getRequiredElement<HTMLCanvasElement>("chart-wealth"),
-    wealthCalcDialog: getRequiredElement<HTMLDialogElement>("wealth-calc-dialog"),
+    wealthCalcDialog:
+      getRequiredElement<HTMLDialogElement>("wealth-calc-dialog"),
     wealthCalcForm: getRequiredElement<HTMLFormElement>("wealth-calc-form"),
     wealthCalcTitle: getRequiredElement<HTMLElement>("wealth-calc-title"),
-    wealthCalcExpression: getRequiredElement<HTMLInputElement>("wealth-calc-expression"),
+    wealthCalcExpression: getRequiredElement<HTMLInputElement>(
+      "wealth-calc-expression",
+    ),
     wealthCalcClose: getRequiredElement<HTMLButtonElement>("wealth-calc-close"),
 
     investmentMonth: getRequiredElement<HTMLSelectElement>("investment-month"),
-    investmentSubtabButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-investment-tab]")),
-    investmentSubtabPanels: Array.from(document.querySelectorAll<HTMLElement>("[data-investment-tab-panel]")),
-    investmentReturnModeButtons: Array.from(document.querySelectorAll<HTMLButtonElement>("[data-return-mode]")),
+    investmentSubtabButtons: Array.from(
+      document.querySelectorAll<HTMLButtonElement>("[data-investment-tab]"),
+    ),
+    investmentSubtabPanels: Array.from(
+      document.querySelectorAll<HTMLElement>("[data-investment-tab-panel]"),
+    ),
+    investmentReturnModeButtons: Array.from(
+      document.querySelectorAll<HTMLButtonElement>("[data-return-mode]"),
+    ),
     invTotalValue: getRequiredElement<HTMLElement>("inv-total-value"),
     invCapital: getRequiredElement<HTMLElement>("inv-capital"),
     invReturn: getRequiredElement<HTMLElement>("inv-return"),
     invReturnLabel: getRequiredElement<HTMLElement>("inv-return-label"),
-    investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>("investment-portfolio-chart"),
-    investmentAssetsChart: getRequiredElement<HTMLCanvasElement>("investment-assets-chart"),
-    investmentAllocation: getRequiredElement<HTMLCanvasElement>("investment-allocation"),
-    investmentYearFilter: getRequiredElement<HTMLSelectElement>("investment-year-filter"),
-    investmentOnlyUndeclared: getRequiredElement<HTMLInputElement>("investment-only-undeclared"),
-    investmentMovementForm: getRequiredElement<InvestmentMovementForm>("investment-movement-form"),
-    investmentTxBody: getRequiredElement<HTMLElement>("investment-tx-table-body"),
-    investmentMovementDate: getRequiredElement<HTMLInputElement>("investment-movement-date"),
-    investmentMovementTime: getRequiredElement<HTMLInputElement>("investment-movement-time"),
-    investmentMovementSide: getRequiredElement<HTMLSelectElement>("investment-movement-side"),
-    investmentMovementSymbol: getRequiredElement<HTMLInputElement>("investment-movement-symbol"),
-    investmentMovementCategory: getRequiredElement<HTMLSelectElement>("investment-movement-category"),
-    investmentMovementUnitPrice: getRequiredElement<HTMLInputElement>("investment-movement-unit-price"),
-    investmentMovementUnits: getRequiredElement<HTMLInputElement>("investment-movement-units"),
-    investmentMovementFee: getRequiredElement<HTMLInputElement>("investment-movement-fee"),
-    investmentMovementTotal: getRequiredElement<HTMLInputElement>("investment-movement-total"),
-    investmentMovementCurrency: getRequiredElement<HTMLInputElement>("investment-movement-currency"),
-    investmentMovementBroker: getRequiredElement<HTMLSelectElement>("investment-movement-broker"),
-    investmentMovementDeclared: getRequiredElement<HTMLInputElement>("investment-movement-declared"),
+    investmentPortfolioChart: getRequiredElement<HTMLCanvasElement>(
+      "investment-portfolio-chart",
+    ),
+    investmentAssetsChart: getRequiredElement<HTMLCanvasElement>(
+      "investment-assets-chart",
+    ),
+    investmentAllocation: getRequiredElement<HTMLCanvasElement>(
+      "investment-allocation",
+    ),
+    investmentYearFilter: getRequiredElement<HTMLSelectElement>(
+      "investment-year-filter",
+    ),
+    investmentOnlyUndeclared: getRequiredElement<HTMLInputElement>(
+      "investment-only-undeclared",
+    ),
+    investmentMovementForm: getRequiredElement<InvestmentMovementForm>(
+      "investment-movement-form",
+    ),
+    investmentTxBody: getRequiredElement<HTMLElement>(
+      "investment-tx-table-body",
+    ),
+    investmentMovementDate: getRequiredElement<HTMLInputElement>(
+      "investment-movement-date",
+    ),
+    investmentMovementTime: getRequiredElement<HTMLInputElement>(
+      "investment-movement-time",
+    ),
+    investmentMovementSide: getRequiredElement<HTMLSelectElement>(
+      "investment-movement-side",
+    ),
+    investmentMovementSymbol: getRequiredElement<HTMLInputElement>(
+      "investment-movement-symbol",
+    ),
+    investmentMovementCategory: getRequiredElement<HTMLSelectElement>(
+      "investment-movement-category",
+    ),
+    investmentMovementUnitPrice: getRequiredElement<HTMLInputElement>(
+      "investment-movement-unit-price",
+    ),
+    investmentMovementUnits: getRequiredElement<HTMLInputElement>(
+      "investment-movement-units",
+    ),
+    investmentMovementFee: getRequiredElement<HTMLInputElement>(
+      "investment-movement-fee",
+    ),
+    investmentMovementTotal: getRequiredElement<HTMLInputElement>(
+      "investment-movement-total",
+    ),
+    investmentMovementCurrency: getRequiredElement<HTMLInputElement>(
+      "investment-movement-currency",
+    ),
+    investmentMovementBroker: getRequiredElement<HTMLSelectElement>(
+      "investment-movement-broker",
+    ),
+    investmentMovementDeclared: getRequiredElement<HTMLInputElement>(
+      "investment-movement-declared",
+    ),
     contributionBody: getRequiredElement<HTMLElement>("contribution-body"),
-    openContributionWorkflow: getRequiredElement<HTMLButtonElement>("open-contribution-workflow"),
-    contributionWorkflowDialog: getRequiredElement<HTMLDialogElement>("contribution-workflow-dialog"),
-    contributionWorkflowForm: getRequiredElement<HTMLFormElement>("contribution-workflow-form"),
-    contributionWorkflowClose: getRequiredElement<HTMLButtonElement>("contribution-workflow-close"),
-    contributionWorkflowMonth: getRequiredElement<HTMLSelectElement>("contribution-workflow-month"),
-    contributionWorkflowDate: getRequiredElement<HTMLInputElement>("contribution-workflow-date"),
-    contributionWorkflowStepSnapshot: getRequiredElement<HTMLElement>("contribution-workflow-step-snapshot"),
-    contributionWorkflowStepAllocation: getRequiredElement<HTMLElement>("contribution-workflow-step-allocation"),
-    contributionWorkflowInvestmentsBody: getRequiredElement<HTMLElement>("contribution-workflow-investments-body"),
-    contributionWorkflowLiquidityBody: getRequiredElement<HTMLElement>("contribution-workflow-liquidity-body"),
-    contributionWorkflowAllocationBody: getRequiredElement<HTMLElement>("contribution-workflow-allocation-body"),
-    contributionWorkflowTotal: getRequiredElement<HTMLInputElement>("contribution-workflow-total"),
-    contributionWorkflowSnapshotWarning: getRequiredElement<HTMLElement>("contribution-workflow-snapshot-warning"),
-    contributionWorkflowAllocationWarning: getRequiredElement<HTMLElement>("contribution-workflow-allocation-warning"),
-    contributionWorkflowPrev: getRequiredElement<HTMLButtonElement>("contribution-workflow-prev"),
-    contributionWorkflowNext: getRequiredElement<HTMLButtonElement>("contribution-workflow-next"),
-    contributionWorkflowSave: getRequiredElement<HTMLButtonElement>("contribution-workflow-save"),
-    contributionDeleteDialog: getRequiredElement<HTMLDialogElement>("contribution-delete-dialog"),
-    contributionDeleteForm: getRequiredElement<HTMLFormElement>("contribution-delete-form"),
-    contributionDeleteTitle: getRequiredElement<HTMLElement>("contribution-delete-title"),
-    contributionDeleteMessage: getRequiredElement<HTMLElement>("contribution-delete-message"),
-    contributionDeleteClose: getRequiredElement<HTMLButtonElement>("contribution-delete-close"),
-    contributionDeleteCancel: getRequiredElement<HTMLButtonElement>("contribution-delete-cancel"),
-    contributionDeleteConfirm: getRequiredElement<HTMLButtonElement>("contribution-delete-confirm"),
-    contributionCalcDialog: getRequiredElement<HTMLDialogElement>("contribution-calc-dialog"),
-    contributionCalcForm: getRequiredElement<HTMLFormElement>("contribution-calc-form"),
-    contributionCalcTitle: getRequiredElement<HTMLElement>("contribution-calc-title"),
-    contributionCalcClose: getRequiredElement<HTMLButtonElement>("contribution-calc-close"),
-    contributionCalcExpression: getRequiredElement<HTMLInputElement>("contribution-calc-expression"),
+    openContributionWorkflow: getRequiredElement<HTMLButtonElement>(
+      "open-contribution-workflow",
+    ),
+    contributionWorkflowDialog: getRequiredElement<HTMLDialogElement>(
+      "contribution-workflow-dialog",
+    ),
+    contributionWorkflowForm: getRequiredElement<HTMLFormElement>(
+      "contribution-workflow-form",
+    ),
+    contributionWorkflowClose: getRequiredElement<HTMLButtonElement>(
+      "contribution-workflow-close",
+    ),
+    contributionWorkflowMonth: getRequiredElement<HTMLSelectElement>(
+      "contribution-workflow-month",
+    ),
+    contributionWorkflowDate: getRequiredElement<HTMLInputElement>(
+      "contribution-workflow-date",
+    ),
+    contributionWorkflowStepSnapshot: getRequiredElement<HTMLElement>(
+      "contribution-workflow-step-snapshot",
+    ),
+    contributionWorkflowStepAllocation: getRequiredElement<HTMLElement>(
+      "contribution-workflow-step-allocation",
+    ),
+    contributionWorkflowInvestmentsBody: getRequiredElement<HTMLElement>(
+      "contribution-workflow-investments-body",
+    ),
+    contributionWorkflowLiquidityBody: getRequiredElement<HTMLElement>(
+      "contribution-workflow-liquidity-body",
+    ),
+    contributionWorkflowAllocationBody: getRequiredElement<HTMLElement>(
+      "contribution-workflow-allocation-body",
+    ),
+    contributionWorkflowTotal: getRequiredElement<HTMLInputElement>(
+      "contribution-workflow-total",
+    ),
+    contributionWorkflowSnapshotWarning: getRequiredElement<HTMLElement>(
+      "contribution-workflow-snapshot-warning",
+    ),
+    contributionWorkflowAllocationWarning: getRequiredElement<HTMLElement>(
+      "contribution-workflow-allocation-warning",
+    ),
+    contributionWorkflowPrev: getRequiredElement<HTMLButtonElement>(
+      "contribution-workflow-prev",
+    ),
+    contributionWorkflowNext: getRequiredElement<HTMLButtonElement>(
+      "contribution-workflow-next",
+    ),
+    contributionWorkflowSave: getRequiredElement<HTMLButtonElement>(
+      "contribution-workflow-save",
+    ),
+    contributionDeleteDialog: getRequiredElement<HTMLDialogElement>(
+      "contribution-delete-dialog",
+    ),
+    contributionDeleteForm: getRequiredElement<HTMLFormElement>(
+      "contribution-delete-form",
+    ),
+    contributionDeleteTitle: getRequiredElement<HTMLElement>(
+      "contribution-delete-title",
+    ),
+    contributionDeleteMessage: getRequiredElement<HTMLElement>(
+      "contribution-delete-message",
+    ),
+    contributionDeleteClose: getRequiredElement<HTMLButtonElement>(
+      "contribution-delete-close",
+    ),
+    contributionDeleteCancel: getRequiredElement<HTMLButtonElement>(
+      "contribution-delete-cancel",
+    ),
+    contributionDeleteConfirm: getRequiredElement<HTMLButtonElement>(
+      "contribution-delete-confirm",
+    ),
+    contributionCalcDialog: getRequiredElement<HTMLDialogElement>(
+      "contribution-calc-dialog",
+    ),
+    contributionCalcForm: getRequiredElement<HTMLFormElement>(
+      "contribution-calc-form",
+    ),
+    contributionCalcTitle: getRequiredElement<HTMLElement>(
+      "contribution-calc-title",
+    ),
+    contributionCalcClose: getRequiredElement<HTMLButtonElement>(
+      "contribution-calc-close",
+    ),
+    contributionCalcExpression: getRequiredElement<HTMLInputElement>(
+      "contribution-calc-expression",
+    ),
 
     goalsProgress: getRequiredElement<HTMLElement>("goals-progress"),
 
     settingsYear: getRequiredElement<HTMLInputElement>("settings-year"),
     settingsCurrency: getRequiredElement<HTMLInputElement>("settings-currency"),
-    saveSettingsMain: getRequiredElement<HTMLButtonElement>("save-settings-main"),
+    saveSettingsMain:
+      getRequiredElement<HTMLButtonElement>("save-settings-main"),
 
     addAccountForm: getRequiredElement<HTMLFormElement>("add-account-form"),
-    addInvestmentForm: getRequiredElement<HTMLFormElement>("add-investment-form"),
+    addInvestmentForm: getRequiredElement<HTMLFormElement>(
+      "add-investment-form",
+    ),
     addLiabilityForm: getRequiredElement<HTMLFormElement>("add-liability-form"),
 
     settingsAccounts: getRequiredElement<HTMLElement>("settings-accounts"),
-    settingsInvestments: getRequiredElement<HTMLElement>("settings-investments"),
-    settingsLiabilities: getRequiredElement<HTMLElement>("settings-liabilities"),
-    settingsTwrLiquidity: getRequiredElement<HTMLElement>("settings-twr-liquidity"),
+    settingsInvestments: getRequiredElement<HTMLElement>(
+      "settings-investments",
+    ),
+    settingsLiabilities: getRequiredElement<HTMLElement>(
+      "settings-liabilities",
+    ),
+    settingsTwrLiquidity: getRequiredElement<HTMLElement>(
+      "settings-twr-liquidity",
+    ),
 
-    addIncomeCategory: getRequiredElement<HTMLFormElement>("add-income-category"),
-    addExpenseCategory: getRequiredElement<HTMLFormElement>("add-expense-category"),
-    addInvestmentCategory: getRequiredElement<HTMLFormElement>("add-investment-category"),
+    addIncomeCategory: getRequiredElement<HTMLFormElement>(
+      "add-income-category",
+    ),
+    addExpenseCategory: getRequiredElement<HTMLFormElement>(
+      "add-expense-category",
+    ),
+    addInvestmentCategory: getRequiredElement<HTMLFormElement>(
+      "add-investment-category",
+    ),
 
     incomeTags: getRequiredElement<HTMLElement>("settings-income-categories"),
     expenseTags: getRequiredElement<HTMLElement>("settings-expense-categories"),
-    investmentTags: getRequiredElement<HTMLElement>("settings-investment-categories"),
+    investmentTags: getRequiredElement<HTMLElement>(
+      "settings-investment-categories",
+    ),
 
-    dataTotalTransactions: getRequiredElement<HTMLElement>("data-total-transactions"),
+    dataTotalTransactions: getRequiredElement<HTMLElement>(
+      "data-total-transactions",
+    ),
     dataTotalSnapshots: getRequiredElement<HTMLElement>("data-total-snapshots"),
-    dataTotalContributions: getRequiredElement<HTMLElement>("data-total-contributions"),
+    dataTotalContributions: getRequiredElement<HTMLElement>(
+      "data-total-contributions",
+    ),
     dataMeta: getRequiredElement<HTMLElement>("data-meta"),
     exportJson: getRequiredElement<HTMLButtonElement>("export-json"),
     importJson: getRequiredElement<HTMLInputElement>("import-json"),
-    exportTransactionsCsv: getRequiredElement<HTMLButtonElement>("export-transactions-csv"),
+    exportTransactionsCsv: getRequiredElement<HTMLButtonElement>(
+      "export-transactions-csv",
+    ),
     resetSeed: getRequiredElement<HTMLButtonElement>("reset-seed"),
     chartTooltip: getRequiredElement<HTMLElement>("chart-tooltip"),
   } as const;
@@ -380,8 +537,14 @@ import {
     getLatestDataMonth,
     computeInvestedCapital,
   } = appCalculationHelpers;
-  const { saveState, sortTransactions, sortContributions, showToast, formatMoney, formatMoneyCompact } =
-    appStateFormatHelpers;
+  const {
+    saveState,
+    sortTransactions,
+    sortContributions,
+    showToast,
+    formatMoney,
+    formatMoneyCompact,
+  } = appStateFormatHelpers;
 
   const transactionSection = setupTransactionSection({
     getState: () => state,
@@ -411,22 +574,40 @@ import {
     isSnapshotKind,
   });
 
-  const renderContributionsTable = () => contributionWorkflowSection.renderContributionsTable();
+  const renderContributionsTable = () =>
+    contributionWorkflowSection.renderContributionsTable();
   const getContributionEntriesFromSnapshots = (): Contribution[] =>
     contributionWorkflowSection.getContributionEntriesFromSnapshots();
-  const openContributionWorkflowModal = () => contributionWorkflowSection.openContributionWorkflowModal();
-  const closeContributionWorkflowModal = () => contributionWorkflowSection.closeContributionWorkflowModal();
-  const renderContributionWorkflowModal = () => contributionWorkflowSection.renderContributionWorkflowModal();
-  const renderContributionWorkflowStepState = () => contributionWorkflowSection.renderContributionWorkflowStepState();
-  const openContributionCalcModal = (kind: SnapshotKind, targetId: string, targetName: string) =>
-    contributionWorkflowSection.openContributionCalcModal(kind, targetId, targetName);
-  const closeContributionCalcModal = () => contributionWorkflowSection.closeContributionCalcModal();
-  const applyContributionCalcModalResult = () => contributionWorkflowSection.applyContributionCalcModalResult();
-  const renderContributionWorkflowModalWarnings = () => contributionWorkflowSection.renderContributionWorkflowModalWarnings();
-  const saveContributionFromWorkflowModal = () => contributionWorkflowSection.saveContributionFromWorkflowModal();
+  const openContributionWorkflowModal = () =>
+    contributionWorkflowSection.openContributionWorkflowModal();
+  const closeContributionWorkflowModal = () =>
+    contributionWorkflowSection.closeContributionWorkflowModal();
+  const renderContributionWorkflowModal = () =>
+    contributionWorkflowSection.renderContributionWorkflowModal();
+  const renderContributionWorkflowStepState = () =>
+    contributionWorkflowSection.renderContributionWorkflowStepState();
+  const openContributionCalcModal = (
+    kind: SnapshotKind,
+    targetId: string,
+    targetName: string,
+  ) =>
+    contributionWorkflowSection.openContributionCalcModal(
+      kind,
+      targetId,
+      targetName,
+    );
+  const closeContributionCalcModal = () =>
+    contributionWorkflowSection.closeContributionCalcModal();
+  const applyContributionCalcModalResult = () =>
+    contributionWorkflowSection.applyContributionCalcModalResult();
+  const renderContributionWorkflowModalWarnings = () =>
+    contributionWorkflowSection.renderContributionWorkflowModalWarnings();
+  const saveContributionFromWorkflowModal = () =>
+    contributionWorkflowSection.saveContributionFromWorkflowModal();
   const upsertContributionFlowForDate = (date: string, flow: number) =>
     contributionWorkflowSection.upsertContributionFlowForDate(date, flow);
-  const isManualContributionDate = (date: string) => contributionWorkflowSection.isManualContributionDate(date);
+  const isManualContributionDate = (date: string) =>
+    contributionWorkflowSection.isManualContributionDate(date);
 
   const dashboardBudgetGoalsSection = setupDashboardBudgetGoalsSection({
     getState: () => state,
@@ -464,15 +645,25 @@ import {
     formatMoney,
     isSnapshotKind,
   });
-  const renderSnapshotRows = (items: any, kind: any, month: any, computeFn: any) =>
+  const renderSnapshotRows = (
+    items: any,
+    kind: any,
+    month: any,
+    computeFn: any,
+  ) =>
     investmentSnapshotHelpers.renderSnapshotRows(items, kind, month, computeFn);
   const renderInvestmentEditingTransactionRow = (item: Transaction) =>
     investmentSnapshotHelpers.renderInvestmentEditingTransactionRow(item);
-  const saveEditedInvestmentTransactionRow = (id: string) => investmentSnapshotHelpers.saveEditedInvestmentTransactionRow(id);
-  const onOpenInvestmentSnapshotCalcModal = (event: Event) => investmentSnapshotHelpers.onOpenInvestmentSnapshotCalcModal(event);
-  const closeWealthCalcModal = () => investmentSnapshotHelpers.closeWealthCalcModal();
-  const applyWealthCalcModalResult = () => investmentSnapshotHelpers.applyWealthCalcModalResult();
-  const saveSnapshotFromTable = () => investmentSnapshotHelpers.saveSnapshotFromTable();
+  const saveEditedInvestmentTransactionRow = (id: string) =>
+    investmentSnapshotHelpers.saveEditedInvestmentTransactionRow(id);
+  const onOpenInvestmentSnapshotCalcModal = (event: Event) =>
+    investmentSnapshotHelpers.onOpenInvestmentSnapshotCalcModal(event);
+  const closeWealthCalcModal = () =>
+    investmentSnapshotHelpers.closeWealthCalcModal();
+  const applyWealthCalcModalResult = () =>
+    investmentSnapshotHelpers.applyWealthCalcModalResult();
+  const saveSnapshotFromTable = () =>
+    investmentSnapshotHelpers.saveSnapshotFromTable();
 
   const investmentRenderers = setupInvestmentRenderers({
     getState: () => state,
@@ -498,10 +689,14 @@ import {
   });
   const renderWealth = () => investmentRenderers.renderWealth();
   const renderInvestment = () => investmentRenderers.renderInvestment();
-  const renderInvestmentTabState = () => investmentRenderers.renderInvestmentTabState();
-  const renderInvestmentReturnModeToggle = () => investmentRenderers.renderInvestmentReturnModeToggle();
-  const renderInvestmentDashboard = () => investmentRenderers.renderInvestmentDashboard();
-  const renderInvestmentTransactionsTable = () => investmentRenderers.renderInvestmentTransactionsTable();
+  const renderInvestmentTabState = () =>
+    investmentRenderers.renderInvestmentTabState();
+  const renderInvestmentReturnModeToggle = () =>
+    investmentRenderers.renderInvestmentReturnModeToggle();
+  const renderInvestmentDashboard = () =>
+    investmentRenderers.renderInvestmentDashboard();
+  const renderInvestmentTransactionsTable = () =>
+    investmentRenderers.renderInvestmentTransactionsTable();
 
   const investmentEventBindings = setupInvestmentEventBindings({
     getState: () => state,
@@ -563,25 +758,34 @@ import {
 
   async function init() {
     await hydrateState();
-    ui.activeSection = dashboardBudgetGoalsSection.getSectionFromPath(window.location.pathname);
+    ui.activeSection = dashboardBudgetGoalsSection.getSectionFromPath(
+      window.location.pathname,
+    );
     dashboardBudgetGoalsSection.populateMonthSelects();
     bindEvents();
     renderAll();
-    dashboardBudgetGoalsSection.switchSection(ui.activeSection, { updateHistory: false });
+    dashboardBudgetGoalsSection.switchSection(ui.activeSection, {
+      updateHistory: false,
+    });
     // Expose a re-render hook so the theme toggle can repaint charts with
     // the active theme's colors (charts read CSS variables at render time).
-    (window as typeof window & { __ftRenderAll?: () => void }).__ftRenderAll = renderAll;
+    (window as typeof window & { __ftRenderAll?: () => void }).__ftRenderAll =
+      renderAll;
   }
 
   async function hydrateState() {
     const localState = loadPersistedState();
     const serverState = await loadServerState();
-    const preferredState = pickMostRecentState(localState, serverState) || clone(BASE_SEED);
+    const preferredState =
+      pickMostRecentState(localState, serverState) || clone(BASE_SEED);
     state = normalizeState(preferredState);
     persistState(state);
   }
 
-  function pickMostRecentState(localState: unknown, serverState: unknown): unknown | null {
+  function pickMostRecentState(
+    localState: unknown,
+    serverState: unknown,
+  ): unknown | null {
     if (!localState && !serverState) {
       return null;
     }
@@ -598,7 +802,9 @@ import {
   }
 
   function extractStateTimestamp(candidate: unknown): number {
-    const rawMeta = (candidate as { meta?: { savedAt?: string; generatedAt?: string } } | null)?.meta;
+    const rawMeta = (
+      candidate as { meta?: { savedAt?: string; generatedAt?: string } } | null
+    )?.meta;
     const timestamp = String(rawMeta?.savedAt || rawMeta?.generatedAt || "");
     const value = Date.parse(timestamp);
     return Number.isFinite(value) ? value : 0;
@@ -632,11 +838,9 @@ import {
     investmentEventBindings.bindWealthEvents();
   }
 
-
   function bindInvestmentEvents() {
     investmentEventBindings.bindInvestmentEvents();
   }
-
 
   function bindGoalEvents() {
     dashboardBudgetGoalsSection.bindGoalEvents();
@@ -709,7 +913,10 @@ import {
   function populateTransactionFormOptions() {
     const accountSelect = el.txForm.elements.accountId;
     accountSelect.innerHTML = state.accounts
-      .map((item: any) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+      .map(
+        (item: any) =>
+          `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
+      )
       .join("");
 
     if (!state.accounts.length) {
@@ -719,7 +926,10 @@ import {
     const currentBulkAccount = String(el.txBulkAccount.value || "");
     el.txBulkAccount.innerHTML = ['<option value="">Sin cambio</option>']
       .concat(
-        state.accounts.map((item: any) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+        state.accounts.map(
+          (item: any) =>
+            `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
+        ),
       )
       .join("");
     if (currentBulkAccount) {
@@ -737,11 +947,15 @@ import {
     const categories = getOrderedCategoriesForType("investment");
 
     categorySelect.innerHTML = categories
-      .map((name: string) => `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`)
+      .map(
+        (name: string) =>
+          `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`,
+      )
       .join("");
 
     if (!categories.length) {
-      categorySelect.innerHTML = '<option value="Sin categoría">Sin categoría</option>';
+      categorySelect.innerHTML =
+        '<option value="Sin categoría">Sin categoría</option>';
       return;
     }
 
@@ -758,7 +972,10 @@ import {
     const currentValue = String(brokerSelect.value || "").trim();
 
     brokerSelect.innerHTML = state.accounts
-      .map((item: any) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`)
+      .map(
+        (item: any) =>
+          `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
+      )
       .join("");
 
     if (!state.accounts.length) {
@@ -766,7 +983,10 @@ import {
       return;
     }
 
-    if (currentValue && state.accounts.some((item: any) => item.id === currentValue)) {
+    if (
+      currentValue &&
+      state.accounts.some((item: any) => item.id === currentValue)
+    ) {
       brokerSelect.value = currentValue;
     } else {
       brokerSelect.value = state.accounts[0].id;
@@ -788,7 +1008,9 @@ import {
   }
 
   function normalizeInvestmentMovementSymbolField() {
-    el.investmentMovementSymbol.value = normalizeInvestmentSymbol(el.investmentMovementSymbol.value);
+    el.investmentMovementSymbol.value = normalizeInvestmentSymbol(
+      el.investmentMovementSymbol.value,
+    );
   }
 
   function syncInvestmentMovementCategoryField() {
@@ -796,11 +1018,13 @@ import {
     const categorySelect = el.investmentMovementCategory;
 
     if (isBitvavo) {
-      const hasCryptoOption = Array.from(categorySelect.options).some((option) => option.value === "Crypto");
+      const hasCryptoOption = Array.from(categorySelect.options).some(
+        (option) => option.value === "Crypto",
+      );
       if (!hasCryptoOption) {
         categorySelect.insertAdjacentHTML(
           "afterbegin",
-          '<option value="Crypto" data-temporary-bitvavo-option="true">Crypto</option>'
+          '<option value="Crypto" data-temporary-bitvavo-option="true">Crypto</option>',
         );
       }
       categorySelect.value = "Crypto";
@@ -810,9 +1034,10 @@ import {
     }
 
     const wasDisabled = categorySelect.disabled;
-    const temporaryCryptoOption = categorySelect.querySelector<HTMLOptionElement>(
-      'option[data-temporary-bitvavo-option="true"]'
-    );
+    const temporaryCryptoOption =
+      categorySelect.querySelector<HTMLOptionElement>(
+        'option[data-temporary-bitvavo-option="true"]',
+      );
     if (temporaryCryptoOption) {
       temporaryCryptoOption.remove();
     }
@@ -836,12 +1061,13 @@ import {
     categorySelect.innerHTML = categories
       .map(
         (name: any) =>
-          `<option value="${escapeAttr(name)}">${escapeHtml(decorateCategoryLabel(type, name))}</option>`
+          `<option value="${escapeAttr(name)}">${escapeHtml(decorateCategoryLabel(type, name))}</option>`,
       )
       .join("");
 
     if (!categories.length) {
-      categorySelect.innerHTML = '<option value="Sin categoría">Sin categoría</option>';
+      categorySelect.innerHTML =
+        '<option value="Sin categoría">Sin categoría</option>';
       return;
     }
 

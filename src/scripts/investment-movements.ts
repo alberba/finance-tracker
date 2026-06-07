@@ -18,13 +18,18 @@ export interface InvestmentComputedFields {
   description: string;
 }
 
-export function computeInvestmentMovement(input: InvestmentDraftInput): InvestmentComputedFields {
+export function computeInvestmentMovement(
+  input: InvestmentDraftInput,
+): InvestmentComputedFields {
   const normalizedSymbol = normalizeInvestmentSymbol(input.symbol);
   const normalizedUnits = normalizeNonNegative(input.units, 8);
   const normalizedUnitPrice = normalizeNonNegative(input.unitPrice, 6);
   const normalizedFee = normalizeNonNegative(input.fee, 2);
-  const grossAmount = round2(normalizedUnits * normalizedUnitPrice + normalizedFee);
-  const signedAmount = input.side === "sell" ? round2(-grossAmount) : grossAmount;
+  const grossAmount = round2(
+    normalizedUnits * normalizedUnitPrice + normalizedFee,
+  );
+  const signedAmount =
+    input.side === "sell" ? round2(-grossAmount) : grossAmount;
 
   return {
     normalizedSymbol,
@@ -32,7 +37,11 @@ export function computeInvestmentMovement(input: InvestmentDraftInput): Investme
     normalizedUnitPrice,
     normalizedFee,
     signedAmount,
-    description: buildInvestmentDescription(input.side, normalizedUnits, normalizedSymbol),
+    description: buildInvestmentDescription(
+      input.side,
+      normalizedUnits,
+      normalizedSymbol,
+    ),
   };
 }
 
@@ -45,10 +54,16 @@ export function normalizeInvestmentSide(value: unknown): InvestmentSide {
 }
 
 export function normalizeInvestmentSymbol(value: unknown): string {
-  return String(value || "").trim().toUpperCase();
+  return String(value || "")
+    .trim()
+    .toUpperCase();
 }
 
-export function buildInvestmentDescription(side: InvestmentSide, units: number, symbol: string): string {
+export function buildInvestmentDescription(
+  side: InvestmentSide,
+  units: number,
+  symbol: string,
+): string {
   const action = side === "sell" ? "Venta" : "Compra";
   return `${action} ${formatUnits(units)} ${symbol}`.trim();
 }
@@ -82,5 +97,7 @@ function formatUnits(value: number): string {
     return "0";
   }
   const rounded = roundWithPrecision(value, 8);
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 }

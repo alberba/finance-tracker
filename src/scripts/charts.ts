@@ -12,7 +12,9 @@ type ValueFormatter = (value: number) => string;
    ────────────────────────────────────────────────────────────────── */
 function cssVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
   return value || fallback;
 }
 const axisColor = () => cssVar("--chart-axis", "#7b8b8d");
@@ -43,7 +45,12 @@ function areaFill(color: string) {
     const chart = context.chart;
     const area = chart?.chartArea;
     if (!area) return withAlpha(color, 0);
-    const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    const gradient = chart.ctx.createLinearGradient(
+      0,
+      area.top,
+      0,
+      area.bottom,
+    );
     gradient.addColorStop(0, withAlpha(color, 0.22));
     gradient.addColorStop(0.55, withAlpha(color, 0.07));
     gradient.addColorStop(1, withAlpha(color, 0));
@@ -69,7 +76,11 @@ const lineCommon = {
   borderCapStyle: "round" as const,
 };
 
-function baseScales(formatAxisValue: ValueFormatter, labels: readonly string[], beginAtZero: boolean) {
+function baseScales(
+  formatAxisValue: ValueFormatter,
+  labels: readonly string[],
+  beginAtZero: boolean,
+) {
   return {
     x: {
       grid: { display: false },
@@ -80,7 +91,8 @@ function baseScales(formatAxisValue: ValueFormatter, labels: readonly string[], 
         maxRotation: 0,
         autoSkipPadding: 16,
         padding: 6,
-        callback: (_value: any, index: number) => (labels[index] || "").slice(0, 3),
+        callback: (_value: any, index: number) =>
+          (labels[index] || "").slice(0, 3),
       },
     },
     y: {
@@ -187,7 +199,11 @@ function destroyExisting(canvas: HTMLCanvasElement): void {
   }
 }
 
-export function renderLineChart(canvas: HTMLCanvasElement, values: number[], options: LineChartOptions): void {
+export function renderLineChart(
+  canvas: HTMLCanvasElement,
+  values: number[],
+  options: LineChartOptions,
+): void {
   destroyExisting(canvas);
 
   const labels = Array.from(options.labels || []);
@@ -236,7 +252,53 @@ export function renderLineChart(canvas: HTMLCanvasElement, values: number[], opt
           }),
         },
       },
-      scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true),
+      scales: baseScales(
+        formatAxisValue,
+        labels,
+        options.includeZeroBaseline ?? true,
+      ),
+    },
+  });
+}
+
+// Tiny, chrome-less trend line for the dashboard stat cards: no axes, grid,
+// legend, tooltip or resting points — just the line and a soft gradient fill.
+export function renderSparkline(
+  canvas: HTMLCanvasElement,
+  values: number[],
+  color: string,
+): void {
+  destroyExisting(canvas);
+
+  const safeValues = values.map((v) => Number(v || 0));
+
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: safeValues.map((_, i) => i),
+      datasets: [
+        {
+          data: safeValues,
+          borderColor: color,
+          backgroundColor: areaFill(color),
+          fill: true,
+          borderWidth: 2,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          borderJoinStyle: "round" as const,
+          borderCapStyle: "round" as const,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      layout: { padding: { top: 2, bottom: 2, left: 0, right: 0 } },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
+      elements: { line: { capBezierPoints: true } },
     },
   });
 }
@@ -245,7 +307,8 @@ export function renderGroupedBarChart(
   canvas: HTMLCanvasElement,
   labels: readonly string[],
   series: GroupedBarSeriesItem[],
-  formatValue: ValueFormatter = (value) => String(Number(value || 0).toFixed(2))
+  formatValue: ValueFormatter = (value) =>
+    String(Number(value || 0).toFixed(2)),
 ): void {
   destroyExisting(canvas);
 
@@ -279,7 +342,9 @@ export function renderGroupedBarChart(
         tooltip: {
           enabled: false,
           external: makeExternalTooltip((tooltip) => {
-            return tooltip.dataPoints.map((dp: any) => `${dp.dataset.label}: ${formatValue(dp.raw)}`).join(" | ");
+            return tooltip.dataPoints
+              .map((dp: any) => `${dp.dataset.label}: ${formatValue(dp.raw)}`)
+              .join(" | ");
           }),
         },
       },
@@ -293,7 +358,8 @@ export function renderGroupedBarChart(
             color: axisColor(),
             maxRotation: 0,
             padding: 6,
-            callback: (_value: any, index: number) => (Array.from(labels)[index] || "").slice(0, 3),
+            callback: (_value: any, index: number) =>
+              (Array.from(labels)[index] || "").slice(0, 3),
           },
         },
         y: {
@@ -313,19 +379,35 @@ export function renderGroupedBarChart(
   });
 }
 
-export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem[], formatValue: ValueFormatter): void {
+export function renderDonutChart(
+  canvas: HTMLCanvasElement,
+  data: DonutChartItem[],
+  formatValue: ValueFormatter,
+  options: { showLegend?: boolean } = {},
+): void {
   destroyExisting(canvas);
 
-  const clean = data.map((item) => ({ ...item, value: Math.max(Number(item.value || 0), 0) }));
+  const showLegend = options.showLegend ?? true;
+  const clean = data.map((item) => ({
+    ...item,
+    value: Math.max(Number(item.value || 0), 0),
+  }));
   const total = clean.reduce((sum, item) => sum + item.value, 0);
 
-  canvas.dataset.chartSegmentCount = String(clean.filter((item) => item.value > 0).length);
+  canvas.dataset.chartSegmentCount = String(
+    clean.filter((item) => item.value > 0).length,
+  );
   canvas.dataset.chartLegendCount = String(clean.length);
 
   if (total <= 0) {
     new Chart(canvas, {
       type: "doughnut",
-      data: { labels: ["Sin datos"], datasets: [{ data: [1], backgroundColor: [emptyColor()], borderWidth: 0 }] },
+      data: {
+        labels: ["Sin datos"],
+        datasets: [
+          { data: [1], backgroundColor: [emptyColor()], borderWidth: 0 },
+        ],
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -361,7 +443,7 @@ export function renderDonutChart(canvas: HTMLCanvasElement, data: DonutChartItem
       layout: { padding: 6 },
       plugins: {
         legend: {
-          display: true,
+          display: showLegend,
           position: "right" as const,
           labels: {
             font: { size: 11, family: FONT_FAMILY },
@@ -415,12 +497,15 @@ export function renderHorizontalBarChart(
   canvas: HTMLCanvasElement,
   data: Array<{ label: string; value: number }>,
   palette: string[],
-  formatValue: ValueFormatter
+  formatValue: ValueFormatter,
 ): void {
   destroyExisting(canvas);
 
   const cleaned = data
-    .map((item) => ({ label: item.label, value: Math.max(Number(item.value || 0), 0) }))
+    .map((item) => ({
+      label: item.label,
+      value: Math.max(Number(item.value || 0), 0),
+    }))
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
@@ -429,7 +514,10 @@ export function renderHorizontalBarChart(
   if (!cleaned.length) {
     new Chart(canvas, {
       type: "bar",
-      data: { labels: ["Sin datos"], datasets: [{ data: [0], backgroundColor: [emptyColor()] }] },
+      data: {
+        labels: ["Sin datos"],
+        datasets: [{ data: [0], backgroundColor: [emptyColor()] }],
+      },
       options: {
         indexAxis: "y" as const,
         responsive: true,
@@ -448,7 +536,9 @@ export function renderHorizontalBarChart(
       datasets: [
         {
           data: cleaned.map((item) => item.value),
-          backgroundColor: cleaned.map((_, idx) => palette[idx % palette.length]),
+          backgroundColor: cleaned.map(
+            (_, idx) => palette[idx % palette.length],
+          ),
           borderRadius: 6,
           borderSkipped: false,
           maxBarThickness: 22,
@@ -487,14 +577,22 @@ export function renderHorizontalBarChart(
         y: {
           grid: { display: false },
           border: { display: false },
-          ticks: { font: { size: 11, family: FONT_FAMILY }, color: axisColor(), padding: 6 },
+          ticks: {
+            font: { size: 11, family: FONT_FAMILY },
+            color: axisColor(),
+            padding: 6,
+          },
         },
       },
     },
   });
 }
 
-export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLineSeries[], options: MultiLineChartOptions): void {
+export function renderMultiLineChart(
+  canvas: HTMLCanvasElement,
+  series: MultiLineSeries[],
+  options: MultiLineChartOptions,
+): void {
   destroyExisting(canvas);
 
   const labels = Array.from(options.labels || []);
@@ -521,14 +619,16 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
 
   const maxPoints = Math.max(...series.map((s) => s.values.length));
   canvas.dataset.chartPointCount = String(maxPoints);
-  canvas.dataset.chartHasZeroTick = String(forceZeroTick || series.some((s) => s.values.some((v) => v === 0)));
+  canvas.dataset.chartHasZeroTick = String(
+    forceZeroTick || series.some((s) => s.values.some((v) => v === 0)),
+  );
   canvas.dataset.chartSeriesNames = JSON.stringify(series.map((s) => s.name));
 
   const tooltipData = series.map((s) =>
     s.values.map((v, i) => {
       const label = labels[i] || `Punto ${i + 1}`;
       return `${s.name} · ${label}: ${formatValue(v)}`;
-    })
+    }),
   );
   canvas.dataset.chartTooltips = JSON.stringify(tooltipData);
 
@@ -564,7 +664,10 @@ export function renderMultiLineChart(canvas: HTMLCanvasElement, series: MultiLin
           enabled: false,
           external: makeExternalTooltip((tooltip) => {
             return tooltip.dataPoints
-              .map((dp: any) => `${dp.dataset.label} · ${dp.label}: ${formatValue(dp.raw)}`)
+              .map(
+                (dp: any) =>
+                  `${dp.dataset.label} · ${dp.label}: ${formatValue(dp.raw)}`,
+              )
               .join(" | ");
           }),
         },

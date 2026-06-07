@@ -1,5 +1,9 @@
 import { type SnapshotKind, type State } from "../types";
-import { computeInvestmentMovement, normalizeInvestmentSide, normalizeInvestmentSymbol } from "../investment-movements";
+import {
+  computeInvestmentMovement,
+  normalizeInvestmentSide,
+  normalizeInvestmentSymbol,
+} from "../investment-movements";
 import { monthFromISO } from "../utils";
 import { parseFloatSafe, parseIntSafe, round2, todayISO, uid } from "../utils";
 import { toSnapshotDate } from "../contribution-workflow";
@@ -25,7 +29,11 @@ interface InvestmentEventBindingsDeps {
   syncInvestmentMovementComputedAmount: () => void;
   normalizeInvestmentMovementSymbolField: () => void;
   syncInvestmentMovementCategoryField: () => void;
-  resolveInvestmentCategory: (accountId: string, rawCategory: string, fallbackCategory: string) => string;
+  resolveInvestmentCategory: (
+    accountId: string,
+    rawCategory: string,
+    fallbackCategory: string,
+  ) => string;
   sortTransactions: () => void;
   saveState: () => void;
   renderAll: () => void;
@@ -38,14 +46,20 @@ interface InvestmentEventBindingsDeps {
   renderContributionWorkflowModal: () => void;
   renderContributionWorkflowStepState: () => void;
   renderContributionWorkflowModalWarnings: () => void;
-  openContributionCalcModal: (kind: SnapshotKind, itemId: string, itemName: string) => void;
+  openContributionCalcModal: (
+    kind: SnapshotKind,
+    itemId: string,
+    itemName: string,
+  ) => void;
   closeContributionCalcModal: () => void;
   applyContributionCalcModalResult: () => void;
   saveContributionFromWorkflowModal: () => void;
   isManualContributionDate: (date: string) => boolean;
 }
 
-export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) {
+export function setupInvestmentEventBindings(
+  deps: InvestmentEventBindingsDeps,
+) {
   const { ui, el } = deps;
   let pendingContributionDeleteDate = "";
 
@@ -86,7 +100,10 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       deps.renderWealth();
     });
     el.saveSnapshot.addEventListener("click", deps.saveSnapshotFromTable);
-    el.snapshotInvestments.addEventListener("click", deps.onOpenInvestmentSnapshotCalcModal);
+    el.snapshotInvestments.addEventListener(
+      "click",
+      deps.onOpenInvestmentSnapshotCalcModal,
+    );
     el.wealthCalcClose.addEventListener("click", deps.closeWealthCalcModal);
     el.wealthCalcDialog.addEventListener("cancel", (event: Event) => {
       event.preventDefault();
@@ -119,31 +136,60 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
     });
 
     el.investmentMonth.addEventListener("change", () => {
-      ui.investmentMonth = parseIntSafe(el.investmentMonth.value, ui.investmentMonth);
+      ui.investmentMonth = parseIntSafe(
+        el.investmentMonth.value,
+        ui.investmentMonth,
+      );
       deps.renderInvestment();
       deps.renderGoals();
     });
 
     el.investmentYearFilter.addEventListener("change", () => {
       const state = deps.getState();
-      ui.investmentYearFilter = parseIntSafe(el.investmentYearFilter.value, state.year);
+      ui.investmentYearFilter = parseIntSafe(
+        el.investmentYearFilter.value,
+        state.year,
+      );
       ui.investmentTxEditingId = "";
       deps.renderInvestmentTransactionsTable();
     });
 
     el.investmentOnlyUndeclared.addEventListener("change", () => {
-      ui.investmentOnlyUndeclared = Boolean(el.investmentOnlyUndeclared.checked);
+      ui.investmentOnlyUndeclared = Boolean(
+        el.investmentOnlyUndeclared.checked,
+      );
       ui.investmentTxEditingId = "";
       deps.renderInvestmentTransactionsTable();
     });
 
-    [el.investmentMovementSide, el.investmentMovementCategory, el.investmentMovementUnitPrice, el.investmentMovementUnits, el.investmentMovementFee].forEach((control: HTMLElement) => {
-      control.addEventListener("input", deps.syncInvestmentMovementComputedAmount);
-      control.addEventListener("change", deps.syncInvestmentMovementComputedAmount);
+    [
+      el.investmentMovementSide,
+      el.investmentMovementCategory,
+      el.investmentMovementUnitPrice,
+      el.investmentMovementUnits,
+      el.investmentMovementFee,
+    ].forEach((control: HTMLElement) => {
+      control.addEventListener(
+        "input",
+        deps.syncInvestmentMovementComputedAmount,
+      );
+      control.addEventListener(
+        "change",
+        deps.syncInvestmentMovementComputedAmount,
+      );
     });
-    el.investmentMovementSymbol.addEventListener("input", deps.syncInvestmentMovementComputedAmount);
-    el.investmentMovementSymbol.addEventListener("change", deps.normalizeInvestmentMovementSymbolField);
-    el.investmentMovementSymbol.addEventListener("blur", deps.normalizeInvestmentMovementSymbolField);
+    el.investmentMovementSymbol.addEventListener(
+      "input",
+      deps.syncInvestmentMovementComputedAmount,
+    );
+    el.investmentMovementSymbol.addEventListener(
+      "change",
+      deps.normalizeInvestmentMovementSymbolField,
+    );
+    el.investmentMovementSymbol.addEventListener(
+      "blur",
+      deps.normalizeInvestmentMovementSymbolField,
+    );
 
     el.investmentMovementBroker.addEventListener("change", () => {
       deps.syncInvestmentMovementCategoryField();
@@ -160,7 +206,12 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       const date = String(form.get("date") || "").trim() || todayISO();
       const accountId = String(form.get("accountId") || "").trim();
       const time = String(form.get("time") || "").trim();
-      const movementCurrency = String(form.get("movementCurrency") || state.currency || "EUR").trim().toUpperCase().slice(0, 3);
+      const movementCurrency = String(
+        form.get("movementCurrency") || state.currency || "EUR",
+      )
+        .trim()
+        .toUpperCase()
+        .slice(0, 3);
       const declared = Boolean(form.get("declared"));
 
       if (!accountId || !symbol || !time) {
@@ -168,15 +219,46 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
         return;
       }
 
-      const computed = computeInvestmentMovement({ side, symbol, units: parseFloatSafe(form.get("units"), 0), unitPrice: parseFloatSafe(form.get("unitPrice"), 0), fee: parseFloatSafe(form.get("fee"), 0) });
-      const category = deps.resolveInvestmentCategory(accountId, rawCategory, computed.normalizedSymbol);
+      const computed = computeInvestmentMovement({
+        side,
+        symbol,
+        units: parseFloatSafe(form.get("units"), 0),
+        unitPrice: parseFloatSafe(form.get("unitPrice"), 0),
+        fee: parseFloatSafe(form.get("fee"), 0),
+      });
+      const category = deps.resolveInvestmentCategory(
+        accountId,
+        rawCategory,
+        computed.normalizedSymbol,
+      );
 
-      if (computed.normalizedUnits <= 0 || computed.normalizedUnitPrice <= 0 || computed.signedAmount === 0) {
+      if (
+        computed.normalizedUnits <= 0 ||
+        computed.normalizedUnitPrice <= 0 ||
+        computed.signedAmount === 0
+      ) {
         deps.showToast("Precio, títulos y gasto deben ser válidos.");
         return;
       }
 
-      state.transactions.push({ id: uid("tx"), date, month: monthFromISO(date) ?? ui.investmentMonth, type: "investment", accountId, category, description: computed.description, amount: computed.signedAmount, time, symbol: computed.normalizedSymbol, side, unitPrice: computed.normalizedUnitPrice, units: computed.normalizedUnits, fee: computed.normalizedFee, movementCurrency, declared });
+      state.transactions.push({
+        id: uid("tx"),
+        date,
+        month: monthFromISO(date) ?? ui.investmentMonth,
+        type: "investment",
+        accountId,
+        category,
+        description: computed.description,
+        amount: computed.signedAmount,
+        time,
+        symbol: computed.normalizedSymbol,
+        side,
+        unitPrice: computed.normalizedUnitPrice,
+        units: computed.normalizedUnits,
+        fee: computed.normalizedFee,
+        movementCurrency,
+        declared,
+      });
 
       deps.sortTransactions();
       deps.saveState();
@@ -184,7 +266,7 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       const selectedDate = date;
       const selectedTime = time;
       const selectedBroker = accountId;
-      const selectedCurrency = movementCurrency || (state.currency || "EUR");
+      const selectedCurrency = movementCurrency || state.currency || "EUR";
 
       el.investmentMovementForm.reset();
       el.investmentMovementDate.value = selectedDate;
@@ -204,7 +286,9 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
     el.investmentTxBody.addEventListener("click", (event: Event) => {
       const state = deps.getState();
       const target = deps.getEventElement(event.target);
-      const actionButton = target?.closest<HTMLButtonElement>("button[data-action]");
+      const actionButton = target?.closest<HTMLButtonElement>(
+        "button[data-action]",
+      );
       if (actionButton) {
         const action = actionButton.dataset.action;
         const id = actionButton.dataset.id;
@@ -224,20 +308,30 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
           return;
         }
         if (action === "toggle-investment-declared") {
-          const tx = state.transactions.find((item: any) => item.id === id && item.type === "investment");
+          const tx = state.transactions.find(
+            (item: any) => item.id === id && item.type === "investment",
+          );
           if (!tx) return;
-          tx.declared = !Boolean(tx.declared);
+          tx.declared = !tx.declared;
           deps.saveState();
           deps.renderInvestmentTransactionsTable();
-          deps.showToast(tx.declared ? "Movimiento marcado como declarado." : "Movimiento marcado como no declarado.");
+          deps.showToast(
+            tx.declared
+              ? "Movimiento marcado como declarado."
+              : "Movimiento marcado como no declarado.",
+          );
           return;
         }
       }
 
-      const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-id]");
+      const deleteButton = target?.closest<HTMLButtonElement>(
+        "button[data-delete-id]",
+      );
       if (!deleteButton) return;
       const id = deleteButton.dataset.deleteId;
-      state.transactions = state.transactions.filter((item: any) => item.id !== id);
+      state.transactions = state.transactions.filter(
+        (item: any) => item.id !== id,
+      );
       ui.investmentTxEditingId = "";
       deps.saveState();
       deps.renderAll();
@@ -246,23 +340,41 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
 
     el.investmentTxBody.addEventListener("change", (event: Event) => {
       const target = deps.getEventElement(event.target);
-      const accountSelect = target?.closest<HTMLSelectElement>('select[data-edit-field="accountId"]');
+      const accountSelect = target?.closest<HTMLSelectElement>(
+        'select[data-edit-field="accountId"]',
+      );
       if (!accountSelect) {
         return;
       }
 
-      const row = accountSelect.closest<HTMLTableRowElement>("tr[data-investment-editing-id]");
-      const categorySelect = row?.querySelector<HTMLSelectElement>('select[data-edit-field="category"]');
+      const row = accountSelect.closest<HTMLTableRowElement>(
+        "tr[data-investment-editing-id]",
+      );
+      const categorySelect = row?.querySelector<HTMLSelectElement>(
+        'select[data-edit-field="category"]',
+      );
       if (!row || !categorySelect) {
         return;
       }
 
       const accountId = String(accountSelect.value || "").trim();
-      const resolvedCategory = deps.resolveInvestmentCategory(accountId, categorySelect.value, "Sin categoría");
+      const resolvedCategory = deps.resolveInvestmentCategory(
+        accountId,
+        categorySelect.value,
+        "Sin categoría",
+      );
       const isCryptoOnly = resolvedCategory === "Crypto";
 
-      if (isCryptoOnly && !Array.from(categorySelect.options).some((option) => option.value === "Crypto")) {
-        categorySelect.insertAdjacentHTML("afterbegin", '<option value="Crypto">Crypto</option>');
+      if (
+        isCryptoOnly &&
+        !Array.from(categorySelect.options).some(
+          (option) => option.value === "Crypto",
+        )
+      ) {
+        categorySelect.insertAdjacentHTML(
+          "afterbegin",
+          '<option value="Crypto">Crypto</option>',
+        );
       }
 
       categorySelect.value = resolvedCategory;
@@ -276,7 +388,9 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
 
     el.contributionBody.addEventListener("input", (event: Event) => {
       const target = deps.getEventElement(event.target);
-      const input = target?.closest<HTMLInputElement>("input[data-contribution-flow-date]");
+      const input = target?.closest<HTMLInputElement>(
+        "input[data-contribution-flow-date]",
+      );
       if (!input) return;
       const date = String(input.dataset.contributionFlowDate || "");
       if (!date) return;
@@ -288,20 +402,30 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
 
     el.contributionBody.addEventListener("click", (event: Event) => {
       const target = deps.getEventElement(event.target);
-      const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-contribution-date]");
+      const deleteButton = target?.closest<HTMLButtonElement>(
+        "button[data-delete-contribution-date]",
+      );
       if (!deleteButton) {
         return;
       }
 
-      const date = String(deleteButton.dataset.deleteContributionDate || "").trim();
+      const date = String(
+        deleteButton.dataset.deleteContributionDate || "",
+      ).trim();
       if (!date || !deps.isManualContributionDate(date)) {
         return;
       }
       openContributionDeleteDialog(date);
     });
 
-    el.openContributionWorkflow.addEventListener("click", deps.openContributionWorkflowModal);
-    el.contributionWorkflowClose.addEventListener("click", deps.closeContributionWorkflowModal);
+    el.openContributionWorkflow.addEventListener(
+      "click",
+      deps.openContributionWorkflowModal,
+    );
+    el.contributionWorkflowClose.addEventListener(
+      "click",
+      deps.closeContributionWorkflowModal,
+    );
 
     el.contributionWorkflowDialog.addEventListener("cancel", (event: Event) => {
       event.preventDefault();
@@ -310,14 +434,22 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
 
     el.contributionWorkflowMonth.addEventListener("change", () => {
       const state = deps.getState();
-      ui.contributionWorkflowMonth = parseIntSafe(el.contributionWorkflowMonth.value, ui.contributionWorkflowMonth);
-      ui.contributionWorkflowDate = toSnapshotDate(state.year, ui.contributionWorkflowMonth);
+      ui.contributionWorkflowMonth = parseIntSafe(
+        el.contributionWorkflowMonth.value,
+        ui.contributionWorkflowMonth,
+      );
+      ui.contributionWorkflowDate = toSnapshotDate(
+        state.year,
+        ui.contributionWorkflowMonth,
+      );
       el.contributionWorkflowDate.value = ui.contributionWorkflowDate;
       deps.renderContributionWorkflowModal();
     });
 
     el.contributionWorkflowDate.addEventListener("change", () => {
-      ui.contributionWorkflowDate = String(el.contributionWorkflowDate.value || "").trim();
+      ui.contributionWorkflowDate = String(
+        el.contributionWorkflowDate.value || "",
+      ).trim();
       const month = monthFromISO(ui.contributionWorkflowDate);
       if (month !== null) {
         ui.contributionWorkflowMonth = month;
@@ -339,24 +471,32 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
     });
 
     el.contributionWorkflowTotal.addEventListener("input", () => {
-      ui.contributionWorkflowAmount = round2(parseFloatSafe(el.contributionWorkflowTotal.value, 0));
+      ui.contributionWorkflowAmount = round2(
+        parseFloatSafe(el.contributionWorkflowTotal.value, 0),
+      );
       deps.renderContributionWorkflowModalWarnings();
     });
 
     el.contributionWorkflowDialog.addEventListener("input", (event: Event) => {
       const target = deps.getEventElement(event.target);
-      const snapshotInput = target?.closest<HTMLInputElement>("input[data-contribution-snapshot-kind]");
+      const snapshotInput = target?.closest<HTMLInputElement>(
+        "input[data-contribution-snapshot-kind]",
+      );
       if (snapshotInput) {
         deps.renderContributionWorkflowModalWarnings();
         return;
       }
-      const allocationInput = target?.closest<HTMLInputElement>("input[data-contribution-allocation-account-id]");
+      const allocationInput = target?.closest<HTMLInputElement>(
+        "input[data-contribution-allocation-account-id]",
+      );
       if (allocationInput) deps.renderContributionWorkflowModalWarnings();
     });
 
     el.contributionWorkflowDialog.addEventListener("click", (event: Event) => {
       const target = deps.getEventElement(event.target);
-      const calcButton = target?.closest<HTMLButtonElement>('button[data-action="open-contribution-snapshot-calc"]');
+      const calcButton = target?.closest<HTMLButtonElement>(
+        'button[data-action="open-contribution-snapshot-calc"]',
+      );
       if (!calcButton) return;
       const kind = String(calcButton.dataset.snapshotKind || "");
       const itemId = String(calcButton.dataset.snapshotId || "");
@@ -365,7 +505,10 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       deps.openContributionCalcModal(kind, itemId, itemName);
     });
 
-    el.contributionCalcClose.addEventListener("click", deps.closeContributionCalcModal);
+    el.contributionCalcClose.addEventListener(
+      "click",
+      deps.closeContributionCalcModal,
+    );
     el.contributionCalcDialog.addEventListener("cancel", (event: Event) => {
       event.preventDefault();
       deps.closeContributionCalcModal();
@@ -381,8 +524,14 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       }
       deps.saveContributionFromWorkflowModal();
     });
-    el.contributionDeleteClose.addEventListener("click", closeContributionDeleteDialog);
-    el.contributionDeleteCancel.addEventListener("click", closeContributionDeleteDialog);
+    el.contributionDeleteClose.addEventListener(
+      "click",
+      closeContributionDeleteDialog,
+    );
+    el.contributionDeleteCancel.addEventListener(
+      "click",
+      closeContributionDeleteDialog,
+    );
     el.contributionDeleteDialog.addEventListener("cancel", (event: Event) => {
       event.preventDefault();
       closeContributionDeleteDialog();
