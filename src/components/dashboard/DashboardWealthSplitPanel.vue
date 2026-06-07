@@ -1,21 +1,40 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderDonutChart } from '../../scripts/charts'
-import {
-  subscribeDashboardWealthSplit,
-  type DashboardWealthSplitItem,
-} from '../../scripts/app/dashboard-wealth-split-bridge'
+import type { DashboardWealthSplitItem } from '../../scripts/app/dashboard-view-model'
+import { formatMoneyForCurrency } from '../../scripts/money-format'
 
-const items = ref<DashboardWealthSplitItem[]>([])
+const props = defineProps<{
+  currency: string
+  items: DashboardWealthSplitItem[]
+}>()
+
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
-let unsubscribe: (() => void) | undefined
 
 const chartItems = computed(() =>
-  items.value.length
-    ? items.value
+  props.items.length
+    ? props.items.map((item) => ({
+        ...item,
+        color: cssColor(item.colorVar, item.fallbackColor),
+      }))
     : [{ label: 'Sin datos', color: cssColor('--line-strong', '#CCD4E1'), value: 0 }],
 )
+
+watch(() => [props.items, props.currency] as const, renderChart, { deep: true, immediate: true })
+
+async function renderChart(): Promise<void> {
+  await nextTick()
+  if (!canvas.value) {
+    return
+  }
+  renderDonutChart(
+    canvas.value,
+    chartItems.value,
+    (value) => formatMoneyForCurrency(value, props.currency),
+    { showLegend: false },
+  )
+}
 
 function cssColor(name: string, fallback: string): string {
   if (typeof window === 'undefined') {
@@ -23,35 +42,6 @@ function cssColor(name: string, fallback: string): string {
   }
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 }
-
-function formatChartValue(value: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-async function renderChart(): Promise<void> {
-  await nextTick()
-  if (!canvas.value) {
-    return
-  }
-  renderDonutChart(canvas.value, chartItems.value, formatChartValue, { showLegend: false })
-}
-
-watch(items, renderChart)
-
-onMounted(() => {
-  unsubscribe = subscribeDashboardWealthSplit((nextItems) => {
-    items.value = nextItems
-  })
-  void renderChart()
-})
-
-onUnmounted(() => {
-  unsubscribe?.()
-})
 </script>
 
 <template>
@@ -65,35 +55,26 @@ onUnmounted(() => {
   </div>
 
   <div id="wealth-split-legend" class="grid gap-1">
-    <div
-      v-for="item in items"
-      :key="item.label"
-      class="flex justify-between items-center"
-    >
+    <div v-for="item in props.items" :key="item.label" class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span
           class="block h-2.25 w-2.25 rounded-[3px]"
-          :style="{ background: item.color }"
+          :style="{ background: cssColor(item.colorVar, item.fallbackColor) }"
         ></span>
-        <span
-          class="overflow-hidden text-ellipsis whitespace-nowrap text-(--text-muted)"
-        >
+        <span class="overflow-hidden text-ellipsis whitespace-nowrap text-(--text-muted)">
           {{ item.label }}
         </span>
       </div>
       <div class="flex gap-1">
-        <strong
-          class="font-['DM_Mono',monospace] text-xs font-medium"
-        >
+        <strong class="font-['DM_Mono',monospace] text-xs font-medium">
           {{ item.amount }}
         </strong>
         <span class="text-xs text-(--text-faint)">
           {{ item.pct }}
         </span>
-        
       </div>
     </div>
-    <p v-if="!items.length" class="dash-empty py-2 text-sm text-(--text-faint)">
+    <p v-if="!props.items.length" class="dash-empty py-2 text-sm text-(--text-faint)">
       Configura tus cuentas e inversiones en Patrimonio.
     </p>
   </div>

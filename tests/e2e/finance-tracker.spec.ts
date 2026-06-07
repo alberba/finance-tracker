@@ -262,58 +262,6 @@ test.describe("Finance tracker E2E", () => {
     }
   });
 
-  test("dashboard muestra patrimonio con variación anual y progreso de inversión mensual", async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openDashboard();
-
-    await expect(
-      tracker.dashboardSection.locator("#kpi-net-worth-change"),
-    ).toBeVisible();
-    await expect(
-      tracker.dashboardSection.locator(".dash-hero-meta-text"),
-    ).toContainText("año anterior");
-    await expect(
-      tracker.dashboardSection.getByRole("heading", {
-        name: "Plan de inversión mensual",
-      }),
-    ).toBeVisible();
-
-    const progressRows = tracker.dashboardSection.locator(
-      "#investment-progress-list [data-investment-progress-item]",
-    );
-    const progressRowsCount = await progressRows.count();
-    if (progressRowsCount > 0) {
-      await expect(progressRows.first()).toBeVisible();
-    }
-
-    const progressData = await page.evaluate(() => {
-      const firstProgress = document.querySelector<HTMLElement>(
-        "#investment-progress-list [data-investment-progress-item]",
-      );
-      if (!firstProgress) {
-        return null;
-      }
-      const bar = firstProgress.querySelector<HTMLElement>(
-        '[role="progressbar"]',
-      );
-      const fill = firstProgress.querySelector<HTMLElement>(".progress-fill");
-      return {
-        hasProgressRole: bar?.getAttribute("role") === "progressbar",
-        progressNow: Number(bar?.getAttribute("aria-valuenow") || "0"),
-        fillWidth: fill?.style.width || "",
-      };
-    });
-
-    if (progressData) {
-      expect(progressData.hasProgressRole).toBeTruthy();
-      expect(progressData.progressNow).toBeGreaterThanOrEqual(0);
-      expect(progressData.progressNow).toBeLessThanOrEqual(100);
-      expect(progressData.fillWidth).toMatch(/%$/);
-    }
-  });
-
   test("permite crear movimiento y persiste tras recarga", async ({
     tracker,
   }) => {

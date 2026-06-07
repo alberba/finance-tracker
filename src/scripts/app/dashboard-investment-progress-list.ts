@@ -1,6 +1,3 @@
-import { h, render } from 'vue'
-
-import DashboardInvestmentProgressList from '../../components/dashboard/DashboardInvestmentProgressList.vue'
 import { getCategoryEmoji } from '../category-emoji'
 import { round2 } from '../utils'
 
@@ -40,13 +37,6 @@ export function buildDashboardInvestmentProgressItems({
         progress,
       }
     })
-}
-
-export function renderDashboardInvestmentProgressList(
-  container: HTMLElement,
-  items: InvestmentProgressItem[],
-) {
-  render(h(DashboardInvestmentProgressList, { items }), container)
 }
 
 function formatPlanMoney(value: number, formatMoney: (value: number) => string): string {

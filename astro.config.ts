@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 import vue from '@astrojs/vue'
 
+import svgLoader from 'vite-svg-loader'
+
 export default defineConfig({
   output: 'server',
 
@@ -20,7 +22,7 @@ export default defineConfig({
   },
 
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), svgLoader()],
   },
 
   integrations: [vue()],

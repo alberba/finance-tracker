@@ -20,24 +20,17 @@ function progressLabel(progress: number): string {
     Sin inversión registrada en este mes.
   </p>
   <template v-else>
-    <article
-      v-for="item in props.items"
-      :key="item.category"
-      data-investment-progress-item
-    >
-      
+    <article v-for="item in props.items" :key="item.category" data-investment-progress-item>
       <div class="grid min-w-0 gap-1">
-        <div class="flex gap-3 items-center">
+        <div class="flex items-center gap-3">
           {{ item.icon }}
-          <div class="flex justify-between w-full">
+          <div class="flex w-full justify-between">
             <span
               class="overflow-hidden text-[0.9rem] leading-[1.2] font-semibold text-ellipsis whitespace-nowrap text-(--text-main)"
             >
               {{ item.category }}
             </span>
-            <small
-              class="font-['DM_Mono',monospace] text-(--text-muted)"
-            >
+            <small class="font-['DM_Mono',monospace] text-(--text-muted)">
               {{ item.actual }}/{{ item.plannedLabel }}({{ progressLabel(item.progress) }}%)
             </small>
           </div>

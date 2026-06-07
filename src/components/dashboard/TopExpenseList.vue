@@ -1,23 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
-import {
-  subscribeTopExpenses,
-  type TopExpenseItem,
-} from '../../scripts/app/dashboard-top-expenses-bridge'
+import type { DashboardTopExpenseItem } from '../../scripts/app/dashboard-view-model'
 import ProgressBar from './ProgressBar.vue'
 
-const items = ref<TopExpenseItem[]>([])
-let unsubscribe: (() => void) | undefined
-
-onMounted(() => {
-  unsubscribe = subscribeTopExpenses((next) => {
-    items.value = next
-  })
-})
-
-onUnmounted(() => {
-  unsubscribe?.()
-})
+defineProps<{
+  items: DashboardTopExpenseItem[]
+}>()
 </script>
 
 <template>
@@ -29,9 +16,7 @@ onUnmounted(() => {
       <div class="flex items-center justify-between text-(--text-main)">
         <div class="flex items-center gap-2">
           {{ item.emoji }}
-          <span
-            class="font-semibold"
-          >
+          <span class="font-semibold">
             {{ item.category }}
           </span>
         </div>
