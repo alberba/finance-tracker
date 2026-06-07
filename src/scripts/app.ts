@@ -205,9 +205,6 @@ import {
     sparkInvestment: getRequiredElement<HTMLCanvasElement>("spark-investment"),
     chartNetWorth: getRequiredElement<HTMLCanvasElement>("chart-networth"),
     chartCashflow: getRequiredElement<HTMLCanvasElement>("chart-cashflow"),
-    chartWealthSplit:
-      getRequiredElement<HTMLCanvasElement>("chart-wealth-split"),
-    wealthSplitLegend: getRequiredElement<HTMLElement>("wealth-split-legend"),
     networthEndpoint: getRequiredElement<HTMLElement>("networth-endpoint"),
     investmentProgressList: getRequiredElement<HTMLElement>(
       "investment-progress-list",

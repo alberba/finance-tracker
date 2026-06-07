@@ -10,7 +10,6 @@ import {
   type State,
 } from '../types'
 import {
-  renderDonutChart,
   renderGroupedBarChart,
   renderLineChart,
   renderSparkline,
@@ -36,6 +35,7 @@ import {
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { publishTopExpenses } from './dashboard-top-expenses-bridge'
+import { publishDashboardWealthSplit } from './dashboard-wealth-split-bridge'
 
 interface DashboardBudgetGoalsUi {
   activeSection: SectionId
@@ -86,8 +86,6 @@ interface DashboardBudgetGoalsElements {
   sparkInvestment: HTMLCanvasElement
   chartNetWorth: HTMLCanvasElement
   chartCashflow: HTMLCanvasElement
-  chartWealthSplit: HTMLCanvasElement
-  wealthSplitLegend: HTMLElement
   networthEndpoint: HTMLElement
   investmentProgressList: HTMLElement
   recentTxBody: HTMLElement
@@ -352,15 +350,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     good: 'bg-[var(--income-bg)] text-[var(--income)]',
     bad: 'bg-[var(--expense-bg)] text-[var(--expense)]',
   } as const
-  const WEALTH_LEGEND_ITEM_CLASS =
-    'wealth-legend-item grid grid-cols-[auto_1fr_auto_auto] items-baseline gap-y-1 gap-x-2 text-[0.82rem]'
-  const WEALTH_LEGEND_DOT_CLASS = 'wealth-legend-dot h-[9px] w-[9px] self-center rounded-[3px]'
-  const WEALTH_LEGEND_NAME_CLASS =
-    'wealth-legend-name overflow-hidden text-ellipsis whitespace-nowrap text-[var(--text-muted)]'
-  const WEALTH_LEGEND_PCT_CLASS =
-    'wealth-legend-pct text-[0.78rem] tabular-nums text-[var(--text-faint)]'
-  const WEALTH_LEGEND_AMOUNT_CLASS =
-    "wealth-legend-amount [font-family:'DM_Mono',monospace] text-[0.8rem] font-medium tabular-nums text-[var(--text-main)]"
   const RECENT_TX_EMPTY_CLASS = 'recent-tx-empty py-4 text-center text-[var(--text-faint)]'
   const RECENT_DATE_CLASS =
     "rt-date whitespace-nowrap [font-family:'DM_Mono',monospace] text-[0.8rem] text-[var(--text-muted)]"
@@ -520,29 +509,17 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
       { label: 'Otras inversiones', color: cssColor('--income', '#0E9F6E'), value: otherInvest },
     ].filter((item) => item.value > 0)
 
-    renderDonutChart(
-      el.chartWealthSplit,
-      items.length
-        ? items
-        : [{ label: 'Sin datos', color: cssColor('--line-strong', '#CCD4E1'), value: 0 }],
-      deps.formatMoney,
-      { showLegend: false },
-    )
-
     const total = items.reduce((sum, item) => sum + item.value, 0)
-    el.wealthSplitLegend.innerHTML = items.length
-      ? items
-          .map((item) => {
-            const pct = total > 0 ? (item.value / total) * 100 : 0
-            return `<div class="${WEALTH_LEGEND_ITEM_CLASS}">
-              <span class="${WEALTH_LEGEND_DOT_CLASS}" style="background:${item.color}"></span>
-              <span class="${WEALTH_LEGEND_NAME_CLASS}">${escapeHtml(item.label)}</span>
-              <span class="${WEALTH_LEGEND_PCT_CLASS}">${pct.toFixed(0)}%</span>
-              <strong class="${WEALTH_LEGEND_AMOUNT_CLASS}">${deps.formatMoney(item.value)}</strong>
-            </div>`
-          })
-          .join('')
-      : `<p class="${DASH_EMPTY_CLASS}">Configura tus cuentas e inversiones en Patrimonio.</p>`
+    publishDashboardWealthSplit(
+      items.map((item) => {
+        const pct = total > 0 ? (item.value / total) * 100 : 0
+        return {
+          ...item,
+          amount: deps.formatMoney(item.value),
+          pct: `${pct.toFixed(0)}%`,
+        }
+      }),
+    )
   }
 
   function renderRecentTransactions() {
