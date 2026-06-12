@@ -1,4 +1,16 @@
-<section id="budget" class="panel" aria-labelledby="budget-title">
+---
+export interface Props {
+  isActive?: boolean
+}
+
+const { isActive = false } = Astro.props
+---
+
+<section
+  id="budget"
+  class:list={['panel', { 'is-active': isActive }]}
+  aria-labelledby="budget-title"
+>
   <div class="panel-head">
     <div>
       <p class="panel-kicker">Planificación anual</p>

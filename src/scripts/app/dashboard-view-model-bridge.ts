@@ -7,6 +7,7 @@ const DASHBOARD_YEAR_CHANGE_EVENT = 'dashboard:year-change'
 const DASHBOARD_RANGE_CHANGE_EVENT = 'dashboard:range-change'
 const DASHBOARD_NAVIGATE_EVENT = 'dashboard:navigate'
 
+// Adapter between the imperative app controller and the Vue dashboard composable.
 declare global {
   interface WindowEventMap {
     'dashboard:view-model': CustomEvent<DashboardViewModel>

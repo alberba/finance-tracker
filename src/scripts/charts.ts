@@ -1,5 +1,23 @@
-// Chart.js is loaded via CDN as a global (see FinanceTrackerShell.astro)
-declare const Chart: any
+import {
+  Chart,
+  registerables,
+  type ChartType,
+  type ScriptableContext,
+  type TooltipModel,
+  type TooltipOptions,
+} from 'chart.js'
+
+Chart.register(...registerables)
+
+declare global {
+  interface Window {
+    Chart?: typeof Chart
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.Chart = Chart
+}
 
 type ValueFormatter = (value: number) => string
 
@@ -20,8 +38,6 @@ const gridColor = () => cssVar('--chart-grid', '#edf3f0')
 const legendColor = () => cssVar('--chart-legend', '#516164')
 const pointBorderColorVar = () => cssVar('--chart-point-border', '#ffffff')
 const emptyColor = () => cssVar('--chart-empty', '#e2ece7')
-const centerLabelColor = () => cssVar('--chart-center-label', '#6b7b7f')
-const centerValueColor = () => cssVar('--chart-center-value', '#18363b')
 
 const FONT_FAMILY = "'DM Sans', system-ui, sans-serif"
 
@@ -39,7 +55,7 @@ function withAlpha(color: string, alpha: number): string {
 // Scriptable vertical gradient fill for area lines: solid-ish at the top of
 // the plot, fading to transparent at the baseline.
 function areaFill(color: string) {
-  return (context: any) => {
+  return (context: ScriptableContext<'line'>) => {
     const chart = context.chart
     const area = chart?.chartArea
     if (!area) return withAlpha(color, 0)
@@ -53,7 +69,7 @@ function areaFill(color: string) {
 
 // Show a small dot only when the series is short enough that a bare line
 // would read poorly; otherwise the line stays clean until hover.
-function restingPointRadius(context: any): number {
+function restingPointRadius(context: ScriptableContext<'line'>): number {
   const count = context?.chart?.data?.labels?.length ?? 0
   return count <= 3 ? 2.5 : 0
 }
@@ -84,7 +100,7 @@ function baseScales(
         maxRotation: 0,
         autoSkipPadding: 16,
         padding: 6,
-        callback: (_value: any, index: number) => (labels[index] || '').slice(0, 3),
+        callback: (_value: string | number, index: number) => (labels[index] || '').slice(0, 3),
       },
     },
     y: {
@@ -95,7 +111,7 @@ function baseScales(
         color: axisColor(),
         maxTicksLimit: 5,
         padding: 10,
-        callback: (value: number) => formatAxisValue(value),
+        callback: (value: string | number) => formatAxisValue(Number(value || 0)),
       },
       beginAtZero,
     },
@@ -160,9 +176,18 @@ function getTooltipEl(): HTMLElement | null {
   return document.getElementById('chart-tooltip')
 }
 
-function makeExternalTooltip(formatLines: (tooltipModel: any) => string) {
-  return function (context: any): void {
-    const { chart, tooltip } = context
+function tooltipRawNumber(item: { raw: unknown }): number {
+  return Number(item.raw || 0)
+}
+
+function tooltipDatasetLabel(item: { dataset: { label?: string } }): string {
+  return item.dataset.label || ''
+}
+
+function makeExternalTooltip<TType extends ChartType>(
+  formatLines: (tooltipModel: TooltipModel<TType>) => string,
+): TooltipOptions<TType>['external'] {
+  return function ({ chart, tooltip }): void {
     const tooltipEl = getTooltipEl()
     if (!tooltipEl) return
 
@@ -237,10 +262,10 @@ export function renderLineChart(
         legend: { display: false },
         tooltip: {
           enabled: false,
-          external: makeExternalTooltip((tooltip) => {
+          external: makeExternalTooltip<'line'>((tooltip) => {
             const dp = tooltip.dataPoints[0]
             const label = dp.label || `Punto ${dp.dataIndex + 1}`
-            return `${label}: ${formatValue(dp.raw)}`
+            return `${label}: ${formatValue(tooltipRawNumber(dp))}`
           }),
         },
       },
@@ -324,9 +349,9 @@ export function renderGroupedBarChart(
         legend: refinedLegend(true),
         tooltip: {
           enabled: false,
-          external: makeExternalTooltip((tooltip) => {
+          external: makeExternalTooltip<'bar'>((tooltip) => {
             return tooltip.dataPoints
-              .map((dp: any) => `${dp.dataset.label}: ${formatValue(dp.raw)}`)
+              .map((dp) => `${tooltipDatasetLabel(dp)}: ${formatValue(tooltipRawNumber(dp))}`)
               .join(' | ')
           }),
         },
@@ -341,7 +366,8 @@ export function renderGroupedBarChart(
             color: axisColor(),
             maxRotation: 0,
             padding: 6,
-            callback: (_value: any, index: number) => (Array.from(labels)[index] || '').slice(0, 3),
+            callback: (_value: string | number, index: number) =>
+              (Array.from(labels)[index] || '').slice(0, 3),
           },
         },
         y: {
@@ -352,7 +378,7 @@ export function renderGroupedBarChart(
             color: axisColor(),
             maxTicksLimit: 5,
             padding: 10,
-            callback: (value: number) => formatValue(value),
+            callback: (value: string | number) => formatValue(Number(value || 0)),
           },
           beginAtZero: true,
         },
@@ -435,10 +461,11 @@ export function renderDonutChart(
         },
         tooltip: {
           enabled: false,
-          external: makeExternalTooltip((tooltip) => {
+          external: makeExternalTooltip<'doughnut'>((tooltip) => {
             const dp = tooltip.dataPoints[0]
-            const pct = total > 0 ? ((dp.raw as number) / total) * 100 : 0
-            return `${dp.label}: ${formatValue(dp.raw as number)} (${pct.toFixed(1)}%)`
+            const raw = tooltipRawNumber(dp)
+            const pct = total > 0 ? (raw / total) * 100 : 0
+            return `${dp.label}: ${formatValue(raw)} (${pct.toFixed(1)}%)`
           }),
         },
       },
@@ -511,9 +538,9 @@ export function renderHorizontalBarChart(
         legend: { display: false },
         tooltip: {
           enabled: false,
-          external: makeExternalTooltip((tooltip) => {
+          external: makeExternalTooltip<'bar'>((tooltip) => {
             const dp = tooltip.dataPoints[0]
-            return `${dp.label}: ${formatValue(dp.raw as number)}`
+            return `${dp.label}: ${formatValue(tooltipRawNumber(dp))}`
           }),
         },
       },
@@ -526,7 +553,7 @@ export function renderHorizontalBarChart(
             color: axisColor(),
             maxTicksLimit: 5,
             padding: 8,
-            callback: (value: number) => formatValue(value),
+            callback: (value: string | number) => formatValue(Number(value || 0)),
           },
           beginAtZero: true,
         },
@@ -618,9 +645,12 @@ export function renderMultiLineChart(
         legend: refinedLegend(series.length > 1),
         tooltip: {
           enabled: false,
-          external: makeExternalTooltip((tooltip) => {
+          external: makeExternalTooltip<'line'>((tooltip) => {
             return tooltip.dataPoints
-              .map((dp: any) => `${dp.dataset.label} · ${dp.label}: ${formatValue(dp.raw)}`)
+              .map(
+                (dp) =>
+                  `${tooltipDatasetLabel(dp)} · ${dp.label}: ${formatValue(tooltipRawNumber(dp))}`,
+              )
               .join(' | ')
           }),
         },

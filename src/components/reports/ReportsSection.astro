@@ -2,9 +2,19 @@
 import IssueReportFormCard from "./IssueReportFormCard.astro";
 import ReportsGuideCard from "./ReportsGuideCard.astro";
 import ReportsPanelHeader from "./ReportsPanelHeader.astro";
+
+export interface Props {
+  isActive?: boolean;
+}
+
+const { isActive = false } = Astro.props;
 ---
 
-<section id="reports" class="panel" aria-labelledby="reports-title">
+<section
+  id="reports"
+  class:list={["panel", { "is-active": isActive }]}
+  aria-labelledby="reports-title"
+>
   <ReportsPanelHeader />
 
   <div class="reports-layout">

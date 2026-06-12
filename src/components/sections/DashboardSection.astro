@@ -1,5 +1,11 @@
 ---
 import DashboardSectionVue from './DashboardSection.vue'
+
+export interface Props {
+  isActive?: boolean
+}
+
+const { isActive = true } = Astro.props
 ---
 
-<DashboardSectionVue client:load />
+<DashboardSectionVue isActive={isActive} client:load />

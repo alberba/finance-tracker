@@ -9,6 +9,10 @@ export function getSectionFromPath(pathname: string): SectionId {
   return ROUTE_SECTION_MAP[normalizedPath] || 'dashboard'
 }
 
+export function isSectionRoutePath(pathname: string): boolean {
+  return Object.prototype.hasOwnProperty.call(ROUTE_SECTION_MAP, normalizePath(pathname))
+}
+
 export function getPathFromSection(sectionId: SectionId | string) {
   return SECTION_ROUTE_MAP[normalizeSectionId(sectionId)] || '/dashboard'
 }
