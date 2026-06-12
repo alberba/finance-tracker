@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import type { DashboardViewModel } from '../../scripts/app/dashboard-view-model'
-import DashboardCashflowPanel from './DashboardCashflowPanel.vue'
 import DashboardInvestmentProgressList from './DashboardInvestmentProgressList.vue'
 import DashboardPanel from './DashboardPanel.vue'
 import DashboardWealthSplitPanel from './DashboardWealthSplitPanel.vue'
 import TopExpenseList from './TopExpenseList.vue'
 
 defineProps<
-  Pick<
-    DashboardViewModel,
-    'currency' | 'wealthSplit' | 'topExpenses' | 'investmentProgress' | 'cashflowChart'
-  >
+  Pick<DashboardViewModel, 'currency' | 'wealthSplit' | 'topExpenses' | 'investmentProgress'>
 >()
 
 const emit = defineEmits<{
@@ -23,7 +19,7 @@ function navigate(target: string): void {
 </script>
 
 <template>
-  <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
     <DashboardPanel
       title="Distribución de patrimonio"
       action-label="Ver detalle de patrimonio"
@@ -54,16 +50,6 @@ function navigate(target: string): void {
       <div id="investment-progress-list" class="flex min-h-0 flex-col justify-between gap-3">
         <DashboardInvestmentProgressList :items="investmentProgress" />
       </div>
-    </DashboardPanel>
-
-    <DashboardPanel
-      title="Ingresos, gastos e inversión"
-      action-label="Ver análisis detallado"
-      action-target="reports"
-      class="dash-panel--chart justify-start gap-3.5"
-      @navigate="navigate"
-    >
-      <DashboardCashflowPanel :chart="cashflowChart" :currency="currency" />
     </DashboardPanel>
   </section>
 </template>

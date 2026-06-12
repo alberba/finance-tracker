@@ -33,7 +33,7 @@ async function renderChart(): Promise<void> {
 </script>
 
 <template>
-  <div class="dash-chart-wrap relative mt-0.5 min-h-52.5 grow">
+  <div class="dash-chart-wrap relative mt-0.5 min-h-64 grow">
     <canvas
       id="chart-cashflow"
       ref="canvas"
