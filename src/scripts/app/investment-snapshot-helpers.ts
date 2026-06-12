@@ -1,4 +1,5 @@
 import {
+  type Entity,
   type InvestmentSide,
   type SnapshotKind,
   type State,
@@ -17,11 +18,20 @@ import {
   parseFloatSafe,
   round2,
 } from "../utils";
+import { type UiState } from "./ui-state";
+
+interface InvestmentSnapshotElements {
+  investmentTxBody: HTMLElement;
+  snapshotInvestments: HTMLElement;
+  wealthCalcDialog: HTMLDialogElement;
+  wealthCalcExpression: HTMLInputElement;
+  wealthCalcTitle: HTMLElement;
+}
 
 interface InvestmentSnapshotHelpersDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: InvestmentSnapshotElements;
   getEventElement: (target: EventTarget | null) => Element | null;
   getSnapshotValue: (
     kind: SnapshotKind,
@@ -48,13 +58,13 @@ export function setupInvestmentSnapshotHelpers(
 
   function saveEditedInvestmentTransactionRow(id: string) {
     const state = deps.getState();
-    const row = (el.investmentTxBody as HTMLElement).querySelector(
+    const row = el.investmentTxBody.querySelector(
       `tr[data-investment-editing-id="${id}"]`,
     );
     if (!row) return;
 
     const tx = state.transactions.find(
-      (item: any): item is Transaction =>
+      (item): item is Transaction =>
         item.id === id && item.type === "investment",
     );
     if (!tx) return;
@@ -174,14 +184,14 @@ export function setupInvestmentSnapshotHelpers(
   function renderInvestmentEditingTransactionRow(item: Transaction) {
     const state = deps.getState();
     const selectedAccount = state.accounts.find(
-      (account: any) => account.id === item.accountId,
+      (account) => account.id === item.accountId,
     );
     const isBitvavoBroker =
       String(selectedAccount?.name || "")
         .trim()
         .toLowerCase() === "bitvavo";
     const accountOptions = state.accounts
-      .map((account: any) => {
+      .map((account) => {
         const selected = account.id === item.accountId ? "selected" : "";
         return `<option value="${escapeAttr(account.id)}" ${selected}>${escapeHtml(account.name)}</option>`;
       })
@@ -234,7 +244,7 @@ export function setupInvestmentSnapshotHelpers(
   }
 
   function renderSnapshotRows(
-    items: any[],
+    items: Entity[],
     kind: SnapshotKind,
     month: number,
     computeFn: (itemId: string) => number,
@@ -242,7 +252,7 @@ export function setupInvestmentSnapshotHelpers(
     if (!items.length)
       return "<tr><td colspan='4'>No hay elementos configurados.</td></tr>";
     return items
-      .map((item: any) => {
+      .map((item) => {
         const opening = round2(item.openingBalance || 0);
         const calculated = round2(computeFn(item.id));
         const currentSnapshot = deps.getSnapshotValue(kind, month, item.id);
@@ -308,9 +318,7 @@ export function setupInvestmentSnapshotHelpers(
       el.wealthCalcExpression.focus();
       return;
     }
-    const snapshotInput = (
-      el.snapshotInvestments as HTMLElement
-    ).querySelector<HTMLInputElement>(
+    const snapshotInput = el.snapshotInvestments.querySelector<HTMLInputElement>(
       `input[data-snapshot-kind="investments"][data-snapshot-id="${CSS.escape(ui.wealthCalcTargetId)}"]`,
     );
     if (!snapshotInput) {

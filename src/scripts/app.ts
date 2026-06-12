@@ -3,6 +3,7 @@ import {
   isSnapshotKind,
   type BudgetType,
   type Contribution,
+  type Entity,
   type InvestmentSubTab,
   type SnapshotKind,
   type Transaction,
@@ -521,10 +522,10 @@ import {
     isSnapshotKind,
   });
   const renderSnapshotRows = (
-    items: any,
-    kind: any,
-    month: any,
-    computeFn: any,
+    items: Entity[],
+    kind: SnapshotKind,
+    month: number,
+    computeFn: (itemId: string) => number,
   ) =>
     investmentSnapshotHelpers.renderSnapshotRows(items, kind, month, computeFn);
   const renderInvestmentEditingTransactionRow = (item: Transaction) =>
@@ -789,7 +790,7 @@ import {
     const accountSelect = el.txForm.elements.accountId;
     accountSelect.innerHTML = state.accounts
       .map(
-        (item: any) =>
+        (item) =>
           `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
       )
       .join("");
@@ -802,7 +803,7 @@ import {
     el.txBulkAccount.innerHTML = ['<option value="">Sin cambio</option>']
       .concat(
         state.accounts.map(
-          (item: any) =>
+          (item) =>
             `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
         ),
       )
@@ -848,7 +849,7 @@ import {
 
     brokerSelect.innerHTML = state.accounts
       .map(
-        (item: any) =>
+        (item) =>
           `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
       )
       .join("");
@@ -860,7 +861,7 @@ import {
 
     if (
       currentValue &&
-      state.accounts.some((item: any) => item.id === currentValue)
+      state.accounts.some((item) => item.id === currentValue)
     ) {
       brokerSelect.value = currentValue;
     } else {
@@ -935,7 +936,7 @@ import {
 
     categorySelect.innerHTML = categories
       .map(
-        (name: any) =>
+        (name) =>
           `<option value="${escapeAttr(name)}">${escapeHtml(decorateCategoryLabel(type, name))}</option>`,
       )
       .join("");
