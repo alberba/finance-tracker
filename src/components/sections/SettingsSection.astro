@@ -1,4 +1,16 @@
-<section id="settings" class="panel" aria-labelledby="settings-title">
+---
+export interface Props {
+  isActive?: boolean
+}
+
+const { isActive = false } = Astro.props
+---
+
+<section
+  id="settings"
+  class:list={['panel', { 'is-active': isActive }]}
+  aria-labelledby="settings-title"
+>
   <div class="panel-head">
     <div>
       <p class="panel-kicker">Datos maestros</p>

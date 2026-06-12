@@ -16,6 +16,25 @@ const MONTH_NAMES = [
   "DICIEMBRE",
 ] as const;
 
+interface TestChart {
+  data: {
+    datasets: Array<{
+      data?: unknown[];
+    }>;
+  };
+  tooltip: {
+    setActiveElements(
+      elements: Array<{ datasetIndex: number; index: number }>,
+      position: { x: number; y: number },
+    ): void;
+  };
+  update(): void;
+}
+
+interface TestChartConstructor {
+  getChart(canvas: HTMLCanvasElement): TestChart | undefined;
+}
+
 test.describe("Finance tracker E2E", () => {
   test("sincroniza pestañas con path y permite carga directa por URL", async ({
     page,
@@ -37,6 +56,16 @@ test.describe("Finance tracker E2E", () => {
     await expect(page).toHaveURL(/\/reportes$/);
     await expect(
       tracker.reportsSection.getByRole("heading", { name: "Reportes" }),
+    ).toBeVisible();
+  });
+
+  test("redirige rutas de sección desconocidas al dashboard", async ({ page }) => {
+    await page.goto("/seccion-inexistente");
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.locator("#dashboard").getByRole("heading", {
+        name: "Resumen financiero",
+      }),
     ).toBeVisible();
   });
 
@@ -218,12 +247,17 @@ test.describe("Finance tracker E2E", () => {
     await expect(tooltip).toBeHidden();
 
     const networthHasData = await page.evaluate(() => {
-      const canvas = document.getElementById(
-        "chart-networth",
-      ) as HTMLCanvasElement;
-      const chart = (window as any).Chart?.getChart(canvas);
-      if (chart && chart.data.datasets[0]?.data?.length > 0) {
-        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], {
+      const canvas = document.getElementById("chart-networth");
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        return false;
+      }
+      const chartConstructor = (
+        window as Window & { Chart?: TestChartConstructor }
+      ).Chart;
+      const chart = chartConstructor?.getChart(canvas);
+      const tooltipApi = chart?.tooltip;
+      if (chart && tooltipApi && chart.data.datasets[0]?.data?.length > 0) {
+        tooltipApi.setActiveElements([{ datasetIndex: 0, index: 0 }], {
           x: 0,
           y: 0,
         });
@@ -240,12 +274,17 @@ test.describe("Finance tracker E2E", () => {
     }
 
     const cashflowHasData = await page.evaluate(() => {
-      const canvas = document.getElementById(
-        "chart-cashflow",
-      ) as HTMLCanvasElement;
-      const chart = (window as any).Chart?.getChart(canvas);
-      if (chart && chart.data.datasets[0]?.data?.length > 0) {
-        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: 0 }], {
+      const canvas = document.getElementById("chart-cashflow");
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        return false;
+      }
+      const chartConstructor = (
+        window as Window & { Chart?: TestChartConstructor }
+      ).Chart;
+      const chart = chartConstructor?.getChart(canvas);
+      const tooltipApi = chart?.tooltip;
+      if (chart && tooltipApi && chart.data.datasets[0]?.data?.length > 0) {
+        tooltipApi.setActiveElements([{ datasetIndex: 0, index: 0 }], {
           x: 0,
           y: 0,
         });
@@ -365,7 +404,10 @@ test.describe("Finance tracker E2E", () => {
     expect(afterCreateCount).toBe(beforeCount + 1);
 
     await page.waitForFunction(async () => {
-      const namespace = String((window as any).__FINANCE_NAMESPACE__ || "");
+      const namespace = String(
+        (window as Window & { __FINANCE_NAMESPACE__?: string })
+          .__FINANCE_NAMESPACE__ || "",
+      );
       const response = await fetch("/api/state", {
         headers: namespace ? { "x-finance-namespace": namespace } : {},
       });
@@ -378,9 +420,14 @@ test.describe("Finance tracker E2E", () => {
       const transactions = Array.isArray(payload?.state?.transactions)
         ? payload.state.transactions
         : [];
-      return transactions.some(
-        (item: any) => item?.description === "sqlite-persist-e2e",
-      );
+      return transactions.some((item) => {
+        return (
+          typeof item === "object" &&
+          item !== null &&
+          "description" in item &&
+          item.description === "sqlite-persist-e2e"
+        );
+      });
     });
 
     await page.evaluate(() => {
@@ -1006,6 +1053,7 @@ test.describe("Finance tracker E2E", () => {
         portfolioCount: parseInt(portfolio.dataset.chartPointCount || "0"),
         assetsCount: parseInt(assets.dataset.chartPointCount || "0"),
         firstPortfolioTooltip: portfolioTooltips[0] || "",
+        firstAssetsTooltip: assetsTooltips[0] || "",
       };
     });
 
@@ -1017,6 +1065,7 @@ test.describe("Finance tracker E2E", () => {
 
     // Verificar que los tooltips contienen símbolo de porcentaje
     expect(chartData.firstPortfolioTooltip).toMatch(/%/);
+    expect(chartData.firstAssetsTooltip).toMatch(/%/);
   });
 
   test("inversión: gráficos de líneas muestran tick 0% en eje Y", async ({
