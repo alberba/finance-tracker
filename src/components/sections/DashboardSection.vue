@@ -16,8 +16,10 @@ import type {
   DashboardViewModel,
 } from '../../scripts/app/dashboard-view-model'
 import { MONTHS, isSectionId } from '../../scripts/types'
+import DashboardCashflowPanel from '../dashboard/DashboardCashflowPanel.vue'
 import DashboardHeroNetWorth from '../dashboard/DashboardHeroNetWorth.vue'
 import DashboardOverviewPanels from '../dashboard/DashboardOverviewPanels.vue'
+import DashboardPanel from '../dashboard/DashboardPanel.vue'
 import DashboardPeriodControls from '../dashboard/DashboardPeriodControls.vue'
 import DashboardRecentTransactionsPanel from '../dashboard/DashboardRecentTransactionsPanel.vue'
 import DashboardSavingsGoalPanel from '../dashboard/DashboardSavingsGoalPanel.vue'
@@ -143,15 +145,31 @@ function navigate(target: string): void {
       :wealth-split="wealthSplit"
       :top-expenses="topExpenses"
       :investment-progress="investmentProgress"
-      :cashflow-chart="cashflowChart"
       @navigate="navigate"
     />
 
     <section
-      class="dash-panels-2 grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] items-start gap-[clamp(14px,1.6vw,20px)] max-[1200px]:grid-cols-1"
+      class="dash-panels-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-stretch gap-[clamp(14px,1.6vw,20px)] max-[1200px]:grid-cols-1"
     >
-      <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />
-      <DashboardSavingsGoalPanel :goal="savingsGoal" @navigate="navigate" />
+      <DashboardPanel
+        title="Objetivo de ahorro"
+        action-label="Ver todos los objetivos"
+        action-target="goals"
+        @navigate="navigate"
+      >
+        <DashboardSavingsGoalPanel :goal="savingsGoal" />
+      </DashboardPanel>
+      <DashboardPanel
+        title="Ingresos, gastos e inversión"
+        action-label="Ver análisis detallado"
+        action-target="reports"
+        class="dash-panel--chart justify-start gap-3.5"
+        @navigate="navigate"
+      >
+        <DashboardCashflowPanel :chart="cashflowChart" :currency="currentCurrency" />
+      </DashboardPanel>
     </section>
+
+    <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />
   </section>
 </template>
