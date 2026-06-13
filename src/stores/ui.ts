@@ -3,7 +3,6 @@ import { reactive } from 'vue'
 
 import type { UiState } from '../scripts/app/ui-state'
 import type { SectionId } from '../scripts/types'
-import { todayISO } from '../scripts/utils'
 
 function currentMonth(): number {
   return Math.min(new Date().getMonth(), 11)
@@ -42,7 +41,7 @@ function createDefaultUiState(): UiState {
     investmentReturnMode: 'simple',
     contributionWorkflowStep: 1,
     contributionWorkflowMonth: month,
-    contributionWorkflowDate: todayISO(),
+    contributionWorkflowDate: '',
     contributionWorkflowAmount: 0,
     contributionCalcTargetKind: '',
     contributionCalcTargetId: '',

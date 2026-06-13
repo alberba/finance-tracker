@@ -41,48 +41,17 @@ import {
   normalizeInvestmentSide,
   normalizeInvestmentSymbol,
 } from "./investment-movements";
+import { useFinancialStateStore } from "../stores/financial-state";
+import { pinia } from "../stores/pinia";
+import { useUiStore } from "../stores/ui";
 
 (() => {
   "use strict";
 
-  let state: State = normalizeState(clone(BASE_SEED));
-
-  const ui: UiState = {
-    activeSection: "dashboard",
-    month: Math.min(new Date().getMonth(), 11),
-    budgetType: "income",
-    budgetMonth: Math.min(new Date().getMonth(), 11),
-    txFilterMonth: Math.min(new Date().getMonth(), 11),
-    txSort: { column: "date", direction: "desc" },
-    txOpenHeaderFilter: "",
-    txSelectedIds: [],
-    txFilters: {
-      date: "",
-      accountIds: [],
-      types: [],
-      category: "",
-      description: "",
-      amountMin: "",
-      amountMax: "",
-    },
-    txEditingId: "",
-    snapshotMonth: Math.min(new Date().getMonth(), 11),
-    investmentMonth: Math.min(new Date().getMonth(), 11),
-    wealthCalcTargetId: "",
-    wealthCalcTargetName: "",
-    investmentTab: "dashboard",
-    investmentTxEditingId: "",
-    investmentYearFilter: new Date().getFullYear(),
-    investmentOnlyUndeclared: false,
-    investmentReturnMode: "simple",
-    contributionWorkflowStep: 1,
-    contributionWorkflowMonth: Math.min(new Date().getMonth(), 11),
-    contributionWorkflowDate: "",
-    contributionWorkflowAmount: 0,
-    contributionCalcTargetKind: "",
-    contributionCalcTargetId: "",
-    contributionCalcTargetName: "",
-  };
+  const financialStateStore = useFinancialStateStore(pinia);
+  const uiStore = useUiStore(pinia);
+  let state: State = financialStateStore.replaceState(clone(BASE_SEED));
+  const ui = uiStore.ui as UiState;
 
   const el = getAppElements();
 
@@ -95,7 +64,10 @@ import {
     getState: () => state,
     saveStatusEl: el.saveStatus,
     toastEl: el.toast,
-    persistState,
+    persistState: (nextState) => {
+      persistState(nextState);
+      financialStateStore.replaceState(nextState);
+    },
     persistServerState,
     sortTransactionsInState,
     sortContributionsInState,
@@ -328,7 +300,7 @@ import {
   const settingsDataSection = setupSettingsDataSection({
     getState: () => state,
     setState: (nextState: State) => {
-      state = nextState;
+      state = financialStateStore.replaceState(nextState);
     },
     el,
     saveState,
@@ -364,7 +336,7 @@ import {
     const serverState = await loadServerState();
     const preferredState =
       pickMostRecentState(localState, serverState) || clone(BASE_SEED);
-    state = normalizeState(preferredState);
+    state = financialStateStore.replaceState(preferredState);
     persistState(state);
   }
 
