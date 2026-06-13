@@ -64,4 +64,25 @@ test.describe('Dashboard section', () => {
       }),
     ).toBeVisible()
   })
+
+  test('sincroniza controles Vue del dashboard con el controlador principal', async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openDashboard()
+
+    await tracker.dashboardSection.locator('#year-display').fill('2027')
+    await tracker.dashboardSection.locator('#year-display').press('Tab')
+
+    await tracker.dashboardSection.locator('#dashboard-month').selectOption('0')
+    await expect(tracker.dashboardSection.locator('#dashboard-month')).toHaveValue('0')
+
+    await tracker.dashboardSection.getByRole('button', { name: '7D' }).click()
+    await expect(tracker.dashboardSection.getByRole('button', { name: '7D' })).toHaveClass(
+      /is-active/,
+    )
+
+    await tracker.openSettings()
+    await expect(page.locator('#settings-year')).toHaveValue('2027')
+  })
 })

@@ -26,7 +26,14 @@ const scopedVueConfigs = vue.configs['flat/recommended'].map((config) => ({
 
 export default defineConfig([
   {
-    ignores: ['dist/**', 'coverage/**', '.astro/**', 'node_modules/**'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      '.astro/**',
+      'node_modules/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   {
     files: scriptFiles,
