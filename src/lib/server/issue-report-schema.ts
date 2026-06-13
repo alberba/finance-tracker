@@ -21,14 +21,17 @@ export const issueReportSchema = z.object({
 export type IssueReportInput = z.input<typeof issueReportSchema>;
 export type IssueReportPayload = z.output<typeof issueReportSchema>;
 
-const CONTROL_CHARACTERS_REGEX =
-  /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+function removeControlCharacters(value: string): string {
+  return Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint > 0x1f && codePoint !== 0x7f;
+    })
+    .join("");
+}
 
 function sanitizeText(value: string): string {
-  return value
-    .replace(CONTROL_CHARACTERS_REGEX, "")
-    .replace(/\r\n/g, "\n")
-    .trim();
+  return removeControlCharacters(value).replace(/\r\n/g, "\n").trim();
 }
 
 export function parseIssueReportPayload(input: unknown): IssueReportPayload {

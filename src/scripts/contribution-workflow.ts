@@ -6,6 +6,8 @@ export interface ContributionFlowAllocation {
   amount: number;
 }
 
+type UnknownRecord = Record<string, unknown>;
+
 export const LIQUIDITY_TARGET_KEYS = [
   "myinvestor",
   "trading212",
@@ -138,10 +140,14 @@ export function sanitizeFlowAllocations(
 ): ContributionFlowAllocation[] {
   const items = Array.isArray(list) ? list : [];
   return items
-    .map((item: any) => ({
-      accountId: String(item?.accountId || "").trim(),
-      amount: round2(parseFloatSafe(item?.amount, 0)),
-    }))
+    .map((item): ContributionFlowAllocation => {
+      const candidate: UnknownRecord =
+        item && typeof item === "object" ? (item as UnknownRecord) : {};
+      return {
+        accountId: String(candidate.accountId || "").trim(),
+        amount: round2(parseFloatSafe(candidate.amount, 0)),
+      };
+    })
     .filter(
       (item) =>
         item.accountId && Number.isFinite(item.amount) && item.amount > 0,

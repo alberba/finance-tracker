@@ -1,10 +1,12 @@
 import {
   type Contribution,
   type ContributionMetricRow,
+  type Entity,
   type SnapshotKind,
   type SnapshotRow,
   type State,
 } from "../types";
+import { type UiState } from "./ui-state";
 import {
   deriveContributionFlow,
   findLiquidityTargets,
@@ -27,14 +29,35 @@ import {
 
 interface ContributionWorkflowSectionDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: ContributionWorkflowElements;
   formatMoney: (value: number) => string;
   showToast: (message: string) => void;
   saveState: () => void;
   renderAll: () => void;
   sortContributions: () => void;
   isSnapshotKind: (value: string) => value is SnapshotKind;
+}
+
+interface ContributionWorkflowElements {
+  contributionBody: HTMLElement;
+  contributionWorkflowDialog: HTMLDialogElement;
+  contributionWorkflowMonth: HTMLSelectElement;
+  contributionWorkflowDate: HTMLInputElement;
+  contributionWorkflowInvestmentsBody: HTMLElement;
+  contributionWorkflowLiquidityBody: HTMLElement;
+  contributionWorkflowAllocationBody: HTMLElement;
+  contributionWorkflowTotal: HTMLInputElement;
+  contributionWorkflowSnapshotWarning: HTMLElement;
+  contributionWorkflowAllocationWarning: HTMLElement;
+  contributionWorkflowStepSnapshot: HTMLElement;
+  contributionWorkflowStepAllocation: HTMLElement;
+  contributionWorkflowPrev: HTMLElement;
+  contributionWorkflowNext: HTMLElement;
+  contributionWorkflowSave: HTMLElement;
+  contributionCalcDialog: HTMLDialogElement;
+  contributionCalcTitle: HTMLElement;
+  contributionCalcExpression: HTMLInputElement;
 }
 
 export function setupContributionWorkflowSection(
@@ -48,7 +71,7 @@ export function setupContributionWorkflowSection(
   ): number {
     return round2(
       Object.values(snapshot?.investments || {}).reduce(
-        (sum: number, value: any) => sum + parseFloatSafe(value, 0),
+        (sum, value) => sum + parseFloatSafe(value, 0),
         0,
       ),
     );
@@ -97,7 +120,7 @@ export function setupContributionWorkflowSection(
     const rowsByDate = new Map<string, Contribution>();
 
     Object.entries(state.snapshots || {})
-      .map(([monthKey, snapshot]: any) => {
+      .map(([monthKey, snapshot]) => {
         const month = parseIntSafe(monthKey, -1);
         if (!Number.isInteger(month) || month < 0 || month > 11) {
           return null;
@@ -113,7 +136,7 @@ export function setupContributionWorkflowSection(
 
         const date = toSnapshotDate(state.year, month);
         const existing = state.contributions.find(
-          (item: any) => String(item.portfolioDate || item.date) === date,
+          (item) => String(item.portfolioDate || item.date) === date,
         );
         const derived = deriveContributionFlow(existing || {});
         const flow = round2(derived.flow);
@@ -271,7 +294,7 @@ export function setupContributionWorkflowSection(
       monthFromISO(ui.contributionWorkflowDate) ?? ui.investmentMonth;
 
     const existing = state.contributions.find(
-      (item: any) =>
+      (item) =>
         String(item.portfolioDate || item.date) === ui.contributionWorkflowDate,
     );
     const derived = deriveContributionFlow(existing || {});
@@ -298,7 +321,7 @@ export function setupContributionWorkflowSection(
     const date =
       ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
     const existing = state.contributions.find(
-      (item: any) => String(item.portfolioDate || item.date) === date,
+      (item) => String(item.portfolioDate || item.date) === date,
     );
     const existingAllocations = sanitizeFlowAllocations(
       existing?.flowAllocations || [],
@@ -312,7 +335,7 @@ export function setupContributionWorkflowSection(
     el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets
       .length
       ? state.investmentAssets
-          .map((asset: any) => {
+          .map((asset: Entity) => {
             const snapshotValue = snapshot?.investments?.[asset.id];
             return `
               <tr>
@@ -634,7 +657,7 @@ export function setupContributionWorkflowSection(
       })),
     );
     const existingIndex = state.contributions.findIndex(
-      (item: any) => String(item.portfolioDate || item.date) === date,
+      (item) => String(item.portfolioDate || item.date) === date,
     );
     const previousAllocations =
       existingIndex >= 0
@@ -740,13 +763,13 @@ export function setupContributionWorkflowSection(
     const state = deps.getState();
     const entries = getContributionEntriesFromSnapshots();
     const current = entries.find(
-      (item: any) => item.date === date || item.portfolioDate === date,
+      (item) => item.date === date || item.portfolioDate === date,
     );
     if (!current) {
       return;
     }
     const existingIndex = state.contributions.findIndex(
-      (item: any) => String(item.portfolioDate || item.date) === date,
+      (item) => String(item.portfolioDate || item.date) === date,
     );
     const payload: Contribution = {
       id: current.id,

@@ -9,27 +9,51 @@ import {
 import { toSnapshotDate } from "../contribution-workflow";
 import {
   MONTHS,
-  type ContributionMetricRow,
+  type Contribution,
+  type Entity,
   type InvestmentSubTab,
   type SnapshotKind,
   type State,
   type Transaction,
 } from "../types";
 import { escapeAttr, escapeHtml, formatPercent, round2 } from "../utils";
+import { type UiState } from "./ui-state";
+
+type WealthEntry = {
+  liquidity: number;
+  investment: number;
+  liabilities: number;
+  net: number;
+};
+
+interface InvestmentRendererElements {
+  snapshotAccounts: HTMLElement;
+  snapshotInvestments: HTMLElement;
+  snapshotLiabilities: HTMLElement;
+  wealthTimelineBody: HTMLElement;
+  chartWealth: HTMLCanvasElement;
+  investmentSubtabButtons: HTMLButtonElement[];
+  investmentSubtabPanels: HTMLElement[];
+  investmentReturnModeButtons: HTMLButtonElement[];
+  invTotalValue: HTMLElement;
+  invCapital: HTMLElement;
+  invReturn: HTMLElement;
+  invReturnLabel: HTMLElement;
+  investmentPortfolioChart: HTMLCanvasElement;
+  investmentAssetsChart: HTMLCanvasElement;
+  investmentAllocation: HTMLCanvasElement;
+  investmentYearFilter: HTMLSelectElement;
+  investmentTxBody: HTMLElement;
+}
 
 interface InvestmentRenderersDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: InvestmentRendererElements;
   formatMoney: (value: number) => string;
   formatMoneyCompact: (value: number) => string;
   getWealthByMonth: (month: number) => { investment: number };
-  getWealthSeries: () => Array<{
-    liquidity: number;
-    investment: number;
-    liabilities: number;
-    net: number;
-  }>;
+  getWealthSeries: () => WealthEntry[];
   computeInvestmentPortfolioValueForReturnMode: (
     month: number,
     mode: "simple" | "twr",
@@ -39,18 +63,18 @@ interface InvestmentRenderersDeps {
   computeInvestmentValue: (assetId: string, month: number) => number;
   computeAccountBalance: (accountId: string, month: number) => number;
   computeLiabilityValue: (liabilityId: string, month: number) => number;
-  matchesInvestmentAsset: (category: string, asset: any) => boolean;
+  matchesInvestmentAsset: (category: string, asset: Entity) => boolean;
   getAccountName: (accountId: string) => string;
   syncInvestmentMovementComputedAmount: () => void;
   renderInvestmentEditingTransactionRow: (item: Transaction) => string;
   renderSnapshotRows: (
-    items: any[],
+    items: Entity[],
     kind: SnapshotKind,
     month: number,
     computeFn: (itemId: string) => number,
   ) => string;
   renderContributionsTable: () => void;
-  getContributionEntriesFromSnapshots: () => any[];
+  getContributionEntriesFromSnapshots: () => Contribution[];
 }
 
 export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
@@ -93,7 +117,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     const chartWealthSeries = wealthSeries.slice(0, visibleMonthLimit + 1);
     renderLineChart(
       el.chartWealth,
-      chartWealthSeries.map((entry: any) => entry.net),
+      chartWealthSeries.map((entry) => entry.net),
       {
         color: "#1f6feb",
         fill: "rgba(37, 99, 235, 0.13)",
@@ -106,7 +130,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     el.wealthTimelineBody.innerHTML = wealthSeries
       .slice(0, visibleMonthLimit + 1)
       .map(
-        (entry: any, monthIndex: number) =>
+        (entry, monthIndex) =>
           `<tr><td>${MONTHS[monthIndex]}</td><td>${deps.formatMoney(entry.liquidity)}</td><td>${deps.formatMoney(entry.investment)}</td><td>${deps.formatMoney(entry.liabilities)}</td><td><strong>${deps.formatMoney(entry.net)}</strong></td></tr>`,
       )
       .join("");
@@ -127,8 +151,8 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     const years = Array.from(
       new Set(
         state.transactions
-          .filter((item: any) => item.type === "investment")
-          .map((item: any) => parseTransactionYear(item.date))
+          .filter((item) => item.type === "investment")
+          .map((item) => parseTransactionYear(item.date))
           .filter(
             (year): year is number =>
               typeof year === "number" && Number.isInteger(year),
@@ -180,7 +204,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     );
     const twrEntries = isTWR ? deps.getContributionEntriesFromSnapshots() : [];
     const twrMetrics = isTWR
-      ? (computeContributionMetricsCore(twrEntries) as ContributionMetricRow[])
+      ? computeContributionMetricsCore(twrEntries)
       : [];
     const twrByDate = new Map<string, number>();
     twrMetrics.forEach((m) =>
@@ -226,12 +250,12 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
       targetMonth: number,
     ): number => {
       const asset = state.investmentAssets.find(
-        (item: any) => item.id === assetId,
+        (item) => item.id === assetId,
       );
       if (!asset) return 0;
       const openingCapital = Number(asset.openingBalance || 0);
       const contributions = state.transactions.reduce(
-        (sum: number, item: any) => {
+        (sum, item) => {
           if (item.type !== "investment") return sum;
           if (Number(item.month) > targetMonth) return sum;
           if (!deps.matchesInvestmentAsset(item.category, asset)) return sum;
@@ -245,7 +269,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     const computeInvestedCapitalTotal = (targetMonth: number): number =>
       round2(
         state.investmentAssets.reduce(
-          (sum: number, asset: any) =>
+          (sum, asset) =>
             sum + computeInvestedCapitalByAsset(asset.id, targetMonth),
           0,
         ),
@@ -290,8 +314,8 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     );
 
     const assetsSeries: MultiLineSeries[] = state.investmentAssets
-      .filter((asset: any) => deps.computeInvestmentValue(asset.id, month) > 0)
-      .map((asset: any, idx: number) => {
+      .filter((asset) => deps.computeInvestmentValue(asset.id, month) > 0)
+      .map((asset, idx) => {
         const values = chartPoints.map((m) =>
           deps.computeInvestmentValue(asset.id, m),
         );
@@ -313,7 +337,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
     });
 
     const allocation = state.investmentAssets
-      .map((asset: any, idx: number) => ({
+      .map((asset, idx) => ({
         label: asset.name,
         color: COLORS[idx % COLORS.length],
         value: deps.computeInvestmentValue(asset.id, month),
@@ -325,7 +349,7 @@ export function setupInvestmentRenderers(deps: InvestmentRenderersDeps) {
   function renderInvestmentTransactionsTable() {
     const state = deps.getState();
     const rows = state.transactions
-      .filter((item: any): item is Transaction => item.type === "investment")
+      .filter((item): item is Transaction => item.type === "investment")
       .filter((item) => {
         const year = parseTransactionYear(item.date);
         if (year === null || year !== ui.investmentYearFilter) return false;

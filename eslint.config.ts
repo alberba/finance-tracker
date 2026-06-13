@@ -59,5 +59,11 @@ export default defineConfig([
     language: 'css/css',
     extends: ['css/recommended'],
   },
+  {
+    files: ['tests/e2e/screenshot-stable.css'],
+    rules: {
+      'css/no-important': 'off',
+    },
+  },
   prettierConfig,
 ])
