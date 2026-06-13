@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardViewModel } from '../../scripts/app/dashboard-view-model'
+import type { DashboardViewModel } from '../../domain/dashboard/view-model'
 import DashboardInvestmentProgressList from './DashboardInvestmentProgressList.vue'
 import DashboardPanel from './DashboardPanel.vue'
 import DashboardWealthSplitPanel from './DashboardWealthSplitPanel.vue'

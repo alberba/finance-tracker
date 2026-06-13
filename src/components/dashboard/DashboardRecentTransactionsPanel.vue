@@ -2,7 +2,7 @@
 import type {
   DashboardRecentTransaction,
   DashboardTransactionTone,
-} from '../../scripts/app/dashboard-view-model'
+} from '../../domain/dashboard/view-model'
 
 defineProps<{
   transactions: DashboardRecentTransaction[]

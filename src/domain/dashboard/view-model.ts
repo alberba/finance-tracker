@@ -1,4 +1,4 @@
-import { getCategoryEmoji } from '../category-emoji'
+import { getCategoryEmoji } from '../../scripts/category-emoji'
 import {
   MONTHS,
   type BudgetType,
@@ -6,12 +6,12 @@ import {
   type GoalKey,
   type MonthTotals,
   type State,
-} from '../types'
-import { formatPercent, parseIntSafe, round2 } from '../utils'
+} from '../../scripts/types'
+import { formatPercent, parseIntSafe, round2 } from '../../scripts/utils'
 import {
   buildDashboardInvestmentProgressItems,
   type InvestmentProgressItem,
-} from './dashboard-investment-progress-list'
+} from '../../scripts/app/dashboard-investment-progress-list'
 
 export type DashboardHeroRange = '7d' | '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'

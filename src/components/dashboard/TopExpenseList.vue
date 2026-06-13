@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardTopExpenseItem } from '../../scripts/app/dashboard-view-model'
+import type { DashboardTopExpenseItem } from '../../domain/dashboard/view-model'
 import ProgressBar from './ProgressBar.vue'
 
 defineProps<{

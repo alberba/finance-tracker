@@ -2,8 +2,8 @@
 import "../styles/global.css";
 import AppSidebar from "./layout/AppSidebar.astro";
 import BudgetSection from "./sections/BudgetSection.astro";
-import DashboardSection from "./sections/DashboardSection.astro";
 import DataSection from "./sections/DataSection.astro";
+import FinanceWorkspace from "./FinanceWorkspace.vue";
 import GoalsSection from "./sections/GoalsSection.astro";
 import InvestmentSection from "./sections/InvestmentSection.astro";
 import ReportsSection from "./reports/ReportsSection.astro";
@@ -67,7 +67,7 @@ const activeSection = getSectionFromPath(Astro.url.pathname);
       <AppSidebar activeSection={activeSection} />
 
       <main id="app-main" class="content">
-        <DashboardSection isActive={activeSection === "dashboard"} />
+        <FinanceWorkspace activeSection={activeSection} client:only="vue" />
         <TransactionsSection isActive={activeSection === "transactions"} />
         <BudgetSection isActive={activeSection === "budget"} />
         <WealthSection isActive={activeSection === "wealth"} />

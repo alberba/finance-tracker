@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardMonthOption } from '../../scripts/app/dashboard-view-model'
+import type { DashboardMonthOption } from '../../domain/dashboard/view-model'
 
 defineProps<{
   year: number

@@ -19,19 +19,14 @@ import {
   round2,
   todayISO,
 } from '../utils'
-import { buildDashboardViewModel, type DashboardHeroRange } from './dashboard-view-model'
-import {
-  onDashboardMonthChange,
-  onDashboardNavigation,
-  onDashboardRangeChange,
-  onDashboardYearChange,
-  publishDashboardViewModel,
-} from './dashboard-view-model-bridge'
+import { buildDashboardViewModel, type DashboardHeroRange } from '../../domain/dashboard/view-model'
 import {
   getPathFromSection,
   getSectionFromPath,
   normalizeSectionId,
 } from './dashboard-section-routing'
+import { useDashboardStore } from '../../stores/dashboard'
+import { pinia } from '../../stores/pinia'
 
 interface DashboardBudgetGoalsUi {
   activeSection: SectionId
@@ -101,6 +96,7 @@ interface DashboardBudgetGoalsDeps {
 
 export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps) {
   const { ui, el } = deps
+  const dashboardStore = useDashboardStore(pinia)
   const budgetTypes: BudgetType[] = ['income', 'expense', 'investment']
   const budgetTypeMeta: Record<BudgetType, { title: string; description: string }> = {
     income: { title: 'Ingresos', description: 'Planifica cuánto esperas ingresar cada mes.' },
@@ -131,26 +127,25 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
       switchSection(sectionId, { updateHistory: false })
     })
 
-    onDashboardYearChange((year) => {
-      const state = deps.getState()
-      state.year = parseIntSafe(year, state.year)
-      el.settingsYear.value = String(state.year)
-      deps.saveState()
-      deps.renderAll()
-    })
-
-    onDashboardMonthChange((month) => {
-      ui.month = parseIntSafe(month, ui.month)
-      publishDashboard()
-    })
-
-    onDashboardRangeChange((range) => {
-      heroRange = range
-      publishDashboard()
-    })
-
-    onDashboardNavigation((sectionId) => {
-      switchSection(sectionId)
+    dashboardStore.registerControllerActions({
+      changeYear: (year) => {
+        const state = deps.getState()
+        state.year = parseIntSafe(year, state.year)
+        el.settingsYear.value = String(state.year)
+        deps.saveState()
+        deps.renderAll()
+      },
+      changeMonth: (month) => {
+        ui.month = parseIntSafe(month, ui.month)
+        publishDashboard()
+      },
+      changeRange: (range) => {
+        heroRange = range
+        publishDashboard()
+      },
+      navigate: (sectionId) => {
+        switchSection(sectionId)
+      },
     })
   }
 
@@ -278,7 +273,7 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
   }
 
   function publishDashboard() {
-    publishDashboardViewModel(
+    dashboardStore.setViewModel(
       buildDashboardViewModel({
         state: deps.getState(),
         month: ui.month,

@@ -2,7 +2,7 @@
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderDonutChart } from '../../scripts/charts'
-import type { DashboardWealthSplitItem } from '../../scripts/app/dashboard-view-model'
+import type { DashboardWealthSplitItem } from '../../domain/dashboard/view-model'
 import { formatMoneyForCurrency } from '../../scripts/money-format'
 
 const props = defineProps<{

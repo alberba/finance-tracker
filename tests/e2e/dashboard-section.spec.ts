@@ -7,6 +7,7 @@ test.describe('Dashboard section', () => {
   }) => {
     await tracker.openDashboard()
 
+    await expect(page.locator('[data-finance-workspace]')).toBeVisible()
     await expect(
       tracker.dashboardSection.getByRole('heading', { name: 'Resumen financiero' }),
     ).toBeVisible()
@@ -54,6 +55,7 @@ test.describe('Dashboard section', () => {
 
     expect(chartDetails.cashflowBarCount).toBeGreaterThanOrEqual(0)
     expect(chartDetails.networthPointCount).toBeGreaterThanOrEqual(0)
+    await expect.poll(() => page.evaluate(() => '__dashboardViewModel' in window)).toBe(false)
 
     await tracker.dashboardSection.getByRole('button', { name: 'Ver todos los gastos' }).click()
 
