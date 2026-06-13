@@ -74,14 +74,12 @@ import { useUiStore } from "../stores/ui";
   });
 
   const {
-    getCategoriesForType,
     getOrderedCategoriesForType,
     getMonthTotals,
     getYearTotals,
     getMonthlyCashflowSeries,
     getCategoryActuals,
     getBudgetValue,
-    ensureBudgetCategory,
     getSnapshotValue,
     getAccountName,
     isBitvavoBrokerAccount,
@@ -181,13 +179,17 @@ import { useUiStore } from "../stores/ui";
     getMonthlyCashflowSeries,
     getCategoryActuals,
     getBudgetValue,
-    ensureBudgetCategory,
-    getCategoriesForType,
     getWealthByMonth,
     computeInvestmentValue,
     formatMoney,
   });
   const renderGoals = () => dashboardBudgetGoalsSection.renderGoals();
+
+  financialStateStore.registerStateCommitHandler((nextState) => {
+    state = nextState;
+    saveState();
+    dashboardBudgetGoalsSection.publishDashboard();
+  });
 
   const investmentSnapshotHelpers = setupInvestmentSnapshotHelpers({
     getState: () => state,
@@ -371,7 +373,6 @@ import { useUiStore } from "../stores/ui";
   function bindEvents() {
     bindNavigationEvents();
     bindTransactionEvents();
-    bindBudgetEvents();
     bindWealthEvents();
     bindInvestmentEvents();
     bindGoalEvents();
@@ -386,10 +387,6 @@ import { useUiStore } from "../stores/ui";
 
   function bindTransactionEvents() {
     transactionSection.bindTransactionEvents();
-  }
-
-  function bindBudgetEvents() {
-    dashboardBudgetGoalsSection.bindBudgetEvents();
   }
 
   function bindWealthEvents() {
@@ -460,7 +457,6 @@ import { useUiStore } from "../stores/ui";
     populateTransactionFormOptions();
     dashboardBudgetGoalsSection.publishDashboard();
     renderTransactions();
-    dashboardBudgetGoalsSection.renderBudget();
     renderWealth();
     renderInvestment();
     dashboardBudgetGoalsSection.renderGoals();

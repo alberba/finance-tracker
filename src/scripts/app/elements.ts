@@ -53,11 +53,6 @@ export function getAppElements() {
       "tx-category-breakdown-body",
     ),
 
-    budgetBody: getRequiredElement<HTMLElement>("budget-tables"),
-    budgetPlanned: getRequiredElement<HTMLElement>("budget-total-planned"),
-    budgetActual: getRequiredElement<HTMLElement>("budget-total-actual"),
-    budgetDiff: getRequiredElement<HTMLElement>("budget-total-diff"),
-
     snapshotMonth: getRequiredElement<HTMLSelectElement>("snapshot-month"),
     saveSnapshot: getRequiredElement<HTMLButtonElement>("save-snapshot"),
     snapshotAccounts: getRequiredElement<HTMLElement>("snapshot-accounts"),
