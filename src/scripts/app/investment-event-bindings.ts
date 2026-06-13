@@ -1,4 +1,4 @@
-import { type SnapshotKind, type State } from "../types";
+import { type InvestmentSubTab, type SnapshotKind, type State } from "../types";
 import {
   computeInvestmentMovement,
   normalizeInvestmentSide,
@@ -7,14 +7,60 @@ import {
 import { monthFromISO } from "../utils";
 import { parseFloatSafe, parseIntSafe, round2, todayISO, uid } from "../utils";
 import { toSnapshotDate } from "../contribution-workflow";
+import { type UiState } from "./ui-state";
+
+interface InvestmentEventElements {
+  snapshotMonth: HTMLSelectElement;
+  saveSnapshot: HTMLButtonElement;
+  snapshotInvestments: HTMLElement;
+  wealthCalcClose: HTMLButtonElement;
+  wealthCalcDialog: HTMLDialogElement;
+  wealthCalcForm: HTMLFormElement;
+  investmentSubtabButtons: HTMLButtonElement[];
+  investmentReturnModeButtons: HTMLButtonElement[];
+  investmentMonth: HTMLSelectElement;
+  investmentYearFilter: HTMLSelectElement;
+  investmentOnlyUndeclared: HTMLInputElement;
+  investmentMovementSide: HTMLSelectElement;
+  investmentMovementCategory: HTMLSelectElement;
+  investmentMovementUnitPrice: HTMLInputElement;
+  investmentMovementUnits: HTMLInputElement;
+  investmentMovementFee: HTMLInputElement;
+  investmentMovementSymbol: HTMLInputElement;
+  investmentMovementBroker: HTMLSelectElement;
+  investmentMovementForm: HTMLFormElement;
+  investmentMovementDate: HTMLInputElement;
+  investmentMovementTime: HTMLInputElement;
+  investmentMovementCurrency: HTMLInputElement;
+  investmentMovementDeclared: HTMLInputElement;
+  investmentTxBody: HTMLElement;
+  openContributionWorkflow: HTMLButtonElement;
+  contributionWorkflowDialog: HTMLDialogElement;
+  contributionWorkflowClose: HTMLButtonElement;
+  contributionWorkflowForm: HTMLFormElement;
+  contributionWorkflowMonth: HTMLSelectElement;
+  contributionWorkflowDate: HTMLInputElement;
+  contributionWorkflowTotal: HTMLInputElement;
+  contributionWorkflowNext: HTMLButtonElement;
+  contributionWorkflowPrev: HTMLButtonElement;
+  contributionCalcDialog: HTMLDialogElement;
+  contributionCalcClose: HTMLButtonElement;
+  contributionCalcForm: HTMLFormElement;
+  contributionBody: HTMLElement;
+  contributionDeleteMessage: HTMLElement;
+  contributionDeleteDialog: HTMLDialogElement;
+  contributionDeleteClose: HTMLButtonElement;
+  contributionDeleteCancel: HTMLButtonElement;
+  contributionDeleteForm: HTMLFormElement;
+}
 
 interface InvestmentEventBindingsDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: InvestmentEventElements;
   getEventElement: (target: EventTarget | null) => Element | null;
   isSnapshotKind: (value: string) => value is SnapshotKind;
-  isInvestmentSubTab: (value: string) => boolean;
+  isInvestmentSubTab: (value: string) => value is InvestmentSubTab;
   renderWealth: () => void;
   saveSnapshotFromTable: () => void;
   onOpenInvestmentSnapshotCalcModal: (event: Event) => void;
@@ -84,7 +130,7 @@ export function setupInvestmentEventBindings(
       return;
     }
 
-    state.contributions = state.contributions.filter((item: any) => {
+    state.contributions = state.contributions.filter((item) => {
       const itemDate = String(item.portfolioDate || item.date || "").trim();
       return itemDate !== date;
     });
@@ -309,7 +355,7 @@ export function setupInvestmentEventBindings(
         }
         if (action === "toggle-investment-declared") {
           const tx = state.transactions.find(
-            (item: any) => item.id === id && item.type === "investment",
+            (item) => item.id === id && item.type === "investment",
           );
           if (!tx) return;
           tx.declared = !tx.declared;
@@ -330,7 +376,7 @@ export function setupInvestmentEventBindings(
       if (!deleteButton) return;
       const id = deleteButton.dataset.deleteId;
       state.transactions = state.transactions.filter(
-        (item: any) => item.id !== id,
+        (item) => item.id !== id,
       );
       ui.investmentTxEditingId = "";
       deps.saveState();

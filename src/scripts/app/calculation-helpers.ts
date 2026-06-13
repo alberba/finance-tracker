@@ -1,6 +1,7 @@
 import {
   MONTHS,
   type BudgetType,
+  type Entity,
   type MonthTotals,
   type SnapshotKind,
   type State,
@@ -64,9 +65,9 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
   function getMonthTotals(month: number): MonthTotals {
     const state = deps.getState();
     return state.transactions
-      .filter((item: any) => Number(item.month) === month)
+      .filter((item) => Number(item.month) === month)
       .reduce(
-        (acc: any, item: any) => {
+        (acc, item) => {
           if (item.type === "income") {
             acc.income += Number(item.amount || 0);
           }
@@ -84,7 +85,7 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
 
   function getYearTotals(): MonthTotals {
     return MONTHS.map((_, month) => getMonthTotals(month)).reduce(
-      (acc: any, item: any) => {
+      (acc, item) => {
         acc.income += item.income;
         acc.expense += item.expense;
         acc.investment += item.investment;
@@ -116,20 +117,20 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     const state = deps.getState();
     const map: Record<string, number> = {};
 
-    getCategoriesForType(type).forEach((category: any) => {
+    getCategoriesForType(type).forEach((category) => {
       map[category] = 0;
     });
 
     state.transactions
-      .filter((item: any) => Number(item.month) === month && item.type === type)
-      .forEach((item: any) => {
+      .filter((item) => Number(item.month) === month && item.type === type)
+      .forEach((item) => {
         if (!map[item.category]) {
           map[item.category] = 0;
         }
         map[item.category] += Number(item.amount || 0);
       });
 
-    Object.keys(map).forEach((key: any) => {
+    Object.keys(map).forEach((key) => {
       map[key] = round2(map[key]);
     });
 
@@ -182,15 +183,15 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return null;
   }
 
-  function getAccountName(accountId: any) {
+  function getAccountName(accountId: string) {
     const state = deps.getState();
-    const account = state.accounts.find((item: any) => item.id === accountId);
+    const account = state.accounts.find((item) => item.id === accountId);
     return account ? account.name : accountId || "-";
   }
 
   function isBitvavoBrokerAccount(accountId: string): boolean {
     const state = deps.getState();
-    const account = state.accounts.find((item: any) => item.id === accountId);
+    const account = state.accounts.find((item) => item.id === accountId);
     const accountName = String(account?.name || "")
       .trim()
       .toLowerCase();
@@ -216,9 +217,9 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     );
   }
 
-  function computeAccountBalance(accountId: any, month: any) {
+  function computeAccountBalance(accountId: string, month: number) {
     const state = deps.getState();
-    const account = state.accounts.find((item: any) => item.id === accountId);
+    const account = state.accounts.find((item) => item.id === accountId);
     if (!account) {
       return 0;
     }
@@ -232,7 +233,7 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
       balance = latestSnapshot.value;
     }
 
-    state.transactions.forEach((item: any) => {
+    state.transactions.forEach((item) => {
       if (item.accountId !== accountId) {
         return;
       }
@@ -251,7 +252,7 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return round2(balance);
   }
 
-  function matchesInvestmentAsset(category: any, asset: any) {
+  function matchesInvestmentAsset(category: string, asset: Entity) {
     if (!category || !asset) {
       return false;
     }
@@ -262,10 +263,10 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     );
   }
 
-  function computeInvestmentValue(assetId: any, month: any) {
+  function computeInvestmentValue(assetId: string, month: number) {
     const state = deps.getState();
     const asset = state.investmentAssets.find(
-      (item: any) => item.id === assetId,
+      (item) => item.id === assetId,
     );
     if (!asset) {
       return 0;
@@ -284,7 +285,7 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
       value = latestSnapshot.value;
     }
 
-    state.transactions.forEach((item: any) => {
+    state.transactions.forEach((item) => {
       if (item.type !== "investment") {
         return;
       }
@@ -301,10 +302,10 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return round2(value);
   }
 
-  function computeLiabilityValue(liabilityId: any, month: any) {
+  function computeLiabilityValue(liabilityId: string, month: number) {
     const state = deps.getState();
     const liability = state.liabilities.find(
-      (item: any) => item.id === liabilityId,
+      (item) => item.id === liabilityId,
     );
     if (!liability) {
       return 0;
@@ -322,18 +323,18 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return round2(Number(liability.openingBalance || 0));
   }
 
-  function getWealthByMonth(month: any) {
+  function getWealthByMonth(month: number) {
     const state = deps.getState();
     const liquidity = state.accounts.reduce(
-      (sum: any, item: any) => sum + computeAccountBalance(item.id, month),
+      (sum, item) => sum + computeAccountBalance(item.id, month),
       0,
     );
     const investment = state.investmentAssets.reduce(
-      (sum: any, item: any) => sum + computeInvestmentValue(item.id, month),
+      (sum, item) => sum + computeInvestmentValue(item.id, month),
       0,
     );
     const liabilities = state.liabilities.reduce(
-      (sum: any, item: any) => sum + computeLiabilityValue(item.id, month),
+      (sum, item) => sum + computeLiabilityValue(item.id, month),
       0,
     );
     const net = liquidity + investment - liabilities;
@@ -381,21 +382,21 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     const state = deps.getState();
     let latest = -1;
 
-    state.transactions.forEach((item: any) => {
+    state.transactions.forEach((item) => {
       const month = Number(item.month);
       if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
         latest = Math.max(latest, month);
       }
     });
 
-    Object.keys(state.snapshots || {}).forEach((monthKey: any) => {
+    Object.keys(state.snapshots || {}).forEach((monthKey) => {
       const month = Number(monthKey);
       if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
         latest = Math.max(latest, month);
       }
     });
 
-    state.contributions.forEach((entry: any) => {
+    state.contributions.forEach((entry) => {
       const month = monthFromISO(entry.portfolioDate || entry.date);
       if (month !== null) {
         latest = Math.max(latest, month);
@@ -412,18 +413,18 @@ export function setupAppCalculationHelpers(deps: AppCalculationHelpersDeps) {
     return 0;
   }
 
-  function computeInvestedCapital(month: any) {
+  function computeInvestedCapital(month: number) {
     const state = deps.getState();
     const openingCapital = state.investmentAssets.reduce(
-      (sum: any, item: any) => sum + Number(item.openingBalance || 0),
+      (sum, item) => sum + Number(item.openingBalance || 0),
       0,
     );
     const contributions = state.transactions
       .filter(
-        (item: any) =>
+        (item) =>
           item.type === "investment" && Number(item.month) <= month,
       )
-      .reduce((sum: any, item: any) => sum + Number(item.amount || 0), 0);
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
     return round2(openingCapital + contributions);
   }

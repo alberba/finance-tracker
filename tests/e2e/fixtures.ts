@@ -1,6 +1,12 @@
 import { test as base, expect } from "@playwright/test";
 import { FinanceTrackerPage } from "./pages/FinanceTrackerPage";
 
+declare global {
+  interface Window {
+    __FINANCE_NAMESPACE__?: string;
+  }
+}
+
 type Fixtures = {
   tracker: FinanceTrackerPage;
 };
@@ -14,7 +20,7 @@ export const test = base.extend<Fixtures>({
       },
     });
     await page.addInitScript((value) => {
-      (window as any).__FINANCE_NAMESPACE__ = value;
+      window.__FINANCE_NAMESPACE__ = value;
     }, namespace);
     const tracker = new FinanceTrackerPage(page);
     await tracker.goto();

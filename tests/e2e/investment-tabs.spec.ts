@@ -235,7 +235,7 @@ test.describe("inversión tabs y TWR", () => {
 
     const headers = await section
       .locator("#investment-tab-contributions thead th")
-      .allInnerTexts();
+      .allTextContents();
     expect(headers.map((value) => value.trim())).toEqual([
       "Fecha",
       "Valor cartera (cierre)",
