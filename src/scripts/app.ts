@@ -14,7 +14,6 @@ import { setupContributionWorkflowSection } from "./app/contribution-workflow-mo
 import { setupInvestmentSnapshotHelpers } from "./app/investment-snapshot-helpers";
 import { setupInvestmentRenderers } from "./app/investment-renderers";
 import { setupInvestmentEventBindings } from "./app/investment-event-bindings";
-import { setupSettingsDataSection } from "./app/settings-data-section";
 import { setupAppCalculationHelpers } from "./app/calculation-helpers";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
@@ -167,10 +166,13 @@ import { useUiStore } from "../stores/ui";
     saveState,
     renderAll,
   });
+  // Any Pinia-driven mutation repaints the sections still rendered
+  // imperatively so they stay consistent with the shared state during the
+  // migration. Once every section is a Vue island this bridge can be dropped.
   financialStateStore.registerStateCommitHandler((nextState) => {
     state = nextState;
     saveState();
-    dashboardBudgetGoalsSection.publishDashboard();
+    renderAll();
   });
   financialStateStore.registerStateReloadHandler((nextState) => {
     state = nextState;
@@ -285,15 +287,6 @@ import { useUiStore } from "../stores/ui";
     isManualContributionDate,
   });
 
-  const settingsDataSection = setupSettingsDataSection({
-    getState: () => state,
-    el,
-    saveState,
-    renderAll,
-    showToast,
-    getEventElement,
-  });
-
   void init();
 
   async function init() {
@@ -355,7 +348,6 @@ import { useUiStore } from "../stores/ui";
     bindTransactionEvents();
     bindWealthEvents();
     bindInvestmentEvents();
-    bindSettingsEvents();
     bindChartTooltipEvents();
   }
 
@@ -373,10 +365,6 @@ import { useUiStore } from "../stores/ui";
 
   function bindInvestmentEvents() {
     investmentEventBindings.bindInvestmentEvents();
-  }
-
-  function bindSettingsEvents() {
-    settingsDataSection.bindSettingsEvents();
   }
 
   function bindChartTooltipEvents() {
@@ -429,7 +417,6 @@ import { useUiStore } from "../stores/ui";
     renderTransactions();
     renderWealth();
     renderInvestment();
-    renderSettings();
   }
 
   function populateTransactionFormOptions() {
@@ -607,9 +594,5 @@ import { useUiStore } from "../stores/ui";
 
   function isInvestmentSubTab(value: string): value is InvestmentSubTab {
     return investmentRenderers.isInvestmentSubTab(value);
-  }
-
-  function renderSettings() {
-    settingsDataSection.renderSettings();
   }
 })();

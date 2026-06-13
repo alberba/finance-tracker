@@ -6,6 +6,7 @@ import {
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { useDashboardStore } from '../../stores/dashboard'
+import { useFinancialStateStore } from '../../stores/financial-state'
 import { pinia } from '../../stores/pinia'
 import { useUiStore } from '../../stores/ui'
 
@@ -37,7 +38,6 @@ interface DashboardBudgetGoalsElements {
   investmentOnlyUndeclared: HTMLInputElement
   contributionWorkflowMonth: HTMLSelectElement
   contributionWorkflowDate: HTMLInputElement
-  settingsYear: HTMLInputElement
 }
 
 interface DashboardBudgetGoalsDeps {
@@ -52,6 +52,7 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
   const { ui, el } = deps
   const dashboardStore = useDashboardStore(pinia)
   const uiStore = useUiStore(pinia)
+  const financialStateStore = useFinancialStateStore(pinia)
 
   function bindNavigationEvents() {
     el.navTabs.addEventListener('click', (event) => {
@@ -71,11 +72,9 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
 
     dashboardStore.registerControllerActions({
       changeYear: (year) => {
-        const state = deps.getState()
-        state.year = parseIntSafe(year, state.year)
-        el.settingsYear.value = String(state.year)
-        deps.saveState()
-        deps.renderAll()
+        financialStateStore.commitState((draft) => {
+          draft.year = parseIntSafe(year, draft.year)
+        })
       },
       changeMonth: (month) => {
         ui.month = parseIntSafe(month, ui.month)
