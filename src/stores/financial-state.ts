@@ -8,12 +8,14 @@ import { loadStateFromApi, saveStateToApi } from '../services/state-api'
 
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
 type StateCommitHandler = (state: State) => void
+type StateReloadHandler = (state: State) => void
 
 export const useFinancialStateStore = defineStore('financial-state', () => {
   const state = shallowRef<State>(normalizeState(clone(BASE_SEED)))
   const status = shallowRef<FinanceStoreStatus>('idle')
   const errorMessage = shallowRef<string | null>(null)
   let stateCommitHandler: StateCommitHandler | undefined
+  let stateReloadHandler: StateReloadHandler | undefined
 
   const currency = computed(() => state.value.currency)
   const year = computed(() => state.value.year)
@@ -45,6 +47,21 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
 
   function registerStateCommitHandler(handler: StateCommitHandler): void {
     stateCommitHandler = handler
+  }
+
+  /**
+   * Replaces the whole financial state (imports, seed resets) and notifies the
+   * reload handler so any legacy section still rendered imperatively repaints
+   * against the new state. Bridges the migration until every section is Vue.
+   */
+  function reloadState(nextState: unknown): State {
+    const next = replaceState(nextState)
+    stateReloadHandler?.(next)
+    return next
+  }
+
+  function registerStateReloadHandler(handler: StateReloadHandler): void {
+    stateReloadHandler = handler
   }
 
   async function loadFromApi(): Promise<State | null> {
@@ -98,6 +115,8 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     patchState,
     commitState,
     registerStateCommitHandler,
+    reloadState,
+    registerStateReloadHandler,
     loadFromApi,
     saveToApi,
   }

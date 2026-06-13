@@ -6,7 +6,6 @@ import {
   type Entity,
   type EntityKey,
   type State,
-  type Transaction,
 } from "../types";
 import { decorateCategoryLabel } from "../category-emoji";
 import {
@@ -20,15 +19,11 @@ import {
 
 interface SettingsDataSectionDeps {
   getState: () => State;
-  setState: (nextState: State) => void;
   el: SettingsDataElements;
   saveState: () => void;
   renderAll: () => void;
   showToast: (message: string) => void;
   getEventElement: (target: EventTarget | null) => Element | null;
-  normalizeState: (candidate: unknown) => State;
-  clone: <T>(value: T) => T;
-  baseSeed: State;
 }
 
 interface SettingsDataElements {
@@ -48,17 +43,7 @@ interface SettingsDataElements {
   incomeTags: HTMLElement;
   expenseTags: HTMLElement;
   investmentTags: HTMLElement;
-  exportJson: HTMLElement;
-  importJson: HTMLInputElement;
-  exportTransactionsCsv: HTMLElement;
-  resetSeed: HTMLElement;
-  dataTotalTransactions: HTMLElement;
-  dataTotalSnapshots: HTMLElement;
-  dataTotalContributions: HTMLElement;
-  dataMeta: HTMLElement;
 }
-
-type CsvField = string | number | undefined;
 
 export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
   const { el } = deps;
@@ -117,25 +102,6 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     );
   }
 
-  function bindDataEvents() {
-    el.exportJson.addEventListener("click", exportStateAsJson);
-    el.importJson.addEventListener("change", importStateFromJson);
-    el.exportTransactionsCsv.addEventListener("click", exportTransactionsCsv);
-
-    el.resetSeed.addEventListener("click", () => {
-      const confirmed = window.confirm(
-        "Se reiniciará todo y se cargará el seed original. ¿Continuar?",
-      );
-      if (!confirmed) {
-        return;
-      }
-      deps.setState(deps.normalizeState(deps.clone(deps.baseSeed)));
-      deps.saveState();
-      deps.renderAll();
-      deps.showToast("Tracker reiniciado con datos semilla.");
-    });
-  }
-
   function renderSettings() {
     const state = deps.getState();
     el.settingsYear.value = String(state.year);
@@ -149,20 +115,6 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     el.incomeTags.innerHTML = renderCategoryTags("incomeCategories");
     el.expenseTags.innerHTML = renderCategoryTags("expenseCategories");
     el.investmentTags.innerHTML = renderCategoryTags("investmentCategories");
-  }
-
-  function renderDataTab() {
-    const state = deps.getState();
-    el.dataTotalTransactions.textContent = String(state.transactions.length);
-    el.dataTotalSnapshots.textContent = String(
-      Object.keys(state.snapshots || {}).length,
-    );
-    el.dataTotalContributions.textContent = String(state.contributions.length);
-
-    const source = state.meta?.source || "desconocido";
-    const generated = state.meta?.generatedAt || "";
-    const savedAt = state.meta?.savedAt || "";
-    el.dataMeta.textContent = `Origen: ${source} | Seed: ${generated} | Último guardado local: ${savedAt || "-"}`;
   }
 
   function renderEntityEditor(key: EntityKey, container: HTMLElement) {
@@ -428,108 +380,8 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     state.investmentCategories = merged;
   }
 
-  function exportStateAsJson() {
-    const state = deps.getState();
-    const payload = JSON.stringify(state, null, 2);
-    const blob = new Blob([payload], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    downloadUrl(url, `finance-tracker-${state.year}.json`);
-    URL.revokeObjectURL(url);
-    deps.showToast("JSON exportado.");
-  }
-
-  function importStateFromJson(event: Event) {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
-      return;
-    }
-    const file = target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result || "{}"));
-        deps.setState(deps.normalizeState(data));
-        deps.saveState();
-        deps.renderAll();
-        deps.showToast("JSON importado correctamente.");
-      } catch {
-        deps.showToast("No se pudo importar el archivo.");
-      } finally {
-        el.importJson.value = "";
-      }
-    };
-    reader.readAsText(file, "utf-8");
-  }
-
-  function exportTransactionsCsv() {
-    const state = deps.getState();
-    const header = [
-      "id",
-      "date",
-      "month",
-      "type",
-      "accountId",
-      "category",
-      "description",
-      "amount",
-      "time",
-      "symbol",
-      "side",
-      "unitPrice",
-      "units",
-      "fee",
-      "movementCurrency",
-      "declared",
-    ];
-    const rows = state.transactions.map((item: Transaction) => [
-      item.id,
-      item.date,
-      item.month,
-      item.type,
-      item.accountId,
-      item.category,
-      item.description,
-      item.amount,
-      item.time || "",
-      item.symbol || "",
-      item.side || "",
-      Number.isFinite(item.unitPrice) ? item.unitPrice : "",
-      Number.isFinite(item.units) ? item.units : "",
-      Number.isFinite(item.fee) ? item.fee : "",
-      item.movementCurrency || "",
-      item.declared ? "true" : "false",
-    ]);
-
-    const csv = [header, ...rows]
-      .map((row: CsvField[]) =>
-        row
-          .map((field) => `"${String(field ?? "").replace(/"/g, '""')}"`)
-          .join(","),
-      )
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    downloadUrl(url, `movimientos-${state.year}.csv`);
-    URL.revokeObjectURL(url);
-    deps.showToast("CSV exportado.");
-  }
-
-  function downloadUrl(url: string, filename: string) {
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-  }
-
   return {
     bindSettingsEvents,
-    bindDataEvents,
     renderSettings,
-    renderDataTab,
   };
 }

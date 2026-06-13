@@ -1,0 +1,72 @@
+import { defineStore } from 'pinia'
+import { computed } from 'vue'
+
+import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
+import { useToast } from '../composables/useToast'
+import { BASE_SEED } from '../scripts/state'
+import { clone } from '../scripts/utils'
+import { useFinancialStateStore } from './financial-state'
+
+function downloadBlob(content: string, mimeType: string, filename: string): void {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+export const useDataStore = defineStore('data', () => {
+  const financialStateStore = useFinancialStateStore()
+  const { showToast } = useToast()
+
+  const summary = computed(() => buildDataSummaryViewModel(financialStateStore.state))
+
+  function exportJson(): void {
+    const state = financialStateStore.state
+    downloadBlob(
+      JSON.stringify(state, null, 2),
+      'application/json',
+      `finance-tracker-${state.year}.json`,
+    )
+    showToast('JSON exportado.')
+  }
+
+  function exportTransactionsCsv(): void {
+    const state = financialStateStore.state
+    downloadBlob(
+      buildTransactionsCsv(state),
+      'text/csv;charset=utf-8',
+      `movimientos-${state.year}.csv`,
+    )
+    showToast('CSV exportado.')
+  }
+
+  function importJson(file: File): void {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result || '{}'))
+        financialStateStore.reloadState(data)
+        showToast('JSON importado correctamente.')
+      } catch {
+        showToast('No se pudo importar el archivo.')
+      }
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+
+  function resetSeed(): void {
+    financialStateStore.reloadState(clone(BASE_SEED))
+    showToast('Tracker reiniciado con datos semilla.')
+  }
+
+  return {
+    summary,
+    exportJson,
+    exportTransactionsCsv,
+    importJson,
+    resetSeed,
+  }
+})

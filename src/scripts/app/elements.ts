@@ -271,20 +271,6 @@ export function getAppElements() {
       "settings-investment-categories",
     ),
 
-    dataTotalTransactions: getRequiredElement<HTMLElement>(
-      "data-total-transactions",
-    ),
-    dataTotalSnapshots: getRequiredElement<HTMLElement>("data-total-snapshots"),
-    dataTotalContributions: getRequiredElement<HTMLElement>(
-      "data-total-contributions",
-    ),
-    dataMeta: getRequiredElement<HTMLElement>("data-meta"),
-    exportJson: getRequiredElement<HTMLButtonElement>("export-json"),
-    importJson: getRequiredElement<HTMLInputElement>("import-json"),
-    exportTransactionsCsv: getRequiredElement<HTMLButtonElement>(
-      "export-transactions-csv",
-    ),
-    resetSeed: getRequiredElement<HTMLButtonElement>("reset-seed"),
     chartTooltip: getRequiredElement<HTMLElement>("chart-tooltip"),
   } as const;
 }

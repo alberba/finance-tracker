@@ -30,7 +30,6 @@ import {
   BASE_SEED,
   loadPersistedState,
   loadServerState,
-  normalizeState,
   persistState,
   persistServerState,
   sortContributionsInState,
@@ -173,6 +172,11 @@ import { useUiStore } from "../stores/ui";
     saveState();
     dashboardBudgetGoalsSection.publishDashboard();
   });
+  financialStateStore.registerStateReloadHandler((nextState) => {
+    state = nextState;
+    saveState();
+    renderAll();
+  });
 
   const investmentSnapshotHelpers = setupInvestmentSnapshotHelpers({
     getState: () => state,
@@ -283,17 +287,11 @@ import { useUiStore } from "../stores/ui";
 
   const settingsDataSection = setupSettingsDataSection({
     getState: () => state,
-    setState: (nextState: State) => {
-      state = financialStateStore.replaceState(nextState);
-    },
     el,
     saveState,
     renderAll,
     showToast,
     getEventElement,
-    normalizeState,
-    clone,
-    baseSeed: BASE_SEED as State,
   });
 
   void init();
@@ -358,7 +356,6 @@ import { useUiStore } from "../stores/ui";
     bindWealthEvents();
     bindInvestmentEvents();
     bindSettingsEvents();
-    bindDataEvents();
     bindChartTooltipEvents();
   }
 
@@ -380,10 +377,6 @@ import { useUiStore } from "../stores/ui";
 
   function bindSettingsEvents() {
     settingsDataSection.bindSettingsEvents();
-  }
-
-  function bindDataEvents() {
-    settingsDataSection.bindDataEvents();
   }
 
   function bindChartTooltipEvents() {
@@ -437,7 +430,6 @@ import { useUiStore } from "../stores/ui";
     renderWealth();
     renderInvestment();
     renderSettings();
-    renderDataTab();
   }
 
   function populateTransactionFormOptions() {
@@ -619,9 +611,5 @@ import { useUiStore } from "../stores/ui";
 
   function renderSettings() {
     settingsDataSection.renderSettings();
-  }
-
-  function renderDataTab() {
-    settingsDataSection.renderDataTab();
   }
 })();
