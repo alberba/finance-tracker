@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardSavingsGoal, DashboardTone } from '../../scripts/app/dashboard-view-model'
+import type { DashboardSavingsGoal, DashboardTone } from '../../domain/dashboard/view-model'
 
 defineProps<{
   goal: DashboardSavingsGoal

@@ -2,7 +2,7 @@
 import { nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderGroupedBarChart } from '../../scripts/charts'
-import type { DashboardCashflowChart } from '../../scripts/app/dashboard-view-model'
+import type { DashboardCashflowChart } from '../../domain/dashboard/view-model'
 import { formatMoneyForCurrency } from '../../scripts/money-format'
 
 const props = defineProps<{

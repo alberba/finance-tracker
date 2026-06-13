@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DashboardKpis, DashboardStat } from '../../scripts/app/dashboard-view-model'
+import type { DashboardKpis, DashboardStat } from '../../domain/dashboard/view-model'
 import DashboardStatCard from './DashboardStatCard.vue'
 
 const props = defineProps<{

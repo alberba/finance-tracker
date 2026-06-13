@@ -9,7 +9,7 @@ import type {
   DashboardLineChart,
   DashboardRangeOption,
   DashboardTone,
-} from '../../scripts/app/dashboard-view-model'
+} from '../../domain/dashboard/view-model'
 import { formatCompactMoneyForCurrency, formatMoneyForCurrency } from '../../scripts/money-format'
 
 const props = defineProps<{

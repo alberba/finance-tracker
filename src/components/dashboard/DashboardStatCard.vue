@@ -2,7 +2,7 @@
 import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderSparkline } from '../../scripts/charts'
-import type { DashboardStatDelta } from '../../scripts/app/dashboard-view-model'
+import type { DashboardStatDelta } from '../../domain/dashboard/view-model'
 
 type DashboardStatVariant = 'income' | 'expense' | 'investment'
 

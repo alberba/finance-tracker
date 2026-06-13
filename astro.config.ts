@@ -25,5 +25,9 @@ export default defineConfig({
     plugins: [tailwindcss(), svgLoader()],
   },
 
-  integrations: [vue()],
+  integrations: [
+    vue({
+      appEntrypoint: '/src/vue-app',
+    }),
+  ],
 })
