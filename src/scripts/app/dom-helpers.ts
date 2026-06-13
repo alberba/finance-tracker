@@ -1,17 +1,3 @@
-export interface TxFormControls extends HTMLFormControlsCollection {
-  date: HTMLInputElement
-  month: HTMLSelectElement
-  type: HTMLSelectElement
-  accountId: HTMLSelectElement
-  category: HTMLSelectElement
-  description: HTMLInputElement
-  amount: HTMLInputElement
-}
-
-export interface TxForm extends HTMLFormElement {
-  elements: TxFormControls
-}
-
 export interface InvestmentMovementFormControls extends HTMLFormControlsCollection {
   date: HTMLInputElement
   time: HTMLInputElement
