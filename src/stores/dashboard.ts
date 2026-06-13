@@ -2,32 +2,13 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import type {
-  DashboardCashflowChart,
   DashboardHeroRange,
-  DashboardLineChart,
-  DashboardSavingsGoal,
-  DashboardViewModel,
 } from '../domain/dashboard/view-model'
+import { buildDashboardViewModelFromState } from '../domain/dashboard/view-model'
 import { MONTHS, isSectionId } from '../scripts/types'
 import type { SectionId } from '../scripts/types'
-
-const emptyNetWorthChart: DashboardLineChart = {
-  labels: [],
-  values: [],
-  endpoint: '0,00 €',
-}
-
-const emptyCashflowChart: DashboardCashflowChart = {
-  labels: [],
-  income: [],
-  expense: [],
-  investment: [],
-}
-
-const emptySavingsGoal: DashboardSavingsGoal = {
-  kind: 'empty',
-  message: 'Cargando dashboard.',
-}
+import { useFinancialStateStore } from './financial-state'
+import { useUiStore } from './ui'
 
 const fallbackMonths = MONTHS.map((label, value) => ({ label, value }))
 
@@ -46,28 +27,32 @@ interface DashboardControllerActions {
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {
-  const viewModel = shallowRef<DashboardViewModel | null>(null)
+  const financialStateStore = useFinancialStateStore()
+  const uiStore = useUiStore()
+  const heroRange = shallowRef<DashboardHeroRange>('1a')
   let controllerActions: DashboardControllerActions | null = null
 
-  const currentCurrency = computed(() => viewModel.value?.currency || 'EUR')
-  const currentYear = computed(() => viewModel.value?.year ?? new Date().getFullYear())
-  const currentMonth = computed(() =>
-    viewModel.value?.month ?? Math.min(new Date().getMonth(), MONTHS.length - 1),
+  const viewModel = computed(() =>
+    buildDashboardViewModelFromState({
+      state: financialStateStore.state,
+      month: uiStore.ui.month,
+      heroRange: heroRange.value,
+    }),
   )
-  const monthOptions = computed(() => viewModel.value?.months ?? fallbackMonths)
-  const rangeOptions = computed(() => viewModel.value?.ranges ?? fallbackRanges)
-  const kpis = computed(() => viewModel.value?.kpis)
-  const netWorthChart = computed(() => viewModel.value?.netWorthChart ?? emptyNetWorthChart)
-  const cashflowChart = computed(() => viewModel.value?.cashflowChart ?? emptyCashflowChart)
-  const topExpenses = computed(() => viewModel.value?.topExpenses ?? [])
-  const wealthSplit = computed(() => viewModel.value?.wealthSplit ?? [])
-  const investmentProgress = computed(() => viewModel.value?.investmentProgress ?? [])
-  const recentTransactions = computed(() => viewModel.value?.recentTransactions ?? [])
-  const savingsGoal = computed(() => viewModel.value?.savingsGoal ?? emptySavingsGoal)
 
-  function setViewModel(nextViewModel: DashboardViewModel): void {
-    viewModel.value = nextViewModel
-  }
+  const currentCurrency = computed(() => viewModel.value.currency || 'EUR')
+  const currentYear = computed(() => viewModel.value.year ?? new Date().getFullYear())
+  const currentMonth = computed(() => viewModel.value.month)
+  const monthOptions = computed(() => viewModel.value.months ?? fallbackMonths)
+  const rangeOptions = computed(() => viewModel.value.ranges ?? fallbackRanges)
+  const kpis = computed(() => viewModel.value.kpis)
+  const netWorthChart = computed(() => viewModel.value.netWorthChart)
+  const cashflowChart = computed(() => viewModel.value.cashflowChart)
+  const topExpenses = computed(() => viewModel.value.topExpenses)
+  const wealthSplit = computed(() => viewModel.value.wealthSplit)
+  const investmentProgress = computed(() => viewModel.value.investmentProgress)
+  const recentTransactions = computed(() => viewModel.value.recentTransactions)
+  const savingsGoal = computed(() => viewModel.value.savingsGoal)
 
   function registerControllerActions(actions: DashboardControllerActions): void {
     controllerActions = actions
@@ -78,10 +63,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
   }
 
   function requestMonthChange(month: number): void {
+    uiStore.setDashboardMonth(month)
     controllerActions?.changeMonth(month)
   }
 
   function requestRangeChange(range: DashboardHeroRange): void {
+    heroRange.value = range
     controllerActions?.changeRange(range)
   }
 
@@ -106,7 +93,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     investmentProgress,
     recentTransactions,
     savingsGoal,
-    setViewModel,
     registerControllerActions,
     requestYearChange,
     requestMonthChange,
