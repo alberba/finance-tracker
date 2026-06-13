@@ -15,3 +15,5 @@ package-lock.json
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+# Local-only visual snapshots (CI generates the canonical -linux baselines)
+tests/e2e/**/*-darwin.png
