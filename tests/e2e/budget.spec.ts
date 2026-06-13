@@ -2,6 +2,7 @@ import { test, expect } from "./fixtures";
 
 test.describe("Budget E2E", () => {
   test("presupuesto renderiza tres tablas anuales por bloque", async ({
+    page,
     tracker,
   }) => {
     await tracker.openBudget();
@@ -9,6 +10,7 @@ test.describe("Budget E2E", () => {
     await expect(
       tracker.budgetSection.getByRole("heading", { name: "Presupuesto" }),
     ).toBeVisible();
+    await expect(page.locator("[data-finance-workspace] #budget")).toBeVisible();
     await expect(
       tracker.budgetSection.locator("[data-budget-type='income']"),
     ).toBeVisible();

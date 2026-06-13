@@ -7,11 +7,13 @@ import { clone } from '../scripts/utils'
 import { loadStateFromApi, saveStateToApi } from '../services/state-api'
 
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
+type StateCommitHandler = (state: State) => void
 
 export const useFinancialStateStore = defineStore('financial-state', () => {
   const state = shallowRef<State>(normalizeState(clone(BASE_SEED)))
   const status = shallowRef<FinanceStoreStatus>('idle')
   const errorMessage = shallowRef<string | null>(null)
+  let stateCommitHandler: StateCommitHandler | undefined
 
   const currency = computed(() => state.value.currency)
   const year = computed(() => state.value.year)
@@ -33,6 +35,16 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     const draft = clone(state.value)
     mutator(draft)
     return replaceState(draft)
+  }
+
+  function commitState(mutator: (draft: State) => void): State {
+    const nextState = patchState(mutator)
+    stateCommitHandler?.(nextState)
+    return nextState
+  }
+
+  function registerStateCommitHandler(handler: StateCommitHandler): void {
+    stateCommitHandler = handler
   }
 
   async function loadFromApi(): Promise<State | null> {
@@ -84,6 +96,8 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     contributions,
     replaceState,
     patchState,
+    commitState,
+    registerStateCommitHandler,
     loadFromApi,
     saveToApi,
   }
