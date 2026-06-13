@@ -7,11 +7,17 @@ import {
   type MonthTotals,
   type State,
 } from '../../scripts/types'
-import { formatPercent, parseIntSafe, round2 } from '../../scripts/utils'
+import { formatPercent, monthFromISO, parseIntSafe, round2 } from '../../scripts/utils'
 import {
   buildDashboardInvestmentProgressItems,
   type InvestmentProgressItem,
 } from '../../scripts/app/dashboard-investment-progress-list'
+import {
+  computeInvestmentValue as computeCoreInvestmentValue,
+  getCategoryActuals as getCoreCategoryActuals,
+  getMonthTotals as getCoreMonthTotals,
+  getWealthByMonth as getCoreWealthByMonth,
+} from '../../lib/finance-core'
 
 export type DashboardHeroRange = '7d' | '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'
@@ -161,6 +167,59 @@ const TYPE_LABEL: Record<BudgetType, string> = {
   investment: 'Inversión',
 }
 
+export function buildDashboardViewModelFromState({
+  state,
+  month,
+  heroRange,
+}: {
+  state: State
+  month: number
+  heroRange: DashboardHeroRange
+}): DashboardViewModel {
+  const getWealthByMonth = (targetMonth: number) =>
+    getCoreWealthByMonth(
+      targetMonth,
+      state.accounts,
+      state.investmentAssets,
+      state.liabilities,
+      state.transactions,
+      state.snapshots,
+    )
+
+  const getMonthTotals = (targetMonth: number) =>
+    getCoreMonthTotals(state.transactions, targetMonth)
+
+  return buildDashboardViewModel({
+    state,
+    month,
+    heroRange,
+    getMonthTotals,
+    getYearTotals: () => getYearTotalsFromState(getMonthTotals),
+    getWealthSeries: () => MONTHS.map((_, targetMonth) => getWealthByMonth(targetMonth)),
+    getLatestDataMonth: () => getLatestDataMonthFromState(state, month),
+    getMonthlyCashflowSeries: () => getMonthlyCashflowSeriesFromState(getMonthTotals),
+    getCategoryActuals: (type, targetMonth) =>
+      getCoreCategoryActuals(
+        state.transactions,
+        type,
+        targetMonth,
+        getCategoriesForType(state, type),
+      ),
+    getBudgetValue: (type, category, targetMonth) =>
+      getBudgetValueFromState(state, type, category, targetMonth),
+    getWealthByMonth,
+    computeInvestmentValue: (assetId, targetMonth) =>
+      computeCoreInvestmentValue(
+        assetId,
+        targetMonth,
+        state.investmentAssets,
+        state.transactions,
+        state.snapshots,
+      ),
+    formatMoney: (value) => formatStateMoney(value, state.currency),
+  })
+}
+
 export function buildDashboardViewModel({
   state,
   month,
@@ -266,6 +325,95 @@ export function buildDashboardViewModel({
       computeInvestmentValue,
       formatMoney,
     }),
+  }
+}
+
+function getCategoriesForType(state: State, type: BudgetType): string[] {
+  if (type === 'income') {
+    return state.incomeCategories
+  }
+  if (type === 'expense') {
+    return state.expenseCategories
+  }
+  return state.investmentCategories
+}
+
+function getYearTotalsFromState(getMonthTotals: (month: number) => MonthTotals): MonthTotals {
+  return MONTHS.map((_, month) => getMonthTotals(month)).reduce(
+    (acc, item) => {
+      acc.income += item.income
+      acc.expense += item.expense
+      acc.investment += item.investment
+      return acc
+    },
+    { income: 0, expense: 0, investment: 0 },
+  )
+}
+
+function getMonthlyCashflowSeriesFromState(getMonthTotals: (month: number) => MonthTotals) {
+  const income: number[] = []
+  const expense: number[] = []
+  const investment: number[] = []
+
+  MONTHS.forEach((_, month) => {
+    const total = getMonthTotals(month)
+    income.push(round2(total.income))
+    expense.push(round2(total.expense))
+    investment.push(round2(total.investment))
+  })
+
+  return { income, expense, investment }
+}
+
+function getBudgetValueFromState(
+  state: State,
+  type: BudgetType,
+  category: string,
+  month: number,
+): number {
+  return round2(state.budget[type]?.[category]?.[month] || 0)
+}
+
+function getLatestDataMonthFromState(state: State, fallbackMonth: number): number {
+  let latest = -1
+
+  state.transactions.forEach((item) => {
+    const month = Number(item.month)
+    if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
+      latest = Math.max(latest, month)
+    }
+  })
+
+  Object.keys(state.snapshots || {}).forEach((monthKey) => {
+    const month = Number(monthKey)
+    if (Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
+      latest = Math.max(latest, month)
+    }
+  })
+
+  state.contributions.forEach((entry) => {
+    const month = monthFromISO(entry.portfolioDate || entry.date)
+    if (month !== null) {
+      latest = Math.max(latest, month)
+    }
+  })
+
+  if (latest >= 0) {
+    return latest
+  }
+  return MONTHS[fallbackMonth] ? fallbackMonth : 0
+}
+
+function formatStateMoney(value: unknown, currency: string): string {
+  const safeCurrency = (currency || 'EUR').toUpperCase()
+  try {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: safeCurrency,
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0))
+  } catch {
+    return `${Number(value || 0).toFixed(2)} ${safeCurrency}`
   }
 }
 

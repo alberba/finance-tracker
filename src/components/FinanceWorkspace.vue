@@ -5,6 +5,7 @@ import type { SectionId } from '../scripts/types'
 import { useUiStore } from '../stores/ui'
 import BudgetSection from './sections/BudgetSection.vue'
 import DashboardSection from './sections/DashboardSection.vue'
+import GoalsSection from './sections/GoalsSection.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -23,5 +24,6 @@ const currentSection = computed(() => uiStore.ui.activeSection)
   <div class="contents" data-finance-workspace>
     <DashboardSection :is-active="currentSection === 'dashboard'" />
     <BudgetSection :is-active="currentSection === 'budget'" />
+    <GoalsSection :is-active="currentSection === 'goals'" />
   </div>
 </template>

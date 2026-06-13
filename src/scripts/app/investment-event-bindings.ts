@@ -70,7 +70,6 @@ interface InvestmentEventBindingsDeps {
   renderInvestmentReturnModeToggle: () => void;
   renderInvestmentDashboard: () => void;
   renderInvestment: () => void;
-  renderGoals: () => void;
   renderInvestmentTransactionsTable: () => void;
   syncInvestmentMovementComputedAmount: () => void;
   normalizeInvestmentMovementSymbolField: () => void;
@@ -187,7 +186,6 @@ export function setupInvestmentEventBindings(
         ui.investmentMonth,
       );
       deps.renderInvestment();
-      deps.renderGoals();
     });
 
     el.investmentYearFilter.addEventListener("change", () => {

@@ -233,8 +233,6 @@ export function getAppElements() {
       "contribution-calc-expression",
     ),
 
-    goalsProgress: getRequiredElement<HTMLElement>("goals-progress"),
-
     settingsYear: getRequiredElement<HTMLInputElement>("settings-year"),
     settingsCurrency: getRequiredElement<HTMLInputElement>("settings-currency"),
     saveSettingsMain:
