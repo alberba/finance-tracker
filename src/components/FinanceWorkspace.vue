@@ -8,6 +8,7 @@ import DashboardSection from './sections/DashboardSection.vue'
 import DataSection from './sections/DataSection.vue'
 import GoalsSection from './sections/GoalsSection.vue'
 import ReportsSection from './reports/ReportsSection.vue'
+import SettingsSection from './sections/SettingsSection.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -29,5 +30,6 @@ const currentSection = computed(() => uiStore.ui.activeSection)
     <GoalsSection :is-active="currentSection === 'goals'" />
     <DataSection :is-active="currentSection === 'data'" />
     <ReportsSection :is-active="currentSection === 'reports'" />
+    <SettingsSection :is-active="currentSection === 'settings'" />
   </div>
 </template>

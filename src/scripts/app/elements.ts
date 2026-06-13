@@ -233,44 +233,6 @@ export function getAppElements() {
       "contribution-calc-expression",
     ),
 
-    settingsYear: getRequiredElement<HTMLInputElement>("settings-year"),
-    settingsCurrency: getRequiredElement<HTMLInputElement>("settings-currency"),
-    saveSettingsMain:
-      getRequiredElement<HTMLButtonElement>("save-settings-main"),
-
-    addAccountForm: getRequiredElement<HTMLFormElement>("add-account-form"),
-    addInvestmentForm: getRequiredElement<HTMLFormElement>(
-      "add-investment-form",
-    ),
-    addLiabilityForm: getRequiredElement<HTMLFormElement>("add-liability-form"),
-
-    settingsAccounts: getRequiredElement<HTMLElement>("settings-accounts"),
-    settingsInvestments: getRequiredElement<HTMLElement>(
-      "settings-investments",
-    ),
-    settingsLiabilities: getRequiredElement<HTMLElement>(
-      "settings-liabilities",
-    ),
-    settingsTwrLiquidity: getRequiredElement<HTMLElement>(
-      "settings-twr-liquidity",
-    ),
-
-    addIncomeCategory: getRequiredElement<HTMLFormElement>(
-      "add-income-category",
-    ),
-    addExpenseCategory: getRequiredElement<HTMLFormElement>(
-      "add-expense-category",
-    ),
-    addInvestmentCategory: getRequiredElement<HTMLFormElement>(
-      "add-investment-category",
-    ),
-
-    incomeTags: getRequiredElement<HTMLElement>("settings-income-categories"),
-    expenseTags: getRequiredElement<HTMLElement>("settings-expense-categories"),
-    investmentTags: getRequiredElement<HTMLElement>(
-      "settings-investment-categories",
-    ),
-
     chartTooltip: getRequiredElement<HTMLElement>("chart-tooltip"),
   } as const;
 }
