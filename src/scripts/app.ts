@@ -1,7 +1,5 @@
 import {
-  isBudgetType,
   isSnapshotKind,
-  type BudgetType,
   type Contribution,
   type Entity,
   type InvestmentSubTab,
@@ -9,7 +7,6 @@ import {
   type Transaction,
   type State,
 } from "./types";
-import { setupTransactionSection } from "./app/transactions-section";
 import { setupContributionWorkflowSection } from "./app/contribution-workflow-modal";
 import { setupInvestmentSnapshotHelpers } from "./app/investment-snapshot-helpers";
 import { setupInvestmentRenderers } from "./app/investment-renderers";
@@ -17,14 +14,10 @@ import { setupInvestmentEventBindings } from "./app/investment-event-bindings";
 import { setupAppCalculationHelpers } from "./app/calculation-helpers";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
-import {
-  getEventElement,
-  hasSelectionWithin,
-} from "./app/dom-helpers";
+import { getEventElement } from "./app/dom-helpers";
 import { getAppElements } from "./app/elements";
 import { type UiState } from "./app/ui-state";
 import { clone, escapeAttr, escapeHtml, parseFloatSafe } from "./utils";
-import { decorateCategoryLabel } from "./category-emoji";
 import {
   BASE_SEED,
   loadPersistedState,
@@ -96,21 +89,6 @@ import { useUiStore } from "../stores/ui";
     formatMoneyCompact,
   } = appStateFormatHelpers;
 
-  const transactionSection = setupTransactionSection({
-    getState: () => state,
-    ui,
-    el,
-    getEventElement,
-    hasSelectionWithin,
-    populateTransactionFormOptions,
-    populateTransactionCategoryOptions,
-    sortTransactions,
-    saveState,
-    renderAll,
-    showToast,
-    getAccountName,
-    formatMoney,
-  });
 
   const contributionWorkflowSection = setupContributionWorkflowSection({
     getState: () => state,
@@ -345,7 +323,6 @@ import { useUiStore } from "../stores/ui";
 
   function bindEvents() {
     bindNavigationEvents();
-    bindTransactionEvents();
     bindWealthEvents();
     bindInvestmentEvents();
     bindChartTooltipEvents();
@@ -353,10 +330,6 @@ import { useUiStore } from "../stores/ui";
 
   function bindNavigationEvents() {
     dashboardBudgetGoalsSection.bindNavigationEvents();
-  }
-
-  function bindTransactionEvents() {
-    transactionSection.bindTransactionEvents();
   }
 
   function bindWealthEvents() {
@@ -412,40 +385,13 @@ import { useUiStore } from "../stores/ui";
 
   function renderAll() {
     dashboardBudgetGoalsSection.populateMonthSelects();
-    populateTransactionFormOptions();
+    populateInvestmentMovementFormOptions();
     dashboardBudgetGoalsSection.publishDashboard();
-    renderTransactions();
     renderWealth();
     renderInvestment();
   }
 
-  function populateTransactionFormOptions() {
-    const accountSelect = el.txForm.elements.accountId;
-    accountSelect.innerHTML = state.accounts
-      .map(
-        (item) =>
-          `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
-      )
-      .join("");
-
-    if (!state.accounts.length) {
-      accountSelect.innerHTML = '<option value="">Sin cuentas</option>';
-    }
-
-    const currentBulkAccount = String(el.txBulkAccount.value || "");
-    el.txBulkAccount.innerHTML = ['<option value="">Sin cambio</option>']
-      .concat(
-        state.accounts.map(
-          (item) =>
-            `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
-        ),
-      )
-      .join("");
-    if (currentBulkAccount) {
-      el.txBulkAccount.value = currentBulkAccount;
-    }
-
-    populateTransactionCategoryOptions();
+  function populateInvestmentMovementFormOptions() {
     populateInvestmentMovementCategoryOptions();
     populateInvestmentMovementBrokerOptions();
   }
@@ -558,38 +504,6 @@ import { useUiStore } from "../stores/ui";
         categorySelect.value = firstOption.value;
       }
     }
-  }
-
-  function populateTransactionCategoryOptions() {
-    const rawType = String(el.txForm.elements.type.value || "expense");
-    const type: BudgetType = isBudgetType(rawType) ? rawType : "expense";
-    const categories = getOrderedCategoriesForType(type);
-    const categorySelect = el.txForm.elements.category;
-    const currentValue = String(categorySelect.value || "").trim();
-
-    categorySelect.innerHTML = categories
-      .map(
-        (name) =>
-          `<option value="${escapeAttr(name)}">${escapeHtml(decorateCategoryLabel(type, name))}</option>`,
-      )
-      .join("");
-
-    if (!categories.length) {
-      categorySelect.innerHTML =
-        '<option value="Sin categoría">Sin categoría</option>';
-      return;
-    }
-
-    if (currentValue && categories.includes(currentValue)) {
-      categorySelect.value = currentValue;
-      return;
-    }
-
-    categorySelect.value = categories[0];
-  }
-
-  function renderTransactions() {
-    transactionSection.renderTransactions();
   }
 
   function isInvestmentSubTab(value: string): value is InvestmentSubTab {

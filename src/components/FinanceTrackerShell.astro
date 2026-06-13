@@ -3,7 +3,6 @@ import "../styles/global.css";
 import AppSidebar from "./layout/AppSidebar.astro";
 import FinanceWorkspace from "./FinanceWorkspace.vue";
 import InvestmentSection from "./sections/InvestmentSection.astro";
-import TransactionsSection from "./sections/TransactionsSection.astro";
 import WealthSection from "./sections/WealthSection.astro";
 import { getSectionFromPath } from "../scripts/app/dashboard-section-routing";
 
@@ -62,7 +61,6 @@ const activeSection = getSectionFromPath(Astro.url.pathname);
 
       <main id="app-main" class="content">
         <FinanceWorkspace activeSection={activeSection} client:only="vue" />
-        <TransactionsSection isActive={activeSection === "transactions"} />
         <WealthSection isActive={activeSection === "wealth"} />
         <InvestmentSection isActive={activeSection === "investment"} />
       </main>

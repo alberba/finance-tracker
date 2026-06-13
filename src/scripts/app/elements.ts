@@ -1,7 +1,6 @@
 import {
   getRequiredElement,
   type InvestmentMovementForm,
-  type TxForm,
 } from "./dom-helpers";
 
 export function getAppElements() {
@@ -10,48 +9,6 @@ export function getAppElements() {
     panels: Array.from(document.querySelectorAll<HTMLElement>(".panel")),
     toast: getRequiredElement<HTMLElement>("toast"),
     saveStatus: getRequiredElement<HTMLElement>("save-status"),
-
-    txMonthFilter: getRequiredElement<HTMLSelectElement>("tx-month-filter"),
-    txForm: getRequiredElement<TxForm>("tx-form"),
-    txBody: getRequiredElement<HTMLElement>("tx-table-body"),
-    txHeaderFilterDate: getRequiredElement<HTMLInputElement>(
-      "tx-header-filter-date",
-    ),
-    txHeaderFilterAccount: getRequiredElement<HTMLElement>(
-      "tx-header-filter-account",
-    ),
-    txHeaderFilterType: getRequiredElement<HTMLElement>(
-      "tx-header-filter-type",
-    ),
-    txHeaderFilterCategory: getRequiredElement<HTMLInputElement>(
-      "tx-header-filter-category",
-    ),
-    txHeaderFilterDescription: getRequiredElement<HTMLInputElement>(
-      "tx-header-filter-description",
-    ),
-    txHeaderFilterAmountMin: getRequiredElement<HTMLInputElement>(
-      "tx-header-filter-amount-min",
-    ),
-    txHeaderFilterAmountMax: getRequiredElement<HTMLInputElement>(
-      "tx-header-filter-amount-max",
-    ),
-    txOpenModal: getRequiredElement<HTMLButtonElement>("tx-open-modal"),
-    txDialog: getRequiredElement<HTMLDialogElement>("tx-dialog"),
-    txCloseModal: getRequiredElement<HTMLButtonElement>("tx-close-modal"),
-    txSubmitMore: getRequiredElement<HTMLButtonElement>("tx-submit-more"),
-    txSelectAll: getRequiredElement<HTMLInputElement>("tx-select-all"),
-    txSelectedCount: getRequiredElement<HTMLElement>("tx-selected-count"),
-    txBulkType: getRequiredElement<HTMLSelectElement>("tx-bulk-type"),
-    txBulkAccount: getRequiredElement<HTMLSelectElement>("tx-bulk-account"),
-    txBulkCategory: getRequiredElement<HTMLInputElement>("tx-bulk-category"),
-    txBulkApply: getRequiredElement<HTMLButtonElement>("tx-bulk-apply"),
-    txBulkDelete: getRequiredElement<HTMLButtonElement>("tx-bulk-delete"),
-    txTotalIncome: getRequiredElement<HTMLElement>("tx-total-income"),
-    txTotalExpense: getRequiredElement<HTMLElement>("tx-total-expense"),
-    txTotalInvestment: getRequiredElement<HTMLElement>("tx-total-investment"),
-    txCategoryBreakdownBody: getRequiredElement<HTMLElement>(
-      "tx-category-breakdown-body",
-    ),
 
     snapshotMonth: getRequiredElement<HTMLSelectElement>("snapshot-month"),
     saveSnapshot: getRequiredElement<HTMLButtonElement>("save-snapshot"),

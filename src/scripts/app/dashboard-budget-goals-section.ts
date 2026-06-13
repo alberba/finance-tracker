@@ -26,10 +26,6 @@ interface DashboardBudgetGoalsUi {
 interface DashboardBudgetGoalsElements {
   navTabs: HTMLElement
   panels: HTMLElement[]
-  txMonthFilter: HTMLSelectElement
-  txForm: HTMLFormElement & {
-    elements: HTMLFormControlsCollection & { date: HTMLInputElement; month: HTMLSelectElement }
-  }
   snapshotMonth: HTMLSelectElement
   investmentMonth: HTMLSelectElement
   investmentMovementDate: HTMLInputElement
@@ -121,8 +117,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
   function populateMonthSelects() {
     const state = deps.getState()
     const monthSelects = [
-      el.txMonthFilter,
-      el.txForm.elements.month,
       el.snapshotMonth,
       el.investmentMonth,
       el.contributionWorkflowMonth,
@@ -144,9 +138,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     if (!MONTHS[ui.investmentMonth]) ui.investmentMonth = ui.month
     if (!MONTHS[ui.contributionWorkflowMonth]) ui.contributionWorkflowMonth = ui.investmentMonth
 
-    el.txMonthFilter.value = String(ui.txFilterMonth)
-    el.txForm.elements.month.value = String(ui.txFilterMonth)
-    if (!el.txForm.elements.date.value) el.txForm.elements.date.value = todayISO()
     if (!el.investmentMovementDate.value) el.investmentMovementDate.value = todayISO()
     if (!el.investmentMovementTime.value) {
       const now = new Date()
