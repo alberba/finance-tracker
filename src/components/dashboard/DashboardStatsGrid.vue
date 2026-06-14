@@ -19,10 +19,7 @@ function stat(kind: 'income' | 'expense' | 'investment'): DashboardStat {
 </script>
 
 <template>
-  <section
-    class="dash-stats grid grid-cols-3 gap-4 max-[860px]:grid-cols-1"
-    aria-label="Resumen del mes"
-  >
+  <section class="grid grid-cols-1 gap-4 md:grid-cols-3" aria-label="Resumen del mes">
     <DashboardStatCard
       variant="income"
       label="Ingresos"
