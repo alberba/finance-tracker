@@ -93,6 +93,7 @@ export interface DashboardRecentTransaction {
   date: string
   description: string
   category: string
+  emoji: string
   typeLabel: string
   amount: string
   sign: string
@@ -572,12 +573,13 @@ function buildRecentTransactions(
       (a, b) =>
         String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)),
     )
-    .slice(0, 5)
+    .slice(0, 8)
     .map((transaction) => ({
       id: transaction.id,
       date: formatTxDate(transaction.date),
       description: transaction.description || '—',
       category: transaction.category || 'Sin categoría',
+      emoji: getCategoryEmoji(transaction.type, transaction.category),
       typeLabel: TYPE_LABEL[transaction.type] || transaction.type,
       amount: formatMoney(Math.abs(transaction.amount)),
       sign: transaction.type === 'income' ? '+' : '−',

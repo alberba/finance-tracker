@@ -103,6 +103,14 @@ const {
       </DashboardPanel>
     </section>
 
-    <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />
+    <DashboardPanel
+      title="Últimos movimientos"
+      action-label="Ver todos los movimientos"
+      action-target="transactions"
+      class="mt-4"
+      @navigate="navigate"
+    >
+      <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />
+    </DashboardPanel>
   </AppSection>
 </template>
