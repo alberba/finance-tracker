@@ -1479,39 +1479,6 @@ dialog {
   max-height: 360px;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-thead {
-  background: var(--bg-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-th,
-td {
-  border-bottom: 1px solid var(--line);
-  padding: 10px 12px;
-  text-align: left;
-  vertical-align: middle;
-}
-tbody tr {
-  transition: background 0.12s;
-}
-tbody tr:hover {
-  background: color-mix(in srgb, var(--primary) 5%, transparent);
-}
-th {
-  white-space: nowrap;
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  font-weight: 700;
-}
-
 .tx-col-select {
   width: 44px;
   text-align: center;
@@ -1690,18 +1657,6 @@ td select {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-.badge-income {
-  background: var(--income-bg);
-  color: var(--income);
-}
-.badge-expense {
-  background: var(--expense-bg);
-  color: var(--expense);
-}
-.badge-investment {
-  background: var(--invest-bg);
-  color: var(--invest);
 }
 
 /* ══ DUAL / GOAL GRIDS ═══════════════════════════════════════════ */

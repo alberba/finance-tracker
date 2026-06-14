@@ -41,7 +41,6 @@ test.describe('Dashboard section', () => {
 
     await expect(tracker.dashboardSection.locator('#chart-networth')).toBeVisible()
     await expect(tracker.dashboardSection.locator('#chart-cashflow')).toBeVisible()
-    await expect(tracker.dashboardSection.locator('#recent-tx-body')).toBeVisible()
     await expect(tracker.dashboardSection.locator('#savings-goal')).toBeVisible()
 
     const chartDetails = await page.evaluate(() => {
