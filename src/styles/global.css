@@ -19,6 +19,18 @@
   --color-text-faint: var(--text-faint);
 }
 
+@layer utilities {
+  .progress-ring {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 9999px;
+    background: conic-gradient(
+      var(--income, #2f9e44) calc(var(--p, 0) * 1%),
+      var(--track-bg, rgba(255, 255, 255, 0.12)) 0
+    );
+  }
+}
+
 @keyframes panelIn {
   from {
     opacity: 0;
