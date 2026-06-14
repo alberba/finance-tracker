@@ -45,7 +45,7 @@ function updateBudgetValue(payload: {
 <template>
   <section
     id="budget"
-    class="panel"
+    class="panel [overflow-x:hidden]"
     :class="{ 'is-active': props.isActive }"
     aria-labelledby="budget-title"
   >
@@ -73,7 +73,7 @@ function updateBudgetValue(payload: {
       />
     </div>
 
-    <div class="budget-tables">
+    <div class="grid min-w-0 gap-[18px]">
       <BudgetBlock
         v-for="block in viewModel.blocks"
         :key="block.type"

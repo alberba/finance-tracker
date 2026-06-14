@@ -66,7 +66,7 @@ const drawAllocationChart = computed(() => {
       </article>
       <article class="kpi-card">
         <p id="inv-return-label">{{ dashboardViewModel.returnLabel }}</p>
-        <strong id="inv-return" :class="dashboardViewModel.returnIsGood ? 'text-good' : 'text-bad'">
+        <strong id="inv-return" :class="dashboardViewModel.returnIsGood ? 'text-(--income)' : 'text-(--expense)'">
           {{ formatPercent(dashboardViewModel.displayReturn) }}
         </strong>
       </article>

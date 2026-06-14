@@ -338,7 +338,7 @@ defineExpose({ open })
               </tr>
               <tr v-for="name in missingLiquidity" :key="name">
                 <td>{{ name }}</td>
-                <td class="text-bad">Cuenta no configurada</td>
+                <td class="text-(--expense)">Cuenta no configurada</td>
               </tr>
             </tbody>
           </table>

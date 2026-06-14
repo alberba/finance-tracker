@@ -38,10 +38,10 @@ const deltaToneClass = computed(() => {
     return ''
   }
   if (props.delta.tone === 'good') {
-    return 'text-good text-(--income)'
+    return 'text-(--income)'
   }
   if (props.delta.tone === 'bad') {
-    return 'text-bad text-(--expense)'
+    return 'text-(--expense)'
   }
   return 'is-flat text-(--text-faint)'
 })
