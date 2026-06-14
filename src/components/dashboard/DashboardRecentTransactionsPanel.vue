@@ -14,10 +14,10 @@ const emit = defineEmits<{
 
 function transactionAmountClass(tone: DashboardTransactionTone): string {
   if (tone === 'income') {
-    return 'text-good text-(--income)'
+    return 'text-(--income)'
   }
   if (tone === 'expense') {
-    return 'text-bad text-(--expense)'
+    return 'text-(--expense)'
   }
   return 'rt-amount--invest text-(--invest)'
 }

@@ -6,7 +6,7 @@ defineProps<{
 }>()
 
 function remainingGoalClass(tone: DashboardTone): string {
-  return tone === 'good' ? 'text-good' : 'text-bad'
+  return tone === 'good' ? 'text-(--income)' : 'text-(--expense)'
 }
 </script>
 

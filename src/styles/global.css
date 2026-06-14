@@ -1,2 +1,11 @@
 @import "tailwindcss";
 @import "./legacy.css";
+
+/* Font families exposed as Tailwind-native tokens so components can use
+   `font-sans` / `font-display` / `font-mono` utilities instead of raw
+   `font-family` declarations. See legacy.css header for the design system. */
+@theme {
+  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Syne", sans-serif;
+  --font-mono: "DM Mono", monospace;
+}

@@ -22,7 +22,7 @@ function returnText(value: number | null): string {
 
 function returnClass(value: number | null): string {
   if (value === null) return ''
-  return value >= 0 ? 'text-good' : 'text-bad'
+  return value >= 0 ? 'text-(--income)' : 'text-(--expense)'
 }
 
 function onFlowInput(date: string, event: Event): void {

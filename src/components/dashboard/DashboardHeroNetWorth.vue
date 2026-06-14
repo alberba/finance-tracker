@@ -53,10 +53,10 @@ function cssColor(name: string, fallback: string): string {
 
 function netWorthChangeClass(tone: DashboardTone | undefined): string {
   if (tone === 'good') {
-    return 'bg-(--income-bg) text-good text-(--income)'
+    return 'bg-(--income-bg) text-(--income)'
   }
   if (tone === 'bad') {
-    return 'bg-(--expense-bg) text-bad text-(--expense)'
+    return 'bg-(--expense-bg) text-(--expense)'
   }
   return 'bg-(--bg-subtle) text-(--text-faint)'
 }

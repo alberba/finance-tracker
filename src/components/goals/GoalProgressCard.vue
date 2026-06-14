@@ -5,6 +5,10 @@ defineProps<{
   item: GoalProgressViewModel
   formatMoney: (value: number) => string
 }>()
+
+function toneClass(tone: 'good' | 'bad'): string {
+  return tone === 'good' ? 'text-(--income)' : 'text-(--expense)'
+}
 </script>
 
 <template>
@@ -28,7 +32,7 @@ defineProps<{
     </div>
     <div class="list-item">
       <span>Faltan</span>
-      <strong :class="`text-${item.remainingTone}`">{{ formatMoney(item.remaining) }}</strong>
+      <strong :class="toneClass(item.remainingTone)">{{ formatMoney(item.remaining) }}</strong>
     </div>
     <div class="list-item">
       <span>Necesitas/mes</span>

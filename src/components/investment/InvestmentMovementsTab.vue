@@ -215,7 +215,7 @@ function fmt(value: number | undefined, digits: number): string {
                     aria-label="Cambiar declarado"
                     @click="investmentStore.toggleDeclared(row.tx.id)"
                   >
-                    <span :class="row.declared ? 'text-good' : 'text-bad'">{{ row.declaredLabel }}</span>
+                    <span :class="row.declared ? 'text-(--income)' : 'text-(--expense)'">{{ row.declaredLabel }}</span>
                   </button>
                 </td>
                 <td>
