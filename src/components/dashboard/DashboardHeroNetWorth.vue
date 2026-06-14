@@ -83,16 +83,16 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
       <p class="flex flex-wrap items-center gap-2.5">
         <span
           id="kpi-net-worth-change"
-          class="kpi-networth-change rounded-full px-2.25 py-0.75 font-['DM_Mono',monospace] text-[0.875rem] font-medium tabular-nums"
+          class="rounded-full px-2.25 py-0.75 font-mono text-sm"
           :class="netWorthChangeClass(kpis?.netWorthChange.tone)"
         >
           {{ kpis?.netWorthChange.label ?? '--' }}
         </span>
-        <span class="text-[0.88rem] text-text-muted">vs. año anterior</span>
+        <span class="text-sm text-text-muted">vs. año anterior</span>
       </p>
       <p class="text-[0.9rem] text-text-muted">
         Ahorro anual:
-        <strong id="kpi-annual-savings" class="font-bold text-primary tabular-nums">
+        <strong id="kpi-annual-savings" class="font-bold text-primary">
           {{ kpis?.annualSavings ?? '0,00 €' }}
         </strong>
       </p>
@@ -108,8 +108,8 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
           v-for="range in ranges"
           :key="range.value"
           type="button"
-          class="rounded-full! text-xs! p-2! px-3! min-h-auto! font-bold text-text-muted hover:text-text-main [&.is-active]:bg-(--bg-panel) [&.is-active]:text-primary [&.is-active]:[box-shadow:var(--shadow-soft)]"
-          :class="{ 'is-active': range.active }"
+          class="rounded-full text-xs p-2 px-3 min-h-auto font-bold text-text-muted hover:text-text-main aria-pressed:bg-(--bg-panel) aria-pressed:text-primary aria-pressed:shadow-(--shadow-soft)"
+          :aria-pressed="range.active"
           :data-range="range.value"
           @click="emit('change-range', range.value)"
         >
@@ -117,13 +117,6 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
         </button>
       </div>
       <div class="relative h-64 w-full">
-        <span
-          id="networth-endpoint"
-          class="absolute top-1 right-1 z-2 rounded-full border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-(--primary-light) px-2.25 py-1 font-['DM_Mono',monospace] text-[0.74rem] font-medium text-primary tabular-nums"
-          aria-hidden="true"
-        >
-          {{ chart.endpoint }}
-        </span>
         <canvas
           id="chart-networth"
           ref="canvas"

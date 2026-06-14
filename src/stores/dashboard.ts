@@ -42,6 +42,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   const currentCurrency = computed(() => viewModel.value.currency || 'EUR')
   const currentYear = computed(() => viewModel.value.year ?? new Date().getFullYear())
+  const yearOptions = computed(() => viewModel.value.yearOptions ?? [currentYear.value])
   const currentMonth = computed(() => viewModel.value.month)
   const monthOptions = computed(() => viewModel.value.months ?? fallbackMonths)
   const rangeOptions = computed(() => viewModel.value.ranges ?? fallbackRanges)
@@ -82,6 +83,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     viewModel,
     currentCurrency,
     currentYear,
+    yearOptions,
     currentMonth,
     monthOptions,
     rangeOptions,

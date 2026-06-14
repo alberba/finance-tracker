@@ -12,6 +12,7 @@ test.describe('Dashboard section', () => {
       tracker.dashboardSection.getByRole('heading', { name: 'Resumen financiero' }),
     ).toBeVisible()
     await expect(tracker.dashboardSection.locator('#year-display')).toBeVisible()
+    await expect(tracker.dashboardSection.locator('#year-display')).toBeDisabled()
     await expect(tracker.dashboardSection.locator('#dashboard-month')).toBeVisible()
 
     await expect(tracker.dashboardSection.locator('#kpi-income')).toContainText('€')
@@ -71,17 +72,26 @@ test.describe('Dashboard section', () => {
     page,
     tracker,
   }) => {
-    await tracker.openDashboard()
+    await tracker.addCustomTransaction({
+      date: '2027-01-02',
+      monthLabel: 'ENERO',
+      type: 'income',
+      categoryLabel: 'Nómina',
+      amount: 1,
+      description: 'Ingreso 2027',
+    })
 
-    await tracker.dashboardSection.locator('#year-display').fill('2027')
-    await tracker.dashboardSection.locator('#year-display').press('Tab')
+    await tracker.openDashboard()
+    await expect(tracker.dashboardSection.locator('#year-display')).toBeEnabled()
+    await tracker.dashboardSection.locator('#year-display').selectOption('2027')
 
     await tracker.dashboardSection.locator('#dashboard-month').selectOption('0')
     await expect(tracker.dashboardSection.locator('#dashboard-month')).toHaveValue('0')
 
     await tracker.dashboardSection.getByRole('button', { name: '7D' }).click()
-    await expect(tracker.dashboardSection.getByRole('button', { name: '7D' })).toHaveClass(
-      /is-active/,
+    await expect(tracker.dashboardSection.getByRole('button', { name: '7D' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     )
 
     await tracker.openSettings()

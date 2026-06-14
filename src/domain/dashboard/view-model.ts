@@ -119,6 +119,7 @@ export type DashboardSavingsGoal =
 
 export interface DashboardViewModel {
   year: number
+  yearOptions: number[]
   currency: string
   month: number
   months: DashboardMonthOption[]
@@ -265,6 +266,7 @@ export function buildDashboardViewModel({
 
   return {
     year: state.year,
+    yearOptions: buildDashboardYearOptions(state),
     currency: state.currency,
     month: safeMonth,
     months: MONTHS.map((label, value) => ({ label, value })),
@@ -325,6 +327,22 @@ export function buildDashboardViewModel({
       computeInvestmentValue,
       formatMoney,
     }),
+  }
+}
+
+function buildDashboardYearOptions(state: State): number[] {
+  const years = new Set<number>([state.year])
+
+  state.transactions.forEach((item) => addYear(years, item.date))
+  state.contributions.forEach((item) => addYear(years, item.portfolioDate || item.date))
+
+  return Array.from(years).sort((a, b) => b - a)
+}
+
+function addYear(years: Set<number>, value: string): void {
+  const year = String(value).slice(0, 4)
+  if (/^\d{4}$/.test(year)) {
+    years.add(Number(year))
   }
 }
 

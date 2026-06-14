@@ -7,6 +7,7 @@ export function useDashboardViewModel() {
   const {
     currentCurrency,
     currentYear,
+    yearOptions,
     currentMonth,
     monthOptions,
     rangeOptions,
@@ -23,6 +24,7 @@ export function useDashboardViewModel() {
   return {
     currentCurrency,
     currentYear,
+    yearOptions,
     currentMonth,
     monthOptions,
     rangeOptions,
