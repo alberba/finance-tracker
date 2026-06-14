@@ -69,6 +69,11 @@ export default defineConfig([
       customSyntax: tailwind4,
     },
     extends: ['css/recommended'],
+    rules: {
+      // Design tokens (var(--primary), --line, …) live in legacy.css :root and
+      // are consumed across files; the rule can't resolve them cross-file.
+      'css/no-invalid-properties': ['error', { allowUnknownVariables: true }],
+    },
   },
   {
     files: ['tests/e2e/screenshot-stable.css'],

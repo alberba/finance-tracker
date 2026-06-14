@@ -6,6 +6,14 @@
       "description": "Tailwind CSS v4 theme token block."
     },
     {
+      "name": "@apply",
+      "description": "Inline Tailwind utility classes into a custom CSS rule."
+    },
+    {
+      "name": "@layer",
+      "description": "Tailwind CSS cascade layer (base, components, utilities)."
+    },
+    {
       "name": "@source",
       "description": "Tailwind CSS v4 source detection directive."
     },

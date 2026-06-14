@@ -21,7 +21,9 @@ function onApply(): void {
 <template>
   <article class="card tx-bulk-card">
     <h3>Selección múltiple</h3>
-    <div class="tx-bulk-grid">
+    <div
+      class="tx-bulk-grid [&_label]:grid [&_label]:gap-1.5 [&_label]:text-[0.78rem] [&_label]:font-semibold [&_label]:text-text-muted [&_:is(select,input)]:min-h-[42px] [&_:is(select,input)]:w-full [&_:is(select,input)]:rounded-(--radius-md) [&_:is(select,input)]:border [&_:is(select,input)]:border-(--line) [&_:is(select,input)]:bg-(--bg-card) [&_:is(select,input)]:px-3 [&_:is(select,input)]:py-[9px] [&_:is(select,input)]:text-text-main [&_:is(select,input)]:transition [&_:is(select,input):focus-visible]:border-primary [&_:is(select,input):focus-visible]:shadow-[0_0_0_3px_var(--ring)] [&_:is(select,input):focus-visible]:outline-none [&_select]:cursor-pointer [&_input]:placeholder:text-text-faint"
+    >
       <p id="tx-selected-count" class="tx-selected-count">
         {{ selectedVisibleCount }} seleccionadas
       </p>

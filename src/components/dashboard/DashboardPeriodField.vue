@@ -43,7 +43,7 @@ function onChange(event: Event): void {
     >
       <select
         :id="id"
-        class="appearance-none rounded-md border-0 bg-transparent py-2"
+        class="appearance-none rounded-md border-0 bg-transparent py-2 focus:outline-none"
         :name="name"
         :value="modelValue"
         :disabled="disabled"
