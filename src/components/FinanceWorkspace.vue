@@ -7,9 +7,11 @@ import BudgetSection from './sections/BudgetSection.vue'
 import DashboardSection from './sections/DashboardSection.vue'
 import DataSection from './sections/DataSection.vue'
 import GoalsSection from './sections/GoalsSection.vue'
+import InvestmentSection from './sections/InvestmentSection.vue'
 import ReportsSection from './reports/ReportsSection.vue'
 import SettingsSection from './sections/SettingsSection.vue'
 import TransactionsSection from './sections/TransactionsSection.vue'
+import WealthSection from './sections/WealthSection.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -33,5 +35,7 @@ const currentSection = computed(() => uiStore.ui.activeSection)
     <ReportsSection :is-active="currentSection === 'reports'" />
     <SettingsSection :is-active="currentSection === 'settings'" />
     <TransactionsSection :is-active="currentSection === 'transactions'" />
+    <WealthSection :is-active="currentSection === 'wealth'" />
+    <InvestmentSection :is-active="currentSection === 'investment'" />
   </div>
 </template>

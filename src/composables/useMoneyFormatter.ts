@@ -23,6 +23,20 @@ export function useMoneyFormatter() {
     }
   })
 
+  const compactFormatter = computed(() => {
+    const currency = (financialStateStore.currency || 'EUR').toUpperCase()
+    try {
+      return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency,
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      })
+    } catch {
+      return null
+    }
+  })
+
   function formatMoney(value: unknown): string {
     const numeric = Number(value || 0)
     const instance = formatter.value
@@ -32,5 +46,13 @@ export function useMoneyFormatter() {
     return instance.format(numeric)
   }
 
-  return { formatMoney }
+  function formatMoneyCompact(value: unknown): string {
+    const instance = compactFormatter.value
+    if (!instance) {
+      return formatMoney(value)
+    }
+    return instance.format(Number(value || 0))
+  }
+
+  return { formatMoney, formatMoneyCompact }
 }
