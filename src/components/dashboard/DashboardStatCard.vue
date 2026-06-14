@@ -43,7 +43,7 @@ const deltaToneClass = computed(() => {
   if (props.delta.tone === 'bad') {
     return 'text-(--expense)'
   }
-  return 'is-flat text-text-faint'
+  return 'text-text-faint'
 })
 
 watch(() => [props.sparkValues, props.variant] as const, renderChart, {
@@ -72,10 +72,7 @@ function cssColor(style: { accent: string; fallback: string }): string {
 
 <template>
   <article
-    :class="[
-      'relative flex min-w-0 items-center gap-3.5 rounded-xl bg-(--bg-panel) p-4 shadow-(--shadow-soft) xl:py-2',
-      `dash-stat--${variant}`,
-    ]"
+    class="flex min-w-0 items-center gap-3.5 rounded-xl bg-(--bg-panel) p-4 shadow-(--shadow-soft) xl:py-2"
     :style="styleVars"
     :aria-label="label"
   >
@@ -86,27 +83,22 @@ function cssColor(style: { accent: string; fallback: string }): string {
       >
         <slot name="icon" />
       </span>
-      <div class="min-w-0 gap-1">
-        <p class="text-sm font-semibold text-ellipsis text-text-muted">
+      <div class="min-w-0">
+        <p class="text-text-muted text-sm font-semibold">
           {{ label }}
         </p>
-        <strong :id="valueId" class="text-2xl font-bold text-text-main">
+        <strong :id="valueId" class="text-text-main text-2xl font-bold">
           {{ value }}
         </strong>
         <p
           :id="deltaId"
-          class="flex flex-nowrap items-center gap-0.5 text-[0.76rem] whitespace-nowrap text-text-faint xl:gap-1.5"
+          class="text-text-faint flex flex-nowrap items-center gap-0.5 text-[0.76rem] whitespace-nowrap xl:gap-1.5"
         >
-          <span class="dash-stat-delta-pre">Este mes</span>
-          <span
-            v-if="delta"
-            data-delta-tag
-            class="dash-stat-delta-tag font-bold"
-            :class="deltaToneClass"
-          >
+          <span>Este mes</span>
+          <span v-if="delta" class="font-bold" :class="deltaToneClass">
             {{ delta.tag }}
           </span>
-          <span v-if="delta" data-delta-post class="dash-stat-delta-post">
+          <span v-if="delta">
             {{ delta.post }}
           </span>
         </p>
@@ -115,7 +107,7 @@ function cssColor(style: { accent: string; fallback: string }): string {
     <div
       class="relative -left-2 h-24 w-full max-w-96 min-w-12 mask-[linear-gradient(to_right,transparent,black)] py-2 max-xl:hidden"
     >
-      <canvas :id="sparkId" ref="canvas" class="dash-spark h-full! w-full!"></canvas>
+      <canvas :id="sparkId" ref="canvas" class="h-full! w-full!"></canvas>
     </div>
   </article>
 </template>
