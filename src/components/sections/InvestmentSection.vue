@@ -6,6 +6,7 @@ import ContributionWorkflowDialog from '../investment/ContributionWorkflowDialog
 import InvestmentContributionsTab from '../investment/InvestmentContributionsTab.vue'
 import InvestmentDashboardTab from '../investment/InvestmentDashboardTab.vue'
 import InvestmentMovementsTab from '../investment/InvestmentMovementsTab.vue'
+import AppSection from '../ui/AppSection.vue'
 import type { ReturnMode } from '../../domain/investment/view-model'
 import { MONTHS, type InvestmentSubTab } from '../../scripts/types'
 import { parseIntSafe } from '../../scripts/utils'
@@ -47,12 +48,7 @@ function onConfirmDelete(date: string): void {
 </script>
 
 <template>
-  <section
-    id="investment"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="investment-title"
-  >
+  <AppSection id="investment" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Cartera y aportes</p>
@@ -146,5 +142,5 @@ function onConfirmDelete(date: string): void {
 
     <ContributionWorkflowDialog ref="workflowDialogRef" />
     <ContributionDeleteDialog ref="deleteDialogRef" @confirm="onConfirmDelete" />
-  </section>
+  </AppSection>
 </template>

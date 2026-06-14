@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSection from '../ui/AppSection.vue'
 import IssueReportFormCard from './IssueReportFormCard.vue'
 import ReportsGuideCard from './ReportsGuideCard.vue'
 
@@ -11,12 +12,7 @@ withDefaults(
 </script>
 
 <template>
-  <section
-    id="reports"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="reports-title"
-  >
+  <AppSection id="reports" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Soporte</p>
@@ -32,5 +28,5 @@ withDefaults(
       <IssueReportFormCard />
       <ReportsGuideCard />
     </div>
-  </section>
+  </AppSection>
 </template>

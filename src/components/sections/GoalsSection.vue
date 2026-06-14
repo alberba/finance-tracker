@@ -4,6 +4,7 @@ import { computed } from 'vue'
 
 import GoalEditorCard from '../goals/GoalEditorCard.vue'
 import GoalProgressCard from '../goals/GoalProgressCard.vue'
+import AppSection from '../ui/AppSection.vue'
 import type { GoalField, GoalKey } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useGoalsStore } from '../../stores/goals'
@@ -38,12 +39,7 @@ function updateGoalField(payload: { key: GoalKey; field: GoalField; value: strin
 </script>
 
 <template>
-  <section
-    id="goals"
-    class="panel"
-    :class="{ 'is-active': props.isActive }"
-    aria-labelledby="goals-title"
-  >
+  <AppSection id="goals" :is-active="props.isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Metas financieras</p>
@@ -69,5 +65,5 @@ function updateGoalField(payload: { key: GoalKey; field: GoalField; value: strin
         :format-money="formatMoney"
       />
     </div>
-  </section>
+  </AppSection>
 </template>

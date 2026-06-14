@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 
+import AppSection from '../ui/AppSection.vue'
 import { useDataStore } from '../../stores/data'
 
 withDefaults(
@@ -36,12 +37,7 @@ function onResetSeed(): void {
 </script>
 
 <template>
-  <section
-    id="data"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="data-title"
-  >
+  <AppSection id="data" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Copias y exportación</p>
@@ -97,5 +93,5 @@ function onResetSeed(): void {
       <h3>Estado</h3>
       <p id="data-meta">{{ summary.meta }}</p>
     </article>
-  </section>
+  </AppSection>
 </template>

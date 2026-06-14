@@ -16,7 +16,7 @@ function progressLabel(progress: number): string {
 </script>
 
 <template>
-  <p v-if="!hasItems" class="dash-empty py-2 text-sm text-(--text-faint)">
+  <p v-if="!hasItems" class="dash-empty py-2 text-sm text-text-faint">
     Sin inversión registrada en este mes.
   </p>
   <template v-else>
@@ -26,11 +26,11 @@ function progressLabel(progress: number): string {
           {{ item.icon }}
           <div class="flex w-full justify-between">
             <span
-              class="overflow-hidden text-[0.9rem] leading-[1.2] font-semibold text-ellipsis whitespace-nowrap text-(--text-main)"
+              class="overflow-hidden text-[0.9rem] leading-[1.2] font-semibold text-ellipsis whitespace-nowrap text-text-main"
             >
               {{ item.category }}
             </span>
-            <small class="font-['DM_Mono',monospace] text-(--text-muted)">
+            <small class="font-['DM_Mono',monospace] text-text-muted">
               {{ item.actual }}/{{ item.plannedLabel }}({{ progressLabel(item.progress) }}%)
             </small>
           </div>

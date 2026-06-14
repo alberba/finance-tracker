@@ -657,29 +657,6 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
 }
 
 /* ══ PANELS ══════════════════════════════════════════════════════ */
-.panel {
-  display: none;
-  opacity: 0;
-  transform: translateY(6px);
-}
-.panel.is-active {
-  display: grid;
-  gap: 18px;
-  align-content: start;
-  opacity: 1;
-  transform: translateY(0);
-  animation: panelIn 0.26s ease;
-}
-@keyframes panelIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* ── Panel head · editorial masthead (todas las secciones) ── */
 .panel-head {

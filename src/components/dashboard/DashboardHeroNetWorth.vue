@@ -58,7 +58,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
   if (tone === 'bad') {
     return 'bg-(--expense-bg) text-(--expense)'
   }
-  return 'bg-(--bg-subtle) text-(--text-faint)'
+  return 'bg-(--bg-subtle) text-text-faint'
 }
 </script>
 
@@ -69,14 +69,14 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
   >
     <div class="flex flex-col gap-2.5 shrink-0">
       <p
-        class="inline-flex items-center gap-1.5 text-lg font-semibold text-(--text-muted)"
+        class="inline-flex items-center gap-1.5 text-lg font-semibold text-text-muted"
       >
         Patrimonio neto
         <InfoIcon />
       </p>
       <strong
         id="kpi-net-worth"
-        class="text-6xl font-bold text-(--text-main)"
+        class="text-6xl font-bold text-text-main"
       >
         {{ kpis?.netWorth ?? '0,00 €' }}
       </strong>
@@ -88,11 +88,11 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
         >
           {{ kpis?.netWorthChange.label ?? '--' }}
         </span>
-        <span class="text-[0.88rem] text-(--text-muted)">vs. año anterior</span>
+        <span class="text-[0.88rem] text-text-muted">vs. año anterior</span>
       </p>
-      <p class="text-[0.9rem] text-(--text-muted)">
+      <p class="text-[0.9rem] text-text-muted">
         Ahorro anual:
-        <strong id="kpi-annual-savings" class="font-bold text-(--primary) tabular-nums">
+        <strong id="kpi-annual-savings" class="font-bold text-primary tabular-nums">
           {{ kpis?.annualSavings ?? '0,00 €' }}
         </strong>
       </p>
@@ -108,7 +108,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
           v-for="range in ranges"
           :key="range.value"
           type="button"
-          class="rounded-full! text-xs! p-2! px-3! min-h-auto! font-bold text-(--text-muted) hover:text-(--text-main) [&.is-active]:bg-(--bg-panel) [&.is-active]:text-(--primary) [&.is-active]:[box-shadow:var(--shadow-soft)]"
+          class="rounded-full! text-xs! p-2! px-3! min-h-auto! font-bold text-text-muted hover:text-text-main [&.is-active]:bg-(--bg-panel) [&.is-active]:text-primary [&.is-active]:[box-shadow:var(--shadow-soft)]"
           :class="{ 'is-active': range.active }"
           :data-range="range.value"
           @click="emit('change-range', range.value)"
@@ -119,7 +119,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
       <div class="relative h-64 w-full">
         <span
           id="networth-endpoint"
-          class="absolute top-1 right-1 z-2 rounded-full border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-(--primary-light) px-2.25 py-1 font-['DM_Mono',monospace] text-[0.74rem] font-medium text-(--primary) tabular-nums"
+          class="absolute top-1 right-1 z-2 rounded-full border border-[color-mix(in_srgb,var(--primary)_30%,transparent)] bg-(--primary-light) px-2.25 py-1 font-['DM_Mono',monospace] text-[0.74rem] font-medium text-primary tabular-nums"
           aria-hidden="true"
         >
           {{ chart.endpoint }}

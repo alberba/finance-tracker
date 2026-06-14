@@ -8,4 +8,24 @@
   --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Syne", sans-serif;
   --font-mono: "DM Mono", monospace;
+
+  /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
+  --animate-panel-in: panelIn 0.26s ease;
+
+  /* Brand and text color tokens — delegate to CSS variables defined in legacy.css. */
+  --color-primary: var(--primary);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

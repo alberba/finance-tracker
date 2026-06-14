@@ -23,7 +23,7 @@ function toneClass(tone: 'good' | 'bad'): string {
 }
 
 const headCellClass =
-  'sticky top-0 z-[1] border-b border-(--line) bg-(--bg-subtle) px-[13px] py-[11px] align-top text-[0.66rem] font-bold tracking-[0.1em] text-(--text-muted) uppercase'
+  'sticky top-0 z-[1] border-b border-(--line) bg-(--bg-subtle) px-[13px] py-[11px] align-top text-[0.66rem] font-bold tracking-[0.1em] text-text-muted uppercase'
 
 const rowHeadClass =
   'min-w-[180px] border-b border-(--line) bg-(--bg-subtle) px-[13px] py-[11px] text-left align-top'
@@ -37,11 +37,11 @@ const rowHeadClass =
     <header class="flex items-start justify-between gap-4">
       <div>
         <h3 class="text-[1.05rem]">{{ block.title }}</h3>
-        <p class="mt-1 max-w-[56ch] text-[0.875rem] text-(--text-muted)">{{ block.description }}</p>
+        <p class="mt-1 max-w-[56ch] text-[0.875rem] text-text-muted">{{ block.description }}</p>
       </div>
       <dl class="m-0 grid grid-cols-[repeat(3,minmax(110px,1fr))] gap-[11px]">
         <div class="rounded-(--radius-md) border border-(--line) bg-(--bg-subtle) px-[15px] py-[13px]">
-          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-(--text-muted) uppercase">
+          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-text-muted uppercase">
             Presupuestado
           </dt>
           <dd class="mt-[7px] font-mono text-[1.22rem] font-medium tracking-[-0.02em] tabular-nums">
@@ -49,7 +49,7 @@ const rowHeadClass =
           </dd>
         </div>
         <div class="rounded-(--radius-md) border border-(--line) bg-(--bg-subtle) px-[15px] py-[13px]">
-          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-(--text-muted) uppercase">
+          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-text-muted uppercase">
             Real
           </dt>
           <dd class="mt-[7px] font-mono text-[1.22rem] font-medium tracking-[-0.02em] tabular-nums">
@@ -57,7 +57,7 @@ const rowHeadClass =
           </dd>
         </div>
         <div class="rounded-(--radius-md) border border-(--line) bg-(--bg-subtle) px-[15px] py-[13px]">
-          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-(--text-muted) uppercase">
+          <dt class="text-[0.66rem] font-bold tracking-[0.1em] text-text-muted uppercase">
             Diferencia
           </dt>
           <dd
@@ -70,7 +70,7 @@ const rowHeadClass =
       </dl>
     </header>
 
-    <p v-if="!block.rows.length" class="text-(--text-muted)">No hay categorías para este bloque.</p>
+    <p v-if="!block.rows.length" class="text-text-muted">No hay categorías para este bloque.</p>
 
     <div
       v-else
@@ -112,14 +112,14 @@ const rowHeadClass =
                 />
               </label>
               <div class="mt-1 grid gap-0.5 text-[0.72rem]">
-                <span class="text-(--text-muted)">{{ formatMoney(cell.actual) }}</span>
+                <span class="text-text-muted">{{ formatMoney(cell.actual) }}</span>
                 <span :class="toneClass(cell.diffTone)">{{ formatMoney(cell.diff) }}</span>
               </div>
             </td>
             <td class="min-w-[110px] border-b border-(--line) px-[13px] py-[11px] align-top">
               <strong>{{ formatMoney(row.plannedTotal) }}</strong>
               <div class="mt-1 grid gap-0.5 text-[0.72rem]">
-                <span class="text-(--text-muted)">{{ formatMoney(row.actualTotal) }}</span>
+                <span class="text-text-muted">{{ formatMoney(row.actualTotal) }}</span>
                 <span :class="toneClass(row.diffTone)">{{ formatMoney(row.diffTotal) }}</span>
               </div>
             </td>

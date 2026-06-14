@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 
+import AppSection from '../ui/AppSection.vue'
 import TransactionBulkCard from '../transactions/TransactionBulkCard.vue'
 import TransactionFormDialog from '../transactions/TransactionFormDialog.vue'
 import TransactionSummary from '../transactions/TransactionSummary.vue'
@@ -22,7 +23,7 @@ const movementsStore = useMovementsStore()
 const uiStore = useUiStore()
 const ui = uiStore.ui
 
-const sectionRef = ref<HTMLElement | null>(null)
+const sectionRef = useTemplateRef<InstanceType<typeof AppSection>>('appSection')
 const dialogRef = ref<InstanceType<typeof TransactionFormDialog> | null>(null)
 
 function onMonthChange(event: Event): void {
@@ -41,7 +42,7 @@ function onDocumentPointerDown(event: PointerEvent): void {
   if (!column) {
     return
   }
-  const root = sectionRef.value
+  const root = sectionRef.value?.el
   const popover = root?.querySelector<HTMLElement>(`.tx-filter-popover[data-column="${column}"]`)
   const target = event.target instanceof Element ? event.target : null
   if (popover && target && popover.contains(target)) {
@@ -71,13 +72,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section
-    id="transactions"
-    ref="sectionRef"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="transactions-title"
-  >
+  <AppSection id="transactions" ref="appSection" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Registro mensual</p>
@@ -110,5 +105,5 @@ onBeforeUnmount(() => {
       <TransactionsTable />
       <TransactionSummary />
     </div>
-  </section>
+  </AppSection>
 </template>
