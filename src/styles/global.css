@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tailwindcss/preflight.css" layer(base);
 @import "./legacy.css";
 
 /* Font families exposed as Tailwind-native tokens so components can use

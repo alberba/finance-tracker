@@ -20,6 +20,7 @@ const props = withDefaults(
 const {
   currentCurrency,
   currentYear,
+  yearOptions,
   currentMonth,
   monthOptions,
   rangeOptions,
@@ -55,6 +56,7 @@ const {
       </div>
       <DashboardPeriodControls
         :year="currentYear"
+        :years="yearOptions"
         :month="currentMonth"
         :months="monthOptions"
         @change-year="changeYear"

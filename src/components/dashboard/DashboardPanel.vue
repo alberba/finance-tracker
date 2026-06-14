@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAttrs } from 'vue'
+import RightArrowIcon from '../../assets/icons/right-arrow.svg?component'
 
 defineOptions({
   inheritAttrs: false,
@@ -38,16 +39,7 @@ const attrs = useAttrs()
       @click="$emit('navigate', actionTarget)"
     >
       {{ actionLabel }}
-      <svg
-        class="h-4 w-4 transition-transform hover:translate-x-0.75"
-        viewBox="0 0 20 20"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.7"
-        aria-hidden="true"
-      >
-        <path d="M4 10h11M11 6l4 4-4 4"></path>
-      </svg>
+      <RightArrowIcon class="size-5 shrink-0" />
     </button>
   </article>
 </template>

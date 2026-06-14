@@ -1030,9 +1030,7 @@ export class FinanceTrackerPage {
 
   async reload() {
     await this.page.reload();
-    await expect(
-      this.page.locator(".panel.is-active h2").first(),
-    ).toBeVisible();
+    await expect(this.page.locator("[data-finance-workspace]")).toBeVisible();
   }
 
   private async openSection(
