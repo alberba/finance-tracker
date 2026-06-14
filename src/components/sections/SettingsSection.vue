@@ -4,6 +4,7 @@ import { ref, watch } from 'vue'
 
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
+import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
 
 withDefaults(
@@ -40,12 +41,7 @@ function onSaveGeneral(): void {
 </script>
 
 <template>
-  <section
-    id="settings"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="settings-title"
-  >
+  <AppSection id="settings" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Datos maestros</p>
@@ -170,5 +166,5 @@ function onSaveGeneral(): void {
         </div>
       </article>
     </div>
-  </section>
+  </AppSection>
 </template>

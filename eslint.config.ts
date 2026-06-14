@@ -5,6 +5,7 @@ import astro from 'eslint-plugin-astro'
 import vue from 'eslint-plugin-vue'
 import globals from 'globals'
 import { defineConfig } from 'eslint/config'
+import { tailwind4 } from 'tailwind-csstree'
 import tseslint from 'typescript-eslint'
 
 const sharedGlobals = {
@@ -64,6 +65,9 @@ export default defineConfig([
       css,
     },
     language: 'css/css',
+    languageOptions: {
+      customSyntax: tailwind4,
+    },
     extends: ['css/recommended'],
   },
   {

@@ -61,7 +61,7 @@ function cssColor(name: string, fallback: string): string {
           class="block h-2.25 w-2.25 rounded-[3px]"
           :style="{ background: cssColor(item.colorVar, item.fallbackColor) }"
         ></span>
-        <span class="overflow-hidden text-ellipsis whitespace-nowrap text-(--text-muted)">
+        <span class="overflow-hidden text-ellipsis whitespace-nowrap text-text-muted">
           {{ item.label }}
         </span>
       </div>
@@ -69,12 +69,12 @@ function cssColor(name: string, fallback: string): string {
         <strong class="font-['DM_Mono',monospace] text-xs font-medium">
           {{ item.amount }}
         </strong>
-        <span class="text-xs text-(--text-faint)">
+        <span class="text-xs text-text-faint">
           {{ item.pct }}
         </span>
       </div>
     </div>
-    <p v-if="!props.items.length" class="dash-empty py-2 text-sm text-(--text-faint)">
+    <p v-if="!props.items.length" class="dash-empty py-2 text-sm text-text-faint">
       Configura tus cuentas e inversiones en Patrimonio.
     </p>
   </div>

@@ -43,7 +43,7 @@ const deltaToneClass = computed(() => {
   if (props.delta.tone === 'bad') {
     return 'text-(--expense)'
   }
-  return 'is-flat text-(--text-faint)'
+  return 'is-flat text-text-faint'
 })
 
 watch(() => [props.sparkValues, props.variant] as const, renderChart, {
@@ -87,15 +87,15 @@ function cssColor(style: { accent: string; fallback: string }): string {
         <slot name="icon" />
       </span>
       <div class="min-w-0 gap-1">
-        <p class="text-sm font-semibold text-ellipsis text-(--text-muted)">
+        <p class="text-sm font-semibold text-ellipsis text-text-muted">
           {{ label }}
         </p>
-        <strong :id="valueId" class="text-2xl font-bold text-(--text-main)">
+        <strong :id="valueId" class="text-2xl font-bold text-text-main">
           {{ value }}
         </strong>
         <p
           :id="deltaId"
-          class="flex flex-nowrap items-center gap-0.5 text-[0.76rem] whitespace-nowrap text-(--text-faint) xl:gap-1.5"
+          class="flex flex-nowrap items-center gap-0.5 text-[0.76rem] whitespace-nowrap text-text-faint xl:gap-1.5"
         >
           <span class="dash-stat-delta-pre">Este mes</span>
           <span

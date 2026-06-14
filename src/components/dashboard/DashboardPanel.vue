@@ -25,7 +25,7 @@ const attrs = useAttrs()
       attrs.class,
     ]"
   >
-    <h3 class="font-bold text-(--text-main)">
+    <h3 class="font-bold text-text-main">
       {{ title }}
     </h3>
 
@@ -33,7 +33,7 @@ const attrs = useAttrs()
 
     <button
       type="button"
-      class="mt-auto inline-flex items-center gap-1.5 bg-transparent text-(--primary)"
+      class="mt-auto inline-flex items-center gap-1.5 bg-transparent text-primary"
       :data-goto="actionTarget"
       @click="$emit('navigate', actionTarget)"
     >

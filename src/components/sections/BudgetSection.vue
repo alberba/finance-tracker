@@ -4,6 +4,7 @@ import { computed } from 'vue'
 
 import BudgetBlock from '../budget/BudgetBlock.vue'
 import BudgetSummaryCard from '../budget/BudgetSummaryCard.vue'
+import AppSection from '../ui/AppSection.vue'
 import type { BudgetType } from '../../scripts/types'
 import { useBudgetStore } from '../../stores/budget'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -43,12 +44,7 @@ function updateBudgetValue(payload: {
 </script>
 
 <template>
-  <section
-    id="budget"
-    class="panel [overflow-x:hidden]"
-    :class="{ 'is-active': props.isActive }"
-    aria-labelledby="budget-title"
-  >
+  <AppSection id="budget" :is-active="props.isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Planificación anual</p>
@@ -73,7 +69,7 @@ function updateBudgetValue(payload: {
       />
     </div>
 
-    <div class="grid min-w-0 gap-[18px]">
+    <div class="grid min-w-0 gap-4">
       <BudgetBlock
         v-for="block in viewModel.blocks"
         :key="block.type"
@@ -83,5 +79,5 @@ function updateBudgetValue(payload: {
         @update-budget-value="updateBudgetValue"
       />
     </div>
-  </section>
+  </AppSection>
 </template>

@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 
+import AppSection from '../ui/AppSection.vue'
 import ChartCanvas from '../charts/ChartCanvas.vue'
 import WealthSnapshotTable from '../wealth/WealthSnapshotTable.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
@@ -124,12 +125,7 @@ function applyCalc(): void {
 </script>
 
 <template>
-  <section
-    id="wealth"
-    class="panel"
-    :class="{ 'is-active': isActive }"
-    aria-labelledby="wealth-title"
-  >
+  <AppSection id="wealth" :is-active="isActive">
     <div class="panel-head">
       <div>
         <p class="panel-kicker">Balance patrimonial</p>
@@ -253,5 +249,5 @@ function applyCalc(): void {
         </div>
       </form>
     </dialog>
-  </section>
+  </AppSection>
 </template>

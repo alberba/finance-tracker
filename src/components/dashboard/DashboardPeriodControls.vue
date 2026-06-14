@@ -32,15 +32,15 @@ function changeMonth(event: Event): void {
 <template>
   <div class="dash-period flex flex-wrap items-stretch gap-3">
     <label class="dash-period-field grid gap-1">
-      <span class="pl-0.5 text-[0.6rem] font-bold tracking-[0.12em] text-(--text-faint) uppercase">
+      <span class="pl-0.5 text-[0.6rem] font-bold tracking-[0.12em] text-text-faint uppercase">
         Año
       </span>
       <span
-        class="dash-period-control relative inline-flex items-center rounded-md border border-(--line) bg-(--bg-panel) [box-shadow:var(--shadow-soft)] focus-within:border-(--primary) focus-within:[box-shadow:0_0_0_3px_var(--ring)]"
+        class="dash-period-control relative inline-flex items-center rounded-md border border-(--line) bg-(--bg-panel) [box-shadow:var(--shadow-soft)] focus-within:border-primary focus-within:[box-shadow:0_0_0_3px_var(--ring)]"
       >
         <input
           id="year-display"
-          class="w-auto min-w-19.5 appearance-none rounded-md border-0 bg-transparent py-2.25 pr-8.5 pl-3.5 text-[0.95rem] font-semibold text-(--text-main)"
+          class="w-auto min-w-19.5 appearance-none rounded-md border-0 bg-transparent py-2.25 pr-8.5 pl-3.5 text-[0.95rem] font-semibold text-text-main"
           name="yearDisplay"
           type="number"
           min="2000"
@@ -50,7 +50,7 @@ function changeMonth(event: Event): void {
           @change="changeYear"
         />
         <svg
-          class="dash-period-icon pointer-events-none absolute right-2.75 h-3.5 w-3.5 text-(--text-faint)"
+          class="dash-period-icon pointer-events-none absolute right-2.75 h-3.5 w-3.5 text-text-faint"
           viewBox="0 0 20 20"
           fill="none"
           stroke="currentColor"
@@ -64,15 +64,15 @@ function changeMonth(event: Event): void {
     </label>
 
     <label class="dash-period-field grid gap-1">
-      <span class="pl-0.5 text-[0.6rem] font-bold tracking-[0.12em] text-(--text-faint) uppercase">
+      <span class="pl-0.5 text-[0.6rem] font-bold tracking-[0.12em] text-text-faint uppercase">
         Mes
       </span>
       <span
-        class="dash-period-control relative inline-flex items-center rounded-md border border-(--line) bg-(--bg-panel) [box-shadow:var(--shadow-soft)] focus-within:border-(--primary) focus-within:[box-shadow:0_0_0_3px_var(--ring)]"
+        class="dash-period-control relative inline-flex items-center rounded-md border border-(--line) bg-(--bg-panel) [box-shadow:var(--shadow-soft)] focus-within:border-primary focus-within:[box-shadow:0_0_0_3px_var(--ring)]"
       >
         <select
           id="dashboard-month"
-          class="w-auto min-w-23 appearance-none rounded-md border-0 bg-transparent py-2.25 pr-8.5 pl-3.5 text-[0.95rem] font-semibold text-(--text-main)"
+          class="w-auto min-w-23 appearance-none rounded-md border-0 bg-transparent py-2.25 pr-8.5 pl-3.5 text-[0.95rem] font-semibold text-text-main"
           name="dashboardMonth"
           :value="month"
           @change="changeMonth"
@@ -82,7 +82,7 @@ function changeMonth(event: Event): void {
           </option>
         </select>
         <svg
-          class="dash-period-icon pointer-events-none absolute right-2.75 h-3.5 w-3.5 text-(--text-faint)"
+          class="dash-period-icon pointer-events-none absolute right-2.75 h-3.5 w-3.5 text-text-faint"
           viewBox="0 0 20 20"
           fill="none"
           stroke="currentColor"

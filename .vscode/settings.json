@@ -1,5 +1,6 @@
 {
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "css.customData": [".vscode/tailwind-v4.css-data.json"],
   "[astro]": {
     "editor.defaultFormatter": "astro-build.astro-vscode"
   }
