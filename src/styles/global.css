@@ -1,14 +1,14 @@
-@import "tailwindcss";
-@import "tailwindcss/preflight.css" layer(base);
-@import "./legacy.css";
+@import 'tailwindcss';
+@import 'tailwindcss/preflight.css' layer(base);
+@import './legacy.css';
 
 /* Font families exposed as Tailwind-native tokens so components can use
    `font-sans` / `font-display` / `font-mono` utilities instead of raw
    `font-family` declarations. See legacy.css header for the design system. */
 @theme {
-  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: "Syne", sans-serif;
-  --font-mono: "DM Mono", monospace;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
 
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
   --animate-panel-in: panelIn 0.26s ease;
@@ -18,6 +18,123 @@
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
+}
+
+/* Shared button base — restores the form-control base the migration dropped,
+   scoped to the legacy btn classes (only used by not-yet-migrated sections)
+   so it can't leak into components already on Tailwind utilities. Colors stay
+   in legacy.css. */
+@layer components {
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn {
+    min-height: 42px;
+    padding: 9px 17px;
+    border: 0;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      box-shadow 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+  .primary-btn:disabled,
+  .secondary-btn:disabled,
+  .danger-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .primary-btn:focus-visible,
+  .secondary-btn:focus-visible,
+  .danger-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* Base grid for legacy data tables (transactions / investment / wealth),
+     scoped to .table-wrap so migrated tables that don't use it are untouched.
+     Class-scoped tables (.tx-summary-table, .budget-*) override via specificity. */
+  .table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .table-wrap thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-subtle);
+  }
+  .table-wrap :is(th, td) {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .table-wrap th {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .table-wrap tbody tr {
+    transition: background 0.12s;
+  }
+  .table-wrap tbody tr:hover {
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+  }
+
+  /* Form controls: inline edit rows in those tables + the not-yet-migrated
+     investment / wealth forms. Scoped to their container classes so header
+     dropdowns and already-migrated sections stay untouched. */
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+    label {
+    display: grid;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .table-wrap td :is(input, select):not([type='checkbox']),
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+    :is(input, select):not([type='checkbox']):not([type='radio']),
+  .snapshot-field-stack input {
+    width: 100%;
+    max-width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    color: var(--text-main);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      background 0.15s;
+  }
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+    select,
+  .table-wrap td select {
+    cursor: pointer;
+  }
+  .snapshot-field-stack input::placeholder,
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+    input::placeholder {
+    color: var(--text-faint);
+  }
+  .table-wrap td :is(input, select):focus-visible,
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+    :is(input, select):focus-visible,
+  .snapshot-field-stack input:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
 }
 
 @layer utilities {

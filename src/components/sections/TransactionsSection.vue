@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 
 import AppSection from '../ui/AppSection.vue'
 import TransactionBulkCard from '../transactions/TransactionBulkCard.vue'
@@ -8,9 +8,9 @@ import TransactionSummary from '../transactions/TransactionSummary.vue'
 import TransactionsTable from '../transactions/TransactionsTable.vue'
 import { hasSelectionWithin } from '../../scripts/app/dom-helpers'
 import { MONTHS } from '../../scripts/types'
-import { parseIntSafe } from '../../scripts/utils'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
+import DashboardPeriodField from '../dashboard/DashboardPeriodField.vue'
 
 withDefaults(
   defineProps<{
@@ -26,10 +26,7 @@ const ui = uiStore.ui
 const sectionRef = useTemplateRef<InstanceType<typeof AppSection>>('appSection')
 const dialogRef = ref<InstanceType<typeof TransactionFormDialog> | null>(null)
 
-function onMonthChange(event: Event): void {
-  const value = (event.target as HTMLSelectElement).value
-  movementsStore.setMonth(parseIntSafe(value, ui.txFilterMonth))
-}
+const monthOptions = computed(() => MONTHS.map((name, index) => ({ value: index, label: name })))
 
 function openModal(): void {
   dialogRef.value?.open()
@@ -73,35 +70,50 @@ onBeforeUnmount(() => {
 
 <template>
   <AppSection id="transactions" ref="appSection" :is-active="isActive">
-    <div class="panel-head">
-      <div>
-        <p class="panel-kicker">Registro mensual</p>
-        <h2 id="transactions-title">Movimientos mensuales</h2>
-        <p>Registro diario de ingresos, gastos e inversión por mes.</p>
+    <header
+      class="flex flex-wrap items-center justify-between gap-4"
+    >
+      <div class="grid min-w-0 gap-2">
+        <p class="text-primary font-mono text-xs tracking-widest uppercase">
+          Registro mensual
+        </p>
+        <h2
+          id="transactions-title"
+          class="font-display text-text-main text-[clamp(1.8rem,3vw,2.6rem)] leading-[1.03]"
+        >
+          Movimientos mensuales
+        </h2>
+        <p class="text-text-muted text-sm">
+          Registro diario de ingresos, gastos e inversión por mes.
+        </p>
       </div>
-      <div class="inline-controls">
-        <label>
-          Filtrar mes
-          <select
-            id="tx-month-filter"
-            name="txMonthFilter"
-            :value="ui.txFilterMonth"
-            @change="onMonthChange"
-          >
-            <option v-for="(name, index) in MONTHS" :key="name" :value="index">{{ name }}</option>
-          </select>
-        </label>
-        <button id="tx-open-modal" type="button" class="primary-btn" @click="openModal">
+      <div class="flex flex-wrap items-end gap-3">
+        <DashboardPeriodField
+          id="tx-month-filter"
+          name="txMonthFilter"
+          label="Filtrar mes"
+          :model-value="ui.txFilterMonth"
+          :options="monthOptions"
+          @update:model-value="movementsStore.setMonth"
+        />
+        <button
+          id="tx-open-modal"
+          type="button"
+          class="inline-flex cursor-pointer items-center justify-center rounded-md bg-linear-to-b from-[color-mix(in_srgb,var(--primary)_92%,#fff_8%)] to-(--primary) px-4 py-2 font-medium text-white shadow-[0_2px_10px_color-mix(in_srgb,var(--primary)_38%,transparent)] transition hover:-translate-y-px hover:shadow-[0_6px_20px_color-mix(in_srgb,var(--primary)_48%,transparent)] active:translate-y-0"
+          @click="openModal"
+        >
           Nuevo
         </button>
       </div>
-    </div>
+    </header>
 
     <TransactionBulkCard />
 
     <TransactionFormDialog ref="dialogRef" />
 
-    <div class="tx-layout">
+    <div
+      class="grid items-start gap-3.5 min-[1240px]:grid-cols-[minmax(0,1fr)_minmax(310px,0.4fr)]"
+    >
       <TransactionsTable />
       <TransactionSummary />
     </div>
