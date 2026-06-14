@@ -1,5 +1,5 @@
-import { MONTHS, type BudgetType, type SectionId, type State } from '../types'
-import { monthFromISO, parseIntSafe, todayISO } from '../utils'
+import { MONTHS, type SectionId } from '../types'
+import { parseIntSafe } from '../utils'
 import {
   getPathFromSection,
   getSectionFromPath,
@@ -10,41 +10,21 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { pinia } from '../../stores/pinia'
 import { useUiStore } from '../../stores/ui'
 
-interface DashboardBudgetGoalsUi {
+interface DashboardNavigationUi {
   activeSection: SectionId
   month: number
-  budgetType: BudgetType
-  budgetMonth: number
-  txFilterMonth: number
-  snapshotMonth: number
-  investmentMonth: number
-  investmentOnlyUndeclared: boolean
-  contributionWorkflowMonth: number
-  contributionWorkflowDate: string
 }
 
-interface DashboardBudgetGoalsElements {
+interface DashboardNavigationElements {
   navTabs: HTMLElement
-  panels: HTMLElement[]
-  snapshotMonth: HTMLSelectElement
-  investmentMonth: HTMLSelectElement
-  investmentMovementDate: HTMLInputElement
-  investmentMovementTime: HTMLInputElement
-  investmentMovementCurrency: HTMLInputElement
-  investmentOnlyUndeclared: HTMLInputElement
-  contributionWorkflowMonth: HTMLSelectElement
-  contributionWorkflowDate: HTMLInputElement
 }
 
-interface DashboardBudgetGoalsDeps {
-  getState: () => State
-  ui: DashboardBudgetGoalsUi
-  el: DashboardBudgetGoalsElements
-  saveState: () => void
-  renderAll: () => void
+interface DashboardNavigationDeps {
+  ui: DashboardNavigationUi
+  el: DashboardNavigationElements
 }
 
-export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps) {
+export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) {
   const { ui, el } = deps
   const dashboardStore = useDashboardStore(pinia)
   const uiStore = useUiStore(pinia)
@@ -90,11 +70,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     const normalizedSectionId = normalizeSectionId(sectionId)
     ui.activeSection = normalizedSectionId
     uiStore.setActiveSection(normalizedSectionId)
-    el.panels.forEach((panel) => {
-      const isActive = panel.id === normalizedSectionId
-      panel.classList.toggle('is-active', isActive)
-      panel.setAttribute('aria-hidden', String(!isActive))
-    })
 
     Array.from(el.navTabs.querySelectorAll('.nav-btn')).forEach((button) => {
       const isActive = (button as HTMLElement).dataset.section === normalizedSectionId
@@ -114,54 +89,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     }
   }
 
-  function populateMonthSelects() {
-    const state = deps.getState()
-    const monthSelects = [
-      el.snapshotMonth,
-      el.investmentMonth,
-      el.contributionWorkflowMonth,
-    ]
-
-    monthSelects.forEach((select) => {
-      const current = String(select.value || '')
-      select.innerHTML = MONTHS.map(
-        (name, index) => `<option value="${index}">${name}</option>`,
-      ).join('')
-      if (current && Number.isFinite(Number(current))) {
-        select.value = current
-      }
-    })
-
-    if (!MONTHS[ui.month]) ui.month = 0
-    if (!MONTHS[ui.txFilterMonth]) ui.txFilterMonth = ui.month
-    if (!MONTHS[ui.snapshotMonth]) ui.snapshotMonth = ui.month
-    if (!MONTHS[ui.investmentMonth]) ui.investmentMonth = ui.month
-    if (!MONTHS[ui.contributionWorkflowMonth]) ui.contributionWorkflowMonth = ui.investmentMonth
-
-    if (!el.investmentMovementDate.value) el.investmentMovementDate.value = todayISO()
-    if (!el.investmentMovementTime.value) {
-      const now = new Date()
-      const hh = String(now.getHours()).padStart(2, '0')
-      const mm = String(now.getMinutes()).padStart(2, '0')
-      el.investmentMovementTime.value = `${hh}:${mm}`
-    }
-    if (!el.investmentMovementCurrency.value) {
-      el.investmentMovementCurrency.value = String(state.currency || 'EUR').toUpperCase()
-    }
-    if (!ui.contributionWorkflowDate) {
-      ui.contributionWorkflowDate = todayISO()
-      const contributionMonthFromToday = monthFromISO(ui.contributionWorkflowDate)
-      if (contributionMonthFromToday !== null) {
-        ui.contributionWorkflowMonth = contributionMonthFromToday
-      }
-    }
-    el.contributionWorkflowDate.value = ui.contributionWorkflowDate
-    el.investmentOnlyUndeclared.checked = ui.investmentOnlyUndeclared
-    el.snapshotMonth.value = String(ui.snapshotMonth)
-    el.investmentMonth.value = String(ui.investmentMonth)
-    el.contributionWorkflowMonth.value = String(ui.contributionWorkflowMonth)
-  }
-
   function publishDashboard() {
     if (!MONTHS[ui.month]) {
       ui.month = 0
@@ -172,7 +99,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardBudgetGoalsDeps)
     bindNavigationEvents,
     switchSection,
     getSectionFromPath,
-    populateMonthSelects,
     publishDashboard,
   }
 }

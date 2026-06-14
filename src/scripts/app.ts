@@ -1,23 +1,10 @@
-import {
-  isSnapshotKind,
-  type Contribution,
-  type Entity,
-  type InvestmentSubTab,
-  type SnapshotKind,
-  type Transaction,
-  type State,
-} from "./types";
-import { setupContributionWorkflowSection } from "./app/contribution-workflow-modal";
-import { setupInvestmentSnapshotHelpers } from "./app/investment-snapshot-helpers";
-import { setupInvestmentRenderers } from "./app/investment-renderers";
-import { setupInvestmentEventBindings } from "./app/investment-event-bindings";
-import { setupAppCalculationHelpers } from "./app/calculation-helpers";
+import { type State } from "./types";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
 import { getEventElement } from "./app/dom-helpers";
 import { getAppElements } from "./app/elements";
 import { type UiState } from "./app/ui-state";
-import { clone, escapeAttr, escapeHtml, parseFloatSafe } from "./utils";
+import { clone } from "./utils";
 import {
   BASE_SEED,
   loadPersistedState,
@@ -27,11 +14,6 @@ import {
   sortContributionsInState,
   sortTransactionsInState,
 } from "./state";
-import {
-  computeInvestmentMovement,
-  normalizeInvestmentSide,
-  normalizeInvestmentSymbol,
-} from "./investment-movements";
 import { useFinancialStateStore } from "../stores/financial-state";
 import { pinia } from "../stores/pinia";
 import { useUiStore } from "../stores/ui";
@@ -46,12 +28,7 @@ import { useUiStore } from "../stores/ui";
 
   const el = getAppElements();
 
-  const appCalculationHelpers = setupAppCalculationHelpers({
-    getState: () => state,
-    getFallbackMonth: () => ui.month,
-  });
-
-  const appStateFormatHelpers = setupAppStateFormatHelpers({
+  const { saveState } = setupAppStateFormatHelpers({
     getState: () => state,
     saveStatusEl: el.saveStatus,
     toastEl: el.toast,
@@ -64,205 +41,21 @@ import { useUiStore } from "../stores/ui";
     sortContributionsInState,
   });
 
-  const {
-    getOrderedCategoriesForType,
-    getSnapshotValue,
-    getAccountName,
-    isBitvavoBrokerAccount,
-    resolveInvestmentCategory,
-    computeAccountBalance,
-    computeInvestmentValue,
-    computeLiabilityValue,
-    matchesInvestmentAsset,
-    getWealthByMonth,
-    getWealthSeries,
-    computeInvestmentPortfolioValueForReturnMode,
-    getLatestDataMonth,
-    computeInvestedCapital,
-  } = appCalculationHelpers;
-  const {
-    saveState,
-    sortTransactions,
-    sortContributions,
-    showToast,
-    formatMoney,
-    formatMoneyCompact,
-  } = appStateFormatHelpers;
-
-
-  const contributionWorkflowSection = setupContributionWorkflowSection({
-    getState: () => state,
-    ui,
-    el,
-    formatMoney,
-    showToast,
-    saveState,
-    renderAll,
-    sortContributions,
-    isSnapshotKind,
-  });
-
-  const renderContributionsTable = () =>
-    contributionWorkflowSection.renderContributionsTable();
-  const getContributionEntriesFromSnapshots = (): Contribution[] =>
-    contributionWorkflowSection.getContributionEntriesFromSnapshots();
-  const openContributionWorkflowModal = () =>
-    contributionWorkflowSection.openContributionWorkflowModal();
-  const closeContributionWorkflowModal = () =>
-    contributionWorkflowSection.closeContributionWorkflowModal();
-  const renderContributionWorkflowModal = () =>
-    contributionWorkflowSection.renderContributionWorkflowModal();
-  const renderContributionWorkflowStepState = () =>
-    contributionWorkflowSection.renderContributionWorkflowStepState();
-  const openContributionCalcModal = (
-    kind: SnapshotKind,
-    targetId: string,
-    targetName: string,
-  ) =>
-    contributionWorkflowSection.openContributionCalcModal(
-      kind,
-      targetId,
-      targetName,
-    );
-  const closeContributionCalcModal = () =>
-    contributionWorkflowSection.closeContributionCalcModal();
-  const applyContributionCalcModalResult = () =>
-    contributionWorkflowSection.applyContributionCalcModalResult();
-  const renderContributionWorkflowModalWarnings = () =>
-    contributionWorkflowSection.renderContributionWorkflowModalWarnings();
-  const saveContributionFromWorkflowModal = () =>
-    contributionWorkflowSection.saveContributionFromWorkflowModal();
-  const upsertContributionFlowForDate = (date: string, flow: number) =>
-    contributionWorkflowSection.upsertContributionFlowForDate(date, flow);
-  const isManualContributionDate = (date: string) =>
-    contributionWorkflowSection.isManualContributionDate(date);
-
   const dashboardBudgetGoalsSection = setupDashboardBudgetGoalsSection({
-    getState: () => state,
     ui,
     el,
-    saveState,
-    renderAll,
   });
-  // Any Pinia-driven mutation repaints the sections still rendered
-  // imperatively so they stay consistent with the shared state during the
-  // migration. Once every section is a Vue island this bridge can be dropped.
+
+  // Every section is now a Vue island reading from Pinia; the legacy app only
+  // owns state hydration, persistence and the imperative sidebar navigation.
+  // Persist whenever a Pinia mutation lands so the canonical state stays saved.
   financialStateStore.registerStateCommitHandler((nextState) => {
     state = nextState;
     saveState();
-    renderAll();
   });
   financialStateStore.registerStateReloadHandler((nextState) => {
     state = nextState;
     saveState();
-    renderAll();
-  });
-
-  const investmentSnapshotHelpers = setupInvestmentSnapshotHelpers({
-    getState: () => state,
-    ui,
-    el,
-    getEventElement,
-    getSnapshotValue,
-    resolveInvestmentCategory,
-    sortTransactions,
-    saveState,
-    renderAll,
-    showToast,
-    formatMoney,
-    isSnapshotKind,
-  });
-  const renderSnapshotRows = (
-    items: Entity[],
-    kind: SnapshotKind,
-    month: number,
-    computeFn: (itemId: string) => number,
-  ) =>
-    investmentSnapshotHelpers.renderSnapshotRows(items, kind, month, computeFn);
-  const renderInvestmentEditingTransactionRow = (item: Transaction) =>
-    investmentSnapshotHelpers.renderInvestmentEditingTransactionRow(item);
-  const saveEditedInvestmentTransactionRow = (id: string) =>
-    investmentSnapshotHelpers.saveEditedInvestmentTransactionRow(id);
-  const onOpenInvestmentSnapshotCalcModal = (event: Event) =>
-    investmentSnapshotHelpers.onOpenInvestmentSnapshotCalcModal(event);
-  const closeWealthCalcModal = () =>
-    investmentSnapshotHelpers.closeWealthCalcModal();
-  const applyWealthCalcModalResult = () =>
-    investmentSnapshotHelpers.applyWealthCalcModalResult();
-  const saveSnapshotFromTable = () =>
-    investmentSnapshotHelpers.saveSnapshotFromTable();
-
-  const investmentRenderers = setupInvestmentRenderers({
-    getState: () => state,
-    ui,
-    el,
-    formatMoney,
-    formatMoneyCompact,
-    getWealthByMonth,
-    getWealthSeries,
-    computeInvestmentPortfolioValueForReturnMode,
-    getLatestDataMonth,
-    computeInvestedCapital,
-    computeInvestmentValue,
-    computeAccountBalance,
-    computeLiabilityValue,
-    matchesInvestmentAsset,
-    getAccountName,
-    syncInvestmentMovementComputedAmount,
-    renderInvestmentEditingTransactionRow,
-    renderSnapshotRows,
-    renderContributionsTable,
-    getContributionEntriesFromSnapshots,
-  });
-  const renderWealth = () => investmentRenderers.renderWealth();
-  const renderInvestment = () => investmentRenderers.renderInvestment();
-  const renderInvestmentTabState = () =>
-    investmentRenderers.renderInvestmentTabState();
-  const renderInvestmentReturnModeToggle = () =>
-    investmentRenderers.renderInvestmentReturnModeToggle();
-  const renderInvestmentDashboard = () =>
-    investmentRenderers.renderInvestmentDashboard();
-  const renderInvestmentTransactionsTable = () =>
-    investmentRenderers.renderInvestmentTransactionsTable();
-
-  const investmentEventBindings = setupInvestmentEventBindings({
-    getState: () => state,
-    ui,
-    el,
-    getEventElement,
-    isSnapshotKind,
-    isInvestmentSubTab,
-    renderWealth,
-    saveSnapshotFromTable,
-    onOpenInvestmentSnapshotCalcModal,
-    closeWealthCalcModal,
-    applyWealthCalcModalResult,
-    renderInvestmentTabState,
-    renderInvestmentReturnModeToggle,
-    renderInvestmentDashboard,
-    renderInvestment,
-    renderInvestmentTransactionsTable,
-    syncInvestmentMovementComputedAmount,
-    normalizeInvestmentMovementSymbolField,
-    syncInvestmentMovementCategoryField,
-    resolveInvestmentCategory,
-    sortTransactions,
-    saveState,
-    renderAll,
-    showToast,
-    saveEditedInvestmentTransactionRow,
-    renderContributionsTable,
-    upsertContributionFlowForDate,
-    openContributionWorkflowModal,
-    closeContributionWorkflowModal,
-    renderContributionWorkflowModal,
-    renderContributionWorkflowStepState,
-    renderContributionWorkflowModalWarnings,
-    openContributionCalcModal,
-    closeContributionCalcModal,
-    applyContributionCalcModalResult,
-    saveContributionFromWorkflowModal,
-    isManualContributionDate,
   });
 
   void init();
@@ -272,16 +65,10 @@ import { useUiStore } from "../stores/ui";
     ui.activeSection = dashboardBudgetGoalsSection.getSectionFromPath(
       window.location.pathname,
     );
-    dashboardBudgetGoalsSection.populateMonthSelects();
     bindEvents();
-    renderAll();
     dashboardBudgetGoalsSection.switchSection(ui.activeSection, {
       updateHistory: false,
     });
-    // Expose a re-render hook so the theme toggle can repaint charts with
-    // the active theme's colors (charts read CSS variables at render time).
-    (window as typeof window & { __ftRenderAll?: () => void }).__ftRenderAll =
-      renderAll;
   }
 
   async function hydrateState() {
@@ -322,22 +109,8 @@ import { useUiStore } from "../stores/ui";
   }
 
   function bindEvents() {
-    bindNavigationEvents();
-    bindWealthEvents();
-    bindInvestmentEvents();
-    bindChartTooltipEvents();
-  }
-
-  function bindNavigationEvents() {
     dashboardBudgetGoalsSection.bindNavigationEvents();
-  }
-
-  function bindWealthEvents() {
-    investmentEventBindings.bindWealthEvents();
-  }
-
-  function bindInvestmentEvents() {
-    investmentEventBindings.bindInvestmentEvents();
+    bindChartTooltipEvents();
   }
 
   function bindChartTooltipEvents() {
@@ -381,132 +154,5 @@ import { useUiStore } from "../stores/ui";
 
     document.addEventListener("pointerdown", hideTooltip);
     window.addEventListener("blur", hideTooltip);
-  }
-
-  function renderAll() {
-    dashboardBudgetGoalsSection.populateMonthSelects();
-    populateInvestmentMovementFormOptions();
-    dashboardBudgetGoalsSection.publishDashboard();
-    renderWealth();
-    renderInvestment();
-  }
-
-  function populateInvestmentMovementFormOptions() {
-    populateInvestmentMovementCategoryOptions();
-    populateInvestmentMovementBrokerOptions();
-  }
-
-  function populateInvestmentMovementCategoryOptions() {
-    const categorySelect = el.investmentMovementCategory;
-    const currentValue = String(categorySelect.value || "").trim();
-    const categories = getOrderedCategoriesForType("investment");
-
-    categorySelect.innerHTML = categories
-      .map(
-        (name: string) =>
-          `<option value="${escapeAttr(name)}">${escapeHtml(name)}</option>`,
-      )
-      .join("");
-
-    if (!categories.length) {
-      categorySelect.innerHTML =
-        '<option value="Sin categoría">Sin categoría</option>';
-      return;
-    }
-
-    if (currentValue && categories.includes(currentValue)) {
-      categorySelect.value = currentValue;
-      return;
-    }
-
-    categorySelect.value = categories[0];
-  }
-
-  function populateInvestmentMovementBrokerOptions() {
-    const brokerSelect = el.investmentMovementBroker;
-    const currentValue = String(brokerSelect.value || "").trim();
-
-    brokerSelect.innerHTML = state.accounts
-      .map(
-        (item) =>
-          `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`,
-      )
-      .join("");
-
-    if (!state.accounts.length) {
-      brokerSelect.innerHTML = '<option value="">Sin brokers</option>';
-      return;
-    }
-
-    if (
-      currentValue &&
-      state.accounts.some((item) => item.id === currentValue)
-    ) {
-      brokerSelect.value = currentValue;
-    } else {
-      brokerSelect.value = state.accounts[0].id;
-    }
-
-    syncInvestmentMovementCategoryField();
-  }
-
-  function syncInvestmentMovementComputedAmount() {
-    const side = normalizeInvestmentSide(el.investmentMovementSide.value);
-    const computed = computeInvestmentMovement({
-      side,
-      symbol: el.investmentMovementSymbol.value,
-      units: parseFloatSafe(el.investmentMovementUnits.value, 0),
-      unitPrice: parseFloatSafe(el.investmentMovementUnitPrice.value, 0),
-      fee: parseFloatSafe(el.investmentMovementFee.value, 0),
-    });
-    el.investmentMovementTotal.value = String(computed.signedAmount);
-  }
-
-  function normalizeInvestmentMovementSymbolField() {
-    el.investmentMovementSymbol.value = normalizeInvestmentSymbol(
-      el.investmentMovementSymbol.value,
-    );
-  }
-
-  function syncInvestmentMovementCategoryField() {
-    const isBitvavo = isBitvavoBrokerAccount(el.investmentMovementBroker.value);
-    const categorySelect = el.investmentMovementCategory;
-
-    if (isBitvavo) {
-      const hasCryptoOption = Array.from(categorySelect.options).some(
-        (option) => option.value === "Crypto",
-      );
-      if (!hasCryptoOption) {
-        categorySelect.insertAdjacentHTML(
-          "afterbegin",
-          '<option value="Crypto" data-temporary-bitvavo-option="true">Crypto</option>',
-        );
-      }
-      categorySelect.value = "Crypto";
-      categorySelect.disabled = true;
-      categorySelect.setAttribute("aria-disabled", "true");
-      return;
-    }
-
-    const wasDisabled = categorySelect.disabled;
-    const temporaryCryptoOption =
-      categorySelect.querySelector<HTMLOptionElement>(
-        'option[data-temporary-bitvavo-option="true"]',
-      );
-    if (temporaryCryptoOption) {
-      temporaryCryptoOption.remove();
-    }
-    categorySelect.disabled = false;
-    categorySelect.removeAttribute("aria-disabled");
-    if (wasDisabled && categorySelect.value === "Crypto") {
-      const firstOption = categorySelect.options[0];
-      if (firstOption) {
-        categorySelect.value = firstOption.value;
-      }
-    }
-  }
-
-  function isInvestmentSubTab(value: string): value is InvestmentSubTab {
-    return investmentRenderers.isInvestmentSubTab(value);
   }
 })();

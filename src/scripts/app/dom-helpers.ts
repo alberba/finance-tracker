@@ -1,22 +1,3 @@
-export interface InvestmentMovementFormControls extends HTMLFormControlsCollection {
-  date: HTMLInputElement
-  time: HTMLInputElement
-  side: HTMLSelectElement
-  symbol: HTMLInputElement
-  category: HTMLSelectElement
-  unitPrice: HTMLInputElement
-  units: HTMLInputElement
-  fee: HTMLInputElement
-  total: HTMLInputElement
-  movementCurrency: HTMLInputElement
-  accountId: HTMLSelectElement
-  declared: HTMLInputElement
-}
-
-export interface InvestmentMovementForm extends HTMLFormElement {
-  elements: InvestmentMovementFormControls
-}
-
 export function getRequiredElement<T extends Element>(id: string): T {
   const element = document.getElementById(id)
   if (!element) {
