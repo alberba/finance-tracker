@@ -13,8 +13,14 @@
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
   --animate-panel-in: panelIn 0.26s ease;
 
-  /* Brand and text color tokens — delegate to CSS variables defined in legacy.css. */
+  /* Brand, semantic and text color tokens — delegate to CSS variables defined
+     in legacy.css (so dark-theme overrides keep working). Exposed as
+     `text-*` / `bg-*` / `border-*` utilities. */
   --color-primary: var(--primary);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+  --color-invest: var(--invest);
+  --color-accent: var(--accent);
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
