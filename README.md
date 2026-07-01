@@ -19,8 +19,10 @@ Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
 - `src/pages/index.astro`: página principal de Astro
 - `src/scripts/app.ts`: runtime del tracker (TypeScript)
 - `src/lib/finance-core.ts`: lógica financiera tipada (TypeScript)
-- `src/data/seed.ts`: datos semilla extraídos de tu Excel (TypeScript)
-- `public/styles.css`: estilos
+- `src/data/seed.json`: datos semilla extraidos de tu Excel
+- `src/data/seed.ts`: wrapper TypeScript para importar el seed desde cliente y servidor
+- `src/styles/global.css`: entrada global de Tailwind y estilos de la app
+- `src/styles/legacy.css`: estilos legacy globales pendientes de migracion gradual
 - `scripts/extract_excel_seed.py`: script para regenerar el seed desde un `.xlsx`
 
 ## Ejecutar en local (Astro)
@@ -144,5 +146,5 @@ Opcional (GitHub Variables):
 ```bash
 python3 scripts/extract_excel_seed.py \
   --input "/home/albert/Descargas/FINANZAS PERSONALES 2026.xlsx" \
-  --output "src/data/seed.ts"
+  --output "src/data/seed.json"
 ```

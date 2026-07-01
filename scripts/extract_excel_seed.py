@@ -4,7 +4,7 @@
 Usage:
   python3 scripts/extract_excel_seed.py \
       --input "/home/albert/Descargas/FINANZAS PERSONALES 2026.xlsx" \
-      --output src/data/seed.ts
+      --output src/data/seed.json
 """
 
 from __future__ import annotations
@@ -494,6 +494,10 @@ def build_seed(input_path: Path) -> Dict[str, object]:
 
 def write_output(seed: Dict[str, object], output_path: Path) -> None:
     payload = json.dumps(seed, ensure_ascii=False, indent=2)
+    if output_path.suffix == ".json":
+        output_path.write_text(f"{payload}\n", encoding="utf-8")
+        return
+
     text = f"export const FINANCE_TRACKER_SEED = {payload} as const;\n\nexport default FINANCE_TRACKER_SEED;\n"
     output_path.write_text(text, encoding="utf-8")
 

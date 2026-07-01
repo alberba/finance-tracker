@@ -9,3 +9,11 @@ test-results
 .wrangler
 worker-configuration.d.ts
 package-lock.json
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+# Local-only visual snapshots (CI generates the canonical -linux baselines)
+tests/e2e/**/*-darwin.png

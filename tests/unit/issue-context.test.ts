@@ -3,7 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { buildIssueContextMarkdown, findCandidateFiles } from "../../.github/scripts/issue-context.mjs";
+import {
+  buildIssueContextMarkdown,
+  findCandidateFiles,
+} from "../../.github/scripts/issue-context.mjs";
 
 describe("issue context helper", () => {
   it("selecciona archivos candidatos por tokens", () => {
@@ -13,7 +16,10 @@ describe("issue context helper", () => {
       "tests/e2e/finance-tracker.spec.ts",
     ];
 
-    const candidates = findCandidateFiles(files, "Error en transactions y filtro de tabla");
+    const candidates = findCandidateFiles(
+      files,
+      "Error en transactions y filtro de tabla",
+    );
     expect(candidates[0]).toContain("transactions");
   });
 
@@ -25,7 +31,7 @@ describe("issue context helper", () => {
         body: "Descripción base",
         labels: [{ name: "source:web-report" }],
       },
-      ["src/scripts/app.ts"]
+      ["src/scripts/app.ts"],
     );
 
     expect(markdown).toContain("# Contexto inicial de issue");
@@ -39,14 +45,31 @@ describe("issue context helper", () => {
 
     fs.writeFileSync(
       issueFile,
-      JSON.stringify({ number: 1, title: "Fallo dashboard", body: "Error KPI", labels: [] }),
-      "utf-8"
+      JSON.stringify({
+        number: 1,
+        title: "Fallo dashboard",
+        body: "Error KPI",
+        labels: [],
+      }),
+      "utf-8",
     );
 
     const scriptPath = path.resolve(".github/scripts/issue-context.mjs");
-    const result = spawnSync("node", [scriptPath, "--issue-file", issueFile, "--out", outFile, "--repo", process.cwd()], {
-      encoding: "utf-8",
-    });
+    const result = spawnSync(
+      "node",
+      [
+        scriptPath,
+        "--issue-file",
+        issueFile,
+        "--out",
+        outFile,
+        "--repo",
+        process.cwd(),
+      ],
+      {
+        encoding: "utf-8",
+      },
+    );
     expect(result.status).toBe(0);
 
     const out = fs.readFileSync(outFile, "utf-8");

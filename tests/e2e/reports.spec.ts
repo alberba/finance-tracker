@@ -1,7 +1,11 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
-async function expectModalCentered(page: Page, selector: string, tolerance = 24) {
+async function expectModalCentered(
+  page: Page,
+  selector: string,
+  tolerance = 24,
+) {
   const dialog = page.locator(selector);
   await expect(dialog).toBeVisible();
 
@@ -16,22 +20,41 @@ async function expectModalCentered(page: Page, selector: string, tolerance = 24)
   const viewportCenterX = viewport.width / 2;
   const viewportCenterY = viewport.height / 2;
 
-  expect(Math.abs(dialogCenterX - viewportCenterX)).toBeLessThanOrEqual(tolerance);
-  expect(Math.abs(dialogCenterY - viewportCenterY)).toBeLessThanOrEqual(tolerance);
+  expect(Math.abs(dialogCenterX - viewportCenterX)).toBeLessThanOrEqual(
+    tolerance,
+  );
+  expect(Math.abs(dialogCenterY - viewportCenterY)).toBeLessThanOrEqual(
+    tolerance,
+  );
 }
 
 test.describe("Reports E2E", () => {
-  test("reportes muestra el flujo simple como camino principal", async ({ tracker }) => {
+  test("reportes muestra el flujo simple como camino principal", async ({
+    tracker,
+  }) => {
     await tracker.openReports();
 
-    await expect(tracker.reportsSection.getByRole("heading", { name: "Reportes" })).toBeVisible();
-    await expect(tracker.reportsSection.locator(".reports-form-card h3")).toHaveText("Crear reporte");
-    await expect(tracker.reportsSection.locator(".reports-guide-card h3")).toHaveText("Qué ocurre al enviarlo");
-    await expect(tracker.reportsSection.locator(".reports-guide-list li")).toHaveCount(3);
-    await expect(tracker.reportsSection.locator("#issue-report-mention-claude")).not.toBeChecked();
+    await expect(
+      tracker.reportsSection.getByRole("heading", { name: "Reportes" }),
+    ).toBeVisible();
+    await expect(
+      tracker.reportsSection.locator(".reports-form-card h3"),
+    ).toHaveText("Crear reporte");
+    await expect(
+      tracker.reportsSection.locator(".reports-guide-card h3"),
+    ).toHaveText("Qué ocurre al enviarlo");
+    await expect(
+      tracker.reportsSection.locator(".reports-guide-list li"),
+    ).toHaveCount(3);
+    await expect(
+      tracker.reportsSection.locator("#issue-report-mention-claude"),
+    ).not.toBeChecked();
   });
 
-  test("crea un reporte simple sin automatización", async ({ page, tracker }) => {
+  test("crea un reporte simple sin automatización", async ({
+    page,
+    tracker,
+  }) => {
     await page.route("**/api/issues/report", async (route) => {
       await route.fulfill({
         status: 201,
@@ -52,10 +75,15 @@ test.describe("Reports E2E", () => {
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
     await expect(tracker.issueReportStatus()).toContainText("#654");
-    await expect(tracker.issueReportStatus()).not.toContainText("automatización en curso");
+    await expect(tracker.issueReportStatus()).not.toContainText(
+      "automatización en curso",
+    );
   });
 
-  test("permite activar automatización manualmente", async ({ page, tracker }) => {
+  test("permite activar automatización manualmente", async ({
+    page,
+    tracker,
+  }) => {
     await page.route("**/api/issues/report", async (route) => {
       await route.fulfill({
         status: 201,
@@ -78,23 +106,32 @@ test.describe("Reports E2E", () => {
     });
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
-    await expect(tracker.issueReportStatus()).toContainText("automatización en curso");
+    await expect(tracker.issueReportStatus()).toContainText(
+      "automatización en curso",
+    );
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
-      "https://github.com/example/repo/issues/321"
+      "https://github.com/example/repo/issues/321",
     );
   });
 
-  test("muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({ tracker }) => {
+  test("muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({
+    tracker,
+  }) => {
     await tracker.openReports();
     const form = tracker.reportsSection.locator("#issue-report-form");
     await form.locator("#issue-report-summary").fill("abc");
     await form.locator("#issue-report-description").fill("corta");
     await form.getByRole("button", { name: "Crear reporte" }).click();
-    await expect(tracker.issueReportStatus()).toContainText("el resumen debe tener al menos 5 caracteres");
+    await expect(tracker.issueReportStatus()).toContainText(
+      "el resumen debe tener al menos 5 caracteres",
+    );
   });
 
-  test("muestra error cuando falla la API de reporte", async ({ page, tracker }) => {
+  test("muestra error cuando falla la API de reporte", async ({
+    page,
+    tracker,
+  }) => {
     await page.route("**/api/issues/report", async (route) => {
       await route.fulfill({
         status: 500,
@@ -109,16 +146,26 @@ test.describe("Reports E2E", () => {
       description: "Prueba de manejo de error al crear issue.",
     });
 
-    await expect(tracker.issueReportStatus()).toContainText("No se pudo crear la issue: GitHub no disponible");
+    await expect(tracker.issueReportStatus()).toContainText(
+      "No se pudo crear la issue: GitHub no disponible",
+    );
   });
 
-  test("los modales principales se abren centrados en pantalla", async ({ page, tracker }) => {
+  test("los modales principales se abren centrados en pantalla", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.openTransactions();
-    await tracker.transactionsSection.getByRole("button", { name: "Nuevo" }).click();
+    await tracker.transactionsSection
+      .getByRole("button", { name: "Nuevo" })
+      .click();
     await expectModalCentered(page, "#tx-dialog");
 
     await tracker.openWealth();
-    await tracker.wealthSection.getByRole("button", { name: /^Calcular$/ }).first().click();
+    await tracker.wealthSection
+      .getByRole("button", { name: /^Calcular$/ })
+      .first()
+      .click();
     await expectModalCentered(page, "#wealth-calc-dialog");
     await page.locator("#wealth-calc-close").click();
 
@@ -126,7 +173,9 @@ test.describe("Reports E2E", () => {
     await expectModalCentered(page, "#contribution-workflow-dialog");
 
     const workflowModal = page.locator("#contribution-workflow-dialog");
-    const investmentSnapshotButton = workflowModal.getByRole("button", { name: /^Calcular snapshot de / }).first();
+    const investmentSnapshotButton = workflowModal
+      .getByRole("button", { name: /^Calcular snapshot de / })
+      .first();
     await investmentSnapshotButton.click();
     await expectModalCentered(page, "#contribution-calc-dialog");
   });

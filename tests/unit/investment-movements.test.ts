@@ -71,6 +71,8 @@ describe("investment-movements helpers", () => {
 
   it("genera descripción para compra y venta", () => {
     expect(buildInvestmentDescription("buy", 2, "MSFT")).toBe("Compra 2 MSFT");
-    expect(buildInvestmentDescription("sell", 1.5, "AAPL")).toBe("Venta 1.5 AAPL");
+    expect(buildInvestmentDescription("sell", 1.5, "AAPL")).toBe(
+      "Venta 1.5 AAPL",
+    );
   });
 });

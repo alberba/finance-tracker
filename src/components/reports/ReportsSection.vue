@@ -1,0 +1,32 @@
+<script setup lang="ts">
+import AppSection from '../ui/AppSection.vue'
+import IssueReportFormCard from './IssueReportFormCard.vue'
+import ReportsGuideCard from './ReportsGuideCard.vue'
+
+withDefaults(
+  defineProps<{
+    isActive?: boolean
+  }>(),
+  { isActive: false },
+)
+</script>
+
+<template>
+  <AppSection id="reports" :is-active="isActive">
+    <div class="panel-head">
+      <div>
+        <p class="panel-kicker">Soporte</p>
+        <h2 id="reports-title">Reportes</h2>
+        <p>
+          Envía errores o mejoras. El reporte se convertirá en una issue de GitHub
+          con el contexto necesario.
+        </p>
+      </div>
+    </div>
+
+    <div class="reports-layout">
+      <IssueReportFormCard />
+      <ReportsGuideCard />
+    </div>
+  </AppSection>
+</template>

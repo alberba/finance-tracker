@@ -41,7 +41,7 @@ describe("issue report schema", () => {
         description: "corta",
         section: "data",
         context: {},
-      })
+      }),
     ).toThrowError();
   });
 });

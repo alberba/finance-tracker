@@ -31,7 +31,7 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
     deps.sortContributionsInState(deps.getState());
   }
 
-  function showToast(message: any) {
+  function showToast(message: string) {
     deps.toastEl.textContent = message;
     deps.toastEl.classList.add("show");
     window.clearTimeout(toastTimer);
@@ -40,7 +40,7 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
     }, 2200);
   }
 
-  function formatMoney(value: any) {
+  function formatMoney(value: unknown) {
     const currency = (deps.getState().currency || "EUR").toUpperCase();
     try {
       return new Intl.NumberFormat("es-ES", {
@@ -48,12 +48,12 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
         currency,
         maximumFractionDigits: 2,
       }).format(Number(value || 0));
-    } catch (_) {
+    } catch {
       return `${Number(value || 0).toFixed(2)} ${currency}`;
     }
   }
 
-  function formatMoneyCompact(value: any) {
+  function formatMoneyCompact(value: unknown) {
     const currency = (deps.getState().currency || "EUR").toUpperCase();
     try {
       return new Intl.NumberFormat("es-ES", {
@@ -62,7 +62,7 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
         notation: "compact",
         maximumFractionDigits: 1,
       }).format(Number(value || 0));
-    } catch (_) {
+    } catch {
       return formatMoney(value);
     }
   }
