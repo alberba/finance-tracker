@@ -1,7 +1,9 @@
 import { test, expect } from "./fixtures";
 
 test.describe("Sidebar toggle", () => {
-  test("la inicialización del sidebar no lanza errores de classList en carga", async ({ page }) => {
+  test("la inicialización del sidebar no lanza errores de classList en carga", async ({
+    page,
+  }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => {
       pageErrors.push(error.message);
@@ -10,18 +12,33 @@ test.describe("Sidebar toggle", () => {
     await page.goto("/");
     await expect(page.locator("#dashboard")).toBeVisible();
 
-    expect(pageErrors.some((message) => message.includes("Cannot read properties of null (reading 'classList')"))).toBe(false);
+    expect(
+      pageErrors.some((message) =>
+        message.includes(
+          "Cannot read properties of null (reading 'classList')",
+        ),
+      ),
+    ).toBe(false);
   });
 
-  test("el botón de toggle existe y tiene el aria-label correcto", async ({ page, tracker }) => {
+  test("el botón de toggle existe y tiene el aria-label correcto", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
     const toggleBtn = page.locator("#sidebar-toggle");
     await expect(toggleBtn).toBeVisible();
-    await expect(toggleBtn).toHaveAttribute("aria-label", "Colapsar barra lateral");
+    await expect(toggleBtn).toHaveAttribute(
+      "aria-label",
+      "Colapsar barra lateral",
+    );
     await expect(toggleBtn).toHaveAttribute("aria-expanded", "true");
   });
 
-  test("muestra icono de marca encima del nav cuando el sidebar está colapsado", async ({ page, tracker }) => {
+  test("muestra icono de marca encima del nav cuando el sidebar está colapsado", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     const collapsedBrand = page.locator(".sidebar-collapsed-brand");
@@ -47,7 +64,10 @@ test.describe("Sidebar toggle", () => {
     await expect(collapsedBrand).toBeHidden();
   });
 
-  test("colapsar el sidebar oculta las etiquetas de texto de las pestañas", async ({ page, tracker }) => {
+  test("colapsar el sidebar oculta las etiquetas de texto de las pestañas", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     // Las nav-labels deben estar visibles inicialmente
@@ -62,19 +82,29 @@ test.describe("Sidebar toggle", () => {
 
     // El botón actualiza sus atributos aria
     const toggleBtn = page.locator("#sidebar-toggle");
-    await expect(toggleBtn).toHaveAttribute("aria-label", "Expandir barra lateral");
+    await expect(toggleBtn).toHaveAttribute(
+      "aria-label",
+      "Expandir barra lateral",
+    );
     await expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("el sidebar colapsado reduce su anchura visiblemente respecto al expandido", async ({ page, tracker }) => {
+  test("el sidebar colapsado reduce su anchura visiblemente respecto al expandido", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
-    const expandedWidth = await page.locator(".sidebar").evaluate((el) => el.getBoundingClientRect().width);
+    const expandedWidth = await page
+      .locator(".sidebar")
+      .evaluate((el) => el.getBoundingClientRect().width);
 
     await page.locator("#sidebar-toggle").click();
     await page.waitForTimeout(350); // esperar a la transición CSS
 
-    const collapsedWidth = await page.locator(".sidebar").evaluate((el) => el.getBoundingClientRect().width);
+    const collapsedWidth = await page
+      .locator(".sidebar")
+      .evaluate((el) => el.getBoundingClientRect().width);
 
     expect(collapsedWidth).toBeLessThan(expandedWidth);
     expect(collapsedWidth).toBeLessThan(100);
@@ -90,17 +120,28 @@ test.describe("Sidebar toggle", () => {
     await page.locator("#sidebar-toggle").click();
     await expect(page.locator("body")).toHaveClass(/is-sidebar-collapsed/);
 
-    // Navegar a Movimientos a través del botón de icono (aria-label)
-    await page.getByRole("button", { name: "Movimientos" }).click();
+    // Navegar a Movimientos a través del botón de icono (aria-label) del nav lateral
+    await page
+      .locator("#nav-tabs")
+      .getByRole("button", { name: "Movimientos" })
+      .click();
     await expect(page.locator("#transactions")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Movimientos mensuales" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Movimientos mensuales" }),
+    ).toBeVisible();
 
     // Navegar a Inversión
-    await page.getByRole("button", { name: "Inversión" }).click();
+    await page
+      .locator("#nav-tabs")
+      .getByRole("button", { name: "Inversión" })
+      .click();
     await expect(page.locator("#investment")).toBeVisible();
   });
 
-  test("expandir de nuevo el sidebar vuelve a mostrar las etiquetas de texto", async ({ page, tracker }) => {
+  test("expandir de nuevo el sidebar vuelve a mostrar las etiquetas de texto", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     // Colapsar y volver a expandir
@@ -112,10 +153,16 @@ test.describe("Sidebar toggle", () => {
 
     // Las nav-labels deben ser visibles de nuevo
     await expect(page.locator(".nav-label").first()).toBeVisible();
-    await expect(page.locator("#sidebar-toggle")).toHaveAttribute("aria-label", "Colapsar barra lateral");
+    await expect(page.locator("#sidebar-toggle")).toHaveAttribute(
+      "aria-label",
+      "Colapsar barra lateral",
+    );
   });
 
-  test("el estado colapsado persiste tras recargar la página (localStorage)", async ({ page, tracker }) => {
+  test("el estado colapsado persiste tras recargar la página (localStorage)", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     // Colapsar
@@ -128,10 +175,16 @@ test.describe("Sidebar toggle", () => {
 
     // El sidebar debe seguir colapsado
     await expect(page.locator("body")).toHaveClass(/is-sidebar-collapsed/);
-    await expect(page.locator("#sidebar-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#sidebar-toggle")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
-  test("el estado expandido persiste tras recargar la página", async ({ page, tracker }) => {
+  test("el estado expandido persiste tras recargar la página", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     // Colapsar y luego expandir
@@ -146,7 +199,10 @@ test.describe("Sidebar toggle", () => {
     await expect(page.locator("body")).not.toHaveClass(/is-sidebar-collapsed/);
   });
 
-  test("los iconos del nav son visibles tanto en estado expandido como colapsado", async ({ page, tracker }) => {
+  test("los iconos del nav son visibles tanto en estado expandido como colapsado", async ({
+    page,
+    tracker,
+  }) => {
     await tracker.goto();
 
     // Expandido: los iconos deben estar presentes en el DOM

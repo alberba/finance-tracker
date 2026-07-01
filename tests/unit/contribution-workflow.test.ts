@@ -49,7 +49,11 @@ describe("contribution-workflow helpers", () => {
     ]);
 
     expect(result.missing).toEqual([]);
-    expect(result.matched.map((account) => account.id)).toEqual(["acc-1", "acc-2", "acc-3"]);
+    expect(result.matched.map((account) => account.id)).toEqual([
+      "acc-1",
+      "acc-2",
+      "acc-3",
+    ]);
   });
 
   it("respeta la configuración explícita de cuentas de liquidez", () => {
@@ -59,11 +63,14 @@ describe("contribution-workflow helpers", () => {
         { id: "acc-2", name: "Trading212", openingBalance: 0 },
         { id: "acc-3", name: "Trade Republic", openingBalance: 0 },
       ],
-      ["acc-2", "acc-1"]
+      ["acc-2", "acc-1"],
     );
 
     expect(result.missing).toEqual([]);
-    expect(result.matched.map((account) => account.id)).toEqual(["acc-2", "acc-1"]);
+    expect(result.matched.map((account) => account.id)).toEqual([
+      "acc-2",
+      "acc-1",
+    ]);
   });
 
   it("normaliza contributions nuevos sin romper legacy", () => {
@@ -71,7 +78,9 @@ describe("contribution-workflow helpers", () => {
       year: 2026,
       currency: "EUR",
       accounts: [{ id: "myinvestor", name: "MyInvestor", openingBalance: 0 }],
-      investmentAssets: [{ id: "fondos-indexados", name: "Fondos Indexados", openingBalance: 0 }],
+      investmentAssets: [
+        { id: "fondos-indexados", name: "Fondos Indexados", openingBalance: 0 },
+      ],
       liabilities: [],
       incomeCategories: ["Nomina"],
       expenseCategories: ["Comida"],
@@ -109,13 +118,19 @@ describe("contribution-workflow helpers", () => {
       ],
     });
 
-    const legacy = normalized.contributions.find((item) => item.id === "legacy");
-    const allocation = normalized.contributions.find((item) => item.id === "alloc");
+    const legacy = normalized.contributions.find(
+      (item) => item.id === "legacy",
+    );
+    const allocation = normalized.contributions.find(
+      (item) => item.id === "alloc",
+    );
 
     expect(legacy?.flowSource).toBe("legacy");
     expect(legacy?.flow).toBe(50);
     expect(allocation?.flowSource).toBe("allocations");
     expect(allocation?.flow).toBe(80);
-    expect(allocation?.flowAllocations).toEqual([{ accountId: "myinvestor", amount: 80 }]);
+    expect(allocation?.flowAllocations).toEqual([
+      { accountId: "myinvestor", amount: 80 },
+    ]);
   });
 });

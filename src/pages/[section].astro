@@ -1,21 +1,10 @@
 ---
 import FinanceTrackerShell from "../components/FinanceTrackerShell.astro";
+import { isSectionRoutePath } from "../scripts/app/dashboard-section-routing";
 
-export function getStaticPaths() {
-  return [
-    { params: { section: "dashboard" } },
-    { params: { section: "movimientos" } },
-    { params: { section: "presupuesto" } },
-    { params: { section: "patrimonio" } },
-    { params: { section: "inversion" } },
-    { params: { section: "objetivos" } },
-    { params: { section: "configuracion" } },
-    { params: { section: "datos" } },
-    { params: { section: "reportes" } },
-  ];
+if (!isSectionRoutePath(Astro.url.pathname)) {
+  return Astro.redirect("/");
 }
-
-const sectionParam = String(Astro.params.section || "");
 ---
 
-<FinanceTrackerShell activeRoute="section" sectionParam={sectionParam} />
+<FinanceTrackerShell />

@@ -24,7 +24,9 @@ const investments: Entity[] = [
   { id: "crypto", name: "Crypto", openingBalance: 300 },
 ];
 
-const liabilities: Entity[] = [{ id: "hipoteca", name: "Hipoteca", openingBalance: 90000 }];
+const liabilities: Entity[] = [
+  { id: "hipoteca", name: "Hipoteca", openingBalance: 90000 },
+];
 
 const transactions: Transaction[] = [
   {
@@ -95,44 +97,104 @@ describe("finance-core helpers", () => {
   });
 
   it("calcula reales por categoría", () => {
-    const actuals = getCategoryActuals(transactions, "expense", 0, ["Comida", "Transporte"]);
+    const actuals = getCategoryActuals(transactions, "expense", 0, [
+      "Comida",
+      "Transporte",
+    ]);
     expect(actuals).toEqual({ Comida: 250, Transporte: 0 });
   });
 
   it("calcula saldo de cuenta considerando snapshot previo", () => {
-    const revolutMonth0 = computeAccountBalance("revolut", 0, accounts, transactions, snapshots);
+    const revolutMonth0 = computeAccountBalance(
+      "revolut",
+      0,
+      accounts,
+      transactions,
+      snapshots,
+    );
     expect(revolutMonth0).toBe(2250);
 
-    const revolutMonth1 = computeAccountBalance("revolut", 1, accounts, transactions, snapshots);
+    const revolutMonth1 = computeAccountBalance(
+      "revolut",
+      1,
+      accounts,
+      transactions,
+      snapshots,
+    );
     expect(revolutMonth1).toBe(1800);
   });
 
   it("calcula valor de inversión por categoría y snapshot", () => {
-    const fundsMonth0 = computeInvestmentValue("fondos-indexados", 0, investments, transactions, snapshots);
+    const fundsMonth0 = computeInvestmentValue(
+      "fondos-indexados",
+      0,
+      investments,
+      transactions,
+      snapshots,
+    );
     expect(fundsMonth0).toBe(2500);
 
-    const fundsMonth1 = computeInvestmentValue("fondos-indexados", 1, investments, transactions, snapshots);
+    const fundsMonth1 = computeInvestmentValue(
+      "fondos-indexados",
+      1,
+      investments,
+      transactions,
+      snapshots,
+    );
     expect(fundsMonth1).toBe(2800);
 
-    const cryptoMonth1 = computeInvestmentValue("crypto", 1, investments, transactions, snapshots);
+    const cryptoMonth1 = computeInvestmentValue(
+      "crypto",
+      1,
+      investments,
+      transactions,
+      snapshots,
+    );
     expect(cryptoMonth1).toBe(380);
   });
 
   it("devuelve 0 para activos o pasivos inexistentes", () => {
-    expect(computeInvestmentValue("asset-missing", 1, investments, transactions, snapshots)).toBe(0);
-    expect(computeLiabilityValue("liability-missing", 1, liabilities, snapshots)).toBe(0);
+    expect(
+      computeInvestmentValue(
+        "asset-missing",
+        1,
+        investments,
+        transactions,
+        snapshots,
+      ),
+    ).toBe(0);
+    expect(
+      computeLiabilityValue("liability-missing", 1, liabilities, snapshots),
+    ).toBe(0);
   });
 
   it("calcula pasivos usando snapshot cuando existe", () => {
-    const liabilityMonth0 = computeLiabilityValue("hipoteca", 0, liabilities, snapshots);
+    const liabilityMonth0 = computeLiabilityValue(
+      "hipoteca",
+      0,
+      liabilities,
+      snapshots,
+    );
     expect(liabilityMonth0).toBe(90000);
 
-    const liabilityMonth1 = computeLiabilityValue("hipoteca", 1, liabilities, snapshots);
+    const liabilityMonth1 = computeLiabilityValue(
+      "hipoteca",
+      1,
+      liabilities,
+      snapshots,
+    );
     expect(liabilityMonth1).toBe(89000);
   });
 
   it("calcula patrimonio neto mensual", () => {
-    const wealthMonth1 = getWealthByMonth(1, accounts, investments, liabilities, transactions, snapshots);
+    const wealthMonth1 = getWealthByMonth(
+      1,
+      accounts,
+      investments,
+      liabilities,
+      transactions,
+      snapshots,
+    );
 
     expect(wealthMonth1).toEqual({
       liquidity: 2100,
@@ -225,14 +287,35 @@ describe("finance-core helpers", () => {
     // TWR mide la gestión pura: +10% × -10% = -1%
     // El retorno simple penaliza el timing: (18900-20000)/20000 = -5.5%
     const metrics = computeContributionMetrics([
-      { id: "t1", date: "2026-01-31", portfolioDate: "2026-01-31", amount: 0, flow: 0, portfolioValue: 10000 },
-      { id: "t2", date: "2026-02-28", portfolioDate: "2026-02-28", amount: 10000, flow: 10000, portfolioValue: 11000 },
-      { id: "t3", date: "2026-03-31", portfolioDate: "2026-03-31", amount: 0, flow: 0, portfolioValue: 18900 },
+      {
+        id: "t1",
+        date: "2026-01-31",
+        portfolioDate: "2026-01-31",
+        amount: 0,
+        flow: 0,
+        portfolioValue: 10000,
+      },
+      {
+        id: "t2",
+        date: "2026-02-28",
+        portfolioDate: "2026-02-28",
+        amount: 10000,
+        flow: 10000,
+        portfolioValue: 11000,
+      },
+      {
+        id: "t3",
+        date: "2026-03-31",
+        portfolioDate: "2026-03-31",
+        amount: 0,
+        flow: 0,
+        portfolioValue: 18900,
+      },
     ]);
 
     // Retornos por período correctos
-    expect(metrics[1].periodReturn).toBeCloseTo(0.10, 6);
-    expect(metrics[2].periodReturn).toBeCloseTo(-0.10, 6);
+    expect(metrics[1].periodReturn).toBeCloseTo(0.1, 6);
+    expect(metrics[2].periodReturn).toBeCloseTo(-0.1, 6);
 
     // TWR acumulado: gestión real = -1%
     expect(metrics[2].cumulativeReturn).toBeCloseTo(-0.01, 6);

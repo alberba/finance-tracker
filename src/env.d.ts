@@ -1,3 +1,5 @@
+/// <reference types="vite-svg-loader" />
+
 declare namespace App {
   interface Locals {
     runtime?: {

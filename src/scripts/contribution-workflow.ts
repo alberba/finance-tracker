@@ -6,9 +6,18 @@ export interface ContributionFlowAllocation {
   amount: number;
 }
 
-export const LIQUIDITY_TARGET_KEYS = ["myinvestor", "trading212", "traderepublic"] as const;
+type UnknownRecord = Record<string, unknown>;
 
-const LIQUIDITY_TARGET_LABELS: Record<(typeof LIQUIDITY_TARGET_KEYS)[number], string> = {
+export const LIQUIDITY_TARGET_KEYS = [
+  "myinvestor",
+  "trading212",
+  "traderepublic",
+] as const;
+
+const LIQUIDITY_TARGET_LABELS: Record<
+  (typeof LIQUIDITY_TARGET_KEYS)[number],
+  string
+> = {
   myinvestor: "MyInvestor",
   trading212: "Trading 212",
   traderepublic: "Trade Republic",
@@ -21,11 +30,16 @@ export function normalizeLiquidityName(value: unknown): string {
 }
 
 export function getLiquidityTargetLabel(key: string): string {
-  const normalized = normalizeLiquidityName(key) as (typeof LIQUIDITY_TARGET_KEYS)[number];
+  const normalized = normalizeLiquidityName(
+    key,
+  ) as (typeof LIQUIDITY_TARGET_KEYS)[number];
   return LIQUIDITY_TARGET_LABELS[normalized] || String(key || "");
 }
 
-function resolveLiquidityAccountsFromConfiguredIds(accounts: Entity[], configuredAccountIds: string[]): {
+function resolveLiquidityAccountsFromConfiguredIds(
+  accounts: Entity[],
+  configuredAccountIds: string[],
+): {
   matched: Entity[];
   missing: string[];
 } {
@@ -33,10 +47,12 @@ function resolveLiquidityAccountsFromConfiguredIds(accounts: Entity[], configure
     new Set(
       configuredAccountIds
         .map((item) => String(item || "").trim())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
-  const byId = new Map(accounts.map((account) => [String(account.id), account] as const));
+  const byId = new Map(
+    accounts.map((account) => [String(account.id), account] as const),
+  );
   const matched: Entity[] = [];
   const missing: string[] = [];
 
@@ -57,17 +73,26 @@ export function findLiquidityTargets(accounts: Entity[]): {
   missing: string[];
 };
 
-export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: string[]): {
+export function findLiquidityTargets(
+  accounts: Entity[],
+  configuredAccountIds: string[],
+): {
   matched: Entity[];
   missing: string[];
 };
 
-export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: string[] = []): {
+export function findLiquidityTargets(
+  accounts: Entity[],
+  configuredAccountIds: string[] = [],
+): {
   matched: Entity[];
   missing: string[];
 } {
   if (configuredAccountIds.length > 0) {
-    return resolveLiquidityAccountsFromConfiguredIds(accounts, configuredAccountIds);
+    return resolveLiquidityAccountsFromConfiguredIds(
+      accounts,
+      configuredAccountIds,
+    );
   }
 
   const byKey = new Map<string, Entity>();
@@ -90,7 +115,9 @@ export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: s
       return;
     }
 
-    const partial = Array.from(byKey.entries()).find(([key]) => key.includes(targetKey) || targetKey.includes(key));
+    const partial = Array.from(byKey.entries()).find(
+      ([key]) => key.includes(targetKey) || targetKey.includes(key),
+    );
     if (partial) {
       matched.push(partial[1]);
       return;
@@ -103,21 +130,34 @@ export function findLiquidityTargets(accounts: Entity[], configuredAccountIds: s
 }
 
 export function deriveDefaultLiquidityAccountIds(accounts: Entity[]): string[] {
-  return findLiquidityTargets(accounts).matched.map((account) => String(account.id));
+  return findLiquidityTargets(accounts).matched.map((account) =>
+    String(account.id),
+  );
 }
 
-export function sanitizeFlowAllocations(list: unknown): ContributionFlowAllocation[] {
+export function sanitizeFlowAllocations(
+  list: unknown,
+): ContributionFlowAllocation[] {
   const items = Array.isArray(list) ? list : [];
   return items
-    .map((item: any) => ({
-      accountId: String(item?.accountId || "").trim(),
-      amount: round2(parseFloatSafe(item?.amount, 0)),
-    }))
-    .filter((item) => item.accountId && Number.isFinite(item.amount) && item.amount > 0);
+    .map((item): ContributionFlowAllocation => {
+      const candidate: UnknownRecord =
+        item && typeof item === "object" ? (item as UnknownRecord) : {};
+      return {
+        accountId: String(candidate.accountId || "").trim(),
+        amount: round2(parseFloatSafe(candidate.amount, 0)),
+      };
+    })
+    .filter(
+      (item) =>
+        item.accountId && Number.isFinite(item.amount) && item.amount > 0,
+    );
 }
 
 export function getFlowFromAllocations(list: unknown): number {
-  return round2(sanitizeFlowAllocations(list).reduce((sum, item) => sum + item.amount, 0));
+  return round2(
+    sanitizeFlowAllocations(list).reduce((sum, item) => sum + item.amount, 0),
+  );
 }
 
 export function deriveContributionFlow(contribution: Partial<Contribution>): {
@@ -125,7 +165,9 @@ export function deriveContributionFlow(contribution: Partial<Contribution>): {
   flowSource: "legacy" | "allocations";
   allocations: ContributionFlowAllocation[];
 } {
-  const allocations = sanitizeFlowAllocations(contribution.flowAllocations || []);
+  const allocations = sanitizeFlowAllocations(
+    contribution.flowAllocations || [],
+  );
   const allocatedFlow = getFlowFromAllocations(allocations);
 
   if (allocatedFlow > 0) {
@@ -137,8 +179,11 @@ export function deriveContributionFlow(contribution: Partial<Contribution>): {
   }
 
   return {
-    flow: round2(parseFloatSafe(contribution.flow, parseFloatSafe(contribution.amount, 0))),
-    flowSource: contribution.flowSource === "allocations" ? "allocations" : "legacy",
+    flow: round2(
+      parseFloatSafe(contribution.flow, parseFloatSafe(contribution.amount, 0)),
+    ),
+    flowSource:
+      contribution.flowSource === "allocations" ? "allocations" : "legacy",
     allocations,
   };
 }

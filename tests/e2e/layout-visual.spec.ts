@@ -48,10 +48,10 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
       activePanel,
       ...Array.from(
         activePanel.querySelectorAll<HTMLElement>(
-            [
-              ".cards-grid",
-              ".dashboard-kpi-layout",
-              "[data-dashboard-chart-grid]",
+          [
+            ".cards-grid",
+            ".dashboard-kpi-layout",
+            "[data-dashboard-chart-grid]",
             ".dual-grid",
             ".goal-edit-grid",
             ".goal-progress",
@@ -62,23 +62,29 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
             ".mini-form",
             ".data-actions",
             ".tag-wrap",
-          ].join(",")
-        )
+          ].join(","),
+        ),
       ),
     ];
 
     for (const container of containers) {
-      const children = Array.from(container.children).filter((node): node is HTMLElement => {
-        if (!(node instanceof HTMLElement)) {
-          return false;
-        }
-        const styles = window.getComputedStyle(node);
-        if (styles.display === "none" || styles.visibility === "hidden" || styles.opacity === "0") {
-          return false;
-        }
-        const rect = node.getBoundingClientRect();
-        return rect.width > 1 && rect.height > 1;
-      });
+      const children = Array.from(container.children).filter(
+        (node): node is HTMLElement => {
+          if (!(node instanceof HTMLElement)) {
+            return false;
+          }
+          const styles = window.getComputedStyle(node);
+          if (
+            styles.display === "none" ||
+            styles.visibility === "hidden" ||
+            styles.opacity === "0"
+          ) {
+            return false;
+          }
+          const rect = node.getBoundingClientRect();
+          return rect.width > 1 && rect.height > 1;
+        },
+      );
 
       for (let i = 0; i < children.length; i += 1) {
         const first = children[i];
@@ -92,19 +98,27 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
 
           const overlapX = Math.max(
             0,
-            Math.min(firstRect.right, secondRect.right) - Math.max(firstRect.left, secondRect.left)
+            Math.min(firstRect.right, secondRect.right) -
+              Math.max(firstRect.left, secondRect.left),
           );
           const overlapY = Math.max(
             0,
-            Math.min(firstRect.bottom, secondRect.bottom) - Math.max(firstRect.top, secondRect.top)
+            Math.min(firstRect.bottom, secondRect.bottom) -
+              Math.max(firstRect.top, secondRect.top),
           );
           const overlapArea = overlapX * overlapY;
 
           if (overlapArea > 4) {
             overlapIssues.push({
-              container: container.id ? `#${container.id}` : container.className || container.tagName.toLowerCase(),
-              first: first.id ? `#${first.id}` : first.className || first.tagName.toLowerCase(),
-              second: second.id ? `#${second.id}` : second.className || second.tagName.toLowerCase(),
+              container: container.id
+                ? `#${container.id}`
+                : container.className || container.tagName.toLowerCase(),
+              first: first.id
+                ? `#${first.id}`
+                : first.className || first.tagName.toLowerCase(),
+              second: second.id
+                ? `#${second.id}`
+                : second.className || second.tagName.toLowerCase(),
               overlapArea: Math.round(overlapArea),
             });
           }
@@ -114,8 +128,8 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
 
     const interactiveElements = Array.from(
       activePanel.querySelectorAll<HTMLElement>(
-        "button, a[href], [role='button'], input:not([type='checkbox']):not([type='radio']), select"
-      )
+        "button, a[href], [role='button'], input:not([type='checkbox']):not([type='radio']), select",
+      ),
     ).filter((element) => {
       const styles = window.getComputedStyle(element);
       if (styles.display === "none" || styles.visibility === "hidden") {
@@ -129,7 +143,10 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
       const rect = element.getBoundingClientRect();
       if (rect.width < 24 || rect.height < 24) {
         undersizedInteractiveElements.push(
-          element.id ? `#${element.id}` : element.getAttribute("aria-label") || element.tagName.toLowerCase()
+          element.id
+            ? `#${element.id}`
+            : element.getAttribute("aria-label") ||
+                element.tagName.toLowerCase(),
         );
       }
     }
@@ -152,12 +169,17 @@ test.describe("UI layout integrity", () => {
       });
 
       const scan = await getLayoutScanResult(page);
-      expect(scan.documentScrollWidth).toBeLessThanOrEqual(scan.viewportWidth + 1);
+      expect(scan.documentScrollWidth).toBeLessThanOrEqual(
+        scan.viewportWidth + 1,
+      );
       expect(scan.overlapIssues).toEqual([]);
       expect(scan.undersizedInteractiveElements).toEqual([]);
     });
 
-    test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
+    test(`snapshot visual estable en "${sectionId}"`, async ({
+      tracker,
+      page,
+    }) => {
       await tracker.open(sectionId);
       await page.evaluate(async () => {
         await document.fonts.ready;

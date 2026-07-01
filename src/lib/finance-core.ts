@@ -62,7 +62,10 @@ export function slug(value: string): string {
   );
 }
 
-export function getMonthTotals(transactions: Transaction[], month: number): {
+export function getMonthTotals(
+  transactions: Transaction[],
+  month: number,
+): {
   income: number;
   expense: number;
   investment: number;
@@ -83,7 +86,7 @@ export function getMonthTotals(transactions: Transaction[], month: number): {
         }
         return acc;
       },
-      { income: 0, expense: 0, investment: 0 }
+      { income: 0, expense: 0, investment: 0 },
     );
 }
 
@@ -91,7 +94,7 @@ export function getCategoryActuals(
   transactions: Transaction[],
   type: TxType,
   month: number,
-  categories: string[]
+  categories: string[],
 ): Record<string, number> {
   const map: Record<string, number> = {};
 
@@ -119,7 +122,7 @@ function getSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",
   month: number,
-  itemId: string
+  itemId: string,
 ): number | null {
   const snapshot = snapshots[String(month)];
   if (!snapshot || !snapshot[kind]) {
@@ -133,7 +136,7 @@ function getLatestSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",
   itemId: string,
-  month: number
+  month: number,
 ): { month: number; value: number } | null {
   for (let m = month; m >= 0; m -= 1) {
     const value = getSnapshotValue(snapshots, kind, m, itemId);
@@ -149,14 +152,19 @@ export function computeAccountBalance(
   month: number,
   accounts: Entity[],
   transactions: Transaction[],
-  snapshots: Record<string, Snapshot>
+  snapshots: Record<string, Snapshot>,
 ): number {
   const account = accounts.find((item) => item.id === accountId);
   if (!account) {
     return 0;
   }
 
-  const latestSnapshot = getLatestSnapshotValue(snapshots, "accounts", accountId, month);
+  const latestSnapshot = getLatestSnapshotValue(
+    snapshots,
+    "accounts",
+    accountId,
+    month,
+  );
   let startMonth = -1;
   let balance = Number(account.openingBalance || 0);
 
@@ -190,7 +198,10 @@ function matchesInvestmentAsset(category: string, asset: Entity): boolean {
     return false;
   }
   const categorySlug = slug(category);
-  return categorySlug === asset.id || category.toLowerCase() === String(asset.name || "").toLowerCase();
+  return (
+    categorySlug === asset.id ||
+    category.toLowerCase() === String(asset.name || "").toLowerCase()
+  );
 }
 
 export function computeInvestmentValue(
@@ -198,14 +209,19 @@ export function computeInvestmentValue(
   month: number,
   assets: Entity[],
   transactions: Transaction[],
-  snapshots: Record<string, Snapshot>
+  snapshots: Record<string, Snapshot>,
 ): number {
   const asset = assets.find((item) => item.id === assetId);
   if (!asset) {
     return 0;
   }
 
-  const latestSnapshot = getLatestSnapshotValue(snapshots, "investments", assetId, month);
+  const latestSnapshot = getLatestSnapshotValue(
+    snapshots,
+    "investments",
+    assetId,
+    month,
+  );
   let startMonth = -1;
   let value = Number(asset.openingBalance || 0);
 
@@ -235,14 +251,19 @@ export function computeLiabilityValue(
   liabilityId: string,
   month: number,
   liabilities: Entity[],
-  snapshots: Record<string, Snapshot>
+  snapshots: Record<string, Snapshot>,
 ): number {
   const liability = liabilities.find((item) => item.id === liabilityId);
   if (!liability) {
     return 0;
   }
 
-  const latestSnapshot = getLatestSnapshotValue(snapshots, "liabilities", liabilityId, month);
+  const latestSnapshot = getLatestSnapshotValue(
+    snapshots,
+    "liabilities",
+    liabilityId,
+    month,
+  );
   if (latestSnapshot) {
     return round2(latestSnapshot.value);
   }
@@ -256,19 +277,30 @@ export function getWealthByMonth(
   investmentAssets: Entity[],
   liabilities: Entity[],
   transactions: Transaction[],
-  snapshots: Record<string, Snapshot>
+  snapshots: Record<string, Snapshot>,
 ): WealthSnapshot {
   const liquidity = accounts.reduce(
-    (sum, item) => sum + computeAccountBalance(item.id, month, accounts, transactions, snapshots),
-    0
+    (sum, item) =>
+      sum +
+      computeAccountBalance(item.id, month, accounts, transactions, snapshots),
+    0,
   );
   const investment = investmentAssets.reduce(
-    (sum, item) => sum + computeInvestmentValue(item.id, month, investmentAssets, transactions, snapshots),
-    0
+    (sum, item) =>
+      sum +
+      computeInvestmentValue(
+        item.id,
+        month,
+        investmentAssets,
+        transactions,
+        snapshots,
+      ),
+    0,
   );
   const liabilitiesValue = liabilities.reduce(
-    (sum, item) => sum + computeLiabilityValue(item.id, month, liabilities, snapshots),
-    0
+    (sum, item) =>
+      sum + computeLiabilityValue(item.id, month, liabilities, snapshots),
+    0,
   );
 
   return {
@@ -279,9 +311,13 @@ export function getWealthByMonth(
   };
 }
 
-export function computeContributionMetrics(entries: ContributionEntry[]): ContributionMetric[] {
+export function computeContributionMetrics(
+  entries: ContributionEntry[],
+): ContributionMetric[] {
   const sorted = [...entries].sort((a, b) =>
-    String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date))
+    String(a.portfolioDate || a.date).localeCompare(
+      String(b.portfolioDate || b.date),
+    ),
   );
 
   if (!sorted.length) {
@@ -294,8 +330,12 @@ export function computeContributionMetrics(entries: ContributionEntry[]): Contri
   let prevUnits = 0;
 
   sorted.forEach((item, index) => {
-    const portfolioValue = Number.isFinite(Number(item.portfolioValue)) ? Number(item.portfolioValue) : 0;
-    const flow = Number.isFinite(Number(item.flow)) ? Number(item.flow) : Number(item.amount || 0);
+    const portfolioValue = Number.isFinite(Number(item.portfolioValue))
+      ? Number(item.portfolioValue)
+      : 0;
+    const flow = Number.isFinite(Number(item.flow))
+      ? Number(item.flow)
+      : Number(item.amount || 0);
 
     let nav: number;
     let unitsBefore: number;

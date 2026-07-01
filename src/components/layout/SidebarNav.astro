@@ -1,0 +1,35 @@
+---
+import { APP_SECTIONS } from '../../config/app-sections'
+import type { SectionId } from '../../scripts/types'
+import NavIcon from './NavIcon.astro'
+
+export interface Props {
+  activeSection: SectionId
+}
+
+const { activeSection } = Astro.props
+---
+
+<nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
+  {
+    APP_SECTIONS.map((section) => {
+      const isActive = section.id === activeSection
+
+      return (
+        <button
+          type="button"
+          class:list={['nav-btn', { 'is-active': isActive }]}
+          data-section={section.id}
+          aria-controls={section.id}
+          aria-current={isActive ? 'page' : undefined}
+          aria-label={section.label}
+        >
+          <span class="nav-icon" aria-hidden="true">
+            <NavIcon sectionId={section.id} />
+          </span>
+          <span class="nav-label">{section.label}</span>
+        </button>
+      )
+    })
+  }
+</nav>

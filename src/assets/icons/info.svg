@@ -1,0 +1,12 @@
+<svg
+    class="h-3 w-3 flex-none text-(--text-faint)"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.35"
+    aria-hidden="true"
+>
+    <circle cx="10" cy="10" r="7"></circle>
+    <path d="M10 9.2v4"></path>
+    <circle cx="10" cy="6.5" r="0.7" fill="currentColor" stroke="none"></circle>
+</svg>

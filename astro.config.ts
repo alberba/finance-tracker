@@ -1,10 +1,14 @@
-import { defineConfig } from "astro/config";
-import cloudflare from "@astrojs/cloudflare";
+import { defineConfig } from 'astro/config'
+import cloudflare from '@astrojs/cloudflare'
 
-import tailwindcss from "@tailwindcss/vite";
+import tailwindcss from '@tailwindcss/vite'
+
+import vue from '@astrojs/vue'
+
+import svgLoader from 'vite-svg-loader'
 
 export default defineConfig({
-  output: "server",
+  output: 'server',
 
   adapter: cloudflare({
     platformProxy: {
@@ -18,6 +22,12 @@ export default defineConfig({
   },
 
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss(), svgLoader()],
   },
-});
+
+  integrations: [
+    vue({
+      appEntrypoint: '/src/vue-app',
+    }),
+  ],
+})

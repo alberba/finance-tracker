@@ -17,10 +17,17 @@ const payload: IssueReportPayload = {
 
 describe("github issues service", () => {
   it("crea issue y devuelve número/url", async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) =>
-      new Response(JSON.stringify({ number: 99, html_url: "https://github.com/org/repo/issues/99" }), {
-        status: 201,
-      })
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            number: 99,
+            html_url: "https://github.com/org/repo/issues/99",
+          }),
+          {
+            status: 201,
+          },
+        ),
     );
 
     const result = await createIssueFromWebReport(
@@ -30,7 +37,7 @@ describe("github issues service", () => {
         GITHUB_OWNER: "org",
         GITHUB_REPO: "repo",
       },
-      { fetch: fakeFetch as unknown as typeof fetch }
+      { fetch: fakeFetch as unknown as typeof fetch },
     );
 
     expect(result.number).toBe(99);
@@ -39,7 +46,12 @@ describe("github issues service", () => {
     const [, init] = fakeFetch.mock.calls[0];
     const body = JSON.parse(String(init?.body || "{}"));
     expect(body.labels).toEqual(
-      expect.arrayContaining(["source:web-report", "status:triage", "enrich:pending", "type:bug"])
+      expect.arrayContaining([
+        "source:web-report",
+        "status:triage",
+        "enrich:pending",
+        "type:bug",
+      ]),
     );
     expect(body.body).toContain("- Se envió desde la sección: transactions");
     expect(body.body).toContain("- Se envió desde la ruta: /movimientos");
@@ -51,10 +63,17 @@ describe("github issues service", () => {
       ...payload,
       mentionClaude: false,
     };
-    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) =>
-      new Response(JSON.stringify({ number: 14, html_url: "https://github.com/org/repo/issues/14" }), {
-        status: 201,
-      })
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            number: 14,
+            html_url: "https://github.com/org/repo/issues/14",
+          }),
+          {
+            status: 201,
+          },
+        ),
     );
 
     await createIssueFromWebReport(
@@ -64,12 +83,18 @@ describe("github issues service", () => {
         GITHUB_OWNER: "org",
         GITHUB_REPO: "repo",
       },
-      { fetch: fakeFetch as unknown as typeof fetch }
+      { fetch: fakeFetch as unknown as typeof fetch },
     );
 
     const [, init] = fakeFetch.mock.calls[0];
     const body = JSON.parse(String(init?.body || "{}"));
-    expect(body.labels).toEqual(expect.arrayContaining(["source:web-report", "status:triage", "type:bug"]));
+    expect(body.labels).toEqual(
+      expect.arrayContaining([
+        "source:web-report",
+        "status:triage",
+        "type:bug",
+      ]),
+    );
     expect(body.labels).not.toContain("enrich:pending");
     expect(body.body).not.toContain("@claude");
   });
@@ -78,7 +103,12 @@ describe("github issues service", () => {
     const fakeFetch = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(new Response("busy", { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ number: 7, html_url: "https://x/issues/7" }), { status: 201 }));
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ number: 7, html_url: "https://x/issues/7" }),
+          { status: 201 },
+        ),
+      );
 
     const result = await createIssueFromWebReport(
       payload,
@@ -87,7 +117,7 @@ describe("github issues service", () => {
         GITHUB_OWNER: "org",
         GITHUB_REPO: "repo",
       },
-      { fetch: fakeFetch as unknown as typeof fetch }
+      { fetch: fakeFetch as unknown as typeof fetch },
     );
 
     expect(result.number).toBe(7);
@@ -95,7 +125,9 @@ describe("github issues service", () => {
   });
 
   it("lanza error en fallo no recuperable", async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) => new Response("forbidden", { status: 403 }));
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () => new Response("forbidden", { status: 403 }),
+    );
 
     await expect(
       createIssueFromWebReport(
@@ -105,16 +137,23 @@ describe("github issues service", () => {
           GITHUB_OWNER: "org",
           GITHUB_REPO: "repo",
         },
-        { fetch: fakeFetch as unknown as typeof fetch }
-      )
+        { fetch: fakeFetch as unknown as typeof fetch },
+      ),
     ).rejects.toThrowError(/GitHub API devolvió 403/);
   });
 
   it("usa GITHUB_TOKEN cuando GITHUB_ISSUE_TOKEN no está definido", async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async (_input, _init) =>
-      new Response(JSON.stringify({ number: 5, html_url: "https://github.com/org/repo/issues/5" }), {
-        status: 201,
-      })
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({
+            number: 5,
+            html_url: "https://github.com/org/repo/issues/5",
+          }),
+          {
+            status: 201,
+          },
+        ),
     );
 
     await createIssueFromWebReport(
@@ -124,7 +163,7 @@ describe("github issues service", () => {
         GITHUB_OWNER: "org",
         GITHUB_REPO: "repo",
       },
-      { fetch: fakeFetch as unknown as typeof fetch }
+      { fetch: fakeFetch as unknown as typeof fetch },
     );
 
     const [, init] = fakeFetch.mock.calls[0];
@@ -143,8 +182,8 @@ describe("github issues service", () => {
           GITHUB_OWNER: "org",
           GITHUB_REPO: "repo",
         },
-        { fetch: fakeFetch as unknown as typeof fetch }
-      )
+        { fetch: fakeFetch as unknown as typeof fetch },
+      ),
     ).rejects.toThrowError(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/);
     expect(fakeFetch).not.toHaveBeenCalled();
   });

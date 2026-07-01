@@ -2,8 +2,5 @@
   "number": 42,
   "title": "No guarda el filtro de cuenta",
   "body": "Cuando cambio de pestaña se pierde el filtro. @claude",
-  "labels": [
-    { "name": "source:web-report" },
-    { "name": "type:bug" }
-  ]
+  "labels": [{ "name": "source:web-report" }, { "name": "type:bug" }]
 }

@@ -55,7 +55,10 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!consumeRateLimit(getClientKey(request))) {
-    return jsonResponse({ ok: false, error: "Rate limit excedido. Intenta en un minuto." }, 429);
+    return jsonResponse(
+      { ok: false, error: "Rate limit excedido. Intenta en un minuto." },
+      429,
+    );
   }
 
   try {
@@ -68,15 +71,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
         ok: true,
         issueNumber: created.number,
         issueUrl: created.url,
-        ...(payload.mentionClaude ? { enrichmentStatus: "pending" as const } : {}),
+        ...(payload.mentionClaude
+          ? { enrichmentStatus: "pending" as const }
+          : {}),
       },
-      201
+      201,
     );
   } catch (error) {
     if (error instanceof ZodError) {
-      return jsonResponse({ ok: false, error: "Payload inválido.", details: error.issues }, 400);
+      return jsonResponse(
+        { ok: false, error: "Payload inválido.", details: error.issues },
+        400,
+      );
     }
-    const message = error instanceof Error ? error.message : "No se pudo crear la issue";
+    const message =
+      error instanceof Error ? error.message : "No se pudo crear la issue";
     return jsonResponse({ ok: false, error: message }, 500);
   }
 };
