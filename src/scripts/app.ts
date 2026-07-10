@@ -4,7 +4,7 @@ import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-s
 import { getEventElement } from "./app/dom-helpers";
 import { getAppElements } from "./app/elements";
 import { type UiState } from "./app/ui-state";
-import { clone } from "./utils";
+import { clone, todayISO } from "./utils";
 import {
   BASE_SEED,
   loadPersistedState,
@@ -14,6 +14,7 @@ import {
   sortContributionsInState,
   sortTransactionsInState,
 } from "./state";
+import { materializeDueSubscriptions } from "./subscriptions";
 import { useFinancialStateStore } from "../stores/financial-state";
 import { pinia } from "../stores/pinia";
 import { useUiStore } from "../stores/ui";
@@ -77,6 +78,11 @@ import { useUiStore } from "../stores/ui";
     const preferredState =
       pickMostRecentState(localState, serverState) || clone(BASE_SEED);
     state = financialStateStore.replaceState(preferredState);
+    const dueSubscriptions = materializeDueSubscriptions(state, todayISO());
+    if (dueSubscriptions.advancedCount > 0) {
+      sortTransactionsInState(state);
+      void persistServerState(state);
+    }
     persistState(state);
   }
 

@@ -1,6 +1,7 @@
 import type {
   BudgetType,
   InvestmentSubTab,
+  TransactionsSubTab,
   SectionId,
   SnapshotKind,
   SortDirection,
@@ -22,6 +23,7 @@ export interface UiState {
   txSelectedIds: string[]
   txFilters: TransactionFilters
   txEditingId: string
+  txTab: TransactionsSubTab
   snapshotMonth: number
   investmentMonth: number
   wealthCalcTargetId: string

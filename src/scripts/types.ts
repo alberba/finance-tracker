@@ -1,5 +1,12 @@
 export const TRANSACTION_TYPES = ["income", "expense", "investment"] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+export const SUBSCRIPTION_FREQUENCIES = [
+  "weekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+] as const;
+export type SubscriptionFrequency = (typeof SUBSCRIPTION_FREQUENCIES)[number];
 export const INVESTMENT_SIDES = ["buy", "sell"] as const;
 export type InvestmentSide = (typeof INVESTMENT_SIDES)[number];
 export type BudgetType = TransactionType;
@@ -12,6 +19,7 @@ export type TxSortColumn =
   | "description";
 export type SortDirection = "asc" | "desc";
 export type InvestmentSubTab = "dashboard" | "movements" | "contributions";
+export type TransactionsSubTab = "registry" | "subscriptions";
 export type SnapshotKind = "accounts" | "investments" | "liabilities";
 export type EntityKey = "accounts" | "investmentAssets" | "liabilities";
 export type CategoryKey =
@@ -49,6 +57,20 @@ export interface Transaction {
   fee?: number;
   movementCurrency?: string;
   declared?: boolean;
+  subscriptionId?: string;
+  subscriptionChargeDate?: string;
+}
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  accountId: string;
+  category: string;
+  frequency: SubscriptionFrequency;
+  startDate: string;
+  nextChargeDate: string;
+  active: boolean;
 }
 
 export interface SnapshotRow {
@@ -100,6 +122,7 @@ export interface State {
   expenseCategories: string[];
   investmentCategories: string[];
   transactions: Transaction[];
+  subscriptions: Subscription[];
   snapshots: Record<string, SnapshotRow>;
   budget: Record<BudgetType, Record<string, number[]>>;
   goals: Record<GoalKey, Goal>;
@@ -233,6 +256,10 @@ export function isSnapshotKind(value: string): value is SnapshotKind {
 
 export function isTransactionType(value: string): value is TransactionType {
   return (TRANSACTION_TYPES as readonly string[]).includes(value);
+}
+
+export function isSubscriptionFrequency(value: string): value is SubscriptionFrequency {
+  return (SUBSCRIPTION_FREQUENCIES as readonly string[]).includes(value);
 }
 
 export function isInvestmentSide(value: string): value is InvestmentSide {

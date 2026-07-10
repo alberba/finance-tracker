@@ -7,10 +7,11 @@ import TransactionFormDialog from '../transactions/TransactionFormDialog.vue'
 import TransactionSummary from '../transactions/TransactionSummary.vue'
 import TransactionsTable from '../transactions/TransactionsTable.vue'
 import { hasSelectionWithin } from '../../scripts/app/dom-helpers'
-import { MONTHS } from '../../scripts/types'
+import { MONTHS, type TransactionsSubTab } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 import DashboardPeriodField from '../dashboard/DashboardPeriodField.vue'
+import TransactionsSubscriptionsTab from '../transactions/TransactionsSubscriptionsTab.vue'
 
 withDefaults(
   defineProps<{
@@ -30,6 +31,10 @@ const monthOptions = computed(() => MONTHS.map((name, index) => ({ value: index,
 
 function openModal(): void {
   dialogRef.value?.open()
+}
+
+function setTab(tab: TransactionsSubTab): void {
+  ui.txTab = tab
 }
 
 // Close the open header filter popover on outside pointerdown, unless the
@@ -107,15 +112,19 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <TransactionBulkCard />
-
-    <TransactionFormDialog ref="dialogRef" />
-
-    <div
-      class="grid items-start gap-3.5 min-[1240px]:grid-cols-[minmax(0,1fr)_minmax(310px,0.4fr)]"
-    >
-      <TransactionsTable />
-      <TransactionSummary />
+    <div class="flex w-fit rounded-lg border border-(--border) bg-(--panel) p-1" role="tablist" aria-label="Subsecciones de movimientos">
+      <button id="transactions-tab-registry-button" type="button" role="tab" :aria-selected="ui.txTab === 'registry'" aria-controls="transactions-tab-registry" class="rounded-md px-3 py-1.5 text-sm font-semibold transition" :class="ui.txTab === 'registry' ? 'bg-(--primary) text-white' : 'text-(--text-muted)'" @click="setTab('registry')">Registro</button>
+      <button id="transactions-tab-subscriptions-button" type="button" role="tab" :aria-selected="ui.txTab === 'subscriptions'" aria-controls="transactions-tab-subscriptions" class="rounded-md px-3 py-1.5 text-sm font-semibold transition" :class="ui.txTab === 'subscriptions' ? 'bg-(--primary) text-white' : 'text-(--text-muted)'" @click="setTab('subscriptions')">Suscripciones</button>
     </div>
+
+    <div id="transactions-tab-registry" role="tabpanel" :hidden="ui.txTab !== 'registry'" aria-labelledby="transactions-tab-registry-button">
+      <TransactionBulkCard />
+      <TransactionFormDialog ref="dialogRef" />
+      <div class="grid items-start gap-3.5 min-[1240px]:grid-cols-[minmax(0,1fr)_minmax(310px,0.4fr)]">
+        <TransactionsTable />
+        <TransactionSummary />
+      </div>
+    </div>
+    <TransactionsSubscriptionsTab :is-active="ui.txTab === 'subscriptions'" />
   </AppSection>
 </template>

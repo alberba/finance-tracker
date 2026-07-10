@@ -21,6 +21,7 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
   const year = computed(() => state.value.year)
   const accounts = computed(() => state.value.accounts)
   const transactions = computed(() => state.value.transactions)
+  const subscriptions = computed(() => state.value.subscriptions)
   const budget = computed(() => state.value.budget)
   const goals = computed(() => state.value.goals)
   const investmentAssets = computed(() => state.value.investmentAssets)
@@ -107,6 +108,7 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     year,
     accounts,
     transactions,
+    subscriptions,
     budget,
     goals,
     investmentAssets,
