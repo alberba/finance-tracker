@@ -26,6 +26,10 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
   const goals = computed(() => state.value.goals)
   const investmentAssets = computed(() => state.value.investmentAssets)
   const contributions = computed(() => state.value.contributions)
+  const instruments = computed(() => state.value.instruments)
+  const quotes = computed(() => state.value.quotes)
+  const recurringRules = computed(() => state.value.recurringRules)
+  const pendingMovements = computed(() => state.value.pendingMovements)
 
   function replaceState(nextState: unknown): State {
     state.value = normalizeState(nextState)
@@ -113,6 +117,10 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     goals,
     investmentAssets,
     contributions,
+    instruments,
+    quotes,
+    recurringRules,
+    pendingMovements,
     replaceState,
     patchState,
     commitState,

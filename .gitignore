@@ -8,6 +8,9 @@ test-results
 .data
 .wrangler
 worker-configuration.d.ts
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 package-lock.json
 
 # Playwright

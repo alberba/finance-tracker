@@ -6,3 +6,8 @@ binding = "finance_tracker_db"
 database_name = "finance-tracker-db"
 database_id = "cfcc8de2-9fb4-46b1-81cf-0f32319fd9b1"
 migrations_dir = "migrations"
+
+[vars]
+MARKET_DATA_PROVIDER = "twelve-data"
+MARKET_QUOTE_STALE_MINUTES = "15"
+MARKET_QUOTE_CACHE_SECONDS = "300"
