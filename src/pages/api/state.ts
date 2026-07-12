@@ -10,11 +10,18 @@ function requestNamespace(request: Request): string | undefined {
 export const GET: APIRoute = async ({ request, locals }) => {
   try {
     const db = getD1FromLocals(locals);
-    const state = await loadStateFromD1(db, requestNamespace(request));
-    return new Response(JSON.stringify({ state }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const snapshot = await loadStateFromD1(db, requestNamespace(request));
+    return new Response(
+      JSON.stringify({
+        state: snapshot.state,
+        version: snapshot.version,
+        updatedAt: snapshot.updatedAt,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "No se pudo cargar el estado";
@@ -28,7 +35,10 @@ export const GET: APIRoute = async ({ request, locals }) => {
 export const PUT: APIRoute = async ({ request, locals }) => {
   try {
     const db = getD1FromLocals(locals);
-    const body = (await request.json()) as { state?: unknown };
+    const body = (await request.json()) as {
+      state?: unknown;
+      baseVersion?: unknown;
+    };
     const state = body?.state;
     if (!state || typeof state !== "object") {
       return new Response(JSON.stringify({ error: "Payload inválido" }), {
@@ -37,11 +47,43 @@ export const PUT: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    await saveStateToD1(db, requestNamespace(request), state);
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const baseVersion =
+      typeof body?.baseVersion === "number" ? body.baseVersion : undefined;
+    const outcome = await saveStateToD1(
+      db,
+      requestNamespace(request),
+      state,
+      baseVersion,
+    );
+
+    if (!outcome.ok) {
+      // Another device saved since the client's baseVersion: report the current
+      // server snapshot so the client can reconcile instead of overwriting it.
+      return new Response(
+        JSON.stringify({
+          conflict: true,
+          state: outcome.current.state,
+          version: outcome.current.version,
+          updatedAt: outcome.current.updatedAt,
+        }),
+        {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        version: outcome.version,
+        updatedAt: outcome.updatedAt,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch {
     return new Response(
       JSON.stringify({ error: "No se pudo guardar el estado" }),

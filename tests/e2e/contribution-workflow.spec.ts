@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, mirrorStateToServer } from "./fixtures";
 
 test.describe("recorrido guiado de aportes", () => {
   test("fecha inicial del aporte es hoy", async ({ tracker }) => {
@@ -223,6 +223,7 @@ test.describe("recorrido guiado de aportes", () => {
         JSON.stringify(state),
       );
     });
+    await mirrorStateToServer(page);
     await tracker.reload();
 
     await tracker.openContributionWorkflowModal();

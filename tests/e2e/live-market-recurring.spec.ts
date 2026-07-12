@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, mirrorStateToServer } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
@@ -131,6 +131,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       state.meta = { ...(state.meta || {}), savedAt: new Date(Date.now() + 60_000).toISOString() }
       localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
+    await mirrorStateToServer(page)
     await page.reload()
 
     const liveMarket = new LiveMarketPage(page)

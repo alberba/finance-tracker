@@ -7,10 +7,14 @@ import { type UiState } from "./app/ui-state";
 import { clone, todayISO } from "./utils";
 import {
   BASE_SEED,
+  getKnownServerVersion,
+  hasPendingChanges,
   loadPersistedState,
   loadServerState,
   persistState,
   persistServerState,
+  setKnownServerVersion,
+  setPendingChanges,
   sortContributionsInState,
   sortTransactionsInState,
 } from "./state";
@@ -74,47 +78,60 @@ import { useRecurringStore } from "../stores/recurring";
     });
   }
 
+  /**
+   * Reconciles local and server state with the server as the source of truth.
+   * The one exception is local edits that never reached the server (offline
+   * saves, flagged pending): those are flushed up first so they are not lost.
+   * On conflict the server wins to avoid clobbering another device's change.
+   */
   async function hydrateState() {
+    // Capture the version we last confirmed BEFORE loadServerState overwrites it
+    // as a side effect — we need it to tell "server unchanged since our last
+    // sync" (safe to push local edits) from "another device moved it ahead".
+    const priorKnownVersion = getKnownServerVersion();
     const localState = loadPersistedState();
-    const serverState = await loadServerState();
-    const preferredState =
-      pickMostRecentState(localState, serverState) || clone(BASE_SEED);
-    state = financialStateStore.replaceState(preferredState);
+    const server = await loadServerState();
+
+    if (server) {
+      const localPending =
+        localState !== null &&
+        hasPendingChanges() &&
+        (priorKnownVersion === null || priorKnownVersion === server.version);
+
+      if (localPending) {
+        // Local holds unsynced edits and the server hasn't moved past the
+        // version we last saw: try to push them up.
+        state = financialStateStore.replaceState(localState);
+        const result = await persistServerState(state);
+        if (result.status === "ok") {
+          setPendingChanges(false);
+        } else if (result.status === "conflict") {
+          // Both sides diverged — adopt the server copy to stay consistent.
+          state = financialStateStore.replaceState(result.state);
+          setPendingChanges(false);
+        }
+        // On transient error keep the pending flag so the next save retries.
+      } else {
+        state = financialStateStore.replaceState(server.state);
+        setKnownServerVersion(server.version);
+        setPendingChanges(false);
+      }
+    } else if (localState) {
+      // Server unreachable: fall back to the local cache and keep any pending
+      // flag so the change re-syncs once the server is reachable again.
+      state = financialStateStore.replaceState(localState);
+    } else {
+      state = financialStateStore.replaceState(clone(BASE_SEED));
+    }
+
     const dueSubscriptions = materializeDueSubscriptions(state, todayISO());
     if (dueSubscriptions.advancedCount > 0) {
       sortTransactionsInState(state);
+      setPendingChanges(true);
       void persistServerState(state);
     }
     recurringStore.refreshPending();
     persistState(state);
-  }
-
-  function pickMostRecentState(
-    localState: unknown,
-    serverState: unknown,
-  ): unknown | null {
-    if (!localState && !serverState) {
-      return null;
-    }
-    if (localState && !serverState) {
-      return localState;
-    }
-    if (!localState && serverState) {
-      return serverState;
-    }
-
-    const localSavedAt = extractStateTimestamp(localState);
-    const serverSavedAt = extractStateTimestamp(serverState);
-    return localSavedAt >= serverSavedAt ? localState : serverState;
-  }
-
-  function extractStateTimestamp(candidate: unknown): number {
-    const rawMeta = (
-      candidate as { meta?: { savedAt?: string; generatedAt?: string } } | null
-    )?.meta;
-    const timestamp = String(rawMeta?.savedAt || rawMeta?.generatedAt || "");
-    const value = Date.parse(timestamp);
-    return Number.isFinite(value) ? value : 0;
   }
 
   function bindEvents() {

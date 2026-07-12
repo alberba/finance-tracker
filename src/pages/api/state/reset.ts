@@ -10,11 +10,19 @@ function requestNamespace(request: Request): string | undefined {
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const db = getD1FromLocals(locals);
-    const state = await resetStateInD1(db, requestNamespace(request));
-    return new Response(JSON.stringify({ ok: true, state }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const snapshot = await resetStateInD1(db, requestNamespace(request));
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        state: snapshot.state,
+        version: snapshot.version,
+        updatedAt: snapshot.updatedAt,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "No se pudo reiniciar el estado";

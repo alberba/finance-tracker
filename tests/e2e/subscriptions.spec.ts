@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, mirrorStateToServer } from './fixtures'
 
 function addDays(isoDate: string, days: number): string {
   const date = new Date(`${isoDate}T00:00:00.000Z`)
@@ -104,6 +104,7 @@ test.describe('suscripciones de gastos', () => {
       state.meta.savedAt = new Date(Date.now() + 60_000).toISOString()
       localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     }, { pausedDate })
+    await mirrorStateToServer(page)
 
     await tracker.reload()
     await tracker.openSubscriptionsTab()
