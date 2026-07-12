@@ -1,6 +1,8 @@
 import type { Instrument, Quote } from '../scripts/types'
 import type { MarketSearchResult } from '../lib/server/market-search'
 
+export type { MarketSearchResult }
+
 export async function fetchMarketQuotes(
   instruments: Instrument[],
   fallbackQuotes: Record<string, Quote>,
