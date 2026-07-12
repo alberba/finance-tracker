@@ -9,6 +9,8 @@ import DashboardRecentTransactionsPanel from '../dashboard/DashboardRecentTransa
 import DashboardSavingsGoalPanel from '../dashboard/DashboardSavingsGoalPanel.vue'
 import DashboardStatsGrid from '../dashboard/DashboardStatsGrid.vue'
 import AppSection from '../ui/AppSection.vue'
+import MarketQuotesPanel from '../market/MarketQuotesPanel.vue'
+import PendingMovementsPanel from '../recurring/PendingMovementsPanel.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -63,6 +65,9 @@ const {
         @change-month="changeMonth"
       />
     </header>
+
+    <PendingMovementsPanel compact />
+    <MarketQuotesPanel title="Cartera a precio de mercado" />
 
     <DashboardHeroNetWorth
       :kpis="kpis"

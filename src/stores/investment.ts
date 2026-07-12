@@ -29,6 +29,7 @@ import {
   normalizeInvestmentSide,
   normalizeInvestmentSymbol,
 } from '../scripts/investment-movements'
+import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
 import type { InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -60,6 +61,13 @@ export const useInvestmentStore = defineStore('investment', () => {
   function getAccountName(accountId: string): string {
     const account = financialStateStore.accounts.find((item) => item.id === accountId)
     return account ? account.name : accountId || '-'
+  }
+
+  function findUniqueInstrumentId(symbol: string): string | undefined {
+    const matches = financialStateStore.state.instruments.filter(
+      (instrument) => symbolsMatchInstrument(symbol, instrument),
+    )
+    return matches.length === 1 ? matches[0].id : undefined
   }
 
   function isBitvavoBrokerAccount(accountId: string): boolean {
@@ -154,6 +162,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     }
 
     const category = resolveInvestmentCategory(accountId, input.category.trim(), computed.normalizedSymbol)
+    const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
 
     financialStateStore.commitState((draft) => {
       draft.transactions.push({
@@ -167,12 +176,14 @@ export const useInvestmentStore = defineStore('investment', () => {
         amount: computed.signedAmount,
         time,
         symbol: computed.normalizedSymbol,
+        ...(instrumentId ? { instrumentId } : {}),
         side,
         unitPrice: computed.normalizedUnitPrice,
         units: computed.normalizedUnits,
         fee: computed.normalizedFee,
         movementCurrency,
         declared: input.declared,
+        createdAt: new Date().toISOString(),
       })
     })
     showToast('Movimiento de inversión guardado.')
@@ -226,6 +237,9 @@ export const useInvestmentStore = defineStore('investment', () => {
       tx.accountId = accountId
       tx.side = side
       tx.symbol = computed.normalizedSymbol
+      const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
+      if (instrumentId) tx.instrumentId = instrumentId
+      else delete tx.instrumentId
       tx.category = category
       tx.unitPrice = computed.normalizedUnitPrice
       tx.units = computed.normalizedUnits

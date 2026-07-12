@@ -13,6 +13,7 @@ import { evaluateNumericExpression } from '../../scripts/math-expression'
 import { MONTHS, type SnapshotKind } from '../../scripts/types'
 import { parseIntSafe, round2 } from '../../scripts/utils'
 import { useWealthStore } from '../../stores/wealth'
+import MarketQuotesPanel from '../market/MarketQuotesPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -149,6 +150,8 @@ function applyCalc(): void {
         </button>
       </div>
     </div>
+
+    <MarketQuotesPanel title="Valoración de patrimonio en mercado" />
 
     <div class="dual-grid">
       <WealthSnapshotTable

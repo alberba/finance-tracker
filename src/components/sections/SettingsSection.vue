@@ -6,6 +6,8 @@ import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
 import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
+import InstrumentEditorPanel from '../market/InstrumentEditorPanel.vue'
+import RecurringRulesPanel from '../recurring/RecurringRulesPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -80,6 +82,8 @@ function onSaveGeneral(): void {
     </div>
 
     <div class="dual-grid">
+      <InstrumentEditorPanel />
+      <RecurringRulesPanel />
       <EntityEditorCard
         title="Cuentas de liquidez"
         entity-key="accounts"

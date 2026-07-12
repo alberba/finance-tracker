@@ -18,12 +18,14 @@ import { materializeDueSubscriptions } from "./subscriptions";
 import { useFinancialStateStore } from "../stores/financial-state";
 import { pinia } from "../stores/pinia";
 import { useUiStore } from "../stores/ui";
+import { useRecurringStore } from "../stores/recurring";
 
 (() => {
   "use strict";
 
   const financialStateStore = useFinancialStateStore(pinia);
   const uiStore = useUiStore(pinia);
+  const recurringStore = useRecurringStore(pinia);
   let state: State = financialStateStore.replaceState(clone(BASE_SEED));
   const ui = uiStore.ui as UiState;
 
@@ -83,6 +85,7 @@ import { useUiStore } from "../stores/ui";
       sortTransactionsInState(state);
       void persistServerState(state);
     }
+    recurringStore.refreshPending();
     persistState(state);
   }
 

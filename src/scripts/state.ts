@@ -8,6 +8,14 @@ import {
   type Entity,
   type Goal,
   type GoalKey,
+  type Instrument,
+  type InstrumentType,
+  type PendingMovement,
+  type PendingMovementStatus,
+  type Quote,
+  type QuoteStatus,
+  type RecurringFrequency,
+  type RecurringRule,
   type SnapshotRow,
   type State,
   type Subscription,
@@ -55,6 +63,10 @@ const FALLBACK_BASE_SEED = {
   budget: { income: {}, expense: {}, investment: {} },
   goals: {},
   contributions: [],
+  instruments: [],
+  quotes: {},
+  recurringRules: [],
+  pendingMovements: [],
 };
 
 export const BASE_SEED: unknown = FINANCE_TRACKER_SEED || FALLBACK_BASE_SEED;
@@ -178,6 +190,14 @@ export function normalizeState(candidate: unknown): State {
     contributions: normalizeContributions(
       input?.contributions || base.contributions || [],
     ),
+    instruments: normalizeInstruments(input?.instruments || base.instruments || []),
+    quotes: normalizeQuotes(input?.quotes || base.quotes || {}),
+    recurringRules: normalizeRecurringRules(
+      input?.recurringRules || base.recurringRules || [],
+    ),
+    pendingMovements: normalizePendingMovements(
+      input?.pendingMovements || base.pendingMovements || [],
+    ),
   };
 
   if (!safe.investmentCategories.length) {
@@ -254,6 +274,141 @@ function normalizeEntities(list: unknown): Entity[] {
     .filter((item) => item.name);
 }
 
+function normalizeInstruments(list: unknown): Instrument[] {
+  const items = Array.isArray(list) ? list : [];
+  const validTypes: InstrumentType[] = ["stock", "etf", "fund", "crypto"];
+  return items
+    .map((item) => {
+      const raw = asRecord(item);
+      const typeCandidate = String(raw.type || "stock");
+      const type = validTypes.includes(typeCandidate as InstrumentType)
+        ? (typeCandidate as InstrumentType)
+        : "stock";
+      const symbol = String(raw.symbol || "").trim().toUpperCase();
+      return {
+        id: slug(raw.id || `${raw.investmentAssetId || "instrument"}-${symbol}`),
+        investmentAssetId: String(raw.investmentAssetId || ""),
+        type,
+        symbol,
+        market: String(raw.market || "").trim().toUpperCase(),
+        currency: String(raw.currency || "EUR").trim().toUpperCase().slice(0, 3),
+        provider: String(raw.provider || "twelve-data").trim().toLowerCase(),
+        active: raw.active !== false,
+        openingUnits: roundWithPrecision(parseFloatSafe(raw.openingUnits, 0), 8),
+        ...(raw.holdingUnits !== undefined
+          ? { holdingUnits: roundWithPrecision(parseFloatSafe(raw.holdingUnits, 0), 8) }
+          : {}),
+        ...(raw.holdingsAsOf ? { holdingsAsOf: String(raw.holdingsAsOf) } : {}),
+        ...(raw.holdingsUpdatedAt ? { holdingsUpdatedAt: String(raw.holdingsUpdatedAt) } : {}),
+        ...(raw.holdingsSource === 'manual' ? { holdingsSource: 'manual' as const } : {}),
+      } satisfies Instrument;
+    })
+    .filter((instrument) => instrument.symbol && instrument.investmentAssetId);
+}
+
+function normalizeQuotes(input: unknown): Record<string, Quote> {
+  const source = asRecord(input);
+  const output: Record<string, Quote> = {};
+  Object.entries(source).forEach(([instrumentId, value]) => {
+    const raw = asRecord(value);
+    const statusCandidate = String(raw.status || (raw.isStale ? "stale" : "fresh"));
+    const statuses: QuoteStatus[] = ["fresh", "stale", "unavailable"];
+    const status = statuses.includes(statusCandidate as QuoteStatus)
+      ? (statusCandidate as QuoteStatus)
+      : "unavailable";
+    const price = parseFloatSafe(raw.price, NaN);
+    if (!Number.isFinite(price) || price < 0) return;
+    output[instrumentId] = {
+      instrumentId: String(raw.instrumentId || instrumentId),
+      price: round2(price),
+      currency: String(raw.currency || "EUR").trim().toUpperCase().slice(0, 3),
+      timestamp: String(raw.timestamp || ""),
+      source: String(raw.source || "unknown"),
+      status,
+      isStale: status !== "fresh" || raw.isStale === true,
+      previousClose: normalizeOptionalNumber(raw.previousClose),
+      changePercent: normalizeOptionalNumber(raw.changePercent),
+    } satisfies Quote;
+  });
+  return output;
+}
+
+function normalizeRecurringRules(list: unknown): RecurringRule[] {
+  const items = Array.isArray(list) ? list : [];
+  const frequencies: RecurringFrequency[] = ["daily", "weekly", "monthly", "monthEnd", "yearly"];
+  return items.map((item) => {
+    const raw = asRecord(item);
+    const frequencyCandidate = String(raw.frequency || "monthly");
+    const frequency = frequencies.includes(frequencyCandidate as RecurringFrequency)
+      ? (frequencyCandidate as RecurringFrequency)
+      : "monthly";
+    const type = isTransactionType(String(raw.type || "expense"))
+      ? String(raw.type) as RecurringRule["type"]
+      : "expense";
+    const units = normalizeOptionalNumber(raw.units);
+    const unitPrice = normalizeOptionalNumber(raw.unitPrice);
+    return {
+      id: String(raw.id || uid("rule")),
+      type,
+      accountId: String(raw.accountId || ""),
+      category: String(raw.category || "Sin categoría"),
+      description: String(raw.description || ""),
+      amount: round2(parseFloatSafe(raw.amount, 0)),
+      ...(String(raw.symbol || "").trim() ? { symbol: String(raw.symbol).trim().toUpperCase() } : {}),
+      ...(isInvestmentSide(String(raw.side || "")) ? { side: String(raw.side) as "buy" | "sell" } : {}),
+      ...(units !== null ? { units } : {}),
+      ...(unitPrice !== null ? { unitPrice } : {}),
+      frequency,
+      interval: Math.max(1, parseIntSafe(raw.interval, 1)),
+      startDate: String(raw.startDate || todayISO()),
+      endDate: raw.endDate ? String(raw.endDate) : null,
+      active: raw.active !== false,
+      lastExecutionDate: raw.lastExecutionDate ? String(raw.lastExecutionDate) : null,
+      nextOccurrenceDate: raw.nextOccurrenceDate ? String(raw.nextOccurrenceDate) : null,
+    } satisfies RecurringRule;
+  });
+}
+
+function normalizePendingMovements(list: unknown): PendingMovement[] {
+  const items = Array.isArray(list) ? list : [];
+  const statuses: PendingMovementStatus[] = ["pending", "confirmed", "skipped", "cancelled"];
+  return items.map((item) => {
+    const raw = asRecord(item);
+    const statusCandidate = String(raw.status || "pending");
+    const status = statuses.includes(statusCandidate as PendingMovementStatus)
+      ? (statusCandidate as PendingMovementStatus)
+      : "pending";
+    const units = normalizeOptionalNumber(raw.units);
+    const unitPrice = normalizeOptionalNumber(raw.unitPrice);
+    return {
+      id: String(raw.id || uid("pending")),
+      occurrenceKey: String(raw.occurrenceKey || `${raw.ruleId || "rule"}:${raw.occurrenceDate || todayISO()}`),
+      ruleId: String(raw.ruleId || ""),
+      occurrenceDate: String(raw.occurrenceDate || todayISO()),
+      type: isTransactionType(String(raw.type || "expense"))
+        ? String(raw.type) as PendingMovement["type"]
+        : "expense",
+      accountId: String(raw.accountId || ""),
+      category: String(raw.category || "Sin categoría"),
+      description: String(raw.description || ""),
+      amount: round2(parseFloatSafe(raw.amount, 0)),
+      ...(String(raw.symbol || "").trim() ? { symbol: String(raw.symbol).trim().toUpperCase() } : {}),
+      ...(isInvestmentSide(String(raw.side || "")) ? { side: String(raw.side) as "buy" | "sell" } : {}),
+      ...(units !== null ? { units } : {}),
+      ...(unitPrice !== null ? { unitPrice } : {}),
+      status,
+      createdAt: String(raw.createdAt || new Date().toISOString()),
+      updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
+      transactionId: raw.transactionId ? String(raw.transactionId) : null,
+    } satisfies PendingMovement;
+  });
+}
+
+function normalizeOptionalNumber(value: unknown): number | null {
+  const parsed = parseFloatSafe(value, NaN);
+  return Number.isFinite(parsed) && parsed >= 0 ? round2(parsed) : null;
+}
+
 function normalizeStringList(list: unknown): string[] {
   const items = Array.isArray(list) ? list : [];
   return Array.from(
@@ -287,6 +442,9 @@ function normalizeTransactions(list: unknown): Transaction[] {
         description: String(rawItem.description || ""),
         amount,
       };
+      if (rawItem.createdAt) {
+        safe.createdAt = String(rawItem.createdAt);
+      }
 
       const subscriptionId = String(rawItem.subscriptionId || "").trim();
       const subscriptionChargeDate = String(rawItem.subscriptionChargeDate || "").trim();
@@ -321,6 +479,10 @@ function normalizeTransactions(list: unknown): Transaction[] {
         }
         if (symbol) {
           safe.symbol = symbol;
+        }
+        const instrumentId = String(rawItem.instrumentId || '').trim();
+        if (instrumentId) {
+          safe.instrumentId = instrumentId;
         }
         safe.side = side;
         if (unitPrice !== null) {
