@@ -100,7 +100,11 @@ test.describe("Sidebar toggle", () => {
       .evaluate((el) => el.getBoundingClientRect().width);
 
     await page.locator("#sidebar-toggle").click();
-    await page.waitForTimeout(350); // esperar a la transición CSS
+    await expect
+      .poll(() =>
+        page.locator(".sidebar").evaluate((el) => el.getBoundingClientRect().width),
+      )
+      .toBeLessThan(100);
 
     const collapsedWidth = await page
       .locator(".sidebar")
