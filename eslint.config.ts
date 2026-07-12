@@ -56,6 +56,7 @@ export default defineConfig([
       parserOptions: {
         parser: tseslint.parser,
         extraFileExtensions: ['.vue'],
+        tsconfigRootDir: import.meta.dirname,
       },
     },
   },
