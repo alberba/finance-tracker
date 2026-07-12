@@ -98,7 +98,7 @@
   /* Form controls: inline edit rows in those tables + the not-yet-migrated
      investment / wealth forms. Scoped to their container classes so header
      dropdowns and already-migrated sections stay untouched. */
-  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form, .settings-fields)
     label {
     display: grid;
     gap: 6px;
@@ -107,7 +107,7 @@
     font-weight: 600;
   }
   .table-wrap td :is(input, select):not([type='checkbox']),
-  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form, .settings-fields, .mini-form)
     :is(input, select):not([type='checkbox']):not([type='radio']),
   .snapshot-field-stack input {
     width: 100%;
@@ -123,18 +123,18 @@
       box-shadow 0.15s,
       background 0.15s;
   }
-  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form, .settings-fields)
     select,
   .table-wrap td select {
     cursor: pointer;
   }
   .snapshot-field-stack input::placeholder,
-  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form, .settings-fields, .mini-form)
     input::placeholder {
     color: var(--text-faint);
   }
   .table-wrap td :is(input, select):focus-visible,
-  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form)
+  :is(.investment-form, .investment-table-controls, .contribution-workflow-form, .wealth-calc-form, .settings-fields, .mini-form)
     :is(input, select):focus-visible,
   .snapshot-field-stack input:focus-visible {
     outline: none;
