@@ -73,10 +73,14 @@ watch(
 </script>
 
 <template>
-  <article class="card" data-instrument-editor>
-    <h3 class="font-display text-xl">Instrumentos de mercado</h3>
-    <p class="text-text-muted text-sm">Configura el instrumento y vincula sus movimientos existentes. La tenencia actual se edita en la valoración de cartera.</p>
-    <form class="mt-4 grid gap-3 md:grid-cols-2" @submit.prevent="submit">
+  <section id="cfg-instrumentos" class="settings-block" data-instrument-editor>
+    <header>
+      <span class="settings-block__num">02</span>
+      <h3>Instrumentos de mercado</h3>
+      <p>Configura el instrumento y vincula sus movimientos existentes. La tenencia actual se edita en la valoración de cartera.</p>
+    </header>
+    <div class="settings-block__body">
+    <form class="settings-fields grid gap-3 md:grid-cols-2" @submit.prevent="submit">
       <label>Activo<select v-model="form.investmentAssetId" required><option value="">Selecciona un activo</option><option v-for="asset in financialStateStore.investmentAssets" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select></label>
       <label>Tipo<select v-model="form.type"><option v-for="item in types" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
       <label>Símbolo<input v-model="form.symbol" required placeholder="VWCE, BTC…" /></label>
@@ -85,7 +89,8 @@ watch(
       <label>Proveedor<select v-model="form.provider"><option value="twelve-data">Twelve Data</option><option value="yahoo">Yahoo Finance</option><option value="coingecko">CoinGecko</option></select></label>
       <button type="submit" class="primary-btn md:col-span-2">Añadir instrumento</button>
     </form>
-    <ul v-if="marketStore.instruments.length" class="instrument-list" aria-label="Instrumentos configurados">
+    <p v-if="!marketStore.instruments.length" class="text-text-muted text-sm">Aún no hay instrumentos. Añade uno para recibir cotizaciones en vivo.</p>
+    <ul v-else class="instrument-list" aria-label="Instrumentos configurados">
       <li v-for="instrument in marketStore.instruments" :key="instrument.id" class="instrument-card">
         <div class="instrument-card__header">
           <div>
@@ -167,14 +172,14 @@ watch(
         </div>
       </li>
     </ul>
-  </article>
+    </div>
+  </section>
 </template>
 
 <style scoped>
 .instrument-list {
   display: grid;
   gap: 0.75rem;
-  margin-top: 1rem;
 }
 
 .instrument-card {
