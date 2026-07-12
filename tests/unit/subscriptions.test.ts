@@ -46,6 +46,10 @@ function createState(subscription: Subscription): State {
       investmentCrypto: { name: '', targetYear: 2026, targetAmount: 0 },
     },
     contributions: [],
+    instruments: [],
+    quotes: {},
+    recurringRules: [],
+    pendingMovements: [],
   }
 }
 
