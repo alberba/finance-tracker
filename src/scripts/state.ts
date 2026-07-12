@@ -40,6 +40,65 @@ import {
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
 export const SERVER_STATE_ENDPOINT = "/api/state";
+/** Last server `version` this client has confirmed, for optimistic concurrency. */
+export const SERVER_VERSION_KEY = "finance-tracker-server-version-v1";
+/** Set while localStorage holds edits not yet confirmed by the server. */
+export const PENDING_CHANGES_KEY = "finance-tracker-pending-v1";
+
+export interface ServerState {
+  state: unknown;
+  version: number;
+}
+
+export type ServerSaveResult =
+  | { status: "ok"; version: number }
+  | { status: "conflict"; version: number; state: unknown }
+  | { status: "error" };
+
+export function getKnownServerVersion(): number | null {
+  try {
+    const raw = localStorage.getItem(SERVER_VERSION_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setKnownServerVersion(version: number | null): void {
+  try {
+    if (version === null) {
+      localStorage.removeItem(SERVER_VERSION_KEY);
+    } else {
+      localStorage.setItem(SERVER_VERSION_KEY, String(version));
+    }
+  } catch {
+    /* storage unavailable — best effort */
+  }
+}
+
+export function hasPendingChanges(): boolean {
+  try {
+    return localStorage.getItem(PENDING_CHANGES_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setPendingChanges(pending: boolean): void {
+  try {
+    if (pending) {
+      localStorage.setItem(PENDING_CHANGES_KEY, "1");
+    } else {
+      localStorage.removeItem(PENDING_CHANGES_KEY);
+    }
+  } catch {
+    /* storage unavailable — best effort */
+  }
+}
 
 const FALLBACK_BASE_SEED = {
   meta: {
@@ -104,7 +163,7 @@ export function persistState(state: State): string {
   return state.meta.savedAt;
 }
 
-export async function loadServerState(): Promise<unknown | null> {
+export async function loadServerState(): Promise<ServerState | null> {
   if (typeof fetch !== "function") {
     return null;
   }
@@ -117,23 +176,63 @@ export async function loadServerState(): Promise<unknown | null> {
     if (!response.ok) {
       return null;
     }
-    const data = (await response.json()) as { state?: unknown };
-    return data?.state ?? null;
+    const data = (await response.json()) as {
+      state?: unknown;
+      version?: unknown;
+    };
+    if (data?.state == null) {
+      return null;
+    }
+    const version = typeof data.version === "number" ? data.version : 0;
+    setKnownServerVersion(version);
+    return { state: data.state, version };
   } catch {
     return null;
   }
 }
 
-export async function persistServerState(state: State): Promise<boolean> {
+/**
+ * Pushes `state` to the server using the last known version as the concurrency
+ * base. Returns a structured result so callers can react to conflicts and
+ * transient failures instead of the previous silently-swallowed boolean.
+ */
+export async function persistServerState(
+  state: State,
+): Promise<ServerSaveResult> {
+  const knownVersion = getKnownServerVersion();
   try {
     const response = await fetch(SERVER_STATE_ENDPOINT, {
       method: "PUT",
       headers: buildServerHeaders(true),
-      body: JSON.stringify({ state }),
+      body: JSON.stringify({
+        state,
+        ...(knownVersion !== null ? { baseVersion: knownVersion } : {}),
+      }),
     });
-    return response.ok;
+
+    if (response.status === 409) {
+      const data = (await response.json()) as {
+        state?: unknown;
+        version?: unknown;
+      };
+      const version = typeof data.version === "number" ? data.version : 0;
+      setKnownServerVersion(version);
+      return { status: "conflict", version, state: data.state ?? null };
+    }
+
+    if (!response.ok) {
+      return { status: "error" };
+    }
+
+    const data = (await response.json()) as { version?: unknown };
+    const version =
+      typeof data.version === "number" ? data.version : (knownVersion ?? 0) + 1;
+    setKnownServerVersion(version);
+    // NOTE: the caller clears the pending flag, not us — only it knows whether
+    // newer local edits arrived while this request was in flight (still dirty).
+    return { status: "ok", version };
   } catch {
-    return false;
+    return { status: "error" };
   }
 }
 
