@@ -13,9 +13,12 @@ import {
   type BudgetType,
   type Transaction,
   type TransactionType,
+  type Subscription,
+  type SubscriptionFrequency,
   type TxSortColumn,
 } from '../scripts/types'
-import { monthFromISO, parseFloatSafe, round2, uid } from '../scripts/utils'
+import { getFirstUpcomingChargeDate, materializeDueSubscriptions } from '../scripts/subscriptions'
+import { monthFromISO, parseFloatSafe, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
 
@@ -50,6 +53,23 @@ export interface BulkTransactionChanges {
   category: string
 }
 
+export interface NewSubscriptionInput {
+  name: string
+  amount: number
+  accountId: string
+  category: string
+  frequency: SubscriptionFrequency
+  firstChargeDate: string
+}
+
+export interface EditedSubscriptionInput {
+  name: string
+  amount: number
+  accountId: string
+  category: string
+  frequency: SubscriptionFrequency
+}
+
 export const useMovementsStore = defineStore('movements', () => {
   const financialStateStore = useFinancialStateStore()
   const uiStore = useUiStore()
@@ -67,6 +87,7 @@ export const useMovementsStore = defineStore('movements', () => {
   }
 
   const accounts = computed(() => financialStateStore.accounts)
+  const subscriptions = computed(() => financialStateStore.subscriptions)
 
   const visibleTransactions = computed(() =>
     filterAndSortTransactions({
@@ -298,8 +319,83 @@ export const useMovementsStore = defineStore('movements', () => {
     showToast(`Eliminadas ${removed} filas.`)
   }
 
+  function addSubscription(input: NewSubscriptionInput): boolean {
+    const name = input.name.trim()
+    if (!name || input.amount <= 0 || !input.accountId || !input.category || !input.firstChargeDate) {
+      showToast('Completa nombre, cuenta, categoría, fecha e importe válido.')
+      return false
+    }
+
+    let generatedCount = 0
+    financialStateStore.commitState((draft) => {
+      const subscription: Subscription = {
+        id: uid('subscription'),
+        name,
+        amount: round2(input.amount),
+        accountId: input.accountId,
+        category: input.category,
+        frequency: input.frequency,
+        startDate: input.firstChargeDate,
+        nextChargeDate: input.firstChargeDate,
+        active: true,
+      }
+      subscription.nextChargeDate = getFirstUpcomingChargeDate(subscription, todayISO())
+      draft.subscriptions.push(subscription)
+      generatedCount = materializeDueSubscriptions(draft, todayISO()).generatedCount
+    })
+    showToast(
+      generatedCount > 0
+        ? `Suscripción guardada y ${generatedCount} gasto generado.`
+        : 'Suscripción guardada.',
+    )
+    return true
+  }
+
+  function updateSubscription(id: string, input: EditedSubscriptionInput): boolean {
+    const name = input.name.trim()
+    if (!name || input.amount <= 0 || !input.accountId || !input.category) {
+      showToast('Completa nombre, cuenta, categoría e importe válido.')
+      return false
+    }
+
+    financialStateStore.commitState((draft) => {
+      const subscription = draft.subscriptions.find((item) => item.id === id)
+      if (!subscription) {
+        return
+      }
+      subscription.name = name
+      subscription.amount = round2(input.amount)
+      subscription.accountId = input.accountId
+      subscription.category = input.category
+      subscription.frequency = input.frequency
+    })
+    showToast('Suscripción actualizada.')
+    return true
+  }
+
+  function setSubscriptionActive(id: string, active: boolean): void {
+    financialStateStore.commitState((draft) => {
+      const subscription = draft.subscriptions.find((item) => item.id === id)
+      if (subscription) {
+        if (active && !subscription.active) {
+          subscription.nextChargeDate = getFirstUpcomingChargeDate(subscription, todayISO())
+        }
+        subscription.active = active
+      }
+    })
+    showToast(active ? 'Suscripción reactivada.' : 'Suscripción pausada.')
+  }
+
+  function deleteSubscription(id: string): void {
+    financialStateStore.commitState((draft) => {
+      draft.subscriptions = draft.subscriptions.filter((item) => item.id !== id)
+    })
+    showToast('Suscripción eliminada. Sus gastos ya creados se conservan.')
+  }
+
   return {
     accounts,
+    subscriptions,
     visibleTransactions,
     breakdown,
     accountFilterOptions,
@@ -322,5 +418,9 @@ export const useMovementsStore = defineStore('movements', () => {
     deleteTransaction,
     applyBulkChanges,
     deleteSelected,
+    addSubscription,
+    updateSubscription,
+    setSubscriptionActive,
+    deleteSubscription,
   }
 })

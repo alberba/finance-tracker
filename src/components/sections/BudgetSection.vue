@@ -69,7 +69,7 @@ function updateBudgetValue(payload: {
       />
     </div>
 
-    <div class="grid min-w-0 gap-4">
+    <div class="grid min-w-0 gap-4 overflow-x-hidden">
       <BudgetBlock
         v-for="block in viewModel.blocks"
         :key="block.type"

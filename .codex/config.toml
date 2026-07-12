@@ -1,0 +1,10 @@
+# Project-scoped subagent configuration for finance-tracker.
+
+[agents]
+# Routing policy (human-readable; custom routing is selected by Codex):
+# Automatically decide whether delegation is useful.
+# Choose fast_scan for lightweight read-only work, routine_worker for normal implementation, and deep_worker for complex or high-risk reasoning.
+# Do not ask the user to choose a model unless the required model is unavailable.
+# Keep simple tasks on the main agent.
+max_threads = 6
+max_depth = 1
