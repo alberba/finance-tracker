@@ -66,7 +66,7 @@ function cssColor(name: string, fallback: string): string {
         </span>
       </div>
       <div class="flex gap-1">
-        <strong class="font-['DM_Mono',monospace] text-xs font-medium">
+        <strong class="font-mono text-xs font-medium">
           {{ item.amount }}
         </strong>
         <span class="text-xs text-text-faint">
