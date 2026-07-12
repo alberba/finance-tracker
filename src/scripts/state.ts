@@ -10,7 +10,9 @@ import {
   type GoalKey,
   type SnapshotRow,
   type State,
+  type Subscription,
   type Transaction,
+  isSubscriptionFrequency,
 } from "./types";
 import {
   clamp,
@@ -48,6 +50,7 @@ const FALLBACK_BASE_SEED = {
   expenseCategories: ["Comida", "Vivienda"],
   investmentCategories: ["Fondos Indexados"],
   transactions: [],
+  subscriptions: [],
   snapshots: {},
   budget: { income: {}, expense: {}, investment: {} },
   goals: {},
@@ -168,6 +171,7 @@ export function normalizeState(candidate: unknown): State {
     transactions: normalizeTransactions(
       input?.transactions || base.transactions || [],
     ),
+    subscriptions: normalizeSubscriptions(input?.subscriptions || base.subscriptions || []),
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
@@ -284,6 +288,15 @@ function normalizeTransactions(list: unknown): Transaction[] {
         amount,
       };
 
+      const subscriptionId = String(rawItem.subscriptionId || "").trim();
+      const subscriptionChargeDate = String(rawItem.subscriptionChargeDate || "").trim();
+      if (subscriptionId) {
+        safe.subscriptionId = subscriptionId;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(subscriptionChargeDate)) {
+        safe.subscriptionChargeDate = subscriptionChargeDate;
+      }
+
       if (type === "investment") {
         const time = normalizeTime(rawItem.time);
         const symbol = String(rawItem.symbol || "")
@@ -328,6 +341,39 @@ function normalizeTransactions(list: unknown): Transaction[] {
       return safe;
     })
     .filter((item) => Number.isFinite(item.amount) && item.amount !== 0);
+}
+
+function normalizeSubscriptions(list: unknown): Subscription[] {
+  const items = Array.isArray(list) ? list : [];
+  return items
+    .map((item) => {
+      const rawItem = asRecord(item);
+      const frequencyCandidate = String(rawItem.frequency || "").trim();
+      const frequency = isSubscriptionFrequency(frequencyCandidate)
+        ? frequencyCandidate
+        : "monthly";
+      const startDate = String(rawItem.startDate || "").trim();
+      const nextChargeDate = String(rawItem.nextChargeDate || startDate).trim();
+
+      return {
+        id: String(rawItem.id || uid("subscription")),
+        name: String(rawItem.name || "Suscripción").trim(),
+        amount: round2(parseFloatSafe(rawItem.amount, 0)),
+        accountId: String(rawItem.accountId || "").trim(),
+        category: String(rawItem.category || "Sin categoría").trim(),
+        frequency,
+        startDate,
+        nextChargeDate,
+        active: rawItem.active !== false,
+      } satisfies Subscription;
+    })
+    .filter(
+      (item) =>
+        item.name &&
+        item.amount > 0 &&
+        /^\d{4}-\d{2}-\d{2}$/.test(item.startDate) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(item.nextChargeDate),
+    );
 }
 
 function normalizeNonNegativeNumber(

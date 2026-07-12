@@ -65,6 +65,39 @@ export class FinanceTrackerPage {
     await this.open("transactions");
   }
 
+  async openSubscriptionsTab() {
+    await this.openTransactions();
+    await this.transactionsSection
+      .getByRole("tab", { name: "Suscripciones" })
+      .click();
+  }
+
+  async addSubscription(params: {
+    name: string;
+    amount: number;
+    categoryLabel: string;
+    frequency: "weekly" | "monthly" | "quarterly" | "yearly";
+    firstChargeDate: string;
+  }) {
+    await this.openSubscriptionsTab();
+    const section = this.transactionsSection.locator(
+      "#transactions-tab-subscriptions",
+    );
+    await section.getByLabel("Nombre").fill(params.name);
+    await section.getByLabel("Importe").fill(String(params.amount));
+    await this.selectByLabelOrFirst(
+      section.getByLabel("Cuenta"),
+      "Revolut",
+    );
+    await this.selectByLabelOrFirst(
+      section.getByLabel("Categoría"),
+      params.categoryLabel,
+    );
+    await section.getByLabel("Frecuencia").selectOption(params.frequency);
+    await section.getByLabel("Primer cobro").fill(params.firstChargeDate);
+    await section.getByRole("button", { name: "Añadir suscripción" }).click();
+  }
+
   async openBudget() {
     await this.open("budget");
   }

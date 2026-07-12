@@ -30,6 +30,7 @@ function createDefaultUiState(): UiState {
       amountMax: '',
     },
     txEditingId: '',
+    txTab: 'registry',
     snapshotMonth: month,
     investmentMonth: month,
     wealthCalcTargetId: '',
