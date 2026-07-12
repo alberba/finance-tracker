@@ -377,6 +377,9 @@ export const useMovementsStore = defineStore('movements', () => {
     financialStateStore.commitState((draft) => {
       const subscription = draft.subscriptions.find((item) => item.id === id)
       if (subscription) {
+        if (active && !subscription.active) {
+          subscription.nextChargeDate = getFirstUpcomingChargeDate(subscription, todayISO())
+        }
         subscription.active = active
       }
     })

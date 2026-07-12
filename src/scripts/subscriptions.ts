@@ -83,7 +83,8 @@ export function materializeDueSubscriptions(state: State, today: string): DueSub
   let advancedCount = 0
 
   state.subscriptions.forEach((subscription) => {
-    if (!subscription.active) {
+    const accountExists = state.accounts.some((account) => account.id === subscription.accountId)
+    if (!subscription.active || !accountExists) {
       return
     }
 

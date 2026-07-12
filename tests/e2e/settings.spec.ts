@@ -67,4 +67,39 @@ test.describe("Settings E2E", () => {
     await tag.getByRole("button", { name: /Eliminar categoría/ }).click();
     await expect(tag).toHaveCount(0);
   });
+
+  test("eliminar una cuenta elimina sus suscripciones pendientes", async ({
+    tracker,
+    page,
+  }) => {
+    const today = new Date().toISOString().slice(0, 10);
+    await tracker.addSubscription({
+      name: "Suscripción cuenta eliminada",
+      amount: 12,
+      categoryLabel: "Comida",
+      frequency: "monthly",
+      firstChargeDate: today,
+    });
+
+    await tracker.openSettings();
+    const settingsSection = tracker.section("settings");
+    await settingsSection
+      .getByRole("button", { name: "Eliminar Revolut", exact: true })
+      .click();
+    await expect(
+      settingsSection.getByRole("button", {
+        name: "Eliminar Revolut",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+
+    await tracker.openSubscriptionsTab();
+    await expect(
+      tracker.transactionsSection
+        .locator("#transactions-tab-subscriptions")
+        .getByRole("listitem")
+        .filter({ hasText: "Suscripción cuenta eliminada" }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("status")).toContainText("Elemento eliminado");
+  });
 });
