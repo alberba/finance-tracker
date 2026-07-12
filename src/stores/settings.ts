@@ -86,6 +86,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
       if (key === 'accounts') {
         draft.transactions = draft.transactions.filter((tx) => tx.accountId !== id)
+        draft.subscriptions = draft.subscriptions.filter((subscription) => subscription.accountId !== id)
         draft.twrLiquidityAccountIds = (draft.twrLiquidityAccountIds || []).filter(
           (accountId) => accountId !== id,
         )

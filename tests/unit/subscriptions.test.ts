@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { materializeDueSubscriptions } from '../../src/scripts/subscriptions'
+import {
+  getFirstUpcomingChargeDate,
+  materializeDueSubscriptions,
+} from '../../src/scripts/subscriptions'
 import type { State, Subscription } from '../../src/scripts/types'
 
 function createSubscription(overrides: Partial<Subscription> = {}): Subscription {
@@ -24,7 +27,7 @@ function createState(subscription: Subscription): State {
     year: 2026,
     currency: 'EUR',
     twrLiquidityAccountIds: [],
-    accounts: [],
+    accounts: [{ id: 'main', name: 'Main', openingBalance: 0 }],
     investmentAssets: [],
     liabilities: [],
     incomeCategories: [],
@@ -75,6 +78,30 @@ describe('suscripciones', () => {
     const result = materializeDueSubscriptions(state, '2026-05-01')
 
     expect(result.generatedCount).toBe(0)
+    expect(state.subscriptions[0]?.nextChargeDate).toBe('2026-05-01')
+  })
+
+  it('calcula la primera fecha futura al reactivar una suscripción pausada', () => {
+    const subscription = createSubscription({
+      active: false,
+      nextChargeDate: '2026-03-31',
+    })
+
+    expect(getFirstUpcomingChargeDate(subscription, '2026-05-15')).toBe('2026-05-31')
+  })
+
+  it('ignora suscripciones vinculadas a cuentas eliminadas', () => {
+    const state = createState(
+      createSubscription({
+        accountId: 'deleted-account',
+        nextChargeDate: '2026-05-01',
+      }),
+    )
+
+    const result = materializeDueSubscriptions(state, '2026-05-15')
+
+    expect(result.generatedCount).toBe(0)
+    expect(state.transactions).toHaveLength(0)
     expect(state.subscriptions[0]?.nextChargeDate).toBe('2026-05-01')
   })
 })
