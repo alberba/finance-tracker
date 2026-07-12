@@ -13,6 +13,7 @@ Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
 - Configuración editable de cuentas, activos y categorías
 - Exportación/importación JSON + exportación CSV de movimientos
 - Persistencia local en `localStorage` + backend (`/api/state`) para mantener datos entre sesiones/dispositivos
+- Cotizaciones server-side para instrumentos configurados y movimientos recurrentes con revisión explícita
 
 ## Estructura principal
 
@@ -34,6 +35,38 @@ pnpm dev
 ```
 
 Luego abre `http://localhost:4321`.
+
+### Mercado y reglas recurrentes
+
+Configura instrumentos desde `Configuración`. La ruta `/api/market/quotes` consulta el proveedor en el servidor, mantiene la última cotización válida como fallback y usa Cache API en Cloudflare cuando está disponible. Define las claves como secretos, nunca en el navegador:
+
+```bash
+wrangler secret put TWELVE_DATA_API_KEY
+wrangler secret put COINGECKO_API_KEY
+```
+
+`MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime definidas en `wrangler.toml`. La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
+
+Para probarlo en local:
+
+```bash
+cp .dev.vars.example .dev.vars
+# Edita .dev.vars y añade TWELVE_DATA_API_KEY
+pnpm dev
+```
+
+Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`; su endpoint de gráficos no es una API pública oficial, por lo que se usa con caché y a baja frecuencia. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
+
+Para una clave CoinGecko Demo usa `COINGECKO_API_PLAN=demo`; para una clave Pro usa `COINGECKO_API_PLAN=pro`. Los instrumentos existentes se pueden cambiar de proveedor desde Configuración.
+
+El campo editable `Títulos` de `Valoración actual de cartera` fija el saldo real en ese momento; los movimientos anteriores quedan fuera y las compras y ventas posteriores de ese símbolo actualizan automáticamente la tenencia, sin crear movimientos históricos ficticios.
+
+Para producción en Cloudflare, configura las claves como secretos:
+
+```bash
+wrangler secret put TWELVE_DATA_API_KEY
+wrangler secret put COINGECKO_API_KEY
+```
 
 ## Deploy en Cloudflare Pages + D1
 

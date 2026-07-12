@@ -12,6 +12,7 @@ import { MONTHS, type InvestmentSubTab } from '../../scripts/types'
 import { parseIntSafe } from '../../scripts/utils'
 import { useInvestmentStore } from '../../stores/investment'
 import { useUiStore } from '../../stores/ui'
+import MarketQuotesPanel from '../market/MarketQuotesPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -92,6 +93,8 @@ function onConfirmDelete(date: string): void {
         </label>
       </div>
     </div>
+
+    <MarketQuotesPanel title="Valoración actual de cartera" />
 
     <div class="investment-subtabs" role="tablist" aria-label="Subsecciones de inversión">
       <button

@@ -12,6 +12,7 @@ import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 import DashboardPeriodField from '../dashboard/DashboardPeriodField.vue'
 import TransactionsSubscriptionsTab from '../transactions/TransactionsSubscriptionsTab.vue'
+import PendingMovementsPanel from '../recurring/PendingMovementsPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -119,6 +120,7 @@ onBeforeUnmount(() => {
 
     <div id="transactions-tab-registry" role="tabpanel" :hidden="ui.txTab !== 'registry'" aria-labelledby="transactions-tab-registry-button">
       <TransactionBulkCard />
+      <PendingMovementsPanel />
       <TransactionFormDialog ref="dialogRef" />
       <div class="grid items-start gap-3.5 min-[1240px]:grid-cols-[minmax(0,1fr)_minmax(310px,0.4fr)]">
         <TransactionsTable />

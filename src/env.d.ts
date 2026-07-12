@@ -9,6 +9,12 @@ declare namespace App {
         GITHUB_TOKEN?: string;
         GITHUB_OWNER?: string;
         GITHUB_REPO?: string;
+        MARKET_DATA_PROVIDER?: string;
+        TWELVE_DATA_API_KEY?: string;
+        COINGECKO_API_KEY?: string;
+        COINGECKO_API_PLAN?: string;
+        MARKET_QUOTE_STALE_MINUTES?: string;
+        MARKET_QUOTE_CACHE_SECONDS?: string;
       };
     };
   }

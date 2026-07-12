@@ -22,6 +22,10 @@ export type InvestmentSubTab = "dashboard" | "movements" | "contributions";
 export type TransactionsSubTab = "registry" | "subscriptions";
 export type SnapshotKind = "accounts" | "investments" | "liabilities";
 export type EntityKey = "accounts" | "investmentAssets" | "liabilities";
+export type InstrumentType = "stock" | "etf" | "fund" | "crypto";
+export type QuoteStatus = "fresh" | "stale" | "unavailable";
+export type RecurringFrequency = "daily" | "weekly" | "monthly" | "monthEnd" | "yearly";
+export type PendingMovementStatus = "pending" | "confirmed" | "skipped" | "cancelled";
 export type CategoryKey =
   | "incomeCategories"
   | "expenseCategories"
@@ -51,6 +55,7 @@ export interface Transaction {
   amount: number;
   time?: string;
   symbol?: string;
+  instrumentId?: string;
   side?: InvestmentSide;
   unitPrice?: number;
   units?: number;
@@ -59,6 +64,7 @@ export interface Transaction {
   declared?: boolean;
   subscriptionId?: string;
   subscriptionChargeDate?: string;
+  createdAt?: string;
 }
 
 export interface Subscription {
@@ -71,6 +77,74 @@ export interface Subscription {
   startDate: string;
   nextChargeDate: string;
   active: boolean;
+}
+
+export interface Instrument {
+  id: string;
+  investmentAssetId: string;
+  type: InstrumentType;
+  symbol: string;
+  market: string;
+  currency: string;
+  provider: string;
+  active: boolean;
+  openingUnits?: number;
+  holdingUnits?: number;
+  holdingsAsOf?: string;
+  holdingsUpdatedAt?: string;
+  holdingsSource?: 'manual';
+}
+
+export interface Quote {
+  instrumentId: string;
+  price: number;
+  currency: string;
+  timestamp: string;
+  source: string;
+  status: QuoteStatus;
+  isStale: boolean;
+  previousClose: number | null;
+  changePercent: number | null;
+}
+
+export interface RecurringRule {
+  id: string;
+  type: TransactionType;
+  accountId: string;
+  category: string;
+  description: string;
+  amount: number;
+  symbol?: string;
+  side?: InvestmentSide;
+  units?: number;
+  unitPrice?: number;
+  frequency: RecurringFrequency;
+  interval: number;
+  startDate: string;
+  endDate: string | null;
+  active: boolean;
+  lastExecutionDate: string | null;
+  nextOccurrenceDate: string | null;
+}
+
+export interface PendingMovement {
+  id: string;
+  occurrenceKey: string;
+  ruleId: string;
+  occurrenceDate: string;
+  type: TransactionType;
+  accountId: string;
+  category: string;
+  description: string;
+  amount: number;
+  symbol?: string;
+  side?: InvestmentSide;
+  units?: number;
+  unitPrice?: number;
+  status: PendingMovementStatus;
+  createdAt: string;
+  updatedAt: string;
+  transactionId: string | null;
 }
 
 export interface SnapshotRow {
@@ -127,6 +201,10 @@ export interface State {
   budget: Record<BudgetType, Record<string, number[]>>;
   goals: Record<GoalKey, Goal>;
   contributions: Contribution[];
+  instruments: Instrument[];
+  quotes: Record<string, Quote>;
+  recurringRules: RecurringRule[];
+  pendingMovements: PendingMovement[];
 }
 
 export interface MonthTotals {
