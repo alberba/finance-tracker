@@ -44,7 +44,7 @@ function transactionBadgeClass(tone: DashboardTransactionTone): string {
 </script>
 
 <template>
-  <div class="max-w-full min-w-0">
+  <div class="hidden max-w-full min-w-0 overflow-x-auto md:block">
     <table class="w-full p-2 text-sm [&_tbody_tr:last-child_td]:border-b-0">
       <thead class="text-text-faint bg-(--bg-subtle)">
         <tr class="border-b border-(--line)">
@@ -71,7 +71,7 @@ function transactionBadgeClass(tone: DashboardTransactionTone): string {
             </td>
             <td class="p-2">
               <span
-                class="max-w-37.5 rounded-full px-2 py-1 text-xs flex gap-1 w-fit"
+                class="flex w-fit max-w-37.5 gap-1 rounded-full px-2 py-1 text-xs"
                 :class="transactionBadgeClass(transaction.tone)"
               >
                 <span>
@@ -95,5 +95,44 @@ function transactionBadgeClass(tone: DashboardTransactionTone): string {
         </template>
       </tbody>
     </table>
+  </div>
+
+  <div class="grid gap-2 md:hidden" role="region" aria-label="Lista de últimos movimientos">
+    <p v-if="!transactions.length" class="text-text-faint py-4 text-center text-sm">
+      Sin movimientos registrados.
+    </p>
+    <template v-else>
+      <article
+        v-for="transaction in transactions"
+        :key="transaction.id"
+        class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 rounded-xl border border-(--line) bg-(--bg-subtle) p-3.5"
+      >
+        <div class="min-w-0">
+          <strong
+            class="text-text-main block overflow-hidden text-sm text-ellipsis whitespace-nowrap"
+          >
+            {{ transaction.description }}
+          </strong>
+          <span class="text-text-faint mt-1 block font-mono text-[0.7rem]">
+            {{ transaction.date }} · {{ transaction.typeLabel }}
+          </span>
+        </div>
+        <strong
+          class="self-start font-mono text-sm font-medium whitespace-nowrap"
+          :class="toneTextClass(transaction.tone)"
+        >
+          {{ transaction.sign }}{{ transaction.amount }}
+        </strong>
+        <span
+          class="col-span-2 flex w-fit max-w-full gap-1 rounded-full px-2 py-1 text-xs"
+          :class="transactionBadgeClass(transaction.tone)"
+        >
+          <span>{{ transaction.emoji }}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">
+            {{ transaction.category }}
+          </span>
+        </span>
+      </article>
+    </template>
   </div>
 </template>

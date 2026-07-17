@@ -54,14 +54,14 @@ function withAlpha(color: string, alpha: number): string {
 
 // Scriptable vertical gradient fill for area lines: solid-ish at the top of
 // the plot, fading to transparent at the baseline.
-function areaFill(color: string) {
+function areaFill(color: string, topOpacity = 0.22) {
   return (context: ScriptableContext<'line'>) => {
     const chart = context.chart
     const area = chart?.chartArea
     if (!area) return withAlpha(color, 0)
     const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom)
-    gradient.addColorStop(0, withAlpha(color, 0.22))
-    gradient.addColorStop(0.55, withAlpha(color, 0.07))
+    gradient.addColorStop(0, withAlpha(color, topOpacity))
+    gradient.addColorStop(0.55, withAlpha(color, topOpacity * 0.32))
     gradient.addColorStop(1, withAlpha(color, 0))
     return gradient
   }
@@ -89,6 +89,7 @@ function baseScales(
   formatAxisValue: ValueFormatter,
   labels: readonly string[],
   beginAtZero: boolean,
+  colors: { axis?: string; grid?: string } = {},
 ) {
   return {
     x: {
@@ -96,7 +97,7 @@ function baseScales(
       border: { display: false },
       ticks: {
         font: { size: 10, family: FONT_FAMILY },
-        color: axisColor(),
+        color: colors.axis || axisColor(),
         maxRotation: 0,
         autoSkipPadding: 16,
         padding: 6,
@@ -104,11 +105,11 @@ function baseScales(
       },
     },
     y: {
-      grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
+      grid: { color: colors.grid || gridColor(), drawTicks: false, lineWidth: 1 },
       border: { display: false },
       ticks: {
         font: { size: 10, family: FONT_FAMILY },
-        color: axisColor(),
+        color: colors.axis || axisColor(),
         maxTicksLimit: 5,
         padding: 10,
         callback: (value: string | number) => formatAxisValue(Number(value || 0)),
@@ -136,6 +137,11 @@ const refinedLegend = (display: boolean) => ({
 export interface LineChartOptions {
   color: string
   fill: string
+  axisColor?: string
+  borderWidth?: number
+  fillOpacity?: number
+  gridColor?: string
+  pointBorderColor?: string
   labels?: readonly string[]
   formatValue: ValueFormatter
   formatAxisValue?: ValueFormatter
@@ -244,11 +250,12 @@ export function renderLineChart(
         {
           data: safeValues,
           borderColor: options.color,
-          backgroundColor: areaFill(options.color),
+          backgroundColor: areaFill(options.color, options.fillOpacity),
           pointBackgroundColor: options.color,
-          pointBorderColor: pointBorderColorVar(),
+          pointBorderColor: options.pointBorderColor || pointBorderColorVar(),
           fill: true,
           ...lineCommon,
+          borderWidth: options.borderWidth ?? lineCommon.borderWidth,
         },
       ],
     },
@@ -269,7 +276,10 @@ export function renderLineChart(
           }),
         },
       },
-      scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true),
+      scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true, {
+        axis: options.axisColor,
+        grid: options.gridColor,
+      }),
     },
   })
 }

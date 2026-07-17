@@ -207,7 +207,7 @@ test.describe('UI layout integrity', () => {
 
     test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }, testInfo) => {
       test.skip(
-        testInfo.project.name === 'mobile-chrome',
+        testInfo.project.name !== 'chromium',
         'La cobertura móvil valida el layout con el escáner y un flujo de navegación.',
       )
       await openSectionForLayout(page, tracker, sectionId)

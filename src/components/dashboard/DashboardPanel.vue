@@ -22,11 +22,11 @@ const attrs = useAttrs()
 <template>
   <article
     :class="[
-      'flex flex-col gap-3 rounded-lg bg-(--bg-panel) p-4 [box-shadow:var(--shadow-soft)]',
+      'flex min-w-0 flex-col gap-4 rounded-xl border border-(--line) bg-(--bg-panel) p-4 [box-shadow:var(--shadow-soft)] sm:p-5',
       attrs.class,
     ]"
   >
-    <h3 class="font-bold text-text-main">
+    <h3 class="font-display text-text-main text-base font-bold">
       {{ title }}
     </h3>
 
@@ -34,7 +34,7 @@ const attrs = useAttrs()
 
     <button
       type="button"
-      class="mt-auto inline-flex items-center gap-1.5 bg-transparent text-primary"
+      class="text-primary mt-auto inline-flex min-h-11 w-fit items-center gap-1.5 rounded-lg bg-transparent px-1 text-sm font-semibold transition-colors hover:bg-(--primary-light)"
       :data-goto="actionTarget"
       @click="$emit('navigate', actionTarget)"
     >
