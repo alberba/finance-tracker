@@ -20,6 +20,8 @@ import {
   type RecurringRule,
   type SnapshotRow,
   type State,
+  type StockEventsSettings,
+  type StockEventsSymbolMapping,
   type Subscription,
   type Transaction,
   isSubscriptionFrequency,
@@ -128,6 +130,7 @@ const FALLBACK_BASE_SEED = {
   quotes: {},
   recurringRules: [],
   pendingMovements: [],
+  stockEvents: { enabled: false, apiKey: "", symbolMappings: [] },
 };
 
 export const BASE_SEED: unknown = isDemoMode()
@@ -309,6 +312,7 @@ export function normalizeState(candidate: unknown): State {
     pendingMovements: normalizePendingMovements(
       input?.pendingMovements || base.pendingMovements || [],
     ),
+    stockEvents: normalizeStockEvents(input?.stockEvents || base.stockEvents),
   };
 
   if (!safe.investmentCategories.length) {
@@ -513,6 +517,33 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
       transactionId: raw.transactionId ? String(raw.transactionId) : null,
     } satisfies PendingMovement;
   });
+}
+
+function normalizeStockEvents(input: unknown): StockEventsSettings {
+  const raw = asRecord(input);
+  const rawMappings = Array.isArray(raw.symbolMappings) ? raw.symbolMappings : [];
+  const seen = new Set<string>();
+  const symbolMappings: StockEventsSymbolMapping[] = [];
+  rawMappings.forEach((item) => {
+    const mapping = asRecord(item);
+    const symbol = String(mapping.symbol || "").trim().toUpperCase();
+    if (!symbol || seen.has(symbol)) {
+      return;
+    }
+    seen.add(symbol);
+    symbolMappings.push({
+      symbol,
+      sync: mapping.sync === true,
+      watchlistId: String(mapping.watchlistId || "").trim(),
+      targetSymbol: String(mapping.targetSymbol || "").trim().toUpperCase(),
+      hidden: mapping.hidden === true,
+    });
+  });
+  return {
+    enabled: raw.enabled === true,
+    apiKey: String(raw.apiKey || "").trim(),
+    symbolMappings,
+  };
 }
 
 function normalizeOptionalNumber(value: unknown): number | null {
