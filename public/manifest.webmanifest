@@ -9,7 +9,7 @@
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#eef1f6",
-  "theme_color": "#0b1120",
+  "theme_color": "#090b10",
   "categories": ["finance", "productivity"],
   "icons": [
     {
