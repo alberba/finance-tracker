@@ -1,6 +1,6 @@
 # Finance Tracker (Astro + pnpm)
 
-Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
+Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 
 ## Qué incluye
 
@@ -20,7 +20,7 @@ Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
 - `src/pages/index.astro`: página principal de Astro
 - `src/scripts/app.ts`: runtime del tracker (TypeScript)
 - `src/lib/finance-core.ts`: lógica financiera tipada (TypeScript)
-- `src/data/seed.json`: datos semilla extraidos de tu Excel
+- `src/data/seed.json`: datos semilla sintéticos y neutros
 - `src/data/seed.ts`: wrapper TypeScript para importar el seed desde cliente y servidor
 - `src/styles/global.css`: entrada global de Tailwind y estilos de la app
 - `src/styles/legacy.css`: estilos legacy globales pendientes de migracion gradual
@@ -29,7 +29,7 @@ Tracker financiero web inspirado en tu archivo `FINANZAS PERSONALES 2026.xlsx`.
 ## Ejecutar en local (Astro)
 
 ```bash
-cd /home/albert/proyectos/finance-tracker
+cd /ruta/al/finance-tracker
 pnpm install
 pnpm dev
 ```
@@ -174,10 +174,13 @@ Opcional (GitHub Variables):
 - `enriched:haiku`
 - `autofix-attempted`, `autofix-opened-pr`, `autofix-nochange`, `autofix-failed`, `autofix:skip`
 
-## Regenerar datos semilla desde Excel
+## Extraer datos desde Excel para uso local
 
 ```bash
 python3 scripts/extract_excel_seed.py \
-  --input "/home/albert/Descargas/FINANZAS PERSONALES 2026.xlsx" \
-  --output "src/data/seed.json"
+  --input "/ruta/al/archivo.xlsx" \
+  --output "/tmp/finance-seed.json"
 ```
+
+El resultado puede contener información financiera sensible. No sustituyas con
+él `src/data/seed.json` ni lo añadas al repositorio.
