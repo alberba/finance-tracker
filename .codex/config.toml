@@ -1,10 +1,18 @@
-# Project-scoped subagent configuration for finance-tracker.
+# Agentes especializados y reutilizables de finance-tracker.
 
 [agents]
-# Routing policy (human-readable; custom routing is selected by Codex):
-# Automatically decide whether delegation is useful.
-# Choose fast_scan for lightweight read-only work, routine_worker for normal implementation, and deep_worker for complex or high-risk reasoning.
-# Do not ask the user to choose a model unless the required model is unavailable.
-# Keep simple tasks on the main agent.
+# Los agentes genericos integrados (`explorer`, `worker` y `default`) cubren
+# descubrimiento y trabajo general. Los TOML de `.codex/agents/` se reservan
+# para responsabilidades estables y propias de este repositorio.
+#
+# Enrutado recomendado:
+# - finance_domain_engineer: reglas, calculos y modelos financieros.
+# - frontend_engineer: Astro, Vue, Pinia, estilos y migracion del runtime legacy.
+# - cloudflare_backend_engineer: API, D1, proveedores externos y runtime Cloudflare.
+# - e2e_quality_engineer: Playwright, POM, fixtures y regresion visual.
+# - finance_tracker_reviewer: revision final transversal y de solo lectura.
+#
+# Mantener una sola capa de delegacion evita fan-out recursivo y conflictos de
+# edicion. Seis hilos permiten al agente raiz coordinar hasta cinco especialistas.
 max_threads = 6
 max_depth = 1

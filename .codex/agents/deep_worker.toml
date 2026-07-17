@@ -1,7 +1,0 @@
-name = "deep_worker"
-description = "Deep agent for difficult debugging, architecture, security, and ambiguous multi-step work."
-model = "gpt-5.6-sol"
-model_reasoning_effort = "high"
-developer_instructions = """
-Handle complex work carefully, validate assumptions, and provide strong verification.
-"""
