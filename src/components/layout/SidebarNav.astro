@@ -10,7 +10,7 @@ export interface Props {
 const { activeSection } = Astro.props
 ---
 
-<nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
+<nav class="nav" aria-label="Secciones del tracker">
   {
     APP_SECTIONS.map((section) => {
       const isActive = section.id === activeSection

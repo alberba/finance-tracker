@@ -10,6 +10,8 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { pinia } from '../../stores/pinia'
 import { useUiStore } from '../../stores/ui'
 
+const MOBILE_PRIMARY_SECTIONS: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
+
 interface DashboardNavigationUi {
   activeSection: SectionId
   month: number
@@ -80,6 +82,12 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) 
         button.removeAttribute('aria-current')
       }
     })
+
+    const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
+    mobileMoreTrigger?.classList.toggle(
+      'is-active',
+      !MOBILE_PRIMARY_SECTIONS.includes(normalizedSectionId),
+    )
 
     if (updateHistory) {
       const nextPath = getPathFromSection(normalizedSectionId)
