@@ -43,10 +43,15 @@ async function renderChart(): Promise<void> {
   if (!canvas.value) {
     return
   }
-  const accent = cssColor('--primary', '#3B6BF0')
+  const accent = cssColor('--hero-chart-line', '#93B4FF', canvas.value)
   renderLineChart(canvas.value, props.chart.values, {
     color: accent,
     fill: `${accent}22`,
+    axisColor: cssColor('--hero-chart-axis', '#C2CCDA', canvas.value),
+    borderWidth: 3,
+    fillOpacity: 0.34,
+    gridColor: cssColor('--hero-chart-grid', 'rgba(194, 204, 218, 0.3)', canvas.value),
+    pointBorderColor: cssColor('--hero-chart-point', '#FFFFFF', canvas.value),
     labels: props.chart.labels,
     formatValue: (value) => formatMoneyForCurrency(value, props.currency),
     formatAxisValue: (value) => formatCompactMoneyForCurrency(value, props.currency),
@@ -55,11 +60,15 @@ async function renderChart(): Promise<void> {
   })
 }
 
-function cssColor(name: string, fallback: string): string {
+function cssColor(name: string, fallback: string, element?: Element): string {
   if (typeof window === 'undefined') {
     return fallback
   }
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+  return (
+    getComputedStyle(element ?? document.documentElement)
+      .getPropertyValue(name)
+      .trim() || fallback
+  )
 }
 
 function netWorthChangeClass(tone: DashboardTone | undefined): string {
@@ -130,7 +139,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
           {{ range.label }}
         </button>
       </div>
-      <div class="relative h-52 w-full sm:h-60 lg:h-64">
+      <div class="net-worth-chart relative h-52 w-full sm:h-60 lg:h-64">
         <canvas
           id="chart-networth"
           ref="canvas"
@@ -144,6 +153,11 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
 
 <style scoped>
 .net-worth-hero {
+  --hero-chart-line: #93b4ff;
+  --hero-chart-axis: #c2ccda;
+  --hero-chart-grid: rgba(194, 204, 218, 0.3);
+  --hero-chart-point: #ffffff;
+
   background:
     radial-gradient(
       circle at 9% 10%,
@@ -166,6 +180,13 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
   background-size: 100% 24px;
   content: '';
   pointer-events: none;
+}
+
+.net-worth-chart {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
 }
 
 .net-worth-value {
