@@ -1,3 +1,4 @@
+import { resolveRuntimeNamespace } from '../scripts/demo-mode'
 import type { State } from '../scripts/types'
 
 export const STATE_API_ENDPOINT = '/api/state'
@@ -23,8 +24,11 @@ function buildHeaders({ namespace, hasBody }: StateApiOptions & { hasBody: boole
     headers.set('Content-Type', 'application/json')
   }
 
-  if (namespace) {
-    headers.set('x-finance-namespace', namespace)
+  // Sin namespace explícito se usa el del runtime (__FINANCE_NAMESPACE__),
+  // igual que la capa legacy, para que demo/E2E aíslen también las islas Vue.
+  const effectiveNamespace = namespace || resolveRuntimeNamespace()
+  if (effectiveNamespace) {
+    headers.set('x-finance-namespace', effectiveNamespace)
   }
 
   return headers

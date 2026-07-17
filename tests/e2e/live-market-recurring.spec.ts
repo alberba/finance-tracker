@@ -108,9 +108,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     const row = liveMarket.instrumentEditor.getByRole('listitem').filter({ hasText: 'AGED.MI' })
-    await expect(row).toContainText('2 por vincular')
+    await expect(row).toContainText('1 por vincular')
     await liveMarket.linkExistingMovements('AGED.MI')
-    await expect(row).toContainText('2 vinculados')
+    await expect(row).toContainText('1 vinculados')
 
     await tracker.openDashboard()
     await expect(page.locator('#dashboard [data-market-panel]').getByLabel('Títulos de AGED.MI')).toHaveValue('5')
@@ -141,9 +141,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     const row = liveMarket.instrumentEditor.getByRole('listitem').filter({ hasText: 'AGED.MI' })
-    await expect(row).toContainText('2 por vincular')
+    await expect(row).toContainText('1 por vincular')
     await liveMarket.linkExistingMovements('AGED.MI')
-    await expect(row).toContainText('2 vinculados')
+    await expect(row).toContainText('1 vinculados')
   })
 
   test('crea, edita, confirma pendientes y evita duplicados al recargar', async ({ page, tracker }) => {
@@ -237,9 +237,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.addInstrument({ asset: 'ETF Plata', type: 'etf', symbol: 'LINKED', currency: 'EUR' })
 
     const row = liveMarket.instrumentEditor.getByRole('listitem').filter({ hasText: 'LINKED' })
-    await expect(row).toContainText('4 por vincular')
+    await expect(row).toContainText('1 por vincular')
     await liveMarket.linkExistingMovements('LINKED')
-    await expect(row).toContainText('4 vinculados')
+    await expect(row).toContainText('1 vinculados')
     await expect(row).toContainText('0 por vincular')
 
     await tracker.openDashboard()

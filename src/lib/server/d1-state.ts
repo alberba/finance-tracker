@@ -1,6 +1,9 @@
 import { FINANCE_TRACKER_SEED } from "../../data/seed";
+import { buildDemoSeed } from "../../data/demo-seed";
 
 const DEFAULT_NAMESPACE = "default";
+/** El namespace `demo` se siembra con datos sintéticos, nunca con el seed real. */
+const DEMO_NAMESPACE = "demo";
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS app_state (
     id TEXT PRIMARY KEY,
@@ -42,7 +45,10 @@ export type SaveOutcome =
   | { ok: true; version: number; updatedAt: string }
   | { ok: false; conflict: true; current: StateSnapshot };
 
-function seedClone(): unknown {
+function seedClone(namespace: string = DEFAULT_NAMESPACE): unknown {
+  if (namespace === DEMO_NAMESPACE) {
+    return buildDemoSeed();
+  }
   return JSON.parse(JSON.stringify(FINANCE_TRACKER_SEED));
 }
 
@@ -120,7 +126,7 @@ export async function loadStateFromD1(
   }
 
   // No usable row yet: seed it so first-time clients get a consistent baseline.
-  const seed = seedClone();
+  const seed = seedClone(key);
   const updatedAt = new Date().toISOString();
   await writeRow(db, key, seed, 1, updatedAt);
   return { state: seed, version: 1, updatedAt };
@@ -152,7 +158,7 @@ export async function saveStateToD1(
       ok: false,
       conflict: true,
       current: {
-        state: parsed ?? seedClone(),
+        state: parsed ?? seedClone(key),
         version: currentVersion,
         updatedAt: row?.updated_at ?? null,
       },
@@ -173,7 +179,7 @@ export async function resetStateInD1(
   const key = normalizeNamespace(namespace);
   const row = await readRow(db, key);
   const nextVersion = (row ? Number(row.version ?? 0) : 0) + 1;
-  const seed = seedClone();
+  const seed = seedClone(key);
   const updatedAt = new Date().toISOString();
   await writeRow(db, key, seed, nextVersion, updatedAt);
   return { state: seed, version: nextVersion, updatedAt };
