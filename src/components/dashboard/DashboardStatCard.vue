@@ -72,22 +72,25 @@ function cssColor(style: { accent: string; fallback: string }): string {
 
 <template>
   <article
-    class="flex min-w-0 items-center gap-3.5 rounded-xl bg-(--bg-panel) p-4 shadow-(--shadow-soft) xl:py-2"
+    class="relative flex min-w-0 items-center gap-4 overflow-hidden rounded-xl border border-(--line) bg-(--bg-panel) p-4 shadow-(--shadow-soft) sm:p-5 xl:min-h-32"
     :style="styleVars"
     :aria-label="label"
   >
-    <div class="flex gap-2">
+    <div class="flex min-w-0 flex-1 gap-3">
       <span
-        class="grid aspect-square h-fit place-items-center rounded-sm bg-(--dash-accent-surface) text-(--dash-accent) xl:h-10 xl:w-10"
+        class="grid size-11 shrink-0 place-items-center rounded-lg bg-(--dash-accent-surface) text-(--dash-accent)"
         aria-hidden="true"
       >
         <slot name="icon" />
       </span>
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <p class="text-text-muted text-sm font-semibold">
           {{ label }}
         </p>
-        <strong :id="valueId" class="text-text-main text-2xl font-bold">
+        <strong
+          :id="valueId"
+          class="text-text-main block max-w-full font-mono text-[clamp(1.35rem,6vw,1.75rem)] leading-tight font-medium tracking-[-0.04em] [overflow-wrap:anywhere]"
+        >
           {{ value }}
         </strong>
         <p
@@ -105,7 +108,7 @@ function cssColor(style: { accent: string; fallback: string }): string {
       </div>
     </div>
     <div
-      class="relative -left-2 h-24 w-full max-w-96 min-w-12 mask-[linear-gradient(to_right,transparent,black)] py-2 max-xl:hidden"
+      class="relative -left-2 hidden h-24 w-40 shrink-0 mask-[linear-gradient(to_right,transparent,black)] py-2 2xl:block"
     >
       <canvas :id="sparkId" ref="canvas" class="h-full! w-full!"></canvas>
     </div>

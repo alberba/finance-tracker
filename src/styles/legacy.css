@@ -2910,17 +2910,6 @@ td select {
   .content {
     padding: 18px 13px calc(104px + env(safe-area-inset-bottom));
   }
-  #dashboard section[aria-label='Patrimonio neto'] {
-    gap: 22px;
-    padding: 20px;
-  }
-  #dashboard #kpi-net-worth {
-    font-size: clamp(2.35rem, 12vw, 3.35rem);
-    line-height: 1;
-  }
-  #dashboard section[aria-label='Patrimonio neto'] canvas {
-    max-height: 210px;
-  }
   .cards-grid,
   .cards-grid.slim,
   .form-grid,

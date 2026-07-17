@@ -29,5 +29,14 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
       testMatch: ['tests/e2e/layout-visual.spec.ts', 'tests/e2e/mobile-smoke.spec.ts'],
     },
+    {
+      name: 'pixel-10',
+      use: {
+        ...devices['Pixel 5'],
+        viewport: { width: 412, height: 923 },
+        deviceScaleFactor: 2.625,
+      },
+      testMatch: ['tests/e2e/layout-visual.spec.ts', 'tests/e2e/mobile-smoke.spec.ts'],
+    },
   ],
 })

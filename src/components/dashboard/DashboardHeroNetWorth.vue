@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderLineChart } from '../../scripts/charts'
 import InfoIcon from '../../assets/icons/info.svg?component'
@@ -24,6 +24,17 @@ const emit = defineEmits<{
 }>()
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
+const netWorthLabel = computed(() => props.kpis?.netWorth ?? '0,00 €')
+const netWorthSizeClass = computed(() => {
+  const labelLength = netWorthLabel.value.replace(/\s/g, '').length
+  if (labelLength >= 17) {
+    return 'net-worth-value--compact'
+  }
+  if (labelLength >= 13) {
+    return 'net-worth-value--medium'
+  }
+  return ''
+})
 
 watch([() => props.chart, () => props.currency], renderChart, { deep: true, immediate: true })
 
@@ -64,43 +75,46 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
 
 <template>
   <section
-    class="flex flex-col justify-between lg:flex-row lg:items-center rounded-lg bg-(--bg-panel) [box-shadow:var(--shadow-soft)] gap-8 p-8"
+    class="net-worth-hero relative grid min-w-0 overflow-hidden rounded-[1.5rem] lg:grid-cols-[minmax(20rem,0.82fr)_minmax(0,1.18fr)]"
     aria-label="Patrimonio neto"
   >
-    <div class="flex flex-col gap-2.5 shrink-0">
+    <div class="relative z-1 flex min-w-0 flex-col justify-center gap-3 p-5 sm:p-7 lg:p-9">
       <p
-        class="inline-flex items-center gap-1.5 text-lg font-semibold text-text-muted"
+        class="inline-flex items-center gap-2 text-sm font-semibold tracking-[0.08em] text-(--ink-muted) uppercase"
       >
         Patrimonio neto
-        <InfoIcon />
+        <InfoIcon class="size-4" />
       </p>
       <strong
         id="kpi-net-worth"
-        class="text-6xl font-bold text-text-main"
+        class="net-worth-value font-display text-(--ink-text)"
+        :class="netWorthSizeClass"
       >
-        {{ kpis?.netWorth ?? '0,00 €' }}
+        {{ netWorthLabel }}
       </strong>
-      <p class="flex flex-wrap items-center gap-2.5">
+      <p class="flex flex-wrap items-center gap-2.5 text-(--ink-muted)">
         <span
           id="kpi-net-worth-change"
-          class="rounded-full px-2.25 py-0.75 font-mono text-sm"
+          class="rounded-full px-2.5 py-1 font-mono text-xs font-medium"
           :class="netWorthChangeClass(kpis?.netWorthChange.tone)"
         >
           {{ kpis?.netWorthChange.label ?? '--' }}
         </span>
-        <span class="text-sm text-text-muted">vs. año anterior</span>
+        <span class="text-sm">vs. año anterior</span>
       </p>
-      <p class="text-[0.9rem] text-text-muted">
+      <p class="mt-1 text-sm text-(--ink-muted)">
         Ahorro anual:
-        <strong id="kpi-annual-savings" class="font-bold text-primary">
+        <strong id="kpi-annual-savings" class="font-mono font-medium text-(--ink-text)">
           {{ kpis?.annualSavings ?? '0,00 €' }}
         </strong>
       </p>
     </div>
 
-    <div class="grid gap-2 flex-1 min-w-0 max-w-4xl">
+    <div
+      class="relative z-1 grid min-w-0 gap-3 border-t border-white/8 p-4 pt-3 sm:p-6 lg:border-t-0 lg:border-l lg:p-7"
+    >
       <div
-        class="gap-0.5 justify-self-end rounded-full bg-(--bg-subtle) p-0.75"
+        class="flex max-w-full gap-1 justify-self-start overflow-x-auto rounded-full bg-white/7 p-1 lg:justify-self-end"
         role="group"
         aria-label="Rango temporal del gráfico"
       >
@@ -108,7 +122,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
           v-for="range in ranges"
           :key="range.value"
           type="button"
-          class="rounded-full text-xs p-2 px-3 min-h-auto font-bold text-text-muted hover:text-text-main aria-pressed:bg-(--bg-panel) aria-pressed:text-primary aria-pressed:shadow-(--shadow-soft)"
+          class="aria-pressed:text-primary min-h-11 min-w-11 rounded-full px-3 py-2 text-xs font-bold text-(--ink-muted) transition-colors hover:bg-white/8 hover:text-(--ink-text) aria-pressed:bg-white"
           :aria-pressed="range.active"
           :data-range="range.value"
           @click="emit('change-range', range.value)"
@@ -116,7 +130,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
           {{ range.label }}
         </button>
       </div>
-      <div class="relative h-64 w-full">
+      <div class="relative h-52 w-full sm:h-60 lg:h-64">
         <canvas
           id="chart-networth"
           ref="canvas"
@@ -127,3 +141,63 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
     </div>
   </section>
 </template>
+
+<style scoped>
+.net-worth-hero {
+  background:
+    radial-gradient(
+      circle at 9% 10%,
+      color-mix(in srgb, var(--primary) 32%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 92% 84%,
+      color-mix(in srgb, var(--income) 16%, transparent),
+      transparent 38%
+    ),
+    var(--bg-sidebar);
+  box-shadow: 0 20px 55px color-mix(in srgb, var(--bg-sidebar) 26%, transparent);
+}
+
+.net-worth-hero::after {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 100% 24px;
+  content: '';
+  pointer-events: none;
+}
+
+.net-worth-value {
+  display: block;
+  max-width: 100%;
+  font-size: clamp(2.05rem, 9vw, 4.75rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+}
+
+.net-worth-value--medium {
+  font-size: clamp(1.85rem, 7.8vw, 3.5rem);
+}
+
+.net-worth-value--compact {
+  font-size: clamp(1.25rem, 5vw, 2.5rem);
+}
+
+@media (min-width: 1024px) {
+  .net-worth-value {
+    font-size: clamp(2.05rem, 2.65vw, 3.25rem);
+  }
+
+  .net-worth-value--medium {
+    font-size: clamp(1.8rem, 2.25vw, 2.8rem);
+  }
+
+  .net-worth-value--compact {
+    font-size: clamp(1.3rem, 1.75vw, 2.2rem);
+  }
+}
+</style>
