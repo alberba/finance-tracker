@@ -1,3 +1,5 @@
+import { isDemoMode, setDemoModeEnabled } from './demo-mode'
+
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const THEME_KEY = 'theme'
 
@@ -24,9 +26,9 @@ function applySidebarState(collapsed: boolean, body: HTMLElement, toggleButton: 
     collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral',
   )
   toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
-  toggleButton.querySelector('.sidebar-toggle-label')?.replaceChildren(
-    collapsed ? 'Expandir' : 'Colapsar',
-  )
+  toggleButton
+    .querySelector('.sidebar-toggle-label')
+    ?.replaceChildren(collapsed ? 'Expandir' : 'Colapsar')
 }
 
 function initSidebarToggle(): void {
@@ -49,7 +51,9 @@ function initSidebarToggle(): void {
 function syncThemeToggleLabel(button: HTMLElement): void {
   const isDark = document.documentElement.dataset.theme === 'dark'
   button.setAttribute('aria-label', isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro')
-  button.querySelector('.theme-toggle-label')?.replaceChildren(isDark ? 'Modo claro' : 'Modo oscuro')
+  button
+    .querySelector('.theme-toggle-label')
+    ?.replaceChildren(isDark ? 'Modo claro' : 'Modo oscuro')
 }
 
 function repaintThemeAwareCharts(): void {
@@ -78,9 +82,62 @@ function initThemeToggle(): void {
   })
 }
 
+function setUserMenuOpen(menu: HTMLElement, trigger: HTMLElement, open: boolean): void {
+  menu.hidden = !open
+  trigger.setAttribute('aria-expanded', open ? 'true' : 'false')
+  trigger.setAttribute('aria-label', open ? 'Cerrar menú de usuario' : 'Abrir menú de usuario')
+}
+
+function syncDemoModeAction(action: HTMLElement): void {
+  const active = isDemoMode()
+  action.dataset.active = active ? 'true' : 'false'
+  action
+    .querySelector('.demo-mode-action-label')
+    ?.replaceChildren(active ? 'Salir del modo demo' : 'Activar modo demo')
+  action
+    .querySelector('.demo-mode-action-description')
+    ?.replaceChildren(active ? 'Volver a tus datos privados' : 'Usar únicamente datos ficticios')
+}
+
+function initUserMenu(): void {
+  const root = document.getElementById('sidebar-user-menu-root')
+  const trigger = document.getElementById('sidebar-user-menu-toggle')
+  const menu = document.getElementById('sidebar-user-menu')
+  const demoAction = document.getElementById('demo-mode-menu-action')
+  if (!root || !trigger || !menu || !demoAction) return
+
+  syncDemoModeAction(demoAction)
+  trigger.addEventListener('click', () => {
+    const nextOpen = menu.hidden
+    setUserMenuOpen(menu, trigger, nextOpen)
+    if (nextOpen) demoAction.focus()
+  })
+  demoAction.addEventListener('click', () => setDemoModeEnabled(!isDemoMode()))
+  document.addEventListener('click', (event) => {
+    if (!root.contains(event.target as Node)) setUserMenuOpen(menu, trigger, false)
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || menu.hidden) return
+    setUserMenuOpen(menu, trigger, false)
+    trigger.focus()
+  })
+}
+
+function initDemoBanner(): void {
+  if (!isDemoMode()) return
+  const banner = document.getElementById('demo-banner')
+  const exit = document.getElementById('demo-banner-exit')
+  if (!banner || !exit) return
+
+  banner.hidden = false
+  exit.addEventListener('click', () => setDemoModeEnabled(false))
+}
+
 function initShellInteractions(): void {
   initSidebarToggle()
   initThemeToggle()
+  initUserMenu()
+  initDemoBanner()
 }
 
 if (document.readyState === 'loading') {

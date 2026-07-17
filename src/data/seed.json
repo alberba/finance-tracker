@@ -1,7 +1,7 @@
 {
   "meta": {
-    "source": "/home/albert/Descargas/FINANZAS PERSONALES 2026.xlsx",
-    "generatedAt": "2026-02-18T19:08:33.586957Z",
+    "source": "synthetic-seed",
+    "generatedAt": "2026-01-01T00:00:00.000000Z",
     "version": 1
   },
   "year": 2026,
@@ -10,99 +10,99 @@
     {
       "id": "revolut",
       "name": "Revolut",
-      "openingBalance": 285.67
+      "openingBalance": 1200.0
     },
     {
       "id": "santander",
       "name": "Santander",
-      "openingBalance": 31.09
+      "openingBalance": 800.0
     },
     {
       "id": "trade-republic",
       "name": "Trade Republic",
-      "openingBalance": 11.25
+      "openingBalance": 500.0
     },
     {
       "id": "myinvestor",
       "name": "MyInvestor",
-      "openingBalance": 421.92
+      "openingBalance": 1500.0
     },
     {
       "id": "trading-212",
       "name": "Trading 212",
-      "openingBalance": 444.29
+      "openingBalance": 300.0
     },
     {
       "id": "openbank",
       "name": "Openbank",
-      "openingBalance": 362.25
+      "openingBalance": 950.0
     },
     {
       "id": "revolut-ahorros",
       "name": "Revolut Ahorros",
-      "openingBalance": 2183.03
+      "openingBalance": 3000.0
     },
     {
       "id": "efectivo",
       "name": "Efectivo",
-      "openingBalance": 160
+      "openingBalance": 100.0
     },
     {
       "id": "matchbetting",
       "name": "Matchbetting",
-      "openingBalance": 2305.08
+      "openingBalance": 50.0
     },
     {
       "id": "bitvavo",
       "name": "Bitvavo",
-      "openingBalance": 1010.82
+      "openingBalance": 200.0
     }
   ],
   "investmentAssets": [
     {
       "id": "fondos-indexados",
       "name": "Fondos Indexados",
-      "openingBalance": 1686.32
+      "openingBalance": 5000.0
     },
     {
       "id": "oro",
       "name": "Oro",
-      "openingBalance": 3685.8
+      "openingBalance": 400.0
     },
     {
       "id": "etf-plata",
       "name": "ETF Plata",
-      "openingBalance": 145.3
+      "openingBalance": 250.0
     },
     {
       "id": "etf-aged",
       "name": "ETF AGED",
-      "openingBalance": 423.44
+      "openingBalance": 300.0
     },
     {
       "id": "etf-xdwh",
       "name": "ETF XDWH",
-      "openingBalance": 290.52
+      "openingBalance": 350.0
     },
     {
       "id": "etf-sxrs",
       "name": "ETF SXRS",
-      "openingBalance": 278.92
+      "openingBalance": 300.0
     },
     {
       "id": "etf-iqqi",
       "name": "ETF IQQI",
-      "openingBalance": 297.59
+      "openingBalance": 280.0
     },
     {
       "id": "acciones",
       "name": "Acciones",
-      "openingBalance": 1179.93
+      "openingBalance": 900.0
     },
     {
       "id": "crypto",
       "name": "Crypto",
-      "openingBalance": 1224.09
+      "openingBalance": 600.0
     }
   ],
   "liabilities": [],
@@ -138,1030 +138,448 @@
   ],
   "transactions": [
     {
-      "id": "enero-10",
+      "id": "seed-tx-001",
       "date": "2026-01-01",
       "month": 0,
       "type": "income",
       "accountId": "revolut",
-      "accountName": "Revolut",
       "category": "Nómina",
-      "description": "",
-      "amount": 1695.05
+      "description": "Nómina mensual",
+      "amount": 2000
     },
     {
-      "id": "enero-11",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "income",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Extra",
-      "description": "",
-      "amount": 20
-    },
-    {
-      "id": "enero-12",
-      "date": "2026-01-06",
-      "month": 0,
-      "type": "income",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Extra",
-      "description": "Reyes",
-      "amount": 333
-    },
-    {
-      "id": "enero-17",
-      "date": "2026-01-01",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Otros",
-      "description": "Mochila trabajo",
-      "amount": 29.99
-    },
-    {
-      "id": "enero-18",
-      "date": "2026-01-01",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Avatar IMAX",
-      "amount": 3.5
-    },
-    {
-      "id": "enero-19",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Poker",
-      "amount": 5
-    },
-    {
-      "id": "enero-20",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Deporte",
-      "description": "2o pago Altra",
-      "amount": 35
-    },
-    {
-      "id": "enero-21",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Comida basket",
-      "amount": 16.8
-    },
-    {
-      "id": "enero-22",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Otros",
-      "description": "Portabolis libreta",
-      "amount": 5.38
-    },
-    {
-      "id": "enero-23",
-      "date": "2026-01-03",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Vuelos Oviedo",
-      "amount": 57.46
-    },
-    {
-      "id": "enero-24",
-      "date": "2026-01-03",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Coche Oviedo",
-      "amount": 126.31
-    },
-    {
-      "id": "enero-25",
+      "id": "seed-tx-002",
       "date": "2026-01-04",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "Pobremilenial",
-      "amount": 10
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 32.05
     },
     {
-      "id": "enero-26",
-      "date": "2026-01-04",
+      "id": "seed-tx-003",
+      "date": "2026-01-12",
+      "month": 0,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 45.09
+    },
+    {
+      "id": "seed-tx-004",
+      "date": "2026-01-20",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "ChatGPT",
-      "amount": 20.95
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 45.4
     },
     {
-      "id": "enero-27",
+      "id": "seed-tx-005",
+      "date": "2026-01-27",
+      "month": 0,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 57.24
+    },
+    {
+      "id": "seed-tx-006",
       "date": "2026-01-05",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Fire TV",
-      "amount": 37.82
+      "category": "Transporte",
+      "description": "Abono transporte",
+      "amount": 40
     },
     {
-      "id": "enero-28",
-      "date": "2026-01-05",
+      "id": "seed-tx-007",
+      "date": "2026-01-07",
       "month": 0,
       "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "Zapatos Columbia",
-      "amount": 90.99
-    },
-    {
-      "id": "enero-29",
-      "date": "2026-01-05",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Gafas 3D",
-      "amount": 3
-    },
-    {
-      "id": "enero-30",
-      "date": "2026-01-05",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Pizerria Losteria",
-      "amount": 15.95
-    },
-    {
-      "id": "enero-31",
-      "date": "2026-01-08",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Coche",
-      "description": "Parking Corte ingles",
-      "amount": 3.15
-    },
-    {
-      "id": "enero-32",
-      "date": "2026-01-09",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
+      "accountId": "santander",
       "category": "Coche",
       "description": "Gasolina",
-      "amount": 51.35
+      "amount": 47.57
     },
     {
-      "id": "enero-33",
+      "id": "seed-tx-008",
       "date": "2026-01-10",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "Ropa senderismo Decathlon",
-      "amount": 80.46
+      "category": "Comer fuera",
+      "description": "Restaurante",
+      "amount": 24.03
     },
     {
-      "id": "enero-34",
-      "date": "2026-01-10",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comida",
-      "description": "Comida excusion",
-      "amount": 18.72
-    },
-    {
-      "id": "enero-35",
-      "date": "2026-01-13",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "Cinesa",
-      "amount": 17.9
-    },
-    {
-      "id": "enero-36",
+      "id": "seed-tx-009",
       "date": "2026-01-14",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Corte ingles oficina",
-      "amount": 15.21
+      "category": "Ocio",
+      "description": "Cine",
+      "amount": 18.62
     },
     {
-      "id": "enero-37",
-      "date": "2026-01-14",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Cafeteria corte ingles",
-      "amount": 6.15
-    },
-    {
-      "id": "enero-38",
-      "date": "2026-01-15",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Coche",
-      "description": "Parking rotger",
-      "amount": 1.2
-    },
-    {
-      "id": "enero-39",
+      "id": "seed-tx-010",
       "date": "2026-01-15",
       "month": 0,
       "type": "expense",
       "accountId": "openbank",
-      "accountName": "Openbank",
-      "category": "Otros",
-      "description": "2o pago ratón",
-      "amount": 30.03
-    },
-    {
-      "id": "enero-40",
-      "date": "2026-01-19",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
       "category": "Suscripciones",
-      "description": "RealDebrid",
-      "amount": 9
+      "description": "Suscripción streaming",
+      "amount": 12.99
     },
     {
-      "id": "enero-41",
-      "date": "2026-01-20",
+      "id": "seed-tx-011",
+      "date": "2026-01-18",
       "month": 0,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Otros",
-      "description": "Envio SEUR",
-      "amount": 18.98
-    },
-    {
-      "id": "enero-42",
-      "date": "2026-01-21",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "App Stremio Apple TV",
-      "amount": 5.99
-    },
-    {
-      "id": "enero-43",
-      "date": "2026-01-22",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Mozzatura",
-      "amount": 37.4
-    },
-    {
-      "id": "enero-44",
-      "date": "2026-01-20",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Poker",
-      "amount": 5
-    },
-    {
-      "id": "enero-45",
-      "date": "2026-01-21",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Salud",
-      "description": "Vitamina D3",
-      "amount": 11.49
-    },
-    {
-      "id": "enero-46",
-      "date": "2026-01-22",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
       "category": "Deporte",
-      "description": "Primer Pago Zapatos Futbol",
-      "amount": 14.63
+      "description": "Gimnasio",
+      "amount": 29.9
     },
     {
-      "id": "enero-47",
-      "date": "2026-01-22",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "Infuse",
-      "amount": 1.99
-    },
-    {
-      "id": "enero-48",
-      "date": "2026-01-22",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comida",
-      "description": "Carrefour",
-      "amount": 18.22
-    },
-    {
-      "id": "enero-49",
-      "date": "2026-01-25",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Deporte",
-      "description": "Futbol",
-      "amount": 3.21
-    },
-    {
-      "id": "enero-50",
-      "date": "2026-01-27",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comida",
-      "description": "Cafe",
-      "amount": 20.8
-    },
-    {
-      "id": "enero-51",
-      "date": "2026-01-27",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Salud",
-      "description": "Podologia Avanzada",
-      "amount": 85
-    },
-    {
-      "id": "enero-52",
-      "date": "2026-01-28",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Otros",
-      "description": "Aliexpress",
-      "amount": 1.99
-    },
-    {
-      "id": "enero-53",
-      "date": "2026-01-31",
-      "month": 0,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comida",
-      "description": "Lidl",
-      "amount": 5.77
-    },
-    {
-      "id": "enero-61",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "ETF Plata",
-      "description": "",
-      "amount": 120.56
-    },
-    {
-      "id": "enero-62",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "ETF XDWH",
-      "description": "",
-      "amount": 59.96
-    },
-    {
-      "id": "enero-63",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trade-republic",
-      "accountName": "Trade Republic",
-      "category": "ETF Plata",
-      "description": "",
-      "amount": 100
-    },
-    {
-      "id": "enero-64",
-      "date": "2026-01-02",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 50
-    },
-    {
-      "id": "enero-65",
-      "date": "2026-01-05",
+      "id": "seed-tx-012",
+      "date": "2026-01-03",
       "month": 0,
       "type": "investment",
       "accountId": "myinvestor",
-      "accountName": "MyInvestor",
       "category": "Fondos Indexados",
-      "description": "Ingreso Fondos",
-      "amount": 100
+      "description": "Aportación fondo indexado",
+      "amount": 200
     },
     {
-      "id": "enero-66",
-      "date": "2026-01-09",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "ETH",
-      "amount": 10
-    },
-    {
-      "id": "enero-67",
-      "date": "2026-01-09",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 50
-    },
-    {
-      "id": "enero-68",
-      "date": "2026-01-07",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "Acciones",
-      "description": "MCD",
-      "amount": 92.77
-    },
-    {
-      "id": "enero-69",
+      "id": "seed-tx-013",
       "date": "2026-01-16",
       "month": 0,
       "type": "investment",
       "accountId": "bitvavo",
-      "accountName": "Bitvavo",
       "category": "Crypto",
-      "description": "BTC",
+      "description": "Compra cripto",
       "amount": 50
     },
     {
-      "id": "enero-70",
-      "date": "2026-01-16",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trade-republic",
-      "accountName": "Trade Republic",
-      "category": "ETF IQQI",
-      "description": "INFR",
-      "amount": 60
-    },
-    {
-      "id": "enero-71",
-      "date": "2026-01-19",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC extra",
-      "amount": 80
-    },
-    {
-      "id": "enero-72",
-      "date": "2026-01-20",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "ETF XDWH",
-      "description": "",
-      "amount": 50.24
-    },
-    {
-      "id": "enero-73",
-      "date": "2026-01-22",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "Acciones",
-      "description": "STVN",
-      "amount": 66.25
-    },
-    {
-      "id": "enero-74",
-      "date": "2026-01-20",
-      "month": 0,
-      "type": "investment",
-      "accountId": "trading-212",
-      "accountName": "Trading 212",
-      "category": "ETF AGED",
-      "description": "",
-      "amount": 41.4
-    },
-    {
-      "id": "enero-75",
-      "date": "2026-01-23",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 50
-    },
-    {
-      "id": "enero-76",
-      "date": "2026-01-23",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "ETH",
-      "amount": 10
-    },
-    {
-      "id": "enero-77",
-      "date": "2026-01-30",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 50
-    },
-    {
-      "id": "enero-78",
-      "date": "2026-01-31",
-      "month": 0,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 75
-    },
-    {
-      "id": "febrero-10",
-      "date": "2026-02-02",
-      "month": 1,
-      "type": "income",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Nómina",
-      "description": "Nomina",
-      "amount": 1508
-    },
-    {
-      "id": "febrero-11",
-      "date": "2026-02-02",
-      "month": 1,
-      "type": "income",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Extra",
-      "description": "Matchbetting",
-      "amount": 300
-    },
-    {
-      "id": "febrero-17",
+      "id": "seed-tx-014",
       "date": "2026-02-01",
       "month": 1,
-      "type": "expense",
+      "type": "income",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "3r Pago Altra",
-      "amount": 35
+      "category": "Nómina",
+      "description": "Nómina mensual",
+      "amount": 2000
     },
     {
-      "id": "febrero-18",
-      "date": "2026-02-02",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "1r pago chaqueta Columbia",
-      "amount": 35.33
-    },
-    {
-      "id": "febrero-19",
-      "date": "2026-02-03",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Bar MAllorca",
-      "amount": 28.5
-    },
-    {
-      "id": "febrero-20",
+      "id": "seed-tx-015",
       "date": "2026-02-04",
       "month": 1,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "Chaqueta Columbia",
-      "amount": 37.63
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 46.92
     },
     {
-      "id": "febrero-21",
-      "date": "2026-02-04",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "Pobre Milenial",
-      "amount": 10
-    },
-    {
-      "id": "febrero-22",
-      "date": "2026-02-04",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Suscripciones",
-      "description": "OpenAI",
-      "amount": 20.61
-    },
-    {
-      "id": "febrero-23",
-      "date": "2026-02-05",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ropa",
-      "description": "Compra Decathlon Preparación OVD",
-      "amount": 47.97
-    },
-    {
-      "id": "febrero-24",
-      "date": "2026-02-05",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Deporte",
-      "description": "Padel PAlma PAdel",
-      "amount": 9.83
-    },
-    {
-      "id": "febrero-25",
-      "date": "2026-02-07",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "Mercadona grupo Novios",
-      "amount": 7.82
-    },
-    {
-      "id": "febrero-26",
-      "date": "2026-02-07",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Ocio",
-      "description": "Zar Discoteca",
-      "amount": 12
-    },
-    {
-      "id": "febrero-27",
-      "date": "2026-02-07",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Deporte",
-      "description": "Escalada",
-      "amount": 17.3
-    },
-    {
-      "id": "febrero-28",
-      "date": "2026-02-08",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Comer fuera",
-      "description": "McDonald's Marty Supreme",
-      "amount": 16.28
-    },
-    {
-      "id": "febrero-29",
-      "date": "2026-02-11",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Salud",
-      "description": "Magnesio",
-      "amount": 19.3
-    },
-    {
-      "id": "febrero-30",
+      "id": "seed-tx-016",
       "date": "2026-02-12",
       "month": 1,
       "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Hotel 3ra noche Asturias",
-      "amount": 71.1
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 54.63
     },
     {
-      "id": "febrero-31",
-      "date": "2026-02-13",
+      "id": "seed-tx-017",
+      "date": "2026-02-20",
       "month": 1,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 46.63
+    },
+    {
+      "id": "seed-tx-018",
+      "date": "2026-02-27",
+      "month": 1,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 52.84
+    },
+    {
+      "id": "seed-tx-019",
+      "date": "2026-02-05",
+      "month": 1,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Transporte",
+      "description": "Abono transporte",
+      "amount": 40
+    },
+    {
+      "id": "seed-tx-020",
+      "date": "2026-02-07",
+      "month": 1,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Coche",
+      "description": "Gasolina",
+      "amount": 64.2
+    },
+    {
+      "id": "seed-tx-021",
+      "date": "2026-02-10",
+      "month": 1,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Comer fuera",
+      "description": "Restaurante",
+      "amount": 38.28
+    },
+    {
+      "id": "seed-tx-022",
+      "date": "2026-02-14",
+      "month": 1,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Ocio",
+      "description": "Cine",
+      "amount": 18.38
+    },
+    {
+      "id": "seed-tx-023",
+      "date": "2026-02-15",
+      "month": 1,
+      "type": "expense",
+      "accountId": "openbank",
       "category": "Suscripciones",
-      "description": "Cinesa",
-      "amount": 17.9
+      "description": "Suscripción streaming",
+      "amount": 12.99
     },
     {
-      "id": "febrero-32",
-      "date": "2026-02-14",
+      "id": "seed-tx-024",
+      "date": "2026-02-18",
       "month": 1,
       "type": "expense",
       "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Recago joven SIXT",
-      "amount": 65.98
+      "category": "Deporte",
+      "description": "Gimnasio",
+      "amount": 29.9
     },
     {
-      "id": "febrero-33",
-      "date": "2026-02-14",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Gastos 14 viaje",
-      "amount": 3.2
-    },
-    {
-      "id": "febrero-34",
-      "date": "2026-02-15",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Hotel 1r dia Asturias",
-      "amount": 103.4
-    },
-    {
-      "id": "febrero-35",
-      "date": "2026-02-15",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Restaurante Covadonga",
-      "amount": 20
-    },
-    {
-      "id": "febrero-36",
-      "date": "2026-02-15",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Hotel 2o dia Asturias",
-      "amount": 78
-    },
-    {
-      "id": "febrero-37",
-      "date": "2026-02-16",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Restaurante Bulnes",
-      "amount": 47.7
-    },
-    {
-      "id": "febrero-38",
-      "date": "2026-02-16",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Super 3r dia Asturias",
-      "amount": 4.71
-    },
-    {
-      "id": "febrero-39",
-      "date": "2026-02-17",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Gasolina coche viaje",
-      "amount": 21.94
-    },
-    {
-      "id": "febrero-40",
-      "date": "2026-02-17",
-      "month": 1,
-      "type": "expense",
-      "accountId": "revolut",
-      "accountName": "Revolut",
-      "category": "Viajes",
-      "description": "Regalo Quesos Asturias",
-      "amount": 20.6
-    },
-    {
-      "id": "febrero-61",
-      "date": "2026-01-05",
-      "month": 1,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 100
-    },
-    {
-      "id": "febrero-62",
-      "date": "2026-01-06",
-      "month": 1,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "BTC",
-      "amount": 50
-    },
-    {
-      "id": "febrero-63",
-      "date": "2026-01-06",
-      "month": 1,
-      "type": "investment",
-      "accountId": "bitvavo",
-      "accountName": "Bitvavo",
-      "category": "Crypto",
-      "description": "ETH",
-      "amount": 10
-    },
-    {
-      "id": "febrero-64",
-      "date": "2026-01-05",
+      "id": "seed-tx-025",
+      "date": "2026-02-03",
       "month": 1,
       "type": "investment",
       "accountId": "myinvestor",
-      "accountName": "MyInvestor",
       "category": "Fondos Indexados",
-      "description": "Ingreso Fondos",
-      "amount": 100
+      "description": "Aportación fondo indexado",
+      "amount": 200
     },
     {
-      "id": "febrero-65",
-      "date": "2026-01-02",
+      "id": "seed-tx-026",
+      "date": "2026-02-21",
       "month": 1,
+      "type": "income",
+      "accountId": "revolut",
+      "category": "Reventa",
+      "description": "Venta segunda mano",
+      "amount": 85
+    },
+    {
+      "id": "seed-tx-027",
+      "date": "2026-03-01",
+      "month": 2,
+      "type": "income",
+      "accountId": "revolut",
+      "category": "Nómina",
+      "description": "Nómina mensual",
+      "amount": 2000
+    },
+    {
+      "id": "seed-tx-028",
+      "date": "2026-03-04",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 36.16
+    },
+    {
+      "id": "seed-tx-029",
+      "date": "2026-03-12",
+      "month": 2,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 48.88
+    },
+    {
+      "id": "seed-tx-030",
+      "date": "2026-03-20",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 31.77
+    },
+    {
+      "id": "seed-tx-031",
+      "date": "2026-03-27",
+      "month": 2,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Comida",
+      "description": "Compra semanal",
+      "amount": 55.77
+    },
+    {
+      "id": "seed-tx-032",
+      "date": "2026-03-05",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Transporte",
+      "description": "Abono transporte",
+      "amount": 40
+    },
+    {
+      "id": "seed-tx-033",
+      "date": "2026-03-07",
+      "month": 2,
+      "type": "expense",
+      "accountId": "santander",
+      "category": "Coche",
+      "description": "Gasolina",
+      "amount": 56.24
+    },
+    {
+      "id": "seed-tx-034",
+      "date": "2026-03-10",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Comer fuera",
+      "description": "Restaurante",
+      "amount": 40.0
+    },
+    {
+      "id": "seed-tx-035",
+      "date": "2026-03-14",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Ocio",
+      "description": "Cine",
+      "amount": 19.96
+    },
+    {
+      "id": "seed-tx-036",
+      "date": "2026-03-15",
+      "month": 2,
+      "type": "expense",
+      "accountId": "openbank",
+      "category": "Suscripciones",
+      "description": "Suscripción streaming",
+      "amount": 12.99
+    },
+    {
+      "id": "seed-tx-037",
+      "date": "2026-03-18",
+      "month": 2,
+      "type": "expense",
+      "accountId": "revolut",
+      "category": "Deporte",
+      "description": "Gimnasio",
+      "amount": 29.9
+    },
+    {
+      "id": "seed-tx-038",
+      "date": "2026-03-03",
+      "month": 2,
       "type": "investment",
-      "accountId": "trade-republic",
-      "accountName": "Trade Republic",
-      "category": "ETF Plata",
-      "description": "",
-      "amount": 100
+      "accountId": "myinvestor",
+      "category": "Fondos Indexados",
+      "description": "Aportación fondo indexado",
+      "amount": 200
+    },
+    {
+      "id": "seed-tx-039",
+      "date": "2026-03-16",
+      "month": 2,
+      "type": "investment",
+      "accountId": "bitvavo",
+      "category": "Crypto",
+      "description": "Compra cripto",
+      "amount": 50
     }
   ],
   "snapshots": {
     "0": {
       "month": 0,
       "accounts": {
-        "revolut": 760.23,
-        "santander": 30.1,
-        "trade-republic": 61.38,
-        "myinvestor": 444.35,
-        "trading-212": 251.88,
-        "openbank": 332.22,
-        "revolut-ahorros": 2235.42,
-        "efectivo": 150,
-        "matchbetting": 2162.77,
-        "bitvavo": 660.82
+        "revolut": 1267.56,
+        "santander": 834.72,
+        "trade-republic": 537.61,
+        "myinvestor": 1588.59,
+        "trading-212": 385.05,
+        "openbank": 1026.36,
+        "revolut-ahorros": 3089.98,
+        "efectivo": 155.95,
+        "matchbetting": 75.34,
+        "bitvavo": 243.83
       },
       "investments": {
-        "fondos-indexados": 1820.71,
-        "oro": 4113.8,
-        "etf-plata": 467.77,
-        "etf-aged": 461.7,
-        "etf-xdwh": 397.44,
-        "etf-sxrs": 302.88,
-        "etf-iqqi": 363,
-        "acciones": 1373.33,
-        "crypto": 1498.15
+        "fondos-indexados": 5037.87,
+        "oro": 424.61,
+        "etf-plata": 282.87,
+        "etf-aged": 353.82,
+        "etf-xdwh": 395.2,
+        "etf-sxrs": 338.87,
+        "etf-iqqi": 291.24,
+        "acciones": 945.54,
+        "crypto": 628.18
       },
       "liabilities": {}
     },
     "1": {
       "month": 1,
       "accounts": {
-        "trade-republic": 61.49,
-        "trading-212": 613.88,
-        "bitvavo": 625.82
+        "revolut": 1299.11,
+        "santander": 895.83,
+        "trade-republic": 622.0,
+        "myinvestor": 1609.78,
+        "trading-212": 356.3,
+        "openbank": 1060.89,
+        "revolut-ahorros": 3145.02,
+        "efectivo": 224.02,
+        "matchbetting": 158.74,
+        "bitvavo": 368.35
       },
       "investments": {
-        "fondos-indexados": 1905.15,
-        "oro": 4222.1,
-        "etf-plata": 471.2,
-        "etf-aged": 471.62,
-        "etf-xdwh": 404.88,
-        "etf-sxrs": 294.39,
-        "etf-iqqi": 374.3,
-        "acciones": 1423.86,
-        "crypto": 1495.18
+        "fondos-indexados": 5045.86,
+        "oro": 462.0,
+        "etf-plata": 362.62,
+        "etf-aged": 367.92,
+        "etf-xdwh": 421.8,
+        "etf-sxrs": 322.54,
+        "etf-iqqi": 322.45,
+        "acciones": 932.9,
+        "crypto": 624.89
       },
       "liabilities": {}
     }
@@ -1169,232 +587,232 @@
   "budget": {
     "income": {
       "Nómina": [
-        1700,
-        1550,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000,
+        2000
       ],
       "Reventa": [
-        25,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40
       ],
       "Extra": [
-        50,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
       ]
     },
     "expense": {
       "Comida": [
-        50,
-        1700,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220,
+        220
       ],
       "Coche": [
         70,
-        620,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70
       ],
       "Comer fuera": [
         60,
-        70,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60
       ],
       "Ocio": [
-        60,
-        100,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50
       ],
       "Ropa": [
-        40,
-        50,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30
       ],
       "Suscripciones": [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
       ],
       "Deporte": [
-        50,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30
       ],
       "Viajes": [
-        40,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60
       ],
       "Transporte": [
-        30,
-        25,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40,
+        40
       ],
       "Regalo": [
-        5,
-        35,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
       ],
       "Salud": [
         15,
-        60,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
       ],
       "Otros": [
-        25,
-        20,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30
       ]
     },
     "investment": {
       "Fondos Indexados": [
-        237,
-        177,
-        197,
-        212,
-        221,
-        227,
-        194,
-        0,
-        0,
-        0,
-        0,
-        0
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
       ],
       "Oro": [
         0,
@@ -1403,7 +821,7 @@
         0,
         0,
         0,
-        108,
+        0,
         0,
         0,
         0,
@@ -1411,13 +829,13 @@
         0
       ],
       "ETF Plata": [
-        202,
-        104,
-        85,
-        72,
-        63,
-        57,
-        47,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0,
         0,
         0,
@@ -1425,13 +843,13 @@
         0
       ],
       "ETF AGED": [
-        46,
-        38,
-        44,
-        49,
-        52,
-        54,
-        46,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0,
         0,
         0,
@@ -1439,13 +857,13 @@
         0
       ],
       "ETF XDWH": [
-        114,
-        67,
-        62,
-        59,
-        57,
-        55,
-        46,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0,
         0,
         0,
@@ -1459,7 +877,7 @@
         0,
         0,
         0,
-        16,
+        0,
         0,
         0,
         0,
@@ -1467,13 +885,13 @@
         0
       ],
       "ETF IQQI": [
-        108,
-        64,
-        61,
-        58,
-        56,
-        55,
-        46,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0,
         0,
         0,
@@ -1481,13 +899,13 @@
         0
       ],
       "Acciones": [
-        169,
-        122,
-        134,
-        143,
-        148,
-        151,
-        129,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0,
         0,
         0,
@@ -1495,93 +913,85 @@
         0
       ],
       "Crypto": [
-        384,
-        228,
-        216,
-        208,
-        202,
-        198,
-        167,
-        0,
-        0,
-        0,
-        0,
-        0
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25,
+        25
       ]
     }
   },
   "goals": {
     "short": {
-      "name": "Objetivo a corto plazo 🐜",
+      "name": "Objetivo a corto plazo",
       "targetYear": 2026,
-      "targetAmount": 30000
+      "targetAmount": 10000
     },
     "medium": {
-      "name": "Objetivo a medio plazo 🐅",
+      "name": "Objetivo a medio plazo",
       "targetYear": 2027,
-      "targetAmount": 250000
+      "targetAmount": 50000
     },
     "long": {
-      "name": "Objetivo a largo plazo 🐘",
+      "name": "Objetivo a largo plazo",
       "targetYear": 2030,
-      "targetAmount": 1000000
+      "targetAmount": 150000
     },
     "investmentTotal": {
-      "name": "Objetivo Inversión TOTAL",
-      "targetYear": 2026,
-      "targetAmount": 100000
+      "name": "Objetivo inversión total",
+      "targetYear": 2027,
+      "targetAmount": 20000
     },
     "investmentFunds": {
-      "name": "Objetivo Fondos Indexados",
-      "targetYear": 2026,
-      "targetAmount": 250000
+      "name": "Objetivo fondos indexados",
+      "targetYear": 2027,
+      "targetAmount": 15000
     },
     "investmentCrypto": {
-      "name": "Objetivo Criptomonedas",
-      "targetYear": 2026,
-      "targetAmount": 1000000
+      "name": "Objetivo criptomonedas",
+      "targetYear": 2027,
+      "targetAmount": 3000
     }
   },
   "contributions": [
     {
-      "id": "contrib-4",
-      "date": "2026-01-03",
-      "amount": 60,
-      "portfolioDate": "2026-01-01",
-      "portfolioValue": 11088.94,
-      "flow": 0
+      "id": "seed-contrib-01",
+      "date": "2026-01-28",
+      "amount": 200,
+      "portfolioDate": "2026-01-28",
+      "portfolioValue": 8500,
+      "flow": 200,
+      "flowAllocations": [
+        {
+          "accountId": "myinvestor",
+          "amount": 200
+        }
+      ]
     },
     {
-      "id": "contrib-5",
-      "date": "2026-01-05",
-      "amount": 100,
-      "portfolioDate": "2026-01-31",
-      "portfolioValue": 11462.83,
-      "flow": 580
-    },
-    {
-      "id": "contrib-6",
-      "date": "2026-01-10",
-      "amount": 210,
-      "portfolioDate": "2026-02-08",
-      "portfolioValue": 11800.15,
-      "flow": 562
-    },
-    {
-      "id": "contrib-7",
-      "date": "2026-01-31",
-      "amount": 160,
-      "portfolioDate": "2026-01-31",
-      "portfolioValue": null,
-      "flow": null
-    },
-    {
-      "id": "contrib-8",
-      "date": "2026-02-08",
-      "amount": 562,
-      "portfolioDate": "2026-02-08",
-      "portfolioValue": null,
-      "flow": null
+      "id": "seed-contrib-02",
+      "date": "2026-02-28",
+      "amount": 250,
+      "portfolioDate": "2026-02-28",
+      "portfolioValue": 8850,
+      "flow": 250,
+      "flowAllocations": [
+        {
+          "accountId": "myinvestor",
+          "amount": 200
+        },
+        {
+          "accountId": "trade-republic",
+          "amount": 50
+        }
+      ]
     }
   ]
 }

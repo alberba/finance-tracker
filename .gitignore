@@ -20,3 +20,4 @@ package-lock.json
 /playwright/.auth/
 # Local-only visual snapshots (CI generates the canonical -linux baselines)
 tests/e2e/**/*-darwin.png
+backup.sql

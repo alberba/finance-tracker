@@ -1,11 +1,11 @@
 ---
-import "../styles/global.css";
-import AppSidebar from "./layout/AppSidebar.astro";
-import FinanceWorkspace from "./FinanceWorkspace.vue";
-import { getSectionFromPath } from "../scripts/app/dashboard-section-routing";
+import '../styles/global.css'
+import AppSidebar from './layout/AppSidebar.astro'
+import FinanceWorkspace from './FinanceWorkspace.vue'
+import { getSectionFromPath } from '../scripts/app/dashboard-section-routing'
 
-const canonicalUrl = new URL("/", Astro.url).toString();
-const activeSection = getSectionFromPath(Astro.url.pathname);
+const canonicalUrl = new URL('/', Astro.url).toString()
+const activeSection = getSectionFromPath(Astro.url.pathname)
 ---
 
 <!doctype html>
@@ -14,29 +14,50 @@ const activeSection = getSectionFromPath(Astro.url.pathname);
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script is:inline>
-      (function () {
+      ;(function () {
         try {
-          const stored = localStorage.getItem("theme");
+          const stored = localStorage.getItem('theme')
           const prefersDark =
-      window.matchMedia &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.dataset.theme =
-            stored || (prefersDark ? "dark" : "light");
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light')
         } catch {
-          document.documentElement.dataset.theme = "light";
+          document.documentElement.dataset.theme = 'light'
         }
-      })();
+      })()
     </script>
-    <meta
-      name="theme-color"
-      content="#07080B"
-      media="(prefers-color-scheme: dark)"
-    />
-    <meta
-      name="theme-color"
-      content="#EEF1F6"
-      media="(prefers-color-scheme: light)"
-    />
+    <script is:inline>
+      // Modo demo: `?demo=1` activa (persistente), `?demo=0` desactiva. Debe
+      // correr antes que los scripts de la app para fijar el namespace `demo`
+      // (datos sintéticos aislados) antes de la hidratación del estado.
+      ;(function () {
+        try {
+          const params = new URLSearchParams(window.location.search)
+          const flag = params.get('demo')
+          if (flag !== null) {
+            if (['1', 'on', 'true'].includes(flag.toLowerCase())) {
+              localStorage.setItem('finance-demo-mode', '1')
+            } else {
+              localStorage.removeItem('finance-demo-mode')
+            }
+            params.delete('demo')
+            const query = params.toString()
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + (query ? '?' + query : '') + window.location.hash,
+            )
+          }
+          if (!window.__FINANCE_NAMESPACE__ && localStorage.getItem('finance-demo-mode') === '1') {
+            window.__FINANCE_NAMESPACE__ = 'demo'
+            document.documentElement.dataset.demo = '1'
+          }
+        } catch {
+          /* storage no disponible — sin modo demo */
+        }
+      })()
+    </script>
+    <meta name="theme-color" content="#07080B" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#EEF1F6" media="(prefers-color-scheme: light)" />
     <title>Finance Tracker 2026</title>
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -47,8 +68,8 @@ const activeSection = getSectionFromPath(Astro.url.pathname);
       rel="stylesheet"
     />
     <script>
-      import "../scripts/app";
-      import "../scripts/shell";
+      import '../scripts/app'
+      import '../scripts/shell'
     </script>
   </head>
   <body>
@@ -62,13 +83,12 @@ const activeSection = getSectionFromPath(Astro.url.pathname);
       </main>
     </div>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <div
-      id="chart-tooltip"
-      class="chart-tooltip"
-      role="tooltip"
-      aria-hidden="true"
-    >
+    <div id="demo-banner" class="demo-banner" role="status" hidden>
+      <span class="demo-banner-dot" aria-hidden="true"></span>
+      <span>Modo demo · datos ficticios</span>
+      <button id="demo-banner-exit" class="demo-banner-exit" type="button"> Salir </button>
     </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="chart-tooltip" class="chart-tooltip" role="tooltip" aria-hidden="true"></div>
   </body>
 </html>

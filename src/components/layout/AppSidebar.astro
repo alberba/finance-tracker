@@ -1,6 +1,7 @@
 ---
 import type { SectionId } from '../../scripts/types'
 import SidebarNav from './SidebarNav.astro'
+import SidebarUserMenu from './SidebarUserMenu.astro'
 
 export interface Props {
   activeSection: SectionId
@@ -80,21 +81,5 @@ const { activeSection } = Astro.props
     <span class="sidebar-toggle-label">Colapsar</span>
   </button>
 
-  <footer class="sidebar-footer">
-    <span class="sidebar-user-avatar" aria-hidden="true">U</span>
-    <span class="sidebar-user-text">
-      <span class="sidebar-user-name">Usuario</span>
-      <span id="save-status" class="sidebar-footer-text sidebar-user-status">Sincronizado</span>
-    </span>
-    <svg
-      class="sidebar-user-chevron"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.7"
-      aria-hidden="true"
-    >
-      <path d="M7 8l3 3 3-3"></path>
-    </svg>
-  </footer>
+  <SidebarUserMenu />
 </aside>
