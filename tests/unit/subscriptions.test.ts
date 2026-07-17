@@ -50,6 +50,7 @@ function createState(subscription: Subscription): State {
     quotes: {},
     recurringRules: [],
     pendingMovements: [],
+    stockEvents: { enabled: false, apiKey: '', symbolMappings: [] },
   }
 }
 
