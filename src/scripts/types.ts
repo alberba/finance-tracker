@@ -187,6 +187,7 @@ export interface StockEventsSymbolMapping {
   watchlistId: string;
   /** Ticker tal y como lo conoce Stock Events (p. ej. AGED.MI); vacío = usar `symbol`. */
   targetSymbol: string;
+  hidden: boolean;
 }
 
 export interface StockEventsSettings {

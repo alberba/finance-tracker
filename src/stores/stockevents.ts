@@ -21,6 +21,7 @@ export interface StockEventsSymbolRow {
   sync: boolean
   watchlistId: string
   targetSymbol: string
+  hidden: boolean
   hasInstrument: boolean
   checkResult: SymbolCheckResult | null
 }
@@ -62,6 +63,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         sync: mapping?.sync === true,
         watchlistId: mapping?.watchlistId || '',
         targetSymbol: mapping?.targetSymbol || '',
+        hidden: mapping?.hidden === true,
         hasInstrument: instrumentSymbols.has(symbol),
         checkResult: checkResults.value[symbol] || null,
       }
@@ -90,7 +92,9 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   function updateMapping(
     symbol: string,
-    patch: Partial<Pick<StockEventsSymbolMapping, 'sync' | 'watchlistId' | 'targetSymbol'>>,
+    patch: Partial<
+      Pick<StockEventsSymbolMapping, 'sync' | 'watchlistId' | 'targetSymbol' | 'hidden'>
+    >,
   ): void {
     const normalized = symbol.trim().toUpperCase()
     if (!normalized) return
@@ -102,12 +106,14 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         if (patch.sync !== undefined) mapping.sync = patch.sync
         if (patch.watchlistId !== undefined) mapping.watchlistId = patch.watchlistId
         if (targetSymbol !== undefined) mapping.targetSymbol = targetSymbol
+        if (patch.hidden !== undefined) mapping.hidden = patch.hidden
       } else {
         draft.stockEvents.symbolMappings.push({
           symbol: normalized,
           sync: patch.sync === true,
           watchlistId: patch.watchlistId || '',
           targetSymbol: targetSymbol || '',
+          hidden: patch.hidden === true,
         })
       }
     })
