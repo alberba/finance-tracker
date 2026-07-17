@@ -181,6 +181,21 @@ export interface Contribution {
   warnings?: string[];
 }
 
+export interface StockEventsSymbolMapping {
+  symbol: string;
+  sync: boolean;
+  watchlistId: string;
+  /** Ticker tal y como lo conoce Stock Events (p. ej. AGED.MI); vacío = usar `symbol`. */
+  targetSymbol: string;
+  hidden: boolean;
+}
+
+export interface StockEventsSettings {
+  enabled: boolean;
+  apiKey: string;
+  symbolMappings: StockEventsSymbolMapping[];
+}
+
 export interface StateMeta {
   source: string;
   generatedAt: string;
@@ -209,6 +224,7 @@ export interface State {
   quotes: Record<string, Quote>;
   recurringRules: RecurringRule[];
   pendingMovements: PendingMovement[];
+  stockEvents: StockEventsSettings;
 }
 
 export interface MonthTotals {

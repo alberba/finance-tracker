@@ -182,7 +182,7 @@ async function openSectionForLayout(
     await moreButton.click()
     await page
       .getByRole('dialog', { name: 'Más secciones' })
-      .getByRole('button', { name: secondaryLabel })
+      .getByRole('button', { name: secondaryLabel, exact: true })
       .click()
     await expect(page.locator(`#${sectionId}`)).toBeVisible()
     return

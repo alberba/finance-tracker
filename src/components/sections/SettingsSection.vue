@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
+import StockEventsPanel from '../settings/StockEventsPanel.vue'
 import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
 import InstrumentEditorPanel from '../market/InstrumentEditorPanel.vue'
@@ -50,6 +51,7 @@ const indexEntries = [
   { id: 'cfg-pasivos', num: '06', label: 'Pasivos' },
   { id: 'cfg-categorias', num: '07', label: 'Categorías' },
   { id: 'cfg-twr', num: '08', label: 'Liquidez TWR' },
+  { id: 'cfg-stockevents', num: '09', label: 'Stock Events' },
 ]
 
 const activeBlockId = ref(indexEntries[0].id)
@@ -256,6 +258,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </section>
+
+        <StockEventsPanel />
       </div>
     </div>
   </AppSection>
