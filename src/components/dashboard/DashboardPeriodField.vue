@@ -35,15 +35,15 @@ function onChange(event: Event): void {
 
 <template>
   <label class="grid gap-1">
-    <span class="text-text-faint text-[0.6rem] font-bold uppercase">
+    <span class="text-text-faint px-1 text-[0.58rem] font-bold tracking-[0.12em] uppercase">
       {{ label }}
     </span>
     <span
-      class="focus-within:border-primary relative inline-flex items-center rounded-md bg-(--bg-panel) px-2 shadow-(--shadow-soft) focus-within:shadow-[0_0_0_3px_var(--ring)]"
+      class="focus-within:border-primary relative inline-flex min-w-0 items-center justify-between rounded-lg bg-(--bg-subtle) px-2 focus-within:shadow-[0_0_0_3px_var(--ring)]"
     >
       <select
         :id="id"
-        class="appearance-none rounded-md border-0 bg-transparent py-2 focus:outline-none"
+        class="min-h-10 min-w-0 flex-1 appearance-none rounded-md border-0 bg-transparent py-2 pr-1 font-semibold focus:outline-none"
         :name="name"
         :value="modelValue"
         :disabled="disabled"

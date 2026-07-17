@@ -43,8 +43,8 @@ const {
 
 <template>
   <AppSection id="dashboard" :is-active="props.isActive">
-    <header class="flex flex-col items-start justify-between gap-4 md:flex-row">
-      <div class="grid gap-1">
+    <header class="flex flex-col items-start justify-between gap-5 pb-1 md:flex-row md:items-end">
+      <div class="grid max-w-2xl gap-1.5">
         <p class="text-primary font-mono text-xs tracking-widest uppercase">
           ¡Bienvenido de nuevo!
         </p>
@@ -54,9 +54,12 @@ const {
         >
           Resumen financiero
         </h2>
-        <p class="text-text-muted">Aquí tienes una visión completa de tu situación financiera.</p>
+        <p class="text-text-muted max-w-xl text-sm leading-relaxed sm:text-base">
+          Tu situación financiera, ordenada para decidir con perspectiva.
+        </p>
       </div>
       <DashboardPeriodControls
+        class="w-full sm:w-auto"
         :year="currentYear"
         :years="yearOptions"
         :month="currentMonth"
@@ -67,8 +70,6 @@ const {
     </header>
 
     <PendingMovementsPanel compact />
-    <MarketQuotesPanel title="Cartera a precio de mercado" />
-
     <DashboardHeroNetWorth
       :kpis="kpis"
       :chart="netWorthChart"
@@ -78,6 +79,8 @@ const {
     />
 
     <DashboardStatsGrid :kpis="kpis" />
+
+    <MarketQuotesPanel title="Cartera a precio de mercado" />
 
     <DashboardOverviewPanels
       :currency="currentCurrency"
@@ -112,7 +115,6 @@ const {
       title="Últimos movimientos"
       action-label="Ver todos los movimientos"
       action-target="transactions"
-      class="mt-4"
       @navigate="navigate"
     >
       <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />

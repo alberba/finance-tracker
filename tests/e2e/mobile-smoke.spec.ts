@@ -1,6 +1,57 @@
 import { test, expect } from './fixtures'
 
 test.describe('Mobile smoke', () => {
+  test('mantiene legible el patrimonio y los movimientos en formato PWA', async ({
+    page,
+    tracker,
+  }) => {
+    const currentMonth = new Intl.DateTimeFormat('es-ES', { month: 'long' })
+      .format(new Date())
+      .toLocaleUpperCase('es-ES')
+    await page.goto('/patrimonio')
+    await tracker.saveAccountSnapshot({
+      monthLabel: currentMonth,
+      accountName: 'Revolut',
+      value: 9_999_999_999.99,
+    })
+    await page.goto('/')
+    await expect(
+      tracker.dashboardSection.getByRole('heading', { name: 'Resumen financiero' }),
+    ).toBeVisible()
+
+    const hero = tracker.dashboardSection.getByRole('region', { name: 'Patrimonio neto' })
+    const netWorth = hero.locator('#kpi-net-worth')
+    await expect(netWorth).toContainText('€')
+    await expect(netWorth).toHaveClass(/net-worth-value--compact/)
+
+    const layout = await hero.evaluate((element) => {
+      const amount = element.querySelector<HTMLElement>('#kpi-net-worth')
+      if (!amount) return null
+
+      const heroRect = element.getBoundingClientRect()
+      const amountRect = amount.getBoundingClientRect()
+      const lineHeight = Number.parseFloat(getComputedStyle(amount).lineHeight)
+      return {
+        amountFitsHero:
+          amountRect.left >= heroRect.left - 1 && amountRect.right <= heroRect.right + 1,
+        amountHasNoOverflow: amount.scrollWidth <= amount.clientWidth + 1,
+        amountIsSingleLine: amountRect.height <= lineHeight * 1.1,
+        viewportHasNoOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      }
+    })
+
+    expect(layout).toEqual({
+      amountFitsHero: true,
+      amountHasNoOverflow: true,
+      amountIsSingleLine: true,
+      viewportHasNoOverflow: true,
+    })
+    await expect(hero.getByRole('button', { name: '7D' })).toHaveCSS('min-height', '44px')
+    await expect(
+      tracker.dashboardSection.getByRole('region', { name: 'Lista de últimos movimientos' }),
+    ).toBeVisible()
+  })
+
   test('prioriza el contenido y permite navegar con la barra inferior', async ({
     page,
     tracker,
