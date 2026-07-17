@@ -33,6 +33,7 @@ import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
 import type { InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
 
 export interface NewInvestmentMovementInput {
@@ -51,6 +52,7 @@ export interface NewInvestmentMovementInput {
 
 export const useInvestmentStore = defineStore('investment', () => {
   const financialStateStore = useFinancialStateStore()
+  const stockEventsStore = useStockEventsStore()
   const uiStore = useUiStore()
   const { showToast } = useToast()
   const ui = uiStore.ui
@@ -164,29 +166,31 @@ export const useInvestmentStore = defineStore('investment', () => {
     const category = resolveInvestmentCategory(accountId, input.category.trim(), computed.normalizedSymbol)
     const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
 
+    const transaction: Transaction = {
+      id: uid('tx'),
+      date,
+      month: monthFromISO(date) ?? ui.investmentMonth,
+      type: 'investment',
+      accountId,
+      category,
+      description: computed.description,
+      amount: computed.signedAmount,
+      time,
+      symbol: computed.normalizedSymbol,
+      ...(instrumentId ? { instrumentId } : {}),
+      side,
+      unitPrice: computed.normalizedUnitPrice,
+      units: computed.normalizedUnits,
+      fee: computed.normalizedFee,
+      movementCurrency,
+      declared: input.declared,
+      createdAt: new Date().toISOString(),
+    }
     financialStateStore.commitState((draft) => {
-      draft.transactions.push({
-        id: uid('tx'),
-        date,
-        month: monthFromISO(date) ?? ui.investmentMonth,
-        type: 'investment',
-        accountId,
-        category,
-        description: computed.description,
-        amount: computed.signedAmount,
-        time,
-        symbol: computed.normalizedSymbol,
-        ...(instrumentId ? { instrumentId } : {}),
-        side,
-        unitPrice: computed.normalizedUnitPrice,
-        units: computed.normalizedUnits,
-        fee: computed.normalizedFee,
-        movementCurrency,
-        declared: input.declared,
-        createdAt: new Date().toISOString(),
-      })
+      draft.transactions.push(transaction)
     })
     showToast('Movimiento de inversión guardado.')
+    void stockEventsStore.syncMovement(transaction)
     return true
   }
 

@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, mirrorStateToServer } from "./fixtures";
 
 test.describe("Settings E2E", () => {
   test("renderiza configuración base dentro del workspace Vue", async ({
@@ -101,5 +101,115 @@ test.describe("Settings E2E", () => {
         .filter({ hasText: "Suscripción cuenta eliminada" }),
     ).toHaveCount(0);
     await expect(page.getByRole("status")).toContainText("Elemento eliminado");
+  });
+
+  test("permite editar y conservar la lista y el símbolo de Stock Events", async ({
+    tracker,
+    page,
+  }) => {
+    let releaseFirstWatchlistLoad: (() => void) | undefined;
+    let markFirstWatchlistLoadRequested: (() => void) | undefined;
+    const firstWatchlistLoadRequested = new Promise<void>((resolve) => {
+      markFirstWatchlistLoadRequested = resolve;
+    });
+    let watchlistRequestCount = 0;
+    await page.route("**/api/stockevents/watchlists", async (route) => {
+      watchlistRequestCount += 1;
+      if (watchlistRequestCount === 1) {
+        markFirstWatchlistLoadRequested?.();
+        await new Promise<void>((resolve) => {
+          releaseFirstWatchlistLoad = resolve;
+        });
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          watchlists: [
+            { id: "wl-acciones", name: "Acciones" },
+            { id: "wl-etf", name: "ETF" },
+          ],
+        }),
+      });
+    });
+
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) {
+        throw new Error("No se encontró el estado financiero inicial");
+      }
+      const state = JSON.parse(raw);
+      state.instruments.push({
+        id: "instrument-aged",
+        investmentAssetId: state.investmentAssets[0]?.id ?? "",
+        type: "etf",
+        symbol: "AGED",
+        market: "MI",
+        currency: "EUR",
+        provider: "manual",
+        active: true,
+      });
+      state.stockEvents = {
+        enabled: true,
+        apiKey: "test-stock-events-key",
+        symbolMappings: [
+          {
+            symbol: "AGED",
+            sync: true,
+            watchlistId: "wl-acciones",
+            targetSymbol: "AGED.MI",
+          },
+        ],
+      };
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await page.waitForFunction(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      return raw
+        ? JSON.parse(raw).instruments.some(
+            (item: { symbol?: string }) => item.symbol === "AGED",
+          )
+        : false;
+    });
+    await tracker.openSettings();
+
+    const watchlist = page.getByRole("combobox", {
+      name: "Lista de seguimiento de AGED",
+    });
+    const targetSymbol = page.getByRole("textbox", {
+      name: "Símbolo en Stock Events de AGED",
+    });
+
+    await firstWatchlistLoadRequested;
+    await targetSymbol.fill("aged.xetra");
+    releaseFirstWatchlistLoad?.();
+
+    await expect(watchlist).toBeEnabled();
+    await watchlist.selectOption("wl-etf");
+
+    await expect(watchlist).toHaveValue("wl-etf");
+    await expect(targetSymbol).toHaveValue("AGED.XETRA");
+    await expect(page.locator("#save-status")).toContainText("Sincronizado");
+
+    await page.reload();
+    await page.waitForFunction(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      return raw
+        ? JSON.parse(raw).stockEvents?.symbolMappings?.some(
+            (item: { symbol?: string; watchlistId?: string }) =>
+              item.symbol === "AGED" && item.watchlistId === "wl-etf",
+          )
+        : false;
+    });
+    await tracker.openSettings();
+
+    await expect(
+      page.getByRole("combobox", { name: "Lista de seguimiento de AGED" }),
+    ).toHaveValue("wl-etf");
+    await expect(
+      page.getByRole("textbox", { name: "Símbolo en Stock Events de AGED" }),
+    ).toHaveValue("AGED.XETRA");
   });
 });
