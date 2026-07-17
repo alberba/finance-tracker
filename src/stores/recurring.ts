@@ -3,7 +3,8 @@ import { computed } from 'vue'
 
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { todayISO } from '../domain/recurring/occurrences'
-import type { RecurringFrequency, RecurringRule, TransactionType } from '../scripts/types'
+import { computeInvestmentMovement } from '../scripts/investment-movements'
+import type { InvestmentSide, RecurringFrequency, RecurringRule, TransactionType } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 
@@ -17,6 +18,8 @@ export interface NewRecurringRuleInput {
   side?: 'buy' | 'sell'
   units?: number
   unitPrice?: number
+  fee?: number
+  time?: string
   frequency: RecurringFrequency
   interval: number
   startDate: string
@@ -29,6 +32,12 @@ export interface PendingMovementEdit {
   category: string
   description: string
   amount: number
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
 }
 
 export const useRecurringStore = defineStore('recurring', () => {
@@ -62,6 +71,8 @@ export const useRecurringStore = defineStore('recurring', () => {
       ...(input.side ? { side: input.side } : {}),
       ...(input.units !== undefined ? { units: input.units } : {}),
       ...(input.unitPrice !== undefined ? { unitPrice: input.unitPrice } : {}),
+      ...(input.fee !== undefined ? { fee: round2(input.fee) } : {}),
+      ...(input.time ? { time: input.time } : {}),
       frequency: input.frequency,
       interval: Math.max(1, Math.floor(input.interval || 1)),
       startDate: input.startDate,
@@ -116,6 +127,8 @@ export const useRecurringStore = defineStore('recurring', () => {
         ...(current.side ? { side: current.side } : {}),
         ...(current.units !== undefined ? { units: current.units } : {}),
         ...(current.unitPrice !== undefined ? { unitPrice: current.unitPrice } : {}),
+        ...(current.fee !== undefined ? { fee: current.fee } : {}),
+        ...(current.time ? { time: current.time } : {}),
         declared: false,
         createdAt: new Date().toISOString(),
       })
@@ -134,17 +147,42 @@ export const useRecurringStore = defineStore('recurring', () => {
   }
 
   function editPending(id: string, edit: PendingMovementEdit): boolean {
-    const valid = edit.date && edit.accountId && edit.category && edit.description.trim() && edit.amount > 0
+    const pending = openPendingMovements.value.find((item) => item.id === id)
+    if (!pending) return false
+    const isInvestment = pending.type === 'investment'
+    const investment = isInvestment
+      ? computeInvestmentMovement({
+          side: edit.side || pending.side || 'buy',
+          symbol: edit.symbol ?? pending.symbol ?? '',
+          units: edit.units ?? pending.units ?? 0,
+          unitPrice: edit.unitPrice ?? pending.unitPrice ?? 0,
+          fee: edit.fee ?? pending.fee ?? 0,
+        })
+      : null
+    const amount = investment ? Math.abs(investment.signedAmount) : round2(edit.amount)
+    const validInvestment = !investment || (investment.normalizedSymbol && investment.normalizedUnits > 0 && investment.normalizedUnitPrice > 0)
+    const valid = edit.date && edit.accountId && edit.category && edit.description.trim() && amount > 0 && validInvestment
     if (!valid) return false
     financialStateStore.commitState((draft) => {
-      const pending = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
-      if (!pending) return
-      pending.occurrenceDate = edit.date
-      pending.accountId = edit.accountId
-      pending.category = edit.category
-      pending.description = edit.description.trim()
-      pending.amount = round2(edit.amount)
-      pending.updatedAt = new Date().toISOString()
+      const current = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
+      if (!current) return
+      current.occurrenceDate = edit.date
+      current.accountId = edit.accountId
+      current.category = edit.category
+      current.description = edit.description.trim()
+      current.amount = amount
+      if (investment) {
+        current.symbol = investment.normalizedSymbol
+        current.side = edit.side || current.side || 'buy'
+        current.units = investment.normalizedUnits
+        current.unitPrice = investment.normalizedUnitPrice
+        current.fee = investment.normalizedFee
+        if (edit.time !== undefined) {
+          if (edit.time) current.time = edit.time
+          else delete current.time
+        }
+      }
+      current.updatedAt = new Date().toISOString()
     })
     return true
   }

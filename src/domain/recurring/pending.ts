@@ -66,6 +66,8 @@ function createPendingMovement(
     ...(rule.side ? { side: rule.side } : {}),
     ...(rule.units !== undefined ? { units: rule.units } : {}),
     ...(rule.unitPrice !== undefined ? { unitPrice: rule.unitPrice } : {}),
+    ...(rule.fee !== undefined ? { fee: rule.fee } : {}),
+    ...(rule.time ? { time: rule.time } : {}),
     status: 'pending',
     createdAt: timestamp,
     updatedAt: timestamp,

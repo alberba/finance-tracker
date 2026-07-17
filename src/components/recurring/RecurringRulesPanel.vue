@@ -49,6 +49,8 @@ function submit(): void {
         <label>Operación<select v-model="form.side"><option value="buy">Compra</option><option value="sell">Venta</option></select></label>
         <label>Títulos<input v-model.number="form.units" type="number" min="0" step="0.00000001" /></label>
         <label>Precio por título<input v-model.number="form.unitPrice" type="number" min="0" step="0.000001" /></label>
+        <label>Comisiones<input v-model.number="form.fee" type="number" min="0" step="0.01" /></label>
+        <label>Hora<input v-model="form.time" type="time" /></label>
       </template>
       <button type="submit" class="primary-btn md:col-span-3">Crear regla</button>
     </form>
