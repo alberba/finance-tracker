@@ -1,0 +1,42 @@
+import type { APIRoute } from 'astro'
+import {
+  checkStockEventsSymbols,
+  type SymbolCheckRequest,
+} from '../../../lib/server/stockevents'
+import { errorResponse, json, readApiKey } from './_helpers'
+
+interface CheckSymbolsBody {
+  checks?: unknown
+}
+
+export const POST: APIRoute = async ({ request }) => {
+  const apiKey = readApiKey(request)
+  if (!apiKey) {
+    return json({ error: 'Falta la API key de Stock Events' }, 400)
+  }
+  const body = (await request.json().catch(() => ({}))) as CheckSymbolsBody
+  const checks = normalizeChecks(body.checks)
+  if (!checks.length) {
+    return json({ results: [] })
+  }
+  try {
+    const results = await checkStockEventsSymbols(apiKey, checks)
+    return json({ results })
+  } catch (error) {
+    return errorResponse(error)
+  }
+}
+
+function normalizeChecks(value: unknown): SymbolCheckRequest[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      const raw = (item || {}) as Record<string, unknown>
+      return {
+        symbol: String(raw.symbol || '').trim().toUpperCase(),
+        watchlistId: String(raw.watchlistId || '').trim(),
+      }
+    })
+    .filter((check) => check.symbol && check.watchlistId)
+    .slice(0, 100)
+}
