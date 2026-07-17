@@ -29,14 +29,23 @@ export class LiveMarketPage {
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
   }
 
-  async createRecurringRule(params: { account: string; category: string; description: string; amount: number; frequency: string; startDate: string }): Promise<void> {
+  async createRecurringRule(params: {
+    account: string; category: string; description: string; amount: number; frequency: string; startDate: string;
+    type?: string; symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
+  }): Promise<void> {
     const form = this.recurringRules.locator('form')
+    if (params.type) await form.getByLabel('Tipo').selectOption(params.type)
     await form.getByLabel('Cuenta').selectOption({ label: params.account })
     await form.getByLabel('Categoría').fill(params.category)
     await form.getByLabel('Descripción').fill(params.description)
     await form.getByLabel('Importe').fill(String(params.amount))
     await form.getByLabel('Frecuencia').selectOption(params.frequency)
     await form.getByLabel('Fecha inicial').fill(params.startDate)
+    if (params.symbol !== undefined) await form.getByLabel('Símbolo').fill(params.symbol)
+    if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))
+    if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
+    if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
     await form.getByRole('button', { name: 'Crear regla' }).click()
   }
 
@@ -66,6 +75,17 @@ export class LiveMarketPage {
     await item.getByRole('button', { name: 'Editar' }).click()
     await item.getByLabel('Descripción').fill(description)
     await item.getByLabel('Importe').fill(String(amount))
+    await item.getByRole('button', { name: 'Guardar edición' }).click()
+  }
+
+  async editFirstPendingInvestment(params: { units?: number; unitPrice?: number; fee?: number; time?: string; symbol?: string }): Promise<void> {
+    const item = this.pendingPanel.locator('[data-pending-item]').first()
+    await item.getByRole('button', { name: 'Editar' }).click()
+    if (params.symbol !== undefined) await item.getByLabel('Símbolo').fill(params.symbol)
+    if (params.units !== undefined) await item.getByLabel('Títulos').fill(String(params.units))
+    if (params.unitPrice !== undefined) await item.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.fee !== undefined) await item.getByLabel('Comisiones').fill(String(params.fee))
+    if (params.time !== undefined) await item.getByLabel('Hora').fill(params.time)
     await item.getByRole('button', { name: 'Guardar edición' }).click()
   }
 

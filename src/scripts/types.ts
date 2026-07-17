@@ -118,6 +118,8 @@ export interface RecurringRule {
   side?: InvestmentSide;
   units?: number;
   unitPrice?: number;
+  fee?: number;
+  time?: string;
   frequency: RecurringFrequency;
   interval: number;
   startDate: string;
@@ -141,6 +143,8 @@ export interface PendingMovement {
   side?: InvestmentSide;
   units?: number;
   unitPrice?: number;
+  fee?: number;
+  time?: string;
   status: PendingMovementStatus;
   createdAt: string;
   updatedAt: string;
