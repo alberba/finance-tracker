@@ -422,6 +422,11 @@ export function buildDemoSeed(now: Date = new Date()): State {
       },
     ],
     pendingMovements: [],
+    stockEvents: {
+      enabled: false,
+      apiKey: "",
+      symbolMappings: [],
+    },
   };
 }
 

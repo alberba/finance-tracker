@@ -10,6 +10,10 @@ import svgLoader from 'vite-svg-loader'
 export default defineConfig({
   output: 'server',
 
+  devToolbar: {
+    enabled: false,
+  },
+
   adapter: cloudflare({
     platformProxy: {
       enabled: true,
