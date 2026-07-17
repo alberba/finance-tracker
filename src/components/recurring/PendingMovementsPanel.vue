@@ -2,8 +2,9 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import { useFinancialStateStore } from '../../stores/financial-state'
-import { useRecurringStore } from '../../stores/recurring'
+import { useRecurringStore, type PendingMovementEdit } from '../../stores/recurring'
 import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
+import { round2 } from '../../scripts/utils'
 
 const props = withDefaults(
   defineProps<{ compact?: boolean }>(),
@@ -14,7 +15,9 @@ const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
 const pending = computed(() => recurringStore.openPendingMovements)
 const editingId = ref('')
-const edit = reactive({ date: '', accountId: '', category: '', description: '', amount: 0 })
+const edit = reactive<PendingMovementEdit>({ date: '', accountId: '', category: '', description: '', amount: 0, symbol: '', side: 'buy', units: 0, unitPrice: 0, fee: 0, time: '' })
+const editingIsInvestment = computed(() => pending.value.find((item) => item.id === editingId.value)?.type === 'investment')
+const investmentTotal = computed(() => round2((edit.units || 0) * (edit.unitPrice || 0) + (edit.fee || 0)))
 
 watch(pending, (items) => {
   if (editingId.value && !items.some((item) => item.id === editingId.value)) editingId.value = ''
@@ -32,6 +35,12 @@ function startEdit(item: (typeof pending.value)[number]): void {
   edit.category = item.category
   edit.description = item.description
   edit.amount = item.amount
+  edit.symbol = item.symbol || ''
+  edit.side = item.side || 'buy'
+  edit.units = item.units ?? 0
+  edit.unitPrice = item.unitPrice ?? 0
+  edit.fee = item.fee ?? 0
+  edit.time = item.time || ''
 }
 
 function saveEdit(): void {
@@ -68,13 +77,22 @@ function saveEdit(): void {
           <label>Cuenta<select v-model="edit.accountId" required><option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
           <label>Categoría<input v-model="edit.category" required /></label>
           <label>Descripción<input v-model="edit.description" required /></label>
-          <label>Importe<input v-model.number="edit.amount" type="number" min="0.01" step="0.01" required /></label>
+          <template v-if="editingIsInvestment">
+            <label>Hora<input v-model="edit.time" type="time" /></label>
+            <label>Operación<select v-model="edit.side"><option value="buy">Compra</option><option value="sell">Venta</option></select></label>
+            <label>Símbolo<input v-model="edit.symbol" required placeholder="VWCE" /></label>
+            <label>Títulos<input v-model.number="edit.units" type="number" min="0.00000001" step="0.00000001" required /></label>
+            <label>Precio por título<input v-model.number="edit.unitPrice" type="number" min="0.000001" step="0.000001" required /></label>
+            <label>Comisiones<input v-model.number="edit.fee" type="number" min="0" step="0.01" /></label>
+            <label>Importe total<input :value="investmentTotal.toFixed(2)" type="text" readonly /></label>
+          </template>
+          <label v-else>Importe<input v-model.number="edit.amount" type="number" min="0.01" step="0.01" required /></label>
           <div class="flex gap-2 md:col-span-5"><button type="submit" class="primary-btn">Guardar edición</button><button type="button" class="secondary-btn" @click="editingId = ''">Cancelar edición</button></div>
         </form>
         <div v-else class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <strong>{{ item.description }}</strong>
-            <p class="text-text-muted text-sm">{{ item.occurrenceDate }} · {{ item.category }} · {{ item.amount.toFixed(2) }}</p>
+            <p class="text-text-muted text-sm">{{ item.occurrenceDate }} · {{ item.category }} · {{ item.amount.toFixed(2) }}<template v-if="item.type === 'investment' && item.symbol"> · {{ item.units }} × {{ item.unitPrice }} {{ item.symbol }}</template></p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button type="button" class="secondary-btn" @click="startEdit(item)">Editar</button>

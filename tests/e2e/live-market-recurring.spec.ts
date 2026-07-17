@@ -147,6 +147,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
   })
 
   test('crea, edita, confirma pendientes y evita duplicados al recargar', async ({ page, tracker }) => {
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
     await page.evaluate(() => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
@@ -174,6 +177,36 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
     await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Café editado' })).toHaveCount(0)
+  })
+
+  test('permite editar los campos de inversión de un pendiente automatizado', async ({ page, tracker }) => {
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    await page.evaluate(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openSettings()
+    await liveMarket.createRecurringRule({
+      account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
+      frequency: 'monthly', startDate: '2026-07-01',
+      type: 'investment', symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
+    })
+
+    await tracker.openDashboard()
+    await liveMarket.pendingAlert.getByRole('button', { name: 'Revisar pendientes' }).click()
+    await expect(liveMarket.pendingPanel).toBeVisible()
+    await liveMarket.expectPendingCount(1)
+    await expect(liveMarket.pendingPanel).toContainText('1 × 100 VWCE')
+
+    await liveMarket.editFirstPendingInvestment({ units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
+    await expect(liveMarket.pendingPanel).toContainText('212.50')
+    await expect(liveMarket.pendingPanel).toContainText('2 × 105.5 VWCE')
+
+    await liveMarket.confirmFirstPending()
+    await expect(tracker.transactionsSection).toContainText('Aportación VWCE')
+    await expect(tracker.transactionsSection).toContainText('212,50')
   })
 
   test('avisa cuando el proveedor devuelve un dato obsoleto', async ({ page, tracker }) => {
