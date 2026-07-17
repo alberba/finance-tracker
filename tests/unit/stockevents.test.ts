@@ -76,9 +76,9 @@ describe('resolución del mapeo de símbolos', () => {
     enabled: true,
     apiKey: 'se_live_x',
     symbolMappings: [
-      { symbol: 'VWCE', sync: true, watchlistId: 'wl-1', targetSymbol: '' },
-      { symbol: 'BTC', sync: false, watchlistId: 'wl-1', targetSymbol: '' },
-      { symbol: 'MSFT', sync: true, watchlistId: '', targetSymbol: '' },
+      { symbol: 'VWCE', sync: true, watchlistId: 'wl-1', targetSymbol: '', hidden: false },
+      { symbol: 'BTC', sync: false, watchlistId: 'wl-1', targetSymbol: '', hidden: false },
+      { symbol: 'MSFT', sync: true, watchlistId: '', targetSymbol: '', hidden: false },
     ],
   }
 
@@ -103,7 +103,13 @@ describe('normalización del estado de Stock Events', () => {
         enabled: true,
         apiKey: ' se_live_key ',
         symbolMappings: [
-          { symbol: 'vwce', sync: true, watchlistId: 'wl-1', targetSymbol: 'vwce.de ' },
+          {
+            symbol: 'vwce',
+            sync: true,
+            watchlistId: 'wl-1',
+            targetSymbol: 'vwce.de ',
+            hidden: true,
+          },
           { symbol: 'VWCE', sync: false, watchlistId: 'wl-2' },
           { symbol: '', sync: true, watchlistId: 'wl-3' },
           { symbol: 'btc', sync: 'yes', watchlistId: 42 },
@@ -113,8 +119,14 @@ describe('normalización del estado de Stock Events', () => {
     expect(state.stockEvents.enabled).toBe(true)
     expect(state.stockEvents.apiKey).toBe('se_live_key')
     expect(state.stockEvents.symbolMappings).toEqual([
-      { symbol: 'VWCE', sync: true, watchlistId: 'wl-1', targetSymbol: 'VWCE.DE' },
-      { symbol: 'BTC', sync: false, watchlistId: '42', targetSymbol: '' },
+      {
+        symbol: 'VWCE',
+        sync: true,
+        watchlistId: 'wl-1',
+        targetSymbol: 'VWCE.DE',
+        hidden: true,
+      },
+      { symbol: 'BTC', sync: false, watchlistId: '42', targetSymbol: '', hidden: false },
     ])
   })
 })

@@ -158,6 +158,7 @@ test.describe("Settings E2E", () => {
             sync: true,
             watchlistId: "wl-acciones",
             targetSymbol: "AGED.MI",
+            hidden: false,
           },
         ],
       };
@@ -211,5 +212,29 @@ test.describe("Settings E2E", () => {
     await expect(
       page.getByRole("textbox", { name: "Símbolo en Stock Events de AGED" }),
     ).toHaveValue("AGED.XETRA");
+
+    await page.getByRole("button", { name: "Ocultar AGED" }).click();
+    await expect(page.getByText("No hay símbolos visibles.")).toBeVisible();
+    await page.getByRole("button", { name: "Mostrar ocultos (1)" }).click();
+    await expect(
+      page
+        .getByRole("table", { name: "Símbolos ocultos de Stock Events" })
+        .getByRole("row")
+        .filter({ hasText: "AGED" }),
+    ).toBeVisible();
+    await expect(page.locator("#save-status")).toContainText("Sincronizado");
+
+    await page.reload();
+    await tracker.openSettings();
+    await expect(page.getByRole("button", { name: "Mostrar ocultos (1)" })).toBeVisible();
+    await page.getByRole("button", { name: "Mostrar ocultos (1)" }).click();
+    await page.getByRole("button", { name: "Mostrar AGED" }).click();
+    await expect(
+      page
+        .getByRole("table", { name: "Símbolos visibles de Stock Events" })
+        .getByRole("row")
+        .filter({ hasText: "AGED" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mostrar ocultos/ })).toHaveCount(0);
   });
 });

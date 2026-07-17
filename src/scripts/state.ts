@@ -524,6 +524,7 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
       sync: mapping.sync === true,
       watchlistId: String(mapping.watchlistId || "").trim(),
       targetSymbol: String(mapping.targetSymbol || "").trim().toUpperCase(),
+      hidden: mapping.hidden === true,
     });
   });
   return {

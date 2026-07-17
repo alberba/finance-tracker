@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watch } from 'vue'
 
+import StockEventsSymbolTable from './StockEventsSymbolTable.vue'
 import { useStockEventsStore } from '../../stores/stockevents'
-import type { SymbolCheckResult } from '../../services/stockevents-api'
 
 const stockEventsStore = useStockEventsStore()
 
 const apiKeyInput = shallowRef(stockEventsStore.settings.apiKey)
+const showHiddenSymbols = shallowRef(false)
 
 watch(
   () => stockEventsStore.settings.apiKey,
@@ -19,6 +20,8 @@ const hasApiKey = computed(() => Boolean(stockEventsStore.settings.apiKey))
 const syncedCount = computed(
   () => stockEventsStore.symbolRows.filter((row) => row.sync && row.watchlistId).length,
 )
+const visibleRows = computed(() => stockEventsStore.symbolRows.filter((row) => !row.hidden))
+const hiddenRows = computed(() => stockEventsStore.symbolRows.filter((row) => row.hidden))
 
 function onSaveApiKey(): void {
   stockEventsStore.saveApiKey(apiKeyInput.value)
@@ -27,38 +30,20 @@ function onSaveApiKey(): void {
   }
 }
 
-function onToggleEnabled(event: Event): void {
-  stockEventsStore.setEnabled((event.target as HTMLInputElement).checked)
+function onToggleSync(symbol: string, checked: boolean): void {
+  stockEventsStore.updateMapping(symbol, { sync: checked })
 }
 
-function onToggleSync(symbol: string, event: Event): void {
-  stockEventsStore.updateMapping(symbol, { sync: (event.target as HTMLInputElement).checked })
+function onSelectWatchlist(symbol: string, watchlistId: string): void {
+  stockEventsStore.updateMapping(symbol, { watchlistId })
 }
 
-function onSelectWatchlist(symbol: string, event: Event): void {
-  stockEventsStore.updateMapping(symbol, {
-    watchlistId: (event.target as HTMLSelectElement).value,
-  })
+function onChangeTargetSymbol(symbol: string, targetSymbol: string): void {
+  stockEventsStore.updateMapping(symbol, { targetSymbol })
 }
 
-function onChangeTargetSymbol(symbol: string, event: Event): void {
-  stockEventsStore.updateMapping(symbol, {
-    targetSymbol: (event.target as HTMLInputElement).value,
-  })
-}
-
-function checkResultLabel(result: SymbolCheckResult | null): string {
-  if (!result) return '—'
-  if (result.status === 'in-watchlist') return 'En la lista'
-  if (result.status === 'detected') return 'Detectado'
-  if (result.status === 'not-detected') return 'No detectado'
-  return result.message || 'Error'
-}
-
-function checkResultClass(result: SymbolCheckResult | null): string {
-  if (!result) return ''
-  if (result.status === 'in-watchlist' || result.status === 'detected') return 'is-ok'
-  return 'is-bad'
+function onSetHidden(symbol: string, hidden: boolean): void {
+  stockEventsStore.updateMapping(symbol, { hidden })
 }
 
 onMounted(() => {
@@ -83,7 +68,7 @@ onMounted(() => {
         <input
           type="checkbox"
           :checked="stockEventsStore.settings.enabled"
-          @change="onToggleEnabled"
+          @change="stockEventsStore.setEnabled(($event.target as HTMLInputElement).checked)"
         />
         <span>Sincronizar nuevos movimientos con Stock Events</span>
       </label>
@@ -120,68 +105,45 @@ onMounted(() => {
       <p v-if="!stockEventsStore.symbolRows.length" class="stockevents-hint">
         No hay símbolos en finance-tracker todavía. Añade instrumentos o movimientos de inversión.
       </p>
-      <div v-else class="stockevents-table-wrap">
-        <table class="stockevents-table" aria-label="Sincronización de símbolos con Stock Events">
-          <thead>
-            <tr>
-              <th scope="col">Símbolo</th>
-              <th scope="col">Sincronizar</th>
-              <th scope="col">Lista de seguimiento</th>
-              <th scope="col">Símbolo en Stock Events</th>
-              <th scope="col">Comprobación</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in stockEventsStore.symbolRows" :key="row.symbol">
-              <td>
-                <strong>{{ row.symbol }}</strong>
-                <small v-if="!row.hasInstrument">sin instrumento</small>
-              </td>
-              <td>
-                <input
-                  type="checkbox"
-                  :checked="row.sync"
-                  :aria-label="`Sincronizar ${row.symbol}`"
-                  @change="onToggleSync(row.symbol, $event)"
-                />
-              </td>
-              <td>
-                <select
-                  :value="row.watchlistId"
-                  :aria-label="`Lista de seguimiento de ${row.symbol}`"
-                  :disabled="!stockEventsStore.watchlists.length"
-                  @change="onSelectWatchlist(row.symbol, $event)"
-                >
-                  <option value="">Sin lista</option>
-                  <option
-                    v-for="watchlist in stockEventsStore.watchlists"
-                    :key="watchlist.id"
-                    :value="watchlist.id"
-                  >
-                    {{ watchlist.name }}
-                  </option>
-                </select>
-              </td>
-              <td>
-                <input
-                  class="stockevents-target"
-                  type="text"
-                  :value="row.targetSymbol"
-                  :placeholder="row.symbol"
-                  :aria-label="`Símbolo en Stock Events de ${row.symbol}`"
-                  spellcheck="false"
-                  @input="onChangeTargetSymbol(row.symbol, $event)"
-                />
-              </td>
-              <td>
-                <span class="stockevents-status" :class="checkResultClass(row.checkResult)">
-                  {{ checkResultLabel(row.checkResult) }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <template v-else>
+        <StockEventsSymbolTable
+          v-if="visibleRows.length"
+          :rows="visibleRows"
+          :watchlists="stockEventsStore.watchlists"
+          label="Símbolos visibles de Stock Events"
+          :hidden="false"
+          @toggle-sync="onToggleSync"
+          @select-watchlist="onSelectWatchlist"
+          @change-target-symbol="onChangeTargetSymbol"
+          @set-hidden="onSetHidden"
+        />
+        <p v-else class="stockevents-hint">No hay símbolos visibles.</p>
+
+        <div v-if="hiddenRows.length" class="stockevents-hidden-toggle">
+          <button
+            type="button"
+            class="secondary-btn"
+            :aria-expanded="showHiddenSymbols"
+            @click="showHiddenSymbols = !showHiddenSymbols"
+          >
+            {{ showHiddenSymbols ? 'Ocultar ocultos' : `Mostrar ocultos (${hiddenRows.length})` }}
+          </button>
+        </div>
+
+        <section v-if="showHiddenSymbols && hiddenRows.length" class="stockevents-hidden">
+          <h4>Símbolos ocultos</h4>
+          <StockEventsSymbolTable
+            :rows="hiddenRows"
+            :watchlists="stockEventsStore.watchlists"
+            label="Símbolos ocultos de Stock Events"
+            hidden
+            @toggle-sync="onToggleSync"
+            @select-watchlist="onSelectWatchlist"
+            @change-target-symbol="onChangeTargetSymbol"
+            @set-hidden="onSetHidden"
+          />
+        </section>
+      </template>
 
       <div class="stockevents-actions">
         <button
@@ -240,71 +202,22 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
-.stockevents-table-wrap {
-  overflow-x: auto;
+.stockevents-hidden-toggle {
   margin-top: 0.85rem;
 }
 
-.stockevents-table {
-  width: 100%;
-  border-collapse: collapse;
+.stockevents-hidden {
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.85rem;
 }
 
-.stockevents-table th,
-.stockevents-table td {
-  padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.stockevents-table th {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.stockevents-table td small {
-  display: block;
-  color: var(--text-muted);
-}
-
-.stockevents-table select {
-  min-height: 2.1rem;
-  min-width: 9rem;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: var(--bg-card);
-  padding: 0.35rem 0.55rem;
-  color: var(--text-main);
-}
-
-.stockevents-target {
-  min-width: 7.5rem;
-  width: 8.5rem;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: var(--bg-card);
-  padding: 0.35rem 0.55rem;
-  color: var(--text-main);
-  font-family: var(--font-mono, monospace);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-}
-
-.stockevents-status {
+.stockevents-hidden h4 {
+  margin: 0;
   color: var(--text-muted);
   font-size: 0.82rem;
-}
-
-.stockevents-status.is-ok {
-  color: var(--income, #2e9e5b);
-}
-
-.stockevents-status.is-bad {
-  color: var(--expense);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .stockevents-actions {
