@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css'
 import AppSidebar from './layout/AppSidebar.astro'
+import MobileNavigation from './layout/MobileNavigation.astro'
 import FinanceWorkspace from './FinanceWorkspace.vue'
 import { getSectionFromPath } from '../scripts/app/dashboard-section-routing'
 
@@ -56,11 +57,16 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
         }
       })()
     </script>
-    <meta name="theme-color" content="#07080B" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#090B10" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#EEF1F6" media="(prefers-color-scheme: light)" />
     <title>Finance Tracker 2026</title>
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="application-name" content="Finance Tracker" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -76,7 +82,10 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
     <a class="skip-link" href="#app-main">Saltar al contenido</a>
     <div class="bg-layer"></div>
     <div class="app-shell">
-      <AppSidebar activeSection={activeSection} />
+      <div id="nav-tabs" class="app-navigation">
+        <AppSidebar activeSection={activeSection} />
+        <MobileNavigation activeSection={activeSection} />
+      </div>
 
       <main id="app-main" class="content">
         <FinanceWorkspace activeSection={activeSection} client:only="vue" />

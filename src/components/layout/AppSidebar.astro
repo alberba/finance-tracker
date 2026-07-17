@@ -13,17 +13,7 @@ const { activeSection } = Astro.props
 <aside class="sidebar">
   <header class="brand-block">
     <span class="brand-logo" aria-hidden="true">
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M4 16l4.5-4.5 3 3L20 7"></path>
-        <path d="M15 7h5v5"></path>
-      </svg>
+      <img src="/favicon.svg" alt="" width="40" height="40" />
     </span>
     <h1>Finance<br />Tracker</h1>
   </header>
@@ -33,7 +23,7 @@ const { activeSection } = Astro.props
 
   <SidebarNav activeSection={activeSection} />
 
-  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Cambiar tema">
+  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema">
     <svg
       class="theme-toggle-icon-moon"
       viewBox="0 0 20 20"

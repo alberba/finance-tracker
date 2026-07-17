@@ -13,6 +13,7 @@ describe('demo seed', () => {
 
   it('marks itself as demo data and never reuses the real seed source', () => {
     expect(seed.meta.source).toBe('demo')
+    expect(seed.stockEvents).toEqual({ enabled: false, apiKey: '', symbolMappings: [] })
   })
 
   it('survives normalizeState without losing movements', () => {

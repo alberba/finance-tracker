@@ -1,0 +1,190 @@
+---
+import { APP_SECTIONS } from '../../config/app-sections'
+import type { SectionId } from '../../scripts/types'
+import NavIcon from './NavIcon.astro'
+
+export interface Props {
+  activeSection: SectionId
+}
+
+const { activeSection } = Astro.props
+const primarySectionIds: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
+const primarySections = APP_SECTIONS.filter((section) => primarySectionIds.includes(section.id))
+const secondarySections = APP_SECTIONS.filter((section) => !primarySectionIds.includes(section.id))
+const isSecondarySectionActive = secondarySections.some((section) => section.id === activeSection)
+---
+
+<header class="mobile-app-bar">
+  <button type="button" class="mobile-brand" data-section="dashboard" aria-label="Ir al Dashboard">
+    <img src="/favicon.svg" alt="" width="34" height="34" />
+    <span>
+      <strong>Finance</strong>
+      <small>Tracker</small>
+    </span>
+  </button>
+
+  <button type="button" class="mobile-theme-button" data-theme-toggle aria-label="Cambiar tema">
+    <svg
+      class="theme-toggle-icon-moon"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      aria-hidden="true"
+    >
+      <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
+    </svg>
+    <svg
+      class="theme-toggle-icon-sun"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="3.4"></circle>
+      <path
+        d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"
+      ></path>
+    </svg>
+  </button>
+</header>
+
+<nav class="mobile-bottom-nav" aria-label="Navegación principal">
+  {
+    primarySections.map((section) => {
+      const isActive = section.id === activeSection
+
+      return (
+        <button
+          type="button"
+          class:list={['nav-btn', 'mobile-nav-item', { 'is-active': isActive }]}
+          data-section={section.id}
+          aria-controls={section.id}
+          aria-current={isActive ? 'page' : undefined}
+          aria-label={section.label}
+        >
+          <span class="mobile-nav-icon" aria-hidden="true">
+            <NavIcon sectionId={section.id} />
+          </span>
+          <span>{section.id === 'transactions' ? 'Movimientos' : section.label}</span>
+        </button>
+      )
+    })
+  }
+  <button
+    type="button"
+    class:list={[
+      'mobile-nav-item',
+      'mobile-more-trigger',
+      { 'is-active': isSecondarySectionActive },
+    ]}
+    data-mobile-more-trigger
+    aria-label="Más secciones"
+    aria-haspopup="dialog"
+    aria-controls="mobile-more-menu"
+    aria-expanded="false"
+  >
+    <span class="mobile-more-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span>Más</span>
+  </button>
+</nav>
+
+<dialog id="mobile-more-menu" class="mobile-more-sheet" aria-labelledby="mobile-more-title">
+  <div class="mobile-sheet-handle" aria-hidden="true"></div>
+  <header>
+    <div>
+      <p>Tu espacio</p>
+      <h2 id="mobile-more-title">Más secciones</h2>
+    </div>
+    <button
+      type="button"
+      class="mobile-sheet-close"
+      data-mobile-more-close
+      aria-label="Cerrar menú"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-hidden="true"
+      >
+        <path d="M5 5l10 10M15 5 5 15"></path>
+      </svg>
+    </button>
+  </header>
+
+  <div class="mobile-more-grid">
+    {
+      secondarySections.map((section) => {
+        const isActive = section.id === activeSection
+
+        return (
+          <button
+            type="button"
+            class:list={['nav-btn', 'mobile-more-item', { 'is-active': isActive }]}
+            data-section={section.id}
+            aria-controls={section.id}
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={section.label}
+          >
+            <span class="mobile-more-item-icon" aria-hidden="true">
+              <NavIcon sectionId={section.id} />
+            </span>
+            <span>{section.label}</span>
+          </button>
+        )
+      })
+    }
+  </div>
+
+  <div class="mobile-sheet-actions">
+    <button type="button" class="mobile-sheet-action" data-demo-mode-action>
+      <span class="mobile-sheet-action-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
+          <circle cx="10" cy="10" r="2.1"></circle>
+        </svg>
+      </span>
+      <span class="mobile-sheet-action-copy">
+        <span class="demo-mode-action-label">Activar modo demo</span>
+        <small class="demo-mode-action-description">Usar únicamente datos ficticios</small>
+      </span>
+    </button>
+    <button type="button" class="mobile-sheet-action" data-theme-toggle aria-label="Cambiar tema">
+      <span class="mobile-sheet-action-icon" aria-hidden="true">
+        <svg
+          class="theme-toggle-icon-moon"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+        >
+          <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
+        </svg>
+        <svg
+          class="theme-toggle-icon-sun"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+        >
+          <circle cx="10" cy="10" r="3.4"></circle>
+          <path
+            d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14 6l1.07-1.07"
+          ></path>
+        </svg>
+      </span>
+      <span class="theme-toggle-label">Modo oscuro</span>
+    </button>
+    <button id="pwa-install-button" type="button" class="mobile-sheet-action" hidden>
+      <span class="mobile-sheet-action-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M4 15.5h12"></path>
+        </svg>
+      </span>
+      <span>Instalar aplicación</span>
+    </button>
+  </div>
+</dialog>

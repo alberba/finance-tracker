@@ -3,6 +3,11 @@ import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const THEME_KEY = 'theme'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
 function readStorageValue(key: string): string | null {
   try {
     return localStorage.getItem(key)
@@ -65,20 +70,109 @@ function repaintThemeAwareCharts(): void {
   }
 }
 
-function initThemeToggle(): void {
-  const button = document.getElementById('theme-toggle')
-  if (!button) {
+function syncAllThemeToggleLabels(): void {
+  document.querySelectorAll<HTMLElement>('[data-theme-toggle]').forEach(syncThemeToggleLabel)
+}
+
+function initThemeToggles(): void {
+  const buttons = document.querySelectorAll<HTMLElement>('[data-theme-toggle]')
+  if (buttons.length === 0) {
     return
   }
 
-  syncThemeToggleLabel(button)
-  button.addEventListener('click', () => {
-    const isDark = document.documentElement.dataset.theme === 'dark'
-    const nextTheme = isDark ? 'light' : 'dark'
-    document.documentElement.dataset.theme = nextTheme
-    writeStorageValue(THEME_KEY, nextTheme)
-    syncThemeToggleLabel(button)
-    repaintThemeAwareCharts()
+  syncAllThemeToggleLabels()
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const isDark = document.documentElement.dataset.theme === 'dark'
+      const nextTheme = isDark ? 'light' : 'dark'
+      document.documentElement.dataset.theme = nextTheme
+      writeStorageValue(THEME_KEY, nextTheme)
+      syncAllThemeToggleLabels()
+      repaintThemeAwareCharts()
+    })
+  })
+}
+
+function initMobileMoreMenu(): void {
+  const dialog = document.getElementById('mobile-more-menu')
+  const trigger = document.querySelector<HTMLElement>('[data-mobile-more-trigger]')
+  const closeButton = dialog?.querySelector<HTMLElement>('[data-mobile-more-close]')
+  if (!(dialog instanceof HTMLDialogElement) || !trigger) {
+    return
+  }
+
+  const close = () => {
+    if (dialog.open) {
+      dialog.close()
+    }
+  }
+
+  trigger.addEventListener('click', () => {
+    if (!dialog.open) {
+      dialog.showModal()
+    }
+  })
+  closeButton?.addEventListener('click', close)
+  dialog.addEventListener('click', (event) => {
+    if (
+      event.target === dialog ||
+      (event.target instanceof Element && event.target.closest('[data-section]'))
+    ) {
+      close()
+    }
+  })
+  dialog.addEventListener('toggle', () => {
+    trigger.setAttribute('aria-expanded', dialog.open ? 'true' : 'false')
+  })
+  dialog.addEventListener('close', () => {
+    trigger.setAttribute('aria-expanded', 'false')
+  })
+}
+
+function initPwaInstall(): void {
+  const installButton = document.getElementById('pwa-install-button')
+  if (!(installButton instanceof HTMLButtonElement)) {
+    return
+  }
+
+  let installPrompt: BeforeInstallPromptEvent | null = null
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault()
+    installPrompt = event as BeforeInstallPromptEvent
+    installButton.hidden = false
+  })
+  installButton.addEventListener('click', async () => {
+    if (!installPrompt) {
+      return
+    }
+    await installPrompt.prompt()
+    await installPrompt.userChoice
+    installPrompt = null
+    installButton.hidden = true
+  })
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null
+    installButton.hidden = true
+  })
+}
+
+function initServiceWorker(): void {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) {
+    return
+  }
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').then(async () => {
+      const registration = await navigator.serviceWorker.ready
+      const resourceUrls = performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((url) => new URL(url).origin === window.location.origin)
+
+      registration.active?.postMessage({
+        type: 'CACHE_RESOURCE_URLS',
+        urls: ['/', window.location.pathname, ...resourceUrls],
+      })
+    })
   })
 }
 
@@ -99,20 +193,25 @@ function syncDemoModeAction(action: HTMLElement): void {
     ?.replaceChildren(active ? 'Volver a tus datos privados' : 'Usar únicamente datos ficticios')
 }
 
+function initDemoModeActions(): void {
+  document.querySelectorAll<HTMLElement>('[data-demo-mode-action]').forEach((action) => {
+    syncDemoModeAction(action)
+    action.addEventListener('click', () => setDemoModeEnabled(!isDemoMode()))
+  })
+}
+
 function initUserMenu(): void {
   const root = document.getElementById('sidebar-user-menu-root')
   const trigger = document.getElementById('sidebar-user-menu-toggle')
   const menu = document.getElementById('sidebar-user-menu')
-  const demoAction = document.getElementById('demo-mode-menu-action')
+  const demoAction = root?.querySelector<HTMLElement>('[data-demo-mode-action]')
   if (!root || !trigger || !menu || !demoAction) return
 
-  syncDemoModeAction(demoAction)
   trigger.addEventListener('click', () => {
     const nextOpen = menu.hidden
     setUserMenuOpen(menu, trigger, nextOpen)
     if (nextOpen) demoAction.focus()
   })
-  demoAction.addEventListener('click', () => setDemoModeEnabled(!isDemoMode()))
   document.addEventListener('click', (event) => {
     if (!root.contains(event.target as Node)) setUserMenuOpen(menu, trigger, false)
   })
@@ -135,7 +234,11 @@ function initDemoBanner(): void {
 
 function initShellInteractions(): void {
   initSidebarToggle()
-  initThemeToggle()
+  initThemeToggles()
+  initMobileMoreMenu()
+  initPwaInstall()
+  initServiceWorker()
+  initDemoModeActions()
   initUserMenu()
   initDemoBanner()
 }

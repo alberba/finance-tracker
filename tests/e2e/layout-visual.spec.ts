@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
-import type { FinanceSectionId } from './pages/FinanceTrackerPage'
+import type { FinanceSectionId, FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 const SECTION_IDS: FinanceSectionId[] = [
   'dashboard',
@@ -12,6 +12,13 @@ const SECTION_IDS: FinanceSectionId[] = [
   'settings',
   'data',
 ]
+
+const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>> = {
+  wealth: 'Patrimonio',
+  goals: 'Objetivos',
+  settings: 'Configuración',
+  data: 'Datos',
+}
 
 type LayoutIssue = {
   container: string
@@ -164,10 +171,30 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
   })
 }
 
+async function openSectionForLayout(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  sectionId: FinanceSectionId,
+): Promise<void> {
+  const secondaryLabel = MOBILE_SECONDARY_SECTION_LABELS[sectionId]
+  const moreButton = page.getByRole('button', { name: 'Más secciones' })
+  if (secondaryLabel && (await moreButton.isVisible())) {
+    await moreButton.click()
+    await page
+      .getByRole('dialog', { name: 'Más secciones' })
+      .getByRole('button', { name: secondaryLabel, exact: true })
+      .click()
+    await expect(page.locator(`#${sectionId}`)).toBeVisible()
+    return
+  }
+
+  await tracker.open(sectionId)
+}
+
 test.describe('UI layout integrity', () => {
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
-      await tracker.open(sectionId)
+      await openSectionForLayout(page, tracker, sectionId)
       await page.evaluate(async () => {
         await document.fonts.ready
       })
@@ -183,7 +210,7 @@ test.describe('UI layout integrity', () => {
         testInfo.project.name === 'mobile-chrome',
         'La cobertura móvil valida el layout con el escáner y un flujo de navegación.',
       )
-      await tracker.open(sectionId)
+      await openSectionForLayout(page, tracker, sectionId)
       await page.evaluate(async () => {
         await document.fonts.ready
       })
