@@ -3,8 +3,8 @@
 
 Usage:
   python3 scripts/extract_excel_seed.py \
-      --input "/home/albert/Descargas/FINANZAS PERSONALES 2026.xlsx" \
-      --output src/data/seed.json
+      --input "/ruta/al/archivo.xlsx" \
+      --output /tmp/finance-seed.json
 """
 
 from __future__ import annotations

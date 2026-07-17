@@ -1,4 +1,6 @@
 import { FINANCE_TRACKER_SEED } from "../data/seed";
+import { FINANCE_TRACKER_DEMO_SEED } from "../data/demo-seed";
+import { isDemoMode, resolveRuntimeNamespace } from "./demo-mode";
 import {
   DEFAULT_GOALS,
   isInvestmentSide,
@@ -57,7 +59,7 @@ export type ServerSaveResult =
 
 export function getKnownServerVersion(): number | null {
   try {
-    const raw = localStorage.getItem(SERVER_VERSION_KEY);
+    const raw = localStorage.getItem(storageKey(SERVER_VERSION_KEY));
     if (raw === null) {
       return null;
     }
@@ -71,9 +73,9 @@ export function getKnownServerVersion(): number | null {
 export function setKnownServerVersion(version: number | null): void {
   try {
     if (version === null) {
-      localStorage.removeItem(SERVER_VERSION_KEY);
+      localStorage.removeItem(storageKey(SERVER_VERSION_KEY));
     } else {
-      localStorage.setItem(SERVER_VERSION_KEY, String(version));
+      localStorage.setItem(storageKey(SERVER_VERSION_KEY), String(version));
     }
   } catch {
     /* storage unavailable — best effort */
@@ -82,7 +84,7 @@ export function setKnownServerVersion(version: number | null): void {
 
 export function hasPendingChanges(): boolean {
   try {
-    return localStorage.getItem(PENDING_CHANGES_KEY) === "1";
+    return localStorage.getItem(storageKey(PENDING_CHANGES_KEY)) === "1";
   } catch {
     return false;
   }
@@ -91,9 +93,9 @@ export function hasPendingChanges(): boolean {
 export function setPendingChanges(pending: boolean): void {
   try {
     if (pending) {
-      localStorage.setItem(PENDING_CHANGES_KEY, "1");
+      localStorage.setItem(storageKey(PENDING_CHANGES_KEY), "1");
     } else {
-      localStorage.removeItem(PENDING_CHANGES_KEY);
+      localStorage.removeItem(storageKey(PENDING_CHANGES_KEY));
     }
   } catch {
     /* storage unavailable — best effort */
@@ -128,7 +130,17 @@ const FALLBACK_BASE_SEED = {
   pendingMovements: [],
 };
 
-export const BASE_SEED: unknown = FINANCE_TRACKER_SEED || FALLBACK_BASE_SEED;
+export const BASE_SEED: unknown = isDemoMode()
+  ? FINANCE_TRACKER_DEMO_SEED
+  : FINANCE_TRACKER_SEED || FALLBACK_BASE_SEED;
+
+/**
+ * En modo demo cada clave de localStorage lleva un sufijo propio: así ni se
+ * lee la caché con datos reales ni las ediciones de la demo la contaminan.
+ */
+function storageKey(base: string): string {
+  return isDemoMode() ? `${base}::demo` : base;
+}
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -140,7 +152,7 @@ function asRecord(value: unknown): UnknownRecord {
 
 export function loadPersistedState(): unknown | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey(STORAGE_KEY));
     if (!raw) {
       return null;
     }
@@ -159,7 +171,7 @@ export function persistState(state: State): string {
   };
 
   state.meta.savedAt = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(state));
   return state.meta.savedAt;
 }
 
@@ -819,23 +831,4 @@ function buildServerHeaders(withJsonBody: boolean): HeadersInit {
   }
 
   return headers;
-}
-
-function resolveRuntimeNamespace(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  const candidate = String(
-    (window as Window & { __FINANCE_NAMESPACE__?: string })
-      .__FINANCE_NAMESPACE__ || "",
-  )
-    .trim()
-    .toLowerCase();
-  if (!candidate) {
-    return "";
-  }
-
-  const safe = candidate.replace(/[^a-z0-9_-]/g, "").slice(0, 64);
-  return safe;
 }

@@ -125,3 +125,23 @@ describe('d1-state optimistic concurrency', () => {
     expect(b.state).toEqual({ who: 'other' })
   })
 })
+
+describe('d1-state demo namespace', () => {
+  type SeededState = { meta?: { source?: string }; transactions?: unknown[] }
+
+  it('seeds the demo namespace with synthetic data, not the real seed', async () => {
+    const db = createFakeD1()
+    const snapshot = await loadStateFromD1(db, 'demo')
+    const state = snapshot.state as SeededState
+    expect(state.meta?.source).toBe('demo')
+    expect(state.transactions?.length).toBeGreaterThan(0)
+  })
+
+  it('resets the demo namespace back to synthetic data', async () => {
+    const db = createFakeD1()
+    await saveStateToD1(db, 'demo', { meta: { source: 'edited' } }, undefined)
+    const snapshot = await resetStateInD1(db, 'demo')
+    const state = snapshot.state as SeededState
+    expect(state.meta?.source).toBe('demo')
+  })
+})
