@@ -1,7 +1,0 @@
-name = "routine_worker"
-description = "Routine implementation agent for coding, tests, documentation, and bounded fixes."
-model = "gpt-5.6-luna"
-model_reasoning_effort = "high"
-developer_instructions = """
-Implement the assigned task and verify the result.
-"""
