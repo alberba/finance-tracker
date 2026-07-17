@@ -1,3 +1,5 @@
+import { isDemoMode, setDemoModeEnabled } from './demo-mode'
+
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const THEME_KEY = 'theme'
 
@@ -159,8 +161,75 @@ function initServiceWorker(): void {
     return
   }
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js')
+    void navigator.serviceWorker.register('/sw.js').then(async () => {
+      const registration = await navigator.serviceWorker.ready
+      const resourceUrls = performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((url) => new URL(url).origin === window.location.origin)
+
+      registration.active?.postMessage({
+        type: 'CACHE_RESOURCE_URLS',
+        urls: ['/', window.location.pathname, ...resourceUrls],
+      })
+    })
   })
+}
+
+function setUserMenuOpen(menu: HTMLElement, trigger: HTMLElement, open: boolean): void {
+  menu.hidden = !open
+  trigger.setAttribute('aria-expanded', open ? 'true' : 'false')
+  trigger.setAttribute('aria-label', open ? 'Cerrar menú de usuario' : 'Abrir menú de usuario')
+}
+
+function syncDemoModeAction(action: HTMLElement): void {
+  const active = isDemoMode()
+  action.dataset.active = active ? 'true' : 'false'
+  action
+    .querySelector('.demo-mode-action-label')
+    ?.replaceChildren(active ? 'Salir del modo demo' : 'Activar modo demo')
+  action
+    .querySelector('.demo-mode-action-description')
+    ?.replaceChildren(active ? 'Volver a tus datos privados' : 'Usar únicamente datos ficticios')
+}
+
+function initDemoModeActions(): void {
+  document.querySelectorAll<HTMLElement>('[data-demo-mode-action]').forEach((action) => {
+    syncDemoModeAction(action)
+    action.addEventListener('click', () => setDemoModeEnabled(!isDemoMode()))
+  })
+}
+
+function initUserMenu(): void {
+  const root = document.getElementById('sidebar-user-menu-root')
+  const trigger = document.getElementById('sidebar-user-menu-toggle')
+  const menu = document.getElementById('sidebar-user-menu')
+  const demoAction = root?.querySelector<HTMLElement>('[data-demo-mode-action]')
+  if (!root || !trigger || !menu || !demoAction) return
+
+  trigger.addEventListener('click', () => {
+    const nextOpen = menu.hidden
+    setUserMenuOpen(menu, trigger, nextOpen)
+    if (nextOpen) demoAction.focus()
+  })
+  document.addEventListener('click', (event) => {
+    if (!root.contains(event.target as Node)) setUserMenuOpen(menu, trigger, false)
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || menu.hidden) return
+    setUserMenuOpen(menu, trigger, false)
+    trigger.focus()
+  })
+}
+
+function initDemoBanner(): void {
+  if (!isDemoMode()) return
+  const banner = document.getElementById('demo-banner')
+  const exit = document.getElementById('demo-banner-exit')
+  if (!banner || !exit) return
+
+  banner.hidden = false
+  exit.addEventListener('click', () => setDemoModeEnabled(false))
 }
 
 function initShellInteractions(): void {
@@ -169,6 +238,9 @@ function initShellInteractions(): void {
   initMobileMoreMenu()
   initPwaInstall()
   initServiceWorker()
+  initDemoModeActions()
+  initUserMenu()
+  initDemoBanner()
 }
 
 if (document.readyState === 'loading') {

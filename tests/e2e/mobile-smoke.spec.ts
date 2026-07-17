@@ -80,4 +80,33 @@ test.describe('Mobile smoke', () => {
       ]),
     )
   })
+
+  test('mantiene accesible el modo demo desde la experiencia PWA', async ({ page, request }) => {
+    await request.post('/api/state/reset', {
+      headers: { 'x-finance-namespace': 'demo' },
+    })
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Resumen financiero' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Más secciones' }).click()
+    await page
+      .getByRole('dialog', { name: 'Más secciones' })
+      .getByRole('button', {
+        name: /Activar modo demo/,
+      })
+      .click()
+
+    await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
+    const banner = page.getByRole('status').filter({ hasText: 'Modo demo · datos ficticios' })
+    await expect(banner).toBeVisible()
+
+    const appBarBox = await page.locator('.mobile-app-bar').boundingBox()
+    const bannerBox = await banner.boundingBox()
+    expect(appBarBox).not.toBeNull()
+    expect(bannerBox).not.toBeNull()
+    expect(bannerBox!.y).toBeGreaterThanOrEqual(appBarBox!.y + appBarBox!.height)
+
+    await banner.getByRole('button', { name: 'Salir' }).click()
+    await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')
+  })
 })
