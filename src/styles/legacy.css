@@ -2733,11 +2733,15 @@ td select {
   .tx-bulk-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .tx-form-dialog {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .tx-form-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tx-form-fields .span-3,
+  .tx-form-fields .tx-category-field,
+  .tx-form-fields .tx-amount-field {
+    grid-column: span 2;
   }
   .tx-dialog-actions {
-    grid-column: 1 / -1;
     justify-content: flex-start;
   }
   .reports-layout {
@@ -2916,8 +2920,31 @@ td select {
   .form-grid.compact,
   .investment-form,
   .tx-bulk-grid,
-  .tx-form-dialog {
+  .tx-form-fields {
     grid-template-columns: 1fr;
+  }
+  .tx-form-fields .span-3,
+  .tx-form-fields .tx-category-field,
+  .tx-form-fields .tx-amount-field {
+    grid-column: 1 / -1;
+  }
+  .tx-dialog-head {
+    padding: 18px 18px 16px;
+  }
+  .tx-dialog-head h3 {
+    font-size: 1.1rem;
+  }
+  .tx-form-fields {
+    padding: 18px;
+    gap: 14px;
+  }
+  .tx-dialog-actions {
+    flex-direction: column-reverse;
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+  }
+  .tx-dialog-actions .tx-btn-primary,
+  .tx-dialog-actions .tx-btn-secondary {
+    width: 100%;
   }
   .budget-block {
     padding: 16px;
