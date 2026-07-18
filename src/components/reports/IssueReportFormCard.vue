@@ -107,28 +107,30 @@ async function onSubmit(): Promise<void> {
     </header>
 
     <form id="issue-report-form" autocomplete="off" novalidate @submit.prevent="onSubmit">
-      <label>
-        Tipo
-        <select id="issue-report-type" v-model="form.type" name="type" required>
-          <option value="bug">Error</option>
-          <option value="enhancement">Mejora</option>
-        </select>
-      </label>
-      <label class="span-3">
-        Resumen
-        <input
-          id="issue-report-summary"
-          v-model="form.summary"
-          name="summary"
-          type="text"
-          minlength="5"
-          maxlength="140"
-          required
-          placeholder="Ej. El filtro de movimientos no guarda el valor"
-          autocomplete="off"
-        />
-      </label>
-      <label class="span-3">
+      <div class="reports-form-row reports-form-row-type">
+        <label class="reports-field">
+          Tipo
+          <select id="issue-report-type" v-model="form.type" name="type" required>
+            <option value="bug">Error</option>
+            <option value="enhancement">Mejora</option>
+          </select>
+        </label>
+        <label class="reports-field">
+          Resumen
+          <input
+            id="issue-report-summary"
+            v-model="form.summary"
+            name="summary"
+            type="text"
+            minlength="5"
+            maxlength="140"
+            required
+            placeholder="Ej. El filtro de movimientos no guarda el valor"
+            autocomplete="off"
+          />
+        </label>
+      </div>
+      <label class="reports-field">
         Descripción
         <textarea
           id="issue-report-description"
@@ -141,27 +143,29 @@ async function onSubmit(): Promise<void> {
           placeholder="Describe el error o mejora con el mayor detalle posible."
         ></textarea>
       </label>
-      <label>
-        Resultado esperado (opcional)
-        <textarea
-          id="issue-report-expected"
-          v-model="form.expectedResult"
-          name="expectedResult"
-          maxlength="4000"
-          rows="3"
-        ></textarea>
-      </label>
-      <label>
-        Resultado actual (opcional)
-        <textarea
-          id="issue-report-actual"
-          v-model="form.actualResult"
-          name="actualResult"
-          maxlength="4000"
-          rows="3"
-        ></textarea>
-      </label>
-      <label class="span-3">
+      <div class="reports-form-row reports-form-row-pair">
+        <label class="reports-field">
+          Resultado esperado (opcional)
+          <textarea
+            id="issue-report-expected"
+            v-model="form.expectedResult"
+            name="expectedResult"
+            maxlength="4000"
+            rows="3"
+          ></textarea>
+        </label>
+        <label class="reports-field">
+          Resultado actual (opcional)
+          <textarea
+            id="issue-report-actual"
+            v-model="form.actualResult"
+            name="actualResult"
+            maxlength="4000"
+            rows="3"
+          ></textarea>
+        </label>
+      </div>
+      <label class="reports-field">
         Pasos para reproducir (opcional)
         <textarea
           id="issue-report-steps"
@@ -172,7 +176,7 @@ async function onSubmit(): Promise<void> {
           placeholder="1. Ir a ... 2. Pulsar ... 3. Ocurre ..."
         ></textarea>
       </label>
-      <fieldset class="span-3 reports-automation-fieldset">
+      <fieldset class="reports-automation-fieldset">
         <legend>Automatización opcional</legend>
         <label class="reports-automation-toggle">
           <input
@@ -188,9 +192,11 @@ async function onSubmit(): Promise<void> {
           configurado en GitHub.
         </p>
       </fieldset>
-      <button id="issue-report-submit" class="primary-btn" type="submit" :disabled="submitting">
-        Crear reporte
-      </button>
+      <div class="reports-form-actions">
+        <button id="issue-report-submit" class="primary-btn" type="submit" :disabled="submitting">
+          Crear reporte
+        </button>
+      </div>
     </form>
     <p id="issue-report-status" role="status" aria-live="polite">
       <template v-if="successStatus"

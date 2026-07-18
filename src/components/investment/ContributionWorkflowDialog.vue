@@ -42,6 +42,13 @@ const missingLiquidity = ref<string[]>([])
 const snapValues = reactive<Record<string, string>>({})
 const allocValues = reactive<Record<string, string>>({})
 
+// Recuerda qué campos ha tocado el usuario para no pisarlos al recalcular el
+// snapshot tras un cambio de fecha o mes (ver issue #48: se perdían todos los
+// importes introducidos en el paso 1/2 al ajustar la fecha).
+const touchedSnapshots = reactive<Record<string, boolean>>({})
+const touchedAllocations = reactive<Record<string, boolean>>({})
+const touchedTotal = ref(false)
+
 const calcTargetKind = ref<SnapshotKind | ''>('')
 const calcTargetId = ref('')
 const calcTargetName = ref('')
@@ -54,31 +61,80 @@ function snapKey(kind: SnapshotKind, id: string): string {
   return `${kind}:${id}`
 }
 
+function markSnapshotTouched(kind: SnapshotKind, id: string): void {
+  touchedSnapshots[snapKey(kind, id)] = true
+}
+
+function markAllocationTouched(accountId: string): void {
+  touchedAllocations[accountId] = true
+}
+
+function markTotalTouched(): void {
+  touchedTotal.value = true
+}
+
+function resetTouched(): void {
+  for (const key of Object.keys(touchedSnapshots)) {
+    delete touchedSnapshots[key]
+  }
+  for (const key of Object.keys(touchedAllocations)) {
+    delete touchedAllocations[key]
+  }
+  touchedTotal.value = false
+}
+
+/**
+ * Recalcula las listas y valores por defecto del snapshot para el mes/fecha
+ * seleccionados. Los campos que el usuario ya ha editado a mano (marcados en
+ * `touchedSnapshots`/`touchedAllocations`/`touchedTotal`) se conservan tal
+ * cual: cambiar de fecha o mes nunca debe borrar importes ya introducidos.
+ */
 function seed(): void {
   const workflow = investmentStore.buildWorkflowState(month.value, date.value)
   investmentsList.value = workflow.investments.map((item) => ({ id: item.id, name: item.name }))
   liquidityList.value = workflow.liquidity.map((item) => ({ id: item.id, name: item.name }))
   missingLiquidity.value = workflow.missingLiquidity
 
-  for (const key of Object.keys(snapValues)) {
-    delete snapValues[key]
-  }
+  const nextSnapKeys = new Set<string>()
   workflow.investments.forEach((item) => {
-    snapValues[snapKey('investments', item.id)] = item.value
+    const key = snapKey('investments', item.id)
+    nextSnapKeys.add(key)
+    if (!touchedSnapshots[key]) {
+      snapValues[key] = item.value
+    }
   })
   workflow.liquidity.forEach((item) => {
-    snapValues[snapKey('accounts', item.id)] = item.value
+    const key = snapKey('accounts', item.id)
+    nextSnapKeys.add(key)
+    if (!touchedSnapshots[key]) {
+      snapValues[key] = item.value
+    }
   })
-
-  for (const key of Object.keys(allocValues)) {
-    delete allocValues[key]
+  for (const key of Object.keys(snapValues)) {
+    if (!nextSnapKeys.has(key)) {
+      delete snapValues[key]
+      delete touchedSnapshots[key]
+    }
   }
-  workflow.allocations.forEach((item) => {
-    allocValues[item.accountId] = item.amount
-  })
 
-  const allocatedTotal = workflow.allocations.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
-  total.value = String(round2(allocatedTotal))
+  const nextAllocKeys = new Set<string>()
+  workflow.allocations.forEach((item) => {
+    nextAllocKeys.add(item.accountId)
+    if (!touchedAllocations[item.accountId]) {
+      allocValues[item.accountId] = item.amount
+    }
+  })
+  for (const key of Object.keys(allocValues)) {
+    if (!nextAllocKeys.has(key)) {
+      delete allocValues[key]
+      delete touchedAllocations[key]
+    }
+  }
+
+  if (!touchedTotal.value) {
+    const allocatedTotal = workflow.allocations.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+    total.value = String(round2(allocatedTotal))
+  }
 }
 
 function collectSnapshotInputs(): SnapshotInputValue[] {
@@ -121,6 +177,7 @@ function open(): void {
   const selectedMonth = ui.investmentMonth
   month.value = selectedMonth
   date.value = selectedMonth === currentMonth ? today : toSnapshotDate(financialStateStore.year, selectedMonth)
+  resetTouched()
   seed()
   dialogRef.value?.showModal?.()
 }
@@ -193,6 +250,7 @@ function applyCalc(): void {
     return
   }
   snapValues[snapKey(calcTargetKind.value, calcTargetId.value)] = String(round2(evaluated))
+  touchedSnapshots[snapKey(calcTargetKind.value, calcTargetId.value)] = true
   showToast('Resultado aplicado al snapshot.')
   closeCalc()
 }
@@ -291,6 +349,7 @@ defineExpose({ open })
                       data-contribution-snapshot-kind="investments"
                       :data-contribution-snapshot-id="item.id"
                       :aria-label="`Snapshot inversión ${item.name}`"
+                      @input="markSnapshotTouched('investments', item.id)"
                     />
                     <button
                       type="button"
@@ -330,6 +389,7 @@ defineExpose({ open })
                       data-contribution-snapshot-kind="accounts"
                       :data-contribution-snapshot-id="item.id"
                       :aria-label="`Snapshot liquidez ${item.name}`"
+                      @input="markSnapshotTouched('accounts', item.id)"
                     />
                     <button
                       type="button"
@@ -368,6 +428,7 @@ defineExpose({ open })
             type="number"
             min="0"
             step="0.01"
+            @input="markTotalTouched"
           />
         </label>
 
@@ -393,6 +454,7 @@ defineExpose({ open })
                     min="0"
                     :data-contribution-allocation-account-id="item.id"
                     :aria-label="`Asignación aporte ${item.name}`"
+                    @input="markAllocationTouched(item.id)"
                   />
                 </td>
               </tr>
