@@ -134,6 +134,22 @@ test.describe('Mobile smoke', () => {
     await expect(moreButton).toHaveClass(/is-active/)
   })
 
+  test('ofrece el reporte al final del menú Más sin ocupar la barra inferior', async ({
+    page,
+    tracker,
+  }) => {
+    await expect(tracker.dashboardSection).toBeVisible()
+    await page.getByRole('button', { name: 'Más secciones' }).click()
+
+    const menu = page.getByRole('dialog', { name: 'Más secciones' })
+    await menu.getByRole('button', { name: 'Crear reporte' }).click()
+
+    await expect(menu).toBeHidden()
+    await expect(page.locator('#global-report-dialog')).toBeVisible()
+    await expect(page.locator('#global-report-dialog').getByLabel('Resumen')).toBeFocused()
+    await expect(page.locator('#global-report-trigger')).toBeHidden()
+  })
+
   test('publica los metadatos mínimos de instalación PWA', async ({ page, tracker }) => {
     await expect(tracker.dashboardSection).toBeVisible()
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(

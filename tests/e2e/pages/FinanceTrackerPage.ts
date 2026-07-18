@@ -48,6 +48,10 @@ export class FinanceTrackerPage {
     return this.page.locator("#reports");
   }
 
+  get issueReportDialog(): Locator {
+    return this.page.locator("#global-report-dialog");
+  }
+
   async goto() {
     await this.page.goto("/");
     await expect(
@@ -147,41 +151,34 @@ export class FinanceTrackerPage {
     await this.open("reports");
   }
 
+  async openGlobalReportDialog() {
+    await this.page.locator("#global-report-trigger").click();
+    await expect(this.issueReportDialog).toBeVisible();
+  }
+
   async submitIssueReport(params: {
     type: "bug" | "enhancement";
     summary: string;
     description: string;
-    stepsToReproduce?: string;
     expectedResult?: string;
     actualResult?: string;
-    mentionClaude?: boolean;
   }) {
-    await this.openReports();
-    const form = this.reportsSection.locator("#issue-report-form");
+    await this.openGlobalReportDialog();
+    const form = this.issueReportDialog.locator("#issue-report-form");
     await form.locator("#issue-report-type").selectOption(params.type);
     await form.locator("#issue-report-summary").fill(params.summary);
     await form.locator("#issue-report-description").fill(params.description);
-    if (params.stepsToReproduce !== undefined) {
-      await form.locator("#issue-report-steps").fill(params.stepsToReproduce);
-    }
     if (params.expectedResult !== undefined) {
       await form.locator("#issue-report-expected").fill(params.expectedResult);
     }
     if (params.actualResult !== undefined) {
       await form.locator("#issue-report-actual").fill(params.actualResult);
     }
-    const mention = form.locator("#issue-report-mention-claude");
-    const shouldMention = params.mentionClaude ?? false;
-    if (shouldMention) {
-      await mention.check();
-    } else {
-      await mention.uncheck();
-    }
     await form.getByRole("button", { name: "Crear reporte" }).click();
   }
 
   issueReportStatus(): Locator {
-    return this.reportsSection.locator("#issue-report-status");
+    return this.issueReportDialog.locator("#issue-report-status");
   }
 
   async open(sectionId: FinanceSectionId) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 
 import type { SectionId } from '../scripts/types'
 import { useUiStore } from '../stores/ui'
@@ -8,6 +8,7 @@ import DashboardSection from './sections/DashboardSection.vue'
 import DataSection from './sections/DataSection.vue'
 import GoalsSection from './sections/GoalsSection.vue'
 import InvestmentSection from './sections/InvestmentSection.vue'
+import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
 import ReportsSection from './reports/ReportsSection.vue'
 import SettingsSection from './sections/SettingsSection.vue'
 import TransactionsSection from './sections/TransactionsSection.vue'
@@ -24,6 +25,7 @@ const uiStore = useUiStore()
 uiStore.setActiveSection(props.activeSection)
 
 const currentSection = computed(() => uiStore.ui.activeSection)
+const isReportDialogOpen = shallowRef(false)
 </script>
 
 <template>
@@ -32,10 +34,14 @@ const currentSection = computed(() => uiStore.ui.activeSection)
     <BudgetSection :is-active="currentSection === 'budget'" />
     <GoalsSection :is-active="currentSection === 'goals'" />
     <DataSection :is-active="currentSection === 'data'" />
-    <ReportsSection :is-active="currentSection === 'reports'" />
+    <ReportsSection
+      :is-active="currentSection === 'reports'"
+      @open-report-dialog="isReportDialogOpen = true"
+    />
     <SettingsSection :is-active="currentSection === 'settings'" />
     <TransactionsSection :is-active="currentSection === 'transactions'" />
     <WealthSection :is-active="currentSection === 'wealth'" />
     <InvestmentSection :is-active="currentSection === 'investment'" />
+    <GlobalReportLauncher v-model:open="isReportDialogOpen" />
   </div>
 </template>

@@ -28,10 +28,75 @@ async function expectModalCentered(
   );
 }
 
+async function expectModalAnchoredToLauncher(
+  page: Page,
+  selector: string,
+  inset = 22,
+  tolerance = 4,
+) {
+  const dialog = page.locator(selector);
+  await expect(dialog).toBeVisible();
+
+  const viewport = page.viewportSize();
+  const box = await dialog.boundingBox();
+  if (!viewport || !box) {
+    throw new Error(`No se pudo medir el panel ${selector}.`);
+  }
+
+  expect(Math.abs(viewport.width - (box.x + box.width) - inset)).toBeLessThanOrEqual(
+    tolerance,
+  );
+  expect(Math.abs(viewport.height - (box.y + box.height) - inset)).toBeLessThanOrEqual(
+    tolerance,
+  );
+}
+
 test.describe("Reports E2E", () => {
-  test("reportes muestra el flujo simple como camino principal", async ({
+  test("expande el formulario desde el acceso global anclado", async ({
+    page,
     tracker,
   }) => {
+    const trigger = page.locator("#global-report-trigger");
+    await expect(trigger).toBeVisible();
+    const triggerBox = await trigger.boundingBox();
+    const iconBox = await trigger.locator("svg").boundingBox();
+    if (!triggerBox || !iconBox) {
+      throw new Error("No se pudo medir el acceso global de reportes.");
+    }
+    expect(
+      Math.abs(
+        triggerBox.x + triggerBox.width / 2 - (iconBox.x + iconBox.width / 2),
+      ),
+    ).toBeLessThanOrEqual(1);
+
+    const compactWidth = triggerBox.width;
+    await trigger.hover();
+    await expect
+      .poll(async () => (await trigger.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(compactWidth);
+
+    await tracker.openGlobalReportDialog();
+    await expect(tracker.issueReportDialog).toHaveAttribute("open", "");
+    await expectModalAnchoredToLauncher(page, "#global-report-dialog");
+    await expect(tracker.issueReportDialog).not.toHaveClass(/is-closing/);
+    await expect(tracker.issueReportDialog).toHaveCSS("animation-name", "report-dialog-in");
+    await expect(tracker.issueReportDialog.getByLabel("Resumen")).toBeFocused();
+    await expect(tracker.issueReportDialog.locator("#issue-report-steps")).toHaveCount(0);
+    await expect(
+      tracker.issueReportDialog.locator("#issue-report-mention-claude"),
+    ).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
+    await expect(tracker.issueReportDialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await page.locator("#global-report-dialog-close").click();
+    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
+    await expect(tracker.issueReportDialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
     await tracker.openReports();
 
     await expect(
@@ -39,19 +104,18 @@ test.describe("Reports E2E", () => {
     ).toBeVisible();
     await expect(
       tracker.reportsSection.locator(".reports-form-card h3"),
-    ).toHaveText("Crear reporte");
+    ).toHaveCount(0);
     await expect(
       tracker.reportsSection.locator(".reports-guide-card h3"),
     ).toHaveText("Qué ocurre al enviarlo");
     await expect(
       tracker.reportsSection.locator(".reports-guide-list li"),
     ).toHaveCount(3);
-    await expect(
-      tracker.reportsSection.locator("#issue-report-mention-claude"),
-    ).not.toBeChecked();
+    await tracker.reportsSection.getByRole("button", { name: "Crear reporte" }).click();
+    await expect(tracker.issueReportDialog).toBeVisible();
   });
 
-  test("crea un reporte simple sin automatización", async ({
+  test("crea un reporte desde cualquier sección sin automatización", async ({
     page,
     tracker,
   }) => {
@@ -67,6 +131,7 @@ test.describe("Reports E2E", () => {
       });
     });
 
+    await tracker.openBudget();
     await tracker.submitIssueReport({
       type: "enhancement",
       summary: "Mejorar feedback visual",
@@ -75,16 +140,16 @@ test.describe("Reports E2E", () => {
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
     await expect(tracker.issueReportStatus()).toContainText("#654");
-    await expect(tracker.issueReportStatus()).not.toContainText(
-      "automatización en curso",
-    );
+    await expect(tracker.issueReportStatus()).not.toContainText("automatización");
   });
 
-  test("permite activar automatización manualmente", async ({
+  test("envía únicamente los campos simplificados del formulario", async ({
     page,
     tracker,
   }) => {
+    let submittedPayload: Record<string, unknown> | undefined;
     await page.route("**/api/issues/report", async (route) => {
+      submittedPayload = route.request().postDataJSON() as Record<string, unknown>;
       await route.fulfill({
         status: 201,
         contentType: "application/json",
@@ -92,7 +157,6 @@ test.describe("Reports E2E", () => {
           ok: true,
           issueNumber: 321,
           issueUrl: "https://github.com/example/repo/issues/321",
-          enrichmentStatus: "pending",
         }),
       });
     });
@@ -101,14 +165,19 @@ test.describe("Reports E2E", () => {
       type: "bug",
       summary: "Fallo al exportar datos",
       description: "Después de guardar no persiste el estado.",
-      stepsToReproduce: "1. Ir a datos\n2. Guardar\n3. Recargar",
-      mentionClaude: true,
+      expectedResult: "El cambio debe persistir.",
+      actualResult: "El cambio desaparece al recargar.",
     });
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
-    await expect(tracker.issueReportStatus()).toContainText(
-      "automatización en curso",
-    );
+    expect(submittedPayload).toMatchObject({
+      type: "bug",
+      summary: "Fallo al exportar datos",
+      expectedResult: "El cambio debe persistir.",
+      actualResult: "El cambio desaparece al recargar.",
+    });
+    expect(submittedPayload).not.toHaveProperty("mentionClaude");
+    expect(submittedPayload).not.toHaveProperty("stepsToReproduce");
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
       "https://github.com/example/repo/issues/321",
@@ -118,8 +187,8 @@ test.describe("Reports E2E", () => {
   test("muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({
     tracker,
   }) => {
-    await tracker.openReports();
-    const form = tracker.reportsSection.locator("#issue-report-form");
+    await tracker.openGlobalReportDialog();
+    const form = tracker.issueReportDialog.locator("#issue-report-form");
     await form.locator("#issue-report-summary").fill("abc");
     await form.locator("#issue-report-description").fill("corta");
     await form.getByRole("button", { name: "Crear reporte" }).click();
