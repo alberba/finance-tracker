@@ -1,39 +1,54 @@
 <script setup lang="ts">
-import { computed, nextTick, useTemplateRef, watch } from 'vue'
+import { computed } from 'vue'
 
+import ChartCanvas from '../charts/ChartCanvas.vue'
 import { renderDonutChart } from '../../scripts/charts'
 import type { DashboardWealthSplitItem } from '../../domain/dashboard/view-model'
 import { formatMoneyForCurrency } from '../../scripts/money-format'
+
+type WealthSplitChartItem = Pick<
+  DashboardWealthSplitItem,
+  'label' | 'colorVar' | 'fallbackColor' | 'value'
+>
 
 const props = defineProps<{
   currency: string
   items: DashboardWealthSplitItem[]
 }>()
 
-const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
+const drawChart = computed(() => {
+  const items = props.items.map(({ label, colorVar, fallbackColor, value }) => ({
+    label,
+    colorVar,
+    fallbackColor,
+    value,
+  }))
+  const currency = props.currency
 
-const chartItems = computed(() =>
-  props.items.length
-    ? props.items.map((item) => ({
-        ...item,
-        color: cssColor(item.colorVar, item.fallbackColor),
-      }))
-    : [{ label: 'Sin datos', color: cssColor('--line-strong', '#CCD4E1'), value: 0 }],
-)
-
-watch(() => [props.items, props.currency] as const, renderChart, { deep: true, immediate: true })
-
-async function renderChart(): Promise<void> {
-  await nextTick()
-  if (!canvas.value) {
-    return
+  return (canvas: HTMLCanvasElement) => {
+    renderDonutChart(
+      canvas,
+      chartItemsForTheme(items),
+      (value) => formatMoneyForCurrency(value, currency),
+      { showLegend: false },
+    )
   }
-  renderDonutChart(
-    canvas.value,
-    chartItems.value,
-    (value) => formatMoneyForCurrency(value, props.currency),
-    { showLegend: false },
-  )
+})
+
+function chartItemsForTheme(items: WealthSplitChartItem[]): Array<{
+  label: string
+  color: string
+  value: number
+}> {
+  if (!items.length) {
+    return [{ label: 'Sin datos', color: cssColor('--line-strong', '#CCD4E1'), value: 0 }]
+  }
+
+  return items.map((item) => ({
+    label: item.label,
+    color: cssColor(item.colorVar, item.fallbackColor),
+    value: item.value,
+  }))
 }
 
 function cssColor(name: string, fallback: string): string {
@@ -46,12 +61,12 @@ function cssColor(name: string, fallback: string): string {
 
 <template>
   <div class="relative h-40">
-    <canvas
+    <ChartCanvas
       id="chart-wealth-split"
-      ref="canvas"
       class="absolute inset-0 h-full w-full"
       aria-label="Distribución del patrimonio"
-    ></canvas>
+      :draw="drawChart"
+    />
   </div>
 
   <div id="wealth-split-legend" class="grid gap-1">

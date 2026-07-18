@@ -5,6 +5,7 @@ interface TestChart {
   data: {
     datasets: Array<{
       data?: unknown[];
+      borderColor?: string;
     }>;
   };
   tooltip: {
@@ -147,6 +148,43 @@ test.describe("Finance tracker E2E", () => {
     await expect(
       tracker.wealthSection.getByRole("heading", { name: "Patrimonio total" }),
     ).toBeVisible();
+  });
+
+  test("dashboard repinta el borde del donut de patrimonio al cambiar de tema", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openDashboard();
+    await expect(
+      tracker.dashboardSection.getByLabel("Distribución del patrimonio"),
+    ).toBeVisible();
+
+    const documentElement = page.locator("html");
+    const themeToggle = page.getByRole("button", {
+      name: /Cambiar a modo (oscuro|claro)/,
+    });
+    if ((await documentElement.getAttribute("data-theme")) === "dark") {
+      await themeToggle.click();
+      await expect(documentElement).toHaveAttribute("data-theme", "light");
+    }
+
+    await themeToggle.click();
+    await expect(documentElement).toHaveAttribute("data-theme", "dark");
+
+    await expect.poll(async () =>
+      page.evaluate(() => {
+        const canvas = document.getElementById("chart-wealth-split");
+        if (!(canvas instanceof HTMLCanvasElement)) {
+          return null;
+        }
+
+        const chartConstructor = (
+          window as Window & { Chart?: TestChartConstructor }
+        ).Chart;
+        const chart = chartConstructor?.getChart(canvas);
+        return chart?.data.datasets[0]?.borderColor;
+      }),
+    ).toBe("#121419");
   });
 
   test("dashboard muestra el patrimonio sobre el gráfico de cashflow", async ({
