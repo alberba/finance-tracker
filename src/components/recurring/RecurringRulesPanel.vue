@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 import { frequencyLabel } from '../../domain/recurring/occurrences'
 import { useFinancialStateStore } from '../../stores/financial-state'
+import { useMovementsStore } from '../../stores/movements'
 import { useRecurringStore, type NewRecurringRuleInput } from '../../stores/recurring'
-import type { RecurringFrequency, TransactionType } from '../../scripts/types'
+import type { RecurringFrequency } from '../../scripts/types'
 
 const financialStateStore = useFinancialStateStore()
+const movementsStore = useMovementsStore()
 const recurringStore = useRecurringStore()
 const form = reactive<NewRecurringRuleInput>({
   type: 'expense', accountId: '', category: '', description: '', amount: 0,
@@ -16,6 +18,20 @@ const frequencies: Array<{ value: RecurringFrequency; label: string }> = [
   { value: 'daily', label: 'Diaria' }, { value: 'weekly', label: 'Semanal' },
   { value: 'monthly', label: 'Mensual' }, { value: 'monthEnd', label: 'Fin de mes' }, { value: 'yearly', label: 'Anual' },
 ]
+const categoryOptions = computed(() => movementsStore.orderedCategories(form.type))
+
+watch(
+  () => form.type,
+  () => {
+    if (!categoryOptions.value.length) {
+      form.category = ''
+      return
+    }
+    if (!categoryOptions.value.includes(form.category)) {
+      form.category = categoryOptions.value[0]
+    }
+  },
+)
 
 function submit(): void {
   if (!form.accountId) form.accountId = financialStateStore.accounts[0]?.id || ''
@@ -37,7 +53,7 @@ function submit(): void {
     <form class="settings-fields grid gap-3 md:grid-cols-3" @submit.prevent="submit">
       <label>Tipo<select v-model="form.type"><option value="income">Ingreso</option><option value="expense">Gasto</option><option value="investment">Inversión</option></select></label>
       <label>Cuenta<select v-model="form.accountId" required><option value="">Selecciona una cuenta</option><option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
-      <label>Categoría<input v-model="form.category" required placeholder="Ej. Suscripciones" /></label>
+      <label>Categoría<select v-model="form.category" required><option v-if="!categoryOptions.length" value="Sin categoría">Sin categoría</option><option v-for="category in categoryOptions" :key="category" :value="category">{{ category }}</option></select></label>
       <label>Descripción<input v-model="form.description" required placeholder="Ej. Netflix" /></label>
       <label>Importe<input v-model.number="form.amount" type="number" min="0.01" step="0.01" required /></label>
       <label>Frecuencia<select v-model="form.frequency"><option v-for="item in frequencies" :key="item.value" :value="item.value">{{ item.label }}</option></select></label>
