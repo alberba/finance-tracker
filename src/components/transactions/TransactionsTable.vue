@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
-import type { Transaction, TxSortColumn } from '../../scripts/types'
+import type { BudgetType, Transaction, TxSortColumn } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 
@@ -21,9 +21,13 @@ const editDraft = reactive({
   description: '',
   amount: '',
   accountId: '',
-  type: 'expense',
+  type: 'expense' as BudgetType,
   category: '',
 })
+
+const editCategoryOptions = computed(() =>
+  movementsStore.orderedCategories(editDraft.type),
+)
 
 // Changing a filter invalidates the current selection/edit, mirroring legacy.
 watch(
@@ -33,6 +37,22 @@ watch(
     ui.txSelectedIds = []
   },
   { deep: true },
+)
+
+// Keep the selected category valid whenever the edited row's type changes,
+// mirroring the "new movement" dialog's behaviour.
+watch(
+  () => editDraft.type,
+  () => {
+    const options = editCategoryOptions.value
+    if (!options.length) {
+      editDraft.category = ''
+      return
+    }
+    if (!options.includes(editDraft.category)) {
+      editDraft.category = options[0]
+    }
+  },
 )
 
 function isOpen(column: TxSortColumn): boolean {
@@ -428,7 +448,12 @@ function onSaveEdit(id: string): void {
                 <option value="investment">Inversión</option>
               </select>
             </td>
-            <td><input v-model="editDraft.category" type="text" autocomplete="off" data-edit-field="category" /></td>
+            <td>
+              <select v-model="editDraft.category" data-edit-field="category">
+                <option v-if="!editCategoryOptions.length" value="Sin categoría">Sin categoría</option>
+                <option v-for="name in editCategoryOptions" :key="name" :value="name">{{ name }}</option>
+              </select>
+            </td>
             <td>
               <div class="inline-actions">
                 <button type="button" class="inline-save-btn icon-action-btn" aria-label="Guardar" @click="onSaveEdit(item.id)">

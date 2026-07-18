@@ -1587,7 +1587,9 @@ dialog {
 .tx-form-dialog {
   display: flex;
   flex-direction: column;
+  max-height: inherit;
   background: var(--bg-subtle);
+  overflow-y: auto;
 }
 .tx-dialog-head {
   display: flex;
@@ -2449,12 +2451,15 @@ td select {
 }
 .reports-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 20px;
   align-items: start;
+  max-width: 1220px;
+  margin-inline: auto;
+  width: 100%;
 }
 .reports-form-card {
-  gap: 16px;
+  gap: 18px;
 }
 .reports-form-head {
   display: grid;
@@ -2474,54 +2479,63 @@ td select {
   font-size: 0.875rem;
 }
 
+/* ── Formulario · filas + campos ──
+   Cada campo es un flex column (etiqueta encima, control debajo);
+   las filas agrupan campos cortos (tipo/resumen, esperado/actual)
+   en columnas, el resto ocupa el ancho completo. */
 #issue-report-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: start;
+  gap: 18px;
 }
-#issue-report-form label {
+.reports-form-row {
+  display: grid;
+  gap: 16px;
+}
+.reports-form-row-type {
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+}
+.reports-form-row-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.reports-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   font-size: 0.74rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
-#issue-report-form input[type='text'],
-#issue-report-form select,
-#issue-report-form textarea {
+.reports-field input[type='text'],
+.reports-field select,
+.reports-field textarea {
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--bg-card);
   color: var(--text-main);
   padding: 11px 13px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 400;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
 }
-#issue-report-form input[type='text']:focus-visible,
-#issue-report-form select:focus-visible,
-#issue-report-form textarea:focus-visible {
+.reports-field input[type='text']:focus-visible,
+.reports-field select:focus-visible,
+.reports-field textarea:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--ring);
 }
-#issue-report-form .span-3 {
-  grid-column: 1 / -1;
-}
-#issue-report-form textarea {
-  min-height: 84px;
+.reports-field textarea {
+  min-height: 90px;
 }
 #issue-report-form input[type='checkbox'] {
   inline-size: 16px;
   block-size: 16px;
   min-height: 16px;
   margin: 0;
-}
-#issue-report-form .reports-automation-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-main);
-  font-weight: 600;
-  text-transform: none;
 }
 
 .reports-automation-fieldset {
@@ -2557,8 +2571,11 @@ td select {
   line-height: 1.5;
 }
 
+.reports-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 #issue-report-submit {
-  justify-self: end;
   min-width: 200px;
 }
 #issue-report-status {
@@ -2733,11 +2750,15 @@ td select {
   .tx-bulk-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .tx-form-dialog {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .tx-form-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tx-form-fields .span-3,
+  .tx-form-fields .tx-category-field,
+  .tx-form-fields .tx-amount-field {
+    grid-column: span 2;
   }
   .tx-dialog-actions {
-    grid-column: 1 / -1;
     justify-content: flex-start;
   }
   .reports-layout {
@@ -2916,8 +2937,31 @@ td select {
   .form-grid.compact,
   .investment-form,
   .tx-bulk-grid,
-  .tx-form-dialog {
+  .tx-form-fields {
     grid-template-columns: 1fr;
+  }
+  .tx-form-fields .span-3,
+  .tx-form-fields .tx-category-field,
+  .tx-form-fields .tx-amount-field {
+    grid-column: 1 / -1;
+  }
+  .tx-dialog-head {
+    padding: 18px 18px 16px;
+  }
+  .tx-dialog-head h3 {
+    font-size: 1.1rem;
+  }
+  .tx-form-fields {
+    padding: 18px;
+    gap: 14px;
+  }
+  .tx-dialog-actions {
+    flex-direction: column-reverse;
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+  }
+  .tx-dialog-actions .tx-btn-primary,
+  .tx-dialog-actions .tx-btn-secondary {
+    width: 100%;
   }
   .budget-block {
     padding: 16px;
@@ -2929,11 +2973,12 @@ td select {
   .mini-form.compact-row {
     grid-template-columns: 1fr;
   }
-  #issue-report-form {
+  .reports-form-row-type,
+  .reports-form-row-pair {
     grid-template-columns: 1fr;
   }
   #issue-report-submit {
-    justify-self: stretch;
+    width: 100%;
     min-width: 0;
   }
   .contribution-head {
