@@ -52,6 +52,7 @@
   "dependencies": {
     "@astrojs/vue": "^5.1.4",
     "@sentry/astro": "^10.66.0",
+    "@sentry/cloudflare": "^10.66.0",
     "@tailwindcss/vite": "^4.2.2",
     "chart.js": "4.4.7",
     "pinia": "^3.0.4",
