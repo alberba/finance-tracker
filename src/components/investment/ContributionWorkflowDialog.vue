@@ -13,9 +13,12 @@ import { MONTHS, type SnapshotKind } from '../../scripts/types'
 import { monthFromISO, round2, todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useInvestmentStore } from '../../stores/investment'
+import { useUiStore } from '../../stores/ui'
 
 const investmentStore = useInvestmentStore()
 const financialStateStore = useFinancialStateStore()
+const uiStore = useUiStore()
+const ui = uiStore.ui
 const { formatMoney } = useMoneyFormatter()
 const { showToast } = useToast()
 
@@ -113,8 +116,11 @@ const allocationWarning = computed(() =>
 
 function open(): void {
   step.value = 1
-  date.value = todayISO()
-  month.value = monthFromISO(date.value) ?? financialStateStore.year
+  const today = todayISO()
+  const currentMonth = monthFromISO(today) ?? ui.investmentMonth
+  const selectedMonth = ui.investmentMonth
+  month.value = selectedMonth
+  date.value = selectedMonth === currentMonth ? today : toSnapshotDate(financialStateStore.year, selectedMonth)
   seed()
   dialogRef.value?.showModal?.()
 }
