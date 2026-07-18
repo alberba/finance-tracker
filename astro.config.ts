@@ -7,6 +7,8 @@ import vue from '@astrojs/vue'
 
 import svgLoader from 'vite-svg-loader'
 
+import sentry from '@sentry/astro'
+
 export default defineConfig({
   output: 'server',
 
@@ -32,6 +34,11 @@ export default defineConfig({
   integrations: [
     vue({
       appEntrypoint: '/src/vue-app',
+    }),
+    sentry({
+      project: 'finance-tracker',
+      org: 'alberba',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
     }),
   ],
 })
