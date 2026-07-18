@@ -2,6 +2,7 @@ import {
   computeAccountBalance as coreAccountBalance,
   computeInvestmentValue as coreInvestmentValue,
   getWealthByMonth as coreWealthByMonth,
+  matchesInvestmentAsset,
   type Entity,
   type Snapshot,
   type Transaction,
@@ -9,7 +10,9 @@ import {
 } from '../../lib/finance-core'
 import { findLiquidityTargets } from '../../scripts/contribution-workflow'
 import { MONTHS, type State } from '../../scripts/types'
-import { monthFromISO, round2, slug } from '../../scripts/utils'
+import { monthFromISO, round2 } from '../../scripts/utils'
+
+export { matchesInvestmentAsset }
 
 function assets(state: State): Entity[] {
   return state.investmentAssets as Entity[]
@@ -44,14 +47,6 @@ export function wealthByMonth(state: State, month: number): WealthSnapshot {
     transactions(state),
     snapshots(state),
   )
-}
-
-export function matchesInvestmentAsset(category: string, asset: Entity): boolean {
-  if (!category || !asset) {
-    return false
-  }
-  const catSlug = slug(category)
-  return catSlug === asset.id || category.toLowerCase() === String(asset.name || '').toLowerCase()
 }
 
 export function isBitvavoBrokerAccount(state: State, accountId: string): boolean {

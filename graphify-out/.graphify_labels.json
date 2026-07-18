@@ -144,5 +144,9 @@
   "142": "playwright config",
   "143": "sentry client config",
   "144": "sentry server config",
-  "145": "vitest config"
+  "145": "vitest config",
+  "146": "@astrojs/check",
+  "147": "ProgressBar.vue",
+  "148": "WealthSnapshotTable.vue",
+  "149": "typescript"
 }

@@ -5,6 +5,7 @@ import ChartCanvas from '../charts/ChartCanvas.vue'
 import { renderDonutChart } from '../../scripts/charts'
 import type { DashboardWealthSplitItem } from '../../domain/dashboard/view-model'
 import { formatMoneyForCurrency } from '../../scripts/money-format'
+import { resolveCssColor } from '../../scripts/css-color'
 
 type WealthSplitChartItem = Pick<
   DashboardWealthSplitItem,
@@ -41,22 +42,16 @@ function chartItemsForTheme(items: WealthSplitChartItem[]): Array<{
   value: number
 }> {
   if (!items.length) {
-    return [{ label: 'Sin datos', color: cssColor('--line-strong', '#CCD4E1'), value: 0 }]
+    return [{ label: 'Sin datos', color: resolveCssColor('--line-strong', '#CCD4E1'), value: 0 }]
   }
 
   return items.map((item) => ({
     label: item.label,
-    color: cssColor(item.colorVar, item.fallbackColor),
+    color: resolveCssColor(item.colorVar, item.fallbackColor),
     value: item.value,
   }))
 }
 
-function cssColor(name: string, fallback: string): string {
-  if (typeof window === 'undefined') {
-    return fallback
-  }
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
-}
 </script>
 
 <template>
@@ -74,7 +69,7 @@ function cssColor(name: string, fallback: string): string {
       <div class="flex items-center gap-2">
         <span
           class="block h-2.25 w-2.25 rounded-[3px]"
-          :style="{ background: cssColor(item.colorVar, item.fallbackColor) }"
+          :style="{ background: resolveCssColor(item.colorVar, item.fallbackColor) }"
         ></span>
         <span class="overflow-hidden text-ellipsis whitespace-nowrap text-text-muted">
           {{ item.label }}

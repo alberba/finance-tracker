@@ -1,16 +1,12 @@
 import type { APIRoute } from "astro";
 import { getD1FromLocals } from "../../../lib/server/cloudflare-env";
 import { resetStateInD1 } from "../../../lib/server/d1-state";
-
-function requestNamespace(request: Request): string | undefined {
-  const header = request.headers.get("x-finance-namespace");
-  return header || undefined;
-}
+import { getFinanceNamespace } from "../../../lib/server/state-request";
 
 export const POST: APIRoute = async ({ request, locals }) => {
   try {
     const db = getD1FromLocals(locals);
-    const snapshot = await resetStateInD1(db, requestNamespace(request));
+    const snapshot = await resetStateInD1(db, getFinanceNamespace(request));
     return new Response(
       JSON.stringify({
         ok: true,

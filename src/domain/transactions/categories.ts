@@ -1,6 +1,6 @@
 import type { BudgetType, State } from '../../scripts/types'
 
-function getCategoriesForType(state: State, type: BudgetType): string[] {
+export function getCategoriesForType(state: State, type: BudgetType): string[] {
   if (type === 'income') {
     return state.incomeCategories
   }

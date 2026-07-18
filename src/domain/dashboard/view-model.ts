@@ -18,6 +18,8 @@ import {
   getMonthTotals as getCoreMonthTotals,
   getWealthByMonth as getCoreWealthByMonth,
 } from '../../lib/finance-core'
+import { getCategoriesForType } from '../transactions/categories'
+import { getInvestmentBuckets } from '../investment/buckets'
 
 export type DashboardHeroRange = '7d' | '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'
@@ -352,16 +354,6 @@ function addYear(years: Set<number>, value: string): void {
   }
 }
 
-function getCategoriesForType(state: State, type: BudgetType): string[] {
-  if (type === 'income') {
-    return state.incomeCategories
-  }
-  if (type === 'expense') {
-    return state.expenseCategories
-  }
-  return state.investmentCategories
-}
-
 function getYearTotalsFromState(getMonthTotals: (month: number) => MonthTotals): MonthTotals {
   return MONTHS.map((_, month) => getMonthTotals(month)).reduce(
     (acc, item) => {
@@ -530,7 +522,11 @@ function buildWealthSplit({
   'state' | 'getWealthByMonth' | 'computeInvestmentValue' | 'formatMoney'
 > & { month: number }): DashboardWealthSplitItem[] {
   const wealth = getWealthByMonth(month)
-  const { fundsValue, cryptoValue } = getInvestmentBuckets(state, month, computeInvestmentValue)
+  const { fundsValue, cryptoValue } = getInvestmentBuckets(
+    state.investmentAssets,
+    month,
+    computeInvestmentValue,
+  )
   const otherInvest = Math.max(round2(wealth.investment - fundsValue - cryptoValue), 0)
   const items = [
     {
@@ -668,7 +664,11 @@ function goalCurrentMap({
   month: number
 }): Record<GoalKey, number> {
   const wealth = getWealthByMonth(month)
-  const { fundsValue, cryptoValue } = getInvestmentBuckets(state, month, computeInvestmentValue)
+  const { fundsValue, cryptoValue } = getInvestmentBuckets(
+    state.investmentAssets,
+    month,
+    computeInvestmentValue,
+  )
   return {
     short: wealth.net,
     medium: wealth.net,
@@ -677,18 +677,4 @@ function goalCurrentMap({
     investmentFunds: fundsValue,
     investmentCrypto: cryptoValue,
   }
-}
-
-function getInvestmentBuckets(
-  state: State,
-  month: number,
-  computeInvestmentValue: (assetId: string, month: number) => number,
-) {
-  const fundsValue = state.investmentAssets
-    .filter((asset) => /fond|index/i.test(asset.name))
-    .reduce((sum, asset) => sum + computeInvestmentValue(asset.id, month), 0)
-  const cryptoValue = state.investmentAssets
-    .filter((asset) => /crypto|btc|eth/i.test(asset.name))
-    .reduce((sum, asset) => sum + computeInvestmentValue(asset.id, month), 0)
-  return { fundsValue, cryptoValue }
 }

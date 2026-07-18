@@ -6,6 +6,7 @@ import type {
   Subscription,
   Transaction,
 } from "../scripts/types";
+import { round2 } from "../lib/number";
 
 /**
  * Datos sintéticos para el modo demo. Se generan de forma determinista
@@ -28,10 +29,6 @@ function mulberry32(seed: number): () => number {
 
 function iso(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 function addDays(date: Date, days: number): Date {

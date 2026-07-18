@@ -2,12 +2,14 @@ import {
   computeAccountBalance,
   computeInvestmentValue,
   computeLiabilityValue,
+  getSnapshotValue,
   getWealthByMonth,
   type Entity,
   type Snapshot,
   type Transaction,
 } from '../../lib/finance-core'
-import { MONTHS, type SnapshotKind, type State } from '../../scripts/types'
+import { round2 } from '../../lib/number'
+import { MONTHS, type State } from '../../scripts/types'
 
 export interface SnapshotRowViewModel {
   id: string
@@ -34,19 +36,6 @@ export interface WealthViewModel {
   chartLabels: string[]
 }
 
-function round2(value: number): number {
-  return Math.round((value || 0) * 100) / 100
-}
-
-function getSnapshotValue(state: State, kind: SnapshotKind, month: number, itemId: string): number | null {
-  const snapshot = state.snapshots[String(month)]
-  if (!snapshot || !snapshot[kind]) {
-    return null
-  }
-  const raw = snapshot[kind][itemId]
-  return Number.isFinite(Number(raw)) ? Number(raw) : null
-}
-
 function visibleMonthLimit(year: number): number {
   const now = new Date()
   if (year === now.getFullYear()) {
@@ -67,7 +56,7 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
     name: item.name,
     opening: round2(item.openingBalance || 0),
     calculated: round2(computeAccountBalance(item.id, month, accounts, transactions, snapshots)),
-    snapshot: getSnapshotValue(state, 'accounts', month, item.id),
+    snapshot: getSnapshotValue(snapshots, 'accounts', month, item.id),
   }))
 
   const investmentRows: SnapshotRowViewModel[] = state.investmentAssets.map((item) => ({
@@ -77,7 +66,7 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
     calculated: round2(
       computeInvestmentValue(item.id, month, investmentAssets, transactions, snapshots),
     ),
-    snapshot: getSnapshotValue(state, 'investments', month, item.id),
+    snapshot: getSnapshotValue(snapshots, 'investments', month, item.id),
   }))
 
   const liabilityRows: SnapshotRowViewModel[] = state.liabilities.map((item) => ({
@@ -85,7 +74,7 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
     name: item.name,
     opening: round2(item.openingBalance || 0),
     calculated: round2(computeLiabilityValue(item.id, month, liabilities, snapshots)),
-    snapshot: getSnapshotValue(state, 'liabilities', month, item.id),
+    snapshot: getSnapshotValue(snapshots, 'liabilities', month, item.id),
   }))
 
   const limit = visibleMonthLimit(state.year)

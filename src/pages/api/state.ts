@@ -1,16 +1,12 @@
 import type { APIRoute } from "astro";
 import { getD1FromLocals } from "../../lib/server/cloudflare-env";
 import { loadStateFromD1, saveStateToD1 } from "../../lib/server/d1-state";
-
-function requestNamespace(request: Request): string | undefined {
-  const header = request.headers.get("x-finance-namespace");
-  return header || undefined;
-}
+import { getFinanceNamespace } from "../../lib/server/state-request";
 
 export const GET: APIRoute = async ({ request, locals }) => {
   try {
     const db = getD1FromLocals(locals);
-    const snapshot = await loadStateFromD1(db, requestNamespace(request));
+    const snapshot = await loadStateFromD1(db, getFinanceNamespace(request));
     return new Response(
       JSON.stringify({
         state: snapshot.state,
@@ -51,7 +47,7 @@ export const PUT: APIRoute = async ({ request, locals }) => {
       typeof body?.baseVersion === "number" ? body.baseVersion : undefined;
     const outcome = await saveStateToD1(
       db,
-      requestNamespace(request),
+      getFinanceNamespace(request),
       state,
       baseVersion,
     );

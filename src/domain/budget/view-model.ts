@@ -1,6 +1,7 @@
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import { MONTHS, type BudgetType, type State } from '../../scripts/types'
 import { round2 } from '../../scripts/utils'
+import { getCategoriesForType } from '../transactions/categories'
 
 export interface BudgetMonthCell {
   month: number
@@ -57,16 +58,6 @@ const budgetTypeMeta: Record<BudgetType, { title: string; description: string }>
     title: 'Inversión',
     description: 'Ajusta las aportaciones mensuales y compara la ejecución real.',
   },
-}
-
-function getCategoriesForType(state: State, type: BudgetType): string[] {
-  if (type === 'income') {
-    return state.incomeCategories
-  }
-  if (type === 'expense') {
-    return state.expenseCategories
-  }
-  return state.investmentCategories
 }
 
 function getBudgetValue(state: State, type: BudgetType, category: string, month: number): number {

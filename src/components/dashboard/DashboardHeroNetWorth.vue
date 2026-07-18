@@ -11,6 +11,7 @@ import type {
   DashboardTone,
 } from '../../domain/dashboard/view-model'
 import { formatCompactMoneyForCurrency, formatMoneyForCurrency } from '../../scripts/money-format'
+import { resolveCssColor } from '../../scripts/css-color'
 
 const props = defineProps<{
   kpis?: DashboardKpis
@@ -43,32 +44,25 @@ async function renderChart(): Promise<void> {
   if (!canvas.value) {
     return
   }
-  const accent = cssColor('--hero-chart-line', '#93B4FF', canvas.value)
+  const accent = resolveCssColor('--hero-chart-line', '#93B4FF', canvas.value)
   renderLineChart(canvas.value, props.chart.values, {
     color: accent,
     fill: `${accent}22`,
-    axisColor: cssColor('--hero-chart-axis', '#C2CCDA', canvas.value),
+    axisColor: resolveCssColor('--hero-chart-axis', '#C2CCDA', canvas.value),
     borderWidth: 3,
     fillOpacity: 0.34,
-    gridColor: cssColor('--hero-chart-grid', 'rgba(194, 204, 218, 0.3)', canvas.value),
-    pointBorderColor: cssColor('--hero-chart-point', '#FFFFFF', canvas.value),
+    gridColor: resolveCssColor(
+      '--hero-chart-grid',
+      'rgba(194, 204, 218, 0.3)',
+      canvas.value,
+    ),
+    pointBorderColor: resolveCssColor('--hero-chart-point', '#FFFFFF', canvas.value),
     labels: props.chart.labels,
     formatValue: (value) => formatMoneyForCurrency(value, props.currency),
     formatAxisValue: (value) => formatCompactMoneyForCurrency(value, props.currency),
     includeZeroBaseline: false,
     yPaddingRatio: 0.12,
   })
-}
-
-function cssColor(name: string, fallback: string, element?: Element): string {
-  if (typeof window === 'undefined') {
-    return fallback
-  }
-  return (
-    getComputedStyle(element ?? document.documentElement)
-      .getPropertyValue(name)
-      .trim() || fallback
-  )
 }
 
 function netWorthChangeClass(tone: DashboardTone | undefined): string {
@@ -84,7 +78,7 @@ function netWorthChangeClass(tone: DashboardTone | undefined): string {
 
 <template>
   <section
-    class="net-worth-hero relative grid min-w-0 overflow-hidden rounded-[1.5rem] lg:grid-cols-[minmax(20rem,0.82fr)_minmax(0,1.18fr)]"
+    class="net-worth-hero relative grid min-w-0 overflow-hidden rounded-3xl lg:grid-cols-[minmax(20rem,0.82fr)_minmax(0,1.18fr)]"
     aria-label="Patrimonio neto"
   >
     <div class="relative z-1 flex min-w-0 flex-col justify-center gap-3 p-5 sm:p-7 lg:p-9">

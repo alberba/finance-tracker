@@ -1,5 +1,54 @@
 {
-  "generated_at": "2026-07-18T18:26:56.059557+00:00",
-  "nodes": {},
+  "generated_at": "2026-07-18T18:40:02.299901+00:00",
+  "nodes": {
+    "src_domain_transactions_categories_getcategoriesfortype": {
+      "code_fingerprint": "2f96a4f123168f45e812af74e7ff75c74714b286bb0f9891bdb8b0359f4c8044",
+      "label": "getCategoriesForType()",
+      "last": "2026-07-18T18:33:30.697609+00:00",
+      "provenance": [
+        {
+          "date": "2026-07-18T18:33:30.697609+00:00",
+          "outcome": "useful",
+          "q": "Una vez hecho todo lo del grapiphy, podrías encontrar duplicidades que se pudiesen simplificar?"
+        }
+      ],
+      "score": 0.999895284,
+      "source_file": "src/domain/transactions/categories.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_lib_finance_core_getsnapshotvalue": {
+      "code_fingerprint": "fbd21392444cf2f7af15beb5d588bfbf9cf0e299efce712f3e2fa5b4866b5543",
+      "label": "getSnapshotValue()",
+      "last": "2026-07-18T18:33:30.697609+00:00",
+      "provenance": [
+        {
+          "date": "2026-07-18T18:33:30.697609+00:00",
+          "outcome": "useful",
+          "q": "Una vez hecho todo lo del grapiphy, podrías encontrar duplicidades que se pudiesen simplificar?"
+        }
+      ],
+      "score": 0.999895284,
+      "source_file": "src/lib/finance-core.ts",
+      "status": "tentative",
+      "uses": 1
+    },
+    "src_lib_finance_core_matchesinvestmentasset": {
+      "code_fingerprint": "fbd21392444cf2f7af15beb5d588bfbf9cf0e299efce712f3e2fa5b4866b5543",
+      "label": "matchesInvestmentAsset()",
+      "last": "2026-07-18T18:33:30.697609+00:00",
+      "provenance": [
+        {
+          "date": "2026-07-18T18:33:30.697609+00:00",
+          "outcome": "useful",
+          "q": "Una vez hecho todo lo del grapiphy, podrías encontrar duplicidades que se pudiesen simplificar?"
+        }
+      ],
+      "score": 0.999895284,
+      "source_file": "src/lib/finance-core.ts",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
   "version": 1
 }

@@ -1,7 +1,10 @@
 import type { APIRoute } from 'astro'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { loadMarketQuote, type MarketDataEnv } from '../../../lib/server/market-data'
+import { createJsonResponse } from '../../../lib/server/json-response'
 import type { Instrument, Quote } from '../../../scripts/types'
+
+const json = createJsonResponse('private, max-age=30')
 
 interface QuotesBody {
   instruments?: unknown
@@ -43,11 +46,4 @@ function isInstrument(value: unknown): value is Instrument {
 
 function normalizeFallbackQuotes(value: unknown): Record<string, Quote> {
   return value && typeof value === 'object' ? value as Record<string, Quote> : {}
-}
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=30' },
-  })
 }

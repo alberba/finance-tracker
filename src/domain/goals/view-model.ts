@@ -7,6 +7,7 @@ import {
 } from '../../lib/finance-core'
 import type { Goal, GoalKey, State } from '../../scripts/types'
 import { round2 } from '../../scripts/utils'
+import { getInvestmentBuckets } from '../investment/buckets'
 
 export interface GoalEditorViewModel {
   key: GoalKey
@@ -37,39 +38,6 @@ const goalOrder: Array<{ key: GoalKey; title: string }> = [
   { key: 'investmentCrypto', title: 'Criptomonedas' },
 ]
 
-function getInvestmentBuckets(state: State, month: number) {
-  const fundsValue = state.investmentAssets
-    .filter((asset) => /fond|index/i.test(asset.name))
-    .reduce(
-      (sum, asset) =>
-        sum +
-        computeInvestmentValue(
-          asset.id,
-          month,
-          state.investmentAssets as Entity[],
-          state.transactions as Transaction[],
-          state.snapshots as Record<string, Snapshot>,
-        ),
-      0,
-    )
-  const cryptoValue = state.investmentAssets
-    .filter((asset) => /crypto|btc|eth/i.test(asset.name))
-    .reduce(
-      (sum, asset) =>
-        sum +
-        computeInvestmentValue(
-          asset.id,
-          month,
-          state.investmentAssets as Entity[],
-          state.transactions as Transaction[],
-          state.snapshots as Record<string, Snapshot>,
-        ),
-      0,
-    )
-
-  return { fundsValue, cryptoValue }
-}
-
 function buildCurrentMap(state: State, month: number): Record<GoalKey, number> {
   const wealth = getWealthByMonth(
     month,
@@ -79,7 +47,18 @@ function buildCurrentMap(state: State, month: number): Record<GoalKey, number> {
     state.transactions as Transaction[],
     state.snapshots as Record<string, Snapshot>,
   )
-  const { fundsValue, cryptoValue } = getInvestmentBuckets(state, month)
+  const { fundsValue, cryptoValue } = getInvestmentBuckets(
+    state.investmentAssets,
+    month,
+    (assetId, targetMonth) =>
+      computeInvestmentValue(
+        assetId,
+        targetMonth,
+        state.investmentAssets as Entity[],
+        state.transactions as Transaction[],
+        state.snapshots as Record<string, Snapshot>,
+      ),
+  )
 
   return {
     short: wealth.net,

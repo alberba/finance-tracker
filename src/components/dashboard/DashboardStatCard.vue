@@ -3,6 +3,7 @@ import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import { renderSparkline } from '../../scripts/charts'
 import type { DashboardStatDelta } from '../../domain/dashboard/view-model'
+import { resolveCssColor } from '../../scripts/css-color'
 
 type DashboardStatVariant = 'income' | 'expense' | 'investment'
 
@@ -56,17 +57,8 @@ async function renderChart(): Promise<void> {
   if (!canvas.value) {
     return
   }
-  renderSparkline(canvas.value, props.sparkValues, cssColor(variantStyles[props.variant]))
-}
-
-function cssColor(style: { accent: string; fallback: string }): string {
-  const match = /^var\((--[^)]+)\)$/.exec(style.accent)
-  if (!match || typeof window === 'undefined') {
-    return style.fallback
-  }
-  return (
-    getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim() || style.fallback
-  )
+  const style = variantStyles[props.variant]
+  renderSparkline(canvas.value, props.sparkValues, resolveCssColor(style.accent, style.fallback))
 }
 </script>
 
@@ -89,7 +81,7 @@ function cssColor(style: { accent: string; fallback: string }): string {
         </p>
         <strong
           :id="valueId"
-          class="text-text-main block max-w-full font-mono text-[clamp(1.35rem,6vw,1.75rem)] leading-tight font-medium tracking-[-0.04em] [overflow-wrap:anywhere]"
+          class="text-text-main block max-w-full font-mono text-[clamp(1.35rem,6vw,1.75rem)] leading-tight font-medium tracking-[-0.04em] wrap-anywhere"
         >
           {{ value }}
         </strong>

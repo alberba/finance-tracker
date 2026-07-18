@@ -1,3 +1,7 @@
+import { round2 } from "./number";
+
+export { round2 };
+
 export type TxType = "income" | "expense" | "investment";
 
 export interface Transaction {
@@ -46,10 +50,6 @@ export interface WealthSnapshot {
   investment: number;
   liabilities: number;
   net: number;
-}
-
-export function round2(value: number): number {
-  return Math.round((Number(value) || 0) * 100) / 100;
 }
 
 export function slug(value: string): string {
@@ -118,7 +118,7 @@ export function getCategoryActuals(
   return map;
 }
 
-function getSnapshotValue(
+export function getSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",
   month: number,
@@ -193,7 +193,7 @@ export function computeAccountBalance(
   return round2(balance);
 }
 
-function matchesInvestmentAsset(category: string, asset: Entity): boolean {
+export function matchesInvestmentAsset(category: string, asset: Entity): boolean {
   if (!category || !asset) {
     return false;
   }

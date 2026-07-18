@@ -6,7 +6,9 @@ import {
   computeLiabilityValue,
   getCategoryActuals,
   getMonthTotals,
+  getSnapshotValue,
   getWealthByMonth,
+  matchesInvestmentAsset,
   round2,
   slug,
   type Entity,
@@ -89,6 +91,14 @@ describe("finance-core helpers", () => {
   it("normaliza números y slugs", () => {
     expect(round2(12.3456)).toBe(12.35);
     expect(slug("  ETF Plata + Oro  ")).toBe("etf-plata-oro");
+  });
+
+  it("resuelve snapshots y coincidencias de activos desde los helpers compartidos", () => {
+    expect(getSnapshotValue(snapshots, "accounts", 1, "revolut")).toBe(1800);
+    expect(getSnapshotValue(snapshots, "accounts", 0, "revolut")).toBeNull();
+    expect(matchesInvestmentAsset("Fondos Indexados", investments[0])).toBe(true);
+    expect(matchesInvestmentAsset("fondos-indexados", investments[0])).toBe(true);
+    expect(matchesInvestmentAsset("Crypto", investments[0])).toBe(false);
   });
 
   it("calcula totales mensuales por tipo", () => {
