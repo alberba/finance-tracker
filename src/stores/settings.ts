@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
-import { buildSettingsViewModel } from '../domain/settings/view-model'
+import { buildSettingsViewModel, categoryKeyToType } from '../domain/settings/view-model'
 import { useToast } from '../composables/useToast'
+import { categoryEmojiKey } from '../scripts/category-emoji'
 import type { CategoryKey, EntityKey, State } from '../scripts/types'
 import { parseFloatSafe, parseIntSafe, round2, slug } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+
+export type ReorderDirection = 'up' | 'down'
 
 export type EntityField = 'name' | 'openingBalance'
 
@@ -116,8 +119,42 @@ export const useSettingsStore = defineStore('settings', () => {
   function removeCategory(key: CategoryKey, name: string): void {
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item !== name)
+      delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]
     })
     showToast('Categoría eliminada.')
+  }
+
+  function reorderCategory(key: CategoryKey, name: string, direction: ReorderDirection): void {
+    financialStateStore.commitState((draft) => {
+      const list = draft[key]
+      const index = list.indexOf(name)
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (index === -1 || targetIndex < 0 || targetIndex >= list.length) {
+        return
+      }
+
+      const [moved] = list.splice(index, 1)
+      list.splice(targetIndex, 0, moved)
+    })
+  }
+
+  function setCategoryEmoji(key: CategoryKey, name: string, emoji: string): void {
+    const trimmedEmoji = emoji.trim()
+    if (!trimmedEmoji) {
+      return
+    }
+
+    financialStateStore.commitState((draft) => {
+      draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)] = trimmedEmoji
+    })
+    showToast('Emoji actualizado.')
+  }
+
+  function resetCategoryEmoji(key: CategoryKey, name: string): void {
+    financialStateStore.commitState((draft) => {
+      delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]
+    })
+    showToast('Emoji restablecido.')
   }
 
   function toggleTwrLiquidity(accountId: string, enabled: boolean): void {
@@ -146,6 +183,9 @@ export const useSettingsStore = defineStore('settings', () => {
     removeEntity,
     addCategory,
     removeCategory,
+    reorderCategory,
+    setCategoryEmoji,
+    resetCategoryEmoji,
     toggleTwrLiquidity,
   }
 })
