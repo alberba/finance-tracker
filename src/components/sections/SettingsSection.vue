@@ -44,7 +44,11 @@ function onSaveGeneral(): void {
 }
 
 function onSendSentryTestError(): void {
-  Sentry.captureException(new Error('Error de prueba enviado desde Configuración.'))
+  Sentry.logger.info(Sentry.logger.fmt`El usuario activó el error de prueba de Sentry`, {
+    action: 'settings_sentry_test_error',
+  })
+  Sentry.metrics.count('settings_sentry_test_error', 1)
+  throw new Error('Error de prueba enviado desde Configuración.')
 }
 
 const indexEntries = [
