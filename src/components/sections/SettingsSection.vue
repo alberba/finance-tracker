@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as Sentry from '@sentry/astro'
 
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
@@ -41,14 +40,6 @@ watch(
 
 function onSaveGeneral(): void {
   settingsStore.saveGeneral(yearInput.value, currencyInput.value)
-}
-
-function onSendSentryTestError(): void {
-  Sentry.logger.info(Sentry.logger.fmt`El usuario activó el error de prueba de Sentry`, {
-    action: 'settings_sentry_test_error',
-  })
-  Sentry.metrics.count('settings_sentry_test_error', 1)
-  throw new Error('Error de prueba enviado desde Configuración.')
 }
 
 const indexEntries = [
@@ -154,14 +145,6 @@ onBeforeUnmount(() => {
                 @click="onSaveGeneral"
               >
                 Guardar ajustes
-              </button>
-              <button
-                id="send-sentry-test-error"
-                type="button"
-                class="danger-btn"
-                @click="onSendSentryTestError"
-              >
-                Enviar error de prueba a Sentry
               </button>
             </div>
           </div>
