@@ -1587,7 +1587,9 @@ dialog {
 .tx-form-dialog {
   display: flex;
   flex-direction: column;
+  max-height: inherit;
   background: var(--bg-subtle);
+  overflow-y: auto;
 }
 .tx-dialog-head {
   display: flex;
