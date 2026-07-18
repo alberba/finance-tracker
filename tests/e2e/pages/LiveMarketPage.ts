@@ -36,7 +36,7 @@ export class LiveMarketPage {
     const form = this.recurringRules.locator('form')
     if (params.type) await form.getByLabel('Tipo').selectOption(params.type)
     await form.getByLabel('Cuenta').selectOption({ label: params.account })
-    await form.getByLabel('Categoría').fill(params.category)
+    await form.getByLabel('Categoría').selectOption({ label: params.category })
     await form.getByLabel('Descripción').fill(params.description)
     await form.getByLabel('Importe').fill(String(params.amount))
     await form.getByLabel('Frecuencia').selectOption(params.frequency)
