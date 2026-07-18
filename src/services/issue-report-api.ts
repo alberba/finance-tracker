@@ -30,9 +30,13 @@ interface ReportResponseError {
 
 export type ReportResponse = ReportResponseOk | ReportResponseError
 
+export type ReportSubmissionPayload = Omit<ReportPayload, 'mentionClaude'> & {
+  mentionClaude?: boolean
+}
+
 export const ISSUE_REPORT_ENDPOINT = '/api/issues/report'
 
-export async function submitIssueReport(payload: ReportPayload): Promise<ReportResponse> {
+export async function submitIssueReport(payload: ReportSubmissionPayload): Promise<ReportResponse> {
   const response = await fetch(ISSUE_REPORT_ENDPOINT, {
     method: 'POST',
     headers: {

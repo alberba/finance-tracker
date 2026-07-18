@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, shallowRef, useTemplateRef } from 'vue'
 
+import { useIssueReportContext } from '../../composables/useIssueReportContext'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
-  type ReportPayload,
+  type ReportSubmissionPayload,
   type ReportType,
 } from '../../services/issue-report-api'
 import { useUiStore } from '../../stores/ui'
@@ -12,10 +13,11 @@ import { useUiStore } from '../../stores/ui'
 interface SuccessStatus {
   issueNumber: number
   issueUrl: string
-  showAutomation: boolean
 }
 
 const uiStore = useUiStore()
+const { getIssueReportContext } = useIssueReportContext()
+const summaryInputRef = useTemplateRef<HTMLInputElement>('summaryInput')
 
 const form = reactive({
   type: 'bug' as ReportType,
@@ -23,13 +25,11 @@ const form = reactive({
   description: '',
   expectedResult: '',
   actualResult: '',
-  stepsToReproduce: '',
-  mentionClaude: false,
 })
 
-const statusMessage = ref('')
-const successStatus = ref<SuccessStatus | null>(null)
-const submitting = ref(false)
+const statusMessage = shallowRef('')
+const successStatus = shallowRef<SuccessStatus | null>(null)
+const submitting = shallowRef(false)
 
 function resetForm(): void {
   form.type = 'bug'
@@ -37,8 +37,10 @@ function resetForm(): void {
   form.description = ''
   form.expectedResult = ''
   form.actualResult = ''
-  form.stepsToReproduce = ''
-  form.mentionClaude = false
+}
+
+function focusSummary(): void {
+  summaryInputRef.value?.focus()
 }
 
 async function onSubmit(): Promise<void> {
@@ -52,18 +54,12 @@ async function onSubmit(): Promise<void> {
     return
   }
 
-  const payload: ReportPayload = {
+  const payload: ReportSubmissionPayload = {
     type: form.type === 'enhancement' ? 'enhancement' : 'bug',
     summary,
     description,
-    mentionClaude: form.mentionClaude,
     section: uiStore.ui.activeSection,
-    context: {
-      userAgent: navigator.userAgent,
-      pathname: window.location.pathname,
-      timestamp: new Date().toISOString(),
-    },
-    stepsToReproduce: normalizeText(form.stepsToReproduce) || undefined,
+    context: getIssueReportContext(),
     expectedResult: normalizeText(form.expectedResult) || undefined,
     actualResult: normalizeText(form.actualResult) || undefined,
   }
@@ -83,7 +79,6 @@ async function onSubmit(): Promise<void> {
     successStatus.value = {
       issueNumber: result.issueNumber,
       issueUrl: result.issueUrl,
-      showAutomation: payload.mentionClaude && result.enrichmentStatus === 'pending',
     }
     resetForm()
   } catch (error) {
@@ -93,16 +88,18 @@ async function onSubmit(): Promise<void> {
     submitting.value = false
   }
 }
+
+defineExpose({ focusSummary })
 </script>
 
 <template>
   <article class="card reports-form-card">
     <header class="reports-form-head">
       <p class="reports-kicker">Reporte</p>
-      <h3>Crear reporte</h3>
+      <h3>Describe la mejora o el error</h3>
       <p>
-        Describe el error o la mejora y lo enviaremos como issue con el contexto
-        justo para revisarlo.
+        Describe el error o la mejora y lo enviaremos como issue con el contexto justo para
+        revisarlo.
       </p>
     </header>
 
@@ -119,6 +116,7 @@ async function onSubmit(): Promise<void> {
           Resumen
           <input
             id="issue-report-summary"
+            ref="summaryInput"
             v-model="form.summary"
             name="summary"
             type="text"
@@ -165,33 +163,6 @@ async function onSubmit(): Promise<void> {
           ></textarea>
         </label>
       </div>
-      <label class="reports-field">
-        Pasos para reproducir (opcional)
-        <textarea
-          id="issue-report-steps"
-          v-model="form.stepsToReproduce"
-          name="stepsToReproduce"
-          maxlength="5000"
-          rows="3"
-          placeholder="1. Ir a ... 2. Pulsar ... 3. Ocurre ..."
-        ></textarea>
-      </label>
-      <fieldset class="reports-automation-fieldset">
-        <legend>Automatización opcional</legend>
-        <label class="reports-automation-toggle">
-          <input
-            id="issue-report-mention-claude"
-            v-model="form.mentionClaude"
-            name="mentionClaude"
-            type="checkbox"
-          />
-          Activar automatización con Claude
-        </label>
-        <p class="reports-automation-help">
-          Opcional. Añade <code>@claude</code> a la issue para disparar el flujo automático
-          configurado en GitHub.
-        </p>
-      </fieldset>
       <div class="reports-form-actions">
         <button id="issue-report-submit" class="primary-btn" type="submit" :disabled="submitting">
           Crear reporte
@@ -203,7 +174,7 @@ async function onSubmit(): Promise<void> {
         >Reporte creado:
         <a :href="successStatus.issueUrl" target="_blank" rel="noreferrer"
           >#{{ successStatus.issueNumber }}</a
-        ><template v-if="successStatus.showAutomation"> (automatización en curso)</template>
+        >
       </template>
       <template v-else>{{ statusMessage }}</template>
     </p>

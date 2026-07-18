@@ -2461,6 +2461,22 @@ td select {
 .reports-form-card {
   gap: 18px;
 }
+.reports-entry-card {
+  display: grid;
+  gap: 14px;
+  min-height: 100%;
+  align-content: start;
+}
+.reports-entry-card > p:not(.reports-kicker) {
+  max-width: 60ch;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.reports-entry-action {
+  justify-self: start;
+  margin-top: 4px;
+}
 .reports-form-head {
   display: grid;
   gap: 6px;
@@ -2531,46 +2547,6 @@ td select {
 .reports-field textarea {
   min-height: 90px;
 }
-#issue-report-form input[type='checkbox'] {
-  inline-size: 16px;
-  block-size: 16px;
-  min-height: 16px;
-  margin: 0;
-}
-
-.reports-automation-fieldset {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 15px 17px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: var(--bg-subtle);
-}
-.reports-automation-fieldset legend {
-  padding: 0 6px;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-.reports-automation-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-main);
-  font-weight: 700;
-  text-transform: none;
-}
-.reports-automation-help {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
 .reports-form-actions {
   display: flex;
   justify-content: flex-end;
@@ -2614,8 +2590,7 @@ td select {
   color: var(--text-muted);
   font-size: 0.875rem;
 }
-.reports-guide-list code,
-.reports-automation-help code {
+.reports-guide-list code {
   font-family: 'DM Mono', monospace;
   font-size: 0.82em;
   padding: 0.1rem 0.45rem;
@@ -2630,6 +2605,182 @@ td select {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: 9px 13px;
+}
+
+/* ── Global report launcher ───────────────────────────────────── */
+.global-report-trigger {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  gap: 0;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elevated) 94%, var(--primary-light));
+  color: var(--primary);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--overlay) 24%, transparent);
+  cursor: pointer;
+  transition:
+    width 0.22s ease,
+    gap 0.22s ease,
+    padding 0.22s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.global-report-trigger svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.global-report-trigger-label {
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0;
+  transition:
+    width 0.22s ease,
+    opacity 0.16s ease;
+}
+.global-report-trigger:hover,
+.global-report-trigger:focus-visible {
+  gap: 9px;
+  width: 132px;
+  padding: 0 15px;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.global-report-trigger:hover .global-report-trigger-label,
+.global-report-trigger:focus-visible .global-report-trigger-label {
+  width: 62px;
+  opacity: 1;
+}
+.global-report-trigger:focus-visible,
+.global-report-dialog-close:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+.global-report-dialog {
+  position: fixed;
+  inset: auto 22px 22px auto;
+  width: min(calc(100vw - 44px), 760px);
+  max-height: min(calc(100dvh - 44px), 850px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  color: var(--text-main);
+  box-shadow: 0 24px 76px color-mix(in srgb, var(--overlay) 44%, transparent);
+  transform-origin: bottom right;
+}
+.global-report-dialog::backdrop {
+  background: color-mix(in srgb, var(--overlay) 76%, transparent);
+  animation: report-backdrop-in 0.18s ease-out;
+}
+.global-report-dialog[open] {
+  animation: report-dialog-in 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.global-report-dialog.is-closing {
+  pointer-events: none;
+  animation: report-dialog-out 0.18s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+.global-report-dialog.is-closing::backdrop {
+  animation: report-backdrop-out 0.18s ease-in forwards;
+}
+.global-report-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 0;
+}
+.global-report-dialog-kicker {
+  color: var(--primary);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.global-report-dialog-head h2 {
+  margin-top: 5px;
+  font-size: 1.35rem;
+}
+.global-report-dialog-close {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.global-report-dialog-close:hover {
+  color: var(--text-main);
+  border-color: var(--line-strong);
+}
+.global-report-dialog-close svg {
+  width: 18px;
+  height: 18px;
+}
+.global-report-dialog .reports-form-card {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+@keyframes report-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.12);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes report-dialog-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.12);
+  }
+}
+@keyframes report-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes report-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* ══ FILE BUTTON ═════════════════════════════════════════════════ */
@@ -2780,6 +2931,9 @@ td select {
     grid-template-columns: 1fr;
   }
   .sidebar {
+    display: none;
+  }
+  .global-report-trigger {
     display: none;
   }
   .mobile-app-bar {
@@ -2980,6 +3134,20 @@ td select {
   #issue-report-submit {
     width: 100%;
     min-width: 0;
+  }
+  .reports-entry-action {
+    width: 100%;
+  }
+  .global-report-dialog-head {
+    padding: 18px 18px 0;
+  }
+  .global-report-dialog {
+    inset: auto 8px calc(82px + env(safe-area-inset-bottom)) auto;
+    width: min(calc(100vw - 16px), 560px);
+    max-height: min(calc(100dvh - 106px - env(safe-area-inset-bottom)), 780px);
+  }
+  .global-report-dialog .reports-form-card {
+    padding: 18px;
   }
   .contribution-head {
     flex-direction: column;

@@ -703,7 +703,6 @@ test.describe("Finance tracker E2E", () => {
           ok: true,
           issueNumber: 321,
           issueUrl: "https://github.com/example/repo/issues/321",
-          enrichmentStatus: "pending",
         }),
       });
     });
@@ -712,14 +711,9 @@ test.describe("Finance tracker E2E", () => {
       type: "bug",
       summary: "Error guardando datos",
       description: "Después de guardar no persiste el estado.",
-      stepsToReproduce: "1. Ir a datos\n2. Guardar\n3. Recargar",
-      mentionClaude: true,
     });
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
-    await expect(tracker.issueReportStatus()).toContainText(
-      "automatización en curso",
-    );
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
       "https://github.com/example/repo/issues/321",

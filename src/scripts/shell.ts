@@ -1,4 +1,5 @@
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
+import { requestReportDialogOpen } from './report-dialog'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const THEME_KEY = 'theme'
@@ -116,7 +117,8 @@ function initMobileMoreMenu(): void {
   dialog.addEventListener('click', (event) => {
     if (
       event.target === dialog ||
-      (event.target instanceof Element && event.target.closest('[data-section]'))
+      (event.target instanceof Element &&
+        event.target.closest('[data-section], [data-report-dialog-open]'))
     ) {
       close()
     }
@@ -126,6 +128,12 @@ function initMobileMoreMenu(): void {
   })
   dialog.addEventListener('close', () => {
     trigger.setAttribute('aria-expanded', 'false')
+  })
+}
+
+function initReportDialogActions(): void {
+  document.querySelectorAll<HTMLElement>('[data-report-dialog-open]').forEach((action) => {
+    action.addEventListener('click', requestReportDialogOpen)
   })
 }
 
@@ -236,6 +244,7 @@ function initShellInteractions(): void {
   initSidebarToggle()
   initThemeToggles()
   initMobileMoreMenu()
+  initReportDialogActions()
   initPwaInstall()
   initServiceWorker()
   initDemoModeActions()
