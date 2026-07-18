@@ -214,6 +214,12 @@ export interface State {
   incomeCategories: string[];
   expenseCategories: string[];
   investmentCategories: string[];
+  /**
+   * User-chosen emoji overrides, keyed by `categoryEmojiKey(type, category)`.
+   * Categories without an entry here fall back to the built-in map/defaults
+   * in `scripts/category-emoji.ts`.
+   */
+  categoryEmojis: Record<string, string>;
   transactions: Transaction[];
   subscriptions: Subscription[];
   snapshots: Record<string, SnapshotRow>;

@@ -33,6 +33,7 @@ function createState(subscription: Subscription): State {
     incomeCategories: [],
     expenseCategories: ['Ocio'],
     investmentCategories: [],
+    categoryEmojis: {},
     transactions: [],
     subscriptions: [subscription],
     snapshots: {},
