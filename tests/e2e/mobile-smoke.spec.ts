@@ -89,6 +89,31 @@ test.describe('Mobile smoke', () => {
     ).toBeVisible()
   })
 
+  test('permite alcanzar las acciones del nuevo movimiento con un viewport reducido', async ({
+    page,
+    tracker,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 560 })
+    await tracker.openTransactions()
+    await page.locator('#tx-open-modal').click()
+
+    const dialog = page.locator('#tx-dialog')
+    const addAnother = dialog.getByRole('button', { name: 'Otro' })
+
+    await addAnother.scrollIntoViewIfNeeded()
+    await expect(addAnother).toBeVisible()
+
+    const layout = await addAnother.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        isWithinVisualViewport: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        formScrolls: element.closest('form')!.scrollHeight > element.closest('form')!.clientHeight,
+      }
+    })
+
+    expect(layout).toEqual({ isWithinVisualViewport: true, formScrolls: true })
+  })
+
   test('agrupa las secciones secundarias en un menú inferior accesible', async ({
     page,
     tracker,
