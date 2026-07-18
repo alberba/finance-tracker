@@ -9,7 +9,6 @@ import DataSection from './sections/DataSection.vue'
 import GoalsSection from './sections/GoalsSection.vue'
 import InvestmentSection from './sections/InvestmentSection.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
-import ReportsSection from './reports/ReportsSection.vue'
 import SettingsSection from './sections/SettingsSection.vue'
 import TransactionsSection from './sections/TransactionsSection.vue'
 import WealthSection from './sections/WealthSection.vue'
@@ -34,10 +33,6 @@ const isReportDialogOpen = shallowRef(false)
     <BudgetSection :is-active="currentSection === 'budget'" />
     <GoalsSection :is-active="currentSection === 'goals'" />
     <DataSection :is-active="currentSection === 'data'" />
-    <ReportsSection
-      :is-active="currentSection === 'reports'"
-      @open-report-dialog="isReportDialogOpen = true"
-    />
     <SettingsSection :is-active="currentSection === 'settings'" />
     <TransactionsSection :is-active="currentSection === 'transactions'" />
     <WealthSection :is-active="currentSection === 'wealth'" />

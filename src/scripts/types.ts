@@ -276,7 +276,6 @@ export const SECTION_ROUTE_MAP = {
   goals: "/objetivos",
   settings: "/configuracion",
   data: "/datos",
-  reports: "/reportes",
 } as const;
 
 export type SectionId = keyof typeof SECTION_ROUTE_MAP;

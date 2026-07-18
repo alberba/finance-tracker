@@ -14,5 +14,4 @@ export const APP_SECTIONS: AppSectionConfig[] = [
   { id: 'goals', label: 'Objetivos' },
   { id: 'settings', label: 'Configuración' },
   { id: 'data', label: 'Datos' },
-  { id: 'reports', label: 'Reportes' },
 ]

@@ -103,7 +103,7 @@ const {
       <DashboardPanel
         title="Ingresos, gastos e inversión"
         action-label="Ver análisis detallado"
-        action-target="reports"
+        action-target="budget"
         class="xl:col-span-3"
         @navigate="navigate"
       >

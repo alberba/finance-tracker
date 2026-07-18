@@ -12,7 +12,6 @@ const SECTION_CONFIG = {
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
   data: { buttonLabel: "Datos", headingText: "Datos y backups" },
-  reports: { buttonLabel: "Reportes", headingText: "Reportes" },
 } as const;
 
 export type FinanceSectionId = keyof typeof SECTION_CONFIG;
@@ -42,10 +41,6 @@ export class FinanceTrackerPage {
 
   get dataSection(): Locator {
     return this.page.locator("#data");
-  }
-
-  get reportsSection(): Locator {
-    return this.page.locator("#reports");
   }
 
   get issueReportDialog(): Locator {
@@ -145,10 +140,6 @@ export class FinanceTrackerPage {
 
   async openData() {
     await this.open("data");
-  }
-
-  async openReports() {
-    await this.open("reports");
   }
 
   async openGlobalReportDialog() {

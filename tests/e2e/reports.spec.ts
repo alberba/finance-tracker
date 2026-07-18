@@ -96,23 +96,6 @@ test.describe("Reports E2E", () => {
     await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
     await expect(tracker.issueReportDialog).toBeHidden();
     await expect(trigger).toBeFocused();
-
-    await tracker.openReports();
-
-    await expect(
-      tracker.reportsSection.getByRole("heading", { name: "Reportes" }),
-    ).toBeVisible();
-    await expect(
-      tracker.reportsSection.locator(".reports-form-card h3"),
-    ).toHaveCount(0);
-    await expect(
-      tracker.reportsSection.locator(".reports-guide-card h3"),
-    ).toHaveText("Qué ocurre al enviarlo");
-    await expect(
-      tracker.reportsSection.locator(".reports-guide-list li"),
-    ).toHaveCount(3);
-    await tracker.reportsSection.getByRole("button", { name: "Crear reporte" }).click();
-    await expect(tracker.issueReportDialog).toBeVisible();
   });
 
   test("crea un reporte desde cualquier sección sin automatización", async ({

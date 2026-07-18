@@ -37,12 +37,6 @@ test.describe("Finance tracker E2E", () => {
     await expect(
       tracker.budgetSection.getByRole("heading", { name: "Presupuesto" }),
     ).toBeVisible();
-
-    await tracker.openReports();
-    await expect(page).toHaveURL(/\/reportes$/);
-    await expect(
-      tracker.reportsSection.getByRole("heading", { name: "Reportes" }),
-    ).toBeVisible();
   });
 
   test("redirige rutas de sección desconocidas al dashboard", async ({ page }) => {
@@ -99,11 +93,6 @@ test.describe("Finance tracker E2E", () => {
         open: () => tracker.openData(),
         path: /\/datos$/,
         heading: "Datos y backups",
-      },
-      {
-        open: () => tracker.openReports(),
-        path: /\/reportes$/,
-        heading: "Reportes",
       },
     ];
 
