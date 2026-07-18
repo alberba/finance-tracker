@@ -313,6 +313,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       "Otros",
     ],
     investmentCategories: ["Fondos Indexados", "Criptomonedas"],
+    categoryEmojis: {},
     transactions,
     subscriptions,
     snapshots,

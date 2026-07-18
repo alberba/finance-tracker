@@ -120,6 +120,7 @@ const FALLBACK_BASE_SEED = {
   incomeCategories: ["Nómina", "Extra"],
   expenseCategories: ["Comida", "Vivienda"],
   investmentCategories: ["Fondos Indexados"],
+  categoryEmojis: {},
   transactions: [],
   subscriptions: [],
   snapshots: {},
@@ -293,6 +294,9 @@ export function normalizeState(candidate: unknown): State {
     ),
     investmentCategories: normalizeStringList(
       input?.investmentCategories || base.investmentCategories || [],
+    ),
+    categoryEmojis: normalizeCategoryEmojis(
+      input?.categoryEmojis || base.categoryEmojis || {},
     ),
     transactions: normalizeTransactions(
       input?.transactions || base.transactions || [],
@@ -560,6 +564,25 @@ function normalizeStringList(list: unknown): string[] {
         .filter((item: string) => Boolean(item)),
     ),
   );
+}
+
+const MAX_CATEGORY_EMOJI_LENGTH = 8;
+
+function normalizeCategoryEmojis(input: unknown): Record<string, string> {
+  const record = asRecord(input);
+  const result: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(record)) {
+    const cleanKey = String(key || "").trim();
+    const cleanValue = String(value || "")
+      .trim()
+      .slice(0, MAX_CATEGORY_EMOJI_LENGTH);
+    if (cleanKey && cleanValue) {
+      result[cleanKey] = cleanValue;
+    }
+  }
+
+  return result;
 }
 
 function normalizeTransactions(list: unknown): Transaction[] {

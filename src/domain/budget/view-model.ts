@@ -131,7 +131,7 @@ function buildBudgetBlock(state: State, type: BudgetType): BudgetBlockViewModel 
 
     return {
       category,
-      label: decorateCategoryLabel(type, category),
+      label: decorateCategoryLabel(type, category, state.categoryEmojis),
       plannedTotal: round2(plannedTotal),
       actualTotal: round2(actualTotal),
       diffTotal,

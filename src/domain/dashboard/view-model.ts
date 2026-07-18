@@ -305,7 +305,11 @@ export function buildDashboardViewModel({
       labels: Array.from(chartMonths),
       ...dashboardCashflow,
     },
-    topExpenses: buildTopExpenses(getCategoryActuals('expense', safeMonth), formatMoney),
+    topExpenses: buildTopExpenses(
+      getCategoryActuals('expense', safeMonth),
+      formatMoney,
+      state.categoryEmojis,
+    ),
     wealthSplit: buildWealthSplit({
       state,
       month: safeMonth,
@@ -319,6 +323,7 @@ export function buildDashboardViewModel({
       getBudgetValue: (category, budgetMonth) =>
         getBudgetValue('investment', category, budgetMonth),
       formatMoney,
+      categoryEmojis: state.categoryEmojis,
     }),
     recentTransactions: buildRecentTransactions(state, formatMoney),
     savingsGoal: buildSavingsGoal({
@@ -496,6 +501,7 @@ function buildNetWorthChart(
 function buildTopExpenses(
   expenseActuals: Record<string, number>,
   formatMoney: (value: number) => string,
+  categoryEmojis: Record<string, string>,
 ): DashboardTopExpenseItem[] {
   const expenseTotal = Object.values(expenseActuals).reduce((sum, value) => sum + value, 0)
   return Object.entries(expenseActuals)
@@ -505,7 +511,7 @@ function buildTopExpenses(
       const pct = expenseTotal > 0 ? (amount / expenseTotal) * 100 : 0
       return {
         category,
-        emoji: getCategoryEmoji('expense', category),
+        emoji: getCategoryEmoji('expense', category, categoryEmojis),
         amount: formatMoney(amount),
         pct: `${pct.toFixed(1).replace('.', ',')}%`,
         pctValue: pct,
@@ -579,7 +585,7 @@ function buildRecentTransactions(
       date: formatTxDate(transaction.date),
       description: transaction.description || '—',
       category: transaction.category || 'Sin categoría',
-      emoji: getCategoryEmoji(transaction.type, transaction.category),
+      emoji: getCategoryEmoji(transaction.type, transaction.category, state.categoryEmojis),
       typeLabel: TYPE_LABEL[transaction.type] || transaction.type,
       amount: formatMoney(Math.abs(transaction.amount)),
       sign: transaction.type === 'income' ? '+' : '−',

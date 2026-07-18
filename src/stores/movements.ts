@@ -88,6 +88,7 @@ export const useMovementsStore = defineStore('movements', () => {
 
   const accounts = computed(() => financialStateStore.accounts)
   const subscriptions = computed(() => financialStateStore.subscriptions)
+  const categoryEmojis = computed(() => financialStateStore.state.categoryEmojis)
 
   const visibleTransactions = computed(() =>
     filterAndSortTransactions({
@@ -396,6 +397,7 @@ export const useMovementsStore = defineStore('movements', () => {
   return {
     accounts,
     subscriptions,
+    categoryEmojis,
     visibleTransactions,
     breakdown,
     accountFilterOptions,
