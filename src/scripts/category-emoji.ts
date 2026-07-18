@@ -34,11 +34,31 @@ const TYPE_FALLBACK_EMOJI: Record<BudgetType, string> = {
   investment: "📈",
 };
 
-export function getCategoryEmoji(type: BudgetType, category: string): string {
+export type CategoryEmojiOverrides = Record<string, string>;
+
+/**
+ * Key used to store a user-chosen emoji override for a given category, e.g.
+ * in `State.categoryEmojis`. Stable across renames of the map above.
+ */
+export function categoryEmojiKey(type: BudgetType, category: string): string {
+  return `${type}:${normalizeKey(String(category || ""))}`;
+}
+
+export function getCategoryEmoji(
+  type: BudgetType,
+  category: string,
+  overrides?: CategoryEmojiOverrides,
+): string {
   const cleanCategory = String(category || "").trim();
   if (!cleanCategory) {
     return TYPE_FALLBACK_EMOJI[type];
   }
+
+  const override = overrides?.[categoryEmojiKey(type, cleanCategory)];
+  if (override) {
+    return override;
+  }
+
   return (
     CATEGORY_EMOJI_MAP[normalizeKey(cleanCategory)] || TYPE_FALLBACK_EMOJI[type]
   );
@@ -47,13 +67,14 @@ export function getCategoryEmoji(type: BudgetType, category: string): string {
 export function decorateCategoryLabel(
   type: BudgetType,
   category: string,
+  overrides?: CategoryEmojiOverrides,
 ): string {
   const cleanCategory = String(category || "").trim();
   if (!cleanCategory) {
     return `${TYPE_FALLBACK_EMOJI[type]} Sin categoría`;
   }
 
-  return `${getCategoryEmoji(type, cleanCategory)} ${cleanCategory}`;
+  return `${getCategoryEmoji(type, cleanCategory, overrides)} ${cleanCategory}`;
 }
 
 function normalizeKey(value: string): string {

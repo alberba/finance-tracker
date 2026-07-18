@@ -8,7 +8,7 @@ import type { TransactionType } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 
 const movementsStore = useMovementsStore()
-const { breakdown } = storeToRefs(movementsStore)
+const { breakdown, categoryEmojis } = storeToRefs(movementsStore)
 const { formatMoney } = useMoneyFormatter()
 
 const sections = computed(() => [
@@ -82,7 +82,7 @@ const sections = computed(() => [
             >
               <td>
                 <div class="tx-summary-item">
-                  <span>{{ decorateCategoryLabel(section.type, row.category) }}</span>
+                  <span>{{ decorateCategoryLabel(section.type, row.category, categoryEmojis) }}</span>
                   <strong>{{ formatMoney(row.amount) }}</strong>
                 </div>
               </td>

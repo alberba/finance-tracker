@@ -11,7 +11,7 @@ import { useUiStore } from '../../stores/ui'
 const movementsStore = useMovementsStore()
 const uiStore = useUiStore()
 const ui = uiStore.ui
-const { visibleTransactions, accountFilterOptions, allVisibleSelected } =
+const { visibleTransactions, accountFilterOptions, allVisibleSelected, categoryEmojis } =
   storeToRefs(movementsStore)
 const typeFilterOptions = movementsStore.typeFilterOptions
 const { formatMoney } = useMoneyFormatter()
@@ -461,7 +461,9 @@ function onSaveEdit(id: string): void {
             <td>{{ formatMoney(item.amount) }}</td>
             <td>{{ movementsStore.getAccountName(item.accountId) }}</td>
             <td><span class="badge" :class="typeBadgeClass(item.type)">{{ typeLabel(item.type) }}</span></td>
-            <td>{{ decorateCategoryLabel(item.type, item.category || 'Sin categoría') }}</td>
+            <td>
+              {{ decorateCategoryLabel(item.type, item.category || 'Sin categoría', categoryEmojis) }}
+            </td>
             <td>
               <div class="inline-actions">
                 <button

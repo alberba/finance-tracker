@@ -14,6 +14,7 @@ interface BuildInvestmentProgressItemsOptions {
   month: number
   getBudgetValue: (category: string, month: number) => number
   formatMoney: (value: number) => string
+  categoryEmojis?: Record<string, string>
 }
 
 export function buildDashboardInvestmentProgressItems({
@@ -21,6 +22,7 @@ export function buildDashboardInvestmentProgressItems({
   month,
   getBudgetValue,
   formatMoney,
+  categoryEmojis,
 }: BuildInvestmentProgressItemsOptions): InvestmentProgressItem[] {
   return Object.entries(actuals)
     .sort((a, b) => b[1] - a[1])
@@ -31,7 +33,7 @@ export function buildDashboardInvestmentProgressItems({
 
       return {
         category,
-        icon: getCategoryEmoji('investment', category),
+        icon: getCategoryEmoji('investment', category, categoryEmojis),
         actual: actual,
         plannedLabel: formatPlanMoney(planned, formatMoney),
         progress,
