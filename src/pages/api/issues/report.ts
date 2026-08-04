@@ -71,7 +71,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         ok: true,
         issueNumber: created.number,
         issueUrl: created.url,
-        ...(payload.mentionClaude
+        ...(payload.enrichWithCodex
           ? { enrichmentStatus: "pending" as const }
           : {}),
       },

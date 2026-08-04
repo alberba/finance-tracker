@@ -1,0 +1,136 @@
+name: Issue Enrichment (Codex Luna)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-enrich-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    if: >-
+      contains(join(github.event.issue.labels.*.name, ','), 'source:web-report') &&
+      contains(join(github.event.issue.labels.*.name, ','), 'enrich:pending')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Save issue payload
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+            fs.mkdirSync('.tmp', { recursive: true });
+            fs.writeFileSync('.tmp/issue.json', JSON.stringify(context.payload.issue, null, 2), 'utf-8');
+
+      - name: Build repository context
+        run: node .github/scripts/issue-context.mjs --issue-file .tmp/issue.json --out .tmp/issue-context.md
+
+      - name: Build Codex prompt
+        run: >-
+          node .github/scripts/issue-enrichment.mjs
+          --prompt-file .github/codex/prompts/issue-enrich.md
+          --context-file .tmp/issue-context.md
+          --prompt-out .tmp/issue-enrich-prompt.md
+
+      - name: Validate OpenAI credentials
+        run: |
+          if [ -z "${{ secrets.OPENAI_API_KEY }}" ]; then
+            echo "::error::Falta OPENAI_API_KEY en Secrets > Actions."
+            exit 1
+          fi
+
+      - name: Enrich issue with Codex Luna
+        id: codex_enrich
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .tmp/issue-enrich-prompt.md
+          output-file: .tmp/codex-output.md
+          output-schema-file: .github/codex/schemas/issue-enrichment.schema.json
+          model: gpt-5.6-luna
+          effort: high
+          permission-profile: ":read-only"
+          codex-args: '["--ephemeral"]'
+
+      - name: Validate Codex output
+        run: >-
+          node .github/scripts/issue-enrichment.mjs
+          --codex-output .tmp/codex-output.md
+          --normalized-out .tmp/enrichment.json
+
+      - name: Apply enrichment to issue
+        uses: actions/github-script@v7
+        env:
+          ENRICHMENT_FILE: .tmp/enrichment.json
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('node:fs');
+            const enrichment = JSON.parse(fs.readFileSync(process.env.ENRICHMENT_FILE, 'utf-8'));
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number });
+            const currentLabels = Array.isArray(issue.labels)
+              ? issue.labels.map((label) => typeof label === 'string' ? label : String(label?.name || '')).filter(Boolean)
+              : [];
+            const labelsKeep = Array.isArray(enrichment.labels_keep) ? enrichment.labels_keep : [];
+            const labelsAdd = Array.isArray(enrichment.labels_add) ? enrichment.labels_add : [];
+            const safeKeep = labelsKeep.filter((label) => ['source:web-report', 'status:triage', 'bug', 'feature'].includes(label));
+            const safeAdd = labelsAdd.filter((label) => /^priority:(low|med|high)$/.test(label) || /^area:(frontend|backend|infra|data)$/.test(label));
+            const labelsRemove = new Set([
+              ...(Array.isArray(enrichment.labels_remove) ? enrichment.labels_remove : []),
+              'enrich:pending',
+              'enrich:failed',
+            ]);
+            const finalLabels = Array.from(new Set([
+              ...currentLabels,
+              ...safeKeep,
+              ...safeAdd,
+              'enriched:codex',
+            ])).filter((label) => !labelsRemove.has(label) && !/^type:(bug|feature|enhancement)$/.test(label));
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number,
+              title: enrichment.title,
+              body: enrichment.body_markdown,
+            });
+            await github.rest.issues.setLabels({ owner, repo, issue_number, labels: finalLabels });
+
+      - name: Mark enrichment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const { data: issue } = await github.rest.issues.get({ owner, repo, issue_number });
+            const currentLabels = Array.isArray(issue.labels)
+              ? issue.labels.map((label) => typeof label === 'string' ? label : String(label?.name || '')).filter(Boolean)
+              : [];
+            const finalLabels = Array.from(new Set([
+              ...currentLabels.filter((label) => label !== 'enrich:pending'),
+              'enrich:failed',
+            ]));
+            await github.rest.issues.setLabels({ owner, repo, issue_number, labels: finalLabels });
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: 'El enriquecimiento automático con Codex falló. Revisa los logs del workflow `Issue Enrichment (Codex Luna)`.'
+            });

@@ -1,10 +1,10 @@
-export type ReportType = 'bug' | 'enhancement'
+export type ReportType = 'bug' | 'feature' | 'enhancement'
 
 export interface ReportPayload {
   type: ReportType
   summary: string
   description: string
-  mentionClaude: boolean
+  enrichWithCodex: boolean
   section: string
   context: {
     userAgent: string
@@ -30,7 +30,9 @@ interface ReportResponseError {
 
 export type ReportResponse = ReportResponseOk | ReportResponseError
 
-export type ReportSubmissionPayload = Omit<ReportPayload, 'mentionClaude'> & {
+export type ReportSubmissionPayload = Omit<ReportPayload, 'enrichWithCodex'> & {
+  enrichWithCodex?: boolean
+  /** @deprecated Use enrichWithCodex. Kept for clients deployed before Codex. */
   mentionClaude?: boolean
 }
 

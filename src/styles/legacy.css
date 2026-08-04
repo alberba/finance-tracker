@@ -2547,6 +2547,27 @@ td select {
 .reports-field textarea {
   min-height: 90px;
 }
+.reports-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.reports-checkbox-field input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.reports-checkbox-field span {
+  display: grid;
+  gap: 2px;
+}
+.reports-checkbox-field small {
+  color: var(--text-muted);
+  font-size: 0.92em;
+  font-weight: 400;
+}
 .reports-form-actions {
   display: flex;
   justify-content: flex-end;

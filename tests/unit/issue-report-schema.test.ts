@@ -19,6 +19,7 @@ describe("issue report schema", () => {
     expect(parsed.summary).toBe("Falla guardado");
     expect(parsed.description).toBe("El sistema no guarda al recargar.");
     expect(parsed.mentionClaude).toBe(true);
+    expect(parsed.enrichWithCodex).toBe(true);
   });
 
   it("usa automatización desactivada por defecto", () => {
@@ -31,6 +32,21 @@ describe("issue report schema", () => {
     });
 
     expect(parsed.mentionClaude).toBe(false);
+    expect(parsed.enrichWithCodex).toBe(false);
+  });
+
+  it("normaliza enhancement legacy a feature y acepta Codex", () => {
+    const parsed = parseIssueReportPayload({
+      type: "enhancement",
+      summary: "Mejorar el resumen de incidencias",
+      description: "La issue necesita contexto técnico para poder revisarse.",
+      enrichWithCodex: true,
+      section: "reports",
+      context: {},
+    });
+
+    expect(parsed.type).toBe("feature");
+    expect(parsed.enrichWithCodex).toBe(true);
   });
 
   it("rechaza payload inválido", () => {

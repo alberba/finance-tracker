@@ -148,11 +148,12 @@ export class FinanceTrackerPage {
   }
 
   async submitIssueReport(params: {
-    type: "bug" | "enhancement";
+    type: "bug" | "feature" | "enhancement";
     summary: string;
     description: string;
     expectedResult?: string;
     actualResult?: string;
+    enrichWithCodex?: boolean;
   }) {
     await this.openGlobalReportDialog();
     const form = this.issueReportDialog.locator("#issue-report-form");
@@ -164,6 +165,14 @@ export class FinanceTrackerPage {
     }
     if (params.actualResult !== undefined) {
       await form.locator("#issue-report-actual").fill(params.actualResult);
+    }
+    if (params.enrichWithCodex !== undefined) {
+      const checkbox = form.locator("#issue-report-enrich-codex");
+      if (params.enrichWithCodex) {
+        await checkbox.check();
+      } else {
+        await checkbox.uncheck();
+      }
     }
     await form.getByRole("button", { name: "Crear reporte" }).click();
   }

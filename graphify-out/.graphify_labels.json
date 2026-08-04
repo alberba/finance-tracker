@@ -112,6 +112,8 @@
   "110": "Report Modal Testing",
   "111": "Claude Code Review Workflow",
   "112": "v-memo Conditional Memoization",
+  "113": "eslint",
+  "114": "issue-enrich.md",
   "115": "eslint-config-prettier Module",
   "116": "@eslint css",
   "117": "@eslint js",

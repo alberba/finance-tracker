@@ -142,9 +142,11 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
    - `status:triage`
-   - `type:bug` o `type:enhancement`
-3. Si activas la automatización opcional, el reporte añade mención `@claude` y se activa:
-   - `.github/workflows/issue-enrich-claude.yml` (Haiku): enriquece la issue.
+   - `bug` o `feature`
+3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
+   Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
+4. Si activas la automatización opcional **Enriquecer con Codex**, se añade `enrich:pending` y se activa:
+   - `.github/workflows/issue-enrich-codex.yml` (Codex `gpt-5.6-luna`, effort `high`): enriquece la issue.
    - `.github/workflows/issue-fix-claude.yml` (Sonnet): intenta resolver y abrir PR.
 
 ### Variables y secrets requeridos
@@ -157,21 +159,21 @@ En Cloudflare runtime (`locals.runtime.env`):
 
 En GitHub Actions:
 
-- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY` para el enriquecimiento con Codex.
+- `CLAUDE_CODE_OAUTH_TOKEN` si mantienes el autofix con Claude.
 - `GITHUB_ISSUE_TOKEN` (opcional si no quieres usar `GITHUB_TOKEN` para PR)
 
 Opcional (GitHub Variables):
 
-- `CLAUDE_HAIKU_MODEL`
 - `CLAUDE_SONNET_MODEL`
 
 ### Labels recomendadas en GitHub
 
 - `source:web-report`, `status:triage`
-- `type:bug`, `type:enhancement`
+- `bug`, `feature`
 - `priority:low`, `priority:med`, `priority:high`
 - `area:frontend`, `area:backend`, `area:infra`, `area:data`
-- `enriched:haiku`
+- `enriched:codex`
 - `autofix-attempted`, `autofix-opened-pr`, `autofix-nochange`, `autofix-failed`, `autofix:skip`
 
 ## Extraer datos desde Excel para uso local
