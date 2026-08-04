@@ -148,5 +148,5 @@
   "146": "@astrojs/check",
   "147": "ProgressBar.vue",
   "148": "WealthSnapshotTable.vue",
-  "149": "typescript"
+  "149": "eslint-plugin-vue"
 }
