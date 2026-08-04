@@ -55,7 +55,7 @@ cp .dev.vars.example .dev.vars
 pnpm dev
 ```
 
-Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`; su endpoint de gráficos no es una API pública oficial, por lo que se usa con caché y a baja frecuencia. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
+Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`, pero su endpoint de gráficos no es una API pública oficial y puede responder con HTTP 429. Las peticiones se cachean, se deduplican y, cuando Yahoo está limitado, los instrumentos Yahoo usan Twelve Data como respaldo si `TWELVE_DATA_API_KEY` está configurada. La búsqueda de símbolos aplica el mismo respaldo. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
 
 Para una clave CoinGecko Demo usa `COINGECKO_API_PLAN=demo`; para una clave Pro usa `COINGECKO_API_PLAN=pro`. Los instrumentos existentes se pueden cambiar de proveedor desde Configuración.
 

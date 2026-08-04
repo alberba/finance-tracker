@@ -27,4 +27,30 @@ describe('búsqueda de símbolos de mercado', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )
   })
+
+  it('usa la búsqueda de Twelve Data cuando Yahoo está limitado', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        data: [{
+          symbol: 'XDWH.DE', instrument_name: 'Xtrackers MSCI World Health Care UCITS ETF 1C',
+          exchange: 'XETRA', currency: 'EUR', instrument_type: 'ETF',
+        }],
+      }), { status: 200 }))
+
+    const results = await searchYahooSymbols('XDWH-FALLBACK', fetchMock, { TWELVE_DATA_API_KEY: 'fallback-secret' })
+
+    expect(results).toEqual([{
+      symbol: 'XDWH.DE',
+      name: 'Xtrackers MSCI World Health Care UCITS ETF 1C',
+      exchange: 'XETRA',
+      currency: 'EUR',
+      type: 'ETF',
+    }])
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('api.twelvedata.com/symbol_search?symbol=XDWH-FALLBACK'),
+      expect.objectContaining({ headers: { Authorization: 'apikey fallback-secret' } }),
+    )
+  })
 })

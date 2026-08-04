@@ -770,8 +770,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "users_albertsalom_proyectos_finance_tracker_package_devdependencies_astrojs_cloudflare",
-      "community": 66,
-      "community_name": "Astro Development Dependencies",
+      "community": 91,
+      "community_name": "Dashboard Period Controls",
       "norm_label": "@astrojs/cloudflare"
     },
     {
@@ -781,8 +781,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "astrojs_cloudflare",
-      "community": 66,
-      "community_name": "Astro Development Dependencies",
+      "community": 91,
+      "community_name": "Dashboard Period Controls",
       "norm_label": "@astrojs/cloudflare"
     },
     {
@@ -946,8 +946,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "users_albertsalom_proyectos_finance_tracker_package_devdependencies_eslint",
-      "community": 114,
-      "community_name": "eslint Module",
+      "community": 66,
+      "community_name": "Astro Development Dependencies",
       "norm_label": "eslint"
     },
     {
@@ -957,8 +957,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "eslint",
-      "community": 114,
-      "community_name": "eslint Module",
+      "community": 66,
+      "community_name": "Astro Development Dependencies",
       "norm_label": "eslint"
     },
     {
@@ -2049,8 +2049,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_financeworkspace",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "financeworkspace.vue"
     },
     {
@@ -2060,8 +2060,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_components_financeworkspace_props",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "props"
     },
     {
@@ -2071,8 +2071,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_components_financeworkspace_uistore",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "uistore"
     },
     {
@@ -2082,8 +2082,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_components_financeworkspace_currentsection",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "currentsection"
     },
     {
@@ -2093,8 +2093,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_components_financeworkspace_isreportdialogopen",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "isreportdialogopen"
     },
     {
@@ -2104,8 +2104,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_budget_budgetblock",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "budgetblock.vue"
     },
     {
@@ -2115,8 +2115,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_components_budget_budgetblock_emit",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "emit"
     },
     {
@@ -2126,8 +2126,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_budget_budgetblock_handleinput",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "handleinput()"
     },
     {
@@ -2137,8 +2137,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_components_budget_budgetblock_toneclass",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "toneclass()"
     },
     {
@@ -2478,8 +2478,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_dashboard_dashboardperiodfield",
-      "community": 91,
-      "community_name": "Dashboard Period Controls",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "dashboardperiodfield.vue"
     },
     {
@@ -2489,8 +2489,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_components_dashboard_dashboardperiodfield_periodoption",
-      "community": 91,
-      "community_name": "Dashboard Period Controls",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "periodoption"
     },
     {
@@ -2500,8 +2500,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_components_dashboard_dashboardperiodfield_emit",
-      "community": 91,
-      "community_name": "Dashboard Period Controls",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "emit"
     },
     {
@@ -2511,8 +2511,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_components_dashboard_dashboardperiodfield_onchange",
-      "community": 91,
-      "community_name": "Dashboard Period Controls",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "onchange()"
     },
     {
@@ -2874,8 +2874,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_goals_goalprogresscard",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goalprogresscard.vue"
     },
     {
@@ -2885,8 +2885,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_components_goals_goalprogresscard_toneclass",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "toneclass()"
     },
     {
@@ -3567,8 +3567,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "investmentdashboardtab.vue"
     },
     {
@@ -3578,8 +3578,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_investmentstore",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "investmentstore"
     },
     {
@@ -3589,8 +3589,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_dashboardviewmodel",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "{ dashboardviewmodel }"
     },
     {
@@ -3600,8 +3600,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_formatmoney",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "{ formatmoney }"
     },
     {
@@ -3611,8 +3611,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_drawportfoliochart",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "drawportfoliochart"
     },
     {
@@ -3622,8 +3622,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_drawassetschart",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "drawassetschart"
     },
     {
@@ -3633,8 +3633,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_components_investment_investmentdashboardtab_drawallocationchart",
-      "community": 90,
-      "community_name": "Chart Canvas Component",
+      "community": 3,
+      "community_name": "Dashboard Charts and Wealth",
       "norm_label": "drawallocationchart"
     },
     {
@@ -4010,8 +4010,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "instrumenteditorpanel.vue"
     },
     {
@@ -4021,8 +4021,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_financialstatestore",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "financialstatestore"
     },
     {
@@ -4032,8 +4032,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_marketstore",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "marketstore"
     },
     {
@@ -4043,8 +4043,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_sourcesymbols",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "sourcesymbols"
     },
     {
@@ -4054,8 +4054,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_searchresults",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "searchresults"
     },
     {
@@ -4065,8 +4065,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_searchinstrumentid",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "searchinstrumentid"
     },
     {
@@ -4076,8 +4076,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_issearching",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "issearching"
     },
     {
@@ -4087,8 +4087,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_searcherror",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "searcherror"
     },
     {
@@ -4098,8 +4098,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_form",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "form"
     },
     {
@@ -4109,8 +4109,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_types",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "types"
     },
     {
@@ -4120,8 +4120,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_submit",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "submit()"
     },
     {
@@ -4131,8 +4131,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_linkmovements",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "linkmovements()"
     },
     {
@@ -4142,8 +4142,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_initializesourcesymbols",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "initializesourcesymbols()"
     },
     {
@@ -4153,8 +4153,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_savesourcesymbol",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "savesourcesymbol()"
     },
     {
@@ -4164,8 +4164,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_searchsourcesymbols",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "searchsourcesymbols()"
     },
     {
@@ -4175,8 +4175,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_components_market_instrumenteditorpanel_selectsearchresult",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "selectsearchresult()"
     },
     {
@@ -4296,8 +4296,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "pendingmovementspanel.vue"
     },
     {
@@ -4307,8 +4307,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_props",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "props"
     },
     {
@@ -4318,8 +4318,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_recurringstore",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "recurringstore"
     },
     {
@@ -4329,8 +4329,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_financialstatestore",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "financialstatestore"
     },
     {
@@ -4340,8 +4340,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_pending",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "pending"
     },
     {
@@ -4351,8 +4351,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_editingid",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "editingid"
     },
     {
@@ -4362,8 +4362,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_edit",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "edit"
     },
     {
@@ -4373,8 +4373,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_editingisinvestment",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "editingisinvestment"
     },
     {
@@ -4384,8 +4384,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_investmenttotal",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "investmenttotal"
     },
     {
@@ -4395,8 +4395,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_opentransactions",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "opentransactions()"
     },
     {
@@ -4406,8 +4406,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_startedit",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "startedit()"
     },
     {
@@ -4417,8 +4417,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "src_components_recurring_pendingmovementspanel_saveedit",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 8,
+      "community_name": "Recurring Transactions",
       "norm_label": "saveedit()"
     },
     {
@@ -4923,8 +4923,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_sections_datasection",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "datasection.vue"
     },
     {
@@ -4934,8 +4934,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_components_sections_datasection_datastore",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "datastore"
     },
     {
@@ -4945,8 +4945,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_sections_datasection_summary",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "{ summary }"
     },
     {
@@ -4956,8 +4956,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_components_sections_datasection_onimportchange",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "onimportchange()"
     },
     {
@@ -4967,8 +4967,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_components_sections_datasection_onresetseed",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "onresetseed()"
     },
     {
@@ -6177,8 +6177,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_transactions_transactionbulkcard",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "transactionbulkcard.vue"
     },
     {
@@ -6188,8 +6188,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_components_transactions_transactionbulkcard_movementsstore",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "movementsstore"
     },
     {
@@ -6199,8 +6199,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "src_components_transactions_transactionbulkcard_accounts_selectedvisiblecount",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "{ accounts, selectedvisiblecount }"
     },
     {
@@ -6210,8 +6210,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_components_transactions_transactionbulkcard_bulk",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "bulk"
     },
     {
@@ -6221,8 +6221,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_components_transactions_transactionbulkcard_onapply",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "onapply()"
     },
     {
@@ -6232,8 +6232,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "transactionformdialog.vue"
     },
     {
@@ -6243,8 +6243,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_movementsstore",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "movementsstore"
     },
     {
@@ -6254,8 +6254,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_uistore",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "uistore"
     },
     {
@@ -6265,8 +6265,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_showtoast",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "{ showtoast }"
     },
     {
@@ -6276,8 +6276,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_dialogref",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "dialogref"
     },
     {
@@ -6287,8 +6287,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_pendingkeepopen",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "pendingkeepopen"
     },
     {
@@ -6298,8 +6298,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_form",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "form"
     },
     {
@@ -6309,8 +6309,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_categoryoptions",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "categoryoptions"
     },
     {
@@ -6320,8 +6320,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_ensurevalidcategory",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "ensurevalidcategory()"
     },
     {
@@ -6331,8 +6331,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_open",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "open()"
     },
     {
@@ -6342,8 +6342,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_close",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "close()"
     },
     {
@@ -6353,8 +6353,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_ondatechange",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "ondatechange()"
     },
     {
@@ -6364,8 +6364,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_components_transactions_transactionformdialog_onsubmit",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 36,
+      "community_name": "Investment Dashboard Calculations",
       "norm_label": "onsubmit()"
     },
     {
@@ -6705,8 +6705,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_components_ui_appsection",
-      "community": 22,
-      "community_name": "Application State Hydration",
+      "community": 51,
+      "community_name": "Investment Movement Form",
       "norm_label": "appsection.vue"
     },
     {
@@ -6716,8 +6716,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_components_ui_appsection_props",
-      "community": 22,
-      "community_name": "Application State Hydration",
+      "community": 51,
+      "community_name": "Investment Movement Form",
       "norm_label": "props"
     },
     {
@@ -6727,8 +6727,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_components_ui_appsection_sectionel",
-      "community": 22,
-      "community_name": "Application State Hydration",
+      "community": 51,
+      "community_name": "Investment Movement Form",
       "norm_label": "sectionel"
     },
     {
@@ -6738,8 +6738,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_components_ui_appsection_el",
-      "community": 22,
-      "community_name": "Application State Hydration",
+      "community": 51,
+      "community_name": "Investment Movement Form",
       "norm_label": "el()"
     },
     {
@@ -6947,8 +6947,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_data_demo_seed",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "demo-seed.ts"
     },
     {
@@ -6958,8 +6958,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "src_data_demo_seed_mulberry32",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "mulberry32()"
     },
     {
@@ -6969,8 +6969,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "src_data_demo_seed_iso",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "iso()"
     },
     {
@@ -6980,8 +6980,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_data_demo_seed_adddays",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "adddays()"
     },
     {
@@ -6991,8 +6991,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "src_data_demo_seed_toisodate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "toisodate()"
     },
     {
@@ -7002,8 +7002,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_data_demo_seed_builddemoseed",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "builddemoseed()"
     },
     {
@@ -7013,8 +7013,8 @@
       "source_location": "L431",
       "_origin": "ast",
       "id": "src_data_demo_seed_finance_tracker_demo_seed",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "finance_tracker_demo_seed"
     },
     {
@@ -7068,8 +7068,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "src_domain_budget_view_model_budgetblockviewmodel",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "budgetblockviewmodel"
     },
     {
@@ -7673,8 +7673,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_domain_goals_view_model",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "view-model.ts"
     },
     {
@@ -7684,8 +7684,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_goaleditorviewmodel",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goaleditorviewmodel"
     },
     {
@@ -7695,8 +7695,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_goalprogressviewmodel",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goalprogressviewmodel"
     },
     {
@@ -7706,8 +7706,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_goalsviewmodel",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goalsviewmodel"
     },
     {
@@ -7717,8 +7717,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_goalorder",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goalorder"
     },
     {
@@ -7728,8 +7728,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_buildcurrentmap",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "buildcurrentmap()"
     },
     {
@@ -7739,8 +7739,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_monthsuntilgoal",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "monthsuntilgoal()"
     },
     {
@@ -7750,8 +7750,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_domain_goals_view_model_buildgoalsviewmodel",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "buildgoalsviewmodel()"
     },
     {
@@ -7937,8 +7937,8 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "src_domain_investment_calculations_computeinvestedcapital",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 44,
+      "community_name": "Financial State Formatting",
       "norm_label": "computeinvestedcapital()"
     },
     {
@@ -7948,8 +7948,8 @@
       "source_location": "L88",
       "_origin": "ast",
       "id": "src_domain_investment_calculations_computeinvestedcapitalbyasset",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 44,
+      "community_name": "Financial State Formatting",
       "norm_label": "computeinvestedcapitalbyasset()"
     },
     {
@@ -7992,8 +7992,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_domain_investment_contributions",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contributions.ts"
     },
     {
@@ -8003,8 +8003,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_snapshotinputvalue",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "snapshotinputvalue"
     },
     {
@@ -8014,8 +8014,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_allocationinputvalue",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "allocationinputvalue"
     },
     {
@@ -8025,8 +8025,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_getinvestmentvaluefromsnapshot",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "getinvestmentvaluefromsnapshot()"
     },
     {
@@ -8036,8 +8036,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_getportfoliovaluefromsnapshot",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "getportfoliovaluefromsnapshot()"
     },
     {
@@ -8047,8 +8047,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_isautomaticcontributiondate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "isautomaticcontributiondate()"
     },
     {
@@ -8058,8 +8058,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_ismanualcontributiondate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "ismanualcontributiondate()"
     },
     {
@@ -8069,8 +8069,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_getcontributionentriesfromsnapshots",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "getcontributionentriesfromsnapshots()"
     },
     {
@@ -8080,8 +8080,8 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_buildcontributionmetricrows",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "buildcontributionmetricrows()"
     },
     {
@@ -8091,8 +8091,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_workflowsnapshotstate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "workflowsnapshotstate"
     },
     {
@@ -8102,8 +8102,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_buildworkflowsnapshotstate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "buildworkflowsnapshotstate()"
     },
     {
@@ -8113,8 +8113,8 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_computeworkflowwarnings",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "computeworkflowwarnings()"
     },
     {
@@ -8124,8 +8124,8 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_contributionsaveinput",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contributionsaveinput"
     },
     {
@@ -8135,8 +8135,8 @@
       "source_location": "L260",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_contributionsaveresult",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contributionsaveresult"
     },
     {
@@ -8146,8 +8146,8 @@
       "source_location": "L272",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_applycontributionsave",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "applycontributionsave()"
     },
     {
@@ -8157,8 +8157,8 @@
       "source_location": "L380",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_upsertcontributionflow",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "upsertcontributionflow()"
     },
     {
@@ -8168,8 +8168,8 @@
       "source_location": "L407",
       "_origin": "ast",
       "id": "src_domain_investment_contributions_removemanualcontribution",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "removemanualcontribution()"
     },
     {
@@ -8234,8 +8234,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "src_domain_investment_valuation_instrumentvaluation",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "instrumentvaluation"
     },
     {
@@ -8377,8 +8377,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_domain_investment_view_model",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "view-model.ts"
     },
     {
@@ -8399,8 +8399,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_chart_colors",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "chart_colors"
     },
     {
@@ -8410,8 +8410,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_investmentdashboardviewmodel",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "investmentdashboardviewmodel"
     },
     {
@@ -8421,8 +8421,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_togainpercent",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 44,
+      "community_name": "Financial State Formatting",
       "norm_label": "togainpercent()"
     },
     {
@@ -8432,8 +8432,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_buildinvestmentdashboardviewmodel",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 44,
+      "community_name": "Financial State Formatting",
       "norm_label": "buildinvestmentdashboardviewmodel()"
     },
     {
@@ -8443,8 +8443,8 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_investmentmovementrow",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 0,
+      "community_name": "Stock Events Integration",
       "norm_label": "investmentmovementrow"
     },
     {
@@ -8454,8 +8454,8 @@
       "source_location": "L136",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_buildinvestmentmovementrows",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "buildinvestmentmovementrows()"
     },
     {
@@ -8465,8 +8465,8 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "src_domain_investment_view_model_buildinvestmentyearoptions",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "buildinvestmentyearoptions()"
     },
     {
@@ -8729,8 +8729,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_domain_settings_view_model_categorytagviewmodel",
-      "community": 2,
-      "community_name": "Settings and Categories",
+      "community": 49,
+      "community_name": "Goal View Models",
       "norm_label": "categorytagviewmodel"
     },
     {
@@ -9059,8 +9059,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_lib_finance_core_wealthsnapshot",
-      "community": 15,
-      "community_name": "Core Finance Calculations",
+      "community": 44,
+      "community_name": "Financial State Formatting",
       "norm_label": "wealthsnapshot"
     },
     {
@@ -9092,8 +9092,8 @@
       "source_location": "L93",
       "_origin": "ast",
       "id": "src_lib_finance_core_getcategoryactuals",
-      "community": 12,
-      "community_name": "Dashboard View Models",
+      "community": 15,
+      "community_name": "Core Finance Calculations",
       "norm_label": "getcategoryactuals()"
     },
     {
@@ -9202,8 +9202,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_number_round2",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "round2()"
     },
     {
@@ -9257,8 +9257,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_lib_server_cloudflare_env_getruntimeenvfromlocals",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 1,
+      "community_name": "Cloud State and Reports",
       "norm_label": "getruntimeenvfromlocals()"
     },
     {
@@ -9642,8 +9642,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_server_json_response",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 62,
+      "community_name": "Market Symbol Search",
       "norm_label": "json-response.ts"
     },
     {
@@ -9653,8 +9653,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_server_json_response_createjsonresponse",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 62,
+      "community_name": "Market Symbol Search",
       "norm_label": "createjsonresponse()"
     },
     {
@@ -9675,8 +9675,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "src_lib_server_market_data_marketdataenv",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "marketdataenv"
     },
     {
@@ -9686,15 +9686,15 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_lib_server_market_data_marketquoterequest",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "marketquoterequest"
     },
     {
       "label": "memoryCache",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L18",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "src_lib_server_market_data_memorycache",
       "community": 18,
@@ -9702,43 +9702,98 @@
       "norm_label": "memorycache"
     },
     {
+      "label": "inFlightQuotes",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_inflightquotes",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "inflightquotes"
+    },
+    {
+      "label": "rateLimitedQuotes",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L22",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_ratelimitedquotes",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "ratelimitedquotes"
+    },
+    {
+      "label": "ProviderQuote",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_providerquote",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "providerquote"
+    },
+    {
+      "label": "MarketProviderError",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_marketprovidererror",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "marketprovidererror"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_marketprovidererror_constructor",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": ".constructor()"
+    },
+    {
       "label": "EdgeCache",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L20",
+      "source_location": "L39",
       "_origin": "ast",
       "id": "src_lib_server_market_data_edgecache",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "edgecache"
     },
     {
       "label": ".match()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L21",
+      "source_location": "L40",
       "_origin": "ast",
       "id": "src_lib_server_market_data_edgecache_match",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": ".match()"
     },
     {
       "label": ".put()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L22",
+      "source_location": "L41",
       "_origin": "ast",
       "id": "src_lib_server_market_data_edgecache_put",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": ".put()"
     },
     {
       "label": "loadMarketQuote()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L25",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "src_lib_server_market_data_loadmarketquote",
       "community": 18,
@@ -9746,10 +9801,32 @@
       "norm_label": "loadmarketquote()"
     },
     {
+      "label": "createQuoteLoad()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L70",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_createquoteload",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "createquoteload()"
+    },
+    {
+      "label": "loadAndCacheQuote()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L81",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_loadandcachequote",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "loadandcachequote()"
+    },
+    {
       "label": "fetchProviderQuote()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L50",
+      "source_location": "L100",
       "_origin": "ast",
       "id": "src_lib_server_market_data_fetchproviderquote",
       "community": 18,
@@ -9757,10 +9834,65 @@
       "norm_label": "fetchproviderquote()"
     },
     {
+      "label": "resolveProvider()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L121",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_resolveprovider",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "resolveprovider()"
+    },
+    {
+      "label": "normalizeProvider()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L125",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_normalizeprovider",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "normalizeprovider()"
+    },
+    {
+      "label": "resolveFallbackProvider()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L130",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_resolvefallbackprovider",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "resolvefallbackprovider()"
+    },
+    {
+      "label": "shouldUseProviderFallback()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L138",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_shoulduseproviderfallback",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "shoulduseproviderfallback()"
+    },
+    {
+      "label": "fetchProviderQuoteFrom()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L144",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_fetchproviderquotefrom",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "fetchproviderquotefrom()"
+    },
+    {
       "label": "fetchTwelveData()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L65",
+      "source_location": "L155",
       "_origin": "ast",
       "id": "src_lib_server_market_data_fetchtwelvedata",
       "community": 18,
@@ -9771,7 +9903,7 @@
       "label": "fetchYahooFinance()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L82",
+      "source_location": "L172",
       "_origin": "ast",
       "id": "src_lib_server_market_data_fetchyahoofinance",
       "community": 18,
@@ -9782,7 +9914,7 @@
       "label": "fetchCoinGecko()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L99",
+      "source_location": "L189",
       "_origin": "ast",
       "id": "src_lib_server_market_data_fetchcoingecko",
       "community": 18,
@@ -9793,7 +9925,7 @@
       "label": "normalizeProviderQuote()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L125",
+      "source_location": "L215",
       "_origin": "ast",
       "id": "src_lib_server_market_data_normalizeproviderquote",
       "community": 18,
@@ -9804,7 +9936,7 @@
       "label": "normalizeYahooQuote()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L155",
+      "source_location": "L249",
       "_origin": "ast",
       "id": "src_lib_server_market_data_normalizeyahooquote",
       "community": 18,
@@ -9815,7 +9947,7 @@
       "label": "readLatestYahooClose()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L178",
+      "source_location": "L272",
       "_origin": "ast",
       "id": "src_lib_server_market_data_readlatestyahooclose",
       "community": 18,
@@ -9826,7 +9958,7 @@
       "label": "normalizeYahooTimestamp()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L192",
+      "source_location": "L286",
       "_origin": "ast",
       "id": "src_lib_server_market_data_normalizeyahootimestamp",
       "community": 18,
@@ -9837,7 +9969,7 @@
       "label": "resolveCoinGeckoId()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L198",
+      "source_location": "L292",
       "_origin": "ast",
       "id": "src_lib_server_market_data_resolvecoingeckoid",
       "community": 18,
@@ -9848,7 +9980,7 @@
       "label": "buildFallbackQuote()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L209",
+      "source_location": "L303",
       "_origin": "ast",
       "id": "src_lib_server_market_data_buildfallbackquote",
       "community": 18,
@@ -9859,7 +9991,7 @@
       "label": "fetchJsonWithTimeout()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L226",
+      "source_location": "L320",
       "_origin": "ast",
       "id": "src_lib_server_market_data_fetchjsonwithtimeout",
       "community": 18,
@@ -9867,10 +9999,43 @@
       "norm_label": "fetchjsonwithtimeout()"
     },
     {
+      "label": "cacheExpiry()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L336",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_cacheexpiry",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "cacheexpiry()"
+    },
+    {
+      "label": "rememberRateLimit()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L340",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_rememberratelimit",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "rememberratelimit()"
+    },
+    {
+      "label": "readRetryAfterMs()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L347",
+      "_origin": "ast",
+      "id": "src_lib_server_market_data_readretryafterms",
+      "community": 18,
+      "community_name": "Market Data Loading",
+      "norm_label": "readretryafterms()"
+    },
+    {
       "label": "buildCacheKey()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L242",
+      "source_location": "L356",
       "_origin": "ast",
       "id": "src_lib_server_market_data_buildcachekey",
       "community": 18,
@@ -9881,51 +10046,51 @@
       "label": "readEdgeCache()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L246",
+      "source_location": "L360",
       "_origin": "ast",
       "id": "src_lib_server_market_data_readedgecache",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "readedgecache()"
     },
     {
       "label": "writeEdgeCache()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L259",
+      "source_location": "L373",
       "_origin": "ast",
       "id": "src_lib_server_market_data_writeedgecache",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "writeedgecache()"
     },
     {
       "label": "getEdgeCache()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L271",
+      "source_location": "L385",
       "_origin": "ast",
       "id": "src_lib_server_market_data_getedgecache",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "getedgecache()"
     },
     {
       "label": "cacheRequest()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L276",
+      "source_location": "L390",
       "_origin": "ast",
       "id": "src_lib_server_market_data_cacherequest",
-      "community": 51,
-      "community_name": "Investment Movement Form",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "cacherequest()"
     },
     {
       "label": "normalizeTimestamp()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L280",
+      "source_location": "L394",
       "_origin": "ast",
       "id": "src_lib_server_market_data_normalizetimestamp",
       "community": 18,
@@ -9936,7 +10101,7 @@
       "label": "calculateChangePercent()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L285",
+      "source_location": "L399",
       "_origin": "ast",
       "id": "src_lib_server_market_data_calculatechangepercent",
       "community": 18,
@@ -9947,7 +10112,7 @@
       "label": "readNumber()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L290",
+      "source_location": "L404",
       "_origin": "ast",
       "id": "src_lib_server_market_data_readnumber",
       "community": 18,
@@ -9958,7 +10123,7 @@
       "label": "readOptionalNumber()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L295",
+      "source_location": "L409",
       "_origin": "ast",
       "id": "src_lib_server_market_data_readoptionalnumber",
       "community": 18,
@@ -9969,7 +10134,7 @@
       "label": "asRecord()",
       "file_type": "code",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L300",
+      "source_location": "L414",
       "_origin": "ast",
       "id": "src_lib_server_market_data_asrecord",
       "community": 18,
@@ -9994,15 +10159,70 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_lib_server_market_search_marketsearchresult",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "marketsearchresult"
+    },
+    {
+      "label": "MarketSearchEnv",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L9",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_marketsearchenv",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "marketsearchenv"
+    },
+    {
+      "label": "searchCache",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_searchcache",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "searchcache"
+    },
+    {
+      "label": "inFlightSearches",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L16",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_inflightsearches",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "inflightsearches"
+    },
+    {
+      "label": "MarketSearchError",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_marketsearcherror",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "marketsearcherror"
+    },
+    {
+      "label": ".constructor()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L19",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_marketsearcherror_constructor",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": ".constructor()"
     },
     {
       "label": "searchYahooSymbols()",
       "file_type": "code",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L11",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "src_lib_server_market_search_searchyahoosymbols",
       "community": 62,
@@ -10010,10 +10230,65 @@
       "norm_label": "searchyahoosymbols()"
     },
     {
+      "label": "createSearch()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L45",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_createsearch",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "createsearch()"
+    },
+    {
+      "label": "loadSearchResults()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L56",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_loadsearchresults",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "loadsearchresults()"
+    },
+    {
+      "label": "parseYahooResults()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L80",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_parseyahooresults",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "parseyahooresults()"
+    },
+    {
+      "label": "searchTwelveDataSymbols()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L88",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "searchtwelvedatasymbols()"
+    },
+    {
+      "label": "cacheSearchResults()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L106",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_cachesearchresults",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "cachesearchresults()"
+    },
+    {
       "label": "toSearchResult()",
       "file_type": "code",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L28",
+      "source_location": "L110",
       "_origin": "ast",
       "id": "src_lib_server_market_search_tosearchresult",
       "community": 62,
@@ -10021,15 +10296,48 @@
       "norm_label": "tosearchresult()"
     },
     {
+      "label": "shouldUseSearchFallback()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L124",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_shouldusesearchfallback",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "shouldusesearchfallback()"
+    },
+    {
+      "label": "fetchJson()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L129",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_fetchjson",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "fetchjson()"
+    },
+    {
       "label": "fetchWithTimeout()",
       "file_type": "code",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L42",
+      "source_location": "L139",
       "_origin": "ast",
       "id": "src_lib_server_market_search_fetchwithtimeout",
       "community": 62,
       "community_name": "Market Symbol Search",
       "norm_label": "fetchwithtimeout()"
+    },
+    {
+      "label": "asRecord()",
+      "file_type": "code",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L153",
+      "_origin": "ast",
+      "id": "src_lib_server_market_search_asrecord",
+      "community": 62,
+      "community_name": "Market Symbol Search",
+      "norm_label": "asrecord()"
     },
     {
       "label": "state-request.ts",
@@ -10346,8 +10654,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "quotes.ts"
     },
     {
@@ -10357,8 +10665,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_json",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "json"
     },
     {
@@ -10368,8 +10676,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_quotesbody",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "quotesbody"
     },
     {
@@ -10379,8 +10687,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_post",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "post()"
     },
     {
@@ -10390,8 +10698,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_normalizeinstruments",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "normalizeinstruments()"
     },
     {
@@ -10401,8 +10709,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_isinstrument",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "isinstrument()"
     },
     {
@@ -10412,8 +10720,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_pages_api_market_quotes_normalizefallbackquotes",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "normalizefallbackquotes()"
     },
     {
@@ -10863,8 +11171,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "dashboard-section-routing.ts"
     },
     {
@@ -10874,8 +11182,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing_getsectionfrompath",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "getsectionfrompath()"
     },
     {
@@ -10885,8 +11193,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing_issectionroutepath",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "issectionroutepath()"
     },
     {
@@ -10896,8 +11204,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing_getpathfromsection",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "getpathfromsection()"
     },
     {
@@ -10907,8 +11215,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing_normalizesectionid",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "normalizesectionid()"
     },
     {
@@ -10918,8 +11226,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "src_scripts_app_dashboard_section_routing_normalizepath",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "normalizepath()"
     },
     {
@@ -10929,8 +11237,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_app_dom_helpers",
-      "community": 113,
-      "community_name": "@astrojs cloudflare",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "dom-helpers.ts"
     },
     {
@@ -10940,8 +11248,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_app_dom_helpers_getrequiredelement",
-      "community": 113,
-      "community_name": "@astrojs cloudflare",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "getrequiredelement()"
     },
     {
@@ -10973,8 +11281,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_app_elements",
-      "community": 113,
-      "community_name": "@astrojs cloudflare",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "elements.ts"
     },
     {
@@ -10984,8 +11292,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "src_scripts_app_elements_getappelements",
-      "community": 113,
-      "community_name": "@astrojs cloudflare",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "getappelements()"
     },
     {
@@ -10995,8 +11303,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_scripts_app_elements_appelements",
-      "community": 113,
-      "community_name": "@astrojs cloudflare",
+      "community": 19,
+      "community_name": "Transaction Interface",
       "norm_label": "appelements"
     },
     {
@@ -11006,8 +11314,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_app_state_format_helpers",
-      "community": 126,
-      "community_name": "typescript Module",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "state-format-helpers.ts"
     },
     {
@@ -11017,8 +11325,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_scripts_app_state_format_helpers_appstateformathelpersdeps",
-      "community": 126,
-      "community_name": "typescript Module",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "appstateformathelpersdeps"
     },
     {
@@ -11028,8 +11336,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "src_scripts_app_state_format_helpers_setupappstateformathelpers",
-      "community": 126,
-      "community_name": "typescript Module",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "setupappstateformathelpers()"
     },
     {
@@ -11127,8 +11435,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "src_scripts_category_emoji_decoratecategorylabel",
-      "community": 2,
-      "community_name": "Settings and Categories",
+      "community": 14,
+      "community_name": "Budget View Models",
       "norm_label": "decoratecategorylabel()"
     },
     {
@@ -11336,8 +11644,8 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "src_scripts_charts_donutchartitem",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "donutchartitem"
     },
     {
@@ -11347,8 +11655,8 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "src_scripts_charts_multilineseries",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "multilineseries"
     },
     {
@@ -11490,8 +11798,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contribution-workflow.ts"
     },
     {
@@ -11501,8 +11809,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_contributionflowallocation",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contributionflowallocation"
     },
     {
@@ -11512,8 +11820,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_unknownrecord",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "unknownrecord"
     },
     {
@@ -11523,8 +11831,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_liquidity_target_keys",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "liquidity_target_keys"
     },
     {
@@ -11534,8 +11842,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_liquidity_target_labels",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "liquidity_target_labels"
     },
     {
@@ -11545,8 +11853,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_normalizeliquidityname",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "normalizeliquidityname()"
     },
     {
@@ -11556,8 +11864,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_getliquiditytargetlabel",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "getliquiditytargetlabel()"
     },
     {
@@ -11567,8 +11875,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_resolveliquidityaccountsfromconfiguredids",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "resolveliquidityaccountsfromconfiguredids()"
     },
     {
@@ -11578,8 +11886,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_findliquiditytargets",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "findliquiditytargets()"
     },
     {
@@ -11589,8 +11897,8 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_derivedefaultliquidityaccountids",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "derivedefaultliquidityaccountids()"
     },
     {
@@ -11600,8 +11908,8 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_sanitizeflowallocations",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "sanitizeflowallocations()"
     },
     {
@@ -11611,8 +11919,8 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_getflowfromallocations",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "getflowfromallocations()"
     },
     {
@@ -11622,8 +11930,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_derivecontributionflow",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "derivecontributionflow()"
     },
     {
@@ -11633,8 +11941,8 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "src_scripts_contribution_workflow_tosnapshotdate",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "tosnapshotdate()"
     },
     {
@@ -11721,8 +12029,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_scripts_investment_movements",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "investment-movements.ts"
     },
     {
@@ -11743,8 +12051,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_investmentcomputedfields",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "investmentcomputedfields"
     },
     {
@@ -11754,8 +12062,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_computeinvestmentmovement",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "computeinvestmentmovement()"
     },
     {
@@ -11765,8 +12073,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_normalizeinvestmentside",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "normalizeinvestmentside()"
     },
     {
@@ -11776,8 +12084,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_normalizeinvestmentsymbol",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "normalizeinvestmentsymbol()"
     },
     {
@@ -11787,8 +12095,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_buildinvestmentdescription",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "buildinvestmentdescription()"
     },
     {
@@ -11798,8 +12106,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_parsetransactionyear",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "parsetransactionyear()"
     },
     {
@@ -11809,8 +12117,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_normalizenonnegative",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "normalizenonnegative()"
     },
     {
@@ -11820,8 +12128,8 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_roundwithprecision",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "roundwithprecision()"
     },
     {
@@ -11831,8 +12139,8 @@
       "source_location": "L95",
       "_origin": "ast",
       "id": "src_scripts_investment_movements_formatunits",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "formatunits()"
     },
     {
@@ -12205,8 +12513,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "src_scripts_state_serversaveresult",
-      "community": 126,
-      "community_name": "typescript Module",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "serversaveresult"
     },
     {
@@ -12799,8 +13107,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_scripts_transactions_filterandsorttransactions",
-      "community": 31,
-      "community_name": "Financial Goals State",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "filterandsorttransactions()"
     },
     {
@@ -12810,8 +13118,8 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "src_scripts_transactions_buildaccountfilteroptions",
-      "community": 31,
-      "community_name": "Financial Goals State",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "buildaccountfilteroptions()"
     },
     {
@@ -12931,8 +13239,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "src_scripts_types_budgettype",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 45,
+      "community_name": "Market Quote Types",
       "norm_label": "budgettype"
     },
     {
@@ -12997,8 +13305,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "src_scripts_types_entitykey",
-      "community": 2,
-      "community_name": "Settings and Categories",
+      "community": 32,
+      "community_name": "Vue Finance Workspace",
       "norm_label": "entitykey"
     },
     {
@@ -13063,8 +13371,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_scripts_types_goalkey",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 11,
+      "community_name": "Financial State Normalization",
       "norm_label": "goalkey"
     },
     {
@@ -13085,8 +13393,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "src_scripts_types_transaction",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 0,
+      "community_name": "Stock Events Integration",
       "norm_label": "transaction"
     },
     {
@@ -13107,8 +13415,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "src_scripts_types_instrument",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "instrument"
     },
     {
@@ -13118,8 +13426,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "src_scripts_types_quote",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "quote"
     },
     {
@@ -13151,8 +13459,8 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "src_scripts_types_snapshotrow",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "snapshotrow"
     },
     {
@@ -13162,8 +13470,8 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "src_scripts_types_goal",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 54,
+      "community_name": "Demo Seed Builder",
       "norm_label": "goal"
     },
     {
@@ -13184,8 +13492,8 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "src_scripts_types_contribution",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "contribution"
     },
     {
@@ -13228,8 +13536,8 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "src_scripts_types_state",
-      "community": 126,
-      "community_name": "typescript Module",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "state"
     },
     {
@@ -13272,8 +13580,8 @@
       "source_location": "L270",
       "_origin": "ast",
       "id": "src_scripts_types_section_route_map",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "section_route_map"
     },
     {
@@ -13294,8 +13602,8 @@
       "source_location": "L283",
       "_origin": "ast",
       "id": "src_scripts_types_route_section_map",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "route_section_map"
     },
     {
@@ -13371,8 +13679,8 @@
       "source_location": "L340",
       "_origin": "ast",
       "id": "src_scripts_types_issectionid",
-      "community": 9,
-      "community_name": "Budget Goals Dashboard",
+      "community": 76,
+      "community_name": "Wealth Snapshot Table",
       "norm_label": "issectionid()"
     },
     {
@@ -13547,8 +13855,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "src_scripts_utils_monthfromiso",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "monthfromiso()"
     },
     {
@@ -13580,8 +13888,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "src_scripts_utils_clone",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 37,
+      "community_name": "Dashboard Statistics",
       "norm_label": "clone()"
     },
     {
@@ -13701,8 +14009,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_services_market_api",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "market-api.ts"
     },
     {
@@ -13712,8 +14020,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "src_services_market_api_fetchmarketquotes",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "fetchmarketquotes()"
     },
     {
@@ -13723,8 +14031,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "src_services_market_api_searchmarketsymbols",
-      "community": 21,
-      "community_name": "Market Instrument Editor",
+      "community": 33,
+      "community_name": "Investment Valuation",
       "norm_label": "searchmarketsymbols()"
     },
     {
@@ -13877,8 +14185,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_stores_budget",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "budget.ts"
     },
     {
@@ -13888,8 +14196,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_stores_budget_usebudgetstore",
-      "community": 14,
-      "community_name": "Budget View Models",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "usebudgetstore"
     },
     {
@@ -13976,8 +14284,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "src_stores_data_usedatastore",
-      "community": 36,
-      "community_name": "Investment Dashboard Calculations",
+      "community": 43,
+      "community_name": "Data Management View",
       "norm_label": "usedatastore"
     },
     {
@@ -13987,8 +14295,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_stores_financial_state",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "financial-state.ts"
     },
     {
@@ -13998,8 +14306,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "src_stores_financial_state_financestorestatus",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "financestorestatus"
     },
     {
@@ -14009,8 +14317,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "src_stores_financial_state_statecommithandler",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "statecommithandler"
     },
     {
@@ -14020,8 +14328,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_stores_financial_state_statereloadhandler",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 22,
+      "community_name": "Application State Hydration",
       "norm_label": "statereloadhandler"
     },
     {
@@ -14031,8 +14339,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "src_stores_financial_state_usefinancialstatestore",
-      "community": 43,
-      "community_name": "Data Management View",
+      "community": 55,
+      "community_name": "Investment Movement Calculations",
       "norm_label": "usefinancialstatestore"
     },
     {
@@ -14042,8 +14350,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_stores_goals",
-      "community": 10,
-      "community_name": "Contribution Calculations",
+      "community": 11,
+      "community_name": "Financial State Normalization",
       "norm_label": "goals.ts"
     },
     {
@@ -14064,8 +14372,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_stores_investment",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "investment.ts"
     },
     {
@@ -14075,8 +14383,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "src_stores_investment_newinvestmentmovementinput",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "newinvestmentmovementinput"
     },
     {
@@ -14229,8 +14537,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "src_stores_movements_usemovementsstore",
-      "community": 19,
-      "community_name": "Transaction Interface",
+      "community": 28,
+      "community_name": "Movement Domain Types",
       "norm_label": "usemovementsstore"
     },
     {
@@ -14416,8 +14724,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "src_stores_ui",
-      "community": 76,
-      "community_name": "Wealth Snapshot Table",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "ui.ts"
     },
     {
@@ -14427,8 +14735,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "src_stores_ui_currentmonth",
-      "community": 76,
-      "community_name": "Wealth Snapshot Table",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "currentmonth()"
     },
     {
@@ -14438,8 +14746,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "src_stores_ui_createdefaultuistate",
-      "community": 76,
-      "community_name": "Wealth Snapshot Table",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "createdefaultuistate()"
     },
     {
@@ -14449,8 +14757,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "src_stores_ui_useuistore",
-      "community": 76,
-      "community_name": "Wealth Snapshot Table",
+      "community": 35,
+      "community_name": "Investment Dashboard Tabs",
       "norm_label": "useuistore"
     },
     {
@@ -16176,8 +16484,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_unit_contribution_workflow_test",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 9,
+      "community_name": "Budget Goals Dashboard",
       "norm_label": "contribution-workflow.test.ts"
     },
     {
@@ -16231,8 +16539,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_unit_demo_seed_test",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 48,
+      "community_name": "Subscription Materialization",
       "norm_label": "demo-seed.test.ts"
     },
     {
@@ -16330,8 +16638,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_unit_investment_movements_test",
-      "community": 11,
-      "community_name": "Financial State Normalization",
+      "community": 21,
+      "community_name": "Market Instrument Editor",
       "norm_label": "investment-movements.test.ts"
     },
     {
@@ -16396,8 +16704,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_unit_market_data_test",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "market-data.test.ts"
     },
     {
@@ -16407,8 +16715,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "tests_unit_market_data_test_instrument",
-      "community": 45,
-      "community_name": "Market Quote Types",
+      "community": 18,
+      "community_name": "Market Data Loading",
       "norm_label": "instrument"
     },
     {
@@ -16429,8 +16737,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_unit_shared_helpers_test",
-      "community": 3,
-      "community_name": "Dashboard Charts and Wealth",
+      "community": 62,
+      "community_name": "Market Symbol Search",
       "norm_label": "shared-helpers.test.ts"
     },
     {
@@ -42509,7 +42817,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L300",
+      "source_location": "L414",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42520,7 +42828,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L242",
+      "source_location": "L356",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42531,7 +42839,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L209",
+      "source_location": "L303",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42542,7 +42850,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L276",
+      "source_location": "L336",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_cacheexpiry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L390",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42553,7 +42872,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L285",
+      "source_location": "L399",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42564,7 +42883,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L20",
+      "source_location": "L70",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_createquoteload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L39",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42575,7 +42905,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L99",
+      "source_location": "L189",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42586,7 +42916,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L226",
+      "source_location": "L320",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42597,7 +42927,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L50",
+      "source_location": "L100",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42608,7 +42938,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L65",
+      "source_location": "L144",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_fetchproviderquotefrom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L155",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42619,7 +42960,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L82",
+      "source_location": "L172",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42630,7 +42971,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L271",
+      "source_location": "L385",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42641,7 +42982,29 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L25",
+      "source_location": "L21",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_inflightquotes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L81",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_loadandcachequote",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L44",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42663,6 +43026,17 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_marketprovidererror",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
       "source_location": "L12",
       "weight": 1.0,
       "_origin": "ast",
@@ -42674,7 +43048,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L18",
+      "source_location": "L20",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42689,6 +43063,17 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_normalizeprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L215",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
       "target": "src_lib_server_market_data_normalizeproviderquote",
       "confidence_score": 1.0
     },
@@ -42696,7 +43081,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L280",
+      "source_location": "L394",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42707,7 +43092,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L155",
+      "source_location": "L249",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42718,7 +43103,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L192",
+      "source_location": "L286",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42729,7 +43114,29 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L246",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_providerquote",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L22",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_ratelimitedquotes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L360",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42740,7 +43147,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L178",
+      "source_location": "L272",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42751,7 +43158,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L290",
+      "source_location": "L404",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42762,7 +43169,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L295",
+      "source_location": "L409",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42773,7 +43180,29 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L198",
+      "source_location": "L347",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_readretryafterms",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L340",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_rememberratelimit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L292",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42784,7 +43213,40 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L259",
+      "source_location": "L130",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_resolvefallbackprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L121",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_resolveprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L138",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data",
+      "target": "src_lib_server_market_data_shoulduseproviderfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L373",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data",
@@ -42891,7 +43353,18 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L21",
+      "source_location": "L30",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_marketprovidererror",
+      "target": "src_lib_server_market_data_marketprovidererror_constructor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L40",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_edgecache",
@@ -42902,7 +43375,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L22",
+      "source_location": "L41",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_edgecache",
@@ -42914,7 +43387,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L250",
+      "source_location": "L364",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_readedgecache",
@@ -42926,7 +43399,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L263",
+      "source_location": "L377",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_writeedgecache",
@@ -42938,7 +43411,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L30",
+      "source_location": "L49",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_loadmarketquote",
@@ -42950,7 +43423,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L46",
+      "source_location": "L55",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_loadmarketquote",
@@ -42962,11 +43435,11 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L37",
+      "source_location": "L59",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_loadmarketquote",
-      "target": "src_lib_server_market_data_fetchproviderquote",
+      "target": "src_lib_server_market_data_createquoteload",
       "confidence_score": 1.0
     },
     {
@@ -42974,47 +43447,11 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L38",
+      "source_location": "L63",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_loadmarketquote",
-      "target": "src_lib_server_market_data_normalizeproviderquote",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L33",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_loadmarketquote",
-      "target": "src_lib_server_market_data_readedgecache",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L40",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_loadmarketquote",
-      "target": "src_lib_server_market_data_readnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L43",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_loadmarketquote",
-      "target": "src_lib_server_market_data_writeedgecache",
+      "target": "src_lib_server_market_data_rememberratelimit",
       "confidence_score": 1.0
     },
     {
@@ -43058,10 +43495,166 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L60",
+      "source_location": "L76",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_createquoteload",
+      "target": "src_lib_server_market_data_loadandcachequote",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L89",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_cacheexpiry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L93",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_fetchproviderquote",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L94",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_normalizeproviderquote",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L87",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_readedgecache",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L96",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_readnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L96",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_loadandcachequote",
+      "target": "src_lib_server_market_data_writeedgecache",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L109",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_fetchproviderquote",
+      "target": "src_lib_server_market_data_fetchproviderquotefrom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L112",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_fetchproviderquote",
+      "target": "src_lib_server_market_data_resolvefallbackprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L105",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_fetchproviderquote",
+      "target": "src_lib_server_market_data_resolveprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L113",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_fetchproviderquote",
+      "target": "src_lib_server_market_data_shoulduseproviderfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L122",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_resolveprovider",
+      "target": "src_lib_server_market_data_normalizeprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L131",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_resolvefallbackprovider",
+      "target": "src_lib_server_market_data_normalizeprovider",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L151",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_fetchproviderquotefrom",
       "target": "src_lib_server_market_data_fetchcoingecko",
       "confidence_score": 1.0
     },
@@ -43070,10 +43663,10 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L62",
+      "source_location": "L152",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "src_lib_server_market_data_fetchproviderquote",
+      "source": "src_lib_server_market_data_fetchproviderquotefrom",
       "target": "src_lib_server_market_data_fetchtwelvedata",
       "confidence_score": 1.0
     },
@@ -43082,10 +43675,10 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L57",
+      "source_location": "L150",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "src_lib_server_market_data_fetchproviderquote",
+      "source": "src_lib_server_market_data_fetchproviderquotefrom",
       "target": "src_lib_server_market_data_fetchyahoofinance",
       "confidence_score": 1.0
     },
@@ -43094,7 +43687,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L75",
+      "source_location": "L165",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_fetchtwelvedata",
@@ -43106,7 +43699,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L92",
+      "source_location": "L182",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_fetchyahoofinance",
@@ -43118,7 +43711,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L118",
+      "source_location": "L208",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_fetchcoingecko",
@@ -43130,7 +43723,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L109",
+      "source_location": "L199",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_fetchcoingecko",
@@ -43142,7 +43735,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L126",
+      "source_location": "L221",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
@@ -43154,7 +43747,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L151",
+      "source_location": "L245",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
@@ -43166,7 +43759,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L140",
+      "source_location": "L234",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
@@ -43178,7 +43771,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L129",
+      "source_location": "L223",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
@@ -43190,7 +43783,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L136",
+      "source_location": "L230",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
@@ -43202,130 +43795,10 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L138",
+      "source_location": "L232",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_normalizeproviderquote",
-      "target": "src_lib_server_market_data_readoptionalnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L156",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_asrecord",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L174",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_calculatechangepercent",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L163",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_normalizeyahootimestamp",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L159",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_readlatestyahooclose",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L160",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_readnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L162",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahooquote",
-      "target": "src_lib_server_market_data_readoptionalnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L180",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_readlatestyahooclose",
-      "target": "src_lib_server_market_data_asrecord",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L184",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_readlatestyahooclose",
-      "target": "src_lib_server_market_data_readnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L186",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_readlatestyahooclose",
-      "target": "src_lib_server_market_data_readoptionalnumber",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "context": "call",
-      "confidence": "EXTRACTED",
-      "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L193",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_data_normalizeyahootimestamp",
       "target": "src_lib_server_market_data_readoptionalnumber",
       "confidence_score": 1.0
     },
@@ -43337,6 +43810,150 @@
       "source_location": "L250",
       "weight": 1.0,
       "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_asrecord",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L268",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_calculatechangepercent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L257",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_normalizeyahootimestamp",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L253",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_readlatestyahooclose",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L254",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_readnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L256",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahooquote",
+      "target": "src_lib_server_market_data_readoptionalnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L274",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_readlatestyahooclose",
+      "target": "src_lib_server_market_data_asrecord",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L278",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_readlatestyahooclose",
+      "target": "src_lib_server_market_data_readnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L280",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_readlatestyahooclose",
+      "target": "src_lib_server_market_data_readoptionalnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L287",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_normalizeyahootimestamp",
+      "target": "src_lib_server_market_data_readoptionalnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L329",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_fetchjsonwithtimeout",
+      "target": "src_lib_server_market_data_readretryafterms",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L337",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_data_cacheexpiry",
+      "target": "src_lib_server_market_data_readnumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-data.ts",
+      "source_location": "L364",
+      "weight": 1.0,
+      "_origin": "ast",
       "source": "src_lib_server_market_data_readedgecache",
       "target": "src_lib_server_market_data_cacherequest",
       "confidence_score": 1.0
@@ -43346,7 +43963,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L247",
+      "source_location": "L361",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_readedgecache",
@@ -43358,7 +43975,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L263",
+      "source_location": "L377",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_writeedgecache",
@@ -43370,7 +43987,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L260",
+      "source_location": "L374",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_writeedgecache",
@@ -43382,7 +43999,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-data.ts",
-      "source_location": "L296",
+      "source_location": "L410",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_data_readoptionalnumber",
@@ -43393,11 +44010,99 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L42",
+      "source_location": "L153",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_asrecord",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_cachesearchresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L45",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_createsearch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L129",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_fetchjson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L139",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_search",
       "target": "src_lib_server_market_search_fetchwithtimeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_inflightsearches",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L56",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_loadsearchresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_marketsearchenv",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L18",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_marketsearcherror",
       "confidence_score": 1.0
     },
     {
@@ -43415,7 +44120,40 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L11",
+      "source_location": "L80",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_parseyahooresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L15",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_searchcache",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L88",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L25",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_search",
@@ -43426,7 +44164,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L28",
+      "source_location": "L124",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search",
+      "target": "src_lib_server_market_search_shouldusesearchfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L110",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_search",
@@ -43482,28 +44231,27 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L19",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_marketsearcherror",
+      "target": "src_lib_server_market_search_marketsearcherror_constructor",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "calls",
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L16",
+      "source_location": "L37",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_server_market_search_searchyahoosymbols",
-      "target": "src_lib_server_market_search_fetchwithtimeout",
+      "target": "src_lib_server_market_search_createsearch",
       "confidence_score": 1.0
-    },
-    {
-      "relation": "indirect_call",
-      "context": "argument",
-      "confidence": "INFERRED",
-      "source_file": "src/lib/server/market-search.ts",
-      "source_location": "L24",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "src_lib_server_market_search_searchyahoosymbols",
-      "target": "src_lib_server_market_search_tosearchresult",
-      "confidence_score": 0.5
     },
     {
       "relation": "imports",
@@ -43539,6 +44287,150 @@
       "_origin": "ast",
       "source": "tests_unit_market_search_test",
       "target": "src_lib_server_market_search_searchyahoosymbols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L51",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_createsearch",
+      "target": "src_lib_server_market_search_loadsearchresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L70",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_loadsearchresults",
+      "target": "src_lib_server_market_search_cachesearchresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L64",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_loadsearchresults",
+      "target": "src_lib_server_market_search_fetchjson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_loadsearchresults",
+      "target": "src_lib_server_market_search_parseyahooresults",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L74",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_loadsearchresults",
+      "target": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L73",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_loadsearchresults",
+      "target": "src_lib_server_market_search_shouldusesearchfallback",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L81",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_parseyahooresults",
+      "target": "src_lib_server_market_search_asrecord",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "indirect_call",
+      "context": "argument",
+      "confidence": "INFERRED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L84",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_parseyahooresults",
+      "target": "src_lib_server_market_search_tosearchresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L99",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "target": "src_lib_server_market_search_asrecord",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L94",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "target": "src_lib_server_market_search_fetchjson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "indirect_call",
+      "context": "argument",
+      "confidence": "INFERRED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L102",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_searchtwelvedatasymbols",
+      "target": "src_lib_server_market_search_tosearchresult",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/server/market-search.ts",
+      "source_location": "L134",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_server_market_search_fetchjson",
+      "target": "src_lib_server_market_search_fetchwithtimeout",
       "confidence_score": 1.0
     },
     {
@@ -61893,5 +62785,5 @@
       "source_file": ".agents/skills/vue-best-practices/SKILL.md"
     }
   ],
-  "built_at_commit": "bb954fdd93dc7970c4ee090c1d2c16ad5ffe5f71"
+  "built_at_commit": "282746b812e18651a2a467ddb279b362d80c4fe5"
 }
