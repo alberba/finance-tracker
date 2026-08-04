@@ -270,9 +270,9 @@
     "semantic_hash": "f0add8e79f99c18b0d8e3f4ad25268fc"
   },
   "src/components/recurring/PendingMovementsPanel.vue": {
-    "mtime": 1785861178.4866774,
-    "ast_hash": "6e7784f0db2b3e6bf657b8bd2a7162d7",
-    "semantic_hash": "6e7784f0db2b3e6bf657b8bd2a7162d7"
+    "mtime": 1785862023.5944455,
+    "ast_hash": "e27851c759bd126f06493e9fea91ad39",
+    "semantic_hash": ""
   },
   "src/components/recurring/RecurringRulesPanel.vue": {
     "mtime": 1785861302.5292108,
@@ -705,9 +705,9 @@
     "semantic_hash": "c98f4a3019698fd373321f2985b78d44"
   },
   "src/scripts/state.ts": {
-    "mtime": 1785861178.523316,
-    "ast_hash": "03255505f1cd093c8c12c95dfb590908",
-    "semantic_hash": "03255505f1cd093c8c12c95dfb590908"
+    "mtime": 1785862023.595066,
+    "ast_hash": "9fec9e3a2e7cf1f74638424633c3c12a",
+    "semantic_hash": ""
   },
   "src/scripts/subscriptions.ts": {
     "mtime": 1785861178.5237083,
@@ -795,8 +795,8 @@
     "semantic_hash": "44c17871c12aeb5e4c04c4161b9988e7"
   },
   "src/stores/recurring.ts": {
-    "mtime": 1785861533.599204,
-    "ast_hash": "d2ba039a15724ff3eb0890bac3a4aeb2",
+    "mtime": 1785862023.5954213,
+    "ast_hash": "30011db0896e786498debf5606d6db95",
     "semantic_hash": ""
   },
   "src/stores/settings.ts": {
@@ -890,8 +890,8 @@
     "semantic_hash": "8b8af1af50859ade77ef8735d19175a0"
   },
   "tests/e2e/live-market-recurring.spec.ts": {
-    "mtime": 1785861385.98176,
-    "ast_hash": "223245be40f1f8ec4d75e6d353fe30f9",
+    "mtime": 1785862023.5957913,
+    "ast_hash": "56cef6556bfbcb7198bd6a5c7cd29a89",
     "semantic_hash": ""
   },
   "tests/e2e/mobile-smoke.spec.ts": {
@@ -905,8 +905,8 @@
     "semantic_hash": ""
   },
   "tests/e2e/pages/LiveMarketPage.ts": {
-    "mtime": 1785861385.9812133,
-    "ast_hash": "54408cd434ed68928a7f80cffe20f9ec",
+    "mtime": 1785862023.5962088,
+    "ast_hash": "7434c82099a1b8cec77e7f273592255b",
     "semantic_hash": ""
   },
   "tests/e2e/reports.spec.ts": {
@@ -975,8 +975,8 @@
     "semantic_hash": "c71ea48ca789089ee738207b6bb62acc"
   },
   "tests/unit/live-market-recurring.test.ts": {
-    "mtime": 1785861332.0318327,
-    "ast_hash": "44a3d2b6ac91c3f3161116bcf6a3a3d3",
+    "mtime": 1785862052.6086142,
+    "ast_hash": "6ac9116b809d13793a6264e8c12e437e",
     "semantic_hash": ""
   },
   "tests/unit/market-data.test.ts": {

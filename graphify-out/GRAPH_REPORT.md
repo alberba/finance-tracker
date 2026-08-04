@@ -1,16 +1,16 @@
 # Graph Report - finance-tracker  (2026-08-04)
 
 ## Corpus Check
-- 289 files · ~184,630 words
+- 289 files · ~185,161 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1780 nodes · 3546 edges · 149 communities (113 shown, 36 thin omitted)
+- 1781 nodes · 3553 edges · 150 communities (116 shown, 34 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 62 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `72d95343`
+- Built from commit: `bb954fdd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -154,6 +154,7 @@
 - @astrojs/check
 - ProgressBar.vue
 - WealthSnapshotTable.vue
+- eslint-plugin-vue
 
 ## God Nodes (most connected - your core abstractions)
 1. `FinanceTrackerPage` - 92 edges
@@ -206,7 +207,7 @@
 - **Vue Async View Composition** — agents_skills_vue_best_practices_references_component_async_async_components, agents_skills_vue_best_practices_references_component_suspense_suspense_boundaries, agents_skills_vue_best_practices_references_component_keep_alive_keepalive_cache, agents_skills_vue_best_practices_references_component_transition_transition_component [EXTRACTED 1.00]
 - **Vue Animation Strategies** — agents_skills_vue_best_practices_references_animation_class_based_technique_class_based_animation, agents_skills_vue_best_practices_references_animation_state_driven_technique_state_driven_animation, agents_skills_vue_best_practices_references_component_transition_group_transitiongroup_lists, agents_skills_vue_best_practices_references_component_transition_transition_component [INFERRED 0.85]
 
-## Communities (149 total, 36 thin omitted)
+## Communities (150 total, 34 thin omitted)
 
 ### Community 0 - "Stock Events Integration"
 Cohesion: 0.06
@@ -214,15 +215,15 @@ Nodes (47): apiKeyInput, hasApiKey, hiddenRows, showHiddenSymbols, stockEventsSt
 
 ### Community 1 - "Cloud State and Reports"
 Cohesion: 0.07
-Nodes (50): FINANCE_TRACKER_SEED, getD1FromLocals(), getRuntimeEnvFromLocals(), LocalsWithRuntime, RuntimeEnv, D1DatabaseLike, D1StatementLike, ensureSchema() (+42 more)
+Nodes (49): FINANCE_TRACKER_SEED, getD1FromLocals(), LocalsWithRuntime, RuntimeEnv, D1DatabaseLike, D1StatementLike, ensureSchema(), loadStateFromD1() (+41 more)
 
 ### Community 2 - "Settings and Categories"
-Cohesion: 0.05
-Nodes (39): activeBlockId, currencyInput, indexEntries, settingsStore, { viewModel }, yearInput, name, openPickerFor (+31 more)
+Cohesion: 0.16
+Nodes (18): buildCategoryTags(), buildSettingsViewModel(), categoryKeyToType(), CategoryTagViewModel, SettingsViewModel, TwrLiquidityOptionViewModel, CATEGORY_EMOJI_MAP, categoryEmojiKey() (+10 more)
 
 ### Community 3 - "Dashboard Charts and Wealth"
-Cohesion: 0.13
-Nodes (32): canvas, props, renderChart(), renderChart(), DashboardCashflowChart, areaFill(), axisColor(), baseScales() (+24 more)
+Cohesion: 0.05
+Nodes (63): canvasRef, props, canvas, props, renderChart(), canvas, emit, netWorthLabel (+55 more)
 
 ### Community 5 - "Build Scripts and Dependencies"
 Cohesion: 0.05
@@ -234,39 +235,39 @@ Nodes (32): closeDialog(), dialogRef, focusReportForm(), isClosing, isOpen, laun
 
 ### Community 7 - "Contribution Workflow"
 Cohesion: 0.06
-Nodes (34): allocationWarning, allocValues, calcDialogRef, calcExpression, calcExpressionInput, calcTargetId, calcTargetKind, calcTargetName (+26 more)
+Nodes (29): allocationWarning, allocValues, calcDialogRef, calcExpression, calcExpressionInput, calcTargetId, calcTargetKind, calcTargetName (+21 more)
 
 ### Community 8 - "Recurring Transactions"
-Cohesion: 0.11
-Nodes (32): categoryOptions, editingRuleId, financialStateStore, form, frequencies, movementsStore, recurringStore, resetForm() (+24 more)
+Cohesion: 0.10
+Nodes (35): categoryOptions, editingRuleId, financialStateStore, form, frequencies, movementsStore, recurringStore, resetForm() (+27 more)
 
 ### Community 9 - "Budget Goals Dashboard"
-Cohesion: 0.17
-Nodes (10): edit, editingId, editingIsInvestment, financialStateStore, investmentTotal, openTransactions(), pending, props (+2 more)
+Cohesion: 0.12
+Nodes (17): edit, editingId, editingIsInvestment, financialStateStore, investmentTotal, openTransactions(), pending, props (+9 more)
 
 ### Community 10 - "Contribution Calculations"
-Cohesion: 0.22
-Nodes (11): canvas, emit, netWorthLabel, netWorthSizeClass, props, renderChart(), DashboardLineChart, DashboardRangeOption (+3 more)
+Cohesion: 0.13
+Nodes (18): emit, updateField(), financialStateStore, formatter, goalsStore, props, { viewModel }, buildCurrentMap() (+10 more)
 
 ### Community 11 - "Financial State Normalization"
 Cohesion: 0.05
-Nodes (104): addDays(), buildDemoSeed(), FINANCE_TRACKER_DEMO_SEED, iso(), mulberry32(), toISODate(), AllocationInputValue, applyContributionSave() (+96 more)
+Nodes (110): categoryOptions, close(), dialogRef, ensureValidCategory(), form, movementsStore, onDateChange(), onSubmit() (+102 more)
 
 ### Community 12 - "Dashboard View Models"
-Cohesion: 0.13
-Nodes (27): addYear(), buildDashboardViewModel(), buildDashboardViewModelFromState(), buildDashboardYearOptions(), buildNetWorthChart(), buildRangeOptions(), buildRecentTransactions(), buildSavingsGoal() (+19 more)
+Cohesion: 0.12
+Nodes (28): addYear(), buildDashboardViewModel(), buildDashboardViewModelFromState(), buildDashboardYearOptions(), buildNetWorthChart(), buildRangeOptions(), buildRecentTransactions(), buildSavingsGoal() (+20 more)
 
 ### Community 13 - "Application Shell State"
 Cohesion: 0.12
 Nodes (29): isDemoMode(), resolveRuntimeNamespace(), setDemoModeEnabled(), requestReportDialogOpen(), applySidebarState(), BeforeInstallPromptEvent, initDemoBanner(), initDemoModeActions() (+21 more)
 
 ### Community 14 - "Budget View Models"
-Cohesion: 0.16
-Nodes (17): emit, handleInput(), BudgetBlockViewModel, BudgetCategoryRow, BudgetMonthCell, BudgetSummaryViewModel, budgetTypeMeta, budgetTypes (+9 more)
+Cohesion: 0.15
+Nodes (18): emit, handleInput(), BudgetBlockViewModel, BudgetCategoryRow, BudgetMonthCell, BudgetSummaryViewModel, budgetTypeMeta, budgetTypes (+10 more)
 
 ### Community 15 - "Core Finance Calculations"
-Cohesion: 0.05
-Nodes (76): emit, updateField(), financialStateStore, formatter, goalsStore, props, { viewModel }, buildWealthSplit() (+68 more)
+Cohesion: 0.16
+Nodes (25): buildWealthViewModel(), visibleMonthLimit(), WealthTimelineRow, WealthViewModel, computeAccountBalance(), computeContributionMetrics(), computeInvestmentValue(), computeLiabilityValue() (+17 more)
 
 ### Community 16 - "Graphify Tooling"
 Cohesion: 0.07
@@ -277,28 +278,28 @@ Cohesion: 0.09
 Nodes (29): Clean Code, Meaningful Names, Single Responsibility, Test-Driven Development, Playwright API Mocking, Playwright Configuration, Debugging Flaky Tests, Page Object Model (+21 more)
 
 ### Community 18 - "Market Data Loading"
-Cohesion: 0.18
-Nodes (24): asRecord(), buildCacheKey(), buildFallbackQuote(), cacheRequest(), calculateChangePercent(), EdgeCache, fetchCoinGecko(), fetchJsonWithTimeout() (+16 more)
+Cohesion: 0.25
+Nodes (19): asRecord(), buildCacheKey(), buildFallbackQuote(), calculateChangePercent(), fetchCoinGecko(), fetchJsonWithTimeout(), fetchProviderQuote(), fetchTwelveData() (+11 more)
 
 ### Community 19 - "Transaction Interface"
-Cohesion: 0.10
-Nodes (15): dialogRef, monthOptions, movementsStore, onDocumentPointerDown(), sectionRef, uiStore, { accounts, selectedVisibleCount }, bulk (+7 more)
+Cohesion: 0.13
+Nodes (11): dialogRef, monthOptions, movementsStore, onDocumentPointerDown(), sectionRef, uiStore, { accounts, selectedVisibleCount }, bulk (+3 more)
 
 ### Community 20 - "UI State Types"
 Cohesion: 0.11
-Nodes (11): CATEGORY_KEYS, ENTITY_KEYS, GOAL_FIELDS, GOAL_KEYS, INVESTMENT_SIDES, PendingMovementStatus, QuoteStatus, SNAPSHOT_KINDS (+3 more)
+Nodes (12): CATEGORY_KEYS, ContributionMetricRow, ENTITY_KEYS, GOAL_FIELDS, GOAL_KEYS, INVESTMENT_SIDES, PendingMovementStatus, QuoteStatus (+4 more)
 
 ### Community 21 - "Market Instrument Editor"
 Cohesion: 0.12
 Nodes (13): financialStateStore, form, isSearching, marketStore, searchError, searchInstrumentId, searchResults, searchSourceSymbols() (+5 more)
 
 ### Community 22 - "Application State Hydration"
-Cohesion: 0.15
-Nodes (10): budgetStore, financialStateStore, formatter, props, { viewModel }, useBudgetStore, FinanceStoreStatus, StateCommitHandler (+2 more)
+Cohesion: 0.14
+Nodes (7): budgetStore, financialStateStore, formatter, props, { viewModel }, props, sectionEl
 
 ### Community 23 - "Investment Progress Dashboard"
-Cohesion: 0.14
-Nodes (12): hasItems, props, ariaNow, fillWidth, props, DashboardTopExpenseItem, DashboardViewModel, buildDashboardInvestmentProgressItems() (+4 more)
+Cohesion: 0.12
+Nodes (15): hasItems, props, emit, navigate(), attrs, ariaNow, fillWidth, props (+7 more)
 
 ### Community 24 - "Wealth Calculations"
 Cohesion: 0.11
@@ -317,16 +318,20 @@ Cohesion: 0.12
 Nodes (15): activeSection, ../components/FinanceTrackerShell.astro, canonicalUrl, ./FinanceWorkspace.vue, [], isSecondarySectionActive, primarySections, secondarySections (+7 more)
 
 ### Community 28 - "Movement Domain Types"
-Cohesion: 0.18
-Nodes (16): AccountOption, buildAccountFilterOptions(), buildMonthBreakdown(), CategoryAmountRow, createCategoryMap(), filterAndSortTransactions(), MonthBreakdown, toSortedCategoryRows() (+8 more)
+Cohesion: 0.17
+Nodes (13): { breakdown, categoryEmojis }, { formatMoney }, movementsStore, sections, MonthBreakdown, SubscriptionFrequency, TransactionType, BulkTransactionChanges (+5 more)
 
 ### Community 30 - "Seed Data Extraction"
 Cohesion: 0.23
 Nodes (18): Path, build_seed(), ensure_known_accounts(), main(), parse_budget(), parse_contributions(), parse_goals(), parse_list_with_amount() (+10 more)
 
 ### Community 31 - "Financial Goals State"
-Cohesion: 0.33
-Nodes (9): UiState, TransactionFilters, TransactionSort, InvestmentSubTab, SortDirection, TransactionsSubTab, TxSortColumn, createDefaultUiState() (+1 more)
+Cohesion: 0.23
+Nodes (14): UiState, AccountOption, buildAccountFilterOptions(), buildMonthBreakdown(), CategoryAmountRow, createCategoryMap(), filterAndSortTransactions(), toSortedCategoryRows() (+6 more)
+
+### Community 32 - "Vue Finance Workspace"
+Cohesion: 0.12
+Nodes (10): activeBlockId, currencyInput, indexEntries, settingsStore, { viewModel }, yearInput, draft, props (+2 more)
 
 ### Community 33 - "Investment Valuation"
 Cohesion: 0.18
@@ -337,12 +342,12 @@ Cohesion: 0.17
 Nodes (8): activeTab, deleteDialogRef, investmentStore, onMonthChange(), returnMode, uiStore, workflowDialogRef, ReturnMode
 
 ### Community 36 - "Investment Dashboard Calculations"
-Cohesion: 0.40
-Nodes (4): currentSection, isReportDialogOpen, props, uiStore
+Cohesion: 0.18
+Nodes (7): currentSection, isReportDialogOpen, props, uiStore, dataStore, { summary }, useDataStore
 
 ### Community 37 - "Dashboard Statistics"
-Cohesion: 0.15
-Nodes (14): canvas, DashboardStatVariant, deltaToneClass, props, styleVars, variantStyles, chartItemsForTheme(), drawChart (+6 more)
+Cohesion: 0.28
+Nodes (16): bindChartTooltipEvents(), bindEvents(), getEventElement(), hydrateState(), init(), buildServerHeaders(), getKnownServerVersion(), hasPendingChanges() (+8 more)
 
 ### Community 38 - "Transaction Table Editing"
 Cohesion: 0.12
@@ -361,16 +366,16 @@ Cohesion: 0.14
 Nodes (13): astro/tsconfigs/strict, coverage, dist, node, node_modules, playwright-report, test-results, worker-configuration.d.ts (+5 more)
 
 ### Community 43 - "Data Management View"
-Cohesion: 0.18
-Nodes (8): dataStore, { summary }, buildDataSummaryViewModel(), buildTransactionsCsv(), CSV_HEADER, CsvField, DataSummaryViewModel, useDataStore
+Cohesion: 0.19
+Nodes (10): buildDataSummaryViewModel(), buildTransactionsCsv(), CSV_HEADER, CsvField, DataSummaryViewModel, clone(), FinanceStoreStatus, StateCommitHandler (+2 more)
 
 ### Community 44 - "Financial State Formatting"
-Cohesion: 0.28
-Nodes (11): buildInvestmentDescription(), computeInvestmentMovement(), formatUnits(), InvestmentComputedFields, InvestmentDraftInput, normalizeInvestmentSide(), normalizeInvestmentSymbol(), normalizeNonNegative() (+3 more)
+Cohesion: 0.31
+Nodes (13): accounts(), assets(), computeAccountBalance(), computeInvestmentPortfolioValueForReturnMode(), computeInvestmentValue(), computeTwrLiquidityValue(), getLatestDataMonth(), isBitvavoBrokerAccount() (+5 more)
 
 ### Community 45 - "Market Quote Types"
-Cohesion: 0.31
-Nodes (8): createJsonResponse(), MarketDataEnv, isInstrument(), json, normalizeFallbackQuotes(), normalizeInstruments(), POST(), QuotesBody
+Cohesion: 0.21
+Nodes (13): InstrumentValuation, getRuntimeEnvFromLocals(), MarketDataEnv, MarketQuoteRequest, isInstrument(), json, normalizeFallbackQuotes(), normalizeInstruments() (+5 more)
 
 ### Community 46 - "Investment Movement Editing"
 Cohesion: 0.15
@@ -385,16 +390,16 @@ Cohesion: 0.27
 Nodes (9): addMonths(), advanceSubscriptionDate(), daysInMonth(), DueSubscriptionsResult, formatIsoDate(), getFirstUpcomingChargeDate(), materializeDueSubscriptions(), parseIsoDate() (+1 more)
 
 ### Community 49 - "Goal View Models"
-Cohesion: 0.36
-Nodes (7): getSectionFromPath(), isSectionRoutePath(), normalizePath(), normalizeSectionId(), isSectionId(), ROUTE_SECTION_MAP, SECTION_ROUTE_MAP
+Cohesion: 0.15
+Nodes (5): name, openPickerFor, props, rootRef, settingsStore
 
 ### Community 50 - "Transaction Form Dialog"
-Cohesion: 0.18
-Nodes (12): categoryOptions, close(), dialogRef, ensureValidCategory(), form, movementsStore, onDateChange(), onSubmit() (+4 more)
+Cohesion: 0.38
+Nodes (6): applyCustom(), customEmoji, emit, EMOJI_PALETTE, pick(), props
 
 ### Community 51 - "Investment Movement Form"
-Cohesion: 0.33
-Nodes (4): emptyStat, props, DashboardKpis, DashboardStat
+Cohesion: 0.38
+Nodes (5): cacheRequest(), EdgeCache, getEdgeCache(), readEdgeCache(), writeEdgeCache()
 
 ### Community 52 - "Market Quotes Panel"
 Cohesion: 0.18
@@ -405,8 +410,8 @@ Cohesion: 0.29
 Nodes (8): applyCalc(), close(), closeCalc(), collectAllocations(), collectSnapshotInputs(), markSnapshotTouched(), onSubmit(), snapKey()
 
 ### Community 54 - "Demo Seed Builder"
-Cohesion: 0.25
-Nodes (7): { dashboardViewModel }, drawAllocationChart, drawAssetsChart, drawPortfolioChart, { formatMoney }, investmentStore, useInvestmentStore
+Cohesion: 0.40
+Nodes (5): buildWealthSplit(), getInvestmentBuckets(), InvestmentAsset, InvestmentBuckets, sumMatchingAssets()
 
 ### Community 55 - "Investment Movement Calculations"
 Cohesion: 0.29
@@ -433,8 +438,8 @@ Cohesion: 0.29
 Nodes (7): buildImportSql(), db, KEEP_IDS, OUTPUT_PATH, rows, SQLITE_PATH, toSqlString()
 
 ### Community 61 - "Test Seed Utilities"
-Cohesion: 0.47
-Nodes (5): InstrumentValuation, MarketQuoteRequest, Instrument, Quote, instrument
+Cohesion: 0.40
+Nodes (5): onDateChange(), onMonthChange(), open(), resetTouched(), seed()
 
 ### Community 62 - "Market Symbol Search"
 Cohesion: 0.46
@@ -454,11 +459,11 @@ Nodes (7): Vitest Test API, Vitest Test Concurrency and Sharding, Vitest Test Co
 
 ### Community 66 - "Astro Development Dependencies"
 Cohesion: 0.29
-Nodes (7): @astrojs/check, eslint-plugin-vue, typescript, devDependencies, @astrojs/check, eslint-plugin-vue, typescript
+Nodes (7): @astrojs/check, @astrojs/cloudflare, typescript, devDependencies, @astrojs/check, @astrojs/cloudflare, typescript
 
 ### Community 67 - "Recent Transactions Panel"
-Cohesion: 0.15
-Nodes (9): emit, navigate(), attrs, columns, emit, {
+Cohesion: 0.10
+Nodes (13): props, yearOptions, columns, emit, emptyStat, props, {
   currentCurrency,
   currentYear,
   yearOptions,
@@ -477,7 +482,7 @@ Nodes (9): emit, navigate(), attrs, columns, emit, {
   changeMonth,
   changeRange,
   navigate,
-}, props, DashboardRecentTransaction (+1 more)
+}, props (+5 more)
 
 ### Community 68 - "Contribution Deletion"
 Cohesion: 0.38
@@ -512,8 +517,8 @@ Cohesion: 0.33
 Nodes (5): scopedTsConfigs, scopedVueConfigs, scriptFiles, sharedGlobals, vueFiles
 
 ### Community 76 - "Wealth Snapshot Table"
-Cohesion: 0.17
-Nodes (15): useDashboardViewModel(), APP_SECTIONS, AppSectionConfig, DashboardHeroRange, DashboardNavigationDeps, DashboardNavigationElements, DashboardNavigationUi, MOBILE_PRIMARY_SECTIONS (+7 more)
+Cohesion: 0.16
+Nodes (17): useDashboardViewModel(), APP_SECTIONS, AppSectionConfig, DashboardHeroRange, DashboardNavigationDeps, DashboardNavigationElements, DashboardNavigationUi, MOBILE_PRIMARY_SECTIONS (+9 more)
 
 ### Community 78 - "Budget Desktop Snapshot"
 Cohesion: 0.40
@@ -560,12 +565,12 @@ Cohesion: 0.50
 Nodes (4): Post-commit Graph Refresh, Domain-guided Media Transcription, Incremental Graph Update, Replace on Re-extraction
 
 ### Community 90 - "Chart Canvas Component"
-Cohesion: 0.25
-Nodes (6): { contributionRows }, emit, { formatMoney }, investmentStore, returnText(), formatPercent()
+Cohesion: 0.13
+Nodes (13): { contributionRows }, emit, { formatMoney }, investmentStore, returnText(), { dashboardViewModel }, drawAllocationChart, drawAssetsChart (+5 more)
 
 ### Community 91 - "Dashboard Period Controls"
-Cohesion: 0.29
-Nodes (6): props, yearOptions, emit, onChange(), PeriodOption, DashboardMonthOption
+Cohesion: 0.67
+Nodes (3): emit, onChange(), PeriodOption
 
 ### Community 92 - "Transaction Reporting Snapshot"
 Cohesion: 0.50
@@ -631,9 +636,17 @@ Nodes (3): Bullseye Investment Symbol, Concentric Target Rings, Investment Dashb
 Cohesion: 0.40
 Nodes (4): Answer, Outcome, Q: Una vez hecho todo lo del grapiphy, podrías encontrar duplicidades que se pudiesen simplificar?, Source Nodes
 
+### Community 113 - "@astrojs cloudflare"
+Cohesion: 0.60
+Nodes (3): getRequiredElement(), AppElements, getAppElements()
+
 ### Community 115 - "eslint-config-prettier Module"
 Cohesion: 0.40
 Nodes (4): Answer, Outcome, Q: adelante con los medios, Source Nodes
+
+### Community 126 - "typescript Module"
+Cohesion: 0.60
+Nodes (4): AppStateFormatHelpersDeps, setupAppStateFormatHelpers(), ServerSaveResult, State
 
 ### Community 148 - "WealthSnapshotTable.vue"
 Cohesion: 0.47
@@ -642,14 +655,14 @@ Nodes (5): emit, keyOf(), onInput(), props, SnapshotRowViewModel
 ## Knowledge Gaps
 - **549 isolated node(s):** `sharedGlobals`, `scriptFiles`, `vueFiles`, `scopedTsConfigs`, `scopedVueConfigs` (+544 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **36 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **34 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `round2()` connect `Core Finance Calculations` to `Investment Valuation`, `Settings and Categories`, `Wealth Snapshot State`, `Contribution Workflow`, `Recurring Transactions`, `Budget Goals Dashboard`, `Financial State Normalization`, `Dashboard View Models`, `Financial State Formatting`, `Budget View Models`, `Subscription Materialization`, `Investment Section Tabs`, `Application State Hydration`, `Investment Progress Dashboard`, `Wealth Calculations`, `Movement Domain Types`?**
+- **Why does `round2()` connect `Financial State Normalization` to `Settings and Categories`, `Dashboard Charts and Wealth`, `Contribution Workflow`, `Recurring Transactions`, `Budget Goals Dashboard`, `Contribution Calculations`, `Dashboard View Models`, `Budget View Models`, `Core Finance Calculations`, `Investment Progress Dashboard`, `Wealth Calculations`, `Movement Domain Types`, `Financial Goals State`, `Investment Valuation`, `Financial State Formatting`, `Subscription Materialization`, `Investment Section Tabs`, `Demo Seed Builder`, `Test Seed Utilities`, `Wealth Snapshot State`?**
   _High betweenness centrality (0.033) - this node is a cross-community bridge._
-- **Why does `useUiStore` connect `Wealth Snapshot Table` to `Investment Dashboard Tabs`, `Investment Dashboard Calculations`, `Wealth Snapshot State`, `Issue Reporting Interface`, `Contribution Workflow`, `Transaction Table Editing`, `Financial State Normalization`, `Investment Movement Editing`, `Core Finance Calculations`, `Transaction Form Dialog`, `Transaction Interface`, `Movement Domain Types`, `Financial Goals State`?**
+- **Why does `useUiStore` connect `Wealth Snapshot Table` to `Investment Dashboard Tabs`, `Investment Dashboard Calculations`, `Dashboard Statistics`, `Issue Reporting Interface`, `Contribution Workflow`, `Transaction Table Editing`, `Wealth Snapshot State`, `Contribution Calculations`, `Financial State Normalization`, `Investment Movement Editing`, `Transaction Interface`, `Movement Domain Types`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Why does `FinanceTrackerPage` connect `Finance Page Objects` to `Investment Page Objects`, `Transaction Summary Assertions`, `Transaction Page Objects`, `Visual Layout Testing`, `E2E Fixtures and State`, `Wealth Page Objects`?**
   _High betweenness centrality (0.008) - this node is a cross-community bridge._
@@ -658,6 +671,6 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `Stock Events Integration` be split into smaller, more focused modules?**
   _Cohesion score 0.0642243328810493 - nodes in this community are weakly interconnected._
 - **Should `Cloud State and Reports` be split into smaller, more focused modules?**
-  _Cohesion score 0.0689484126984127 - nodes in this community are weakly interconnected._
-- **Should `Settings and Categories` be split into smaller, more focused modules?**
-  _Cohesion score 0.05026300409117475 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06963645673323093 - nodes in this community are weakly interconnected._
+- **Should `Dashboard Charts and Wealth` be split into smaller, more focused modules?**
+  _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._

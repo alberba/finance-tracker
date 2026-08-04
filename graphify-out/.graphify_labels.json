@@ -147,5 +147,6 @@
   "145": "vitest config",
   "146": "@astrojs/check",
   "147": "ProgressBar.vue",
-  "148": "WealthSnapshotTable.vue"
+  "148": "WealthSnapshotTable.vue",
+  "149": "eslint-plugin-vue"
 }

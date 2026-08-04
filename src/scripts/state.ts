@@ -464,8 +464,13 @@ function normalizeRecurringRules(list: unknown): RecurringRule[] {
     const type = isTransactionType(String(raw.type || "expense"))
       ? String(raw.type) as RecurringRule["type"]
       : "expense";
-    const units = normalizeOptionalNumber(raw.units);
-    const unitPrice = normalizeOptionalNumber(raw.unitPrice);
+    // Investment quantities and prices need more precision than currency
+    // amounts. Keep the same limits used by transaction normalization so
+    // fractional crypto holdings survive a state hydration round-trip.
+    const units = normalizeNonNegativeNumber(raw.units, 8);
+    const unitPrice = normalizeNonNegativeNumber(raw.unitPrice, 6);
+    const fee = normalizeNonNegativeNumber(raw.fee, 2);
+    const time = normalizeTime(raw.time);
     return {
       id: String(raw.id || uid("rule")),
       type,
@@ -477,6 +482,8 @@ function normalizeRecurringRules(list: unknown): RecurringRule[] {
       ...(isInvestmentSide(String(raw.side || "")) ? { side: String(raw.side) as "buy" | "sell" } : {}),
       ...(units !== null ? { units } : {}),
       ...(unitPrice !== null ? { unitPrice } : {}),
+      ...(fee !== null ? { fee } : {}),
+      ...(time ? { time } : {}),
       frequency,
       interval: Math.max(1, parseIntSafe(raw.interval, 1)),
       startDate: String(raw.startDate || todayISO()),
@@ -497,8 +504,12 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
     const status = statuses.includes(statusCandidate as PendingMovementStatus)
       ? (statusCandidate as PendingMovementStatus)
       : "pending";
-    const units = normalizeOptionalNumber(raw.units);
-    const unitPrice = normalizeOptionalNumber(raw.unitPrice);
+    // Pending automated investments are hydrated before confirmation. Do not
+    // round their fractional titles to the two decimals used by money values.
+    const units = normalizeNonNegativeNumber(raw.units, 8);
+    const unitPrice = normalizeNonNegativeNumber(raw.unitPrice, 6);
+    const fee = normalizeNonNegativeNumber(raw.fee, 2);
+    const time = normalizeTime(raw.time);
     return {
       id: String(raw.id || uid("pending")),
       occurrenceKey: String(raw.occurrenceKey || `${raw.ruleId || "rule"}:${raw.occurrenceDate || todayISO()}`),
@@ -515,6 +526,8 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
       ...(isInvestmentSide(String(raw.side || "")) ? { side: String(raw.side) as "buy" | "sell" } : {}),
       ...(units !== null ? { units } : {}),
       ...(unitPrice !== null ? { unitPrice } : {}),
+      ...(fee !== null ? { fee } : {}),
+      ...(time ? { time } : {}),
       status,
       createdAt: String(raw.createdAt || new Date().toISOString()),
       updatedAt: String(raw.updatedAt || raw.createdAt || new Date().toISOString()),
