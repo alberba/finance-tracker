@@ -167,7 +167,15 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(3)
 
-    await liveMarket.editFirstPending('Café editado', 5)
+    const pendingItem = await liveMarket.openFirstPendingEdit()
+    const descriptionInput = pendingItem.getByLabel('Descripción')
+    const accountSelect = pendingItem.getByLabel('Cuenta')
+    await expect(descriptionInput).toHaveCSS('min-height', '42px')
+    await expect(descriptionInput).toHaveCSS('border-radius', '11px')
+    await expect(accountSelect).toHaveCSS('min-height', '42px')
+    await descriptionInput.fill('Café editado')
+    await pendingItem.getByLabel('Importe').fill('5')
+    await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
     await expect(liveMarket.pendingPanel).toContainText('Café editado')
     await liveMarket.confirmFirstPending()
     await expect(liveMarket.pendingPanel).toContainText('(2)')
@@ -207,6 +215,23 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.confirmFirstPending()
     await expect(tracker.transactionsSection).toContainText('Aportación VWCE')
     await expect(tracker.transactionsSection).toContainText('212,50')
+  })
+
+  test('permite editar una regla de inversión recurrente', async ({ page, tracker }) => {
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openSettings()
+    await liveMarket.createRecurringRule({
+      account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
+      frequency: 'monthly', startDate: '2026-07-10',
+      type: 'investment', symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
+    })
+
+    await liveMarket.editFirstRecurringRule({ description: 'Aportación VWCE actualizada', amount: 212.5, units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
+    await expect(liveMarket.recurringRules).toContainText('Aportación VWCE actualizada')
+    await expect(liveMarket.recurringRules).toContainText('212.50')
   })
 
   test('avisa cuando el proveedor devuelve un dato obsoleto', async ({ page, tracker }) => {

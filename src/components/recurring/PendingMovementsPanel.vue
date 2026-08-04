@@ -72,7 +72,7 @@ function saveEdit(): void {
     <p v-if="!pending.length" class="mt-4 text-sm text-text-muted">No hay movimientos pendientes de revisión.</p>
     <div v-else class="mt-4 grid gap-3">
       <article v-for="item in pending" :key="item.id" class="rounded-lg border border-[var(--line)] p-3" data-pending-item>
-        <form v-if="editingId === item.id" class="grid gap-3 md:grid-cols-5" @submit.prevent="saveEdit">
+        <form v-if="editingId === item.id" class="settings-fields grid gap-3 md:grid-cols-5" @submit.prevent="saveEdit">
           <label>Fecha<input v-model="edit.date" type="date" required /></label>
           <label>Cuenta<select v-model="edit.accountId" required><option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
           <label>Categoría<input v-model="edit.category" required /></label>

@@ -270,14 +270,14 @@
     "semantic_hash": "f0add8e79f99c18b0d8e3f4ad25268fc"
   },
   "src/components/recurring/PendingMovementsPanel.vue": {
-    "mtime": 1785861119.516292,
-    "ast_hash": "6e7784f0db2b3e6bf657b8bd2a7162d7",
-    "semantic_hash": "6e7784f0db2b3e6bf657b8bd2a7162d7"
+    "mtime": 1785862277.037325,
+    "ast_hash": "e27851c759bd126f06493e9fea91ad39",
+    "semantic_hash": ""
   },
   "src/components/recurring/RecurringRulesPanel.vue": {
-    "mtime": 1785861119.5167222,
-    "ast_hash": "35efb1468c4089a54d18dbcd9beb3595",
-    "semantic_hash": "35efb1468c4089a54d18dbcd9beb3595"
+    "mtime": 1785862277.0382526,
+    "ast_hash": "ec18e42a89befac08008a554c08a2c80",
+    "semantic_hash": ""
   },
   "src/components/reports/GlobalReportLauncher.vue": {
     "mtime": 1785861119.5170755,
@@ -705,9 +705,9 @@
     "semantic_hash": "c98f4a3019698fd373321f2985b78d44"
   },
   "src/scripts/state.ts": {
-    "mtime": 1785861119.546782,
-    "ast_hash": "03255505f1cd093c8c12c95dfb590908",
-    "semantic_hash": "03255505f1cd093c8c12c95dfb590908"
+    "mtime": 1785862277.0389533,
+    "ast_hash": "9fec9e3a2e7cf1f74638424633c3c12a",
+    "semantic_hash": ""
   },
   "src/scripts/subscriptions.ts": {
     "mtime": 1785861119.547157,
@@ -795,9 +795,9 @@
     "semantic_hash": "44c17871c12aeb5e4c04c4161b9988e7"
   },
   "src/stores/recurring.ts": {
-    "mtime": 1785861119.5522618,
-    "ast_hash": "d3ab750da9479ed23c0d179202e5c887",
-    "semantic_hash": "d3ab750da9479ed23c0d179202e5c887"
+    "mtime": 1785862277.0395017,
+    "ast_hash": "30011db0896e786498debf5606d6db95",
+    "semantic_hash": ""
   },
   "src/stores/settings.ts": {
     "mtime": 1785861119.5525427,
@@ -890,9 +890,9 @@
     "semantic_hash": "8b8af1af50859ade77ef8735d19175a0"
   },
   "tests/e2e/live-market-recurring.spec.ts": {
-    "mtime": 1785861119.5739264,
-    "ast_hash": "4ab369ef8416f31e561fde91f53473f5",
-    "semantic_hash": "4ab369ef8416f31e561fde91f53473f5"
+    "mtime": 1785862277.039931,
+    "ast_hash": "56cef6556bfbcb7198bd6a5c7cd29a89",
+    "semantic_hash": ""
   },
   "tests/e2e/mobile-smoke.spec.ts": {
     "mtime": 1785861119.5748513,
@@ -905,9 +905,9 @@
     "semantic_hash": ""
   },
   "tests/e2e/pages/LiveMarketPage.ts": {
-    "mtime": 1785861119.5760355,
-    "ast_hash": "ec32450d39764b6f05722ac50e63ecd7",
-    "semantic_hash": "ec32450d39764b6f05722ac50e63ecd7"
+    "mtime": 1785862277.040717,
+    "ast_hash": "7434c82099a1b8cec77e7f273592255b",
+    "semantic_hash": ""
   },
   "tests/e2e/reports.spec.ts": {
     "mtime": 1785861119.5765238,
@@ -975,9 +975,9 @@
     "semantic_hash": "c71ea48ca789089ee738207b6bb62acc"
   },
   "tests/unit/live-market-recurring.test.ts": {
-    "mtime": 1785861119.5807106,
-    "ast_hash": "b9d457cd2ee6d303803a2703df5fe16d",
-    "semantic_hash": "b9d457cd2ee6d303803a2703df5fe16d"
+    "mtime": 1785862277.041182,
+    "ast_hash": "6ac9116b809d13793a6264e8c12e437e",
+    "semantic_hash": ""
   },
   "tests/unit/market-data.test.ts": {
     "mtime": 1785861862.1336062,

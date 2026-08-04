@@ -54,6 +54,19 @@ export class LiveMarketPage {
     await row.getByRole('button', { name: 'Vincular movimientos' }).click()
   }
 
+  async editFirstRecurringRule(params: { description: string; amount: number; units?: number; unitPrice?: number; fee?: number; time?: string }): Promise<void> {
+    const row = this.recurringRules.locator('.list-item').first()
+    await row.getByRole('button', { name: 'Editar' }).click()
+    const form = this.recurringRules.locator('form')
+    await form.getByLabel('Descripción').fill(params.description)
+    await form.getByLabel('Importe').fill(String(params.amount))
+    if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))
+    if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
+    if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
+    await form.getByRole('button', { name: 'Guardar regla' }).click()
+  }
+
   async searchSourceSymbol(currentSymbol: string, query: string): Promise<void> {
     const row = this.instrumentEditor.getByRole('listitem').filter({ hasText: currentSymbol })
     await row.getByLabel(`Símbolo fuente de ${currentSymbol}`).fill(query)
@@ -71,11 +84,16 @@ export class LiveMarketPage {
   }
 
   async editFirstPending(description: string, amount: number): Promise<void> {
-    const item = this.pendingPanel.locator('[data-pending-item]').first()
-    await item.getByRole('button', { name: 'Editar' }).click()
+    const item = await this.openFirstPendingEdit()
     await item.getByLabel('Descripción').fill(description)
     await item.getByLabel('Importe').fill(String(amount))
     await item.getByRole('button', { name: 'Guardar edición' }).click()
+  }
+
+  async openFirstPendingEdit(): Promise<Locator> {
+    const item = this.pendingPanel.locator('[data-pending-item]').first()
+    await item.getByRole('button', { name: 'Editar' }).click()
+    return item
   }
 
   async editFirstPendingInvestment(params: { units?: number; unitPrice?: number; fee?: number; time?: string; symbol?: string }): Promise<void> {

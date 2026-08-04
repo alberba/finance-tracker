@@ -64,6 +64,60 @@ describe('reglas recurrentes y pendientes', () => {
     expect(state.pendingMovements).toEqual([])
   })
 
+  it('conserva la precisión de títulos y precios en inversiones automatizadas', () => {
+    const state = normalizeState({
+      year: 2024,
+      accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
+      investmentAssets: [{ id: 'crypto', name: 'Crypto', openingBalance: 0 }],
+      recurringRules: [
+        {
+          id: 'rule-btc',
+          type: 'investment',
+          accountId: 'broker',
+          category: 'Crypto',
+          description: 'Compra BTC',
+          amount: 12.34,
+          symbol: 'BTC',
+          side: 'buy',
+          units: 0.00012345,
+          unitPrice: 54321.123456,
+          frequency: 'monthly',
+          interval: 1,
+          startDate: '2024-01-01',
+          active: true,
+          lastExecutionDate: null,
+          nextOccurrenceDate: '2024-02-01',
+        },
+      ],
+      pendingMovements: [
+        {
+          id: 'pending-eth',
+          occurrenceKey: 'rule-eth:2024-01-01',
+          ruleId: 'rule-eth',
+          occurrenceDate: '2024-01-01',
+          type: 'investment',
+          accountId: 'broker',
+          category: 'Crypto',
+          description: 'Compra ETH',
+          amount: 8.76,
+          symbol: 'ETH',
+          side: 'buy',
+          units: 0.00456789,
+          unitPrice: 3210.654321,
+          status: 'pending',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          transactionId: null,
+        },
+      ],
+    })
+
+    expect(state.recurringRules[0].units).toBe(0.00012345)
+    expect(state.recurringRules[0].unitPrice).toBe(54321.123456)
+    expect(state.pendingMovements[0].units).toBe(0.00456789)
+    expect(state.pendingMovements[0].unitPrice).toBe(3210.654321)
+  })
+
   it('confirma, edita y mantiene pendientes fuera de transacciones hasta confirmar', () => {
     setActivePinia(createPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
@@ -87,8 +141,130 @@ describe('reglas recurrentes y pendientes', () => {
     expect(store.pendingCount).toBe(1)
     vi.unstubAllGlobals()
   })
-})
+  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-01-15' })
+    const financialStore = useFinancialStateStore()
+    financialStore.replaceState({
+      year: 2024, currency: 'EUR', accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
+      investmentAssets: [], liabilities: [], incomeCategories: [], expenseCategories: [], investmentCategories: ['Fondos'],
+      transactions: [], snapshots: {}, budget: { income: {}, expense: {}, investment: {} }, goals: {}, contributions: [],
+      recurringRules: [], pendingMovements: [], instruments: [], quotes: {},
+    })
+    const store = useRecurringStore()
+    expect(store.addRule({
+      type: 'investment', accountId: 'broker', category: 'Fondos', description: 'Aporte original', amount: 100,
+      symbol: 'VWCE', side: 'buy', units: 1, unitPrice: 100, fee: 0,
+      frequency: 'monthly', interval: 1, startDate: '2024-01-01',
+    })).toBe(true)
+    expect(store.pendingCount).toBe(1)
+    const firstPending = store.openPendingMovements[0]
+    const ruleId = store.rules[0].id
 
+    expect(store.updateRule(ruleId, {
+      type: 'investment', accountId: 'broker', category: 'Fondos', description: 'Aporte actualizado', amount: 210,
+      symbol: 'VWCE', side: 'buy', units: 2, unitPrice: 105, fee: 0,
+      frequency: 'monthly', interval: 1, startDate: '2024-01-01',
+    })).toBe(true)
+    expect(store.openPendingMovements[0]).toMatchObject({ id: firstPending.id, description: 'Aporte original', amount: 100, units: 1, unitPrice: 100 })
+    expect(store.rules[0]).toMatchObject({ description: 'Aporte actualizado', amount: 210, units: 2, unitPrice: 105, nextOccurrenceDate: '2024-02-01' })
+
+    store.refreshPending('2024-02-02')
+    expect(store.openPendingMovements).toHaveLength(2)
+    expect(store.openPendingMovements[1]).toMatchObject({ description: 'Aporte actualizado', amount: 210, units: 2, unitPrice: 105, occurrenceDate: '2024-02-01' })
+    vi.unstubAllGlobals()
+  })
+
+  it('sincroniza una inversión recurrente con Stock Events al confirmarla', async () => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(
+          JSON.stringify({ transaction: { id: 'se-tx-1', watchlistId: 'wl-1', symbol: 'VWCE' } }),
+          {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('document', { getElementById: () => null })
+    try {
+      const financialStore = useFinancialStateStore()
+      financialStore.replaceState({
+        year: 2024,
+        currency: 'EUR',
+        accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
+        investmentAssets: [],
+        liabilities: [],
+        incomeCategories: [],
+        expenseCategories: [],
+        investmentCategories: ['Fondos Indexados'],
+        transactions: [],
+        snapshots: {},
+        budget: { income: {}, expense: {}, investment: {} },
+        goals: {},
+        contributions: [],
+        recurringRules: [],
+        pendingMovements: [],
+        instruments: [],
+        quotes: {},
+        stockEvents: {
+          enabled: true,
+          apiKey: 'se_live_key',
+          symbolMappings: [
+            { symbol: 'VWCE', sync: true, watchlistId: 'wl-1', targetSymbol: '', hidden: false },
+          ],
+        },
+      })
+
+      const store = useRecurringStore()
+      expect(
+        store.addRule({
+          type: 'investment',
+          accountId: 'broker',
+          category: 'Fondos Indexados',
+          description: 'Aportación VWCE',
+          amount: 100,
+          symbol: 'VWCE',
+          side: 'buy',
+          units: 1,
+          unitPrice: 100,
+          fee: 1.5,
+          time: '09:00',
+          frequency: 'monthly',
+          interval: 1,
+          startDate: '2024-02-01',
+        }),
+      ).toBe(true)
+      store.refreshPending('2024-02-20')
+      const pendingId = store.openPendingMovements[0]?.id
+      expect(pendingId).toBeTruthy()
+      expect(store.confirmPending(pendingId as string)).toBe(true)
+
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stockevents/transactions')
+      const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+        transaction?: Record<string, unknown>
+      }
+      expect(requestBody.transaction).toMatchObject({
+        watchlistId: 'wl-1',
+        symbol: 'VWCE',
+        date: '2024-02-01T09:00:00Z',
+        change: 1,
+        price: 100,
+        priceCurrency: 'EUR',
+        feesAmount: 1.5,
+        feesCurrency: 'EUR',
+        type: 'buy',
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
 describe('valoración de cartera', () => {
   it('enlaza movimientos existentes al instrumento configurado', () => {
     setActivePinia(createPinia())

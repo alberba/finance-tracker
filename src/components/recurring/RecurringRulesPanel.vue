@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import { frequencyLabel } from '../../domain/recurring/occurrences'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -10,9 +10,11 @@ import type { RecurringFrequency } from '../../scripts/types'
 const financialStateStore = useFinancialStateStore()
 const movementsStore = useMovementsStore()
 const recurringStore = useRecurringStore()
+const editingRuleId = ref('')
 const form = reactive<NewRecurringRuleInput>({
   type: 'expense', accountId: '', category: '', description: '', amount: 0,
   frequency: 'monthly', interval: 1, startDate: new Date().toISOString().slice(0, 10), endDate: '',
+  side: 'buy', units: 0, unitPrice: 0, fee: 0, time: '', symbol: '',
 })
 const frequencies: Array<{ value: RecurringFrequency; label: string }> = [
   { value: 'daily', label: 'Diaria' }, { value: 'weekly', label: 'Semanal' },
@@ -33,11 +35,43 @@ watch(
   },
 )
 
+function resetForm(): void {
+  editingRuleId.value = ''
+  Object.assign(form, {
+    type: 'expense', accountId: '', category: '', description: '', amount: 0,
+    frequency: 'monthly', interval: 1, startDate: new Date().toISOString().slice(0, 10), endDate: '',
+    side: 'buy', units: 0, unitPrice: 0, fee: 0, time: '', symbol: '',
+  })
+}
+
+function startEdit(rule: (typeof recurringStore.rules)[number]): void {
+  editingRuleId.value = rule.id
+  Object.assign(form, {
+    type: rule.type,
+    accountId: rule.accountId,
+    category: rule.category,
+    description: rule.description,
+    amount: rule.amount,
+    frequency: rule.frequency,
+    interval: rule.interval,
+    startDate: rule.startDate,
+    endDate: rule.endDate || '',
+    symbol: rule.symbol || '',
+    side: rule.side || 'buy',
+    units: rule.units ?? 0,
+    unitPrice: rule.unitPrice ?? 0,
+    fee: rule.fee ?? 0,
+    time: rule.time || '',
+  })
+}
+
 function submit(): void {
   if (!form.accountId) form.accountId = financialStateStore.accounts[0]?.id || ''
-  if (recurringStore.addRule(form)) {
-    form.description = ''
-    form.amount = 0
+  const saved = editingRuleId.value
+    ? recurringStore.updateRule(editingRuleId.value, form)
+    : recurringStore.addRule(form)
+  if (saved) {
+    resetForm()
   }
 }
 </script>
@@ -68,14 +102,17 @@ function submit(): void {
         <label>Comisiones<input v-model.number="form.fee" type="number" min="0" step="0.01" /></label>
         <label>Hora<input v-model="form.time" type="time" /></label>
       </template>
-      <button type="submit" class="primary-btn md:col-span-3">Crear regla</button>
+      <div class="flex flex-wrap gap-2 md:col-span-3">
+        <button type="submit" class="primary-btn">{{ editingRuleId ? 'Guardar regla' : 'Crear regla' }}</button>
+        <button v-if="editingRuleId" type="button" class="secondary-btn" @click="resetForm">Cancelar edición</button>
+      </div>
     </form>
 
     <p v-if="!recurringStore.rules.length" class="text-text-muted text-sm">Aún no hay reglas. Crea una y sus vencimientos aparecerán como pendientes.</p>
     <div v-else class="list-stack">
       <article v-for="rule in recurringStore.rules" :key="rule.id" class="list-item">
         <div><strong>{{ rule.description }}</strong><p class="text-text-muted text-sm">{{ frequencyLabel(rule.frequency) }} · próxima: {{ rule.nextOccurrenceDate || '—' }} · {{ rule.amount.toFixed(2) }}</p></div>
-        <div class="flex items-center gap-2"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="rule.active" @change="recurringStore.toggleRule(rule.id, ($event.target as HTMLInputElement).checked)" /> Activa</label><button type="button" class="danger-btn" @click="recurringStore.removeRule(rule.id)">Eliminar</button></div>
+        <div class="flex items-center gap-2"><label class="flex items-center gap-2 text-sm"><input type="checkbox" :checked="rule.active" @change="recurringStore.toggleRule(rule.id, ($event.target as HTMLInputElement).checked)" /> Activa</label><button type="button" class="secondary-btn" @click="startEdit(rule)">Editar</button><button type="button" class="danger-btn" @click="recurringStore.removeRule(rule.id)">Eliminar</button></div>
       </article>
     </div>
     </div>
