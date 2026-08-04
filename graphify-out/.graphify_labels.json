@@ -75,7 +75,7 @@
   "73": "Settings Visual Snapshot",
   "74": "Mobile Transaction Navigation",
   "75": "ESLint Configuration",
-  "76": "Wealth Snapshot Table",
+  "76": "pinia.ts",
   "77": "Dashboard Flow Testing",
   "78": "Budget Desktop Snapshot",
   "79": "Budget Mobile Snapshot",
@@ -114,7 +114,6 @@
   "112": "v-memo Conditional Memoization",
   "113": "@astrojs cloudflare",
   "114": "eslint Module",
-  "115": "eslint-config-prettier Module",
   "116": "@eslint css",
   "117": "@eslint js",
   "118": "eslint-plugin-astro Module",
@@ -145,8 +144,6 @@
   "143": "sentry client config",
   "144": "sentry server config",
   "145": "vitest config",
-  "146": "@astrojs/check",
   "147": "ProgressBar.vue",
-  "148": "WealthSnapshotTable.vue",
-  "149": "typescript"
+  "148": "WealthSnapshotTable.vue"
 }

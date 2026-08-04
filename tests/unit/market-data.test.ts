@@ -75,4 +75,68 @@ describe('adaptador de mercado server-side', () => {
     )
   })
 
+  it('usa Twelve Data cuando Yahoo Finance responde 429', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        price: '9.276', previous_close: '9.312', datetime: new Date().toISOString(),
+      }), { status: 200 }))
+
+    const quote = await loadMarketQuote({ instrument: {
+      ...instrument, id: 'aged-mi-rate-limit-fallback', symbol: 'AGED.MI', market: '', provider: 'yahoo',
+    } }, { MARKET_DATA_PROVIDER: 'twelve-data', TWELVE_DATA_API_KEY: 'fallback-secret' }, fetchMock)
+
+    expect(quote).toMatchObject({
+      instrumentId: 'aged-mi-rate-limit-fallback', price: 9.276, source: 'twelve-data', status: 'fresh',
+    })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('api.twelvedata.com/quote?symbol=AGED.MI'),
+      expect.objectContaining({ headers: { Authorization: 'apikey fallback-secret' } }),
+    )
+  })
+
+  it('deduplica las cotizaciones iguales que llegan mientras hay una petición en vuelo', async () => {
+    let resolveResponse: ((response: Response) => void) | undefined
+    const responsePromise = new Promise<Response>((resolve) => {
+      resolveResponse = resolve
+    })
+    const fetchMock = vi.fn<typeof fetch>().mockReturnValue(responsePromise)
+    const request = { instrument: {
+      ...instrument, id: 'in-flight-quote', symbol: 'INFLIGHT', provider: 'yahoo',
+    } }
+
+    const first = loadMarketQuote(request, {}, fetchMock)
+    const second = loadMarketQuote(request, {}, fetchMock)
+
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    resolveResponse?.(new Response(JSON.stringify({
+      chart: {
+        result: [{
+          meta: { currency: 'EUR', regularMarketPrice: 10, regularMarketTime: Math.floor(Date.now() / 1_000) },
+        }],
+      },
+    }), { status: 200 }))
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ price: 10 }),
+      expect.objectContaining({ price: 10 }),
+    ])
+  })
+
+  it('enfría la fuente después de un 429 para no repetir el golpe al proveedor', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('Too Many Requests', { status: 429 }),
+    )
+    const request = { instrument: {
+      ...instrument, id: 'rate-limit-cooldown', symbol: 'COOLDOWN', provider: 'yahoo',
+    } }
+
+    await loadMarketQuote(request, {}, fetchMock)
+    await loadMarketQuote(request, {}, fetchMock)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
 })

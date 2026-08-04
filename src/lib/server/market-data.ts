@@ -15,7 +15,26 @@ export interface MarketQuoteRequest {
 }
 
 const DEFAULT_TIMEOUT_MS = 5_000
+const DEFAULT_PROVIDER = 'twelve-data'
+const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000
 const memoryCache = new Map<string, { expiresAt: number; quote: Quote }>()
+const inFlightQuotes = new Map<string, Promise<Quote>>()
+const rateLimitedQuotes = new Map<string, number>()
+
+interface ProviderQuote {
+  provider: string
+  raw: unknown
+}
+
+class MarketProviderError extends Error {
+  constructor(
+    readonly status: number,
+    readonly retryAfterMs: number | null,
+  ) {
+    super(`Proveedor de mercado respondió ${status}`)
+    this.name = 'MarketProviderError'
+  }
+}
 
 interface EdgeCache {
   match(request: Request): Promise<Response | undefined>
@@ -30,35 +49,106 @@ export async function loadMarketQuote(
   const cacheKey = buildCacheKey(request.instrument)
   const cached = memoryCache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now()) return cached.quote
-  const edgeCached = await readEdgeCache(cacheKey)
-  if (edgeCached) return edgeCached
 
-  try {
-    const raw = await fetchProviderQuote(request.instrument, env, fetchImpl)
-    const quote = normalizeProviderQuote(request.instrument, raw, env)
-    memoryCache.set(cacheKey, {
-      expiresAt: Date.now() + readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120) * 1_000,
-      quote,
-    })
-    await writeEdgeCache(cacheKey, quote, readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120))
-    return quote
-  } catch {
+  const rateLimitUntil = rateLimitedQuotes.get(cacheKey)
+  if (rateLimitUntil && rateLimitUntil > Date.now()) {
     return buildFallbackQuote(request.instrument, request.fallback)
   }
+  if (rateLimitUntil) rateLimitedQuotes.delete(cacheKey)
+
+  const pending = inFlightQuotes.get(cacheKey) || createQuoteLoad(cacheKey, request.instrument, env, fetchImpl)
+  try {
+    return await pending
+  } catch (error) {
+    rememberRateLimit(cacheKey, error)
+    return buildFallbackQuote(request.instrument, request.fallback)
+  } finally {
+    if (inFlightQuotes.get(cacheKey) === pending) inFlightQuotes.delete(cacheKey)
+  }
+}
+
+function createQuoteLoad(
+  cacheKey: string,
+  instrument: Instrument,
+  env: MarketDataEnv,
+  fetchImpl: typeof fetch,
+): Promise<Quote> {
+  const pending = loadAndCacheQuote(cacheKey, instrument, env, fetchImpl)
+  inFlightQuotes.set(cacheKey, pending)
+  return pending
+}
+
+async function loadAndCacheQuote(
+  cacheKey: string,
+  instrument: Instrument,
+  env: MarketDataEnv,
+  fetchImpl: typeof fetch,
+): Promise<Quote> {
+  const edgeCached = await readEdgeCache(cacheKey)
+  if (edgeCached) {
+    memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote: edgeCached })
+    return edgeCached
+  }
+
+  const providerQuote = await fetchProviderQuote(instrument, env, fetchImpl)
+  const quote = normalizeProviderQuote(instrument, providerQuote.raw, env, providerQuote.provider)
+  memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote })
+  await writeEdgeCache(cacheKey, quote, readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120))
+  return quote
 }
 
 async function fetchProviderQuote(
   instrument: Instrument,
   env: MarketDataEnv,
   fetchImpl: typeof fetch,
+): Promise<ProviderQuote> {
+  const provider = resolveProvider(instrument, env)
+  try {
+    return {
+      provider,
+      raw: await fetchProviderQuoteFrom(provider, instrument, env, fetchImpl),
+    }
+  } catch (error) {
+    const fallbackProvider = resolveFallbackProvider(provider, env)
+    if (!fallbackProvider || !shouldUseProviderFallback(provider, error)) throw error
+    return {
+      provider: fallbackProvider,
+      raw: await fetchProviderQuoteFrom(fallbackProvider, instrument, env, fetchImpl),
+    }
+  }
+}
+
+function resolveProvider(instrument: Instrument, env: MarketDataEnv): string {
+  return normalizeProvider(instrument.provider || env.MARKET_DATA_PROVIDER || DEFAULT_PROVIDER)
+}
+
+function normalizeProvider(value: string): string {
+  const provider = value.trim().toLowerCase()
+  return provider === 'yahoo' || provider === 'coingecko' ? provider : DEFAULT_PROVIDER
+}
+
+function resolveFallbackProvider(provider: string, env: MarketDataEnv): string | null {
+  const configuredProvider = normalizeProvider(env.MARKET_DATA_PROVIDER || DEFAULT_PROVIDER)
+  if (configuredProvider === provider) return null
+  if (configuredProvider === 'twelve-data' && !env.TWELVE_DATA_API_KEY) return null
+  if (configuredProvider === 'coingecko' && !env.COINGECKO_API_KEY) return null
+  return configuredProvider
+}
+
+function shouldUseProviderFallback(provider: string, error: unknown): boolean {
+  if (provider !== 'yahoo') return false
+  if (!(error instanceof MarketProviderError)) return true
+  return error.status === 429 || error.status >= 500
+}
+
+async function fetchProviderQuoteFrom(
+  provider: string,
+  instrument: Instrument,
+  env: MarketDataEnv,
+  fetchImpl: typeof fetch,
 ): Promise<unknown> {
-  const provider = String(instrument.provider || env.MARKET_DATA_PROVIDER || 'twelve-data').toLowerCase()
-  if (provider === 'yahoo') {
-    return fetchYahooFinance(instrument, fetchImpl)
-  }
-  if (provider === 'coingecko') {
-    return fetchCoinGecko(instrument, env, fetchImpl)
-  }
+  if (provider === 'yahoo') return fetchYahooFinance(instrument, fetchImpl)
+  if (provider === 'coingecko') return fetchCoinGecko(instrument, env, fetchImpl)
   return fetchTwelveData(instrument, env, fetchImpl)
 }
 
@@ -122,9 +212,13 @@ async function fetchCoinGecko(
   )
 }
 
-function normalizeProviderQuote(instrument: Instrument, raw: unknown, env: MarketDataEnv): Quote {
+function normalizeProviderQuote(
+  instrument: Instrument,
+  raw: unknown,
+  env: MarketDataEnv,
+  provider = resolveProvider(instrument, env),
+): Quote {
   const response = asRecord(raw)
-  const provider = String(instrument.provider || env.MARKET_DATA_PROVIDER || 'twelve-data').toLowerCase()
   if (provider === 'yahoo') {
     return normalizeYahooQuote(instrument, response, env)
   }
@@ -232,15 +326,35 @@ async function fetchJsonWithTimeout(
   const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
   try {
     const response = await fetchImpl(url, { signal: controller.signal, headers })
-    if (!response.ok) throw new Error(`Proveedor de mercado respondió ${response.status}`)
+    if (!response.ok) throw new MarketProviderError(response.status, readRetryAfterMs(response))
     return response.json()
   } finally {
     clearTimeout(timeout)
   }
 }
 
+function cacheExpiry(env: MarketDataEnv): number {
+  return Date.now() + readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120) * 1_000
+}
+
+function rememberRateLimit(cacheKey: string, error: unknown): void {
+  if (!(error instanceof MarketProviderError) || error.status !== 429) return
+  const retryAfterMs = error.retryAfterMs || 0
+  const cooldownMs = Math.max(DEFAULT_RATE_LIMIT_COOLDOWN_MS, retryAfterMs)
+  rateLimitedQuotes.set(cacheKey, Date.now() + cooldownMs)
+}
+
+function readRetryAfterMs(response: Response): number | null {
+  const retryAfter = response.headers.get('Retry-After')
+  if (!retryAfter) return null
+  const seconds = Number(retryAfter)
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1_000)
+  const date = Date.parse(retryAfter)
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : null
+}
+
 function buildCacheKey(instrument: Instrument): string {
-  return [instrument.provider, instrument.type, instrument.symbol, instrument.market, instrument.currency].join(':')
+  return [instrument.id, instrument.provider, instrument.type, instrument.symbol, instrument.market, instrument.currency].join(':')
 }
 
 async function readEdgeCache(cacheKey: string): Promise<Quote | null> {
