@@ -4,9 +4,10 @@ import { computed } from 'vue'
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { todayISO } from '../domain/recurring/occurrences'
 import { computeInvestmentMovement } from '../scripts/investment-movements'
-import type { InvestmentSide, RecurringFrequency, RecurringRule, TransactionType } from '../scripts/types'
+import type { InvestmentSide, RecurringFrequency, RecurringRule, Transaction, TransactionType } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+import { useStockEventsStore } from './stockevents'
 
 export interface NewRecurringRuleInput {
   type: TransactionType
@@ -42,6 +43,7 @@ export interface PendingMovementEdit {
 
 export const useRecurringStore = defineStore('recurring', () => {
   const financialStateStore = useFinancialStateStore()
+  const stockEventsStore = useStockEventsStore()
   const rules = computed(() => financialStateStore.state.recurringRules)
   const pendingMovements = computed(() => financialStateStore.state.pendingMovements)
   const openPendingMovements = computed(() => pendingMovements.value.filter((item) => item.status === 'pending'))
@@ -111,27 +113,30 @@ export const useRecurringStore = defineStore('recurring', () => {
     const description = edit?.description || pending.description
     const amount = edit?.amount ?? pending.amount
     const transactionId = uid('tx')
+    const transaction: Transaction = {
+      id: transactionId,
+      date: occurrenceDate,
+      month: monthFromISO(occurrenceDate) ?? 0,
+      type: pending.type,
+      accountId,
+      category,
+      description: description.trim(),
+      amount: pending.type === 'investment' && pending.side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
+      ...(pending.symbol ? { symbol: pending.symbol } : {}),
+      ...(pending.side ? { side: pending.side } : {}),
+      ...(pending.units !== undefined ? { units: pending.units } : {}),
+      ...(pending.unitPrice !== undefined ? { unitPrice: pending.unitPrice } : {}),
+      ...(pending.fee !== undefined ? { fee: pending.fee } : {}),
+      ...(pending.time ? { time: pending.time } : {}),
+      declared: false,
+      createdAt: new Date().toISOString(),
+    }
+    let confirmed = false
     financialStateStore.commitState((draft) => {
       const current = draft.pendingMovements.find((item) => item.id === id)
       if (!current || current.status !== 'pending') return
-      draft.transactions.push({
-        id: transactionId,
-        date: occurrenceDate,
-        month: monthFromISO(occurrenceDate) ?? 0,
-        type: current.type,
-        accountId,
-        category,
-        description: description.trim(),
-        amount: current.type === 'investment' && current.side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
-        ...(current.symbol ? { symbol: current.symbol } : {}),
-        ...(current.side ? { side: current.side } : {}),
-        ...(current.units !== undefined ? { units: current.units } : {}),
-        ...(current.unitPrice !== undefined ? { unitPrice: current.unitPrice } : {}),
-        ...(current.fee !== undefined ? { fee: current.fee } : {}),
-        ...(current.time ? { time: current.time } : {}),
-        declared: false,
-        createdAt: new Date().toISOString(),
-      })
+      draft.transactions.push(transaction)
+      confirmed = true
       current.status = 'confirmed'
       current.transactionId = transactionId
       current.updatedAt = new Date().toISOString()
@@ -143,6 +148,7 @@ export const useRecurringStore = defineStore('recurring', () => {
         current.amount = amount
       }
     })
+    if (confirmed) void stockEventsStore.syncMovement(transaction)
     return true
   }
 

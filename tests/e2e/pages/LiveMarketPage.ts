@@ -71,11 +71,16 @@ export class LiveMarketPage {
   }
 
   async editFirstPending(description: string, amount: number): Promise<void> {
-    const item = this.pendingPanel.locator('[data-pending-item]').first()
-    await item.getByRole('button', { name: 'Editar' }).click()
+    const item = await this.openFirstPendingEdit()
     await item.getByLabel('Descripción').fill(description)
     await item.getByLabel('Importe').fill(String(amount))
     await item.getByRole('button', { name: 'Guardar edición' }).click()
+  }
+
+  async openFirstPendingEdit(): Promise<Locator> {
+    const item = this.pendingPanel.locator('[data-pending-item]').first()
+    await item.getByRole('button', { name: 'Editar' }).click()
+    return item
   }
 
   async editFirstPendingInvestment(params: { units?: number; unitPrice?: number; fee?: number; time?: string; symbol?: string }): Promise<void> {
