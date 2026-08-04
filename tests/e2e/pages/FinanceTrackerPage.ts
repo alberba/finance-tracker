@@ -148,7 +148,7 @@ export class FinanceTrackerPage {
   }
 
   async submitIssueReport(params: {
-    type: "bug" | "enhancement";
+    type: "bug" | "feature" | "enhancement";
     summary: string;
     description: string;
     expectedResult?: string;

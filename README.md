@@ -142,8 +142,10 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
    - `status:triage`
-   - `type:bug` o `type:enhancement`
-3. Si activas la automatización opcional, el reporte añade mención `@claude` y se activa:
+   - `bug` o `feature`
+3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
+   Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
+4. Si activas la automatización opcional, el reporte añade mención `@claude` y se activa:
    - `.github/workflows/issue-enrich-claude.yml` (Haiku): enriquece la issue.
    - `.github/workflows/issue-fix-claude.yml` (Sonnet): intenta resolver y abrir PR.
 
@@ -168,7 +170,7 @@ Opcional (GitHub Variables):
 ### Labels recomendadas en GitHub
 
 - `source:web-report`, `status:triage`
-- `type:bug`, `type:enhancement`
+- `bug`, `feature`
 - `priority:low`, `priority:med`, `priority:high`
 - `area:frontend`, `area:backend`, `area:infra`, `area:data`
 - `enriched:haiku`

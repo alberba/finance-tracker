@@ -1,4 +1,4 @@
-export type ReportType = 'bug' | 'enhancement'
+export type ReportType = 'bug' | 'feature' | 'enhancement'
 
 export interface ReportPayload {
   type: ReportType

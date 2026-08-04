@@ -106,7 +106,7 @@ Internamente está formada por:
 
 Campos esperados por backend:
 
-- `type`: `"bug"` | `"enhancement"`
+- `type`: `"bug"` | `"feature"` (`"enhancement"` se acepta como alias antiguo)
 - `summary`: string, 5-140
 - `description`: string, 12-8000
 - `mentionClaude`: boolean, por defecto `false`
@@ -124,7 +124,10 @@ Labels base:
 
 - `source:web-report`
 - `status:triage`
-- `type:bug` o `type:enhancement`
+- `bug` o `feature`
+
+El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
+Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
 
 Label adicional si hay automatización:
 

@@ -43,12 +43,12 @@ async function expectModalAnchoredToLauncher(
     throw new Error(`No se pudo medir el panel ${selector}.`);
   }
 
-  expect(Math.abs(viewport.width - (box.x + box.width) - inset)).toBeLessThanOrEqual(
-    tolerance,
-  );
-  expect(Math.abs(viewport.height - (box.y + box.height) - inset)).toBeLessThanOrEqual(
-    tolerance,
-  );
+  expect(
+    Math.abs(viewport.width - (box.x + box.width) - inset),
+  ).toBeLessThanOrEqual(tolerance);
+  expect(
+    Math.abs(viewport.height - (box.y + box.height) - inset),
+  ).toBeLessThanOrEqual(tolerance);
 }
 
 test.describe("Reports E2E", () => {
@@ -79,9 +79,14 @@ test.describe("Reports E2E", () => {
     await expect(tracker.issueReportDialog).toHaveAttribute("open", "");
     await expectModalAnchoredToLauncher(page, "#global-report-dialog");
     await expect(tracker.issueReportDialog).not.toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toHaveCSS("animation-name", "report-dialog-in");
+    await expect(tracker.issueReportDialog).toHaveCSS(
+      "animation-name",
+      "report-dialog-in",
+    );
     await expect(tracker.issueReportDialog.getByLabel("Resumen")).toBeFocused();
-    await expect(tracker.issueReportDialog.locator("#issue-report-steps")).toHaveCount(0);
+    await expect(
+      tracker.issueReportDialog.locator("#issue-report-steps"),
+    ).toHaveCount(0);
     await expect(
       tracker.issueReportDialog.locator("#issue-report-mention-claude"),
     ).toHaveCount(0);
@@ -123,7 +128,9 @@ test.describe("Reports E2E", () => {
 
     await expect(tracker.issueReportStatus()).toContainText("Reporte creado:");
     await expect(tracker.issueReportStatus()).toContainText("#654");
-    await expect(tracker.issueReportStatus()).not.toContainText("automatización");
+    await expect(tracker.issueReportStatus()).not.toContainText(
+      "automatización",
+    );
   });
 
   test("envía únicamente los campos simplificados del formulario", async ({
@@ -132,7 +139,10 @@ test.describe("Reports E2E", () => {
   }) => {
     let submittedPayload: Record<string, unknown> | undefined;
     await page.route("**/api/issues/report", async (route) => {
-      submittedPayload = route.request().postDataJSON() as Record<string, unknown>;
+      submittedPayload = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
       await route.fulfill({
         status: 201,
         contentType: "application/json",

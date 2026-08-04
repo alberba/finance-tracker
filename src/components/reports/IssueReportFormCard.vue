@@ -55,7 +55,9 @@ async function onSubmit(): Promise<void> {
   }
 
   const payload: ReportSubmissionPayload = {
-    type: form.type === 'enhancement' ? 'enhancement' : 'bug',
+    // `enhancement` remains accepted by the API for old clients, but all new
+    // form submissions use the shorter GitHub-facing `feature` value.
+    type: form.type === 'bug' ? 'bug' : 'feature',
     summary,
     description,
     section: uiStore.ui.activeSection,
@@ -109,7 +111,7 @@ defineExpose({ focusSummary })
           Tipo
           <select id="issue-report-type" v-model="form.type" name="type" required>
             <option value="bug">Error</option>
-            <option value="enhancement">Mejora</option>
+            <option value="feature">Mejora</option>
           </select>
         </label>
         <label class="reports-field">

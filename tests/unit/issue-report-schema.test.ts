@@ -33,6 +33,18 @@ describe("issue report schema", () => {
     expect(parsed.mentionClaude).toBe(false);
   });
 
+  it("normaliza enhancement legacy a feature", () => {
+    const parsed = parseIssueReportPayload({
+      type: "enhancement",
+      summary: "Mejorar el resumen de incidencias",
+      description: "La issue necesita contexto técnico para poder revisarse.",
+      section: "reports",
+      context: {},
+    });
+
+    expect(parsed.type).toBe("feature");
+  });
+
   it("rechaza payload inválido", () => {
     expect(() =>
       parseIssueReportPayload({
