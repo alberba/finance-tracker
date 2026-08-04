@@ -13,7 +13,6 @@ import { useUiStore } from '../../stores/ui'
 interface SuccessStatus {
   issueNumber: number
   issueUrl: string
-  enrichmentPending: boolean
 }
 
 const uiStore = useUiStore()
@@ -26,7 +25,6 @@ const form = reactive({
   description: '',
   expectedResult: '',
   actualResult: '',
-  enrichWithCodex: false,
 })
 
 const statusMessage = shallowRef('')
@@ -39,7 +37,6 @@ function resetForm(): void {
   form.description = ''
   form.expectedResult = ''
   form.actualResult = ''
-  form.enrichWithCodex = false
 }
 
 function focusSummary(): void {
@@ -63,7 +60,6 @@ async function onSubmit(): Promise<void> {
     type: form.type === 'bug' ? 'bug' : 'feature',
     summary,
     description,
-    enrichWithCodex: form.enrichWithCodex,
     section: uiStore.ui.activeSection,
     context: getIssueReportContext(),
     expectedResult: normalizeText(form.expectedResult) || undefined,
@@ -85,7 +81,6 @@ async function onSubmit(): Promise<void> {
     successStatus.value = {
       issueNumber: result.issueNumber,
       issueUrl: result.issueUrl,
-      enrichmentPending: result.enrichmentStatus === 'pending',
     }
     resetForm()
   } catch (error) {
@@ -117,8 +112,6 @@ defineExpose({ focusSummary })
           <select id="issue-report-type" v-model="form.type" name="type" required>
             <option value="bug">Error</option>
             <option value="feature">Mejora</option>
-            <!-- Kept hidden so old Playwright clients can still select it. -->
-            <option value="enhancement" hidden>Mejora (legacy)</option>
           </select>
         </label>
         <label class="reports-field">
@@ -172,20 +165,6 @@ defineExpose({ focusSummary })
           ></textarea>
         </label>
       </div>
-      <label class="reports-checkbox-field">
-        <input
-          id="issue-report-enrich-codex"
-          v-model="form.enrichWithCodex"
-          name="enrichWithCodex"
-          type="checkbox"
-        />
-        <span>
-          Enriquecer con Codex
-          <small
-            >Analiza el reporte con gpt-5.6-luna (high) y propone una descripción técnica.</small
-          >
-        </span>
-      </label>
       <div class="reports-form-actions">
         <button id="issue-report-submit" class="primary-btn" type="submit" :disabled="submitting">
           Crear reporte
@@ -198,7 +177,6 @@ defineExpose({ focusSummary })
         <a :href="successStatus.issueUrl" target="_blank" rel="noreferrer"
           >#{{ successStatus.issueNumber }}</a
         >
-        <span v-if="successStatus.enrichmentPending"> (enriquecimiento Codex en curso)</span>
       </template>
       <template v-else>{{ statusMessage }}</template>
     </p>

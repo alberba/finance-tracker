@@ -59,8 +59,7 @@ describe("github issues service", () => {
     expect(body.body).toContain("### Problema o solicitud");
     expect(body.body).toContain("- Se envió desde la sección: transactions");
     expect(body.body).toContain("- Se envió desde la ruta: /movimientos");
-    expect(body.body).not.toContain("@claude");
-    expect(body.body).toContain("codex-enrichment: requested");
+    expect(body.body).toContain("@claude");
   });
 
   it("crea issue simple sin mención ni label de enriquecimiento", async () => {
@@ -102,7 +101,7 @@ describe("github issues service", () => {
     expect(body.body).not.toContain("@claude");
   });
 
-  it("mapea una mejora legacy a label y tipo Feature", async () => {
+  it("mapea una mejora a label y tipo Feature", async () => {
     const fakeFetch = vi.fn<typeof fetch>(
       async () =>
         new Response(
@@ -117,8 +116,7 @@ describe("github issues service", () => {
     await createIssueFromWebReport(
       {
         ...payload,
-        type: "enhancement",
-        enrichWithCodex: false,
+        type: "feature",
         mentionClaude: false,
       },
       {

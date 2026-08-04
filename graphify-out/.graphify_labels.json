@@ -125,6 +125,7 @@
   "123": "prettier Module",
   "124": "prettier-plugin-astro Module",
   "125": "@types node",
+  "126": "DashboardPeriodControls.vue",
   "127": "typescript-eslint Module",
   "128": "@typescript-eslint parser",
   "129": "vite Module",
@@ -147,5 +148,12 @@
   "146": "@astrojs/check",
   "147": "ProgressBar.vue",
   "148": "WealthSnapshotTable.vue",
-  "149": "eslint-plugin-vue"
+  "149": "eslint-plugin-vue",
+  "150": "useMoneyFormatter.ts",
+  "151": "report-dialog.ts",
+  "152": "buckets.ts",
+  "153": "pinia.ts",
+  "154": "readEdgeCache",
+  "155": "Instrument",
+  "156": "@astrojs/cloudflare"
 }

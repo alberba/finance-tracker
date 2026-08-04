@@ -177,45 +177,6 @@ test.describe("Reports E2E", () => {
     );
   });
 
-  test("permite activar el enriquecimiento Codex de forma explícita", async ({
-    page,
-    tracker,
-  }) => {
-    let submittedPayload: Record<string, unknown> | undefined;
-    await page.route("**/api/issues/report", async (route) => {
-      submittedPayload = route.request().postDataJSON() as Record<
-        string,
-        unknown
-      >;
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ok: true,
-          issueNumber: 322,
-          issueUrl: "https://github.com/example/repo/issues/322",
-          enrichmentStatus: "pending",
-        }),
-      });
-    });
-
-    await tracker.submitIssueReport({
-      type: "feature",
-      summary: "Mejorar el contexto de los reportes",
-      description: "La issue necesita una descripción técnica más completa.",
-      enrichWithCodex: true,
-    });
-
-    await expect(tracker.issueReportStatus()).toContainText(
-      "enriquecimiento Codex en curso",
-    );
-    expect(submittedPayload).toMatchObject({
-      type: "feature",
-      enrichWithCodex: true,
-    });
-    expect(submittedPayload).not.toHaveProperty("mentionClaude");
-  });
-
   test("muestra validación específica cuando resumen o descripción no cumplen mínimo", async ({
     tracker,
   }) => {

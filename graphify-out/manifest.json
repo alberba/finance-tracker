@@ -15,8 +15,8 @@
     "semantic_hash": "6546e9fa9fb9ca27a0862206b0fba92c"
   },
   ".github/scripts/issue-context.mjs": {
-    "mtime": 1785863087.9427679,
-    "ast_hash": "20d1ee4aa6452560225f49deaa74ddcb",
+    "mtime": 1785863599.2878568,
+    "ast_hash": "494edd6eaf01fbb4bb5e72cc16aeec0e",
     "semantic_hash": ""
   },
   ".vscode/extensions.json": {
@@ -285,8 +285,8 @@
     "semantic_hash": "01797da9498bfbce9402a0547d93776b"
   },
   "src/components/reports/IssueReportFormCard.vue": {
-    "mtime": 1785863087.9557898,
-    "ast_hash": "62315be92d8327c335c6d1e6856739bb",
+    "mtime": 1785863514.7710476,
+    "ast_hash": "3cd09676df81fc193e24929d8240179a",
     "semantic_hash": ""
   },
   "src/components/sections/BudgetSection.vue": {
@@ -540,13 +540,13 @@
     "semantic_hash": "18e9624392e02b1a6bfc93a4fbd4810a"
   },
   "src/lib/server/github-issues.ts": {
-    "mtime": 1785863087.956187,
-    "ast_hash": "62c0c611098251c7c1a17cc2076cb265",
+    "mtime": 1785863514.7744598,
+    "ast_hash": "d1c42c9753756ae3a9278f892a28357e",
     "semantic_hash": ""
   },
   "src/lib/server/issue-report-schema.ts": {
-    "mtime": 1785863087.9564471,
-    "ast_hash": "7f1812ba3c2786db617ecb0444992f76",
+    "mtime": 1785863526.2034533,
+    "ast_hash": "9a2681de177999c33f56fa139b3c917c",
     "semantic_hash": ""
   },
   "src/lib/server/market-data.ts": {
@@ -570,8 +570,8 @@
     "semantic_hash": "e580e95d6726e7126ed79360702c534c"
   },
   "src/pages/api/issues/report.ts": {
-    "mtime": 1785863087.9568086,
-    "ast_hash": "26880290d20fb99fbfed499c88356f3a",
+    "mtime": 1785863514.7738981,
+    "ast_hash": "1813f89d363cd919a5fef9dd649bf038",
     "semantic_hash": ""
   },
   "src/pages/api/market/quotes.ts": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "src/services/issue-report-api.ts": {
-    "mtime": 1785863087.9570491,
-    "ast_hash": "aa219cb9c90b5dcd4ac721ec08aa8ce7",
+    "mtime": 1785863514.773367,
+    "ast_hash": "271cc16be8d7151dd535134962e8f537",
     "semantic_hash": ""
   },
   "src/services/market-api.ts": {
@@ -900,8 +900,8 @@
     "semantic_hash": "23fa05b650c36e81fcf4639b54f5bd52"
   },
   "tests/e2e/pages/FinanceTrackerPage.ts": {
-    "mtime": 1785863087.959498,
-    "ast_hash": "870b4db40c4850837ef6b972479ec65a",
+    "mtime": 1785863563.7315886,
+    "ast_hash": "52ea855b4f9fe28edbcf3406ef2079e4",
     "semantic_hash": ""
   },
   "tests/e2e/pages/LiveMarketPage.ts": {
@@ -910,8 +910,8 @@
     "semantic_hash": ""
   },
   "tests/e2e/reports.spec.ts": {
-    "mtime": 1785863087.9598117,
-    "ast_hash": "f7d98fefc248c385342c6964a55230b3",
+    "mtime": 1785863563.741101,
+    "ast_hash": "a62b5bc9e81d3fb130a0cd74ae3d2c31",
     "semantic_hash": ""
   },
   "tests/e2e/settings.spec.ts": {
@@ -950,13 +950,13 @@
     "semantic_hash": ""
   },
   "tests/unit/fixtures/issue-web-report.json": {
-    "mtime": 1785863087.9600523,
-    "ast_hash": "a87dac7f0993ca5fda45e42f13fd2aae",
+    "mtime": 1785863607.8488061,
+    "ast_hash": "e43cb6ae6537147db54d327fe52731b0",
     "semantic_hash": ""
   },
   "tests/unit/github-issues.test.ts": {
-    "mtime": 1785863087.9603875,
-    "ast_hash": "7ea7dfd58b0d10c36df542fbfe6f3732",
+    "mtime": 1785863563.7089453,
+    "ast_hash": "92db452896864cf2e1e2873baada010f",
     "semantic_hash": ""
   },
   "tests/unit/investment-movements.test.ts": {
@@ -970,8 +970,8 @@
     "semantic_hash": "5d2940293d5d86d7e8434e68526c36cb"
   },
   "tests/unit/issue-report-schema.test.ts": {
-    "mtime": 1785863087.9609041,
-    "ast_hash": "136ba4b557990af57b5ddb5efb1109a5",
+    "mtime": 1785863563.7192383,
+    "ast_hash": "32391f2659f27a68efb32bbd58240852",
     "semantic_hash": ""
   },
   "tests/unit/live-market-recurring.test.ts": {
@@ -1400,8 +1400,8 @@
     "semantic_hash": "82efb97a359f5c7290bf2513d14686be"
   },
   "README.md": {
-    "mtime": 1785863087.9439452,
-    "ast_hash": "aa965d0a57e6e0aedf4881402d6e47a5",
+    "mtime": 1785863579.7925742,
+    "ast_hash": "bb92058a146c54a8ab74ac2dd939df8a",
     "semantic_hash": ""
   },
   "docs/architecture/frontend.md": {
@@ -1415,8 +1415,8 @@
     "semantic_hash": "a0547f02bbad1a09695a8b80af5210e2"
   },
   "docs/context/tabs/reportes.md": {
-    "mtime": 1785863087.9446743,
-    "ast_hash": "36dda17a96276b073f5db4dee0516e55",
+    "mtime": 1785863579.8088827,
+    "ast_hash": "28904336a1a681671ce64a3b30e1be4d",
     "semantic_hash": ""
   },
   "pnpm-workspace.yaml": {
@@ -1604,29 +1604,9 @@
     "ast_hash": "0ded9ded51223c7dda22252e0439c317",
     "semantic_hash": ""
   },
-  ".github/codex/schemas/issue-enrichment.schema.json": {
-    "mtime": 1785863087.942246,
-    "ast_hash": "cb2fa45ca05b548e1c0469ac89cb0882",
-    "semantic_hash": ""
-  },
-  ".github/scripts/issue-enrichment.mjs": {
-    "mtime": 1785863087.9431188,
-    "ast_hash": "db61d8f94aee3f1302b6ec58f577b929",
-    "semantic_hash": ""
-  },
-  "tests/unit/issue-enrichment.test.ts": {
-    "mtime": 1785863087.9606562,
-    "ast_hash": "bc0b7202ea317016278cbdba0b3fe331",
-    "semantic_hash": ""
-  },
-  ".github/codex/prompts/issue-enrich.md": {
-    "mtime": 1785863087.941733,
-    "ast_hash": "878ecedb04d1a88e3fd0d72d12f2eb61",
-    "semantic_hash": ""
-  },
-  ".github/workflows/issue-enrich-codex.yml": {
-    "mtime": 1785863087.9435277,
-    "ast_hash": "c6dbcceff9df034869fb0f0132b0d12a",
+  ".github/workflows/issue-enrich-claude.yml": {
+    "mtime": 1785863489.110458,
+    "ast_hash": "6d4bd67f8948f0533a6e5798348e4fac",
     "semantic_hash": ""
   }
 }

@@ -50,10 +50,6 @@ export function getGithubIssueType(
   return canonicalReportType(type) === "bug" ? "Bug" : "Feature";
 }
 
-export function shouldEnrichWithCodex(payload: IssueReportPayload): boolean {
-  return payload.enrichWithCodex ?? payload.mentionClaude ?? false;
-}
-
 export function buildIssueBody(payload: IssueReportPayload): string {
   const reportType = canonicalReportType(payload.type);
   const githubType = getGithubIssueType(payload.type);
@@ -93,14 +89,8 @@ export function buildIssueBody(payload: IssueReportPayload): string {
     baseLines.push("", "## Resultado actual", "", payload.actualResult);
   }
 
-  if (shouldEnrichWithCodex(payload)) {
-    baseLines.push(
-      "",
-      "## Automatización",
-      "",
-      "Se ha solicitado un enriquecimiento técnico con Codex.",
-      "<!-- codex-enrichment: requested -->",
-    );
+  if (payload.mentionClaude) {
+    baseLines.push("", "@claude");
   }
 
   return baseLines.join("\n").trim();
@@ -145,7 +135,7 @@ export async function createIssueFromWebReport(
   const owner = requiredEnv("GITHUB_OWNER", env);
   const repo = requiredEnv("GITHUB_REPO", env);
   const title = payload.summary.slice(0, 140);
-  const labels = shouldEnrichWithCodex(payload)
+  const labels = payload.mentionClaude
     ? [...buildIssueLabels(payload.type), "enrich:pending"]
     : buildIssueLabels(payload.type);
   const baseRequestBody = {

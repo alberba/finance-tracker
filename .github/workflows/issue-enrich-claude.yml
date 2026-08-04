@@ -1,0 +1,437 @@
+name: Issue Enrichment (Haiku)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  enrich:
+    if: >-
+      contains(join(github.event.issue.labels.*.name, ','), 'source:web-report') &&
+      contains(join(github.event.issue.labels.*.name, ','), 'enrich:pending')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build issue context file
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            fs.mkdirSync('.tmp', { recursive: true });
+            fs.writeFileSync('.tmp/issue.json', JSON.stringify(context.payload.issue, null, 2), 'utf-8');
+
+      - name: Generate repository context
+        run: node .github/scripts/issue-context.mjs --issue-file .tmp/issue.json --out .tmp/issue-context.md
+
+      - name: Load context output
+        id: context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const markdown = fs.readFileSync('.tmp/issue-context.md', 'utf-8');
+            core.setOutput('markdown', markdown);
+
+      - name: Validate Claude credentials
+        run: |
+          if [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "::error::Falta CLAUDE_CODE_OAUTH_TOKEN en Secrets > Actions."
+            exit 1
+          fi
+
+      - name: Enrich issue with Claude Haiku
+        id: claude_enrich
+        uses: anthropics/claude-code-action@beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          mode: tag
+          model: claude-haiku-4-5
+          max_turns: "8"
+          disallowed_tools: Read
+          direct_prompt: |
+            Tienes una issue de GitHub creada desde formulario web. Debes enriquecerla en español.
+            No uses herramientas. No leas imágenes ni archivos. No respondas texto libre.
+
+            Devuelve EXCLUSIVAMENTE un bloque HTML comment con este formato exacto:
+            <!-- ENRICHMENT_RESULT_V1
+            {
+              "title": "Título enriquecido",
+              "body_markdown": "Cuerpo markdown enriquecido",
+              "labels_add": ["priority:med", "area:frontend"],
+              "labels_keep": ["source:web-report", "status:triage", "type:enhancement"],
+              "labels_remove": ["enrich:pending"]
+            }
+            -->
+
+            Reglas:
+            - title: string no vacío y técnico.
+            - body_markdown: markdown en español con secciones:
+              - Problema
+              - Hipótesis técnica
+              - Alcance
+              - Criterios de aceptación (verificables)
+            - labels_add: incluir exactamente 1 prioridad (priority:low|priority:med|priority:high)
+              y al menos 1 área (area:frontend|area:backend|area:infra|area:data).
+            - labels_keep: incluir siempre source:web-report, status:triage y el type:* actual.
+            - labels_remove: incluir enrich:pending.
+            - No incluyas texto fuera del bloque ENRICHMENT_RESULT_V1.
+
+            Contexto del repo e issue:
+            ```md
+            ${{ steps.context.outputs.markdown }}
+            ```
+
+      - name: Apply enrichment to issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const fs = require("node:fs");
+            const executionFile = String('${{ steps.claude_enrich.outputs.execution_file }}' || "").trim();
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+
+            const markerRegex = /<!--\s*ENRICHMENT_RESULT_V1\s*([\s\S]*?)-->/m;
+            const xmlRegex = /<(?:data-)?enrichment>([\s\S]*?)<\/(?:data-)?enrichment>/m;
+            const fencedBlockRegex = /```(?:([a-zA-Z0-9_-]+))?\s*([\s\S]*?)```/gm;
+
+            function extractLastMatch(regex, text) {
+              const globalRegex = new RegExp(regex.source, regex.flags.includes("g") ? regex.flags : `${regex.flags}g`);
+              let last = null;
+              let match;
+              while ((match = globalRegex.exec(text)) !== null) {
+                last = match;
+              }
+              return last;
+            }
+
+            function extractFencedPayload(text) {
+              const source = String(text || "");
+              let match;
+              let last = null;
+              const regex = new RegExp(fencedBlockRegex.source, fencedBlockRegex.flags);
+              while ((match = regex.exec(source)) !== null) {
+                const language = String(match[1] || "").toLowerCase();
+                const content = String(match[2] || "");
+                const looksLikePayload = /ENRICHMENT_RESULT_V1/.test(content) || /"title"\s*:/.test(content);
+                const allowedLanguage = !language || language === "json" || language === "html" || language === "xml";
+                if (allowedLanguage && looksLikePayload) {
+                  last = { full: match[0], content };
+                }
+              }
+              return last;
+            }
+
+            function extractPayloadBlock(text) {
+              const source = String(text || "");
+              if (!source.trim()) {
+                return null;
+              }
+              const marker = extractLastMatch(markerRegex, source);
+              if (marker) {
+                return { kind: "marker", raw: marker[0] };
+              }
+              const xml = extractLastMatch(xmlRegex, source);
+              if (xml) {
+                return { kind: "xml", raw: xml[0] };
+              }
+              const fenced = extractFencedPayload(source);
+              if (fenced) {
+                return { kind: "fenced", raw: fenced.full };
+              }
+              return null;
+            }
+
+            const candidateComment = [...comments]
+              .reverse()
+              .find((comment) => {
+                const login = String(comment?.user?.login || "");
+                const commentBody = String(comment.body || "");
+                return (login === "claude[bot]" || login === "github-actions[bot]") &&
+                  extractPayloadBlock(commentBody);
+              });
+
+            const sourceCandidates = [];
+            if (candidateComment) {
+              sourceCandidates.push(String(candidateComment.body || ""));
+            }
+
+            if (executionFile && fs.existsSync(executionFile)) {
+              const executionRaw = fs.readFileSync(executionFile, "utf-8");
+              const executionCandidates = [];
+              try {
+                const parsedExecution = JSON.parse(executionRaw);
+                if (typeof parsedExecution?.result === "string") {
+                  executionCandidates.push(parsedExecution.result);
+                }
+                if (typeof parsedExecution?.output === "string") {
+                  executionCandidates.push(parsedExecution.output);
+                }
+              } catch {
+                // `execution_file` can be NDJSON; we'll parse line by line below.
+              }
+
+              for (const line of executionRaw.split(/\r?\n/)) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+                  continue;
+                }
+                try {
+                  const event = JSON.parse(trimmed);
+                  if (typeof event?.result === "string") {
+                    executionCandidates.push(event.result);
+                  }
+                  if (event?.type === "assistant" && Array.isArray(event?.message?.content)) {
+                    for (const part of event.message.content) {
+                      if (part?.type === "text" && typeof part?.text === "string") {
+                        executionCandidates.push(part.text);
+                      }
+                    }
+                  }
+                } catch {
+                  // Ignore invalid lines.
+                }
+              }
+
+              sourceCandidates.push(...executionCandidates, executionRaw);
+            }
+
+            let rawEnrichment = "";
+            for (const source of sourceCandidates) {
+              const block = extractPayloadBlock(source);
+              if (block) {
+                rawEnrichment = block.raw;
+                break;
+              }
+            }
+
+            if (!rawEnrichment) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "No se encontró bloque de enriquecimiento válido (`ENRICHMENT_RESULT_V1`, `<enrichment>`, `<data-enrichment>` o bloque ```json``` con payload) ni en comentarios ni en `execution_file` de Claude."
+              });
+              return;
+            }
+
+            const commentBody = String(rawEnrichment || "");
+            const jsonMatch = extractLastMatch(markerRegex, commentBody);
+            const xmlMatch = extractLastMatch(xmlRegex, commentBody);
+            const fencedMatch = extractFencedPayload(commentBody);
+
+            function extractXmlTag(content, tagName) {
+              const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, "m");
+              const match = content.match(regex);
+              return match ? match[1].trim() : "";
+            }
+
+            function parseStringArray(raw) {
+              if (!raw) {
+                return [];
+              }
+              try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string" && value.trim()) : [];
+              } catch {
+                const normalized = String(raw)
+                  .replace(/^\[|\]$/g, "")
+                  .split(",")
+                  .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+                  .filter(Boolean);
+                return normalized;
+              }
+            }
+
+            let parsed;
+            if (jsonMatch) {
+              try {
+                parsed = JSON.parse(jsonMatch[1].trim());
+              } catch (error) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: ["enrich:failed"]
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: `JSON inválido en ENRICHMENT_RESULT_V1: ${error instanceof Error ? error.message : "error desconocido"}`
+                });
+                return;
+              }
+            } else if (xmlMatch) {
+              const xml = xmlMatch[1];
+              parsed = {
+                title: extractXmlTag(xml, "title"),
+                body_markdown: extractXmlTag(xml, "body_markdown"),
+                labels_add: parseStringArray(extractXmlTag(xml, "labels_add")),
+                labels_keep: parseStringArray(extractXmlTag(xml, "labels_keep")),
+                labels_remove: parseStringArray(extractXmlTag(xml, "labels_remove"))
+              };
+            } else if (fencedMatch) {
+              try {
+                parsed = JSON.parse(String(fencedMatch.content || "").trim());
+              } catch (error) {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number,
+                  labels: ["enrich:failed"]
+                });
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: `JSON inválido en bloque \`\`\`json\`\`\`: ${error instanceof Error ? error.message : "error desconocido"}`
+                });
+                return;
+              }
+            } else {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Formato inválido de salida: no se pudo parsear `ENRICHMENT_RESULT_V1`, `<enrichment>`, `<data-enrichment>` ni bloque ```json```."
+              });
+              return;
+            }
+
+            const title = typeof parsed?.title === "string" ? parsed.title.trim() : "";
+            const bodyMarkdown = typeof parsed?.body_markdown === "string" ? parsed.body_markdown.trim() : "";
+            const labelsAdd = Array.isArray(parsed?.labels_add) ? parsed.labels_add.filter((v) => typeof v === "string" && v.trim()) : [];
+            const labelsKeep = Array.isArray(parsed?.labels_keep) ? parsed.labels_keep.filter((v) => typeof v === "string" && v.trim()) : [];
+            const labelsRemove = Array.isArray(parsed?.labels_remove) ? parsed.labels_remove.filter((v) => typeof v === "string" && v.trim()) : [];
+
+            if (title === "Título enriquecido" || bodyMarkdown === "Cuerpo markdown enriquecido") {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: se detectó payload de plantilla en lugar de enriquecimiento real."
+              });
+              return;
+            }
+
+            if (!title || !bodyMarkdown || labelsAdd.length === 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: se requieren `title`, `body_markdown` y `labels_add`."
+              });
+              return;
+            }
+
+            const hasPriority = labelsAdd.some((label) => /^priority:(low|med|high)$/.test(label));
+            const hasArea = labelsAdd.some((label) => /^area:(frontend|backend|infra|data)$/.test(label));
+            if (!hasPriority || !hasArea) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: ["enrich:failed"]
+              });
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: "Salida inválida: falta prioridad o área en `labels_add`."
+              });
+              return;
+            }
+
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+
+            const currentLabels = Array.isArray(issue.labels)
+              ? issue.labels.map((label) => typeof label === "string" ? label : String(label?.name || "")).filter(Boolean)
+              : [];
+
+            const finalLabels = Array.from(
+              new Set([
+                ...currentLabels,
+                ...labelsKeep,
+                ...labelsAdd,
+                "enriched:haiku"
+              ])
+            ).filter((label) => !new Set([...labelsRemove, "enrich:pending", "enrich:failed"]).has(label));
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number,
+              title,
+              body: bodyMarkdown
+            });
+
+            await github.rest.issues.setLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: finalLabels
+            });
+
+      - name: Mark enrichment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: ["enrich:failed"]
+            });
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: "El enriquecimiento automático falló. Revisa logs del workflow `Issue Enrichment (Haiku)`."
+            });

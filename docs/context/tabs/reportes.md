@@ -2,8 +2,8 @@
 
 ## Resumen
 
-El lanzador global de `Reportes` permite crear reportes web que terminan como issues de GitHub.
-El flujo principal es crear un reporte simple. El enriquecimiento con Codex es opcional y explícito.
+La pestaña `Reportes` permite crear reportes web que terminan como issues de GitHub.
+El flujo principal es crear un reporte simple. La automatización con `@claude` existe, pero es opcional y manual.
 
 Ruta pública:
 
@@ -14,13 +14,13 @@ Identificadores clave en UI:
 - sección raíz: `#reports`
 - formulario: `#issue-report-form`
 - estado: `#issue-report-status`
-- checkbox opcional Codex: `#issue-report-enrich-codex`
+- checkbox opcional Claude: `#issue-report-mention-claude`
 
 ## Objetivo funcional actual
 
 - Permitir enviar errores o mejoras desde la UI.
 - Crear una issue en GitHub con contexto técnico básico.
-- Ofrecer automatización opcional mediante Codex (`gpt-5.6-luna`, effort `high`).
+- Ofrecer automatización opcional mediante `@claude`.
 
 ## Archivos principales
 
@@ -81,7 +81,7 @@ Internamente está formada por:
    - `type`
    - `summary`
    - `description`
-   - `enrichWithCodex`
+   - `mentionClaude`
    - `section`
    - `context.userAgent`
    - `context.pathname`
@@ -92,15 +92,14 @@ Internamente está formada por:
 6. `github-issues.ts` crea la issue contra GitHub API.
 7. La UI muestra:
    - éxito simple: `Reporte creado: #...`
-   - éxito con automatización: `Reporte creado: #... (enriquecimiento Codex en curso)`
+   - éxito con automatización: `Reporte creado: #... (automatización en curso)`
    - error: `No se pudo crear la issue: ...`
 
 ## Defaults y comportamiento actual
 
-- `enrichWithCodex` está desactivado por defecto.
-- Solo se añade `enrich:pending` y se activa el workflow Codex si el checkbox está marcado.
-- Solo se devuelve `enrichmentStatus: "pending"` si `enrichWithCodex === true`.
-- `mentionClaude` se acepta como alias de entrada para clientes antiguos.
+- `mentionClaude` está desactivado por defecto.
+- Solo se añade `@claude` al cuerpo de la issue si el checkbox está marcado.
+- Solo se devuelve `enrichmentStatus: "pending"` si `mentionClaude === true`.
 - El botón principal usa lenguaje de producto: `Crear reporte`.
 
 ## Contrato del payload
@@ -110,7 +109,7 @@ Campos esperados por backend:
 - `type`: `"bug"` | `"feature"` (`"enhancement"` se acepta como alias antiguo)
 - `summary`: string, 5-140
 - `description`: string, 12-8000
-- `enrichWithCodex`: boolean, por defecto `false`
+- `mentionClaude`: boolean, por defecto `false`
 - `section`: string
 - `context.userAgent`: string
 - `context.pathname`: string
@@ -127,18 +126,12 @@ Labels base:
 - `status:triage`
 - `bug` o `feature`
 
-El backend también intenta asignar el tipo estructurado `Bug` o `Feature` en la
-petición de creación. Si GitHub rechaza el campo por permisos o configuración,
-reintenta sin él para no bloquear la creación.
+El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
+Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
 
 Label adicional si hay automatización:
 
 - `enrich:pending`
-
-Tras el workflow Codex:
-
-- `enriched:codex` si el enriquecimiento termina correctamente.
-- `enrich:failed` si Codex no devuelve un resultado válido.
 
 Metadatos que se escriben en el body:
 
@@ -150,7 +143,7 @@ Metadatos que se escriben en el body:
 - pasos para reproducir
 - resultado esperado
 - resultado actual
-- marcador interno de solicitud Codex (no se menciona a un bot en el texto)
+- `@claude` opcional
 
 ## Issue #29: revisión relevante para esta pestaña
 
@@ -200,13 +193,13 @@ Implicación para futuros cambios:
 `tests/unit/issue-report-schema.test.ts` cubre:
 
 - normalización y validación del payload
-- default `enrichWithCodex = false`
+- default `mentionClaude = false`
 
 `tests/unit/github-issues.test.ts` cubre:
 
 - creación de issue
 - reintentos transitorios
-- ausencia/presencia de `enrich:pending`
+- ausencia/presencia de `@claude`
 - labels correctas según automatización
 
 ## Checklist para futuras issues sobre Reportes
