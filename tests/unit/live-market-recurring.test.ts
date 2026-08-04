@@ -87,6 +87,40 @@ describe('reglas recurrentes y pendientes', () => {
     expect(store.pendingCount).toBe(1)
     vi.unstubAllGlobals()
   })
+
+  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-01-15' })
+    const financialStore = useFinancialStateStore()
+    financialStore.replaceState({
+      year: 2024, currency: 'EUR', accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
+      investmentAssets: [], liabilities: [], incomeCategories: [], expenseCategories: [], investmentCategories: ['Fondos'],
+      transactions: [], snapshots: {}, budget: { income: {}, expense: {}, investment: {} }, goals: {}, contributions: [],
+      recurringRules: [], pendingMovements: [], instruments: [], quotes: {},
+    })
+    const store = useRecurringStore()
+    expect(store.addRule({
+      type: 'investment', accountId: 'broker', category: 'Fondos', description: 'Aporte original', amount: 100,
+      symbol: 'VWCE', side: 'buy', units: 1, unitPrice: 100, fee: 0,
+      frequency: 'monthly', interval: 1, startDate: '2024-01-01',
+    })).toBe(true)
+    expect(store.pendingCount).toBe(1)
+    const firstPending = store.openPendingMovements[0]
+    const ruleId = store.rules[0].id
+
+    expect(store.updateRule(ruleId, {
+      type: 'investment', accountId: 'broker', category: 'Fondos', description: 'Aporte actualizado', amount: 210,
+      symbol: 'VWCE', side: 'buy', units: 2, unitPrice: 105, fee: 0,
+      frequency: 'monthly', interval: 1, startDate: '2024-01-01',
+    })).toBe(true)
+    expect(store.openPendingMovements[0]).toMatchObject({ id: firstPending.id, description: 'Aporte original', amount: 100, units: 1, unitPrice: 100 })
+    expect(store.rules[0]).toMatchObject({ description: 'Aporte actualizado', amount: 210, units: 2, unitPrice: 105, nextOccurrenceDate: '2024-02-01' })
+
+    store.refreshPending('2024-02-02')
+    expect(store.openPendingMovements).toHaveLength(2)
+    expect(store.openPendingMovements[1]).toMatchObject({ description: 'Aporte actualizado', amount: 210, units: 2, unitPrice: 105, occurrenceDate: '2024-02-01' })
+    vi.unstubAllGlobals()
+  })
 })
 
 describe('valoración de cartera', () => {

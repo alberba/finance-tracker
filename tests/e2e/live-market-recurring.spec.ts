@@ -209,6 +209,23 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(tracker.transactionsSection).toContainText('212,50')
   })
 
+  test('permite editar una regla de inversión recurrente', async ({ page, tracker }) => {
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openSettings()
+    await liveMarket.createRecurringRule({
+      account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
+      frequency: 'monthly', startDate: '2026-07-10',
+      type: 'investment', symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
+    })
+
+    await liveMarket.editFirstRecurringRule({ description: 'Aportación VWCE actualizada', amount: 212.5, units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
+    await expect(liveMarket.recurringRules).toContainText('Aportación VWCE actualizada')
+    await expect(liveMarket.recurringRules).toContainText('212.50')
+  })
+
   test('avisa cuando el proveedor devuelve un dato obsoleto', async ({ page, tracker }) => {
     await page.route('**/api/market/quotes', async (route) => {
       const body = route.request().postDataJSON() as { instruments?: Array<{ id: string; currency: string }> }
