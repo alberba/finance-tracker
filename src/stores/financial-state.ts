@@ -4,7 +4,6 @@ import { computed, shallowRef } from 'vue'
 import { BASE_SEED, normalizeState } from '../scripts/state'
 import type { State } from '../scripts/types'
 import { clone } from '../scripts/utils'
-import { loadStateFromApi, saveStateToApi } from '../services/state-api'
 
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
 type StateCommitHandler = (state: State) => void
@@ -69,41 +68,6 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     stateReloadHandler = handler
   }
 
-  async function loadFromApi(): Promise<State | null> {
-    status.value = 'loading'
-    errorMessage.value = null
-
-    try {
-      const nextState = await loadStateFromApi()
-      if (!nextState) {
-        status.value = 'idle'
-        return null
-      }
-      return replaceState(nextState)
-    } catch (error) {
-      status.value = 'error'
-      errorMessage.value =
-        error instanceof Error ? error.message : 'No se pudo cargar el estado financiero'
-      return null
-    }
-  }
-
-  async function saveToApi(): Promise<boolean> {
-    status.value = 'saving'
-    errorMessage.value = null
-
-    try {
-      await saveStateToApi(state.value)
-      status.value = 'idle'
-      return true
-    } catch (error) {
-      status.value = 'error'
-      errorMessage.value =
-        error instanceof Error ? error.message : 'No se pudo guardar el estado financiero'
-      return false
-    }
-  }
-
   return {
     state,
     status,
@@ -127,7 +91,5 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     registerStateCommitHandler,
     reloadState,
     registerStateReloadHandler,
-    loadFromApi,
-    saveToApi,
   }
 })

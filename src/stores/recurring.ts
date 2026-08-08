@@ -3,11 +3,110 @@ import { computed } from 'vue'
 
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
+import {
+  resolveCategoryId,
+  resolveEntityId,
+  syncListDiff,
+  type CategoryKind,
+} from '../lib/client/command-mapping'
 import { computeInvestmentMovement } from '../scripts/investment-movements'
-import type { InvestmentSide, RecurringFrequency, RecurringRule, Transaction, TransactionType } from '../scripts/types'
+import type {
+  InvestmentSide,
+  PendingMovement,
+  RecurringFrequency,
+  RecurringRule,
+  Transaction,
+  TransactionType,
+} from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
+
+/**
+ * WP7b — maps a legacy `RecurringRule` row to a `recurringRule` sync
+ * command payload.
+ *
+ * WP10 fix: `accountId` is a *required* field on `entityCreateSchemas`
+ * for every entity type below (`transaction`, `subscription`,
+ * `recurringRule`, `pendingMovement`) — WP7b's original builders passed
+ * the legacy row's `accountId` straight through unresolved, i.e. the
+ * client-local id (`uid('acc')`), never the server-assigned account UUID
+ * `resolveEntityId('account', …)` would return. Every real `/api/sync`
+ * `create` command for these four entity types was therefore rejected
+ * server-side (either the raw SQLite FK constraint, or WP10's stricter
+ * `assertOwnedReferences` ownership guard, both correctly reject an
+ * unresolved id) — undetected until this WP's E2E offline-sync spec
+ * exercised a real create-account-then-create-transaction flow end to
+ * end; every existing unit/command-mapping test mocked `getEntityRef`
+ * directly rather than going through a real account-creation round trip.
+ * Same "required FK, skip until resolved" pattern as `recurringRuleId`
+ * below.
+ */
+async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
+  const accountId = await resolveEntityId('account', rule.accountId)
+  if (!accountId) {
+    return null
+  }
+  const categoryId = await resolveCategoryId(rule.type as CategoryKind, rule.category)
+  return {
+    name: rule.description,
+    type: rule.type,
+    accountId,
+    categoryId,
+    amount: rule.amount,
+    currency,
+    frequency: rule.frequency,
+    nextRunDate: rule.nextOccurrenceDate,
+    status: rule.active ? 'active' : 'paused',
+  }
+}
+
+/**
+ * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
+ * command payload. Returns `null` (skip, see `syncListDiff`) when the
+ * parent recurring rule *or* account hasn't synced yet — both
+ * `recurringRuleId` and `accountId` are required fields in
+ * `entityCreateSchemas.pendingMovement` (see the WP10 fix note on
+ * `buildRecurringRuleData` above for `accountId`).
+ */
+async function buildPendingMovementData(pending: PendingMovement, currency: string) {
+  const recurringRuleId = await resolveEntityId('recurringRule', pending.ruleId)
+  if (!recurringRuleId) {
+    return null
+  }
+  const accountId = await resolveEntityId('account', pending.accountId)
+  if (!accountId) {
+    return null
+  }
+  const categoryId = await resolveCategoryId(pending.type as CategoryKind, pending.category)
+  return {
+    recurringRuleId,
+    accountId,
+    categoryId,
+    amount: pending.amount,
+    currency,
+    dueDate: pending.occurrenceDate,
+    status: pending.status,
+  }
+}
+
+/** WP7b — maps a legacy `Transaction` row to a `transaction` sync command payload. See the WP10 fix note on `buildRecurringRuleData` above for `accountId`. */
+async function buildTransactionData(tx: Transaction, currency: string) {
+  const accountId = await resolveEntityId('account', tx.accountId)
+  if (!accountId) {
+    return null
+  }
+  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
+  return {
+    accountId,
+    categoryId,
+    type: tx.type,
+    date: tx.date,
+    description: tx.description,
+    amount: tx.amount,
+    currency,
+  }
+}
 
 export interface NewRecurringRuleInput {
   type: TransactionType
@@ -52,10 +151,18 @@ export const useRecurringStore = defineStore('recurring', () => {
   function refreshPending(today = resolveToday()): number {
     const result = generatePendingMovements(financialStateStore.state, today)
     if (hasChanges(result.pendingMovements, financialStateStore.state.pendingMovements) || hasChanges(result.recurringRules, rules.value)) {
+      const beforePending = financialStateStore.state.pendingMovements
+      const beforeRules = rules.value
       financialStateStore.commitState((draft) => {
         draft.pendingMovements = result.pendingMovements
         draft.recurringRules = result.recurringRules
       })
+      void syncListDiff('recurringRule', beforeRules, financialStateStore.state.recurringRules, (rule) =>
+        buildRecurringRuleData(rule, financialStateStore.currency),
+      )
+      void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
+        buildPendingMovementData(pending, financialStateStore.currency),
+      )
     }
     return result.createdCount
   }
@@ -83,7 +190,11 @@ export const useRecurringStore = defineStore('recurring', () => {
       lastExecutionDate: null,
       nextOccurrenceDate: input.startDate,
     }
+    const before = financialStateStore.state.recurringRules
     financialStateStore.commitState((draft) => draft.recurringRules.push(rule))
+    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
+      buildRecurringRuleData(item, financialStateStore.currency),
+    )
     refreshPending()
     return true
   }
@@ -134,19 +245,31 @@ export const useRecurringStore = defineStore('recurring', () => {
   }
 
   function toggleRule(id: string, active: boolean): void {
+    const before = financialStateStore.state.recurringRules
     financialStateStore.commitState((draft) => {
       const rule = draft.recurringRules.find((item) => item.id === id)
       if (rule) rule.active = active
     })
+    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
+      buildRecurringRuleData(item, financialStateStore.currency),
+    )
   }
 
   function removeRule(id: string): void {
+    const beforeRules = financialStateStore.state.recurringRules
+    const beforePending = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
       draft.recurringRules = draft.recurringRules.filter((rule) => rule.id !== id)
       draft.pendingMovements = draft.pendingMovements.map((pending) => pending.ruleId === id && pending.status === 'pending'
         ? { ...pending, status: 'cancelled', updatedAt: new Date().toISOString() }
         : pending)
     })
+    void syncListDiff('recurringRule', beforeRules, financialStateStore.state.recurringRules, (item) =>
+      buildRecurringRuleData(item, financialStateStore.currency),
+    )
+    void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
+      buildPendingMovementData(pending, financialStateStore.currency),
+    )
   }
 
   function confirmPending(id: string, edit?: Partial<PendingMovementEdit>): boolean {
@@ -158,6 +281,8 @@ export const useRecurringStore = defineStore('recurring', () => {
     const description = edit?.description || pending.description
     const amount = edit?.amount ?? pending.amount
     const transactionId = uid('tx')
+    const beforeTransactions = financialStateStore.transactions
+    const beforePending = financialStateStore.state.pendingMovements
     const transaction: Transaction = {
       id: transactionId,
       date: occurrenceDate,
@@ -193,6 +318,12 @@ export const useRecurringStore = defineStore('recurring', () => {
         current.amount = amount
       }
     })
+    void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
+    void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
+      buildPendingMovementData(pending, financialStateStore.currency),
+    )
     if (confirmed) void stockEventsStore.syncMovement(transaction)
     return true
   }
@@ -214,6 +345,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     const validInvestment = !investment || (investment.normalizedSymbol && investment.normalizedUnits > 0 && investment.normalizedUnitPrice > 0)
     const valid = edit.date && edit.accountId && edit.category && edit.description.trim() && amount > 0 && validInvestment
     if (!valid) return false
+    const before = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
       const current = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
       if (!current) return
@@ -235,10 +367,14 @@ export const useRecurringStore = defineStore('recurring', () => {
       }
       current.updatedAt = new Date().toISOString()
     })
+    void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
+      buildPendingMovementData(pending, financialStateStore.currency),
+    )
     return true
   }
 
   function changePendingStatus(id: string, status: 'skipped' | 'cancelled'): void {
+    const before = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
       const pending = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
       if (pending) {
@@ -246,6 +382,9 @@ export const useRecurringStore = defineStore('recurring', () => {
         pending.updatedAt = new Date().toISOString()
       }
     })
+    void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
+      buildPendingMovementData(pending, financialStateStore.currency),
+    )
   }
 
   return {

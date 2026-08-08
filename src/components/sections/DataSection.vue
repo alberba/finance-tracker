@@ -12,7 +12,7 @@ withDefaults(
 )
 
 const dataStore = useDataStore()
-const { summary } = storeToRefs(dataStore)
+const { summary, canStartFresh } = storeToRefs(dataStore)
 
 function onImportChange(event: Event): void {
   const input = event.target
@@ -32,6 +32,15 @@ function onResetSeed(): void {
   )
   if (confirmed) {
     dataStore.resetSeed()
+  }
+}
+
+function onStartFresh(): void {
+  const confirmed = window.confirm(
+    'Se creará un espacio nuevo y vacío (año actual, EUR, sin cuentas ni movimientos). ¿Continuar?',
+  )
+  if (confirmed) {
+    void dataStore.startFresh()
   }
 }
 </script>
@@ -86,6 +95,15 @@ function onResetSeed(): void {
       </button>
       <button id="reset-seed" class="danger-btn" type="button" @click="onResetSeed">
         Reiniciar con datos semilla
+      </button>
+      <button
+        v-if="canStartFresh"
+        id="start-fresh"
+        class="danger-btn"
+        type="button"
+        @click="onStartFresh"
+      >
+        Empezar de cero
       </button>
     </div>
 

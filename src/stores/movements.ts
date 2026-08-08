@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
+import { resolveCategoryId, resolveEntityId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
 import {
   buildAccountFilterOptions,
   buildMonthBreakdown,
@@ -21,6 +22,56 @@ import { getFirstUpcomingChargeDate, materializeDueSubscriptions } from '../scri
 import { monthFromISO, parseFloatSafe, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
+
+/**
+ * WP7b — maps a legacy `Transaction` row to a `transaction` sync command
+ * payload.
+ *
+ * WP10 fix: `accountId` is a *required* field in `entityCreateSchemas`
+ * for `transaction`/`subscription` — the original builder passed the
+ * legacy row's `accountId` straight through unresolved (the client-local
+ * id, not the server-assigned account UUID `resolveEntityId('account', …)`
+ * returns), so every real create command was rejected server-side. Same
+ * "required FK, skip until resolved" pattern as `pendingMovement`'s
+ * `recurringRuleId` in `stores/recurring.ts`. See that file's identical
+ * fix note for the full story of how this went undetected.
+ */
+async function buildTransactionData(tx: Transaction, currency: string) {
+  const accountId = await resolveEntityId('account', tx.accountId)
+  if (!accountId) {
+    return null
+  }
+  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
+  return {
+    accountId,
+    categoryId,
+    type: tx.type,
+    date: tx.date,
+    description: tx.description,
+    amount: tx.amount,
+    currency,
+  }
+}
+
+/** WP7b — maps a legacy `Subscription` row to a `subscription` sync command payload. See the WP10 fix note on `buildTransactionData` above for `accountId`. */
+async function buildSubscriptionData(subscription: Subscription, currency: string) {
+  const accountId = await resolveEntityId('account', subscription.accountId)
+  if (!accountId) {
+    return null
+  }
+  const categoryId = await resolveCategoryId('expense', subscription.category)
+  const billingDay = Number.parseInt(subscription.startDate.slice(8, 10), 10)
+  return {
+    name: subscription.name,
+    categoryId,
+    accountId,
+    amount: subscription.amount,
+    currency,
+    billingDay: Number.isFinite(billingDay) ? billingDay : null,
+    frequency: subscription.frequency,
+    isActive: subscription.active,
+  }
+}
 
 const TYPE_FILTER_OPTIONS = [
   { value: 'income', label: 'Ingreso' },
@@ -205,6 +256,7 @@ export const useMovementsStore = defineStore('movements', () => {
       return false
     }
 
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions.push({
         id: uid('tx'),
@@ -217,6 +269,9 @@ export const useMovementsStore = defineStore('movements', () => {
         amount: round2(input.amount),
       })
     })
+    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
     return true
   }
 
@@ -236,6 +291,7 @@ export const useMovementsStore = defineStore('movements', () => {
       return false
     }
 
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       const tx = draft.transactions.find((item): item is Transaction => item.id === id)
       if (!tx) {
@@ -249,6 +305,9 @@ export const useMovementsStore = defineStore('movements', () => {
       tx.description = description
       tx.amount = round2(amount)
     })
+    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
 
     ui.txEditingId = ''
     ui.investmentTxEditingId = ''
@@ -257,9 +316,13 @@ export const useMovementsStore = defineStore('movements', () => {
   }
 
   function deleteTransaction(id: string): void {
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
+    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
     ui.txSelectedIds = ui.txSelectedIds.filter((itemId) => itemId !== id)
     showToast('Movimiento eliminado.')
   }
@@ -285,6 +348,7 @@ export const useMovementsStore = defineStore('movements', () => {
     }
 
     let updated = 0
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions.forEach((item) => {
         if (!selectedIds.has(item.id)) {
@@ -302,6 +366,9 @@ export const useMovementsStore = defineStore('movements', () => {
         }
       })
     })
+    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
     showToast(`Actualizadas ${updated} filas.`)
   }
 
@@ -313,9 +380,13 @@ export const useMovementsStore = defineStore('movements', () => {
     }
 
     const removed = selectedIds.size
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => !selectedIds.has(item.id))
     })
+    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
     ui.txSelectedIds = []
     showToast(`Eliminadas ${removed} filas.`)
   }
@@ -328,6 +399,8 @@ export const useMovementsStore = defineStore('movements', () => {
     }
 
     let generatedCount = 0
+    const beforeSubscriptions = financialStateStore.subscriptions
+    const beforeTransactions = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       const subscription: Subscription = {
         id: uid('subscription'),
@@ -344,6 +417,14 @@ export const useMovementsStore = defineStore('movements', () => {
       draft.subscriptions.push(subscription)
       generatedCount = materializeDueSubscriptions(draft, todayISO()).generatedCount
     })
+    void syncListDiff('subscription', beforeSubscriptions, financialStateStore.subscriptions, (subscription) =>
+      buildSubscriptionData(subscription, financialStateStore.currency),
+    )
+    // `materializeDueSubscriptions` may also push already-due charges as
+    // ordinary transactions in the same commit — diff those too.
+    void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
     showToast(
       generatedCount > 0
         ? `Suscripción guardada y ${generatedCount} gasto generado.`
@@ -359,6 +440,7 @@ export const useMovementsStore = defineStore('movements', () => {
       return false
     }
 
+    const before = financialStateStore.subscriptions
     financialStateStore.commitState((draft) => {
       const subscription = draft.subscriptions.find((item) => item.id === id)
       if (!subscription) {
@@ -370,11 +452,15 @@ export const useMovementsStore = defineStore('movements', () => {
       subscription.category = input.category
       subscription.frequency = input.frequency
     })
+    void syncListDiff('subscription', before, financialStateStore.subscriptions, (subscription) =>
+      buildSubscriptionData(subscription, financialStateStore.currency),
+    )
     showToast('Suscripción actualizada.')
     return true
   }
 
   function setSubscriptionActive(id: string, active: boolean): void {
+    const before = financialStateStore.subscriptions
     financialStateStore.commitState((draft) => {
       const subscription = draft.subscriptions.find((item) => item.id === id)
       if (subscription) {
@@ -384,13 +470,20 @@ export const useMovementsStore = defineStore('movements', () => {
         subscription.active = active
       }
     })
+    void syncListDiff('subscription', before, financialStateStore.subscriptions, (subscription) =>
+      buildSubscriptionData(subscription, financialStateStore.currency),
+    )
     showToast(active ? 'Suscripción reactivada.' : 'Suscripción pausada.')
   }
 
   function deleteSubscription(id: string): void {
+    const before = financialStateStore.subscriptions
     financialStateStore.commitState((draft) => {
       draft.subscriptions = draft.subscriptions.filter((item) => item.id !== id)
     })
+    void syncListDiff('subscription', before, financialStateStore.subscriptions, (subscription) =>
+      buildSubscriptionData(subscription, financialStateStore.currency),
+    )
     showToast('Suscripción eliminada. Sus gastos ya creados se conservan.')
   }
 
