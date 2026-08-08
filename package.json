@@ -10,6 +10,7 @@
     "d1:migrate:remote": "wrangler d1 migrations apply finance-tracker-db --remote",
     "dev": "astro dev",
     "build": "astro build",
+    "benchmark:performance": "node scripts/benchmark-performance.mjs",
     "preview": "astro preview",
     "check": "astro check",
     "lint": "eslint .",
@@ -51,6 +52,7 @@
   },
   "dependencies": {
     "@astrojs/vue": "^5.1.4",
+    "@sentry/browser": "10.66.0",
     "@sentry/astro": "^10.66.0",
     "@sentry/cloudflare": "^10.66.0",
     "@tailwindcss/vite": "^4.2.2",
