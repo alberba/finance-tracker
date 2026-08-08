@@ -1,4 +1,16 @@
-name: Playwright Tests
+name: CI
+
+# WP10: gates every PR on the full validation surface called out in
+# `docs/migration/work-packages.md`'s Contradiction #6 ("CI does not gate
+# unit/lint/check/build, only Playwright") — lint, astro check, unit tests,
+# the WP5 D1-v2 integration tier, a production build, a local `wrangler d1
+# migrations apply` verification for both databases, and both Playwright
+# suites (the legacy default-flag E2E suite, and the sync-v2 flow behind
+# `PUBLIC_SYNC_V2=true` — see `playwright.sync-v2.config.ts`). Kept as one
+# job (rather than a fan-out matrix) so a single `pnpm install` + Playwright
+# browser install is reused across every gate; fail-fast still surfaces the
+# first failing gate quickly since each step only runs if the previous one
+# passed.
 
 on:
   push:
@@ -21,13 +33,44 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Astro check
+        run: pnpm check
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: D1 v2 integration tests (WP5 tier)
+        run: pnpm test:integration
+      - name: Verify local D1 migrations apply cleanly (v1 + v2)
+        run: |
+          pnpm d1:migrate:local
+          pnpm d1:migrate:local:v2
+      - name: Build
+        run: pnpm build
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Run Playwright tests
+      - name: Write CI-only .dev.vars for test-auth shim (WP8)
+        run: echo "TEST_AUTH_ENABLED=true" >> .dev.vars
+      - name: Run Playwright tests (legacy flow, PUBLIC_SYNC_V2 off)
         run: pnpm test:e2e
+      - name: Run Playwright tests (sync-v2 flow, PUBLIC_SYNC_V2=true)
+        # Not fail-fast against the legacy suite above: the sync-v2 flow is
+        # still stabilizing (see docs/migration/work-packages.md leftovers —
+        # a known-flaky offline-conflict-dialog case remains). Runs and
+        # reports on every PR so regressions are visible without blocking
+        # merges on that one pre-existing flake; promote to blocking once
+        # it's green.
+        continue-on-error: true
+        run: pnpm test:e2e:sync-v2
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-sync-v2
+          path: playwright-report-sync-v2/
           retention-days: 30

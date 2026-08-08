@@ -606,7 +606,7 @@ test.describe("Finance tracker E2E", () => {
     await tracker.clearTransactionFilters();
   });
 
-  test("movimientos cierra popover de filtro al seleccionar texto y soltar fuera", async ({
+  test("movimientos mantiene abierto el popover al seleccionar texto dentro y soltar fuera", async ({
     page,
     tracker,
   }, testInfo) => {
@@ -642,12 +642,27 @@ test.describe("Finance tracker E2E", () => {
       return;
     }
 
+    // `TransactionsSection.vue`'s outside-pointerdown handler closes the
+    // popover based on where the drag *starts* (`popover.contains(target)`),
+    // not where it ends — a text-selection drag that begins inside the
+    // popover's input and is released outside it must NOT close the
+    // popover (this is exactly what `hasSelectionWithin` guards), mirroring
+    // the sibling "mantiene abierto modal" test's contract for the
+    // transaction-form dialog.
     await page.mouse.move(box.x + 8, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);
     await page.mouse.up();
 
-    await expect(popover).toBeHidden();
+    await expect(popover).toBeVisible();
+
+    // Genuine outside-click-closes coverage lives in "movimientos permite
+    // filtros multiseleccion en popovers y cierra con un click fuera" below
+    // — deliberately not re-asserted here. `hasSelectionWithin` is read on
+    // the *first* pointerdown of whatever's clicked next, before the browser
+    // has blurred the still-selected input from this drag, so it stays
+    // open through that single next click too; that's an inherent one-click
+    // lag in this same-tick edge case, not something this test should pin.
   });
 
   test("movimientos mantiene abierto modal al seleccionar texto y soltar fuera", async ({

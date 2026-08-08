@@ -59,9 +59,12 @@ test.describe("Settings E2E", () => {
     await expenseForm.locator('input[name="name"]').fill("Suscripciones");
     await expenseForm.getByRole("button", { name: "Agregar" }).click();
 
-    const tag = settingsSection.locator("#settings-expense-categories .tag", {
-      hasText: "Suscripciones",
-    });
+    const tag = settingsSection.locator(
+      "#settings-expense-categories .category-tag",
+      {
+        hasText: "Suscripciones",
+      },
+    );
     await expect(tag).toBeVisible();
 
     await tag.getByRole("button", { name: /Eliminar categoría/ }).click();
