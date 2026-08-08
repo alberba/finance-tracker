@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, reactive, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
@@ -58,6 +58,62 @@ watch(
 function isOpen(column: TxSortColumn): boolean {
   return ui.txOpenHeaderFilter === column
 }
+
+/**
+ * `.table-wrap` (the scroll container wrapping this table) sets
+ * `overflow: auto` so wide tables scroll horizontally, and `.compact`
+ * variants elsewhere additionally cap `max-height` for vertical scrolling.
+ * A popover positioned with `position: absolute` relative to its `<th>`
+ * gets clipped by that overflow box once the table is tall/narrow enough,
+ * and Playwright then reports the *next* element underneath (the layout
+ * `<div class="grid ...">` wrapping this table + `TransactionSummary`) as
+ * intercepting pointer events on the now-invisible "Limpiar" button.
+ *
+ * Fix: once a header filter popover opens, compute its position from the
+ * trigger button's viewport rect and render it with `position: fixed`
+ * (bound via `popoverStyle` below) — fixed-position elements aren't
+ * clipped by an ancestor's `overflow: auto/hidden`, so the popover always
+ * renders (and receives clicks) above the table regardless of scroll
+ * position or table height.
+ */
+const popoverStyle = ref<Record<string, string>>({})
+
+function updatePopoverPosition(column: TxSortColumn | ''): void {
+  if (!column) {
+    return
+  }
+  const trigger = document.querySelector<HTMLElement>(`.tx-filter-trigger[data-column="${column}"]`)
+  if (!trigger) {
+    return
+  }
+  const rect = trigger.getBoundingClientRect()
+  popoverStyle.value = {
+    position: 'fixed',
+    top: `${rect.bottom + 6}px`,
+    left: `${rect.left}px`,
+    zIndex: '60',
+  }
+}
+
+function onReposition(): void {
+  updatePopoverPosition(ui.txOpenHeaderFilter)
+}
+
+watch(
+  () => ui.txOpenHeaderFilter,
+  (column) => {
+    if (column) {
+      nextTick(() => updatePopoverPosition(column))
+    }
+  },
+)
+
+window.addEventListener('resize', onReposition)
+window.addEventListener('scroll', onReposition, true)
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onReposition)
+  window.removeEventListener('scroll', onReposition, true)
+})
 
 function isFiltered(column: TxSortColumn): boolean {
   if (column === 'date') return Boolean(ui.txFilters.date)
@@ -162,7 +218,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('date') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="date" :hidden="!isOpen('date')">
+            <div class="tx-filter-popover" data-column="date" :hidden="!isOpen('date')" :style="isOpen('date') ? popoverStyle : undefined">
               <label for="tx-header-filter-date">Filtrar fecha</label>
               <input
                 id="tx-header-filter-date"
@@ -206,7 +262,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('description') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="description" :hidden="!isOpen('description')">
+            <div class="tx-filter-popover" data-column="description" :hidden="!isOpen('description')" :style="isOpen('description') ? popoverStyle : undefined">
               <label for="tx-header-filter-description">Descripción</label>
               <input
                 id="tx-header-filter-description"
@@ -251,7 +307,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('amount') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="amount" :hidden="!isOpen('amount')">
+            <div class="tx-filter-popover" data-column="amount" :hidden="!isOpen('amount')" :style="isOpen('amount') ? popoverStyle : undefined">
               <label for="tx-header-filter-amount-min">Importe mín</label>
               <input
                 id="tx-header-filter-amount-min"
@@ -307,7 +363,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('account') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="account" :hidden="!isOpen('account')">
+            <div class="tx-filter-popover" data-column="account" :hidden="!isOpen('account')" :style="isOpen('account') ? popoverStyle : undefined">
               <label>Cuenta</label>
               <div id="tx-header-filter-account" class="tx-checkbox-list" aria-label="Filtrar cuentas">
                 <small v-if="!accountFilterOptions.length">Sin cuentas en este mes.</small>
@@ -356,7 +412,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('type') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="type" :hidden="!isOpen('type')">
+            <div class="tx-filter-popover" data-column="type" :hidden="!isOpen('type')" :style="isOpen('type') ? popoverStyle : undefined">
               <label>Tipo</label>
               <div id="tx-header-filter-type" class="tx-checkbox-list" aria-label="Filtrar tipos">
                 <label v-for="option in typeFilterOptions" :key="option.value" class="tx-checkbox-option">
@@ -404,7 +460,7 @@ function onSaveEdit(id: string): void {
                 {{ sortGlyph('category') }}
               </button>
             </div>
-            <div class="tx-filter-popover" data-column="category" :hidden="!isOpen('category')">
+            <div class="tx-filter-popover" data-column="category" :hidden="!isOpen('category')" :style="isOpen('category') ? popoverStyle : undefined">
               <label for="tx-header-filter-category">Categoría</label>
               <input
                 id="tx-header-filter-category"

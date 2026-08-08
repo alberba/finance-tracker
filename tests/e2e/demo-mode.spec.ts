@@ -5,7 +5,7 @@ test.describe('Modo demo', () => {
     page,
     request,
   }) => {
-    await request.post('/api/state/reset', {
+    await request.post('/api/state/reset-legacy', {
       headers: { 'x-finance-namespace': 'demo' },
     })
 

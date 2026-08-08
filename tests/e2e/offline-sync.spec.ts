@@ -1,0 +1,220 @@
+import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+
+/**
+ * WP10 — offline CRUD + sync-on-reconnect + conflict-dialog E2E, sync-v2
+ * flow (`PUBLIC_SYNC_V2=true`, see `playwright.sync-v2.config.ts`).
+ *
+ * The engine under test is `src/stores/sync.ts` (WP7): every domain
+ * mutation is optimistic (written to IndexedDB immediately, queued in the
+ * outbox) regardless of connectivity — `context.setOffline(true)` just
+ * proves the "offline" and "online" cases are the same code path, per that
+ * WP's design decision.
+ */
+
+const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
+const SYNC_STATUS = '#sidebar-sync-status'
+
+declare global {
+  interface Window {
+    __FINANCE_NAMESPACE__?: string
+  }
+}
+
+/**
+ * See the identical helper/comment in `multi-user-isolation.spec.ts`: the
+ * legacy `financialStateStore` (namespace-scoped) still renders the UI
+ * alongside sync-v2 (WP7b), so `provisionUser` must scope *both* layers.
+ * Deterministic per-email so the "two devices" conflict test's second
+ * context reconnects to the same namespace as the first.
+ */
+function namespaceForEmail(email: string): string {
+  return `pw-sync-v2-${email.replace(/[^a-z0-9]/gi, '-')}`
+}
+
+async function provisionUser(
+  context: BrowserContext,
+  email: string,
+  options: { resetLegacyNamespace?: boolean } = {},
+): Promise<{ tracker: FinanceTrackerPage; page: Page }> {
+  const namespace = namespaceForEmail(email)
+  await context.setExtraHTTPHeaders({ [TEST_USER_EMAIL_HEADER]: email })
+  if (options.resetLegacyNamespace ?? true) {
+    // Skipped for "device two" in the conflict test below, which
+    // re-authenticates as the *same* email as "device one" specifically to
+    // share its namespace/data — resetting here would wipe it.
+    await context.request.post('/api/state/reset-legacy', {
+      headers: { 'x-finance-namespace': namespace },
+    })
+  }
+  await context.request.post('/api/state/initialize', {
+    headers: { [TEST_USER_EMAIL_HEADER]: email },
+  })
+  const page = await context.newPage()
+  await page.addInitScript((value) => {
+    window.__FINANCE_NAMESPACE__ = value
+  }, namespace)
+  const tracker = new FinanceTrackerPage(page)
+  await tracker.goto()
+  // See the identical comment in `multi-user-isolation.spec.ts` — gives the
+  // client Vue bundle time to finish hydrating before the first interaction.
+  await page.waitForLoadState('networkidle')
+  return { tracker, page }
+}
+
+function uniqueEmail(label: string): string {
+  return `pw-offline-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@e2e.test`
+}
+
+/**
+ * Waits for `#sidebar-sync-status` to read "Sincronizado" and *stay* that
+ * way.
+ *
+ * WP10 fix: a bare single check races the `/api/session` →
+ * `syncStore.init()` → `/api/changes` (pull) → `/api/sync` (flush) chain —
+ * `syncStatus` defaults to `'idle'` ("Sincronizado" with no "N
+ * pendiente(s)" suffix) *before* that chain has even started, and a
+ * fire-and-forget mutation (`void syncListDiff(...)`, called from a
+ * form-save handler that resolves synchronously with the save itself) can
+ * likewise not have reached its first `await` yet. Waiting for
+ * `networkidle` (no in-flight requests for 500ms) after the first sighting
+ * rides out whichever leg of that chain was still pending, then the
+ * second check confirms it actually landed on "nothing left to sync"
+ * rather than a stale snapshot from before any of it began.
+ */
+async function waitForSynced(page: Page): Promise<void> {
+  await expect(page.locator(SYNC_STATUS)).toContainText('Sincronizado', { timeout: 15000 })
+  await page.waitForLoadState('networkidle')
+  await expect(page.locator(SYNC_STATUS)).toContainText('Sincronizado', { timeout: 15000 })
+}
+
+test.describe('Sincronización offline (sync v2)', () => {
+  test('CRUD sin conexión persiste localmente y se sincroniza al reconectar, sin duplicados', async ({ browser }) => {
+    const context = await browser.newContext()
+    try {
+      const { tracker, page } = await provisionUser(context, uniqueEmail('crud'))
+      await tracker.addAccount({ name: 'Cuenta Offline', openingBalance: 0 })
+      await waitForSynced(page)
+
+      await context.setOffline(true)
+
+      await tracker.addCustomTransaction({
+        date: '2026-02-01',
+        monthLabel: 'FEBRERO',
+        type: 'expense',
+        categoryLabel: 'Alimentación',
+        amount: 15,
+        description: 'Compra sin conexión',
+      })
+      // The transactions list defaults to filtering on the current month —
+      // point it at the month the seeded transaction actually falls in.
+      // `filterTransactionsMonth` only touches an in-page <select>, so it
+      // works while offline too.
+      await tracker.filterTransactionsMonth('FEBRERO')
+      await tracker.expectTransactionDescriptionVisible('Compra sin conexión')
+
+      // Note: a `page.reload()` *while offline* isn't exercised here —
+      // `context.setOffline(true)` blocks the reload's own navigation
+      // request at the network layer (`net::ERR_INTERNET_DISCONNECTED`),
+      // which is a plain Chromium/Playwright limitation unrelated to the
+      // app (there's no service worker serving the shell from cache). The
+      // optimistic-write-survives-without-a-round-trip claim is still
+      // exercised: the row is visible immediately after the offline write
+      // above with no server request having succeeded yet.
+
+      await context.setOffline(false)
+      await waitForSynced(page)
+
+      // Reload again post-sync: the row must appear exactly once, proving
+      // the outbox replay didn't duplicate it on reconnect.
+      await page.reload()
+      await tracker.filterTransactionsMonth('FEBRERO')
+      const rows = tracker.transactionsSection.locator('#tx-table-body tr', {
+        hasText: 'Compra sin conexión',
+      })
+      await expect(rows).toHaveCount(1)
+    } finally {
+      await context.close()
+    }
+  })
+
+  test('una edición concurrente en dos dispositivos produce el diálogo de conflicto', async ({ browser }) => {
+    const email = uniqueEmail('conflict')
+    const contextDeviceOne = await browser.newContext()
+    const contextDeviceTwo = await browser.newContext()
+
+    try {
+      // Device 1 creates the account + transaction and syncs it, then a
+      // second "device" (fresh context, same identity) pulls it down.
+      const { tracker: deviceOne, page: pageOne } = await provisionUser(contextDeviceOne, email)
+      await deviceOne.addAccount({ name: 'Cuenta Compartida', openingBalance: 0 })
+      // Wait for the account's own `create` command to sync before
+      // referencing it from a transaction: a *seeded* account (the
+      // `addCustomTransaction` default, "Revolut") has no v2 `account`
+      // row at all — `resolveEntityId` can never resolve it, so the
+      // transaction's own sync-v2 create would be silently skipped
+      // forever (see the doc comment on `addCustomTransaction`'s
+      // `accountLabel` param). Only a freshly-created, already-synced
+      // account round-trips correctly.
+      await waitForSynced(pageOne)
+      await deviceOne.addCustomTransaction({
+        date: '2026-02-05',
+        monthLabel: 'FEBRERO',
+        type: 'expense',
+        categoryLabel: 'Alimentación',
+        amount: 20,
+        description: 'Movimiento en disputa',
+        accountLabel: 'Cuenta Compartida',
+      })
+      await deviceOne.filterTransactionsMonth('FEBRERO')
+      await waitForSynced(pageOne)
+
+      const { tracker: deviceTwo, page: pageTwo } = await provisionUser(contextDeviceTwo, email, {
+        resetLegacyNamespace: false,
+      })
+      await deviceTwo.filterTransactionsMonth('FEBRERO')
+      await deviceTwo.expectTransactionDescriptionVisible('Movimiento en disputa')
+      // Wait for device two's *pull* (not just "nothing queued to push") to
+      // land before editing offline: `getEntityRef` only ever resolves
+      // entities present in `cacheDb`, which this device populates
+      // asynchronously from `GET /api/changes` on first load — without
+      // this, `editTransactionByDescription` below can race that pull and
+      // silently no-op (see `useSyncStore`'s `syncNow` doc comment).
+      await waitForSynced(pageTwo)
+
+      // Both devices go offline and edit the *same* row independently.
+      await contextDeviceOne.setOffline(true)
+      await contextDeviceTwo.setOffline(true)
+
+      await deviceOne.editTransactionByDescription('Movimiento en disputa', {
+        amount: 21,
+      })
+      await deviceTwo.editTransactionByDescription('Movimiento en disputa', {
+        amount: 22,
+      })
+
+      // Device 1 reconnects first and wins the race — its edit becomes the
+      // server's current version.
+      await contextDeviceOne.setOffline(false)
+      await waitForSynced(pageOne)
+
+      // Device 2 reconnects with a now-stale `baseVersion` for the same
+      // row: `apply-command.ts`'s optimistic-concurrency check must reject
+      // it as a conflict, surfaced by `ConflictResolutionDialog.vue`.
+      await contextDeviceTwo.setOffline(false)
+      await expect(pageTwo.locator('[data-conflict-resolution-dialog]')).toBeVisible({
+        timeout: 15000,
+      })
+      await expect(pageTwo.locator('[data-conflict-resolution-dialog]')).toContainText(
+        'Conflicto de sincronización',
+      )
+
+      // Resolve by keeping the server's version — dialog closes.
+      await pageTwo.getByRole('button', { name: 'Mantener la del servidor' }).click()
+      await expect(pageTwo.locator('[data-conflict-resolution-dialog]')).toBeHidden()
+    } finally {
+      await contextDeviceOne.close()
+      await contextDeviceTwo.close()
+    }
+  })
+})

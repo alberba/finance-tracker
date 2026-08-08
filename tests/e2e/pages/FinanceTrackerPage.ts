@@ -227,6 +227,17 @@ export class FinanceTrackerPage {
     categoryLabel: string;
     amount: number;
     description: string;
+    /**
+     * WP10 fix: defaults to the pre-seeded "Revolut" account (unchanged
+     * behavior for every other call site), but `offline-sync.spec.ts`'s
+     * sync-v2 conflict test must pass the name of an account it created
+     * itself in this session — a *seeded* account has no v2 `account` row
+     * (never went through a `create` sync command), so
+     * `resolveEntityId('account', …)` can never resolve it and any
+     * transaction referencing it is silently never sync-created at all
+     * (see `command-mapping.ts`'s `syncListDiff`/`buildTransactionData`).
+     */
+    accountLabel?: string;
   }) {
     await this.openTransactions();
     await this.ensureTransactionModalOpen();
@@ -234,7 +245,7 @@ export class FinanceTrackerPage {
     await form.getByLabel("Fecha").fill(params.date);
     await form.getByLabel("Mes").selectOption({ label: params.monthLabel });
     await form.getByLabel("Tipo").selectOption(params.type);
-    await this.selectByLabelOrFirst(form.getByLabel("Cuenta"), "Revolut");
+    await this.selectByLabelOrFirst(form.getByLabel("Cuenta"), params.accountLabel ?? "Revolut");
     await this.selectByLabelOrFirst(
       form.getByLabel("Categoría"),
       params.categoryLabel,
@@ -526,9 +537,10 @@ export class FinanceTrackerPage {
         .fill(String(payload.amount));
     }
     if (typeof payload.category === "string") {
-      await editRow
-        .locator('[data-edit-field="category"]')
-        .fill(payload.category);
+      await this.selectByLabelOrFirst(
+        editRow.locator('[data-edit-field="category"]'),
+        payload.category,
+      );
     }
     if (typeof payload.newDescription === "string") {
       await editRow

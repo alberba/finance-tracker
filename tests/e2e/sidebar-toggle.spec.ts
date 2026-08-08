@@ -209,14 +209,15 @@ test.describe("Sidebar toggle", () => {
   }) => {
     await tracker.goto();
 
-    // Expandido: los iconos deben estar presentes en el DOM
+    // Expandido: los iconos deben estar presentes en el DOM (8 secciones en
+    // APP_SECTIONS tras la eliminación de la sección de informes).
     const icons = page.locator(".nav .nav-icon");
-    await expect(icons).toHaveCount(9);
+    await expect(icons).toHaveCount(8);
 
     // Colapsar
     await page.locator("#sidebar-toggle").click();
 
     // Colapsado: los iconos deben seguir presentes
-    await expect(icons).toHaveCount(9);
+    await expect(icons).toHaveCount(8);
   });
 });
