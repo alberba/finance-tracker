@@ -9,8 +9,8 @@ interface TransactionsBody {
   transaction?: unknown
 }
 
-export const POST: APIRoute = async ({ request }) => {
-  const apiKey = readApiKey(request)
+export const POST: APIRoute = async ({ request, locals }) => {
+  const apiKey = await readApiKey(request, locals)
   if (!apiKey) {
     return json({ error: 'Falta la API key de Stock Events' }, 400)
   }
