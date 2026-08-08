@@ -10,3 +10,9 @@ TWELVE_DATA_API_KEY=
 # Opcional: respaldo específico para cripto.
 COINGECKO_API_KEY=
 COINGECKO_API_PLAN=demo
+
+# Solo para desarrollo local / Playwright (WP8): habilita la cabecera
+# `X-Test-User-Email` como atajo de autenticación sin JWT real de Cf-Access
+# (ver src/middleware.ts). NUNCA definir esta variable en wrangler.toml
+# [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
+TEST_AUTH_ENABLED=true
