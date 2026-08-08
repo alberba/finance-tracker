@@ -34,12 +34,21 @@ export default defineConfig([
       'node_modules/**',
       'playwright-report/**',
       'test-results/**',
+      // Nested git worktrees under `.claude/worktrees/**` each carry their
+      // own `tsconfig.json`, which confuses typescript-eslint's automatic
+      // project-root detection (it sees two candidate `tsconfigRootDir`s and
+      // refuses to guess) once one exists alongside this repo. They're
+      // scratch checkouts, not part of this project's source tree.
+      '.claude/worktrees/**',
     ],
   },
   {
     files: scriptFiles,
     languageOptions: {
       globals: sharedGlobals,
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
   },
   {
