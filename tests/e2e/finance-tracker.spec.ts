@@ -176,14 +176,11 @@ test.describe("Finance tracker E2E", () => {
     page,
     tracker,
   }) => {
+    const yearDisplay = await tracker.getDisplayedYear();
     await tracker.openWealth();
 
-    const chartDetails = await page.evaluate(() => {
+    const chartDetails = await page.evaluate((yearDisplay) => {
       const chart = document.getElementById("chart-wealth");
-      const yearDisplay = Number(
-        (document.getElementById("year-display") as HTMLInputElement | null)
-          ?.value || 0,
-      );
       const now = new Date();
       if (!chart) {
         return null;
@@ -194,7 +191,7 @@ test.describe("Finance tracker E2E", () => {
         currentMonth: now.getMonth(),
         yearDisplay,
       };
-    });
+    }, yearDisplay);
 
     expect(chartDetails).not.toBeNull();
     if (!chartDetails) {
@@ -211,9 +208,10 @@ test.describe("Finance tracker E2E", () => {
     page,
     tracker,
   }) => {
+    const yearDisplay = await tracker.getDisplayedYear();
     await tracker.openWealth();
 
-    const details = await page.evaluate(() => {
+    const details = await page.evaluate((yearDisplay) => {
       const chart = document.getElementById("chart-wealth");
       const rows = Array.from(
         document.querySelectorAll("#wealth-timeline-body tr"),
@@ -224,14 +222,11 @@ test.describe("Finance tracker E2E", () => {
         lastLabel: rows.length
           ? rows[rows.length - 1].querySelector("td")?.textContent?.trim() || ""
           : "",
-        yearDisplay: Number(
-          (document.getElementById("year-display") as HTMLInputElement | null)
-            ?.value || 0,
-        ),
+        yearDisplay,
         currentYear: new Date().getFullYear(),
         currentMonth: new Date().getMonth(),
       };
-    });
+    }, yearDisplay);
 
     expect(details.rowCount).toBe(details.chartPoints);
     const expectedLastMonth =
@@ -314,18 +309,24 @@ test.describe("Finance tracker E2E", () => {
     await page.goto("/movimientos");
     await expect(page).toHaveURL(/\/movimientos$/);
 
-    const headers = await tracker.transactionsSection
-      .locator("thead th")
-      .allInnerTexts();
-    const trimmedHeaders = headers.map((text) => text.trim());
+    // Two things were wrong here. `allInnerTexts()` is a one-shot read with no
+    // auto-waiting, so it could run before the lazily mounted section rendered
+    // its table and leave every index `undefined`; and `thead th` scoped to the
+    // whole section also picks up the five header cells of the summary side
+    // panel's own tables. Scope to the movements table and assert through
+    // locators, which retry.
+    const headerCells = tracker.transactionsSection.locator(
+      "table:has(#tx-table-body) thead th",
+    );
+    await expect(headerCells).toHaveCount(8);
 
-    expect(trimmedHeaders[1]).toContain("Fecha");
-    expect(trimmedHeaders[2]).toContain("Descripción");
-    expect(trimmedHeaders[3]).toContain("Importe");
-    expect(trimmedHeaders[4]).toContain("Cuenta");
-    expect(trimmedHeaders[5]).toContain("Tipo");
-    expect(trimmedHeaders[6]).toContain("Categoría");
-    expect(trimmedHeaders[7]).toMatch(/^acciones$/i);
+    await expect(headerCells.nth(1)).toContainText("Fecha");
+    await expect(headerCells.nth(2)).toContainText("Descripción");
+    await expect(headerCells.nth(3)).toContainText("Importe");
+    await expect(headerCells.nth(4)).toContainText("Cuenta");
+    await expect(headerCells.nth(5)).toContainText("Tipo");
+    await expect(headerCells.nth(6)).toContainText("Categoría");
+    await expect(headerCells.nth(7)).toHaveText(/^\s*acciones\s*$/i);
   });
 
   test("movimientos inicia con popovers de filtros ocultos en header", async ({
@@ -391,28 +392,34 @@ test.describe("Finance tracker E2E", () => {
       }),
     ).toBeVisible();
 
+    // Figures below track February in `src/data/seed.json`: income is
+    // Nómina 2000 + Reventa 85, expenses are the ten rows totalling 404.77,
+    // and the only investment movement is the 200 indexed-fund contribution.
     expect(await tracker.getTransactionSummaryTotal("income")).toBeCloseTo(
-      1808,
+      2085,
       2,
     );
     expect(await tracker.getTransactionSummaryTotal("expense")).toBeCloseTo(
-      752.1,
+      404.77,
       2,
     );
     expect(await tracker.getTransactionSummaryTotal("investment")).toBeCloseTo(
-      360,
+      200,
       2,
     );
 
     expect(
       await tracker.getTransactionSummaryCategoryAmount("income", "Nómina"),
-    ).toBeCloseTo(1508, 2);
+    ).toBeCloseTo(2000, 2);
     expect(
-      await tracker.getTransactionSummaryCategoryAmount("expense", "Viajes"),
-    ).toBeCloseTo(436.63, 2);
+      await tracker.getTransactionSummaryCategoryAmount("expense", "Comida"),
+    ).toBeCloseTo(201.02, 2);
     expect(
-      await tracker.getTransactionSummaryCategoryAmount("investment", "Crypto"),
-    ).toBeCloseTo(160, 2);
+      await tracker.getTransactionSummaryCategoryAmount(
+        "investment",
+        "Fondos Indexados",
+      ),
+    ).toBeCloseTo(200, 2);
 
     const assertSummarySortedDescByAmount = async (
       type: "income" | "expense" | "investment",

@@ -148,7 +148,11 @@ export class FinanceTrackerPage {
   }
 
   async submitIssueReport(params: {
-    type: "bug" | "feature" | "enhancement";
+    // Only the two options `#issue-report-type` actually renders. The wider
+    // `ReportType` in `src/services/issue-report-api.ts` still allows
+    // "enhancement", but the UI dropped it, so asking for it here just made
+    // `selectOption` hang until the test timed out.
+    type: "bug" | "feature";
     summary: string;
     description: string;
     expectedResult?: string;
@@ -739,6 +743,27 @@ export class FinanceTrackerPage {
     return this.dashboardSection.locator("#kpi-income").innerText();
   }
 
+  /**
+   * Year currently selected in the dashboard period controls.
+   *
+   * `#year-display` only exists inside the dashboard section, and sections are
+   * rendered one at a time, so this must be read *before* navigating
+   * elsewhere. Reading it from another section used to yield `null`, which a
+   * `Number(... || 0)` fallback silently turned into year 0 — flipping
+   * year-dependent assertions onto the wrong branch instead of failing.
+   */
+  async getDisplayedYear(): Promise<number> {
+    await this.openDashboard();
+    const value = await this.dashboardSection
+      .locator("#year-display")
+      .inputValue();
+    const year = Number(value);
+    if (!Number.isInteger(year) || year <= 0) {
+      throw new Error(`#year-display returned an unusable year: "${value}"`);
+    }
+    return year;
+  }
+
   async editInvestmentMovementBySymbol(
     symbol: string,
     payload: {
@@ -1073,15 +1098,48 @@ export class FinanceTrackerPage {
   ) {
     const section = this.page.locator(`#${sectionId}`);
     if (!(await section.isVisible())) {
-      await this.page
-        .locator("#nav-tabs")
-        .getByRole("button", { name: buttonLabel })
-        .click();
+      await this.clickNavButton(buttonLabel, sectionId);
     }
     await expect(section).toBeVisible();
     await expect(
       section.getByRole("heading", { name: headingText }),
     ).toBeVisible();
+  }
+
+  /**
+   * Click the navigation entry for a section, on whichever navigation the
+   * current viewport actually shows.
+   *
+   * `#nav-tabs` holds both the desktop sidebar and the mobile bar, so the
+   * button for a section always exists in the DOM — but only one of them is
+   * visible, and on mobile the secondary sections (wealth, goals, data,
+   * settings) are not in the bar at all: they live inside the `Más` bottom
+   * sheet. Targeting the button by accessible name alone therefore matched a
+   * hidden element on mobile and waited until the test timed out. Every nav
+   * button carries `data-section`, in all three places, so that is the hook.
+   */
+  private async clickNavButton(buttonLabel: string, sectionId: string) {
+    const visibleNavButton = this.page.locator(
+      `#nav-tabs [data-section="${sectionId}"]:visible`,
+    );
+    if ((await visibleNavButton.count()) > 0) {
+      await visibleNavButton.first().click();
+      return;
+    }
+
+    const moreTrigger = this.page.locator(
+      "#nav-tabs [data-mobile-more-trigger]:visible",
+    );
+    if ((await moreTrigger.count()) === 0) {
+      throw new Error(
+        `No visible navigation entry for "${buttonLabel}" (${sectionId}), and no mobile "Más" trigger to open.`,
+      );
+    }
+    await moreTrigger.first().click();
+    const moreMenu = this.page.locator("#mobile-more-menu");
+    await expect(moreMenu).toBeVisible();
+    await moreMenu.locator(`[data-section="${sectionId}"]`).first().click();
+    await expect(moreMenu).toBeHidden();
   }
 
   private async selectByLabelOrFirst(select: Locator, label: string) {
