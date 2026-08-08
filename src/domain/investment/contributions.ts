@@ -18,7 +18,7 @@ import type {
   SnapshotRow,
   State,
 } from '../../scripts/types'
-import { monthFromISO, parseFloatSafe, parseIntSafe, round2 } from '../../scripts/utils'
+import { clone, monthFromISO, parseFloatSafe, parseIntSafe, round2 } from '../../scripts/utils'
 
 export interface SnapshotInputValue {
   kind: SnapshotKind
@@ -261,13 +261,26 @@ export interface ContributionSaveResult {
   ok: boolean
   error?: string
   hadWarnings: boolean
+  /**
+   * The resulting state, present only when `ok`. Never the same reference as
+   * the `draft` argument (see purity note on `applyContributionSave`).
+   */
+  state?: State
 }
 
 /**
- * Applies the guided-contribution save onto a state draft, mirroring the legacy
+ * Computes the guided-contribution save onto a state, mirroring the legacy
  * workflow: persist snapshots, derive the closing portfolio value (excluding the
  * contribution flow), fold allocation deltas into the liquidity snapshots and
  * upsert the contribution entry.
+ *
+ * Pure function: `draft` is never mutated. A deep clone is taken up front and
+ * every derived write lands on that clone, which is returned as
+ * `result.state` on success. This matters beyond the Pinia store's own
+ * `commitState` (which already hands in a disposable clone) — a v2
+ * repository (WP6) may call this against a state assembled from D1 rows that
+ * must not be mutated as a side effect, per Contradiction #9 in
+ * `docs/migration/work-packages.md`.
  */
 export function applyContributionSave(
   draft: State,
@@ -275,11 +288,12 @@ export function applyContributionSave(
 ): ContributionSaveResult {
   const month = input.month
   const date = input.date
+  const nextState = clone(draft)
 
-  if (!draft.snapshots[String(month)]) {
-    draft.snapshots[String(month)] = { month, accounts: {}, investments: {}, liabilities: {} }
+  if (!nextState.snapshots[String(month)]) {
+    nextState.snapshots[String(month)] = { month, accounts: {}, investments: {}, liabilities: {} }
   }
-  const snapshot = draft.snapshots[String(month)]
+  const snapshot = nextState.snapshots[String(month)]
 
   input.snapshotInputs.forEach((item) => {
     const parsed = parseFloatSafe(item.value, Number.NaN)
@@ -291,12 +305,12 @@ export function applyContributionSave(
   })
 
   const flowAllocations = sanitizeFlowAllocations(input.allocations)
-  const existingIndex = draft.contributions.findIndex(
+  const existingIndex = nextState.contributions.findIndex(
     (item) => String(item.portfolioDate || item.date) === date,
   )
   const previousAllocations =
     existingIndex >= 0
-      ? sanitizeFlowAllocations(draft.contributions[existingIndex].flowAllocations || [])
+      ? sanitizeFlowAllocations(nextState.contributions[existingIndex].flowAllocations || [])
       : []
 
   const investmentValue = getInvestmentValueFromSnapshot(snapshot)
@@ -309,8 +323,8 @@ export function applyContributionSave(
   }
 
   const liquidityTargetIds = new Set(
-    findLiquidityTargets(draft.accounts, draft.twrLiquidityAccountIds).matched.map((account) =>
-      String(account.id),
+    findLiquidityTargets(nextState.accounts, nextState.twrLiquidityAccountIds).matched.map(
+      (account) => String(account.id),
     ),
   )
   const previousFlow = round2(
@@ -356,8 +370,8 @@ export function applyContributionSave(
   const payload: Contribution = {
     id:
       existingIndex >= 0
-        ? draft.contributions[existingIndex].id
-        : `contrib-snapshot-${draft.year}-${month + 1}`,
+        ? nextState.contributions[existingIndex].id
+        : `contrib-snapshot-${nextState.year}-${month + 1}`,
     date,
     amount: flow,
     portfolioDate: date,
@@ -369,12 +383,12 @@ export function applyContributionSave(
   }
 
   if (existingIndex >= 0) {
-    draft.contributions[existingIndex] = payload
+    nextState.contributions[existingIndex] = payload
   } else {
-    draft.contributions.push(payload)
+    nextState.contributions.push(payload)
   }
 
-  return { ok: true, hadWarnings: input.warnings.length > 0 }
+  return { ok: true, hadWarnings: input.warnings.length > 0, state: nextState }
 }
 
 export function upsertContributionFlow(draft: State, date: string, flow: number): void {

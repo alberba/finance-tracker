@@ -1,3 +1,14 @@
+/**
+ * WP7b leftover (documented, intentionally NOT wired to sync-v2 commands):
+ * `instruments` here conflates a global instrument definition
+ * (symbol/market/currency/provider — would map to `market_instruments`, an
+ * explicitly out-of-scope *global* reference table per
+ * `src/lib/server/sync/command-schemas.ts`'s doc comment) with the
+ * per-user link (`user_instruments`: `instrumentId`/`categoryId`/`alias`
+ * only) and per-user holdings tracking, all in one object. Reconciling
+ * this needs a `market_instruments` materialization step this WP doesn't
+ * own, so this store's mutations are left unsynced for now.
+ */
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 

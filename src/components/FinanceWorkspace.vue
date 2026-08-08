@@ -9,6 +9,7 @@ import DataSection from './sections/DataSection.vue'
 import GoalsSection from './sections/GoalsSection.vue'
 import InvestmentSection from './sections/InvestmentSection.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
+import ConflictResolutionDialog from './sync/ConflictResolutionDialog.vue'
 import SettingsSection from './sections/SettingsSection.vue'
 import TransactionsSection from './sections/TransactionsSection.vue'
 import WealthSection from './sections/WealthSection.vue'
@@ -38,5 +39,6 @@ const isReportDialogOpen = shallowRef(false)
     <WealthSection :is-active="currentSection === 'wealth'" />
     <InvestmentSection :is-active="currentSection === 'investment'" />
     <GlobalReportLauncher v-model:open="isReportDialogOpen" />
+    <ConflictResolutionDialog />
   </div>
 </template>

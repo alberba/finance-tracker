@@ -1,3 +1,12 @@
+/**
+ * WP7b leftover (documented, intentionally NOT wired to sync-v2 commands):
+ * `saveApiKey`/`updateMapping`/`setEnabled` write `integration_credentials`-
+ * and `stockevents_symbol_mappings`-shaped data, both explicitly excluded
+ * from `SYNC_ENTITY_TYPES` in `src/lib/server/sync/command-schemas.ts`
+ * ("WP12 owns encryption semantics" / "no version column to drive
+ * optimistic concurrency"). These need a dedicated encrypted-credentials
+ * endpoint (WP12), not the generic sync-command outbox — left unwired.
+ */
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
