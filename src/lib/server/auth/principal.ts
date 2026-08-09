@@ -8,7 +8,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { users, userIdentities } from "../../../db/schema";
-import { runInTransaction, type Db } from "../../../db/repositories/shared";
+import { normalizeEmail, runInTransaction, type Db } from "../../../db/repositories/shared";
 import { findLegacyOwnerToLink } from "./legacy-owner-link";
 
 /**
@@ -116,7 +116,10 @@ export async function resolvePrincipal(
       const inserted = await tx
         .insert(users)
         .values({
-          email: input.email ?? `${input.provider}:${input.subject}`,
+          // Normalized so a later sign-in whose provider echoes a different
+          // casing resolves to this same row instead of tripping the unique
+          // index or minting a duplicate user.
+          email: normalizeEmail(input.email ?? `${input.provider}:${input.subject}`),
           createdAt: now,
           updatedAt: now,
         })
@@ -130,7 +133,7 @@ export async function resolvePrincipal(
       userId,
       provider: input.provider,
       subject: input.subject,
-      email: input.email ?? null,
+      email: input.email ? normalizeEmail(input.email) : null,
       createdAt: now,
     });
 

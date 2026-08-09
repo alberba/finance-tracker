@@ -10,13 +10,10 @@ migrations_dir = "migrations"
 # v2 relational schema (WP1). Kept as a separate binding/database from the
 # legacy `finance_tracker_db` above so v1 stays readable/untouched during the
 # migration window (see docs/migration/work-packages.md, WP11).
-# NOTE: `database_id` below is a placeholder — replace it with the real ID
-# returned by `wrangler d1 create finance-tracker-db-v2` before the first
-# `d1:migrate:remote:v2` run.
 [[d1_databases]]
 binding = "finance_tracker_db_v2"
 database_name = "finance-tracker-db-v2"
-database_id = "00000000-0000-7000-8000-000000000000"
+database_id = "5c310761-3066-41c4-9133-66ba39d1a65e"
 migrations_dir = "migrations-v2"
 
 [vars]

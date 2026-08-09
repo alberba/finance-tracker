@@ -107,6 +107,14 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         isLegacyOwner: true,
       })).id;
   if (existingUser) {
+    // The reserved row may predate this run — e.g. a Cf-Access sign-in
+    // resolved a principal for the same address before the migration ever
+    // ran, which creates a plain user. `isLegacyOwner` is only ever set at
+    // insert time, so without this the flag would stay 0 forever and
+    // `findLegacyOwnerToLink` (and `/api/session`) would never see an owner.
+    if (!existingUser.isLegacyOwner) {
+      await usersRepository.update(db, userId, { isLegacyOwner: true });
+    }
     bump("users", "skippedExisting");
   } else {
     bump("users", "inserted");

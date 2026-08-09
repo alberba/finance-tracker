@@ -48,6 +48,22 @@ export function fromFlag(value: number): boolean {
 }
 
 /**
+ * Canonical form for an email before it is stored in or matched against
+ * `users.email`.
+ *
+ * `users.email` is a plain `text ... unique` column, and SQLite compares text
+ * case-sensitively, so `Owner@Example.com` and `owner@example.com` are two
+ * different rows and two different lookups. Identity providers do not
+ * guarantee any particular casing, and the cutover feeds the same address in
+ * from three unrelated places — the `--legacy-owner-email` migration flag, the
+ * `LEGACY_OWNER_EMAIL` variable, and the JWT's `email` claim. Normalizing at
+ * every read and write is what keeps those three agreeing.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/**
  * Runs `fn` inside a `BEGIN`/`COMMIT` (or `ROLLBACK` on throw) block, driven
  * by raw SQL rather than each driver's own `Db#transaction()` wrapper
  * (consumed by WP4's `apply-command.ts` and the `state`/`data` routes).

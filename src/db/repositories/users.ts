@@ -11,7 +11,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { users, userIdentities } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { normalizeEmail, nowIso, toFlag, type Db } from "./shared";
 
 export type UserRow = typeof users.$inferSelect;
 export type UserIdentityRow = typeof userIdentities.$inferSelect;
@@ -24,6 +24,7 @@ export interface CreateUserInput {
 
 export interface UpdateUserInput {
   displayName?: string | null;
+  isLegacyOwner?: boolean;
 }
 
 export interface CreateUserIdentityInput {
@@ -38,7 +39,10 @@ export async function get(db: Db, id: string): Promise<UserRow | undefined> {
 }
 
 export async function getByEmail(db: Db, email: string): Promise<UserRow | undefined> {
-  const [row] = await db.select().from(users).where(eq(users.email, email));
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizeEmail(email)));
   return row;
 }
 
@@ -47,7 +51,7 @@ export async function create(db: Db, input: CreateUserInput): Promise<UserRow> {
   const [row] = await db
     .insert(users)
     .values({
-      email: input.email,
+      email: normalizeEmail(input.email),
       displayName: input.displayName ?? null,
       isLegacyOwner: input.isLegacyOwner ? 1 : 0,
       createdAt: now,
@@ -66,6 +70,8 @@ export async function update(db: Db, id: string, input: UpdateUserInput): Promis
     .update(users)
     .set({
       displayName: input.displayName === undefined ? existing.displayName : input.displayName,
+      isLegacyOwner:
+        input.isLegacyOwner === undefined ? existing.isLegacyOwner : toFlag(input.isLegacyOwner),
       updatedAt: nowIso(),
     })
     .where(eq(users.id, id))
@@ -91,7 +97,7 @@ export async function bulkInsert(db: Db, inputs: CreateUserInput[]): Promise<Use
     .insert(users)
     .values(
       inputs.map((input) => ({
-        email: input.email,
+        email: normalizeEmail(input.email),
         displayName: input.displayName ?? null,
         isLegacyOwner: input.isLegacyOwner ? 1 : 0,
         createdAt: now,
@@ -143,7 +149,7 @@ export async function createIdentity(
       userId,
       provider: input.provider,
       subject: input.subject,
-      email: input.email ?? null,
+      email: input.email ? normalizeEmail(input.email) : null,
       createdAt: nowIso(),
     })
     .returning();

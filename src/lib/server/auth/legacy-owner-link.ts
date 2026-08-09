@@ -16,6 +16,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { users } from "../../../db/schema";
+import { normalizeEmail } from "../../../db/repositories/shared";
 import type { Queryable } from "./principal";
 
 export interface LegacyOwnerLinkResult {
@@ -46,14 +47,21 @@ export async function findLegacyOwnerToLink(
   if (!email || !legacyOwnerEmail) {
     return null;
   }
-  if (email.trim().toLowerCase() !== legacyOwnerEmail.trim().toLowerCase()) {
+  const normalizedOwnerEmail = normalizeEmail(legacyOwnerEmail);
+  if (normalizeEmail(email) !== normalizedOwnerEmail) {
     return null;
   }
 
+  // Match the reserved row on the *normalized* address. The guard above is
+  // case-insensitive, so looking the row up with the raw `LEGACY_OWNER_EMAIL`
+  // meant a casing difference between that variable and the value WP9's
+  // migration stored found nothing, returned null, and silently skipped the
+  // link — leaving the owner staring at an empty app after cutover while
+  // their v1 data sat under an unreachable reserved user.
   const rows = await tx
     .select({ id: users.id, email: users.email })
     .from(users)
-    .where(and(eq(users.isLegacyOwner, 1), eq(users.email, legacyOwnerEmail)))
+    .where(and(eq(users.isLegacyOwner, 1), eq(users.email, normalizedOwnerEmail)))
     .limit(1);
 
   const reserved = rows[0];

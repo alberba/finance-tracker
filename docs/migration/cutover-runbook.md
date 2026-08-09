@@ -44,18 +44,27 @@ today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 
 ## 1. Enter maintenance mode (block v1 writes)
 
-> **Verify this before scheduling the window.** Everything below assumes a
-> Cloudflare Access application already fronts this deployment. That is an
-> assumption, not an established fact: the pre-migration survey in
-> `work-packages.md` (Contradiction #2) found *no auth boundary at all* — v1
-> tenant isolation is a client-supplied `x-finance-namespace` header. If no
-> Access application exists yet, then creating and testing one is
-> **prerequisite work before the maintenance window**, not a step inside it,
-> and this section's maintenance-mode lever does not exist until it is done.
-> Creating the Access app is also where `CF_ACCESS_TEAM_DOMAIN` (your
-> `<team>.cloudflareaccess.com`) and `CF_ACCESS_AUD` (the Application
-> Audience tag) come from — without them the WP3 middleware cannot verify a
-> single JWT, so `AUTH_ENFORCED=true` would 401 every request.
+> **Confirmed:** a Cloudflare Access application (`finance tracker`) already
+> fronts this deployment, on team domain **`alberba.cloudflareaccess.com`**,
+> with **GitHub** configured as an identity provider alongside one-time-PIN
+> email. So `CF_ACCESS_TEAM_DOMAIN=alberba.cloudflareaccess.com`, and the
+> maintenance-mode lever in this section does exist.
+>
+> This supersedes Contradiction #2 in `work-packages.md`, which said there was
+> "no auth boundary at all". That was about the *application code* — which is
+> still true, v1 routes trust a client-supplied `x-finance-namespace` header —
+> but Access is enforcing at the edge in front of it.
+>
+> Two values still have to be read from the dashboard before the window:
+>
+> 1. **`CF_ACCESS_AUD`** — Zero Trust → Access → Applications → `finance
+>    tracker` → *Application Audience (AUD) Tag*. Without it the WP3
+>    middleware cannot verify a single JWT and `AUTH_ENFORCED=true` would 401
+>    every request.
+> 2. **The exact email GitHub puts in the JWT** — see the warning under
+>    `LEGACY_OWNER_EMAIL` in §0. Sign in through Access and open
+>    `https://<app-hostname>/cdn-cgi/access/get-identity`; the `email` field
+>    in that JSON is verbatim what the middleware will compare against.
 
 This app has no built-in maintenance-mode flag (no code path checks one) and
 today's legacy routes (`src/pages/api/state.ts`, `state/reset-legacy.ts`) are
