@@ -1,0 +1,170 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
+import * as accountsRepository from "../../../../src/db/repositories/accounts";
+import { createTestDb, type TestDatabase } from "../setup";
+import { seedUser } from "../repositories/fixtures";
+
+let currentDb: TestDatabase["db"];
+vi.mock("../../../../src/db/client", () => ({
+  getDb: () => currentDb,
+}));
+
+function postJson(url: string, body: unknown): Request {
+  return new Request(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST /api/sync", () => {
+  let testDb: TestDatabase;
+  let principal: AuthPrincipal;
+
+  beforeEach(async () => {
+    testDb = createTestDb();
+    currentDb = testDb.db;
+    const user = await seedUser(testDb.db, "sync-user@example.com");
+    principal = {
+      userId: user.id,
+      email: user.email,
+      provider: "cf-access",
+      subject: "sub-1",
+      isLegacyOwner: false,
+    };
+  });
+
+  afterEach(() => {
+    testDb.close();
+  });
+
+  it("returns 401 without a principal", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", { commands: [] }),
+      locals: {},
+    } as never);
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 400 for an invalid payload (Zod validation)", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", {
+        commands: [{ commandId: "x", action: "create" /* missing entityType/data */ }],
+      }),
+      locals: { principal },
+    } as never);
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 when the batch exceeds 5 commands", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const commands = Array.from({ length: 6 }, (_, i) => ({
+      commandId: `cmd-${i}`,
+      action: "noop" as const,
+    }));
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", { commands }),
+      locals: { principal },
+    } as never);
+    expect(response.status).toBe(400);
+  });
+
+  it("applies a create command and bumps the revision", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", {
+        commands: [
+          {
+            commandId: "create-account-1",
+            action: "create",
+            entityType: "account",
+            data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 100 },
+          },
+        ],
+      }),
+      locals: { principal },
+    } as never);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.results[0].status).toBe("applied");
+    expect(body.revision).toBe(1);
+
+    const accounts = await accountsRepository.listByUser(testDb.db, principal.userId);
+    expect(accounts).toHaveLength(1);
+  });
+
+  it("idempotent replay: the same commandId returns the stored result without re-applying the mutation", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const command = {
+      commandId: "create-account-replay",
+      action: "create" as const,
+      entityType: "account" as const,
+      data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 50 },
+    };
+
+    const first = await POST({
+      request: postJson("https://example.test/api/sync", { commands: [command] }),
+      locals: { principal },
+    } as never);
+    expect(first.status).toBe(200);
+
+    const second = await POST({
+      request: postJson("https://example.test/api/sync", { commands: [command] }),
+      locals: { principal },
+    } as never);
+    expect(second.status).toBe(200);
+    const secondBody = await second.json();
+    expect(secondBody.results[0].replayed).toBe(true);
+
+    // Only one account was ever created — the replay did not duplicate the mutation.
+    const accounts = await accountsRepository.listByUser(testDb.db, principal.userId);
+    expect(accounts).toHaveLength(1);
+  });
+
+  it("returns a 409 with a conflict body shape on a version mismatch, and halts remaining commands", async () => {
+    const account = await accountsRepository.create(testDb.db, principal.userId, {
+      name: "Cuenta",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+    expect(account.version).toBe(1);
+
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", {
+        commands: [
+          {
+            commandId: "update-stale",
+            action: "update",
+            entityType: "account",
+            entityId: account.id,
+            baseVersion: 999, // stale on purpose
+            patch: { name: "Renombrada" },
+          },
+          {
+            commandId: "should-not-run",
+            action: "noop",
+          },
+        ],
+      }),
+      locals: { principal },
+    } as never);
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0]).toMatchObject({
+      commandId: "update-stale",
+      status: "conflict",
+      currentVersion: 1,
+    });
+    expect(body.halted).toBe(true);
+
+    // The account was not mutated.
+    const reloaded = await accountsRepository.get(testDb.db, principal.userId, account.id);
+    expect(reloaded?.name).toBe("Cuenta");
+  });
+});
