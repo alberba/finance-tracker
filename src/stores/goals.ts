@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildGoalsViewModel } from '../domain/goals/view-model'
+import { syncUpsert } from '../lib/client/command-mapping'
 import type { GoalField, GoalKey } from '../scripts/types'
 import { parseFloatSafe, parseIntSafe, round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -30,6 +31,15 @@ export const useGoalsStore = defineStore('goals', () => {
       }
 
       draft.goals[key].name = value
+    })
+
+    const goal = financialStateStore.goals[key]
+    void syncUpsert('goal', key, {
+      key,
+      name: goal.name,
+      targetYear: goal.targetYear,
+      targetAmount: goal.targetAmount,
+      currency: financialStateStore.currency,
     })
   }
 

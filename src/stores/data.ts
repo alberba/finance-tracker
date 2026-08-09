@@ -1,8 +1,18 @@
+/**
+ * WP7b note: `importJson`/`resetSeed` use `reloadState` (whole-blob
+ * replace), not `commitState` — they were never in scope for the
+ * per-entity sync-command mapping layer (`src/lib/client/command-mapping.ts`).
+ * The v2 sync path already has dedicated endpoints for these flows
+ * (`/api/data/import`, `/api/state/reset`, `/api/state/initialize` via
+ * `startFresh`/`initializeFreshState` below), so nothing here needs wiring.
+ */
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
+import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { initializeFreshState } from '../lib/client/state-initialize'
 import { BASE_SEED } from '../scripts/state'
 import { clone } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -62,11 +72,33 @@ export const useDataStore = defineStore('data', () => {
     showToast('Tracker reiniciado con datos semilla.')
   }
 
+  /** "Empezar de cero" (WP8) — only meaningful on the v2 sync path. */
+  const canStartFresh = isSyncV2Enabled()
+
+  async function startFresh(): Promise<void> {
+    if (!canStartFresh) {
+      return
+    }
+    const result = await initializeFreshState()
+    if (!result.ok) {
+      showToast(result.error ?? 'No se pudo crear el espacio nuevo.')
+      return
+    }
+    showToast(
+      result.alreadyInitialized
+        ? 'Ya tienes un espacio inicializado.'
+        : 'Espacio nuevo creado. Recargando…',
+    )
+    window.location.reload()
+  }
+
   return {
     summary,
     exportJson,
     exportTransactionsCsv,
     importJson,
     resetSeed,
+    canStartFresh,
+    startFresh,
   }
 })

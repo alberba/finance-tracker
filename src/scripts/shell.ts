@@ -1,5 +1,8 @@
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
+import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { pinia } from '../stores/pinia'
+import { useSyncStore } from '../stores/sync'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 const THEME_KEY = 'theme'
@@ -240,6 +243,64 @@ function initDemoBanner(): void {
   exit.addEventListener('click', () => setDemoModeEnabled(false))
 }
 
+const SYNC_STATUS_LABELS: Record<string, string> = {
+  idle: 'Sincronizado',
+  syncing: 'Sincronizando…',
+  error: 'Error de sincronización',
+}
+
+/**
+ * Wires the menu's email/sync-status/logout entries to `useSyncStore`
+ * (WP7). A no-op when `PUBLIC_SYNC_V2` is off — the legacy save-status
+ * indicator (`#save-status`, driven by `state-format-helpers.ts`) keeps
+ * doing its job until cutover.
+ */
+function initSyncMenu(): void {
+  if (!isSyncV2Enabled()) {
+    return
+  }
+
+  const emailEl = document.getElementById('sidebar-user-email')
+  const statusEl = document.getElementById('sidebar-sync-status')
+  const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
+  const syncStore = useSyncStore(pinia)
+
+  fetch('/api/session')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((body: { user?: { id?: string; email?: string } } | null) => {
+      if (!body?.user?.id) {
+        return
+      }
+      void syncStore.init(body.user.id, { email: body.user.email ?? null })
+      if (emailEl && body.user.email) {
+        emailEl.replaceChildren(body.user.email)
+      }
+    })
+    .catch(() => {
+      /* session lookup failed — sync stays disabled for this load */
+    })
+
+  const renderStatus = () => {
+    if (!statusEl) {
+      return
+    }
+    const pending = syncStore.pendingCount
+    const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
+    const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
+    statusEl.hidden = false
+    statusEl.replaceChildren(`${label}${suffix}`)
+  }
+
+  syncStore.$subscribe(renderStatus)
+  renderStatus()
+
+  logoutAction?.addEventListener('click', () => {
+    void syncStore.logout().finally(() => {
+      window.location.href = '/cdn-cgi/access/logout'
+    })
+  })
+}
+
 function initShellInteractions(): void {
   initSidebarToggle()
   initThemeToggles()
@@ -250,6 +311,7 @@ function initShellInteractions(): void {
   initDemoModeActions()
   initUserMenu()
   initDemoBanner()
+  initSyncMenu()
 }
 
 if (document.readyState === 'loading') {
