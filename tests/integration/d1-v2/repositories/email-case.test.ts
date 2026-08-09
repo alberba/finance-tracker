@@ -68,6 +68,23 @@ describe("email casing", () => {
     expect(linked?.userId).toBe(reserved.id);
   });
 
+  it("can promote an existing plain user to legacy owner", async () => {
+    // What a Cf-Access sign-in creates if it happens before the migration
+    // provisions the reserved row: a normal user, `isLegacyOwner` = 0.
+    const preexisting = await usersRepository.create(db, {
+      email: "owner@example.com",
+    });
+    expect(preexisting.isLegacyOwner).toBe(0);
+
+    await usersRepository.update(db, preexisting.id, { isLegacyOwner: true });
+
+    const linked = await findLegacyOwnerToLink(db, {
+      email: "owner@example.com",
+      legacyOwnerEmail: "owner@example.com",
+    });
+    expect(linked?.userId).toBe(preexisting.id);
+  });
+
   it("still refuses to link a different address", async () => {
     await usersRepository.create(db, {
       email: "owner@example.com",

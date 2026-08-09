@@ -11,7 +11,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { users, userIdentities } from "../schema";
-import { normalizeEmail, nowIso, type Db } from "./shared";
+import { normalizeEmail, nowIso, toFlag, type Db } from "./shared";
 
 export type UserRow = typeof users.$inferSelect;
 export type UserIdentityRow = typeof userIdentities.$inferSelect;
@@ -24,6 +24,7 @@ export interface CreateUserInput {
 
 export interface UpdateUserInput {
   displayName?: string | null;
+  isLegacyOwner?: boolean;
 }
 
 export interface CreateUserIdentityInput {
@@ -69,6 +70,8 @@ export async function update(db: Db, id: string, input: UpdateUserInput): Promis
     .update(users)
     .set({
       displayName: input.displayName === undefined ? existing.displayName : input.displayName,
+      isLegacyOwner:
+        input.isLegacyOwner === undefined ? existing.isLegacyOwner : toFlag(input.isLegacyOwner),
       updatedAt: nowIso(),
     })
     .where(eq(users.id, id))
