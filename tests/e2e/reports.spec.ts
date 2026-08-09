@@ -121,7 +121,7 @@ test.describe("Reports E2E", () => {
 
     await tracker.openBudget();
     await tracker.submitIssueReport({
-      type: "enhancement",
+      type: "feature",
       summary: "Mejorar feedback visual",
       description: "Quiero ver un estado más claro al crear reportes.",
     });
@@ -222,10 +222,18 @@ test.describe("Reports E2E", () => {
       .getByRole("button", { name: "Nuevo" })
       .click();
     await expectModalCentered(page, "#tx-dialog");
+    // Close it before navigating. Sections are rendered one at a time now, so
+    // `openWealth()` has to click the nav tab — and an open dialog's backdrop
+    // swallows that click. It only worked while every section stayed mounted
+    // and the navigation helper could skip the click altogether.
+    await page.locator("#tx-close-modal").click();
 
     await tracker.openWealth();
+    // Match the accessible name, not the visible label: these buttons read
+    // "Calcular" but carry `aria-label="Abrir cálculo de <activo>"`
+    // (`WealthSnapshotTable.vue`), which is what `getByRole` resolves.
     await tracker.wealthSection
-      .getByRole("button", { name: /^Calcular$/ })
+      .getByRole("button", { name: /^Abrir cálculo de / })
       .first()
       .click();
     await expectModalCentered(page, "#wealth-calc-dialog");

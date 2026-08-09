@@ -179,6 +179,13 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toContainText('Café editado')
     await liveMarket.confirmFirstPending()
     await expect(liveMarket.pendingPanel).toContainText('(2)')
+    // Two clocks are in play: `__FINANCE_TODAY__` pins the recurring engine to
+    // 2026-07-10 (only `src/stores/recurring.ts` reads it), while the table's
+    // month filter defaults to the *real* month (`src/stores/ui.ts`). The
+    // confirmed movement is dated July, so select July explicitly instead of
+    // relying on the two happening to agree — which is why this passed only
+    // while the wall clock was in July.
+    await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Café editado')
 
     await page.reload()
@@ -213,6 +220,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toContainText('2 × 105.5 VWCE')
 
     await liveMarket.confirmFirstPending()
+    // See the note above: the movement lands in July (pinned engine clock),
+    // while the table filter defaults to the real month.
+    await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Aportación VWCE')
     await expect(tracker.transactionsSection).toContainText('212,50')
   })

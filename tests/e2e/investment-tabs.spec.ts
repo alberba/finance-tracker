@@ -261,8 +261,11 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentContributionsTab();
     const section = tracker.investmentSection();
 
+    // The auto month-end close rows carry no flow of their own (their input
+    // defaults to "0") — only the manual (non-month-end) contribution row
+    // has a real flow value to edit, so recalculation actually has an effect.
     const editableRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-31",
+      hasText: "2026-01-28",
     });
     await expect(editableRow).toBeVisible();
     const editableDate = (
@@ -270,7 +273,7 @@ test.describe("inversión tabs y TWR", () => {
     ).trim();
 
     const downstreamRow = section.locator("#contribution-body tr", {
-      hasText: "2026-02-08",
+      hasText: "2026-02-28",
     });
     await expect(downstreamRow).toBeVisible();
     const previousVle = (
@@ -289,7 +292,7 @@ test.describe("inversión tabs y TWR", () => {
     const persistedVle = (
       await tracker
         .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-02-08" })
+        .locator("#contribution-body tr", { hasText: "2026-02-28" })
         .locator("td")
         .nth(3)
         .innerText()
@@ -304,12 +307,12 @@ test.describe("inversión tabs y TWR", () => {
     const section = tracker.investmentSection();
 
     const manualRow = section.locator("#contribution-body tr", {
-      hasText: "2026-02-08",
+      hasText: "2026-01-28",
     });
     await expect(manualRow).toBeVisible();
     await expect(
-      manualRow.locator('input[data-contribution-flow-date="2026-02-08"]'),
-    ).toHaveValue("562");
+      manualRow.locator('input[data-contribution-flow-date="2026-01-28"]'),
+    ).toHaveValue("200");
   });
 
   test("aportes automáticos de cierre mensual incluyen la liquidez del mes en valor cartera", async ({
@@ -322,7 +325,7 @@ test.describe("inversión tabs y TWR", () => {
       hasText: "2026-01-31",
     });
     await expect(monthEndRow).toBeVisible();
-    await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.556,39 €");
+    await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.209,45 €");
     await expect(
       monthEndRow.locator('button[data-delete-contribution-date="2026-01-31"]'),
     ).toHaveCount(0);
@@ -332,9 +335,9 @@ test.describe("inversión tabs y TWR", () => {
     tracker,
     page,
   }) => {
-    await tracker.deleteManualContributionByDate("2026-02-08");
+    await tracker.deleteManualContributionByDate("2026-01-28");
     await expect(page.locator("#contribution-delete-dialog")).toContainText(
-      "2026-02-08",
+      "2026-01-28",
     );
     await tracker.confirmDeleteManualContribution();
     await expect(page.getByRole("status")).toContainText(
@@ -343,7 +346,7 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-02-08" }),
+        .locator("#contribution-body tr", { hasText: "2026-01-28" }),
     ).toHaveCount(0);
   });
 });
