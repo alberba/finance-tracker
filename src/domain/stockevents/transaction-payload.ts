@@ -14,6 +14,7 @@ export interface StockEventsTransactionPayload {
   feesAmount?: number
   feesCurrency?: string
   notes?: string
+  toCash?: boolean
   type: 'buy' | 'sell'
 }
 
@@ -33,6 +34,7 @@ export function buildStockEventsTransactionPayload(
   tx: Transaction,
   watchlistId: string,
   targetSymbol = '',
+  toCash = false,
 ): StockEventsTransactionPayload | null {
   if (tx.type !== 'investment' || !tx.symbol || !watchlistId) {
     return null
@@ -54,6 +56,7 @@ export function buildStockEventsTransactionPayload(
     priceCurrency: currency,
     ...(Number.isFinite(fee) && fee > 0 ? { feesAmount: fee, feesCurrency: currency } : {}),
     notes: 'Sincronizado desde finance-tracker',
+    ...(toCash ? { toCash: true } : {}),
     type: side,
   }
 }

@@ -311,6 +311,7 @@ export class FinanceTrackerPage {
     movementCurrency?: string;
     brokerName?: string;
     declared?: boolean;
+    stockEventsCash?: boolean;
   }) {
     await this.openInvestmentMovementsTab();
     const section = this.investmentSection();
@@ -348,6 +349,13 @@ export class FinanceTrackerPage {
       await declaredInput.check();
     } else {
       await declaredInput.uncheck();
+    }
+
+    const stockEventsCashInput = section.locator(
+      "#investment-movement-to-cash",
+    );
+    if (params.stockEventsCash && (await stockEventsCashInput.count()) > 0) {
+      await stockEventsCashInput.check();
     }
 
     await section.getByRole("button", { name: "Guardar movimiento" }).click();

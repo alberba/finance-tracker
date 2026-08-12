@@ -75,6 +75,7 @@ export interface NewInvestmentMovementInput {
   movementCurrency: string
   accountId: string
   declared: boolean
+  toCash?: boolean
 }
 
 export const useInvestmentStore = defineStore('investment', () => {
@@ -93,8 +94,8 @@ export const useInvestmentStore = defineStore('investment', () => {
   }
 
   function findUniqueInstrumentId(symbol: string): string | undefined {
-    const matches = financialStateStore.state.instruments.filter(
-      (instrument) => symbolsMatchInstrument(symbol, instrument),
+    const matches = financialStateStore.state.instruments.filter((instrument) =>
+      symbolsMatchInstrument(symbol, instrument),
     )
     return matches.length === 1 ? matches[0].id : undefined
   }
@@ -103,7 +104,11 @@ export const useInvestmentStore = defineStore('investment', () => {
     return isBitvavoBroker(financialStateStore.state, accountId)
   }
 
-  function resolveInvestmentCategory(accountId: string, rawCategory: string, fallback: string): string {
+  function resolveInvestmentCategory(
+    accountId: string,
+    rawCategory: string,
+    fallback: string,
+  ): string {
     return resolveCategory(financialStateStore.state, accountId, rawCategory, fallback)
   }
 
@@ -190,7 +195,11 @@ export const useInvestmentStore = defineStore('investment', () => {
       return false
     }
 
-    const category = resolveInvestmentCategory(accountId, input.category.trim(), computed.normalizedSymbol)
+    const category = resolveInvestmentCategory(
+      accountId,
+      input.category.trim(),
+      computed.normalizedSymbol,
+    )
     const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
 
     const transaction: Transaction = {
@@ -221,7 +230,7 @@ export const useInvestmentStore = defineStore('investment', () => {
       buildInvestmentTransactionData(tx, financialStateStore.currency),
     )
     showToast('Movimiento de inversión guardado.')
-    void stockEventsStore.syncMovement(transaction)
+    void stockEventsStore.syncMovement(transaction, { toCash: input.toCash })
     return true
   }
 
@@ -257,7 +266,11 @@ export const useInvestmentStore = defineStore('investment', () => {
       return false
     }
 
-    const category = resolveInvestmentCategory(accountId, input.category.trim(), computed.normalizedSymbol)
+    const category = resolveInvestmentCategory(
+      accountId,
+      input.category.trim(),
+      computed.normalizedSymbol,
+    )
 
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
