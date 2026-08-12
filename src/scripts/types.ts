@@ -190,10 +190,16 @@ export interface StockEventsSymbolMapping {
   hidden: boolean;
 }
 
+export interface StockEventsCashMapping {
+  accountId: string;
+  watchlistId: string;
+}
+
 export interface StockEventsSettings {
   enabled: boolean;
   apiKey: string;
   symbolMappings: StockEventsSymbolMapping[];
+  cashMappings?: StockEventsCashMapping[];
 }
 
 export interface StateMeta {

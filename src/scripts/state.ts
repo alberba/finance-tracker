@@ -131,7 +131,7 @@ const FALLBACK_BASE_SEED = {
   quotes: {},
   recurringRules: [],
   pendingMovements: [],
-  stockEvents: { enabled: false, apiKey: "", symbolMappings: [] },
+  stockEvents: { enabled: false, apiKey: "", symbolMappings: [], cashMappings: [] },
 };
 
 export const BASE_SEED: unknown = isDemoMode()
@@ -559,10 +559,23 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
       hidden: mapping.hidden === true,
     });
   });
+  const rawCashMappings = Array.isArray(raw.cashMappings) ? raw.cashMappings : [];
+  const seenAccounts = new Set<string>();
+  const cashMappings = rawCashMappings.flatMap((item) => {
+    const mapping = asRecord(item);
+    const accountId = String(mapping.accountId || "").trim();
+    const watchlistId = String(mapping.watchlistId || "").trim();
+    if (!accountId || !watchlistId || seenAccounts.has(accountId)) {
+      return [];
+    }
+    seenAccounts.add(accountId);
+    return [{ accountId, watchlistId }];
+  });
   return {
     enabled: raw.enabled === true,
     apiKey: String(raw.apiKey || "").trim(),
     symbolMappings,
+    cashMappings,
   };
 }
 

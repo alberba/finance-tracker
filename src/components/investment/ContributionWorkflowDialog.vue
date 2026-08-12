@@ -13,9 +13,11 @@ import { MONTHS, type SnapshotKind } from '../../scripts/types'
 import { monthFromISO, round2, todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useInvestmentStore } from '../../stores/investment'
+import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
 
 const investmentStore = useInvestmentStore()
+const stockEventsStore = useStockEventsStore()
 const financialStateStore = useFinancialStateStore()
 const uiStore = useUiStore()
 const ui = uiStore.ui
@@ -30,6 +32,7 @@ const step = ref<1 | 2>(1)
 const month = ref(0)
 const date = ref('')
 const total = ref('0')
+const syncStockEventsCash = ref(false)
 
 interface NamedItem {
   id: string
@@ -177,6 +180,7 @@ function open(): void {
   const selectedMonth = ui.investmentMonth
   month.value = selectedMonth
   date.value = selectedMonth === currentMonth ? today : toSnapshotDate(financialStateStore.year, selectedMonth)
+  syncStockEventsCash.value = false
   resetTouched()
   seed()
   dialogRef.value?.showModal?.()
@@ -213,6 +217,7 @@ function onSubmit(): void {
     collectSnapshotInputs(),
     collectAllocations(),
     warnings.value,
+    { syncStockEventsCash: syncStockEventsCash.value },
   )
   if (saved) {
     close()
@@ -462,6 +467,17 @@ defineExpose({ open })
           </table>
         </div>
 
+        <label
+          v-if="stockEventsStore.canSyncContributionCash"
+          class="tx-checkbox-option contribution-stockevents-cash"
+        >
+          <input v-model="syncStockEventsCash" type="checkbox" />
+          <span>
+            Añadir las asignaciones al efectivo de Stock Events
+            <small>Se usará la lista relacionada con cada cuenta en Configuración.</small>
+          </span>
+        </label>
+
         <div
           id="contribution-workflow-allocation-warning"
           class="workflow-warning"
@@ -538,3 +554,23 @@ defineExpose({ open })
     </form>
   </dialog>
 </template>
+
+<style scoped>
+.contribution-stockevents-cash {
+  margin-top: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  padding: 0.8rem;
+}
+
+.contribution-stockevents-cash span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.contribution-stockevents-cash small {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+</style>

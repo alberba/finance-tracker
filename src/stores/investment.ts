@@ -78,6 +78,10 @@ export interface NewInvestmentMovementInput {
   toCash?: boolean
 }
 
+export interface SaveContributionOptions {
+  syncStockEventsCash?: boolean
+}
+
 export const useInvestmentStore = defineStore('investment', () => {
   const financialStateStore = useFinancialStateStore()
   const stockEventsStore = useStockEventsStore()
@@ -390,6 +394,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     snapshotInputs: SnapshotInputValue[],
     allocations: AllocationInputValue[],
     warnings: string[],
+    options: SaveContributionOptions = {},
   ): boolean {
     // WP7b leftover (documented, not wired): `applyContributionSave` folds a
     // contribution + wealth-snapshot + snapshot-balances update into one
@@ -415,6 +420,9 @@ export const useInvestmentStore = defineStore('investment', () => {
       return false
     }
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
+    if (options.syncStockEventsCash) {
+      void stockEventsStore.syncContributionCash(date, allocations)
+    }
     return true
   }
 

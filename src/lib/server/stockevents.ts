@@ -237,9 +237,11 @@ export async function createStockEventsTransaction(
   fetchImpl: typeof fetch = fetch,
 ): Promise<StockEventsCreatedTransaction> {
   const symbol = payload.symbol.trim().toUpperCase()
-  const existing = await listWatchlistSymbols(apiKey, payload.watchlistId, fetchImpl)
-  if (!existing.includes(symbol)) {
-    await addSymbolToWatchlist(apiKey, payload.watchlistId, symbol, fetchImpl)
+  if (!symbol.startsWith('CASH_')) {
+    const existing = await listWatchlistSymbols(apiKey, payload.watchlistId, fetchImpl)
+    if (!existing.includes(symbol)) {
+      await addSymbolToWatchlist(apiKey, payload.watchlistId, symbol, fetchImpl)
+    }
   }
   const data = await stockEventsFetch(
     apiKey,
