@@ -31,6 +31,7 @@ export class LiveMarketPage {
 
   async createRecurringRule(params: {
     account: string; category: string; description: string; amount: number; frequency: string; startDate: string;
+    type?: 'investment';
     symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
   }): Promise<void> {
     const form = this.recurringRules.locator('form')

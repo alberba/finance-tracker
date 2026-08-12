@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config'
 
 /**
  * WP5 — separate config for the real-D1 (better-sqlite3-backed) test tier.
@@ -11,12 +11,13 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
-    include: ["tests/integration/**/*.test.ts"],
-    environment: "node",
+    name: 'integration',
+    include: ['tests/integration/**/*.test.ts'],
+    environment: 'node',
     globals: true,
     clearMocks: true,
     restoreMocks: true,
     // Real SQLite handles are not free — avoid oversubscribing workers.
-    pool: "forks",
+    pool: 'forks',
   },
-});
+})
