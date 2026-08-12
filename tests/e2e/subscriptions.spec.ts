@@ -22,6 +22,7 @@ test.describe('suscripciones de gastos', () => {
     await expect(subscriptions.getByText(/activas/)).toBeVisible()
     await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
     await expect(subscriptions.getByLabel('Nombre')).toHaveAttribute('required', '')
+    await expect(subscriptions.getByLabel('Categoría')).toHaveValue('Suscripciones')
     await expect(subscriptions.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
 
     await page.setViewportSize({ width: 375, height: 812 })

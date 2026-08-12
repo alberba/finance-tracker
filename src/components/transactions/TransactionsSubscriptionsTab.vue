@@ -6,6 +6,8 @@ import { type Subscription, type SubscriptionFrequency } from '../../scripts/typ
 import { parseFloatSafe, todayISO } from '../../scripts/utils'
 import { useMovementsStore } from '../../stores/movements'
 
+const DEFAULT_SUBSCRIPTION_CATEGORY = 'Suscripciones'
+
 defineProps<{ isActive: boolean }>()
 
 const movementsStore = useMovementsStore()
@@ -22,12 +24,18 @@ const form = reactive({
 const categoryOptions = computed(() => movementsStore.orderedCategories('expense'))
 const isEditing = computed(() => editingId.value !== null)
 
+function defaultCategory(): string {
+  return categoryOptions.value.includes(DEFAULT_SUBSCRIPTION_CATEGORY)
+    ? DEFAULT_SUBSCRIPTION_CATEGORY
+    : (categoryOptions.value[0] ?? '')
+}
+
 function resetForm(): void {
   editingId.value = null
   form.name = ''
   form.amount = ''
   form.accountId = movementsStore.accounts[0]?.id ?? ''
-  form.category = categoryOptions.value[0] ?? ''
+  form.category = defaultCategory()
   form.frequency = 'monthly'
   form.firstChargeDate = todayISO()
 }
