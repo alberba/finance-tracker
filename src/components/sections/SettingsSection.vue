@@ -8,7 +8,6 @@ import StockEventsPanel from '../settings/StockEventsPanel.vue'
 import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
 import InstrumentEditorPanel from '../market/InstrumentEditorPanel.vue'
-import RecurringRulesPanel from '../recurring/RecurringRulesPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -45,13 +44,12 @@ function onSaveGeneral(): void {
 const indexEntries = [
   { id: 'cfg-general', num: '01', label: 'General' },
   { id: 'cfg-instrumentos', num: '02', label: 'Instrumentos' },
-  { id: 'cfg-recurrentes', num: '03', label: 'Recurrentes' },
-  { id: 'cfg-cuentas', num: '04', label: 'Cuentas' },
-  { id: 'cfg-activos', num: '05', label: 'Activos' },
-  { id: 'cfg-pasivos', num: '06', label: 'Pasivos' },
-  { id: 'cfg-categorias', num: '07', label: 'Categorías' },
-  { id: 'cfg-twr', num: '08', label: 'Liquidez TWR' },
-  { id: 'cfg-stockevents', num: '09', label: 'Stock Events' },
+  { id: 'cfg-cuentas', num: '03', label: 'Cuentas' },
+  { id: 'cfg-activos', num: '04', label: 'Activos' },
+  { id: 'cfg-pasivos', num: '05', label: 'Pasivos' },
+  { id: 'cfg-categorias', num: '06', label: 'Categorías' },
+  { id: 'cfg-twr', num: '07', label: 'Liquidez TWR' },
+  { id: 'cfg-stockevents', num: '08', label: 'Stock Events' },
 ]
 
 const activeBlockId = ref(indexEntries[0].id)
@@ -151,11 +149,9 @@ onBeforeUnmount(() => {
         </section>
 
         <InstrumentEditorPanel />
-        <RecurringRulesPanel />
-
         <EntityEditorCard
           section-id="cfg-cuentas"
-          num="04"
+          num="03"
           title="Cuentas de liquidez"
           description="Cuentas corrientes y de ahorro con su saldo de partida."
           entity-key="accounts"
@@ -169,7 +165,7 @@ onBeforeUnmount(() => {
 
         <EntityEditorCard
           section-id="cfg-activos"
-          num="05"
+          num="04"
           title="Activos de inversión"
           description="Fondos, ETF, acciones y cripto con su valor de partida."
           entity-key="investmentAssets"
@@ -183,7 +179,7 @@ onBeforeUnmount(() => {
 
         <EntityEditorCard
           section-id="cfg-pasivos"
-          num="06"
+          num="05"
           title="Pasivos / deudas"
           description="Préstamos y deudas pendientes con su importe de partida."
           entity-key="liabilities"
@@ -197,7 +193,7 @@ onBeforeUnmount(() => {
 
         <section id="cfg-categorias" class="settings-block">
           <header>
-            <span class="settings-block__num">07</span>
+            <span class="settings-block__num">06</span>
             <h3>Categorías</h3>
             <p>Etiquetas con las que se clasifican ingresos, gastos e inversión.</p>
           </header>
@@ -228,7 +224,7 @@ onBeforeUnmount(() => {
 
         <section id="cfg-twr" class="settings-block">
           <header>
-            <span class="settings-block__num">08</span>
+            <span class="settings-block__num">07</span>
             <h3>Liquidez para TWR</h3>
             <p>
               Cuentas de brokers que se incluyen como liquidez en el cálculo de
