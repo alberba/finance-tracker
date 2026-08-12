@@ -155,9 +155,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
     const liveMarket = new LiveMarketPage(page)
     await tracker.openSettings()
+    await expect(liveMarket.recurringRules).toHaveCount(0)
+    await tracker.openInvestmentRecurringTab()
+    await expect(liveMarket.recurringRules.getByLabel('Tipo')).toHaveCount(0)
     await liveMarket.createRecurringRule({
-      account: 'Revolut', category: 'Comida', description: 'Café recurrente', amount: 4.5,
-      frequency: 'daily', startDate: '2026-07-08',
+      account: 'Revolut', category: 'Fondos Indexados', description: 'Compra recurrente', amount: 4.5,
+      frequency: 'daily', startDate: '2026-07-08', symbol: 'VWCE', units: 1, unitPrice: 4.5,
     })
 
     await tracker.openDashboard()
@@ -173,10 +176,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(descriptionInput).toHaveCSS('min-height', '42px')
     await expect(descriptionInput).toHaveCSS('border-radius', '11px')
     await expect(accountSelect).toHaveCSS('min-height', '42px')
-    await descriptionInput.fill('Café editado')
-    await pendingItem.getByLabel('Importe').fill('5')
+    await descriptionInput.fill('Compra editada')
     await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
-    await expect(liveMarket.pendingPanel).toContainText('Café editado')
+    await expect(liveMarket.pendingPanel).toContainText('Compra editada')
     await liveMarket.confirmFirstPending()
     await expect(liveMarket.pendingPanel).toContainText('(2)')
     // Two clocks are in play: `__FINANCE_TODAY__` pins the recurring engine to
@@ -186,12 +188,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     // relying on the two happening to agree — which is why this passed only
     // while the wall clock was in July.
     await tracker.filterTransactionsMonth('JULIO')
-    await expect(tracker.transactionsSection).toContainText('Café editado')
+    await expect(tracker.transactionsSection).toContainText('Compra editada')
 
     await page.reload()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
-    await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Café editado' })).toHaveCount(0)
+    await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Compra editada' })).toHaveCount(0)
   })
 
   test('permite editar los campos de inversión de un pendiente automatizado', async ({ page, tracker }) => {
@@ -202,11 +204,11 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
     const liveMarket = new LiveMarketPage(page)
-    await tracker.openSettings()
+    await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule({
       account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
       frequency: 'monthly', startDate: '2026-07-01',
-      type: 'investment', symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
+      symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
     })
 
     await tracker.openDashboard()
@@ -232,11 +234,11 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
     const liveMarket = new LiveMarketPage(page)
-    await tracker.openSettings()
+    await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule({
       account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
       frequency: 'monthly', startDate: '2026-07-10',
-      type: 'investment', symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
+      symbol: 'VWCE', units: 1, unitPrice: 100, fee: 0, time: '09:00',
     })
 
     await liveMarket.editFirstRecurringRule({ description: 'Aportación VWCE actualizada', amount: 212.5, units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
