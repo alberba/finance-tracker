@@ -1,30 +1,25 @@
 name: CI
 
-# WP10: gates every PR on the full validation surface called out in
-# `docs/migration/work-packages.md`'s Contradiction #6 ("CI does not gate
-# unit/lint/check/build, only Playwright") — lint, astro check, unit tests,
-# the WP5 D1-v2 integration tier, a production build, a local `wrangler d1
-# migrations apply` verification for both databases, and both Playwright
-# suites (the legacy default-flag E2E suite, and the sync-v2 flow behind
-# `PUBLIC_SYNC_V2=true` — see `playwright.sync-v2.config.ts`). Kept as one
-# job (rather than a fan-out matrix) so a single `pnpm install` + Playwright
-# browser install is reused across every gate; fail-fast still surfaces the
-# first failing gate quickly since each step only runs if the previous one
-# passed.
-
 on:
   push:
     branches: [main, master]
-  # No `branches:` filter here on purpose. That filter matches the PR's *base*
-  # branch, so a stacked PR (base = another feature branch, as in the D1 v2
-  # stack) never triggered CI at all — the exact gap WP10 exists to close.
-  # Running on every PR regardless of base is what makes "gates every PR" true.
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
 jobs:
-  test:
-    timeout-minutes: 60
+  quality:
+    name: Quality and integration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -48,40 +43,130 @@ jobs:
         run: |
           pnpm d1:migrate:local
           pnpm d1:migrate:local:v2
-      - name: Build
+      - name: Production build
         run: pnpm build
-      - name: Install Playwright Chromium
+  e2e:
+    name: E2E shard ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Write CI-only .dev.vars for test-auth shim (WP8)
-        run: echo "TEST_AUTH_ENABLED=true" >> .dev.vars
-      - name: Run Playwright tests (legacy flow, PUBLIC_SYNC_V2 off)
-        run: pnpm test:e2e
-      - name: Run Playwright tests (sync-v2 flow, PUBLIC_SYNC_V2=true)
-        # Not fail-fast against the legacy suite above: the sync-v2 flow is
-        # still stabilizing (see docs/migration/work-packages.md leftovers —
-        # a known-flaky offline-conflict-dialog case remains). Runs and
-        # reports on every PR so regressions are visible without blocking
-        # merges on that one pre-existing flake; promote to blocking once
-        # it's green.
-        #
-        # `if: !cancelled()` is what actually makes that true. `continue-on-
-        # error` only stops *this* step from failing the job — it does not
-        # make the step run when an earlier one failed, because every step
-        # defaults to `if: success()`. Without this, the legacy suite's
-        # pre-existing failures silently skipped this whole suite and WP10's
-        # new sync-v2 E2E coverage reported nothing at all.
+      - name: Enable the test auth shim
+        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
+      - name: Run functional E2E shard
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/4
+      - name: Upload blob report
         if: ${{ !cancelled() }}
-        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-blob-e2e-${{ matrix.shard }}
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  visual:
+    name: Visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Enable the test auth shim
+        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
+      - name: Run visual regression tests
+        run: pnpm test:e2e:visual
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-blob-visual
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  sync-v2:
+    name: Sync v2 E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Enable the test auth shim
+        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
+      - name: Run sync-v2 E2E tests
         run: pnpm test:e2e:sync-v2
-      - uses: actions/upload-artifact@v4
-        if: ${{ failure() }}
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-blob-sync-v2
+          path: blob-report-sync-v2/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e-report:
+    name: Merge Playwright report
+    if: ${{ always() && !cancelled() }}
+    needs: [e2e, visual, sync-v2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-blob-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge HTML report
+        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 3
-      - uses: actions/upload-artifact@v4
-        if: ${{ failure() }}
-        with:
-          name: playwright-report-sync-v2
-          path: playwright-report-sync-v2/
-          retention-days: 3
+          retention-days: 14

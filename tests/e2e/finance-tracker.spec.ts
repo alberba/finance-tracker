@@ -16,7 +16,7 @@ const MONTH_NAMES = [
 ] as const;
 
 test.describe("Finance tracker E2E", () => {
-  test("permite crear movimiento y persiste tras recarga", async ({
+  test("permite crear movimiento y persiste tras recarga", { tag: "@smoke" }, async ({
     tracker,
   }) => {
     await tracker.filterTransactionsMonth("FEBRERO");

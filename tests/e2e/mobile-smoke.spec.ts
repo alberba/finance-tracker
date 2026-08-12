@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures'
 
 test.describe('Mobile smoke', () => {
-  test('mantiene legible el patrimonio y los movimientos en formato PWA', async ({
+  test('mantiene legible el patrimonio y los movimientos en formato PWA', { tag: '@smoke' }, async ({
     page,
     tracker,
   }) => {

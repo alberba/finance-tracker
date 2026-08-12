@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures'
 
 test.describe('Dashboard section', () => {
-  test('renderiza la sección migrada y mantiene sus flujos principales', async ({
+  test('renderiza la sección migrada y mantiene sus flujos principales', { tag: '@smoke' }, async ({
     page,
     tracker,
   }) => {

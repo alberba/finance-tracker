@@ -127,7 +127,7 @@ test.describe('Sincronización offline (sync v2)', () => {
 
       // Reload again post-sync: the row must appear exactly once, proving
       // the outbox replay didn't duplicate it on reconnect.
-      await page.reload()
+      await tracker.reload()
       await tracker.filterTransactionsMonth('FEBRERO')
       const rows = tracker.transactionsSection.locator('#tx-table-body tr', {
         hasText: 'Compra sin conexión',

@@ -130,6 +130,12 @@ pnpm test:e2e:install
 # E2E tests
 pnpm test:e2e
 
+# Smoke rápido durante desarrollo
+pnpm test:e2e:smoke
+
+# Regresión visual y sincronización v2
+pnpm test:e2e:visual
+pnpm test:e2e:sync-v2
 ```
 
 Estructura de tests:
@@ -143,7 +149,8 @@ Estructura de tests:
 - `playwright.config.ts`: configuración de E2E y `webServer`
 
 La estrategia de Vitest y sus comandos están documentados en
-[`docs/testing.md`](docs/testing.md).
+[`docs/testing.md`](docs/testing.md). La configuración y el diagnóstico de los
+flujos de navegador están en [`docs/playwright.md`](docs/playwright.md).
 
 ## Reportes web y automatización opcional
 
