@@ -76,6 +76,7 @@ import { useRecurringStore } from "../stores/recurring";
     dashboardBudgetGoalsSection.switchSection(ui.activeSection, {
       updateHistory: false,
     });
+    document.documentElement.dataset.financeReady = "true";
   }
 
   /**

@@ -50,6 +50,9 @@ export class FinanceTrackerPage {
   async goto() {
     await this.page.goto("/");
     await expect(
+      this.page.locator('html[data-finance-ready="true"]'),
+    ).toBeVisible();
+    await expect(
       this.dashboardSection.getByRole("heading", {
         name: "Resumen financiero",
       }),
@@ -1095,6 +1098,9 @@ export class FinanceTrackerPage {
 
   async reload() {
     await this.page.reload();
+    await expect(
+      this.page.locator('html[data-finance-ready="true"]'),
+    ).toBeVisible();
     await expect(this.page.locator("[data-finance-workspace]")).toBeVisible();
   }
 

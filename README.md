@@ -113,26 +113,31 @@ pnpm astro check
 ## Testing (Vitest + Playwright)
 
 ```bash
-# Unit tests con coverage
-pnpm test:unit
+# Bucle local rápido: unitarias, componentes e integración
+pnpm test
+
+# Watch por capa
+pnpm test:unit:watch
+pnpm test:component:watch
 
 # Instalar navegador E2E (una vez)
 pnpm test:e2e:install
 
-# E2E tests
-pnpm test:e2e
+# Smoke E2E rápido sobre el servidor de desarrollo
+pnpm test:e2e:smoke
 
-# Suite completa
-pnpm test
+# Gates completos
+pnpm test:coverage
+pnpm test:e2e
+pnpm test:e2e:visual
+pnpm test:e2e:sync-v2
 ```
 
-Estructura de tests:
+`pnpm test:all` ejecuta todos los gates secuencialmente. En CI, Playwright reparte el E2E
+funcional en cuatro shards y ejecuta regresión visual y sync-v2 en paralelo.
 
-- `src/lib/finance-core.ts`: lógica financiera pura (unit testing)
-- `tests/unit/finance-core.test.ts`: pruebas unitarias de cálculos
-- `tests/e2e/pages/FinanceTrackerPage.ts`: Page Object Model
-- `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
-- `playwright.config.ts`: configuración de E2E y `webServer`
+La estrategia, los criterios para elegir cada capa, los comandos y el diagnóstico de fallos están
+en [`docs/testing.md`](docs/testing.md).
 
 ## Reportes web y automatización opcional
 

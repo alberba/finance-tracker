@@ -7,7 +7,7 @@ function addDays(isoDate: string, days: number): string {
 }
 
 test.describe('suscripciones de gastos', () => {
-  test('presenta el editor de suscripciones con controles accesibles en móvil', async ({
+  test('presenta el editor de suscripciones con controles accesibles en móvil', { tag: '@smoke' }, async ({
     page,
     tracker,
   }) => {

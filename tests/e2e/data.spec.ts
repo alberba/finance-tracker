@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 
 test.describe("Data E2E", () => {
-  test("renderiza datos y backups dentro del workspace Vue", async ({
+  test("renderiza datos y backups dentro del workspace Vue", { tag: "@smoke" }, async ({
     page,
     tracker,
   }) => {

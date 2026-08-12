@@ -8,6 +8,9 @@ async function expectModalCentered(
 ) {
   const dialog = page.locator(selector);
   await expect(dialog).toBeVisible();
+  await dialog.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
 
   const viewport = page.viewportSize();
   const box = await dialog.boundingBox();
@@ -36,6 +39,9 @@ async function expectModalAnchoredToLauncher(
 ) {
   const dialog = page.locator(selector);
   await expect(dialog).toBeVisible();
+  await dialog.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
 
   const viewport = page.viewportSize();
   const box = await dialog.boundingBox();

@@ -38,7 +38,7 @@ export default defineConfig({
     sentry({
       project: 'finance-tracker',
       org: 'alberba',
-      authToken: process.env.SENTRY_AUTH_TOKEN,
+      authToken: process.env.PLAYWRIGHT_TEST ? undefined : process.env.SENTRY_AUTH_TOKEN,
     }),
   ],
 })

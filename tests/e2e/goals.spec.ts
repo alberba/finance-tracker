@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 
 test.describe("Goals E2E", () => {
-  test("renderiza objetivos dentro del workspace Vue", async ({ page, tracker }) => {
+  test("renderiza objetivos dentro del workspace Vue", { tag: "@smoke" }, async ({ page, tracker }) => {
     await tracker.openGoals();
 
     const goalsSection = tracker.section("goals");

@@ -2,7 +2,7 @@ import { test, expect, mirrorStateToServer } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
-  test('configura un instrumento y muestra una cotización mockeada con actualización', async ({ page, tracker }) => {
+  test('configura un instrumento y muestra una cotización mockeada con actualización', { tag: '@smoke' }, async ({ page, tracker }) => {
     await page.route('**/api/market/quotes', async (route) => {
       const body = route.request().postDataJSON() as { instruments?: Array<{ id: string; currency: string }> }
       const now = new Date().toISOString()
@@ -132,7 +132,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
     await mirrorStateToServer(page)
-    await page.reload()
+    await tracker.reload()
 
     const liveMarket = new LiveMarketPage(page)
     await tracker.openSettings()
@@ -188,7 +188,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Café editado')
 
-    await page.reload()
+    await tracker.reload()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
     await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Café editado' })).toHaveCount(0)
