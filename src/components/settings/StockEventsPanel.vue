@@ -56,7 +56,7 @@ onMounted(() => {
 <template>
   <section id="cfg-stockevents" class="settings-block">
     <header>
-      <span class="settings-block__num">09</span>
+      <span class="settings-block__num">08</span>
       <h3>Stock Events</h3>
       <p>
         Sincroniza los nuevos movimientos de inversión con Stock Events. La API key se crea en la

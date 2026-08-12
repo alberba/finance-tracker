@@ -6,6 +6,7 @@ import ContributionWorkflowDialog from '../investment/ContributionWorkflowDialog
 import InvestmentContributionsTab from '../investment/InvestmentContributionsTab.vue'
 import InvestmentDashboardTab from '../investment/InvestmentDashboardTab.vue'
 import InvestmentMovementsTab from '../investment/InvestmentMovementsTab.vue'
+import InvestmentRecurringTab from '../investment/InvestmentRecurringTab.vue'
 import AppSection from '../ui/AppSection.vue'
 import type { ReturnMode } from '../../domain/investment/view-model'
 import { MONTHS, type InvestmentSubTab } from '../../scripts/types'
@@ -133,6 +134,19 @@ function onConfirmDelete(date: string): void {
       >
         Aportes
       </button>
+      <button
+        id="investment-tab-recurring-button"
+        type="button"
+        class="investment-subtab-btn"
+        :class="{ 'is-active': activeTab === 'recurring' }"
+        data-investment-tab="recurring"
+        role="tab"
+        :aria-selected="activeTab === 'recurring'"
+        aria-controls="investment-tab-recurring"
+        @click="setTab('recurring')"
+      >
+        Compras recurrentes
+      </button>
     </div>
 
     <InvestmentDashboardTab :is-active="activeTab === 'dashboard'" />
@@ -142,6 +156,7 @@ function onConfirmDelete(date: string): void {
       @open-workflow="workflowDialogRef?.open()"
       @request-delete="deleteDialogRef?.open($event)"
     />
+    <InvestmentRecurringTab :is-active="activeTab === 'recurring'" />
 
     <ContributionWorkflowDialog ref="workflowDialogRef" />
     <ContributionDeleteDialog ref="deleteDialogRef" @confirm="onConfirmDelete" />
