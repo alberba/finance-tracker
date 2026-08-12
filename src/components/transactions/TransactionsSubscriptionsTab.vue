@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, shallowRef } from 'vue'
 
+import SubscriptionsAnalysis from './SubscriptionsAnalysis.vue'
 import SubscriptionsList from './SubscriptionsList.vue'
 import { type Subscription, type SubscriptionFrequency } from '../../scripts/types'
 import { parseFloatSafe, todayISO } from '../../scripts/utils'
@@ -166,6 +167,8 @@ resetForm()
         </div>
       </form>
     </article>
+
+    <SubscriptionsAnalysis :subscriptions="movementsStore.subscriptions" />
 
     <SubscriptionsList
       :subscriptions="movementsStore.subscriptions"
