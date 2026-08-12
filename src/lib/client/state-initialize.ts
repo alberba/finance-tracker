@@ -10,6 +10,8 @@
  * and keeps working while `PUBLIC_SYNC_V2` is off.
  */
 
+import { isDemoMode } from "../../scripts/demo-mode";
+
 export interface InitializeResult {
   ok: boolean;
   alreadyInitialized?: boolean;
@@ -17,6 +19,9 @@ export interface InitializeResult {
 }
 
 export async function initializeFreshState(currency?: string): Promise<InitializeResult> {
+  if (isDemoMode()) {
+    return { ok: false, error: "El modo demo no crea ni modifica espacios en la base de datos." };
+  }
   try {
     const response = await fetch("/api/state/initialize", {
       method: "POST",

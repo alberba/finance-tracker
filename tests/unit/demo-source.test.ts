@@ -12,19 +12,19 @@ describe("demo-source (WP8 read-only v2 demo)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("is inactive when sync v2 is off, regardless of demo mode", () => {
+  it("is inactive when demo mode is not active", () => {
     vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(isDemoMode).mockReturnValue(false);
     expect(isReadOnlyDemoActive()).toBe(false);
   });
 
-  it("is inactive when sync v2 is on but demo mode is not active", () => {
+  it("is active with sync v2 off when demo mode is active", () => {
     vi.stubEnv("PUBLIC_SYNC_V2", "");
     vi.mocked(isDemoMode).mockReturnValue(true);
-    expect(isReadOnlyDemoActive()).toBe(false);
+    expect(isReadOnlyDemoActive()).toBe(true);
   });
 
-  it("is active only when both sync v2 is enabled and demo mode is active", () => {
+  it("remains active with sync v2 on", () => {
     vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(isDemoMode).mockReturnValue(true);
     expect(isReadOnlyDemoActive()).toBe(true);

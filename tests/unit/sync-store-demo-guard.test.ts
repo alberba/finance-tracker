@@ -18,14 +18,12 @@ describe("useSyncStore — read-only demo guard (WP8)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("rejects enqueueCommand while the v2 read-only demo is active", async () => {
+  it("ignores enqueueCommand while demo mode is active", async () => {
     vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(isDemoMode).mockReturnValue(true);
 
     const store = useSyncStore();
-    await expect(
-      store.enqueueCommand({ action: "noop" } as never),
-    ).rejects.toThrow(/solo lectura/i);
+    await expect(store.enqueueCommand({ action: "noop" } as never)).resolves.toBeNull();
   });
 
   it("does not throw for the demo guard when demo mode is inactive (falls through to the normal not-ready no-op)", async () => {

@@ -290,9 +290,15 @@ describe("resolvePrincipal", () => {
 // middleware.ts — AUTH_ENFORCED gating (real verifyAccessJwt + resolvePrincipal)
 // ---------------------------------------------------------------------------
 
-function makeContext(options: { headers?: Record<string, string>; env?: Record<string, string> }) {
-  const request = new Request("https://app.example.com/api/state", {
+function makeContext(options: {
+  headers?: Record<string, string>;
+  env?: Record<string, string>;
+  url?: string;
+  method?: string;
+}) {
+  const request = new Request(options.url ?? "https://app.example.com/api/state", {
     headers: options.headers,
+    method: options.method,
   });
   const locals: Record<string, unknown> = {
     runtime: { env: options.env ?? {} },
@@ -330,6 +336,48 @@ describe("middleware onRequest — AUTH_ENFORCED gating", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(response.status).toBe(401);
+  });
+
+  it.each([
+    "https://app.example.com/demo",
+    "https://app.example.com/?demo=1",
+  ])("allows the public demo entry without a token when enforcement is on (%s)", async (url) => {
+    const context = makeContext({
+      url,
+      env: { ...CONFIGURED_ENV, AUTH_ENFORCED: "true" },
+    });
+    const next = makeNext(new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+    expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
+  });
+
+  it("allows demo page navigation with the cookie but never uses it to bypass API auth", async () => {
+    const env = { ...CONFIGURED_ENV, AUTH_ENFORCED: "true" };
+    const headers = { cookie: "finance-demo-mode=1" };
+    const pageContext = makeContext({
+      url: "https://app.example.com/inversion",
+      headers,
+      env,
+    });
+    const pageNext = makeNext(new Response("ok"));
+
+    await onRequest(pageContext, pageNext);
+
+    const apiContext = makeContext({
+      url: "https://app.example.com/api/state",
+      headers,
+      env,
+    });
+    const apiNext = makeNext(new Response("ok"));
+    const apiResponse = (await onRequest(apiContext, apiNext)) as Response;
+
+    expect(pageNext).toHaveBeenCalledTimes(1);
+    expect(apiNext).not.toHaveBeenCalled();
+    expect(apiResponse.status).toBe(401);
   });
 
   it("attaches locals.principal on a valid token and calls next()", async () => {
