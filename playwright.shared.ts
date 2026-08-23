@@ -30,7 +30,7 @@ export function createPlaywrightRuntime({
     fullyParallel: true,
     forbidOnly: isCI,
     retries: isCI ? 2 : 0,
-    workers: 2,
+    workers: isCI ? 4 : 2,
     maxFailures: isCI ? 10 : 1,
     reporter: isCI
       ? [['dot'], ['blob', { outputDir: blobOutputDir }]]

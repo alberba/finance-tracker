@@ -16,6 +16,7 @@ package-lock.json
 # Playwright
 /playwright-report/
 /blob-report/
+/blob-report-sync-v2/
 /playwright/.cache/
 /playwright/.auth/
 # Local-only visual snapshots (CI generates the canonical -linux baselines)
