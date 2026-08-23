@@ -124,6 +124,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Apply local D1 v2 migrations
+        run: pnpm d1:migrate:local:v2
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Enable the test auth shim
