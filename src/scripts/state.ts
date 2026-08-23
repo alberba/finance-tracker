@@ -180,7 +180,7 @@ export function persistState(state: State): string {
 }
 
 export async function loadServerState(): Promise<ServerState | null> {
-  if (typeof fetch !== "function") {
+  if (isDemoMode() || typeof fetch !== "function") {
     return null;
   }
 
@@ -216,6 +216,9 @@ export async function persistServerState(
   state: State,
 ): Promise<ServerSaveResult> {
   const knownVersion = getKnownServerVersion();
+  if (isDemoMode()) {
+    return { status: "ok", version: knownVersion ?? 0 };
+  }
   try {
     const response = await fetch(SERVER_STATE_ENDPOINT, {
       method: "PUT",

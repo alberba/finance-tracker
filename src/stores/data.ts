@@ -13,6 +13,7 @@ import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/
 import { useToast } from '../composables/useToast'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { initializeFreshState } from '../lib/client/state-initialize'
+import { isDemoMode } from '../scripts/demo-mode'
 import { BASE_SEED } from '../scripts/state'
 import { clone } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -73,7 +74,7 @@ export const useDataStore = defineStore('data', () => {
   }
 
   /** "Empezar de cero" (WP8) — only meaningful on the v2 sync path. */
-  const canStartFresh = isSyncV2Enabled()
+  const canStartFresh = isSyncV2Enabled() && !isDemoMode()
 
   async function startFresh(): Promise<void> {
     if (!canStartFresh) {

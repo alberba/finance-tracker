@@ -47,6 +47,7 @@ import { verifyAccessJwt } from "./lib/server/auth/jwks";
 import { resolvePrincipal, CF_ACCESS_PROVIDER } from "./lib/server/auth/principal";
 import { getDb } from "./db/client";
 import type { RuntimeEnv } from "./lib/server/cloudflare-env";
+import { isPublicDemoNavigation } from "./lib/server/demo-access";
 
 const ACCESS_JWT_HEADER = "Cf-Access-Jwt-Assertion";
 /** Test-only principal injection (WP8) — see the module doc comment above. */
@@ -72,6 +73,10 @@ function isTestAuthEnabled(env: RuntimeEnv | undefined): boolean {
 export const onRequest = defineMiddleware(async (context, next) => {
   const env = (context.locals as { runtime?: { env?: RuntimeEnv } })?.runtime?.env;
   const enforced = isEnforced(env);
+
+  if (enforced && isPublicDemoNavigation(context.request)) {
+    return next();
+  }
 
   // Test-only shim: only ever consulted when enforcement is off AND the
   // deployment explicitly opted in via `TEST_AUTH_ENABLED` — see doc comment.

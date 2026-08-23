@@ -256,7 +256,7 @@ const SYNC_STATUS_LABELS: Record<string, string> = {
  * doing its job until cutover.
  */
 function initSyncMenu(): void {
-  if (!isSyncV2Enabled()) {
+  if (!isSyncV2Enabled() || isDemoMode()) {
     return
   }
 

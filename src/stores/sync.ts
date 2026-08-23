@@ -174,9 +174,9 @@ export const useSyncStore = defineStore('sync', () => {
   /** Validates and appends a command to the outbox, then attempts an immediate flush. */
   async function enqueueCommand(command: OutboxCommandInput): Promise<OutboxEntry | null> {
     if (isReadOnlyDemoActive()) {
-      // Demo (v2) is a global, code-generated dataset — never write to D1
-      // for a visitor. See `src/lib/client/demo-source.ts`.
-      throw new Error('El modo demo es de solo lectura: los cambios no se guardan.')
+      // Demo mutations stay in its isolated local cache and never enter the
+      // per-user outbox or reach D1.
+      return null
     }
     if (!isReady() || !outboxDb) {
       return null

@@ -37,8 +37,14 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
           if (flag !== null) {
             if (['1', 'on', 'true'].includes(flag.toLowerCase())) {
               localStorage.setItem('finance-demo-mode', '1')
+              document.cookie =
+                'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
             } else {
               localStorage.removeItem('finance-demo-mode')
+              document.cookie =
+                'finance-demo-mode=; Path=/; Max-Age=0; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
             }
             params.delete('demo')
             const query = params.toString()
@@ -51,6 +57,9 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
           if (!window.__FINANCE_NAMESPACE__ && localStorage.getItem('finance-demo-mode') === '1') {
             window.__FINANCE_NAMESPACE__ = 'demo'
             document.documentElement.dataset.demo = '1'
+            document.cookie =
+              'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+              (window.location.protocol === 'https:' ? '; Secure' : '')
           }
         } catch {
           /* storage no disponible — sin modo demo */

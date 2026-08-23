@@ -1,3 +1,5 @@
+import { isDemoMode } from '../scripts/demo-mode'
+
 export type ReportType = 'bug' | 'feature' | 'enhancement'
 
 export interface ReportPayload {
@@ -37,6 +39,10 @@ export type ReportSubmissionPayload = Omit<ReportPayload, 'mentionClaude'> & {
 export const ISSUE_REPORT_ENDPOINT = '/api/issues/report'
 
 export async function submitIssueReport(payload: ReportSubmissionPayload): Promise<ReportResponse> {
+  if (isDemoMode()) {
+    return { ok: false, error: 'Los reportes no se envían desde el modo demo.' }
+  }
+
   const response = await fetch(ISSUE_REPORT_ENDPOINT, {
     method: 'POST',
     headers: {

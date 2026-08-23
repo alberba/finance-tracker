@@ -229,7 +229,7 @@ export class FinanceTrackerPage {
     await form.getByLabel("Importe").fill(String(params.amount));
 
     await form.getByRole("button", { name: "Guardar" }).click();
-    await expect(this.page.getByRole("status")).toContainText(
+    await expect(this.page.locator("#toast")).toContainText(
       "Movimiento guardado.",
     );
   }
@@ -267,7 +267,7 @@ export class FinanceTrackerPage {
     await form.getByLabel("Descripción").fill(params.description);
     await form.getByLabel("Importe").fill(String(params.amount));
     await form.getByRole("button", { name: "Guardar" }).click();
-    await expect(this.page.getByRole("status")).toContainText(
+    await expect(this.page.locator("#toast")).toContainText(
       "Movimiento guardado.",
     );
   }
