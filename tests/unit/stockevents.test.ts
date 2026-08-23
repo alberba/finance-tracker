@@ -131,6 +131,7 @@ describe('normalización del estado de Stock Events', () => {
       apiKey: '',
       symbolMappings: [],
       cashMappings: [],
+      cashSyncEntries: [],
     })
   })
 
@@ -156,6 +157,20 @@ describe('normalización del estado de Stock Events', () => {
           { accountId: 'myinvestor', watchlistId: 'duplicate' },
           { accountId: '', watchlistId: 'invalid' },
         ],
+        cashSyncEntries: [
+          {
+            contributionDate: '2026-07-19',
+            accountId: 'myinvestor',
+            watchlistId: 'wl-cash',
+            syncedAmount: 125.505,
+          },
+          {
+            contributionDate: 'invalid',
+            accountId: 'myinvestor',
+            watchlistId: 'wl-cash',
+            syncedAmount: 100,
+          },
+        ],
       },
     })
     expect(state.stockEvents.enabled).toBe(true)
@@ -172,6 +187,14 @@ describe('normalización del estado de Stock Events', () => {
     ])
     expect(state.stockEvents.cashMappings).toEqual([
       { accountId: 'myinvestor', watchlistId: 'wl-cash' },
+    ])
+    expect(state.stockEvents.cashSyncEntries).toEqual([
+      {
+        contributionDate: '2026-07-19',
+        accountId: 'myinvestor',
+        watchlistId: 'wl-cash',
+        syncedAmount: 125.51,
+      },
     ])
   })
 })
@@ -310,5 +333,16 @@ describe('creación de transacciones en Stock Events', () => {
       body: { symbol: 'CASH_EUR', price: 100, toCash: true },
     })
     expect(calls[0]?.url).toMatch(/\/transactions$/)
+  })
+
+  it('representa una corrección negativa de efectivo con change negativo', () => {
+    expect(
+      buildStockEventsCashTransactionPayload({
+        watchlistId: 'wl-1',
+        date: '2026-07-19',
+        amount: -25.5,
+        currency: 'EUR',
+      }),
+    ).toMatchObject({ change: -1, price: 25.5, toCash: true })
   })
 })

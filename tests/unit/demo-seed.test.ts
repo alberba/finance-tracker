@@ -18,6 +18,7 @@ describe('demo seed', () => {
       apiKey: '',
       symbolMappings: [],
       cashMappings: [],
+      cashSyncEntries: [],
     })
   })
 

@@ -253,7 +253,7 @@ test.describe("recorrido guiado de aportes", () => {
     tracker,
     page,
   }) => {
-    let syncedTransaction: Record<string, unknown> | undefined;
+    const syncedTransactions: Record<string, unknown>[] = [];
     await page.route("**/api/stockevents/watchlists", async (route) => {
       await route.fulfill({
         status: 200,
@@ -267,7 +267,7 @@ test.describe("recorrido guiado de aportes", () => {
       const body = route.request().postDataJSON() as {
         transaction?: Record<string, unknown>;
       };
-      syncedTransaction = body.transaction;
+      if (body.transaction) syncedTransactions.push(body.transaction);
       await route.fulfill({
         status: 201,
         contentType: "application/json",
@@ -339,7 +339,7 @@ test.describe("recorrido guiado de aportes", () => {
       .check();
     await tracker.contributionWorkflowSave();
 
-    await expect.poll(() => syncedTransaction).toMatchObject({
+    await expect.poll(() => syncedTransactions[0]).toMatchObject({
       watchlistId: "wl-etf",
       symbol: "CASH_EUR",
       date: "2026-07-19T00:00:00Z",
@@ -348,6 +348,27 @@ test.describe("recorrido guiado de aportes", () => {
       priceCurrency: "EUR",
       toCash: true,
       type: "DEFAULT",
+    });
+
+    await tracker.openContributionWorkflowModal();
+    await tracker.contributionWorkflowSelectMonth("JULIO");
+    await tracker.contributionWorkflowSetDate("2026-07-19");
+    await tracker.contributionWorkflowGoToAllocationStep();
+    await tracker.contributionWorkflowSetTotal(150.5);
+    await tracker.contributionWorkflowSetAllocation("MyInvestor", 150.5);
+    await page
+      .locator("#contribution-workflow-dialog")
+      .getByRole("checkbox", {
+        name: /Añadir las asignaciones al efectivo de Stock Events/,
+      })
+      .check();
+    await tracker.contributionWorkflowSave();
+
+    await expect.poll(() => syncedTransactions).toHaveLength(2);
+    expect(syncedTransactions[1]).toMatchObject({
+      change: 1,
+      price: 25,
+      toCash: true,
     });
   });
 

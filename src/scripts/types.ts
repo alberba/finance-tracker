@@ -195,11 +195,19 @@ export interface StockEventsCashMapping {
   watchlistId: string;
 }
 
+export interface StockEventsCashSyncEntry {
+  contributionDate: string;
+  accountId: string;
+  watchlistId: string;
+  syncedAmount: number;
+}
+
 export interface StockEventsSettings {
   enabled: boolean;
   apiKey: string;
   symbolMappings: StockEventsSymbolMapping[];
   cashMappings?: StockEventsCashMapping[];
+  cashSyncEntries?: StockEventsCashSyncEntry[];
 }
 
 export interface StateMeta {

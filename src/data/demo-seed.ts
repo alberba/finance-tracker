@@ -425,6 +425,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       apiKey: "",
       symbolMappings: [],
       cashMappings: [],
+      cashSyncEntries: [],
     },
   };
 }

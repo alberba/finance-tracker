@@ -75,7 +75,7 @@ export function buildStockEventsCashTransactionPayload(
   const watchlistId = input.watchlistId.trim()
   const amount = Math.round(Number(input.amount) * 100) / 100
   const currency = input.currency.trim().toUpperCase().slice(0, 3)
-  if (!watchlistId || !Number.isFinite(amount) || amount <= 0 || currency.length !== 3) {
+  if (!watchlistId || !Number.isFinite(amount) || amount === 0 || currency.length !== 3) {
     return null
   }
   const accountName = input.accountName?.trim()
@@ -83,8 +83,8 @@ export function buildStockEventsCashTransactionPayload(
     watchlistId,
     symbol: `CASH_${currency}`,
     date: buildIsoDate(input.date, undefined),
-    change: 1,
-    price: amount,
+    change: amount > 0 ? 1 : -1,
+    price: Math.abs(amount),
     priceCurrency: currency,
     toCash: true,
     ...(accountName ? { notes: `Aporte desde finance-tracker · ${accountName}` } : {}),

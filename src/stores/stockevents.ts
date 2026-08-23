@@ -275,29 +275,63 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const accountNames = new Map(
       financialStateStore.accounts.map((account) => [account.id, account.name]),
     )
-    const payloads = allocations.flatMap((allocation) => {
+    const requests = allocations.flatMap((allocation) => {
       const watchlistId = mappingsByAccount.get(allocation.accountId)
-      if (!watchlistId || allocation.amount <= 0) return []
+      if (!watchlistId || allocation.amount < 0) return []
+      const syncedAmount = (settings.value.cashSyncEntries || []).find(
+        (entry) =>
+          entry.contributionDate === date &&
+          entry.accountId === allocation.accountId &&
+          entry.watchlistId === watchlistId,
+      )?.syncedAmount ?? 0
+      const delta = Math.round((allocation.amount - syncedAmount) * 100) / 100
+      if (delta === 0) return []
       const payload = buildStockEventsCashTransactionPayload({
         watchlistId,
         date,
-        amount: allocation.amount,
+        amount: delta,
         currency: financialStateStore.currency,
         accountName: accountNames.get(allocation.accountId),
       })
-      return payload ? [payload] : []
+      return payload ? [{ allocation, watchlistId, delta, payload }] : []
     })
-    if (!payloads.length) return
+    if (!requests.length) return
 
     const results = await Promise.allSettled(
-      payloads.map((payload) => createStockEventsTransaction(settings.value.apiKey, payload)),
+      requests.map((request) => createStockEventsTransaction(settings.value.apiKey, request.payload)),
     )
+    results.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return
+      const request = requests[index]
+      if (!request) return
+      financialStateStore.commitState((draft) => {
+        const entries = draft.stockEvents.cashSyncEntries || []
+        draft.stockEvents.cashSyncEntries = entries
+        const existing = entries.find(
+          (entry) =>
+            entry.contributionDate === date &&
+            entry.accountId === request.allocation.accountId &&
+            entry.watchlistId === request.watchlistId,
+        )
+        const syncedAmount = Math.round(request.allocation.amount * 100) / 100
+        if (existing) {
+          existing.syncedAmount = syncedAmount
+        } else {
+          entries.push({
+            contributionDate: date,
+            accountId: request.allocation.accountId,
+            watchlistId: request.watchlistId,
+            syncedAmount,
+          })
+        }
+      })
+    })
     const failedCount = results.filter((result) => result.status === 'rejected').length
     if (failedCount > 0) {
       showToast(`Stock Events: ${failedCount} aporte(s) de efectivo no se pudieron sincronizar.`)
       return
     }
-    showToast(`Efectivo añadido a ${payloads.length} lista(s) de Stock Events.`)
+    showToast(`Efectivo actualizado en ${requests.length} lista(s) de Stock Events.`)
   }
 
   return {
