@@ -35,6 +35,7 @@ const isBitvavo = computed(() => investmentStore.isBitvavoBrokerAccount(form.acc
 const categoryOptions = computed(() =>
   isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories,
 )
+const canSyncMovement = computed(() => stockEventsStore.canSyncSymbol(form.symbol))
 
 const computedTotal = computed(() => {
   const computed = computeInvestmentMovement({
@@ -58,6 +59,9 @@ function syncCategoryForBroker(): void {
 }
 
 watch(() => form.accountId, syncCategoryForBroker)
+watch(canSyncMovement, (canSync) => {
+  if (!canSync) form.toCash = false
+})
 
 function resetDefaults(keep: Partial<typeof form> = {}): void {
   form.symbol = ''
@@ -228,7 +232,7 @@ function onSubmit(): void {
         Declarado
       </label>
       <label
-        v-if="stockEventsStore.isConnected"
+        v-if="canSyncMovement"
         class="investment-declared-field investment-cash-field"
       >
         <input

@@ -100,6 +100,10 @@ test.describe("inversión tabs y TWR", () => {
     await mirrorStateToServer(page);
     await page.reload();
     await tracker.openInvestmentMovementsTab();
+    await tracker
+      .investmentSection()
+      .locator("#investment-movement-symbol")
+      .fill("CASHBUY");
 
     await expect(
       tracker.investmentSection().getByRole("checkbox", {
@@ -129,6 +133,35 @@ test.describe("inversión tabs y TWR", () => {
       toCash: true,
       type: "buy",
     });
+  });
+
+  test("no ofrece ajustar efectivo para símbolos sin mapeo activo", async ({
+    tracker,
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) throw new Error("No se encontró el estado financiero inicial");
+      const state = JSON.parse(raw);
+      state.stockEvents = {
+        enabled: true,
+        apiKey: "test-stock-events-key",
+        symbolMappings: [],
+      };
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await tracker.openInvestmentMovementsTab();
+
+    await tracker
+      .investmentSection()
+      .locator("#investment-movement-symbol")
+      .fill("UNMAPPED");
+
+    await expect(
+      tracker.investmentSection().locator("#investment-movement-to-cash"),
+    ).toHaveCount(0);
   });
 
   test("editar y eliminar en movimientos de inversión se refleja en movimientos generales", async ({

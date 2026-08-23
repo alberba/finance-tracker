@@ -52,6 +52,10 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   const settings = computed(() => financialStateStore.state.stockEvents)
   const isConnected = computed(() => settings.value.enabled && Boolean(settings.value.apiKey))
 
+  function canSyncSymbol(symbol: string): boolean {
+    return isConnected.value && Boolean(findSyncedMapping(settings.value, symbol))
+  }
+
   const trackedSymbols = computed(() => {
     const symbols = new Set<string>()
     financialStateStore.state.instruments.forEach((instrument) => {
@@ -221,6 +225,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     isChecking,
     connectionError,
     symbolRows,
+    canSyncSymbol,
     saveApiKey,
     setEnabled,
     updateMapping,
