@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 
 test.describe("Budget E2E", () => {
-  test("presupuesto renderiza tres tablas anuales por bloque", async ({
+  test("presupuesto renderiza tres tablas anuales por bloque", { tag: "@smoke" }, async ({
     page,
     tracker,
   }) => {

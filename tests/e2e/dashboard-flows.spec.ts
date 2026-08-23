@@ -22,7 +22,7 @@ interface TestChartConstructor {
 }
 
 test.describe("Finance tracker E2E", () => {
-  test("sincroniza pestañas con path y permite carga directa por URL", async ({
+  test("sincroniza pestañas con path y permite carga directa por URL", { tag: "@smoke" }, async ({
     page,
     tracker,
   }) => {

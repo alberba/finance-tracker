@@ -191,7 +191,7 @@ async function openSectionForLayout(
   await tracker.open(sectionId)
 }
 
-test.describe('UI layout integrity', () => {
+test.describe('UI layout integrity', { tag: '@visual' }, () => {
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
       await openSectionForLayout(page, tracker, sectionId)
@@ -205,11 +205,7 @@ test.describe('UI layout integrity', () => {
       expect(scan.undersizedInteractiveElements).toEqual([])
     })
 
-    test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }, testInfo) => {
-      test.skip(
-        testInfo.project.name !== 'chromium',
-        'La cobertura móvil valida el layout con el escáner y un flujo de navegación.',
-      )
+    test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
       await openSectionForLayout(page, tracker, sectionId)
       await page.evaluate(async () => {
         await document.fonts.ready

@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures";
 
 test.describe("Investment charts E2E", () => {
-  test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", async ({
+  test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", { tag: "@smoke" }, async ({
     tracker,
     page,
   }) => {

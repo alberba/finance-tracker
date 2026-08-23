@@ -1,7 +1,7 @@
 import { test, expect, mirrorStateToServer } from "./fixtures";
 
 test.describe("Settings E2E", () => {
-  test("renderiza configuración base dentro del workspace Vue", async ({
+  test("renderiza configuración base dentro del workspace Vue", { tag: "@smoke" }, async ({
     page,
     tracker,
   }) => {
@@ -168,7 +168,7 @@ test.describe("Settings E2E", () => {
       localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
     });
     await mirrorStateToServer(page);
-    await page.reload();
+    await tracker.reload();
     await page.waitForFunction(() => {
       const raw = localStorage.getItem("finance-tracker-state-v1");
       return raw
@@ -197,7 +197,7 @@ test.describe("Settings E2E", () => {
     await expect(targetSymbol).toHaveValue("AGED.XETRA");
     await expect(page.locator("#save-status")).toContainText("Sincronizado");
 
-    await page.reload();
+    await tracker.reload();
     await page.waitForFunction(() => {
       const raw = localStorage.getItem("finance-tracker-state-v1");
       return raw
@@ -227,7 +227,7 @@ test.describe("Settings E2E", () => {
     ).toBeVisible();
     await expect(page.locator("#save-status")).toContainText("Sincronizado");
 
-    await page.reload();
+    await tracker.reload();
     await tracker.openSettings();
     await expect(page.getByRole("button", { name: "Mostrar ocultos (1)" })).toBeVisible();
     await page.getByRole("button", { name: "Mostrar ocultos (1)" }).click();

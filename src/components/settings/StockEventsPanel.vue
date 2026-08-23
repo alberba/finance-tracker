@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 
 import StockEventsSymbolTable from './StockEventsSymbolTable.vue'
 import { useStockEventsStore } from '../../stores/stockevents'
@@ -13,7 +13,11 @@ watch(
   () => stockEventsStore.settings.apiKey,
   (apiKey) => {
     apiKeyInput.value = apiKey
+    if (apiKey) {
+      void stockEventsStore.loadWatchlists()
+    }
   },
+  { immediate: true },
 )
 
 const hasApiKey = computed(() => Boolean(stockEventsStore.settings.apiKey))
@@ -46,11 +50,6 @@ function onSetHidden(symbol: string, hidden: boolean): void {
   stockEventsStore.updateMapping(symbol, { hidden })
 }
 
-onMounted(() => {
-  if (hasApiKey.value) {
-    void stockEventsStore.loadWatchlists()
-  }
-})
 </script>
 
 <template>

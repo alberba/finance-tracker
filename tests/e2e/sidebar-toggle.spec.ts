@@ -174,7 +174,7 @@ test.describe("Sidebar toggle", () => {
     await expect(page.locator("body")).toHaveClass(/is-sidebar-collapsed/);
 
     // Recargar la página
-    await page.reload();
+    await tracker.reload();
     await expect(page.locator("#dashboard")).toBeVisible();
 
     // El sidebar debe seguir colapsado
@@ -196,7 +196,7 @@ test.describe("Sidebar toggle", () => {
     await page.locator("#sidebar-toggle").click();
     await expect(page.locator("body")).not.toHaveClass(/is-sidebar-collapsed/);
 
-    await page.reload();
+    await tracker.reload();
     await expect(page.locator("#dashboard")).toBeVisible();
 
     // El sidebar debe verse expandido
