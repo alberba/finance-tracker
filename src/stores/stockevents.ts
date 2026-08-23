@@ -12,6 +12,7 @@ import { computed, shallowRef } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import {
+  buildStockEventsCashTransactionPayload,
   buildStockEventsTransactionPayload,
   findSyncedMapping,
 } from '../domain/stockevents/transaction-payload'
@@ -22,7 +23,7 @@ import {
   type StockEventsWatchlist,
   type SymbolCheckResult,
 } from '../services/stockevents-api'
-import type { StockEventsSymbolMapping, Transaction } from '../scripts/types'
+import type { StockEventsCashMapping, StockEventsSymbolMapping, Transaction } from '../scripts/types'
 import { useFinancialStateStore } from './financial-state'
 
 export interface StockEventsSymbolRow {
@@ -37,6 +38,12 @@ export interface StockEventsSymbolRow {
 
 export interface StockEventsSyncOptions {
   toCash?: boolean
+}
+
+export interface StockEventsCashMappingRow {
+  accountId: string
+  accountName: string
+  watchlistId: string
 }
 
 export const useStockEventsStore = defineStore('stockEvents', () => {
@@ -55,6 +62,27 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   function canSyncSymbol(symbol: string): boolean {
     return isConnected.value && Boolean(findSyncedMapping(settings.value, symbol))
   }
+
+  const cashMappingRows = computed<StockEventsCashMappingRow[]>(() => {
+    const mappingsByAccount = new Map(
+      (settings.value.cashMappings || []).map((mapping) => [mapping.accountId, mapping.watchlistId]),
+    )
+    const liquidityAccountIds = new Set(financialStateStore.state.twrLiquidityAccountIds)
+    return financialStateStore.accounts
+      .filter((account) => liquidityAccountIds.has(account.id))
+      .map((account) => ({
+        accountId: account.id,
+        accountName: account.name,
+        watchlistId: mappingsByAccount.get(account.id) || '',
+      }))
+  })
+
+  const canSyncContributionCash = computed(
+    () =>
+      settings.value.enabled &&
+      Boolean(settings.value.apiKey) &&
+      (settings.value.cashMappings || []).some((mapping) => Boolean(mapping.watchlistId)),
+  )
 
   const trackedSymbols = computed(() => {
     const symbols = new Set<string>()
@@ -133,6 +161,25 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
           targetSymbol: targetSymbol || '',
           hidden: patch.hidden === true,
         })
+      }
+    })
+  }
+
+  function updateCashMapping(accountId: string, watchlistId: string): void {
+    const normalizedAccountId = accountId.trim()
+    const normalizedWatchlistId = watchlistId.trim()
+    if (!normalizedAccountId) return
+    financialStateStore.commitState((draft) => {
+      const mappings = draft.stockEvents.cashMappings || []
+      draft.stockEvents.cashMappings = mappings.filter(
+        (mapping) => mapping.accountId !== normalizedAccountId,
+      )
+      if (normalizedWatchlistId) {
+        const mapping: StockEventsCashMapping = {
+          accountId: normalizedAccountId,
+          watchlistId: normalizedWatchlistId,
+        }
+        draft.stockEvents.cashMappings.push(mapping)
       }
     })
   }
@@ -217,9 +264,81 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     }
   }
 
+  async function syncContributionCash(
+    date: string,
+    allocations: Array<{ accountId: string; amount: number }>,
+  ): Promise<void> {
+    if (!canSyncContributionCash.value) return
+    const mappingsByAccount = new Map(
+      (settings.value.cashMappings || []).map((mapping) => [mapping.accountId, mapping.watchlistId]),
+    )
+    const accountNames = new Map(
+      financialStateStore.accounts.map((account) => [account.id, account.name]),
+    )
+    const requests = allocations.flatMap((allocation) => {
+      const watchlistId = mappingsByAccount.get(allocation.accountId)
+      if (!watchlistId || allocation.amount < 0) return []
+      const syncedAmount = (settings.value.cashSyncEntries || []).find(
+        (entry) =>
+          entry.contributionDate === date &&
+          entry.accountId === allocation.accountId &&
+          entry.watchlistId === watchlistId,
+      )?.syncedAmount ?? 0
+      const delta = Math.round((allocation.amount - syncedAmount) * 100) / 100
+      if (delta === 0) return []
+      const payload = buildStockEventsCashTransactionPayload({
+        watchlistId,
+        date,
+        amount: delta,
+        currency: financialStateStore.currency,
+        accountName: accountNames.get(allocation.accountId),
+      })
+      return payload ? [{ allocation, watchlistId, delta, payload }] : []
+    })
+    if (!requests.length) return
+
+    const results = await Promise.allSettled(
+      requests.map((request) => createStockEventsTransaction(settings.value.apiKey, request.payload)),
+    )
+    results.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return
+      const request = requests[index]
+      if (!request) return
+      financialStateStore.commitState((draft) => {
+        const entries = draft.stockEvents.cashSyncEntries || []
+        draft.stockEvents.cashSyncEntries = entries
+        const existing = entries.find(
+          (entry) =>
+            entry.contributionDate === date &&
+            entry.accountId === request.allocation.accountId &&
+            entry.watchlistId === request.watchlistId,
+        )
+        const syncedAmount = Math.round(request.allocation.amount * 100) / 100
+        if (existing) {
+          existing.syncedAmount = syncedAmount
+        } else {
+          entries.push({
+            contributionDate: date,
+            accountId: request.allocation.accountId,
+            watchlistId: request.watchlistId,
+            syncedAmount,
+          })
+        }
+      })
+    })
+    const failedCount = results.filter((result) => result.status === 'rejected').length
+    if (failedCount > 0) {
+      showToast(`Stock Events: ${failedCount} aporte(s) de efectivo no se pudieron sincronizar.`)
+      return
+    }
+    showToast(`Efectivo actualizado en ${requests.length} lista(s) de Stock Events.`)
+  }
+
   return {
     settings,
     isConnected,
+    cashMappingRows,
+    canSyncContributionCash,
     watchlists,
     isLoadingWatchlists,
     isChecking,
@@ -229,8 +348,10 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     saveApiKey,
     setEnabled,
     updateMapping,
+    updateCashMapping,
     loadWatchlists,
     checkSymbols,
     syncMovement,
+    syncContributionCash,
   }
 })

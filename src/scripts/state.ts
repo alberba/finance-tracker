@@ -131,7 +131,13 @@ const FALLBACK_BASE_SEED = {
   quotes: {},
   recurringRules: [],
   pendingMovements: [],
-  stockEvents: { enabled: false, apiKey: "", symbolMappings: [] },
+  stockEvents: {
+    enabled: false,
+    apiKey: "",
+    symbolMappings: [],
+    cashMappings: [],
+    cashSyncEntries: [],
+  },
 };
 
 export const BASE_SEED: unknown = isDemoMode()
@@ -559,10 +565,45 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
       hidden: mapping.hidden === true,
     });
   });
+  const rawCashMappings = Array.isArray(raw.cashMappings) ? raw.cashMappings : [];
+  const seenAccounts = new Set<string>();
+  const cashMappings = rawCashMappings.flatMap((item) => {
+    const mapping = asRecord(item);
+    const accountId = String(mapping.accountId || "").trim();
+    const watchlistId = String(mapping.watchlistId || "").trim();
+    if (!accountId || !watchlistId || seenAccounts.has(accountId)) {
+      return [];
+    }
+    seenAccounts.add(accountId);
+    return [{ accountId, watchlistId }];
+  });
+  const rawCashSyncEntries = Array.isArray(raw.cashSyncEntries) ? raw.cashSyncEntries : [];
+  const seenCashSyncEntries = new Set<string>();
+  const cashSyncEntries = rawCashSyncEntries.flatMap((item) => {
+    const entry = asRecord(item);
+    const contributionDate = String(entry.contributionDate || "").trim();
+    const accountId = String(entry.accountId || "").trim();
+    const watchlistId = String(entry.watchlistId || "").trim();
+    const syncedAmount = round2(parseFloatSafe(entry.syncedAmount, NaN));
+    const key = `${contributionDate}:${accountId}:${watchlistId}`;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(contributionDate) ||
+      !accountId ||
+      !watchlistId ||
+      !Number.isFinite(syncedAmount) ||
+      seenCashSyncEntries.has(key)
+    ) {
+      return [];
+    }
+    seenCashSyncEntries.add(key);
+    return [{ contributionDate, accountId, watchlistId, syncedAmount }];
+  });
   return {
     enabled: raw.enabled === true,
     apiKey: String(raw.apiKey || "").trim(),
     symbolMappings,
+    cashMappings,
+    cashSyncEntries,
   };
 }
 

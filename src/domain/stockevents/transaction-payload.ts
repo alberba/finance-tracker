@@ -15,7 +15,15 @@ export interface StockEventsTransactionPayload {
   feesCurrency?: string
   notes?: string
   toCash?: boolean
-  type: 'buy' | 'sell'
+  type: 'buy' | 'sell' | 'DEFAULT'
+}
+
+export interface StockEventsCashTransactionInput {
+  watchlistId: string
+  date: string
+  amount: number
+  currency: string
+  accountName?: string
 }
 
 export function findSyncedMapping(
@@ -58,6 +66,29 @@ export function buildStockEventsTransactionPayload(
     notes: 'Sincronizado desde finance-tracker',
     ...(toCash ? { toCash: true } : {}),
     type: side,
+  }
+}
+
+export function buildStockEventsCashTransactionPayload(
+  input: StockEventsCashTransactionInput,
+): StockEventsTransactionPayload | null {
+  const watchlistId = input.watchlistId.trim()
+  const amount = Math.round(Number(input.amount) * 100) / 100
+  const currency = input.currency.trim().toUpperCase().slice(0, 3)
+  if (!watchlistId || !Number.isFinite(amount) || amount === 0 || currency.length !== 3) {
+    return null
+  }
+  const accountName = input.accountName?.trim()
+  return {
+    watchlistId,
+    symbol: `CASH_${currency}`,
+    date: buildIsoDate(input.date, undefined),
+    change: amount > 0 ? 1 : -1,
+    price: Math.abs(amount),
+    priceCurrency: currency,
+    toCash: true,
+    ...(accountName ? { notes: `Aporte desde finance-tracker · ${accountName}` } : {}),
+    type: 'DEFAULT',
   }
 }
 

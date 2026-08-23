@@ -50,6 +50,9 @@ function onSetHidden(symbol: string, hidden: boolean): void {
   stockEventsStore.updateMapping(symbol, { hidden })
 }
 
+function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
+  stockEventsStore.updateCashMapping(accountId, watchlistId)
+}
 </script>
 
 <template>
@@ -100,6 +103,44 @@ function onSetHidden(symbol: string, hidden: boolean): void {
       <p v-else-if="hasApiKey && stockEventsStore.watchlists.length" class="stockevents-hint">
         Conectado: {{ stockEventsStore.watchlists.length }} lista(s) de seguimiento disponibles.
       </p>
+
+      <section class="stockevents-cash-mappings" aria-labelledby="stockevents-cash-title">
+        <div>
+          <h4 id="stockevents-cash-title">Efectivo de aportes</h4>
+          <p>
+            Relaciona cada cuenta con la lista donde Stock Events debe registrar el efectivo de sus
+            aportes.
+          </p>
+        </div>
+        <div class="stockevents-cash-grid">
+          <label v-for="row in stockEventsStore.cashMappingRows" :key="row.accountId">
+            <span>{{ row.accountName }}</span>
+            <select
+              :value="row.watchlistId"
+              :disabled="!hasApiKey || !stockEventsStore.watchlists.length"
+              :aria-label="`Lista de efectivo de ${row.accountName}`"
+              @change="
+                onSelectCashWatchlist(row.accountId, ($event.target as HTMLSelectElement).value)
+              "
+            >
+              <option value="">No sincronizar efectivo</option>
+              <option
+                v-for="watchlist in stockEventsStore.watchlists"
+                :key="watchlist.id"
+                :value="watchlist.id"
+              >
+                {{ watchlist.name }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <p v-if="!stockEventsStore.cashMappingRows.length" class="stockevents-hint">
+          Añade una cuenta para poder relacionarla con Stock Events.
+        </p>
+        <p v-else-if="!stockEventsStore.watchlists.length" class="stockevents-hint">
+          Guarda la API key y carga las listas para configurar las relaciones.
+        </p>
+      </section>
 
       <p v-if="!stockEventsStore.symbolRows.length" class="stockevents-hint">
         No hay símbolos en finance-tracker todavía. Añade instrumentos o movimientos de inversión.
@@ -193,6 +234,55 @@ function onSetHidden(symbol: string, hidden: boolean): void {
   margin-top: 0.6rem;
   color: var(--expense);
   font-size: 0.85rem;
+}
+
+.stockevents-cash-mappings {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--bg-subtle);
+  padding: 1rem;
+}
+
+.stockevents-cash-mappings h4,
+.stockevents-cash-mappings p {
+  margin: 0;
+}
+
+.stockevents-cash-mappings h4 {
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
+.stockevents-cash-mappings p {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.stockevents-cash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.65rem;
+}
+
+.stockevents-cash-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stockevents-cash-grid select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--bg-card);
+  padding: 0.65rem 0.75rem;
+  color: var(--text-main);
 }
 
 .stockevents-hint {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  buildStockEventsCashTransactionPayload,
   buildStockEventsTransactionPayload,
   findSyncedMapping,
 } from '../../src/domain/stockevents/transaction-payload'
@@ -78,6 +79,28 @@ describe('payload de transacción para Stock Events', () => {
     ).toBeNull()
     expect(buildStockEventsTransactionPayload(buyMovement, '')).toBeNull()
   })
+
+  it('construye un aporte de efectivo con el formato CASH de Stock Events', () => {
+    expect(
+      buildStockEventsCashTransactionPayload({
+        watchlistId: 'wl-cash',
+        date: '2026-07-19',
+        amount: 125.499,
+        currency: 'eur',
+        accountName: 'MyInvestor',
+      }),
+    ).toEqual({
+      watchlistId: 'wl-cash',
+      symbol: 'CASH_EUR',
+      date: '2026-07-19T00:00:00Z',
+      change: 1,
+      price: 125.5,
+      priceCurrency: 'EUR',
+      toCash: true,
+      notes: 'Aporte desde finance-tracker · MyInvestor',
+      type: 'DEFAULT',
+    })
+  })
 })
 
 describe('resolución del mapeo de símbolos', () => {
@@ -103,7 +126,13 @@ describe('resolución del mapeo de símbolos', () => {
 describe('normalización del estado de Stock Events', () => {
   it('aplica valores por defecto cuando no existe configuración', () => {
     const state = normalizeState({})
-    expect(state.stockEvents).toEqual({ enabled: false, apiKey: '', symbolMappings: [] })
+    expect(state.stockEvents).toEqual({
+      enabled: false,
+      apiKey: '',
+      symbolMappings: [],
+      cashMappings: [],
+      cashSyncEntries: [],
+    })
   })
 
   it('sanea símbolos duplicados y campos inválidos', () => {
@@ -123,6 +152,25 @@ describe('normalización del estado de Stock Events', () => {
           { symbol: '', sync: true, watchlistId: 'wl-3' },
           { symbol: 'btc', sync: 'yes', watchlistId: 42 },
         ],
+        cashMappings: [
+          { accountId: 'myinvestor', watchlistId: ' wl-cash ' },
+          { accountId: 'myinvestor', watchlistId: 'duplicate' },
+          { accountId: '', watchlistId: 'invalid' },
+        ],
+        cashSyncEntries: [
+          {
+            contributionDate: '2026-07-19',
+            accountId: 'myinvestor',
+            watchlistId: 'wl-cash',
+            syncedAmount: 125.505,
+          },
+          {
+            contributionDate: 'invalid',
+            accountId: 'myinvestor',
+            watchlistId: 'wl-cash',
+            syncedAmount: 100,
+          },
+        ],
       },
     })
     expect(state.stockEvents.enabled).toBe(true)
@@ -136,6 +184,17 @@ describe('normalización del estado de Stock Events', () => {
         hidden: true,
       },
       { symbol: 'BTC', sync: false, watchlistId: '42', targetSymbol: '', hidden: false },
+    ])
+    expect(state.stockEvents.cashMappings).toEqual([
+      { accountId: 'myinvestor', watchlistId: 'wl-cash' },
+    ])
+    expect(state.stockEvents.cashSyncEntries).toEqual([
+      {
+        contributionDate: '2026-07-19',
+        accountId: 'myinvestor',
+        watchlistId: 'wl-cash',
+        syncedAmount: 125.51,
+      },
     ])
   })
 })
@@ -242,5 +301,48 @@ describe('creación de transacciones en Stock Events', () => {
     const authHeader = (fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)
       ?.Authorization
     expect(authHeader).toBe('Bearer se_live_x')
+  })
+
+  it('crea efectivo sin intentar añadir CASH como símbolo de la lista', async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = []
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input)
+      const method = init?.method || 'GET'
+      calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+      return jsonResponse({ data: { id: 'se-cash-1', watchlistId: 'wl-1', symbol: 'CASH_EUR' } }, 201)
+    })
+
+    await createStockEventsTransaction(
+      'se_live_x',
+      {
+        watchlistId: 'wl-1',
+        symbol: 'CASH_EUR',
+        date: '2026-07-19T00:00:00Z',
+        change: 1,
+        price: 100,
+        priceCurrency: 'EUR',
+        toCash: true,
+        type: 'DEFAULT',
+      },
+      fetchMock,
+    )
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      method: 'POST',
+      body: { symbol: 'CASH_EUR', price: 100, toCash: true },
+    })
+    expect(calls[0]?.url).toMatch(/\/transactions$/)
+  })
+
+  it('representa una corrección negativa de efectivo con change negativo', () => {
+    expect(
+      buildStockEventsCashTransactionPayload({
+        watchlistId: 'wl-1',
+        date: '2026-07-19',
+        amount: -25.5,
+        currency: 'EUR',
+      }),
+    ).toMatchObject({ change: -1, price: 25.5, toCash: true })
   })
 })
