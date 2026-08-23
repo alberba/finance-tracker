@@ -5,7 +5,7 @@ test.describe('Modo demo', () => {
   test('entra por la ruta pública y mantiene los cambios fuera de las APIs persistentes', async ({
     page,
   }) => {
-    const persistenceRequests: string[] = []
+    const remoteRequests: string[] = []
     page.on('request', (request) => {
       const pathname = new URL(request.url()).pathname
       if (
@@ -13,9 +13,11 @@ test.describe('Modo demo', () => {
         pathname === '/api/session' ||
         pathname === '/api/sync' ||
         pathname === '/api/state/initialize' ||
-        pathname === '/api/data/import'
+        pathname === '/api/data/import' ||
+        pathname === '/api/market/quotes' ||
+        pathname === '/api/issues/report'
       ) {
-        persistenceRequests.push(`${request.method()} ${pathname}`)
+        remoteRequests.push(`${request.method()} ${pathname}`)
       }
     })
 
@@ -45,7 +47,17 @@ test.describe('Modo demo', () => {
         page.evaluate(() => localStorage.getItem('finance-tracker-state-v1::demo')),
       )
       .toContain('Cambio local de demo')
-    expect(persistenceRequests).toEqual([])
+
+    await tracker.submitIssueReport({
+      type: 'bug',
+      summary: 'Reporte desde demo',
+      description: 'Este reporte debe permanecer únicamente en el navegador.',
+    })
+    await expect(tracker.issueReportStatus()).toContainText(
+      'Los reportes no se envían desde el modo demo.',
+    )
+
+    expect(remoteRequests).toEqual([])
   })
 
   test('se activa y desactiva desde el menú de usuario sin mezclar la caché real', async ({
