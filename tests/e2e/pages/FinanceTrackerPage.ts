@@ -130,6 +130,13 @@ export class FinanceTrackerPage {
       .click();
   }
 
+  async openInvestmentRecurringTab() {
+    await this.openInvestment();
+    await this.investmentSection()
+      .getByRole("tab", { name: "Compras recurrentes" })
+      .click();
+  }
+
   async openGoals() {
     await this.open("goals");
   }

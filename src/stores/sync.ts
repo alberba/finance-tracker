@@ -233,6 +233,9 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !outboxDb) {
       return
     }
+    if (conflicts.value.length > 0) {
+      return
+    }
     if (flushing) {
       flushAgainRequested = true
       return
@@ -281,9 +284,8 @@ export const useSyncStore = defineStore('sync', () => {
         } else if (result.status === 'conflict') {
           const command = entry.command
           if (command.action === 'update' || command.action === 'remove') {
-            conflicts.value = [
-              ...conflicts.value,
-              {
+            if (!conflicts.value.some((conflict) => conflict.seq === entry.seq)) {
+              conflicts.value = [...conflicts.value, {
                 seq: entry.seq,
                 entityType: command.entityType,
                 entityId: command.entityId,
@@ -292,8 +294,8 @@ export const useSyncStore = defineStore('sync', () => {
                   currentVersion: result.currentVersion,
                   message: result.message,
                 },
-              },
-            ]
+              }]
+            }
           }
           // Conflicted commands stay in the outbox until the user resolves
           // them explicitly (`resolveConflict`) — no auto-merge, per design.
@@ -319,8 +321,10 @@ export const useSyncStore = defineStore('sync', () => {
       syncStatus.value = 'idle'
       retryAttempt = 0
 
-      // More queued than we just sent, or the batch halted early — keep going.
-      if (body.halted || (await countOutbox(outboxDb)) > 0) {
+      // A conflict deliberately keeps its command in the outbox until the
+      // user picks a side. Retrying it here can reopen the dialog while that
+      // resolution is being persisted.
+      if (conflicts.value.length === 0 && (body.halted || (await countOutbox(outboxDb)) > 0)) {
         flushAgainRequested = true
       }
     } catch (error) {
@@ -331,7 +335,7 @@ export const useSyncStore = defineStore('sync', () => {
       flushing = false
       if (flushAgainRequested) {
         flushAgainRequested = false
-        void flush()
+        if (conflicts.value.length === 0) void flush()
       }
     }
   }
@@ -406,6 +410,7 @@ export const useSyncStore = defineStore('sync', () => {
     if (resolution === 'keepServer') {
       await acknowledge(outboxDb, [seq])
       pendingCount.value = await countOutbox(outboxDb)
+      if (conflicts.value.length === 0) void flush()
       return
     }
 

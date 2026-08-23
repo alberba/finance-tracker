@@ -31,10 +31,10 @@ export class LiveMarketPage {
 
   async createRecurringRule(params: {
     account: string; category: string; description: string; amount: number; frequency: string; startDate: string;
-    type?: string; symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
+    type?: 'investment';
+    symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
   }): Promise<void> {
     const form = this.recurringRules.locator('form')
-    if (params.type) await form.getByLabel('Tipo').selectOption(params.type)
     await form.getByLabel('Cuenta').selectOption({ label: params.account })
     await form.getByLabel('Categoría').selectOption({ label: params.category })
     await form.getByLabel('Descripción').fill(params.description)
@@ -46,7 +46,7 @@ export class LiveMarketPage {
     if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
-    await form.getByRole('button', { name: 'Crear regla' }).click()
+    await form.getByRole('button', { name: 'Crear compra recurrente' }).click()
   }
 
   async linkExistingMovements(symbol: string): Promise<void> {

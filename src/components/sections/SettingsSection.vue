@@ -5,10 +5,10 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
 import StockEventsPanel from '../settings/StockEventsPanel.vue'
+import LegacyRecurringRulesPanel from '../recurring/LegacyRecurringRulesPanel.vue'
 import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
 import InstrumentEditorPanel from '../market/InstrumentEditorPanel.vue'
-import RecurringRulesPanel from '../recurring/RecurringRulesPanel.vue'
 
 withDefaults(
   defineProps<{
@@ -151,8 +151,7 @@ onBeforeUnmount(() => {
         </section>
 
         <InstrumentEditorPanel />
-        <RecurringRulesPanel />
-
+        <LegacyRecurringRulesPanel />
         <EntityEditorCard
           section-id="cfg-cuentas"
           num="04"

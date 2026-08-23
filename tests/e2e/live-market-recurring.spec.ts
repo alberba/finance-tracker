@@ -2,6 +2,46 @@ import { test, expect, mirrorStateToServer } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
+  test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({ page, tracker }) => {
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('finance-tracker-state-v1')
+      if (!raw) throw new Error('No se encontró el estado local')
+      const state = JSON.parse(raw)
+      state.recurringRules.push({
+        id: 'legacy-expense-rule',
+        type: 'expense',
+        accountId: state.accounts[0].id,
+        category: state.expenseCategories[0],
+        description: 'Alquiler histórico',
+        amount: 900,
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-01-01',
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: '2026-09-01',
+      })
+      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
+    })
+    await mirrorStateToServer(page)
+    await page.reload()
+    await tracker.openSettings()
+
+    const panel = page.locator('[data-legacy-recurring-rules]')
+    const rule = panel.locator('.list-item', { hasText: 'Alquiler histórico' })
+    await expect(rule).toBeVisible()
+    await rule.getByRole('checkbox', { name: 'Activa' }).uncheck()
+    await expect(rule.getByRole('checkbox', { name: 'Activa' })).not.toBeChecked()
+    await rule.getByRole('button', { name: 'Editar' }).click()
+    await expect(panel.getByLabel('Descripción')).toHaveValue('Alquiler histórico')
+
+    await tracker.openInvestmentRecurringTab()
+    await expect(page.locator('#investment [data-recurring-rules]')).not.toContainText(
+      'Alquiler histórico',
+    )
+  })
+
   test('configura un instrumento y muestra una cotización mockeada con actualización', async ({ page, tracker }) => {
     await page.route('**/api/market/quotes', async (route) => {
       const body = route.request().postDataJSON() as { instruments?: Array<{ id: string; currency: string }> }
@@ -154,10 +194,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
     const liveMarket = new LiveMarketPage(page)
-    await tracker.openSettings()
+    await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule({
-      account: 'Revolut', category: 'Comida', description: 'Café recurrente', amount: 4.5,
-      frequency: 'daily', startDate: '2026-07-08',
+      account: 'Revolut', category: 'Fondos Indexados', description: 'Compra VWCE recurrente', amount: 100,
+      frequency: 'daily', startDate: '2026-07-08', symbol: 'VWCE', units: 1, unitPrice: 100,
     })
 
     await tracker.openDashboard()
@@ -173,10 +213,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(descriptionInput).toHaveCSS('min-height', '42px')
     await expect(descriptionInput).toHaveCSS('border-radius', '11px')
     await expect(accountSelect).toHaveCSS('min-height', '42px')
-    await descriptionInput.fill('Café editado')
-    await pendingItem.getByLabel('Importe').fill('5')
+    await descriptionInput.fill('Compra VWCE editada')
+    await pendingItem.getByLabel('Precio por título').fill('105')
     await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
-    await expect(liveMarket.pendingPanel).toContainText('Café editado')
+    await expect(liveMarket.pendingPanel).toContainText('Compra VWCE editada')
     await liveMarket.confirmFirstPending()
     await expect(liveMarket.pendingPanel).toContainText('(2)')
     // Two clocks are in play: `__FINANCE_TODAY__` pins the recurring engine to
@@ -186,12 +226,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     // relying on the two happening to agree — which is why this passed only
     // while the wall clock was in July.
     await tracker.filterTransactionsMonth('JULIO')
-    await expect(tracker.transactionsSection).toContainText('Café editado')
+    await expect(tracker.transactionsSection).toContainText('Compra VWCE editada')
 
     await page.reload()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
-    await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Café editado' })).toHaveCount(0)
+    await expect(liveMarket.pendingPanel.locator('[data-pending-item]').filter({ hasText: 'Compra VWCE editada' })).toHaveCount(0)
   })
 
   test('permite editar los campos de inversión de un pendiente automatizado', async ({ page, tracker }) => {
@@ -202,7 +242,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
     const liveMarket = new LiveMarketPage(page)
-    await tracker.openSettings()
+    await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule({
       account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
       frequency: 'monthly', startDate: '2026-07-01',
@@ -232,7 +272,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
     const liveMarket = new LiveMarketPage(page)
-    await tracker.openSettings()
+    await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule({
       account: 'Revolut', category: 'Fondos Indexados', description: 'Aportación VWCE', amount: 100,
       frequency: 'monthly', startDate: '2026-07-10',

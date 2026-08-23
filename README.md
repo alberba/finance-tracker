@@ -113,8 +113,16 @@ pnpm astro check
 ## Testing (Vitest + Playwright)
 
 ```bash
-# Unit tests con coverage
+# Bucle local rápido: unitarias, componentes e integración
+pnpm test
+
+# Capas individuales
 pnpm test:unit
+pnpm test:component
+pnpm test:integration
+
+# Coverage conjunto
+pnpm test:coverage
 
 # Instalar navegador E2E (una vez)
 pnpm test:e2e:install
@@ -122,17 +130,20 @@ pnpm test:e2e:install
 # E2E tests
 pnpm test:e2e
 
-# Suite completa
-pnpm test
 ```
 
 Estructura de tests:
 
 - `src/lib/finance-core.ts`: lógica financiera pura (unit testing)
 - `tests/unit/finance-core.test.ts`: pruebas unitarias de cálculos
+- `tests/component/`: contratos y estados visibles de componentes Vue
+- `tests/integration/`: repositorios, migraciones y SQLite real
 - `tests/e2e/pages/FinanceTrackerPage.ts`: Page Object Model
 - `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
 - `playwright.config.ts`: configuración de E2E y `webServer`
+
+La estrategia de Vitest y sus comandos están documentados en
+[`docs/testing.md`](docs/testing.md).
 
 ## Reportes web y automatización opcional
 

@@ -40,8 +40,8 @@ jobs:
         run: pnpm lint
       - name: Astro check
         run: pnpm check
-      - name: Unit tests
-        run: pnpm test:unit
+      - name: Vitest coverage
+        run: pnpm test:coverage
       - name: D1 v2 integration tests (WP5 tier)
         run: pnpm test:integration
       - name: Verify local D1 migrations apply cleanly (v1 + v2)
