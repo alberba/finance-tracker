@@ -23,7 +23,7 @@ export default defineConfig({
         'src/lib/client/types.ts',
         'src/lib/server/types.ts',
       ],
-      reporter: ['text', 'html', 'json-summary'],
+      reporter: process.env.CI ? ['text', 'json-summary'] : ['text', 'html', 'json-summary'],
       all: true,
       thresholds: {
         lines: 29,
