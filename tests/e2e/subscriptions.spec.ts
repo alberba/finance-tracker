@@ -19,7 +19,13 @@ test.describe('suscripciones de gastos', () => {
     })
 
     await expect(editor).toBeVisible()
-    await expect(subscriptions.getByText(/activas/)).toBeVisible()
+    await expect(
+      subscriptions.getByLabel('Resumen de suscripciones').getByText(/activas/),
+    ).toBeVisible()
+    await expect(
+      subscriptions.getByRole('heading', { name: 'Análisis de suscripciones' }),
+    ).toBeVisible()
+    await expect(subscriptions.getByText('Activa o añade una suscripción')).toBeVisible()
     await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
     await expect(subscriptions.getByLabel('Nombre')).toHaveAttribute('required', '')
     await expect(subscriptions.getByLabel('Categoría')).toHaveValue('Suscripciones')
@@ -31,6 +37,7 @@ test.describe('suscripciones de gastos', () => {
       subscriptions.getByLabel('Nombre'),
       subscriptions.getByLabel('Importe'),
       subscriptions.getByLabel('Cuenta'),
+      subscriptions.getByRole('heading', { name: 'Análisis de suscripciones' }),
       subscriptions.getByRole('button', { name: 'Añadir suscripción' }),
     ]
     for (const control of mobileControls) {
@@ -55,6 +62,12 @@ test.describe('suscripciones de gastos', () => {
       firstChargeDate: today,
     })
 
+    const analysis = tracker.transactionsSection.getByRole('region', {
+      name: 'Análisis de suscripciones',
+    })
+    await expect(analysis.getByText('Coste mensual equivalente')).toBeVisible()
+    await expect(analysis.getByText('14,99 €', { exact: true })).toBeVisible()
+    await expect(analysis.getByText('179,88 €', { exact: true })).toBeVisible()
     await expect(page.getByRole('status')).toContainText('gasto generado')
     await tracker.openTransactions()
     await expect(
