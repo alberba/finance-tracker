@@ -17,6 +17,7 @@ export interface StockEventsTransactionPayload {
   feesAmount?: number
   feesCurrency?: string
   notes?: string
+  toCash?: boolean
   type: string
 }
 
@@ -72,9 +73,10 @@ async function stockEventsFetch(
     if (response.status === 204) {
       return null
     }
-    const body = (await response.json().catch(() => null)) as
-      | { data?: unknown; error?: { code?: string; message?: string } }
-      | null
+    const body = (await response.json().catch(() => null)) as {
+      data?: unknown
+      error?: { code?: string; message?: string }
+    } | null
     if (!response.ok) {
       throw new StockEventsApiError(describeApiError(response.status, body?.error), response.status)
     }
@@ -132,7 +134,11 @@ export async function listWatchlistSymbols(
   return data
     .map((entry) => {
       const raw = (entry || {}) as Record<string, unknown>
-      return raw.isDeleted === true ? '' : String(raw.symbol || '').trim().toUpperCase()
+      return raw.isDeleted === true
+        ? ''
+        : String(raw.symbol || '')
+            .trim()
+            .toUpperCase()
     })
     .filter(Boolean)
 }

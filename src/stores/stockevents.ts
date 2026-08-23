@@ -35,6 +35,10 @@ export interface StockEventsSymbolRow {
   checkResult: SymbolCheckResult | null
 }
 
+export interface StockEventsSyncOptions {
+  toCash?: boolean
+}
+
 export const useStockEventsStore = defineStore('stockEvents', () => {
   const financialStateStore = useFinancialStateStore()
   const { showToast } = useToast()
@@ -46,6 +50,11 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   const checkResults = shallowRef<Record<string, SymbolCheckResult>>({})
 
   const settings = computed(() => financialStateStore.state.stockEvents)
+  const isConnected = computed(() => settings.value.enabled && Boolean(settings.value.apiKey))
+
+  function canSyncSymbol(symbol: string): boolean {
+    return isConnected.value && Boolean(findSyncedMapping(settings.value, symbol))
+  }
 
   const trackedSymbols = computed(() => {
     const symbols = new Set<string>()
@@ -165,7 +174,9 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
       checkResults.value = Object.fromEntries(
         results.map((result, index) => [rows[index]?.symbol || result.symbol, result]),
       )
-      const failed = results.filter((result) => result.status === 'not-detected' || result.status === 'error')
+      const failed = results.filter(
+        (result) => result.status === 'not-detected' || result.status === 'error',
+      )
       showToast(
         failed.length
           ? `Comprobación completada: ${failed.length} símbolo(s) con problemas.`
@@ -183,10 +194,18 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
    * Fire-and-forget sync of a freshly created investment movement. Never
    * blocks the local save: failures only surface as a toast.
    */
-  async function syncMovement(tx: Transaction): Promise<void> {
+  async function syncMovement(
+    tx: Transaction,
+    options: StockEventsSyncOptions = {},
+  ): Promise<void> {
     const mapping = findSyncedMapping(settings.value, tx.symbol)
     if (!mapping) return
-    const payload = buildStockEventsTransactionPayload(tx, mapping.watchlistId, mapping.targetSymbol)
+    const payload = buildStockEventsTransactionPayload(
+      tx,
+      mapping.watchlistId,
+      mapping.targetSymbol,
+      options.toCash,
+    )
     if (!payload) return
     try {
       await createStockEventsTransaction(settings.value.apiKey, payload)
@@ -200,11 +219,13 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   return {
     settings,
+    isConnected,
     watchlists,
     isLoadingWatchlists,
     isChecking,
     connectionError,
     symbolRows,
+    canSyncSymbol,
     saveApiKey,
     setEnabled,
     updateMapping,

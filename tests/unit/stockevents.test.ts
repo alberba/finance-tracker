@@ -64,9 +64,18 @@ describe('payload de transacción para Stock Events', () => {
     expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1', '  ')?.symbol).toBe('VWCE')
   })
 
+  it('incluye la operación de efectivo sólo cuando se solicita', () => {
+    expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1')).not.toHaveProperty('toCash')
+    expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1', '', true)).toMatchObject({
+      toCash: true,
+    })
+  })
+
   it('rechaza movimientos sin datos válidos', () => {
     expect(buildStockEventsTransactionPayload({ ...buyMovement, units: 0 }, 'wl-1')).toBeNull()
-    expect(buildStockEventsTransactionPayload({ ...buyMovement, symbol: undefined }, 'wl-1')).toBeNull()
+    expect(
+      buildStockEventsTransactionPayload({ ...buyMovement, symbol: undefined }, 'wl-1'),
+    ).toBeNull()
     expect(buildStockEventsTransactionPayload(buyMovement, '')).toBeNull()
   })
 })
@@ -230,7 +239,8 @@ describe('creación de transacciones en Stock Events', () => {
     expect(
       calls.some((call) => call.method === 'POST' && call.url.endsWith('/watchlists/wl-1/symbols')),
     ).toBe(true)
-    const authHeader = (fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)?.Authorization
+    const authHeader = (fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>)
+      ?.Authorization
     expect(authHeader).toBe('Bearer se_live_x')
   })
 })

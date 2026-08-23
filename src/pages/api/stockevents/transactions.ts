@@ -30,7 +30,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
 function normalizePayload(value: unknown): StockEventsTransactionPayload | null {
   const raw = (value || {}) as Record<string, unknown>
   const watchlistId = String(raw.watchlistId || '').trim()
-  const symbol = String(raw.symbol || '').trim().toUpperCase()
+  const symbol = String(raw.symbol || '')
+    .trim()
+    .toUpperCase()
   const date = String(raw.date || '').trim()
   const change = Number(raw.change)
   const price = Number(raw.price)
@@ -48,7 +50,10 @@ function normalizePayload(value: unknown): StockEventsTransactionPayload | null 
     date,
     change,
     price,
-    priceCurrency: String(raw.priceCurrency || 'EUR').trim().toUpperCase().slice(0, 3),
+    priceCurrency: String(raw.priceCurrency || 'EUR')
+      .trim()
+      .toUpperCase()
+      .slice(0, 3),
     ...(Number.isFinite(feesAmount) && feesAmount > 0
       ? {
           feesAmount,
@@ -59,6 +64,7 @@ function normalizePayload(value: unknown): StockEventsTransactionPayload | null 
         }
       : {}),
     ...(notes ? { notes } : {}),
+    ...(raw.toCash === true ? { toCash: true } : {}),
     type: String(raw.type || (change < 0 ? 'sell' : 'buy')).trim(),
   }
 }

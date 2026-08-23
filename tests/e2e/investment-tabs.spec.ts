@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { test, expect, mirrorStateToServer } from "./fixtures";
 
 test.describe("inversión tabs y TWR", () => {
   test("inversión muestra 3 subpestañas y alterna vistas", async ({
@@ -45,6 +45,123 @@ test.describe("inversión tabs y TWR", () => {
     expect(
       operations.every((value) => value === "Compra" || value === "Venta"),
     ).toBe(true);
+  });
+
+  test("permite descontar una compra del efectivo de Stock Events", async ({
+    tracker,
+    page,
+  }) => {
+    await tracker.openInvestmentMovementsTab();
+    await expect(
+      tracker.investmentSection().locator("#investment-movement-to-cash"),
+    ).toHaveCount(0);
+
+    let syncedTransaction: Record<string, unknown> | undefined;
+    await page.route("**/api/stockevents/transactions", async (route) => {
+      const body = route.request().postDataJSON() as {
+        transaction?: Record<string, unknown>;
+      };
+      syncedTransaction = body.transaction;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          transaction: {
+            id: "se-cash-1",
+            watchlistId: "wl-etf",
+            symbol: "CASHBUY",
+          },
+        }),
+      });
+    });
+
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) {
+        throw new Error("No se encontró el estado financiero inicial");
+      }
+      const state = JSON.parse(raw);
+      state.stockEvents = {
+        enabled: true,
+        apiKey: "test-stock-events-key",
+        symbolMappings: [
+          {
+            symbol: "CASHBUY",
+            sync: true,
+            watchlistId: "wl-etf",
+            targetSymbol: "",
+            hidden: false,
+          },
+        ],
+      };
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await tracker.openInvestmentMovementsTab();
+    await tracker
+      .investmentSection()
+      .locator("#investment-movement-symbol")
+      .fill("CASHBUY");
+
+    await expect(
+      tracker.investmentSection().getByRole("checkbox", {
+        name: "Descontar del efectivo en Stock Events",
+      }),
+    ).toBeVisible();
+
+    await tracker.addInvestmentMovement({
+      date: "2026-07-19",
+      time: "10:04",
+      side: "buy",
+      symbol: "CASHBUY",
+      category: "Fondos Indexados",
+      unitPrice: 50,
+      units: 2,
+      fee: 1,
+      brokerName: "Revolut",
+      stockEventsCash: true,
+    });
+
+    await expect.poll(() => syncedTransaction).toMatchObject({
+      watchlistId: "wl-etf",
+      symbol: "CASHBUY",
+      change: 2,
+      price: 50,
+      feesAmount: 1,
+      toCash: true,
+      type: "buy",
+    });
+  });
+
+  test("no ofrece ajustar efectivo para símbolos sin mapeo activo", async ({
+    tracker,
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) throw new Error("No se encontró el estado financiero inicial");
+      const state = JSON.parse(raw);
+      state.stockEvents = {
+        enabled: true,
+        apiKey: "test-stock-events-key",
+        symbolMappings: [],
+      };
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await tracker.openInvestmentMovementsTab();
+
+    await tracker
+      .investmentSection()
+      .locator("#investment-movement-symbol")
+      .fill("UNMAPPED");
+
+    await expect(
+      tracker.investmentSection().locator("#investment-movement-to-cash"),
+    ).toHaveCount(0);
   });
 
   test("editar y eliminar en movimientos de inversión se refleja en movimientos generales", async ({

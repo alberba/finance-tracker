@@ -5,8 +5,10 @@ import { computeInvestmentMovement } from '../../scripts/investment-movements'
 import { todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useInvestmentStore } from '../../stores/investment'
+import { useStockEventsStore } from '../../stores/stockevents'
 
 const investmentStore = useInvestmentStore()
+const stockEventsStore = useStockEventsStore()
 const financialStateStore = useFinancialStateStore()
 
 function nowTime(): string {
@@ -26,12 +28,14 @@ const form = reactive({
   movementCurrency: 'EUR',
   accountId: '',
   declared: false,
+  toCash: false,
 })
 
 const isBitvavo = computed(() => investmentStore.isBitvavoBrokerAccount(form.accountId))
 const categoryOptions = computed(() =>
   isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories,
 )
+const canSyncMovement = computed(() => stockEventsStore.canSyncSymbol(form.symbol))
 
 const computedTotal = computed(() => {
   const computed = computeInvestmentMovement({
@@ -55,6 +59,9 @@ function syncCategoryForBroker(): void {
 }
 
 watch(() => form.accountId, syncCategoryForBroker)
+watch(canSyncMovement, (canSync) => {
+  if (!canSync) form.toCash = false
+})
 
 function resetDefaults(keep: Partial<typeof form> = {}): void {
   form.symbol = ''
@@ -62,6 +69,7 @@ function resetDefaults(keep: Partial<typeof form> = {}): void {
   form.units = ''
   form.fee = '0'
   form.declared = false
+  form.toCash = false
   Object.assign(form, keep)
   syncCategoryForBroker()
 }
@@ -87,6 +95,7 @@ function onSubmit(): void {
     movementCurrency: form.movementCurrency,
     accountId: form.accountId,
     declared: form.declared,
+    toCash: form.toCash,
   })
   if (added) {
     resetDefaults({
@@ -186,7 +195,13 @@ function onSubmit(): void {
       </label>
       <label>
         Gasto (incl. comisión)
-        <input id="investment-movement-total" :value="computedTotal" name="total" type="number" readonly />
+        <input
+          id="investment-movement-total"
+          :value="computedTotal"
+          name="total"
+          type="number"
+          readonly
+        />
       </label>
       <label>
         Moneda
@@ -216,7 +231,42 @@ function onSubmit(): void {
         />
         Declarado
       </label>
+      <label
+        v-if="canSyncMovement"
+        class="investment-declared-field investment-cash-field"
+      >
+        <input
+          id="investment-movement-to-cash"
+          v-model="form.toCash"
+          name="toCash"
+          type="checkbox"
+        />
+        <span>
+          {{
+            form.side === 'sell'
+              ? 'Añadir al efectivo en Stock Events'
+              : 'Descontar del efectivo en Stock Events'
+          }}
+        </span>
+      </label>
       <button type="submit" class="primary-btn">Guardar movimiento</button>
     </form>
   </article>
 </template>
+
+<style scoped>
+.investment-cash-field {
+  grid-column: span 2;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+}
+
+@media (max-width: 720px) {
+  .investment-cash-field {
+    grid-column: 1 / -1;
+  }
+}
+</style>
