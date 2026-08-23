@@ -19,7 +19,7 @@ export type TxSortColumn =
   | "description";
 export type SortDirection = "asc" | "desc";
 export type InvestmentSubTab = "dashboard" | "movements" | "contributions" | "recurring";
-export type TransactionsSubTab = "registry" | "subscriptions";
+export type TransactionsSubTab = "registry" | "subscriptions" | "analysis";
 export type SnapshotKind = "accounts" | "investments" | "liabilities";
 export type EntityKey = "accounts" | "investmentAssets" | "liabilities";
 export type InstrumentType = "stock" | "etf" | "fund" | "crypto";

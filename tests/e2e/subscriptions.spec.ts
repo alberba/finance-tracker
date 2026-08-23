@@ -107,6 +107,76 @@ test.describe('suscripciones de gastos', () => {
     ).toHaveCount(1)
   })
 
+  test('analiza el compromiso recurrente en una página responsive', async ({
+    page,
+    tracker,
+  }) => {
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('finance-tracker-state-v1')
+      if (!raw) throw new Error('No se encontró el estado local')
+      const state = JSON.parse(raw)
+      state.subscriptions = [
+        {
+          id: 'analysis-monthly',
+          name: 'Streaming análisis',
+          amount: 10,
+          accountId: 'revolut',
+          category: 'Ocio',
+          frequency: 'monthly',
+          startDate: '2026-01-01',
+          nextChargeDate: '2026-08-20',
+          active: true,
+        },
+        {
+          id: 'analysis-yearly',
+          name: 'Nube análisis',
+          amount: 120,
+          accountId: 'santander',
+          category: 'Software',
+          frequency: 'yearly',
+          startDate: '2026-01-01',
+          nextChargeDate: '2026-10-01',
+          active: true,
+        },
+        {
+          id: 'analysis-paused',
+          name: 'Gimnasio pausado',
+          amount: 30,
+          accountId: 'revolut',
+          category: 'Salud',
+          frequency: 'quarterly',
+          startDate: '2026-01-01',
+          nextChargeDate: '2026-09-01',
+          active: false,
+        },
+      ]
+      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
+    })
+    await mirrorStateToServer(page)
+    await tracker.reload()
+    await tracker.openTransactions()
+    await tracker.transactionsSection.getByRole('tab', { name: 'Análisis' }).click()
+
+    const analysis = tracker.transactionsSection.locator('#transactions-tab-analysis')
+    await expect(analysis.getByRole('heading', { name: 'Radar de suscripciones' })).toBeVisible()
+    await expect(analysis.locator('.analysis-metric', { hasText: 'Compromiso mensual' })).toContainText(
+      '20,00',
+    )
+    await expect(analysis.locator('.analysis-metric', { hasText: 'Proyección anual' })).toContainText(
+      '240,00',
+    )
+    await expect(analysis.getByText('Revolut')).toBeVisible()
+    await expect(
+      analysis.locator('.analysis-ranking').getByText('Streaming análisis'),
+    ).toBeVisible()
+
+    await page.setViewportSize({ width: 375, height: 812 })
+    await expect(analysis).toBeVisible()
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true)
+  })
+
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {
     const today = new Date().toISOString().slice(0, 10)
     const pausedDate = addDays(today, -10)

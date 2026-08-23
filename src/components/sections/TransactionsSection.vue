@@ -12,6 +12,7 @@ import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 import DashboardPeriodField from '../dashboard/DashboardPeriodField.vue'
 import TransactionsSubscriptionsTab from '../transactions/TransactionsSubscriptionsTab.vue'
+import SubscriptionAnalysisPage from '../transactions/SubscriptionAnalysisPage.vue'
 import PendingMovementsPanel from '../recurring/PendingMovementsPanel.vue'
 
 withDefaults(
@@ -116,6 +117,7 @@ onBeforeUnmount(() => {
     <div class="flex w-fit rounded-lg border border-(--border) bg-(--panel) p-1" role="tablist" aria-label="Subsecciones de movimientos">
       <button id="transactions-tab-registry-button" type="button" role="tab" :aria-selected="ui.txTab === 'registry'" aria-controls="transactions-tab-registry" class="rounded-md px-3 py-1.5 text-sm font-semibold transition" :class="ui.txTab === 'registry' ? 'bg-(--primary) text-white' : 'text-(--text-muted)'" @click="setTab('registry')">Registro</button>
       <button id="transactions-tab-subscriptions-button" type="button" role="tab" :aria-selected="ui.txTab === 'subscriptions'" aria-controls="transactions-tab-subscriptions" class="rounded-md px-3 py-1.5 text-sm font-semibold transition" :class="ui.txTab === 'subscriptions' ? 'bg-(--primary) text-white' : 'text-(--text-muted)'" @click="setTab('subscriptions')">Suscripciones</button>
+      <button id="transactions-tab-analysis-button" type="button" role="tab" :aria-selected="ui.txTab === 'analysis'" aria-controls="transactions-tab-analysis" class="rounded-md px-3 py-1.5 text-sm font-semibold transition" :class="ui.txTab === 'analysis' ? 'bg-(--primary) text-white' : 'text-(--text-muted)'" @click="setTab('analysis')">Análisis</button>
     </div>
 
     <div id="transactions-tab-registry" role="tabpanel" :hidden="ui.txTab !== 'registry'" aria-labelledby="transactions-tab-registry-button">
@@ -128,5 +130,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <TransactionsSubscriptionsTab :is-active="ui.txTab === 'subscriptions'" />
+    <SubscriptionAnalysisPage
+      :is-active="ui.txTab === 'analysis'"
+      :subscriptions="movementsStore.subscriptions"
+      :accounts="movementsStore.accounts"
+    />
   </AppSection>
 </template>
