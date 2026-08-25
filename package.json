@@ -17,6 +17,7 @@
     "migrate:validate-parity": "tsx scripts/validate-migration-parity.ts",
     "dev": "astro dev",
     "build": "astro build",
+    "deploy:worker": "pnpm build && wrangler deploy --config dist/server/wrangler.json",
     "audit:prod": "pnpm audit --prod --audit-level high",
     "benchmark:performance": "node scripts/benchmark-performance.mjs",
     "preview": "astro preview",
