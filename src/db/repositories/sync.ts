@@ -4,7 +4,7 @@
  * the idempotent command log, and the entity-change log.
  */
 
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { syncChanges, syncCommands, userRevisions } from "../schema";
 import { nowIso, type Db } from "./shared";
 
@@ -126,6 +126,29 @@ export async function finalizeCommand(
     .where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)))
     .returning();
   return row;
+}
+
+/** Atomically acquires a stale processing reservation for recovery. */
+export async function claimStaleCommand(
+  db: Db,
+  userId: string,
+  id: string,
+  previousCreatedAt: string,
+  staleBefore: string,
+): Promise<boolean> {
+  if (previousCreatedAt > staleBefore) return false;
+  const rows = await db
+    .update(syncCommands)
+    .set({ createdAt: nowIso() })
+    .where(and(
+      eq(syncCommands.id, id),
+      eq(syncCommands.userId, userId),
+      eq(syncCommands.status, "processing"),
+      isNull(syncCommands.result),
+      eq(syncCommands.createdAt, previousCreatedAt),
+    ))
+    .returning({ id: syncCommands.id });
+  return rows.length === 1;
 }
 
 export async function remove(db: Db, userId: string, id: string): Promise<boolean> {

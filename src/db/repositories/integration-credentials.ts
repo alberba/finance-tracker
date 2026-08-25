@@ -100,6 +100,15 @@ export async function getByProvider(
   return row ? toPublicRow(env, row) : undefined;
 }
 
+/** Checks existence without decrypting or exposing credential material. */
+export async function hasProvider(db: Db, userId: string, provider: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: integrationCredentials.id })
+    .from(integrationCredentials)
+    .where(and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)));
+  return row !== undefined;
+}
+
 export async function create(
   db: Db,
   userId: string,

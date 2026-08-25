@@ -5,6 +5,7 @@ import {
   clearEntityStore,
   getAllEntities,
   getCachedSettings,
+  getCachedBootstrap,
   getEntity,
   getRevision,
   openIdbCache,
@@ -13,6 +14,7 @@ import {
   removeEntity,
   replaceEntities,
   setCachedSettings,
+  setCachedBootstrap,
   setRevision,
   wipeIdbCache,
 } from "../../src/lib/client/idb-cache";
@@ -90,6 +92,14 @@ describe("idb-cache", () => {
     expect(await getCachedSettings(db)).toBeNull();
     await setCachedSettings(db, { currency: "EUR" });
     expect(await getCachedSettings(db)).toEqual({ currency: "EUR" });
+    db.close();
+  });
+
+  it("persists the complete bootstrap for offline hydration", async () => {
+    const db = await openIdbCache(USER_ID);
+    expect(await getCachedBootstrap(db)).toBeNull();
+    await setCachedBootstrap(db, { revision: 4, accounts: [{ id: "acc-1" }] });
+    expect(await getCachedBootstrap(db)).toEqual({ revision: 4, accounts: [{ id: "acc-1" }] });
     db.close();
   });
 

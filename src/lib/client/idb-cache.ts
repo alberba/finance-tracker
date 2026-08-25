@@ -19,6 +19,7 @@ const DB_VERSION = 1;
 const META_STORE = "__meta";
 const REVISION_KEY = "revision";
 const SETTINGS_KEY = "settings";
+const BOOTSTRAP_KEY = "bootstrap";
 
 export interface CachedEntity {
   id: string;
@@ -176,6 +177,21 @@ export async function getCachedSettings<T = unknown>(db: IDBDatabase): Promise<T
 export async function setCachedSettings<T = unknown>(db: IDBDatabase, settings: T): Promise<void> {
   const tx = db.transaction(META_STORE, "readwrite");
   tx.objectStore(META_STORE).put({ key: SETTINGS_KEY, value: settings });
+  await txDone(tx);
+}
+
+export async function getCachedBootstrap<T = unknown>(db: IDBDatabase): Promise<T | null> {
+  const tx = db.transaction(META_STORE, "readonly");
+  const row = await requestToPromise(
+    tx.objectStore(META_STORE).get(BOOTSTRAP_KEY) as IDBRequest<{ key: string; value: T } | undefined>,
+  );
+  await txDone(tx);
+  return row?.value ?? null;
+}
+
+export async function setCachedBootstrap<T = unknown>(db: IDBDatabase, bootstrap: T): Promise<void> {
+  const tx = db.transaction(META_STORE, "readwrite");
+  tx.objectStore(META_STORE).put({ key: BOOTSTRAP_KEY, value: bootstrap });
   await txDone(tx);
 }
 

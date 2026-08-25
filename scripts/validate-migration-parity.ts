@@ -16,7 +16,6 @@ import { openLocalV2Db, readV1StateFromJsonFile, readV1StateFromLocalSqlite } fr
 import { computeV1Parity, diffParity } from "./lib/migration-parity";
 import { computeV2Parity } from "./lib/migration-v2-read";
 import { normalizeState } from "../src/scripts/state";
-import type { DataEncryptionEnv } from "../src/lib/server/crypto/data-encryption";
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -49,14 +48,8 @@ async function main(): Promise<void> {
       userId = user.id;
     }
 
-    const env: DataEncryptionEnv = {
-      DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
-      DATA_ENCRYPTION_KEY_PREVIOUS: process.env.DATA_ENCRYPTION_KEY_PREVIOUS,
-      DATA_ENCRYPTION_KEY_VERSION: process.env.DATA_ENCRYPTION_KEY_VERSION,
-    };
-
     const v1Parity = computeV1Parity(state);
-    const v2Parity = await computeV2Parity(db, userId, state.year, env);
+    const v2Parity = await computeV2Parity(db, userId, state.year);
     const discrepancies = diffParity(v1Parity, v2Parity);
 
     if (discrepancies.length === 0) {

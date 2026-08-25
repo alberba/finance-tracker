@@ -43,6 +43,7 @@ import {
 } from "./command-schemas";
 
 export type CommandStatus = "applied" | "conflict" | "not_found" | "noop";
+const PROCESSING_LEASE_MS = 30_000;
 
 export interface CommandOutcome {
   commandId: string;
@@ -60,6 +61,34 @@ interface VersionedRow {
   id: string;
   version: number;
   [key: string]: unknown;
+}
+
+async function findByLegacyId(
+  db: Db,
+  userId: string,
+  entityType: SyncEntityType,
+  value: unknown,
+): Promise<VersionedRow | undefined> {
+  if (typeof value !== "string" || !value) return undefined;
+  let rows: VersionedRow[] = [];
+  switch (entityType) {
+    case "account": rows = await accountsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "category": rows = await accountsRepository.listCategoriesByUser(db, userId) as VersionedRow[]; break;
+    case "transaction": rows = await transactionsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "subscription": rows = await subscriptionsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "recurringRule": rows = await recurringRulesRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "pendingMovement": rows = await pendingMovementsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "budgetEntry": rows = await budgetEntriesRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "goal": rows = await goalsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "contribution": rows = await contributionsRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "wealthSnapshot": rows = await wealthRepository.listByUser(db, userId) as VersionedRow[]; break;
+    case "userInstrument": return undefined;
+  }
+  return rows.find((row) => row.legacyId === value);
+}
+
+function includesPatch(row: VersionedRow, patch: Record<string, unknown>): boolean {
+  return Object.entries(patch).every(([key, value]) => JSON.stringify(row[key]) === JSON.stringify(value));
 }
 
 /** Looks up + version-checks an entity, returning its current row (or a not-found/conflict signal). */
@@ -257,6 +286,10 @@ async function performMutation(
     case "create": {
       const schema = entityCreateSchemas[command.entityType];
       const parsed = schema.parse(command.data);
+      const existing = await findByLegacyId(
+        db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
+      );
+      if (existing) return { status: "noop", entityType: command.entityType, entityId: existing.id, entity: existing };
       const row = await createEntity(db, userId, command.entityType, parsed);
       const revision = await recordChange(db, userId, command.entityType, row.id, "create", row);
       return {
@@ -279,6 +312,9 @@ async function performMutation(
         };
       }
       if (existing.version !== command.baseVersion) {
+        if (includesPatch(existing, command.patch)) {
+          return { status: "noop", entityType: command.entityType, entityId: existing.id, entity: existing };
+        }
         return {
           status: "conflict",
           entityType: command.entityType,
@@ -427,6 +463,13 @@ async function reserveCommand(
 ): Promise<CommandOutcome | null> {
   const existing = await syncRepository.getCommand(db, userId, command.commandId);
   if (existing) {
+    if (!existing.result) {
+      const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS).toISOString();
+      const claimed = await syncRepository.claimStaleCommand(
+        db, userId, command.commandId, existing.createdAt, staleBefore,
+      );
+      if (claimed) return null;
+    }
     return replayStoredCommand(command.commandId, existing);
   }
   try {

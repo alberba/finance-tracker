@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
 import * as accountsRepository from "../../../../src/db/repositories/accounts";
+import * as syncRepository from "../../../../src/db/repositories/sync";
+import { syncCommands } from "../../../../src/db/schema";
+import { eq } from "drizzle-orm";
 import { applyOneCommand } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
@@ -122,6 +125,30 @@ describe("POST /api/sync", () => {
     // Only one account was ever created — the replay did not duplicate the mutation.
     const accounts = await accountsRepository.listByUser(testDb.db, principal.userId);
     expect(accounts).toHaveLength(1);
+  });
+
+  it("recovers a stale processing create without duplicating a partially applied entity", async () => {
+    const commandId = "recover-partial-create";
+    const legacyId = "local-account-recovery";
+    await accountsRepository.create(testDb.db, principal.userId, {
+      legacyId, name: "Ya aplicada", kind: "cash", currency: "EUR", openingBalance: 25,
+    });
+    await syncRepository.createCommand(testDb.db, principal.userId, {
+      id: commandId, commandType: "create", status: "processing", result: null,
+      payload: JSON.stringify({ commandId }),
+    });
+    await testDb.db.update(syncCommands)
+      .set({ createdAt: "2000-01-01T00:00:00.000Z" })
+      .where(eq(syncCommands.id, commandId));
+
+    const outcome = await applyOneCommand(testDb.db, principal.userId, {
+      commandId, action: "create", entityType: "account",
+      data: { legacyId, name: "Ya aplicada", kind: "cash", currency: "EUR", openingBalance: 25 },
+    });
+
+    expect(outcome.status).toBe("noop");
+    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(1);
+    expect((await syncRepository.getCommand(testDb.db, principal.userId, commandId))?.result).not.toBeNull();
   });
 
   it("applies a concurrently repeated commandId at most once", async () => {

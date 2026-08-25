@@ -75,6 +75,17 @@ function pad2(value: number): string {
   return String(value).padStart(2, "0");
 }
 
+function dateWithLegacyMonth(date: string, month: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(.*)$/.exec(date);
+  if (!match || month < 0 || month > 11) return date;
+
+  const year = Number(match[1]);
+  const sourceDay = Number(match[3]);
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(Math.max(sourceDay, 1), lastDay);
+  return `${match[1]}-${pad2(month + 1)}-${pad2(day)}${match[4]}`;
+}
+
 export async function runMigration(db: Db, state: State, options: RunMigrationOptions): Promise<MigrationReport> {
   try {
     return await runInTransaction(db, async (tx) => applyMigration(tx, state, options));
@@ -331,6 +342,14 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
       if (!v2CategoryId) {
         anomaly("transactions", tx.id, `Category '${tx.category}' (${tx.type}) not found; categoryId left null.`);
       }
+      const canonicalDate = dateWithLegacyMonth(tx.date, tx.month);
+      if (canonicalDate !== tx.date) {
+        anomaly(
+          "transactions",
+          tx.id,
+          `Date '${tx.date}' disagrees with legacy month ${tx.month}; normalized to '${canonicalDate}'.`,
+        );
+      }
       toInsert.push({
         legacyId: tx.id,
         input: {
@@ -338,7 +357,7 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
           accountId: v2AccountId,
           categoryId: v2CategoryId,
           type: tx.type,
-          date: tx.date,
+          date: canonicalDate,
           description: tx.description,
           amount: tx.amount,
           currency: state.currency,
@@ -762,8 +781,7 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
     counts.integrationCredentials.source = state.stockEvents.apiKey ? 1 : 0;
     if (state.stockEvents.apiKey) {
       const env = options.dataEncryptionEnv;
-      const existing = env ? await integrationCredentialsRepository.listByUser(db, userId, env) : [];
-      const alreadyMigrated = existing.some((c) => c.provider === "stockevents");
+      const alreadyMigrated = await integrationCredentialsRepository.hasProvider(db, userId, "stockevents");
       if (alreadyMigrated) {
         bump("integrationCredentials", "skippedExisting");
       } else if (!env?.DATA_ENCRYPTION_KEY) {
