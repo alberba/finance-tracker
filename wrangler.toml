@@ -1,5 +1,6 @@
 name = "finance-tracker"
 compatibility_date = "2026-02-23"
+compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "finance_tracker_db"
@@ -17,6 +18,12 @@ database_id = "5c310761-3066-41c4-9133-66ba39d1a65e"
 migrations_dir = "migrations-v2"
 
 [vars]
+AUTH_ENFORCED = "true"
+CF_ACCESS_AUD = "a794f12d18ea90cb8724a6fd4bde770add09ced87a1a34b191e7fd45d6b86d50"
+CF_ACCESS_TEAM_DOMAIN = "alberba.cloudflareaccess.com"
+GITHUB_OWNER = "alberba"
+GITHUB_REPO = "finance-tracker"
+LEGACY_OWNER_EMAIL = "albertsalomv@proton.me"
 MARKET_DATA_PROVIDER = "twelve-data"
 MARKET_QUOTE_STALE_MINUTES = "15"
 MARKET_QUOTE_CACHE_SECONDS = "300"
