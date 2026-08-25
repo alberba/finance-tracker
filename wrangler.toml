@@ -19,7 +19,11 @@ migrations_dir = "migrations-v2"
 
 [vars]
 AUTH_ENFORCED = "true"
-CF_ACCESS_AUD = "a794f12d18ea90cb8724a6fd4bde770add09ced87a1a34b191e7fd45d6b86d50"
+# Two Access applications guard this Worker, each with its own AUD tag: the
+# production hostname app ("Acceso albert") and the previews-only Worker
+# policy, which Cloudflare creates as a separate app. A token matching
+# either is accepted — see `parseAudiences` in src/lib/server/auth/jwks.ts.
+CF_ACCESS_AUD = "a794f12d18ea90cb8724a6fd4bde770add09ced87a1a34b191e7fd45d6b86d50,08d3b540b5204c3061e46086267417db34acb55634d73c491f132580c5860a04"
 CF_ACCESS_TEAM_DOMAIN = "alberba.cloudflareaccess.com"
 GITHUB_OWNER = "alberba"
 GITHUB_REPO = "finance-tracker"

@@ -34,6 +34,7 @@ declare global {
         MARKET_QUOTE_CACHE_SECONDS?: string;
         LEGACY_OWNER_EMAIL?: string;
         CF_ACCESS_TEAM_DOMAIN?: string;
+        /** Access Application AUD tag, or several comma-separated (production app + the previews-only Worker policy app). */
         CF_ACCESS_AUD?: string;
         /** Test-only principal injection (WP8) — see `src/middleware.ts`. Never set outside `.dev.vars`/CI. */
         TEST_AUTH_ENABLED?: string;

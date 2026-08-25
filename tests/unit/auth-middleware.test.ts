@@ -34,7 +34,7 @@ vi.mock("../../src/db/client", () => ({
   getDb: vi.fn(),
 }));
 
-import { verifyAccessJwt } from "../../src/lib/server/auth/jwks";
+import { parseAudiences, verifyAccessJwt } from "../../src/lib/server/auth/jwks";
 import { users, userIdentities } from "../../src/db/schema";
 import { resolvePrincipal, CF_ACCESS_PROVIDER } from "../../src/lib/server/auth/principal";
 import { getDb } from "../../src/db/client";
@@ -48,6 +48,26 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // jwks.ts — Cf-Access JWT verification
 // ---------------------------------------------------------------------------
+
+describe("parseAudiences", () => {
+  it("reads a single AUD tag", () => {
+    expect(parseAudiences("aud-123")).toEqual(["aud-123"]);
+  });
+
+  it("splits several comma-separated AUD tags, so one deployment can sit behind both the production and the previews-only Access app", () => {
+    expect(parseAudiences("aud-prod,aud-preview")).toEqual(["aud-prod", "aud-preview"]);
+  });
+
+  it("trims spaces and drops blanks, so a trailing comma cannot produce an empty audience", () => {
+    expect(parseAudiences(" aud-prod , , aud-preview ,")).toEqual(["aud-prod", "aud-preview"]);
+  });
+
+  it("returns an empty list for unset or blank values, which the middleware treats as unconfigured", () => {
+    expect(parseAudiences(undefined)).toEqual([]);
+    expect(parseAudiences("")).toEqual([]);
+    expect(parseAudiences(" , ")).toEqual([]);
+  });
+});
 
 describe("verifyAccessJwt", () => {
   it("returns sub/email for a valid token", async () => {
@@ -68,6 +88,23 @@ describe("verifyAccessJwt", () => {
         issuer: "https://team-valid.cloudflareaccess.com",
         audience: "aud-123",
       }),
+    );
+  });
+
+  it("forwards a list of audiences to jose, which accepts a token matching any of them", async () => {
+    vi.mocked(jose.jwtVerify).mockResolvedValue({
+      payload: { sub: "user-sub-2" },
+    } as never);
+
+    await verifyAccessJwt("preview.jwt.token", {
+      teamDomain: "team-multi.cloudflareaccess.com",
+      audience: ["aud-prod", "aud-preview"],
+    });
+
+    expect(jose.jwtVerify).toHaveBeenCalledWith(
+      "preview.jwt.token",
+      "fake-jwks",
+      expect.objectContaining({ audience: ["aud-prod", "aud-preview"] }),
     );
   });
 
