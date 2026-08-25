@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, onMounted, shallowRef } from 'vue'
 import type { Component } from 'vue'
 
 import type { SectionId } from '../scripts/types'
+import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
 import DashboardSection from './sections/DashboardSection.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
@@ -63,7 +64,12 @@ const props = withDefaults(
 )
 
 const uiStore = useUiStore()
+const stockEventsStore = useStockEventsStore()
 uiStore.setActiveSection(props.activeSection)
+
+onMounted(() => {
+  void stockEventsStore.initializeCredential()
+})
 
 const currentSection = computed(() => uiStore.ui.activeSection)
 const activeSectionComponent = computed(() => sectionComponents[currentSection.value])

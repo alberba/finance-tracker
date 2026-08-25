@@ -2,17 +2,17 @@
  * Per-command sync-command applier (WP4), consumed by `POST /api/sync`.
  *
  * Design (per `docs/migration/work-packages.md` WP4):
- * - Each command runs in its own D1 transaction (via `db.transaction()`,
- *   which `drizzle-orm/d1` and `drizzle-orm/better-sqlite3` both implement
- *   with real `BEGIN`/`COMMIT`/`ROLLBACK`/savepoints).
+ * - Each command is reserved before mutation, so concurrent replay of one
+ *   `commandId` is applied at most once. SQLite tests also wrap the remaining
+ *   writes in a transaction; D1 executes them sequentially because it has no
+ *   interactive multi-statement transaction API.
  * - Idempotent replay: `sync_commands.id` (the client's `commandId`) is the
  *   table's primary key. If a command with the same id was already
  *   processed, its stored `result` is returned verbatim — the mutation is
  *   never re-applied.
  * - Optimistic concurrency: `update`/`remove` commands carry `baseVersion`;
- *   if it doesn't match the entity's current `version` column, the command
- *   is rejected as a `conflict` (equivalent to an HTTP 409) and nothing is
- *   mutated. `POST /api/sync`'s batch loop halts on the first conflict.
+ *   the mutation itself includes `WHERE version = baseVersion` so two racing
+ *   command ids cannot both win. A mismatch is a conflict and the batch halts.
  * - Every successful mutation bumps the user's `user_revisions` cursor,
  *   appends a `sync_changes` row (what `GET /api/changes?since` walks), and
  *   an `audit_events` row.
@@ -132,46 +132,47 @@ async function updateEntity(
   entityId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see createEntity
   patch: any,
+  expectedVersion: number,
 ): Promise<VersionedRow | undefined> {
   switch (entityType) {
     case "account":
-      return (await accountsRepository.update(db, userId, entityId, patch)) as VersionedRow | undefined;
+      return (await accountsRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
     case "category":
-      return (await accountsRepository.updateCategory(db, userId, entityId, patch)) as
+      return (await accountsRepository.updateCategory(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "transaction":
-      return (await transactionsRepository.update(db, userId, entityId, patch)) as
+      return (await transactionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "subscription":
-      return (await subscriptionsRepository.update(db, userId, entityId, patch)) as
+      return (await subscriptionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "recurringRule":
-      return (await recurringRulesRepository.update(db, userId, entityId, patch)) as
+      return (await recurringRulesRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "pendingMovement":
-      return (await pendingMovementsRepository.update(db, userId, entityId, patch)) as
+      return (await pendingMovementsRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "budgetEntry":
-      return (await budgetEntriesRepository.update(db, userId, entityId, patch)) as
+      return (await budgetEntriesRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "goal":
-      return (await goalsRepository.update(db, userId, entityId, patch)) as VersionedRow | undefined;
+      return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
     case "contribution":
-      return (await contributionsRepository.update(db, userId, entityId, patch)) as
+      return (await contributionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "userInstrument":
-      return (await marketRepository.updateUserInstrument(db, userId, entityId, patch)) as
+      return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
     case "wealthSnapshot":
-      return (await wealthRepository.update(db, userId, entityId, patch)) as VersionedRow | undefined;
+      return (await wealthRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
   }
 }
 
@@ -180,30 +181,31 @@ async function removeEntity(
   userId: string,
   entityType: SyncEntityType,
   entityId: string,
+  expectedVersion: number,
 ): Promise<boolean> {
   switch (entityType) {
     case "account":
-      return accountsRepository.remove(db, userId, entityId);
+      return accountsRepository.remove(db, userId, entityId, expectedVersion);
     case "category":
-      return accountsRepository.removeCategory(db, userId, entityId);
+      return accountsRepository.removeCategory(db, userId, entityId, expectedVersion);
     case "transaction":
-      return transactionsRepository.remove(db, userId, entityId);
+      return transactionsRepository.remove(db, userId, entityId, expectedVersion);
     case "subscription":
-      return subscriptionsRepository.remove(db, userId, entityId);
+      return subscriptionsRepository.remove(db, userId, entityId, expectedVersion);
     case "recurringRule":
-      return recurringRulesRepository.remove(db, userId, entityId);
+      return recurringRulesRepository.remove(db, userId, entityId, expectedVersion);
     case "pendingMovement":
-      return pendingMovementsRepository.remove(db, userId, entityId);
+      return pendingMovementsRepository.remove(db, userId, entityId, expectedVersion);
     case "budgetEntry":
-      return budgetEntriesRepository.remove(db, userId, entityId);
+      return budgetEntriesRepository.remove(db, userId, entityId, expectedVersion);
     case "goal":
-      return goalsRepository.remove(db, userId, entityId);
+      return goalsRepository.remove(db, userId, entityId, expectedVersion);
     case "contribution":
-      return contributionsRepository.remove(db, userId, entityId);
+      return contributionsRepository.remove(db, userId, entityId, expectedVersion);
     case "userInstrument":
-      return marketRepository.removeUserInstrument(db, userId, entityId);
+      return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion);
     case "wealthSnapshot":
-      return wealthRepository.remove(db, userId, entityId);
+      return wealthRepository.remove(db, userId, entityId, expectedVersion);
   }
 }
 
@@ -287,7 +289,31 @@ async function performMutation(
       }
       const schema = entityUpdateSchemas[command.entityType];
       const parsed = schema.parse(command.patch);
-      const row = await updateEntity(db, userId, command.entityType, command.entityId, parsed);
+      const row = await updateEntity(
+        db,
+        userId,
+        command.entityType,
+        command.entityId,
+        parsed,
+        command.baseVersion,
+      );
+      if (!row) {
+        const current = await loadForMutation(db, userId, command.entityType, command.entityId);
+        return current
+          ? {
+              status: "conflict",
+              entityType: command.entityType,
+              entityId: command.entityId,
+              currentVersion: current.version,
+              message: "La entidad cambió mientras se aplicaba el comando.",
+            }
+          : {
+              status: "not_found",
+              entityType: command.entityType,
+              entityId: command.entityId,
+              message: "Entidad no encontrada.",
+            };
+      }
       const revision = await recordChange(
         db,
         userId,
@@ -324,7 +350,30 @@ async function performMutation(
           message: "La versión base no coincide con la versión actual del servidor.",
         };
       }
-      await removeEntity(db, userId, command.entityType, command.entityId);
+      const removed = await removeEntity(
+        db,
+        userId,
+        command.entityType,
+        command.entityId,
+        command.baseVersion,
+      );
+      if (!removed) {
+        const current = await loadForMutation(db, userId, command.entityType, command.entityId);
+        return current
+          ? {
+              status: "conflict",
+              entityType: command.entityType,
+              entityId: command.entityId,
+              currentVersion: current.version,
+              message: "La entidad cambió mientras se aplicaba el comando.",
+            }
+          : {
+              status: "not_found",
+              entityType: command.entityType,
+              entityId: command.entityId,
+              message: "Entidad no encontrada.",
+            };
+      }
       const revision = await recordChange(
         db,
         userId,
@@ -348,6 +397,59 @@ function isUniqueConstraintError(error: unknown): boolean {
   return /unique constraint|constraint failed|UNIQUE/i.test(message);
 }
 
+export class CommandInProgressError extends Error {
+  constructor(commandId: string) {
+    super(`El comando ${commandId} ya se está procesando.`);
+    this.name = "CommandInProgressError";
+  }
+}
+
+function replayStoredCommand(
+  commandId: string,
+  command: syncRepository.SyncCommandRow,
+): CommandOutcome {
+  if (!command.result) {
+    throw new CommandInProgressError(commandId);
+  }
+  const stored = JSON.parse(command.result) as Partial<CommandOutcome>;
+  return {
+    commandId,
+    replayed: true,
+    status: stored.status ?? "applied",
+    ...stored,
+  };
+}
+
+async function reserveCommand(
+  db: Db,
+  userId: string,
+  command: SyncCommandInput,
+): Promise<CommandOutcome | null> {
+  const existing = await syncRepository.getCommand(db, userId, command.commandId);
+  if (existing) {
+    return replayStoredCommand(command.commandId, existing);
+  }
+  try {
+    await syncRepository.createCommand(db, userId, {
+      id: command.commandId,
+      commandType: command.action,
+      payload: JSON.stringify(command),
+      status: "processing",
+      result: null,
+    });
+    return null;
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+    const raced = await syncRepository.getCommand(db, userId, command.commandId);
+    if (!raced) {
+      throw error;
+    }
+    return replayStoredCommand(command.commandId, raced);
+  }
+}
+
 /**
  * Applies a single sync command, honoring idempotent replay via
  * `sync_commands`'s primary key. Never throws for expected outcomes
@@ -358,40 +460,22 @@ export async function applyOneCommand(
   userId: string,
   command: SyncCommandInput,
 ): Promise<CommandOutcome> {
-  const existingCommand = await syncRepository.getCommand(db, userId, command.commandId);
-  if (existingCommand) {
-    const stored = existingCommand.result ? JSON.parse(existingCommand.result) : {};
-    return { commandId: command.commandId, replayed: true, status: stored.status ?? "applied", ...stored };
+  const replay = await reserveCommand(db, userId, command);
+  if (replay) {
+    return replay;
   }
 
-  try {
-    return await runInTransaction(db, async (tx) => {
-      const outcome = await performMutation(tx, userId, command);
-      await syncRepository.createCommand(tx, userId, {
-        id: command.commandId,
-        commandType: command.action,
-        payload: JSON.stringify(command),
-        status: outcome.status,
-        result: JSON.stringify(outcome),
-      });
-      return { commandId: command.commandId, replayed: false, ...outcome };
-    });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      // Raced with another request applying the same commandId concurrently.
-      const raced = await syncRepository.getCommand(db, userId, command.commandId);
-      if (raced) {
-        const stored = raced.result ? JSON.parse(raced.result) : {};
-        return {
-          commandId: command.commandId,
-          replayed: true,
-          status: stored.status ?? "applied",
-          ...stored,
-        };
-      }
-    }
-    throw error;
-  }
+  return runInTransaction(db, async (tx) => {
+    const outcome = await performMutation(tx, userId, command);
+    await syncRepository.finalizeCommand(
+      tx,
+      userId,
+      command.commandId,
+      outcome.status,
+      JSON.stringify(outcome),
+    );
+    return { commandId: command.commandId, replayed: false, ...outcome };
+  });
 }
 
 export interface SyncBatchResult {
@@ -401,8 +485,8 @@ export interface SyncBatchResult {
 }
 
 /**
- * Applies a batch of ≤5 commands, each in its own transaction (WP4 design
- * decision), halting on the first `conflict` outcome (fail-fast semantics —
+ * Applies a batch of ≤5 commands, halting on the first `conflict` outcome
+ * (fail-fast semantics —
  * the client must resolve the conflict before any later command in the
  * batch is considered).
  */

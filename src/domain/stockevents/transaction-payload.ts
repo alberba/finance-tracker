@@ -30,7 +30,7 @@ export function findSyncedMapping(
   settings: StockEventsSettings,
   symbol: string | undefined,
 ): StockEventsSymbolMapping | null {
-  if (!settings.enabled || !settings.apiKey || !symbol) {
+  if (!settings.enabled || !symbol) {
     return null
   }
   const normalized = symbol.trim().toUpperCase()

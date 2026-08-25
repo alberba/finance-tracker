@@ -110,6 +110,9 @@ test.describe("Settings E2E", () => {
     tracker,
     page,
   }) => {
+    await page.route("**/api/integrations/stockevents", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: '{"configured":true}' }),
+    );
     let releaseFirstWatchlistLoad: (() => void) | undefined;
     let markFirstWatchlistLoadRequested: (() => void) | undefined;
     const firstWatchlistLoadRequested = new Promise<void>((resolve) => {
@@ -154,7 +157,7 @@ test.describe("Settings E2E", () => {
       });
       state.stockEvents = {
         enabled: true,
-        apiKey: "test-stock-events-key",
+        apiKey: "",
         symbolMappings: [
           {
             symbol: "AGED",

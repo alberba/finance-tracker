@@ -148,7 +148,13 @@ export async function runInTransaction<T>(db: Db, fn: (db: Db) => Promise<T>): P
 export async function assertOwnedReferences(
   db: Db,
   userId: string,
-  refs: { accountId?: string | null; categoryId?: string | null; recurringRuleId?: string | null },
+  refs: {
+    accountId?: string | null;
+    categoryId?: string | null;
+    recurringRuleId?: string | null;
+    snapshotId?: string | null;
+    contributionId?: string | null;
+  },
 ): Promise<void> {
   if (refs.accountId) {
     const [account] = await db
@@ -177,6 +183,28 @@ export async function assertOwnedReferences(
       );
     if (!rule) {
       throw new Error("La regla recurrente indicada no existe o no pertenece al usuario.");
+    }
+  }
+  if (refs.snapshotId) {
+    const [snapshot] = await db
+      .select({ id: schema.wealthSnapshots.id })
+      .from(schema.wealthSnapshots)
+      .where(
+        and(eq(schema.wealthSnapshots.id, refs.snapshotId), eq(schema.wealthSnapshots.userId, userId)),
+      );
+    if (!snapshot) {
+      throw new Error("La instantánea indicada no existe o no pertenece al usuario.");
+    }
+  }
+  if (refs.contributionId) {
+    const [contribution] = await db
+      .select({ id: schema.contributions.id })
+      .from(schema.contributions)
+      .where(
+        and(eq(schema.contributions.id, refs.contributionId), eq(schema.contributions.userId, userId)),
+      );
+    if (!contribution) {
+      throw new Error("La aportación indicada no existe o no pertenece al usuario.");
     }
   }
 }

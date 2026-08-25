@@ -86,7 +86,7 @@ describe("wealth repository", () => {
           balance: 1,
           currency: "EUR",
         }),
-      ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
+      ).rejects.toThrow(/no existe o no pertenece/i);
     });
 
     it("enforces cross-user isolation", async () => {

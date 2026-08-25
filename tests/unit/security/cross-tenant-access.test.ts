@@ -4,6 +4,10 @@ import * as accountsRepository from "../../../src/db/repositories/accounts";
 import * as transactionsRepository from "../../../src/db/repositories/transactions";
 import * as subscriptionsRepository from "../../../src/db/repositories/subscriptions";
 import * as budgetEntriesRepository from "../../../src/db/repositories/budget-entries";
+import * as contributionsRepository from "../../../src/db/repositories/contributions";
+import * as marketRepository from "../../../src/db/repositories/market";
+import * as stockeventsSymbolMappingsRepository from "../../../src/db/repositories/stockevents-symbol-mappings";
+import * as wealthRepository from "../../../src/db/repositories/wealth";
 import { createTestDb, type TestDatabase } from "../../integration/d1-v2/setup";
 import { seedUser } from "../../integration/d1-v2/repositories/fixtures";
 
@@ -190,5 +194,116 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
         currency: "EUR",
       }),
     ).rejects.toThrow();
+  });
+
+  it("rejects another user's category in a tracked instrument", async () => {
+    const { db } = testDb;
+    const userA = await seedUser(db, "market-victim@example.com");
+    const userB = await seedUser(db, "market-attacker@example.com");
+    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+      name: "Cartera privada",
+      kind: "investment",
+    });
+    const instrument = await marketRepository.createInstrument(db, {
+      symbol: "SEC",
+      normalizedSymbol: "SEC",
+      provider: "test",
+      currency: "EUR",
+    });
+
+    await expect(
+      marketRepository.createUserInstrument(db, userB.id, {
+        instrumentId: instrument.id,
+        categoryId: categoryA.id,
+      }),
+    ).rejects.toThrow(/categoría/i);
+  });
+
+  it("rejects another user's snapshot and account in a snapshot balance", async () => {
+    const { db } = testDb;
+    const userA = await seedUser(db, "snapshot-victim@example.com");
+    const userB = await seedUser(db, "snapshot-attacker@example.com");
+    const accountA = await accountsRepository.create(db, userA.id, {
+      name: "Cuenta privada",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+    const snapshotA = await wealthRepository.create(db, userA.id, {
+      snapshotDate: "2026-08-01",
+      year: 2026,
+      month: 7,
+    });
+
+    await expect(
+      wealthRepository.createBalance(db, userB.id, {
+        snapshotId: snapshotA.id,
+        accountId: accountA.id,
+        balance: 500,
+        currency: "EUR",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects another user's contribution and account in an allocation", async () => {
+    const { db } = testDb;
+    const userA = await seedUser(db, "contribution-victim@example.com");
+    const userB = await seedUser(db, "contribution-attacker@example.com");
+    const accountA = await accountsRepository.create(db, userA.id, {
+      name: "Broker privado",
+      kind: "investment",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+    const contributionA = await contributionsRepository.create(db, userA.id, {
+      date: "2026-08-01",
+      amount: 100,
+      currency: "EUR",
+    });
+
+    await expect(
+      contributionsRepository.createAllocation(db, userB.id, {
+        contributionId: contributionA.id,
+        accountId: accountA.id,
+        amount: 100,
+        currency: "EUR",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("rejects another user's account in a TWR liquidity link", async () => {
+    const { db } = testDb;
+    const userA = await seedUser(db, "twr-victim@example.com");
+    const userB = await seedUser(db, "twr-attacker@example.com");
+    const accountA = await accountsRepository.create(db, userA.id, {
+      name: "Liquidez privada",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+
+    await expect(
+      accountsRepository.createTwrLiquidityAccount(db, userB.id, {
+        accountId: accountA.id,
+        name: "Referencia cruzada",
+      }),
+    ).rejects.toThrow(/cuenta/i);
+  });
+
+  it("rejects another user's category in a Stock Events mapping", async () => {
+    const { db } = testDb;
+    const userA = await seedUser(db, "stockevents-victim@example.com");
+    const userB = await seedUser(db, "stockevents-attacker@example.com");
+    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+      name: "Inversión privada",
+      kind: "investment",
+    });
+
+    await expect(
+      stockeventsSymbolMappingsRepository.create(db, userB.id, {
+        categoryId: categoryA.id,
+        stockeventsSymbol: "SECRET",
+      }),
+    ).rejects.toThrow(/categoría/i);
   });
 });

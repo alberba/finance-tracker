@@ -16,11 +16,7 @@ export default defineConfig({
     enabled: false,
   },
 
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true,
-    },
-  }),
+  adapter: cloudflare(),
 
   server: {
     host: true,
@@ -39,6 +35,9 @@ export default defineConfig({
       project: 'finance-tracker',
       org: 'alberba',
       authToken: process.env.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      enabled: { client: true, server: false },
+      autoInstrumentation: { requestHandler: false },
     }),
   ],
 })

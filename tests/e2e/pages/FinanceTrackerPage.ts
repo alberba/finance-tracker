@@ -63,6 +63,11 @@ export class FinanceTrackerPage {
     await this.open("dashboard");
   }
 
+  async logout() {
+    await this.page.getByRole("button", { name: "Abrir menú de usuario" }).click();
+    await this.page.getByRole("menuitem", { name: /Cerrar sesión/ }).click();
+  }
+
   async openTransactions() {
     await this.open("transactions");
   }

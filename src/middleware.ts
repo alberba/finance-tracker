@@ -1,41 +1,8 @@
 /**
- * Astro middleware (WP3) — new subsystem, no prior `src/middleware.ts`
- * existed before this WP (see `docs/migration/work-packages.md` Contradiction
- * #1).
- *
- * Validates the `Cf-Access-Jwt-Assertion` header against Cloudflare Access'
- * JWKS (issuer + audience checked) and, on success, resolves/provisions the
- * `AuthPrincipal` onto `Astro.locals.principal`.
- *
- * **Enforcement is gated behind `AUTH_ENFORCED`** (see `cloudflare-env.ts`),
- * defaulting to off:
- * - `AUTH_ENFORCED !== "true"` (today, everywhere): the middleware still
- *   attempts verification and attaches `locals.principal` when a valid
- *   header is present, but a missing/invalid/expired token never blocks the
- *   request — every existing unauthenticated route keeps working exactly as
- *   before this WP. This is intentional: cutover to hard enforcement is a
- *   later step (WP11) that happens once every route consumes
- *   `locals.principal` instead of the `x-finance-namespace` header.
- * - `AUTH_ENFORCED === "true"`: a missing/invalid header yields a `401`
- *   before `next()` is ever called.
- *
- * ## Test-only principal injection (WP8)
- *
- * Real Cf-Access JWTs cannot be minted in Playwright/CI. WP4's new v2 routes
- * (`requirePrincipal` in `api-auth.ts`) require `Astro.locals.principal`
- * *unconditionally*, regardless of `AUTH_ENFORCED` — so without a way to
- * inject a principal in tests, every v2 route 401s in e2e/dev. The
- * `X-Test-User-Email` header lets `tests/e2e/fixtures.ts` (and only that,
- * or a local dev session) provision/select a principal directly, bypassing
- * Cf-Access entirely, but **only** when both of the following hold:
- * - `AUTH_ENFORCED !== "true"` (same gate as everything else here — real
- *   enforced environments never look at this header at all), AND
- * - `TEST_AUTH_ENABLED === "true"` — a second, independent flag that must
- *   be set explicitly (`.dev.vars` locally, an ephemeral CI env var — see
- *   `.dev.vars.example`). It must **never** be set in `wrangler.toml`
- *   `[vars]` or any deployed/staging environment: unlike `AUTH_ENFORCED`
- *   (which is expected to be off pre-cutover in real deployments too), this
- *   flag alone would let any caller impersonate any user by email.
+ * Fail-closed Cf-Access authentication and CSRF boundary. Private page
+ * navigations and every API require a verified principal; the synthetic demo
+ * navigation is the only public application surface. The E2E identity header
+ * is honored only when explicitly enabled and the request origin is loopback.
  */
 
 // `astro/middleware` is the real package export backing the `astro:middleware`
@@ -46,8 +13,13 @@ import { defineMiddleware } from "astro/middleware";
 import { verifyAccessJwt } from "./lib/server/auth/jwks";
 import { resolvePrincipal, CF_ACCESS_PROVIDER } from "./lib/server/auth/principal";
 import { getDb } from "./db/client";
-import type { RuntimeEnv } from "./lib/server/cloudflare-env";
+import { getRuntimeEnv, type RuntimeEnv } from "./lib/server/cloudflare-env";
 import { isPublicDemoNavigation } from "./lib/server/demo-access";
+import {
+  isLocalTestRequest,
+  rejectUnsafeApiMutation,
+  requiresAuthentication,
+} from "./lib/server/request-security";
 
 const ACCESS_JWT_HEADER = "Cf-Access-Jwt-Assertion";
 /** Test-only principal injection (WP8) — see the module doc comment above. */
@@ -58,12 +30,8 @@ export const TEST_AUTH_PROVIDER = "e2e-test-header";
 function jsonUnauthorized(message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
     status: 401,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
-}
-
-function isEnforced(env: RuntimeEnv | undefined): boolean {
-  return env?.AUTH_ENFORCED === "true";
 }
 
 function isTestAuthEnabled(env: RuntimeEnv | undefined): boolean {
@@ -71,26 +39,34 @@ function isTestAuthEnabled(env: RuntimeEnv | undefined): boolean {
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const env = (context.locals as { runtime?: { env?: RuntimeEnv } })?.runtime?.env;
-  const enforced = isEnforced(env);
+  const env = getRuntimeEnv(context.locals);
 
-  if (enforced && isPublicDemoNavigation(context.request)) {
+  if (isPublicDemoNavigation(context.request)) {
     return next();
   }
 
-  // Test-only shim: only ever consulted when enforcement is off AND the
-  // deployment explicitly opted in via `TEST_AUTH_ENABLED` — see doc comment.
-  if (!enforced && isTestAuthEnabled(env)) {
+  const unsafeMutation = rejectUnsafeApiMutation(context.request);
+  if (unsafeMutation) {
+    return unsafeMutation;
+  }
+
+  // Even if TEST_AUTH_ENABLED is accidentally deployed, the bypass is inert
+  // outside a loopback origin.
+  if (isTestAuthEnabled(env) && isLocalTestRequest(context.request)) {
     const testEmail = context.request.headers.get(TEST_USER_EMAIL_HEADER)?.trim().toLowerCase();
     if (testEmail) {
       try {
         const db = getDb(context.locals);
-        context.locals.principal = await resolvePrincipal(db, {
+        const principal = await resolvePrincipal(db, {
           provider: TEST_AUTH_PROVIDER,
           subject: testEmail,
           email: testEmail,
           legacyOwnerEmail: env?.LEGACY_OWNER_EMAIL ?? null,
         });
+        context.locals.principal = {
+          ...principal,
+          isLegacyOwner: env?.LEGACY_OWNER_EMAIL?.trim().toLowerCase() === testEmail,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo resolver el principal de prueba.";
         console.warn(`[middleware] test-auth-shim failed: ${message}`);
@@ -102,17 +78,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const token = context.request.headers.get(ACCESS_JWT_HEADER);
 
   if (!token) {
-    return enforced ? jsonUnauthorized("Falta la cabecera Cf-Access-Jwt-Assertion.") : next();
+    return requiresAuthentication(context.request)
+      ? jsonUnauthorized("Falta la cabecera Cf-Access-Jwt-Assertion.")
+      : next();
   }
 
   const teamDomain = env?.CF_ACCESS_TEAM_DOMAIN;
   const audience = env?.CF_ACCESS_AUD;
   if (!teamDomain || !audience) {
-    // Not configured yet: can't verify, so treat like "no token" rather than
-    // hard-failing every request in dev/local environments.
-    return enforced
-      ? jsonUnauthorized("Cf-Access no está configurado en este entorno.")
-      : next();
+    return jsonUnauthorized("Cf-Access no está configurado en este entorno.");
   }
 
   try {
@@ -125,13 +99,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
       legacyOwnerEmail: env?.LEGACY_OWNER_EMAIL ?? null,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Token de Cf-Access inválido.";
-    if (enforced) {
-      return jsonUnauthorized(message);
-    }
-    // Not enforced yet: log and continue unauthenticated rather than break
-    // the request, per this WP's cutover-safety design decision.
+    const message = error instanceof Error ? error.message : "error desconocido";
     console.warn(`[middleware] Cf-Access verification failed: ${message}`);
+    return jsonUnauthorized("Token de Cf-Access inválido o caducado.");
   }
 
   return next();

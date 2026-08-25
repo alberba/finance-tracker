@@ -1,12 +1,3 @@
-/**
- * WP7b leftover (documented, intentionally NOT wired to sync-v2 commands):
- * `saveApiKey`/`updateMapping`/`setEnabled` write `integration_credentials`-
- * and `stockevents_symbol_mappings`-shaped data, both explicitly excluded
- * from `SYNC_ENTITY_TYPES` in `src/lib/server/sync/command-schemas.ts`
- * ("WP12 owns encryption semantics" / "no version column to drive
- * optimistic concurrency"). These need a dedicated encrypted-credentials
- * endpoint (WP12), not the generic sync-command outbox — left unwired.
- */
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
@@ -19,7 +10,9 @@ import {
 import {
   checkStockEventsSymbols,
   createStockEventsTransaction,
+  fetchStockEventsCredentialStatus,
   fetchStockEventsWatchlists,
+  saveStockEventsCredential,
   type StockEventsWatchlist,
   type SymbolCheckResult,
 } from '../services/stockevents-api'
@@ -53,11 +46,15 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   const watchlists = shallowRef<StockEventsWatchlist[]>([])
   const isLoadingWatchlists = shallowRef(false)
   const isChecking = shallowRef(false)
+  const credentialConfigured = shallowRef(false)
+  const isSavingCredential = shallowRef(false)
   const connectionError = shallowRef('')
   const checkResults = shallowRef<Record<string, SymbolCheckResult>>({})
+  let credentialInitialization: Promise<void> | null = null
+  let credentialStatusLoaded = false
 
   const settings = computed(() => financialStateStore.state.stockEvents)
-  const isConnected = computed(() => settings.value.enabled && Boolean(settings.value.apiKey))
+  const isConnected = computed(() => settings.value.enabled && credentialConfigured.value)
 
   function canSyncSymbol(symbol: string): boolean {
     return isConnected.value && Boolean(findSyncedMapping(settings.value, symbol))
@@ -80,7 +77,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   const canSyncContributionCash = computed(
     () =>
       settings.value.enabled &&
-      Boolean(settings.value.apiKey) &&
+      credentialConfigured.value &&
       (settings.value.cashMappings || []).some((mapping) => Boolean(mapping.watchlistId)),
   )
 
@@ -116,13 +113,52 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     })
   })
 
-  function saveApiKey(value: string): void {
-    const apiKey = value.trim()
-    financialStateStore.commitState((draft) => {
-      draft.stockEvents.apiKey = apiKey
-    })
+  async function initializeCredential(): Promise<void> {
+    if (credentialStatusLoaded) return
+    if (credentialInitialization) return credentialInitialization
+
+    credentialInitialization = (async () => {
+      connectionError.value = ''
+      try {
+        credentialConfigured.value = await fetchStockEventsCredentialStatus()
+        credentialStatusLoaded = true
+        if (settings.value.apiKey) {
+          financialStateStore.patchState((draft) => {
+            draft.stockEvents.apiKey = ''
+          })
+        }
+      } catch (error) {
+        connectionError.value =
+          error instanceof Error ? error.message : 'No se pudo consultar Stock Events'
+      } finally {
+        credentialInitialization = null
+      }
+    })()
+
+    return credentialInitialization
+  }
+
+  async function saveApiKey(value: string): Promise<void> {
+    if (isSavingCredential.value) return
+    isSavingCredential.value = true
     connectionError.value = ''
-    showToast(apiKey ? 'API key de Stock Events guardada.' : 'API key de Stock Events eliminada.')
+    try {
+      credentialConfigured.value = await saveStockEventsCredential(value)
+      credentialStatusLoaded = true
+      financialStateStore.patchState((draft) => {
+        draft.stockEvents.apiKey = ''
+      })
+      showToast(
+        credentialConfigured.value
+          ? 'API key de Stock Events guardada de forma segura.'
+          : 'API key de Stock Events eliminada.',
+      )
+    } catch (error) {
+      connectionError.value =
+        error instanceof Error ? error.message : 'No se pudo guardar la API key de Stock Events'
+    } finally {
+      isSavingCredential.value = false
+    }
   }
 
   function setEnabled(enabled: boolean): void {
@@ -185,12 +221,11 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   }
 
   async function loadWatchlists(): Promise<void> {
-    const apiKey = settings.value.apiKey
-    if (!apiKey || isLoadingWatchlists.value) return
+    if (!credentialConfigured.value || isLoadingWatchlists.value) return
     isLoadingWatchlists.value = true
     connectionError.value = ''
     try {
-      watchlists.value = await fetchStockEventsWatchlists(apiKey)
+      watchlists.value = await fetchStockEventsWatchlists()
     } catch (error) {
       watchlists.value = []
       connectionError.value =
@@ -201,8 +236,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   }
 
   async function checkSymbols(): Promise<void> {
-    const apiKey = settings.value.apiKey
-    if (!apiKey || isChecking.value) return
+    if (!credentialConfigured.value || isChecking.value) return
     const rows = symbolRows.value.filter((row) => row.sync && row.watchlistId)
     const checks = rows.map((row) => ({
       symbol: row.targetSymbol || row.symbol,
@@ -215,7 +249,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     isChecking.value = true
     connectionError.value = ''
     try {
-      const results = await checkStockEventsSymbols(apiKey, checks)
+      const results = await checkStockEventsSymbols(checks)
       // Results keep the request order, so index them back to the local symbol
       // (the checked ticker may be a per-symbol override).
       checkResults.value = Object.fromEntries(
@@ -255,7 +289,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     )
     if (!payload) return
     try {
-      await createStockEventsTransaction(settings.value.apiKey, payload)
+      await createStockEventsTransaction(payload)
       showToast(`Movimiento de ${payload.symbol} sincronizado con Stock Events.`)
     } catch (error) {
       const message =
@@ -298,7 +332,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     if (!requests.length) return
 
     const results = await Promise.allSettled(
-      requests.map((request) => createStockEventsTransaction(settings.value.apiKey, request.payload)),
+      requests.map((request) => createStockEventsTransaction(request.payload)),
     )
     results.forEach((result, index) => {
       if (result.status !== 'fulfilled') return
@@ -336,6 +370,8 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   return {
     settings,
+    credentialConfigured,
+    isSavingCredential,
     isConnected,
     cashMappingRows,
     canSyncContributionCash,
@@ -345,6 +381,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     connectionError,
     symbolRows,
     canSyncSymbol,
+    initializeCredential,
     saveApiKey,
     setEnabled,
     updateMapping,

@@ -119,7 +119,7 @@ describe('resolución del mapeo de símbolos', () => {
     expect(findSyncedMapping(settings, 'BTC')).toBeNull()
     expect(findSyncedMapping(settings, 'MSFT')).toBeNull()
     expect(findSyncedMapping({ ...settings, enabled: false }, 'VWCE')).toBeNull()
-    expect(findSyncedMapping({ ...settings, apiKey: '' }, 'VWCE')).toBeNull()
+    expect(findSyncedMapping({ ...settings, apiKey: '' }, 'VWCE')?.watchlistId).toBe('wl-1')
   })
 })
 

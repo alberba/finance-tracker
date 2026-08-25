@@ -129,6 +129,6 @@ export function wipeEncryptionKey(userId: string): Promise<void> {
     const request = indexedDB.deleteDatabase(dbNameFor(userId));
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error ?? new Error("No se pudo borrar la clave de cifrado."));
-    request.onblocked = () => resolve();
+    request.onblocked = () => reject(new Error("Otra pestaña mantiene abierta la clave IndexedDB."));
   });
 }

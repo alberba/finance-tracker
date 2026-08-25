@@ -11,15 +11,9 @@
 
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "./schema";
-import type { RuntimeEnv } from "../lib/server/cloudflare-env";
+import { getRuntimeEnv } from "../lib/server/cloudflare-env";
 
 export type Db = DrizzleD1Database<typeof schema>;
-
-type LocalsWithRuntime = {
-  runtime?: {
-    env?: RuntimeEnv;
-  };
-};
 
 // Matches the codebase's existing convention (see `D1DatabaseLike` in
 // `src/lib/server/d1-state.ts`) of a hand-rolled duck-typed binding instead
@@ -28,8 +22,7 @@ type D1BindingLike = Parameters<typeof drizzle>[0];
 
 /** Wraps the `finance_tracker_db_v2` D1 binding in a typed Drizzle client. */
 export function getDb(locals: App.Locals): Db {
-  const env = (locals as LocalsWithRuntime)?.runtime?.env;
-  const binding = env?.finance_tracker_db_v2;
+  const binding = getRuntimeEnv(locals).finance_tracker_db_v2;
   if (!binding) {
     throw new Error("D1 binding 'finance_tracker_db_v2' no está disponible en runtime.");
   }

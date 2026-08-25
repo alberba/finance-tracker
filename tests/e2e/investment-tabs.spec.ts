@@ -57,6 +57,9 @@ test.describe("inversión tabs y TWR", () => {
     ).toHaveCount(0);
 
     let syncedTransaction: Record<string, unknown> | undefined;
+    await page.route("**/api/integrations/stockevents", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: '{"configured":true}' }),
+    );
     await page.route("**/api/stockevents/transactions", async (route) => {
       const body = route.request().postDataJSON() as {
         transaction?: Record<string, unknown>;
@@ -84,7 +87,7 @@ test.describe("inversión tabs y TWR", () => {
       const state = JSON.parse(raw);
       state.stockEvents = {
         enabled: true,
-        apiKey: "test-stock-events-key",
+        apiKey: "",
         symbolMappings: [
           {
             symbol: "CASHBUY",

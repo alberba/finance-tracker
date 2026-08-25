@@ -1,36 +1,33 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
+import { computed, onMounted, shallowRef } from 'vue'
 
 import StockEventsSymbolTable from './StockEventsSymbolTable.vue'
 import { useStockEventsStore } from '../../stores/stockevents'
 
 const stockEventsStore = useStockEventsStore()
 
-const apiKeyInput = shallowRef(stockEventsStore.settings.apiKey)
+const apiKeyInput = shallowRef('')
 const showHiddenSymbols = shallowRef(false)
 
-watch(
-  () => stockEventsStore.settings.apiKey,
-  (apiKey) => {
-    apiKeyInput.value = apiKey
-    if (apiKey) {
-      void stockEventsStore.loadWatchlists()
-    }
-  },
-  { immediate: true },
-)
+onMounted(async () => {
+  await stockEventsStore.initializeCredential()
+  if (stockEventsStore.credentialConfigured) {
+    await stockEventsStore.loadWatchlists()
+  }
+})
 
-const hasApiKey = computed(() => Boolean(stockEventsStore.settings.apiKey))
+const hasApiKey = computed(() => stockEventsStore.credentialConfigured)
 const syncedCount = computed(
   () => stockEventsStore.symbolRows.filter((row) => row.sync && row.watchlistId).length,
 )
 const visibleRows = computed(() => stockEventsStore.symbolRows.filter((row) => !row.hidden))
 const hiddenRows = computed(() => stockEventsStore.symbolRows.filter((row) => row.hidden))
 
-function onSaveApiKey(): void {
-  stockEventsStore.saveApiKey(apiKeyInput.value)
-  if (apiKeyInput.value.trim()) {
-    void stockEventsStore.loadWatchlists()
+async function onSaveApiKey(): Promise<void> {
+  await stockEventsStore.saveApiKey(apiKeyInput.value)
+  apiKeyInput.value = ''
+  if (stockEventsStore.credentialConfigured) {
+    await stockEventsStore.loadWatchlists()
   }
 }
 
@@ -81,12 +78,19 @@ function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
           <input
             v-model="apiKeyInput"
             type="password"
-            placeholder="se_live_…"
+            :placeholder="hasApiKey ? 'Configurada · escribe para sustituirla' : 'se_live_…'"
             autocomplete="off"
             spellcheck="false"
           />
         </label>
-        <button type="button" class="primary-btn" @click="onSaveApiKey">Guardar API key</button>
+        <button
+          type="button"
+          class="primary-btn"
+          :disabled="stockEventsStore.isSavingCredential"
+          @click="onSaveApiKey"
+        >
+          {{ stockEventsStore.isSavingCredential ? 'Guardando…' : 'Guardar API key' }}
+        </button>
         <button
           type="button"
           class="secondary-btn"

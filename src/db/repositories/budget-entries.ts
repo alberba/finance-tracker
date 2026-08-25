@@ -69,6 +69,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateBudgetEntryInput,
+  expectedVersion?: number,
 ): Promise<BudgetEntryRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -84,18 +85,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(budgetEntries.id, id), eq(budgetEntries.userId, userId)))
+    .where(and(
+      eq(budgetEntries.id, id),
+      eq(budgetEntries.userId, userId),
+      expectedVersion === undefined ? undefined : eq(budgetEntries.version, expectedVersion),
+    ))
     .returning();
-  return toRow(row);
+  return row ? toRow(row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(budgetEntries).where(and(eq(budgetEntries.id, id), eq(budgetEntries.userId, userId)));
-  return true;
+  const deleted = await db.delete(budgetEntries).where(and(
+    eq(budgetEntries.id, id),
+    eq(budgetEntries.userId, userId),
+    expectedVersion === undefined ? undefined : eq(budgetEntries.version, expectedVersion),
+  )).returning({ id: budgetEntries.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(

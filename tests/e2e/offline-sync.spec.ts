@@ -15,50 +15,22 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
 const SYNC_STATUS = '#sidebar-sync-status'
 
-declare global {
-  interface Window {
-    __FINANCE_NAMESPACE__?: string
-  }
-}
-
-/**
- * See the identical helper/comment in `multi-user-isolation.spec.ts`: the
- * legacy `financialStateStore` (namespace-scoped) still renders the UI
- * alongside sync-v2 (WP7b), so `provisionUser` must scope *both* layers.
- * Deterministic per-email so the "two devices" conflict test's second
- * context reconnects to the same namespace as the first.
- */
-function namespaceForEmail(email: string): string {
-  return `pw-sync-v2-${email.replace(/[^a-z0-9]/gi, '-')}`
-}
-
 async function provisionUser(
   context: BrowserContext,
   email: string,
-  options: { resetLegacyNamespace?: boolean } = {},
 ): Promise<{ tracker: FinanceTrackerPage; page: Page }> {
-  const namespace = namespaceForEmail(email)
   await context.setExtraHTTPHeaders({ [TEST_USER_EMAIL_HEADER]: email })
-  if (options.resetLegacyNamespace ?? true) {
-    // Skipped for "device two" in the conflict test below, which
-    // re-authenticates as the *same* email as "device one" specifically to
-    // share its namespace/data — resetting here would wipe it.
-    await context.request.post('/api/state/reset-legacy', {
-      headers: { 'x-finance-namespace': namespace },
-    })
-  }
-  await context.request.post('/api/state/initialize', {
+  const initialization = await context.request.post('/api/state/initialize', {
     headers: { [TEST_USER_EMAIL_HEADER]: email },
+    data: {},
   })
+  expect(initialization.ok()).toBe(true)
   const page = await context.newPage()
-  await page.addInitScript((value) => {
-    window.__FINANCE_NAMESPACE__ = value
-  }, namespace)
   const tracker = new FinanceTrackerPage(page)
   await tracker.goto()
-  // See the identical comment in `multi-user-isolation.spec.ts` — gives the
-  // client Vue bundle time to finish hydrating before the first interaction.
-  await page.waitForLoadState('networkidle')
+  // `goto()` waits for the app's explicit post-hydration readiness marker.
+  // Sync-v2 can keep network work in flight, so `networkidle` is not a safe
+  // proxy for readiness here.
   return { tracker, page }
 }
 
@@ -169,9 +141,7 @@ test.describe('Sincronización offline (sync v2)', () => {
       await deviceOne.filterTransactionsMonth('FEBRERO')
       await waitForSynced(pageOne)
 
-      const { tracker: deviceTwo, page: pageTwo } = await provisionUser(contextDeviceTwo, email, {
-        resetLegacyNamespace: false,
-      })
+      const { tracker: deviceTwo, page: pageTwo } = await provisionUser(contextDeviceTwo, email)
       await deviceTwo.filterTransactionsMonth('FEBRERO')
       await deviceTwo.expectTransactionDescriptionVisible('Movimiento en disputa')
       // Wait for device two's *pull* (not just "nothing queued to push") to

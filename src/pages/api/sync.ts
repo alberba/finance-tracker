@@ -1,9 +1,8 @@
 /**
  * `POST /api/sync` (WP4) — applies a batch of ≤5 client-submitted sync
- * commands. Each command runs in its own D1 transaction; the batch halts
- * fail-fast on the first version conflict (409-equivalent per-command
- * status); a repeated `commandId` returns its previously stored result
- * instead of re-applying the mutation (idempotent replay).
+ * commands. Each command is reserved for at-most-once application and its
+ * update/delete is guarded by `baseVersion`; the batch halts fail-fast on the
+ * first conflict. Repeated completed commands return their stored result.
  */
 
 import type { APIRoute } from "astro";

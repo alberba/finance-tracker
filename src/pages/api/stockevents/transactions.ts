@@ -4,28 +4,25 @@ import {
   type StockEventsTransactionPayload,
 } from '../../../lib/server/stockevents'
 import { errorResponse, json, readApiKey } from './_helpers'
+import { withApiErrorHandling } from '../../../lib/server/api-auth'
 
 interface TransactionsBody {
   transaction?: unknown
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const apiKey = await readApiKey(request, locals)
-  if (!apiKey) {
-    return json({ error: 'Falta la API key de Stock Events' }, 400)
-  }
-  const body = (await request.json().catch(() => ({}))) as TransactionsBody
-  const payload = normalizePayload(body.transaction)
-  if (!payload) {
-    return json({ error: 'Transacción inválida para Stock Events' }, 400)
-  }
-  try {
-    const transaction = await createStockEventsTransaction(apiKey, payload)
-    return json({ transaction }, 201)
-  } catch (error) {
-    return errorResponse(error)
-  }
-}
+export const POST: APIRoute = async ({ request, locals }) =>
+  withApiErrorHandling(async () => {
+    const apiKey = await readApiKey(locals)
+    if (!apiKey) return json({ error: 'Falta la API key de Stock Events' }, 400)
+    const body = (await request.json().catch(() => ({}))) as TransactionsBody
+    const payload = normalizePayload(body.transaction)
+    if (!payload) return json({ error: 'Transacción inválida para Stock Events' }, 400)
+    try {
+      return json({ transaction: await createStockEventsTransaction(apiKey, payload) }, 201)
+    } catch (error) {
+      return errorResponse(error)
+    }
+  })
 
 function normalizePayload(value: unknown): StockEventsTransactionPayload | null {
   const raw = (value || {}) as Record<string, unknown>

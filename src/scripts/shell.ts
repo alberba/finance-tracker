@@ -1,6 +1,7 @@
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
 
@@ -250,53 +251,68 @@ const SYNC_STATUS_LABELS: Record<string, string> = {
 }
 
 /**
- * Wires the menu's email/sync-status/logout entries to `useSyncStore`
- * (WP7). A no-op when `PUBLIC_SYNC_V2` is off — the legacy save-status
- * indicator (`#save-status`, driven by `state-format-helpers.ts`) keeps
- * doing its job until cutover.
+ * Wires the menu's identity and logout entries for every authenticated
+ * session. Sync status and the v2 store remain feature-flagged, but logout
+ * must never be: v1 localStorage and any per-user v2 IndexedDB data are
+ * private data regardless of which sync path is active.
  */
 function initSyncMenu(): void {
-  if (!isSyncV2Enabled() || isDemoMode()) {
+  if (isDemoMode()) {
     return
   }
 
+  const syncV2Enabled = isSyncV2Enabled()
   const emailEl = document.getElementById('sidebar-user-email')
   const statusEl = document.getElementById('sidebar-sync-status')
   const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
-  const syncStore = useSyncStore(pinia)
+  const syncStore = syncV2Enabled ? useSyncStore(pinia) : null
 
-  fetch('/api/session')
+  const sessionRequest = fetch('/api/session')
     .then((response) => (response.ok ? response.json() : null))
     .then((body: { user?: { id?: string; email?: string } } | null) => {
-      if (!body?.user?.id) {
-        return
-      }
-      void syncStore.init(body.user.id, { email: body.user.email ?? null })
-      if (emailEl && body.user.email) {
+      if (emailEl && body?.user?.email) {
         emailEl.replaceChildren(body.user.email)
       }
+      if (body?.user?.id && syncStore) {
+        void syncStore.init(body.user.id, { email: body.user.email ?? null })
+      }
+      return body
     })
     .catch(() => {
-      /* session lookup failed — sync stays disabled for this load */
+      /* Logout still clears legacy data when the session lookup fails. */
+      return null
     })
 
-  const renderStatus = () => {
-    if (!statusEl) {
-      return
+  if (syncStore) {
+    const renderStatus = () => {
+      if (!statusEl) {
+        return
+      }
+      const pending = syncStore.pendingCount
+      const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
+      const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
+      statusEl.hidden = false
+      statusEl.replaceChildren(`${label}${suffix}`)
     }
-    const pending = syncStore.pendingCount
-    const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
-    const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
-    statusEl.hidden = false
-    statusEl.replaceChildren(`${label}${suffix}`)
+
+    syncStore.$subscribe(renderStatus)
+    renderStatus()
   }
 
-  syncStore.$subscribe(renderStatus)
-  renderStatus()
-
   logoutAction?.addEventListener('click', () => {
-    void syncStore.logout().finally(() => {
+    logoutAction.setAttribute('aria-disabled', 'true')
+    void sessionRequest.then(async (session) => {
+      if (syncStore?.userId) {
+        await syncStore.logout()
+      } else if (session?.user?.id) {
+        await wipeAllClientData(session.user.id)
+      } else {
+        wipeLegacyClientData()
+      }
       window.location.href = '/cdn-cgi/access/logout'
+    }).catch((error: unknown) => {
+      logoutAction.removeAttribute('aria-disabled')
+      console.error('No se pudo borrar el almacenamiento privado antes de cerrar sesión.', error)
     })
   })
 }

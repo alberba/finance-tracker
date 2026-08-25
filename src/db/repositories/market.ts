@@ -13,7 +13,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { assertOwnedReferences, nowIso, type Db } from "./shared";
 
 export type MarketInstrumentRow = typeof marketInstruments.$inferSelect;
 export type MarketQuoteRow = Omit<typeof marketQuotes.$inferSelect, "priceMinor"> & {
@@ -219,6 +219,7 @@ export async function createUserInstrument(
   userId: string,
   input: CreateUserInstrumentInput,
 ): Promise<UserInstrumentRow> {
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
   const now = nowIso();
   const [row] = await db
     .insert(userInstruments)
@@ -239,11 +240,13 @@ export async function updateUserInstrument(
   userId: string,
   id: string,
   input: UpdateUserInstrumentInput,
+  expectedVersion?: number,
 ): Promise<UserInstrumentRow | undefined> {
   const existing = await getUserInstrument(db, userId, id);
   if (!existing) {
     return undefined;
   }
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
   const [row] = await db
     .update(userInstruments)
     .set({
@@ -252,18 +255,31 @@ export async function updateUserInstrument(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(userInstruments.id, id), eq(userInstruments.userId, userId)))
+    .where(and(
+      eq(userInstruments.id, id),
+      eq(userInstruments.userId, userId),
+      expectedVersion === undefined ? undefined : eq(userInstruments.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function removeUserInstrument(db: Db, userId: string, id: string): Promise<boolean> {
+export async function removeUserInstrument(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
   const existing = await getUserInstrument(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(userInstruments).where(and(eq(userInstruments.id, id), eq(userInstruments.userId, userId)));
-  return true;
+  const deleted = await db.delete(userInstruments).where(and(
+    eq(userInstruments.id, id),
+    eq(userInstruments.userId, userId),
+    expectedVersion === undefined ? undefined : eq(userInstruments.version, expectedVersion),
+  )).returning({ id: userInstruments.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsertUserInstruments(

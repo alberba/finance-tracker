@@ -1,31 +1,35 @@
-/**
- * Shared auth guard for the WP4 v2 API surface.
- *
- * Unlike the rest of the app (where `AUTH_ENFORCED` gates whether a missing
- * Cf-Access header blocks a request — see `src/middleware.ts`), every route
- * under this WP4 file list requires `Astro.locals.principal` unconditionally:
- * these are brand-new endpoints with no existing client depending on them,
- * so there is no backwards-compatibility reason to allow anonymous access.
- * "401 if absent for these new routes regardless of AUTH_ENFORCED" per the
- * work-package spec.
- */
+/** Shared API authentication, authorization and private JSON responses. */
 
 import type { AuthPrincipal } from "./auth/principal";
 
 export function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
 
 export class UnauthorizedError extends Error {}
+export class ForbiddenError extends Error {}
 
 /** Returns the request's `AuthPrincipal`, or throws `UnauthorizedError` if absent. */
 export function requirePrincipal(locals: App.Locals): AuthPrincipal {
   const principal = locals.principal;
   if (!principal) {
     throw new UnauthorizedError("Se requiere autenticación (Astro.locals.principal ausente).");
+  }
+  return principal;
+}
+
+/** Temporary cutover guard: only the reserved owner may touch the v1 blob. */
+export function requireLegacyOwner(locals: App.Locals): AuthPrincipal {
+  const principal = requirePrincipal(locals);
+  if (!principal.isLegacyOwner) {
+    throw new ForbiddenError("El estado legacy solo está disponible para su propietario.");
   }
   return principal;
 }
@@ -38,7 +42,10 @@ export async function withApiErrorHandling(handler: () => Promise<Response>): Pr
     if (error instanceof UnauthorizedError) {
       return jsonResponse({ error: error.message }, 401);
     }
-    const message = error instanceof Error ? error.message : "Error interno";
-    return jsonResponse({ error: message }, 500);
+    if (error instanceof ForbiddenError) {
+      return jsonResponse({ error: error.message }, 403);
+    }
+    console.error("[api] Unhandled route error", error);
+    return jsonResponse({ error: "Error interno del servidor." }, 500);
   }
 }

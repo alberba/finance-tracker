@@ -24,7 +24,6 @@ export default defineConfig({
         'src/lib/server/types.ts',
       ],
       reporter: process.env.CI ? ['text', 'json-summary'] : ['text', 'html', 'json-summary'],
-      all: true,
       thresholds: {
         lines: 29,
         statements: 29,

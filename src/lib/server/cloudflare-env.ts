@@ -1,4 +1,5 @@
 import type { D1DatabaseLike } from "./d1-state";
+import { env as cloudflareEnv } from "cloudflare:workers";
 
 export interface RuntimeEnv {
   finance_tracker_db?: D1DatabaseLike;
@@ -21,21 +22,8 @@ export interface RuntimeEnv {
   /** Expected `aud` claim of the Cf-Access Application protecting this app. */
   CF_ACCESS_AUD?: string;
   /**
-   * Feature flag gating auth enforcement (WP3). Defaults to **off** — when
-   * unset or not `"true"`, `src/middleware.ts` still verifies and attaches
-   * `Astro.locals.principal` on a best-effort basis, but never blocks a
-   * request for a missing/invalid JWT. Flip to `"true"` only at cutover
-   * (WP11), once every route consumes `locals.principal` instead of a
-   * client-supplied namespace.
-   */
-  AUTH_ENFORCED?: string;
-  /**
-   * Test-only principal injection (WP8). When `"true"` **and**
-   * `AUTH_ENFORCED !== "true"`, `src/middleware.ts` honors the
-   * `X-Test-User-Email` header as a Cf-Access bypass, letting
-   * `tests/e2e/fixtures.ts`/local dev provision a principal without a real
-   * JWT. Must **never** be set in `wrangler.toml` `[vars]` or any deployed
-   * environment — only in `.dev.vars` (gitignored) or ephemeral CI env vars.
+   * Test-only principal injection. The middleware additionally requires a
+   * loopback request origin, so a deployed flag cannot enable impersonation.
    */
   TEST_AUTH_ENABLED?: string;
   /**
@@ -55,14 +43,19 @@ export interface RuntimeEnv {
   DATA_ENCRYPTION_KEY_VERSION?: string;
 }
 
-type LocalsWithRuntime = {
-  runtime?: {
-    env?: RuntimeEnv;
-  };
-};
+type LocalsWithTestRuntime = { runtimeEnv?: RuntimeEnv };
+
+/**
+ * Astro 6+ exposes Cloudflare bindings through `cloudflare:workers` rather
+ * than `locals.runtime.env`. `runtimeEnv` is an explicit Vitest-only seam;
+ * production request code never populates it.
+ */
+export function getRuntimeEnv(locals?: App.Locals): RuntimeEnv {
+  return (locals as LocalsWithTestRuntime | undefined)?.runtimeEnv ?? (cloudflareEnv as RuntimeEnv);
+}
 
 export function getD1FromLocals(locals: App.Locals): D1DatabaseLike {
-  const db = (locals as LocalsWithRuntime)?.runtime?.env?.finance_tracker_db;
+  const db = getRuntimeEnv(locals).finance_tracker_db;
   if (!db) {
     throw new Error("D1 binding 'finance_tracker_db' no está disponible en runtime.");
   }
@@ -70,9 +63,5 @@ export function getD1FromLocals(locals: App.Locals): D1DatabaseLike {
 }
 
 export function getRuntimeEnvFromLocals(locals: App.Locals): RuntimeEnv {
-  const env = (locals as LocalsWithRuntime)?.runtime?.env;
-  if (!env) {
-    throw new Error("Runtime env no disponible en locals.runtime.env.");
-  }
-  return env;
+  return getRuntimeEnv(locals);
 }

@@ -31,7 +31,11 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
   const pendingMovements = computed(() => state.value.pendingMovements)
 
   function replaceState(nextState: unknown): State {
-    state.value = normalizeState(nextState)
+    const normalized = normalizeState(nextState)
+    // Integration credentials live encrypted server-side and must never be
+    // retained in the client financial snapshot or its legacy persistence.
+    normalized.stockEvents.apiKey = ''
+    state.value = normalized
     errorMessage.value = null
     status.value = 'idle'
     return state.value

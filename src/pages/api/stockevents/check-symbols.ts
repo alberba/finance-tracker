@@ -4,28 +4,25 @@ import {
   type SymbolCheckRequest,
 } from '../../../lib/server/stockevents'
 import { errorResponse, json, readApiKey } from './_helpers'
+import { withApiErrorHandling } from '../../../lib/server/api-auth'
 
 interface CheckSymbolsBody {
   checks?: unknown
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const apiKey = await readApiKey(request, locals)
-  if (!apiKey) {
-    return json({ error: 'Falta la API key de Stock Events' }, 400)
-  }
-  const body = (await request.json().catch(() => ({}))) as CheckSymbolsBody
-  const checks = normalizeChecks(body.checks)
-  if (!checks.length) {
-    return json({ results: [] })
-  }
-  try {
-    const results = await checkStockEventsSymbols(apiKey, checks)
-    return json({ results })
-  } catch (error) {
-    return errorResponse(error)
-  }
-}
+export const POST: APIRoute = async ({ request, locals }) =>
+  withApiErrorHandling(async () => {
+    const apiKey = await readApiKey(locals)
+    if (!apiKey) return json({ error: 'Falta la API key de Stock Events' }, 400)
+    const body = (await request.json().catch(() => ({}))) as CheckSymbolsBody
+    const checks = normalizeChecks(body.checks)
+    if (!checks.length) return json({ results: [] })
+    try {
+      return json({ results: await checkStockEventsSymbols(apiKey, checks) })
+    } catch (error) {
+      return errorResponse(error)
+    }
+  })
 
 function normalizeChecks(value: unknown): SymbolCheckRequest[] {
   if (!Array.isArray(value)) return []

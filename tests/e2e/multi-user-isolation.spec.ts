@@ -10,71 +10,30 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
  * WP3/WP8 — only honored when `TEST_AUTH_ENABLED=true` and
  * `AUTH_ENFORCED` is off, this repo's CI/dev-only configuration).
  *
- * **Both storage layers, not just one**: per WP7b's design ("the
- * translation layer is called *alongside*, never instead of, each domain
- * store's existing `commitState` call"), the UI's rendered state — and
- * client-side checks like `settings.ts`'s "ya existe" duplicate guard —
- * still come from the *legacy* `financialStateStore`, namespace-scoped via
- * the `x-finance-namespace` header/`window.__FINANCE_NAMESPACE__`
- * (`src/scripts/state.ts`), exactly as `tests/e2e/fixtures.ts`'s `tracker`
- * fixture sets up for the single-user legacy-path specs. `PUBLIC_SYNC_V2`
- * additionally enqueues sync-v2 commands on top of that; it does not
- * replace it (cutover is WP11). A context that only sets the
- * `X-Test-User-Email` header without *also* giving itself a unique
- * namespace falls back to the default/shared legacy namespace — every
- * "different user" would then collide on that one shared namespace's data,
- * which is precisely the isolation bug this spec exists to catch, so it is
- * important this fixture setup does not itself introduce that false
- * failure. `provisionUser` therefore replicates `fixtures.ts`'s full setup:
- * unique namespace + `reset-legacy` + `window.__FINANCE_NAMESPACE__` in
- * addition to the test-auth-shim header + `/api/state/initialize`.
+ * The v1 blob is intentionally owner-only during cutover. These tests must
+ * never reset or namespace that blob for arbitrary identities: each test
+ * user is provisioned only in v2 and sync isolation follows the authenticated
+ * principal resolved by the server.
  */
 
 const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
 
-declare global {
-  interface Window {
-    __FINANCE_NAMESPACE__?: string
-  }
-}
-
-/** Deterministic per-identity namespace so a returning session (same email, new context) reconnects to the same legacy-layer data. */
-function namespaceForEmail(email: string): string {
-  return `pw-sync-v2-${email.replace(/[^a-z0-9]/gi, '-')}`
-}
-
 async function provisionUser(
   context: BrowserContext,
   email: string,
-  options: { resetLegacyNamespace?: boolean } = {},
 ): Promise<{ tracker: FinanceTrackerPage; page: Page }> {
-  const namespace = namespaceForEmail(email)
   await context.setExtraHTTPHeaders({ [TEST_USER_EMAIL_HEADER]: email })
-  if (options.resetLegacyNamespace ?? true) {
-    // Skipped for a *returning* session re-authenticating as an email
-    // already provisioned earlier in the same test — resetting here would
-    // wipe the very data that test is asserting persists across sessions.
-    await context.request.post('/api/state/reset-legacy', {
-      headers: { 'x-finance-namespace': namespace },
-    })
-  }
-  await context.request.post('/api/state/initialize', {
+  const initialization = await context.request.post('/api/state/initialize', {
     headers: { [TEST_USER_EMAIL_HEADER]: email },
+    data: {},
   })
+  expect(initialization.ok()).toBe(true)
   const page = await context.newPage()
-  await page.addInitScript((value) => {
-    window.__FINANCE_NAMESPACE__ = value
-  }, namespace)
   const tracker = new FinanceTrackerPage(page)
   await tracker.goto()
-  // `goto()` only waits for the SSR-rendered dashboard heading; on a cold
-  // dev server the client Vue bundle (nav click handlers, sync-store init)
-  // can still be hydrating for a moment after that heading paints. The
-  // first nav click in that window registers the button's `[active]` state
-  // (a CSS/DOM-level effect) without actually firing the section-switch
-  // handler yet — waiting for network idle here gives hydration time to
-  // finish before any test interacts with the page.
-  await page.waitForLoadState('networkidle')
+  // `goto()` waits for `data-finance-ready=true`, which the application
+  // publishes only after state hydration and event binding. Do not wait for
+  // `networkidle`: sync-v2 may legitimately keep network work in flight.
   return { tracker, page }
 }
 
@@ -150,9 +109,7 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     // the reverse assertion of the two tests above.
     const returningContext = await browser.newContext()
     try {
-      const { tracker: returningTracker } = await provisionUser(returningContext, email, {
-        resetLegacyNamespace: false,
-      })
+      const { tracker: returningTracker } = await provisionUser(returningContext, email)
       await returningTracker.filterTransactionsMonth('ENERO')
       await returningTracker.expectTransactionDescriptionVisible('Nómina de A')
     } finally {
