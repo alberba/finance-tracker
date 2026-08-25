@@ -197,7 +197,16 @@ export const useSyncStore = defineStore('sync', () => {
       // Offline reload falls back to the last complete identity-partitioned read model.
     }
     bootstrap ??= await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-    if (!bootstrap) throw new Error('No hay datos v2 disponibles para hidratar esta sesión.')
+    // A brand-new identity has no read model yet. Start from an empty
+    // projection; the first command will create its server-side entities.
+    // Existing identities still hydrate from the network/cache above.
+    bootstrap ??= {
+      revision: 0,
+      settings: null,
+      accounts: [], categories: [], transactions: [], subscriptions: [],
+      recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
+      contributions: [], userInstruments: [], wealthSnapshots: [],
+    }
     const collections = {
       account: bootstrap.accounts,
       category: bootstrap.categories,
