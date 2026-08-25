@@ -11,6 +11,8 @@ export default defineConfig(
     env: { PUBLIC_SYNC_V2: 'true' },
   }),
   {
+    fullyParallel: false,
+    workers: 1,
     testMatch: ['multi-user-isolation.spec.ts', 'offline-sync.spec.ts'],
     projects: [
       {

@@ -61,7 +61,7 @@ describe("IndexedDB wrapper error branches", () => {
     await expect(wipeIdbCache("user-error-cache")).rejects.toThrow();
   });
 
-  it("wipeIdbCache resolves (best-effort) when deleteDatabase is blocked", async () => {
+  it("wipeIdbCache reports when deletion is blocked", async () => {
     const fakeDelete = vi.fn(() => {
       const request = makeFailingRequest();
       queueMicrotask(() => request.onblocked?.());
@@ -69,7 +69,7 @@ describe("IndexedDB wrapper error branches", () => {
     });
     vi.stubGlobal("indexedDB", { ...originalIndexedDb, deleteDatabase: fakeDelete });
 
-    await expect(wipeIdbCache("user-error-cache")).resolves.toBeUndefined();
+    await expect(wipeIdbCache("user-error-cache")).rejects.toThrow(/pestaña/i);
   });
 
   it("a transaction error/abort rejects the pending write", async () => {
@@ -99,7 +99,7 @@ describe("IndexedDB wrapper error branches", () => {
     await expect(openOutbox("user-error-outbox")).rejects.toThrow();
   });
 
-  it("wipeOutbox rejects when deleteDatabase fails and resolves when blocked", async () => {
+  it("wipeOutbox rejects when deleteDatabase fails or is blocked", async () => {
     const failingDelete = vi.fn(() => {
       const request = makeFailingRequest();
       queueMicrotask(() => request.onerror?.());
@@ -114,7 +114,7 @@ describe("IndexedDB wrapper error branches", () => {
       return request;
     });
     vi.stubGlobal("indexedDB", { ...originalIndexedDb, deleteDatabase: blockedDelete });
-    await expect(wipeOutbox("user-error-outbox")).resolves.toBeUndefined();
+    await expect(wipeOutbox("user-error-outbox")).rejects.toThrow(/pestaña/i);
   });
 
   it("enqueue's write transaction propagates an abort as a rejection", async () => {
@@ -140,7 +140,7 @@ describe("IndexedDB wrapper error branches", () => {
     await expect(getOrCreateEncryptionKey("user-error-crypto")).rejects.toThrow();
   });
 
-  it("wipeEncryptionKey rejects on failure and resolves on blocked", async () => {
+  it("wipeEncryptionKey rejects on failure or blocked deletion", async () => {
     const failingDelete = vi.fn(() => {
       const request = makeFailingRequest();
       queueMicrotask(() => request.onerror?.());
@@ -155,6 +155,6 @@ describe("IndexedDB wrapper error branches", () => {
       return request;
     });
     vi.stubGlobal("indexedDB", { ...originalIndexedDb, deleteDatabase: blockedDelete });
-    await expect(wipeEncryptionKey("user-error-crypto")).resolves.toBeUndefined();
+    await expect(wipeEncryptionKey("user-error-crypto")).rejects.toThrow(/pestaña/i);
   });
 });

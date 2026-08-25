@@ -84,6 +84,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateRecurringRuleInput,
+  expectedVersion?: number,
 ): Promise<RecurringRuleRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -107,18 +108,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)))
+    .where(and(
+      eq(recurringRules.id, id),
+      eq(recurringRules.userId, userId),
+      expectedVersion === undefined ? undefined : eq(recurringRules.version, expectedVersion),
+    ))
     .returning();
-  return toRow(row);
+  return row ? toRow(row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(recurringRules).where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)));
-  return true;
+  const deleted = await db.delete(recurringRules).where(and(
+    eq(recurringRules.id, id),
+    eq(recurringRules.userId, userId),
+    expectedVersion === undefined ? undefined : eq(recurringRules.version, expectedVersion),
+  )).returning({ id: recurringRules.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(

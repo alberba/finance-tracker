@@ -13,17 +13,35 @@ export type {
   SymbolCheckResult,
 }
 
-function buildHeaders(apiKey: string, withJsonBody: boolean): Record<string, string> {
+function buildHeaders(withJsonBody: boolean): Record<string, string> {
   return {
     Accept: 'application/json',
-    'x-stockevents-key': apiKey,
     ...(withJsonBody ? { 'Content-Type': 'application/json' } : {}),
   }
 }
 
-export async function fetchStockEventsWatchlists(apiKey: string): Promise<StockEventsWatchlist[]> {
+export async function fetchStockEventsCredentialStatus(): Promise<boolean> {
+  const response = await fetch('/api/integrations/stockevents', { headers: buildHeaders(false) })
+  const body = (await response.json()) as { configured?: boolean; error?: string }
+  if (!response.ok) throw new Error(body.error || 'No se pudo consultar la credencial de Stock Events')
+  return body.configured === true
+}
+
+export async function saveStockEventsCredential(apiKey: string): Promise<boolean> {
+  const normalized = apiKey.trim()
+  const response = await fetch('/api/integrations/stockevents', {
+    method: normalized ? 'PUT' : 'DELETE',
+    headers: buildHeaders(normalized.length > 0),
+    ...(normalized ? { body: JSON.stringify({ apiKey: normalized }) } : {}),
+  })
+  const body = (await response.json()) as { configured?: boolean; error?: string }
+  if (!response.ok) throw new Error(body.error || 'No se pudo guardar la credencial de Stock Events')
+  return body.configured === true
+}
+
+export async function fetchStockEventsWatchlists(): Promise<StockEventsWatchlist[]> {
   const response = await fetch('/api/stockevents/watchlists', {
-    headers: buildHeaders(apiKey, false),
+    headers: buildHeaders(false),
   })
   const body = (await response.json()) as { watchlists?: StockEventsWatchlist[]; error?: string }
   if (!response.ok) throw new Error(body.error || 'No se pudieron cargar las listas de Stock Events')
@@ -31,12 +49,11 @@ export async function fetchStockEventsWatchlists(apiKey: string): Promise<StockE
 }
 
 export async function checkStockEventsSymbols(
-  apiKey: string,
   checks: SymbolCheckRequest[],
 ): Promise<SymbolCheckResult[]> {
   const response = await fetch('/api/stockevents/check-symbols', {
     method: 'POST',
-    headers: buildHeaders(apiKey, true),
+    headers: buildHeaders(true),
     body: JSON.stringify({ checks }),
   })
   const body = (await response.json()) as { results?: SymbolCheckResult[]; error?: string }
@@ -45,12 +62,11 @@ export async function checkStockEventsSymbols(
 }
 
 export async function createStockEventsTransaction(
-  apiKey: string,
   transaction: StockEventsTransactionPayload,
 ): Promise<StockEventsCreatedTransaction> {
   const response = await fetch('/api/stockevents/transactions', {
     method: 'POST',
-    headers: buildHeaders(apiKey, true),
+    headers: buildHeaders(true),
     body: JSON.stringify({ transaction }),
   })
   const body = (await response.json()) as {

@@ -130,7 +130,7 @@ describe("accounts repository", () => {
           accountId: "does-not-exist",
           name: "x",
         }),
-      ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
+      ).rejects.toThrow(/no existe o no pertenece/i);
     });
   });
 });

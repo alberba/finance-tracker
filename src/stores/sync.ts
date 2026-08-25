@@ -511,13 +511,13 @@ export const useSyncStore = defineStore('sync', () => {
 
   /** Full local wipe (Cf-Access logout doesn't clear client storage on its own). */
   async function logout(): Promise<void> {
-    if (userId.value) {
-      await wipeAllClientData(userId.value)
-    }
     cacheDb?.close()
     outboxDb?.close()
     cacheDb = null
     outboxDb = null
+    if (userId.value) {
+      await wipeAllClientData(userId.value)
+    }
     initialized = false
     userId.value = null
     email.value = null

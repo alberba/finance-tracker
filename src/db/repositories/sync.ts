@@ -4,7 +4,7 @@
  * the idempotent command log, and the entity-change log.
  */
 
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { syncChanges, syncCommands, userRevisions } from "../schema";
 import { nowIso, type Db } from "./shared";
 
@@ -51,10 +51,10 @@ export async function ensureRevision(db: Db, userId: string): Promise<UserRevisi
 
 /** Bumps the user's revision cursor by one and returns the new value. */
 export async function bumpRevision(db: Db, userId: string): Promise<UserRevisionRow> {
-  const existing = await ensureRevision(db, userId);
+  await ensureRevision(db, userId);
   const [row] = await db
     .update(userRevisions)
-    .set({ revision: existing.revision + 1, updatedAt: nowIso() })
+    .set({ revision: sql`${userRevisions.revision} + 1`, updatedAt: nowIso() })
     .where(eq(userRevisions.userId, userId))
     .returning();
   return row;
@@ -109,6 +109,21 @@ export async function createCommand(
       result: input.result ?? null,
       createdAt: nowIso(),
     })
+    .returning();
+  return row;
+}
+
+export async function finalizeCommand(
+  db: Db,
+  userId: string,
+  id: string,
+  status: string,
+  result: string,
+): Promise<SyncCommandRow | undefined> {
+  const [row] = await db
+    .update(syncCommands)
+    .set({ status, result })
+    .where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)))
     .returning();
   return row;
 }

@@ -1,6 +1,6 @@
 import { FINANCE_TRACKER_SEED } from "../data/seed";
 import { FINANCE_TRACKER_DEMO_SEED } from "../data/demo-seed";
-import { isDemoMode, resolveRuntimeNamespace } from "./demo-mode";
+import { isDemoMode } from "./demo-mode";
 import {
   DEFAULT_GOALS,
   isInvestmentSide,
@@ -41,6 +41,7 @@ import {
   deriveDefaultLiquidityAccountIds,
   sanitizeFlowAllocations,
 } from "./contribution-workflow";
+import { isSyncV2Enabled } from "../lib/client/feature-flags";
 
 export const STORAGE_KEY = "finance-tracker-state-v1";
 export const SERVER_STATE_ENDPOINT = "/api/state";
@@ -186,7 +187,7 @@ export function persistState(state: State): string {
 }
 
 export async function loadServerState(): Promise<ServerState | null> {
-  if (isDemoMode() || typeof fetch !== "function") {
+  if (isDemoMode() || isSyncV2Enabled() || typeof fetch !== "function") {
     return null;
   }
 
@@ -222,7 +223,7 @@ export async function persistServerState(
   state: State,
 ): Promise<ServerSaveResult> {
   const knownVersion = getKnownServerVersion();
-  if (isDemoMode()) {
+  if (isDemoMode() || isSyncV2Enabled()) {
     return { status: "ok", version: knownVersion ?? 0 };
   }
   try {
@@ -934,11 +935,6 @@ function buildServerHeaders(withJsonBody: boolean): HeadersInit {
 
   if (withJsonBody) {
     headers["Content-Type"] = "application/json";
-  }
-
-  const namespace = resolveRuntimeNamespace();
-  if (namespace) {
-    headers["x-finance-namespace"] = namespace;
   }
 
   return headers;

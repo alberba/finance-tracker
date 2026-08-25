@@ -301,7 +301,7 @@ function makeContext(options: {
     method: options.method,
   });
   const locals: Record<string, unknown> = {
-    runtime: { env: options.env ?? {} },
+    runtimeEnv: options.env ?? {},
   };
   return { request, locals } as unknown as Parameters<typeof onRequest>[0];
 }
@@ -315,15 +315,15 @@ const CONFIGURED_ENV = {
   CF_ACCESS_AUD: "aud-123",
 };
 
-describe("middleware onRequest — AUTH_ENFORCED gating", () => {
-  it("lets unauthenticated requests through when AUTH_ENFORCED is unset (default off)", async () => {
+describe("middleware onRequest — fail-closed authentication", () => {
+  it("rejects unauthenticated API requests when AUTH_ENFORCED is unset", async () => {
     const context = makeContext({ env: CONFIGURED_ENV });
     const next = makeNext(new Response("ok"));
 
     const response = (await onRequest(context, next)) as Response;
 
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(response.status).not.toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
     expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
     expect(jose.jwtVerify).not.toHaveBeenCalled();
   });
@@ -407,7 +407,7 @@ describe("middleware onRequest — AUTH_ENFORCED gating", () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it("does not block when AUTH_ENFORCED is off and the token is invalid/expired", async () => {
+  it("rejects an invalid or expired token regardless of AUTH_ENFORCED", async () => {
     vi.mocked(jose.jwtVerify).mockRejectedValue(
       Object.assign(new Error("exp claim timestamp check failed"), { code: "ERR_JWT_EXPIRED" }),
     );
@@ -419,8 +419,8 @@ describe("middleware onRequest — AUTH_ENFORCED gating", () => {
 
     const response = (await onRequest(context, next)) as Response;
 
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(response.status).not.toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
     expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
   });
 
@@ -442,7 +442,7 @@ describe("middleware onRequest — AUTH_ENFORCED gating", () => {
     expect(response.status).toBe(401);
   });
 
-  it("treats a missing Cf-Access configuration like 'no token' when not enforced", async () => {
+  it("rejects a token when Cf-Access verification is not configured", async () => {
     const context = makeContext({
       headers: { "Cf-Access-Jwt-Assertion": "a.valid.jwt" },
       env: {},
@@ -452,8 +452,8 @@ describe("middleware onRequest — AUTH_ENFORCED gating", () => {
     const response = (await onRequest(context, next)) as Response;
 
     expect(jose.jwtVerify).not.toHaveBeenCalled();
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(response.status).not.toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
   });
 
   it("returns 401 for a missing Cf-Access configuration when enforced", async () => {
@@ -488,10 +488,10 @@ describe("middleware onRequest — test-auth shim (TEST_AUTH_ENABLED)", () => {
     await onRequest(context, next);
 
     expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
-    expect(next).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it("resolves a principal from the test header when explicitly enabled and not enforced", async () => {
+  it("resolves the configured legacy owner from the test header when explicitly enabled", async () => {
     const { db, insertCalls } = createFakeDb({
       identityLookupResult: [],
       legacyOwnerLookupResult: [],
@@ -500,8 +500,9 @@ describe("middleware onRequest — test-auth shim (TEST_AUTH_ENABLED)", () => {
     vi.mocked(getDb).mockReturnValue(db as never);
 
     const context = makeContext({
+      url: "http://127.0.0.1/api/state",
       headers: { "X-Test-User-Email": "Tester@Example.com" },
-      env: { TEST_AUTH_ENABLED: "true" },
+      env: { TEST_AUTH_ENABLED: "true", LEGACY_OWNER_EMAIL: "tester@example.com" },
     });
     const next = makeNext(new Response("ok"));
 
@@ -510,16 +511,17 @@ describe("middleware onRequest — test-auth shim (TEST_AUTH_ENABLED)", () => {
     expect((context.locals as { principal?: unknown }).principal).toMatchObject({
       userId: "test-user-id",
       email: "tester@example.com",
+      isLegacyOwner: true,
     });
     expect(jose.jwtVerify).not.toHaveBeenCalled();
     expect(insertCalls.map((c) => c.table)).toEqual([users, userIdentities]);
     expect(next).toHaveBeenCalledTimes(1);
   });
 
-  it("never honors the test header when AUTH_ENFORCED=true, even if TEST_AUTH_ENABLED is also true", async () => {
+  it("never honors the test header outside a loopback origin", async () => {
     const context = makeContext({
       headers: { "X-Test-User-Email": "tester@example.com" },
-      env: { AUTH_ENFORCED: "true", TEST_AUTH_ENABLED: "true" },
+      env: { TEST_AUTH_ENABLED: "true" },
     });
     const next = makeNext(new Response("ok"));
 
@@ -530,7 +532,7 @@ describe("middleware onRequest — test-auth shim (TEST_AUTH_ENABLED)", () => {
     expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
   });
 
-  it("falls through to the normal Cf-Access flow when the test header is absent, even if enabled", async () => {
+  it("requires normal authentication when the test header is absent", async () => {
     const context = makeContext({
       env: { TEST_AUTH_ENABLED: "true" },
     });
@@ -538,8 +540,46 @@ describe("middleware onRequest — test-auth shim (TEST_AUTH_ENABLED)", () => {
 
     const response = (await onRequest(context, next)) as Response;
 
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(response.status).not.toBe(401);
+    expect(next).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
     expect((context.locals as { principal?: unknown }).principal).toBeUndefined();
+  });
+});
+
+describe("middleware onRequest — CSRF protection", () => {
+  it("rejects cross-site mutations before token validation", async () => {
+    const context = makeContext({
+      method: "POST",
+      headers: {
+        Origin: "https://evil.example",
+        "Content-Type": "application/json",
+        "Sec-Fetch-Site": "cross-site",
+      },
+      env: CONFIGURED_ENV,
+    });
+    const next = makeNext(new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+    expect(jose.jwtVerify).not.toHaveBeenCalled();
+  });
+
+  it("rejects form-compatible mutation content types", async () => {
+    const context = makeContext({
+      method: "POST",
+      headers: {
+        Origin: "https://app.example.com",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      env: CONFIGURED_ENV,
+    });
+    const next = makeNext(new Response("ok"));
+
+    const response = (await onRequest(context, next)) as Response;
+
+    expect(response.status).toBe(415);
+    expect(next).not.toHaveBeenCalled();
   });
 });

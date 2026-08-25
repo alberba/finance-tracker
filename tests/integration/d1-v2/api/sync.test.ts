@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
 import * as accountsRepository from "../../../../src/db/repositories/accounts";
+import { applyOneCommand } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
 
@@ -121,6 +122,56 @@ describe("POST /api/sync", () => {
     // Only one account was ever created — the replay did not duplicate the mutation.
     const accounts = await accountsRepository.listByUser(testDb.db, principal.userId);
     expect(accounts).toHaveLength(1);
+  });
+
+  it("applies a concurrently repeated commandId at most once", async () => {
+    const command = {
+      commandId: "create-account-concurrent",
+      action: "create" as const,
+      entityType: "account" as const,
+      data: { name: "Única", kind: "cash", currency: "EUR", openingBalance: 50 },
+    };
+
+    const outcomes = await Promise.allSettled([
+      applyOneCommand(testDb.db, principal.userId, command),
+      applyOneCommand(testDb.db, principal.userId, command),
+    ]);
+
+    expect(outcomes.some((outcome) => outcome.status === "fulfilled")).toBe(true);
+    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(1);
+  });
+
+  it("allows only one of two concurrent updates with the same baseVersion", async () => {
+    const account = await accountsRepository.create(testDb.db, principal.userId, {
+      name: "Original",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+
+    const outcomes = await Promise.all([
+      applyOneCommand(testDb.db, principal.userId, {
+        commandId: "concurrent-update-a",
+        action: "update",
+        entityType: "account",
+        entityId: account.id,
+        baseVersion: account.version,
+        patch: { name: "Cambio A" },
+      }),
+      applyOneCommand(testDb.db, principal.userId, {
+        commandId: "concurrent-update-b",
+        action: "update",
+        entityType: "account",
+        entityId: account.id,
+        baseVersion: account.version,
+        patch: { name: "Cambio B" },
+      }),
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(["applied", "conflict"]);
+    const reloaded = await accountsRepository.get(testDb.db, principal.userId, account.id);
+    expect(reloaded?.version).toBe(account.version + 1);
+    expect(["Cambio A", "Cambio B"]).toContain(reloaded?.name);
   });
 
   it("returns a 409 with a conflict body shape on a version mismatch, and halts remaining commands", async () => {

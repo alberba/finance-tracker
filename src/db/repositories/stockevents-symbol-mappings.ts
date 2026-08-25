@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { stockeventsSymbolMappings } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { assertOwnedReferences, nowIso, type Db } from "./shared";
 
 export type StockeventsSymbolMappingRow = typeof stockeventsSymbolMappings.$inferSelect;
 
@@ -38,6 +38,7 @@ export async function create(
   userId: string,
   input: CreateStockeventsSymbolMappingInput,
 ): Promise<StockeventsSymbolMappingRow> {
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
   const now = nowIso();
   const [row] = await db
     .insert(stockeventsSymbolMappings)
@@ -63,6 +64,7 @@ export async function update(
   if (!existing) {
     return undefined;
   }
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
   const [row] = await db
     .update(stockeventsSymbolMappings)
     .set({

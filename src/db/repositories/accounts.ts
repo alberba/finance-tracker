@@ -9,7 +9,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { accounts, categories, twrLiquidityAccounts } from "../schema";
-import { fromFlag, nowIso, toFlag, type Db } from "./shared";
+import { assertOwnedReferences, fromFlag, nowIso, toFlag, type Db } from "./shared";
 
 export type AccountRow = Omit<typeof accounts.$inferSelect, "openingBalanceMinor" | "isArchived"> & {
   openingBalance: number;
@@ -82,6 +82,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateAccountInput,
+  expectedVersion?: number,
 ): Promise<AccountRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -100,18 +101,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
+    .where(and(
+      eq(accounts.id, id),
+      eq(accounts.userId, userId),
+      expectedVersion === undefined ? undefined : eq(accounts.version, expectedVersion),
+    ))
     .returning();
-  return toAccountRow(row);
+  return row ? toAccountRow(row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
-  return true;
+  const deleted = await db.delete(accounts).where(and(
+    eq(accounts.id, id),
+    eq(accounts.userId, userId),
+    expectedVersion === undefined ? undefined : eq(accounts.version, expectedVersion),
+  )).returning({ id: accounts.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(
@@ -195,6 +204,7 @@ export async function updateCategory(
   userId: string,
   id: string,
   input: UpdateCategoryInput,
+  expectedVersion?: number,
 ): Promise<CategoryRow | undefined> {
   const existing = await getCategory(db, userId, id);
   if (!existing) {
@@ -209,18 +219,31 @@ export async function updateCategory(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(categories.id, id), eq(categories.userId, userId)))
+    .where(and(
+      eq(categories.id, id),
+      eq(categories.userId, userId),
+      expectedVersion === undefined ? undefined : eq(categories.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function removeCategory(db: Db, userId: string, id: string): Promise<boolean> {
+export async function removeCategory(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
   const existing = await getCategory(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
-  return true;
+  const deleted = await db.delete(categories).where(and(
+    eq(categories.id, id),
+    eq(categories.userId, userId),
+    expectedVersion === undefined ? undefined : eq(categories.version, expectedVersion),
+  )).returning({ id: categories.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsertCategories(
@@ -280,6 +303,7 @@ export async function createTwrLiquidityAccount(
   userId: string,
   input: CreateTwrLiquidityAccountInput,
 ): Promise<TwrLiquidityAccountRow> {
+  await assertOwnedReferences(db, userId, { accountId: input.accountId });
   const now = nowIso();
   const [row] = await db
     .insert(twrLiquidityAccounts)

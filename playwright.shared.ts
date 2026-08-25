@@ -21,8 +21,8 @@ export function createPlaywrightRuntime({
   const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
   const useProductionBuild = isCI || process.env.PLAYWRIGHT_USE_BUILD === 'true'
   const serverCommand = useProductionBuild
-    ? `SENTRY_AUTH_TOKEN= pnpm build && pnpm exec wrangler dev dist/_worker.js/index.js --assets dist --ip 127.0.0.1 --port ${port} --compatibility-flag nodejs_compat`
-    : `pnpm dev --host 127.0.0.1 --port ${port}`
+    ? `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && SENTRY_AUTH_TOKEN= pnpm build && pnpm exec wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --ip 127.0.0.1 --port ${port} --compatibility-flag nodejs_compat`
+    : `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${port}`
 
   return {
     tag,
@@ -37,6 +37,9 @@ export function createPlaywrightRuntime({
       : [['list'], ['html', { open: 'never', outputFolder: htmlOutputFolder }]],
     use: {
       baseURL: externalBaseURL ?? localBaseURL,
+      extraHTTPHeaders: {
+        'X-Test-User-Email': 'legacy-owner@e2e.test',
+      },
       trace: 'on-first-retry',
       screenshot: 'only-on-failure',
       video: 'on-first-retry',

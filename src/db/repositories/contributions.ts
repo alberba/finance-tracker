@@ -10,7 +10,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { assertOwnedReferences, nowIso, type Db } from "./shared";
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
@@ -110,6 +110,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateContributionInput,
+  expectedVersion?: number,
 ): Promise<ContributionRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -133,18 +134,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(contributions.id, id), eq(contributions.userId, userId)))
+    .where(and(
+      eq(contributions.id, id),
+      eq(contributions.userId, userId),
+      expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+    ))
     .returning();
-  return toRow(row);
+  return row ? toRow(row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(contributions).where(and(eq(contributions.id, id), eq(contributions.userId, userId)));
-  return true;
+  const deleted = await db.delete(contributions).where(and(
+    eq(contributions.id, id),
+    eq(contributions.userId, userId),
+    expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+  )).returning({ id: contributions.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(
@@ -213,6 +222,10 @@ export async function createAllocation(
   userId: string,
   input: CreateContributionAllocationInput,
 ): Promise<ContributionAllocationRow> {
+  await assertOwnedReferences(db, userId, {
+    contributionId: input.contributionId,
+    accountId: input.accountId,
+  });
   const [row] = await db
     .insert(contributionAllocations)
     .values({
@@ -245,6 +258,12 @@ export async function bulkInsertAllocations(
 ): Promise<ContributionAllocationRow[]> {
   if (inputs.length === 0) {
     return [];
+  }
+  for (const input of inputs) {
+    await assertOwnedReferences(db, userId, {
+      contributionId: input.contributionId,
+      accountId: input.accountId,
+    });
   }
   const now = nowIso();
   const rows = await db

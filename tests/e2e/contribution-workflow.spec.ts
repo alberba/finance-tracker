@@ -254,6 +254,9 @@ test.describe("recorrido guiado de aportes", () => {
     page,
   }) => {
     const syncedTransactions: Record<string, unknown>[] = [];
+    await page.route("**/api/integrations/stockevents", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: '{"configured":true}' }),
+    );
     await page.route("**/api/stockevents/watchlists", async (route) => {
       await route.fulfill({
         status: 200,
@@ -289,7 +292,7 @@ test.describe("recorrido guiado de aportes", () => {
       const state = JSON.parse(raw);
       state.stockEvents = {
         enabled: true,
-        apiKey: "test-stock-events-key",
+        apiKey: "",
         symbolMappings: [],
         cashMappings: [],
       };

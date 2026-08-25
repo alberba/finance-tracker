@@ -3,6 +3,7 @@ import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { loadMarketQuote, type MarketDataEnv } from '../../../lib/server/market-data'
 import { createJsonResponse } from '../../../lib/server/json-response'
 import type { Instrument, Quote } from '../../../scripts/types'
+import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 
 const json = createJsonResponse('private, max-age=30')
 
@@ -11,8 +12,10 @@ interface QuotesBody {
   fallbackQuotes?: unknown
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  try {
+export const POST: APIRoute = async ({ request, locals }) =>
+  withApiErrorHandling(async () => {
+    requirePrincipal(locals)
+    try {
     const body = (await request.json()) as QuotesBody
     const instruments = normalizeInstruments(body.instruments)
     if (!instruments.length) {
@@ -28,14 +31,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
       ] as const),
     )
     return json({ quotes: Object.fromEntries(entries) })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudieron consultar las cotizaciones'
-    return json({ error: message }, 502)
-  }
-}
+    } catch (error) {
+      console.error('[market/quotes] Quote lookup failed', error)
+      return json({ error: 'No se pudieron consultar las cotizaciones' }, 502)
+    }
+  })
 
 function normalizeInstruments(value: unknown): Instrument[] {
-  return Array.isArray(value) ? value.filter(isInstrument) : []
+  return Array.isArray(value) ? value.filter(isInstrument).slice(0, 50) : []
 }
 
 function isInstrument(value: unknown): value is Instrument {

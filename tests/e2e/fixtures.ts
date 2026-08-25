@@ -36,12 +36,12 @@ type Fixtures = {
 
 export const test = base.extend<Fixtures>({
   tracker: async ({ page }, use) => {
-    // A fresh namespace auto-seeds on the first GET. Avoiding reset and v2
-    // provisioning here removes two backend writes from every legacy test.
-    const namespace = `pw-${crypto.randomUUID()}`
-    await page.addInitScript((value) => {
-      window.__FINANCE_NAMESPACE__ = value
-    }, namespace)
+    // The legacy blob is owner-only and no longer accepts a client-selected
+    // namespace. Legacy browser specs therefore reset the one owner blob and
+    // run serially; multi-user isolation is covered against the relational v2
+    // APIs instead of manufacturing tenants inside v1.
+    const reset = await page.request.post('/api/state/reset-legacy', { data: {} })
+    expect(reset.ok()).toBe(true)
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
     await use(tracker)

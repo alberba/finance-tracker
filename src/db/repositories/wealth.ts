@@ -9,7 +9,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { snapshotBalances, wealthSnapshots } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { assertOwnedReferences, nowIso, type Db } from "./shared";
 
 export type WealthSnapshotRow = typeof wealthSnapshots.$inferSelect;
 export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "balanceMinor"> & {
@@ -74,6 +74,7 @@ export async function update(
   userId: string,
   id: string,
   input: Partial<CreateWealthSnapshotInput>,
+  expectedVersion?: number,
 ): Promise<WealthSnapshotRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -88,18 +89,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(wealthSnapshots.id, id), eq(wealthSnapshots.userId, userId)))
+    .where(and(
+      eq(wealthSnapshots.id, id),
+      eq(wealthSnapshots.userId, userId),
+      expectedVersion === undefined ? undefined : eq(wealthSnapshots.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(wealthSnapshots).where(and(eq(wealthSnapshots.id, id), eq(wealthSnapshots.userId, userId)));
-  return true;
+  const deleted = await db.delete(wealthSnapshots).where(and(
+    eq(wealthSnapshots.id, id),
+    eq(wealthSnapshots.userId, userId),
+    expectedVersion === undefined ? undefined : eq(wealthSnapshots.version, expectedVersion),
+  )).returning({ id: wealthSnapshots.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(
@@ -158,6 +167,10 @@ export async function createBalance(
   userId: string,
   input: CreateSnapshotBalanceInput,
 ): Promise<SnapshotBalanceRow> {
+  await assertOwnedReferences(db, userId, {
+    snapshotId: input.snapshotId,
+    accountId: input.accountId,
+  });
   const [row] = await db
     .insert(snapshotBalances)
     .values({
@@ -190,6 +203,12 @@ export async function bulkInsertBalances(
 ): Promise<SnapshotBalanceRow[]> {
   if (inputs.length === 0) {
     return [];
+  }
+  for (const input of inputs) {
+    await assertOwnedReferences(db, userId, {
+      snapshotId: input.snapshotId,
+      accountId: input.accountId,
+    });
   }
   const now = nowIso();
   const rows = await db

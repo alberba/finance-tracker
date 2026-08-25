@@ -86,6 +86,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateSubscriptionInput,
+  expectedVersion?: number,
 ): Promise<SubscriptionRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -108,18 +109,26 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(subscriptions.id, id), eq(subscriptions.userId, userId)))
+    .where(and(
+      eq(subscriptions.id, id),
+      eq(subscriptions.userId, userId),
+      expectedVersion === undefined ? undefined : eq(subscriptions.version, expectedVersion),
+    ))
     .returning();
-  return toRow(row);
+  return row ? toRow(row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db.delete(subscriptions).where(and(eq(subscriptions.id, id), eq(subscriptions.userId, userId)));
-  return true;
+  const deleted = await db.delete(subscriptions).where(and(
+    eq(subscriptions.id, id),
+    eq(subscriptions.userId, userId),
+    expectedVersion === undefined ? undefined : eq(subscriptions.version, expectedVersion),
+  )).returning({ id: subscriptions.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(

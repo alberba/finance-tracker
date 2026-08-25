@@ -10,6 +10,8 @@ export default defineConfig(
     tag: '@legacy',
   }),
   {
+    fullyParallel: false,
+    workers: 1,
     projects: [
       {
         name: 'chromium',
