@@ -5,13 +5,19 @@ import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import {
   getAllEntities,
+  getCachedBootstrap,
   getRevision as getCachedRevision,
   openIdbCache,
   putEntities,
+  replaceEntities,
   removeEntity as removeCachedEntity,
   setRevision as setCachedRevision,
+  setCachedSettings,
+  setCachedBootstrap,
   type CachedEntity,
 } from '../lib/client/idb-cache'
+import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
+import { useFinancialStateStore } from './financial-state'
 import {
   acknowledge,
   amendPendingCreate,
@@ -120,6 +126,7 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       await pullChanges()
       await flush()
+      if (pendingCount.value === 0 && conflicts.value.length === 0) await bootstrapState()
     } finally {
       if (syncStatus.value === 'syncing') {
         syncStatus.value = 'idle'
@@ -144,10 +151,18 @@ export const useSyncStore = defineStore('sync', () => {
 
   /** Bootstraps the local databases for the authenticated identity. Idempotent. */
   async function init(nextUserId: string, options: { email?: string | null } = {}): Promise<void> {
-    if (!enabled || initialized || isReadOnlyDemoActive()) {
+    if (!enabled || isReadOnlyDemoActive()) {
       // Read-only demo never opens a per-user cache/outbox or talks to the
       // server — `getGlobalDemoState()` is the only data source in that mode.
       return
+    }
+    if (initialized && userId.value === nextUserId) return
+    if (initialized) {
+      cacheDb?.close()
+      outboxDb?.close()
+      cacheDb = null
+      outboxDb = null
+      initialized = false
     }
     initialized = true
     userId.value = nextUserId
@@ -155,6 +170,7 @@ export const useSyncStore = defineStore('sync', () => {
 
     cacheDb = await openIdbCache(nextUserId)
     outboxDb = await openOutbox(nextUserId)
+    await bootstrapState()
     revision.value = await getCachedRevision(cacheDb)
     pendingCount.value = await countOutbox(outboxDb)
 
@@ -167,8 +183,50 @@ export const useSyncStore = defineStore('sync', () => {
       // See the identical comment in `handleConnectionChange`: pull before
       // flushing so `getEntityRef` can resolve entities this device didn't
       // itself create (e.g. a fresh "second device" for an existing user).
-      void syncNow()
+      await syncNow()
     }
+  }
+
+  async function bootstrapState(): Promise<void> {
+    if (!cacheDb) return
+    let bootstrap: SyncV2Bootstrap | null = null
+    try {
+      const response = await fetch('/api/bootstrap')
+      if (response.ok) bootstrap = await response.json() as SyncV2Bootstrap
+    } catch {
+      // Offline reload falls back to the last complete identity-partitioned read model.
+    }
+    bootstrap ??= await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+    // A brand-new identity has no read model yet. Start from an empty
+    // projection; the first command will create its server-side entities.
+    // Existing identities still hydrate from the network/cache above.
+    bootstrap ??= {
+      revision: 0,
+      settings: null,
+      accounts: [], categories: [], transactions: [], subscriptions: [],
+      recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
+      contributions: [], userInstruments: [], wealthSnapshots: [],
+    }
+    const collections = {
+      account: bootstrap.accounts,
+      category: bootstrap.categories,
+      transaction: bootstrap.transactions,
+      subscription: bootstrap.subscriptions,
+      recurringRule: bootstrap.recurringRules,
+      pendingMovement: bootstrap.pendingMovements,
+      budgetEntry: bootstrap.budgetEntries,
+      goal: bootstrap.goals,
+      contribution: bootstrap.contributions,
+      userInstrument: bootstrap.userInstruments,
+      wealthSnapshot: bootstrap.wealthSnapshots,
+    } satisfies Record<SyncEntityType, CachedEntity[]>
+    await Promise.all(Object.entries(collections).map(([entityType, entities]) =>
+      replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
+    ))
+    await setCachedSettings(cacheDb, bootstrap.settings)
+    await setCachedBootstrap(cacheDb, bootstrap)
+    await setCachedRevision(cacheDb, bootstrap.revision)
+    useFinancialStateStore().reloadState(projectSyncV2State(bootstrap))
   }
 
   /** Validates and appends a command to the outbox, then attempts an immediate flush. */
@@ -410,6 +468,7 @@ export const useSyncStore = defineStore('sync', () => {
     if (resolution === 'keepServer') {
       await acknowledge(outboxDb, [seq])
       pendingCount.value = await countOutbox(outboxDb)
+      await bootstrapState()
       if (conflicts.value.length === 0) void flush()
       return
     }

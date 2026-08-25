@@ -21,7 +21,6 @@ import {
   wealthRepository,
 } from "../../src/db/repositories";
 import type { Db } from "../../src/db/repositories/shared";
-import type { DataEncryptionEnv } from "../../src/lib/server/crypto/data-encryption";
 import { TRANSACTION_TYPES, type BudgetType, type GoalKey, type TransactionType } from "../../src/scripts/types";
 import type { MigrationCollection, ParitySnapshot } from "./migration-types";
 
@@ -33,7 +32,6 @@ export async function computeV2Parity(
   db: Db,
   userId: string,
   year: number,
-  dataEncryptionEnv?: DataEncryptionEnv,
 ): Promise<ParitySnapshot> {
   const [
     accounts,
@@ -112,7 +110,11 @@ export async function computeV2Parity(
   }
   for (const instrument of instruments) {
     const quotes = await marketRepository.listQuotesByInstrument(db, instrument.id);
-    marketQuoteCount += quotes.length;
+    // v1 stores one current quote per tracked instrument; v2 intentionally
+    // retains quote history, so parity compares coverage rather than history length.
+    if (quotes.length > 0 && userInstruments.some((item) => item.instrumentId === instrument.id)) {
+      marketQuoteCount += 1;
+    }
   }
 
   const categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -143,9 +145,11 @@ export async function computeV2Parity(
     contributionAllocationCount += allocations.length;
   }
 
-  const integrationCredentials = dataEncryptionEnv
-    ? await integrationCredentialsRepository.listByUser(db, userId, dataEncryptionEnv)
-    : [];
+  const hasStockeventsCredential = await integrationCredentialsRepository.hasProvider(
+    db,
+    userId,
+    "stockevents",
+  );
 
   const counts: Record<MigrationCollection, number> = {
     users: 1,
@@ -166,7 +170,7 @@ export async function computeV2Parity(
     snapshotBalances: snapshotBalanceCount,
     contributions: contributions.length,
     contributionAllocations: contributionAllocationCount,
-    integrationCredentials: integrationCredentials.filter((c) => c.provider === "stockevents").length,
+    integrationCredentials: hasStockeventsCredential ? 1 : 0,
     stockeventsSymbolMappings: stockeventsSymbolMappings.length,
   };
 

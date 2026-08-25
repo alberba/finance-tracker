@@ -10,6 +10,16 @@ IndexedDB/outbox sync).
 Companion doc: `docs/migration/retention-checklist.md` (30-day v1 retention +
 decommission sign-off).
 
+> **Desactualizado desde la migración a Workers.** Este runbook se escribió
+> cuando la app se desplegaba como proyecto de **Cloudflare Pages**, y las
+> notas de los pasos 2, 4 y 6 sobre "Pages no lee `wrangler.toml`" y sobre
+> configurar bindings y variables en el dashboard de Pages **ya no aplican**.
+> Ahora la app es un **Worker** desplegado por Workers Builds con
+> `pnpm deploy:cf`, y `wrangler.toml` (vía `dist/server/wrangler.json`) *sí*
+> es la fuente de verdad de bindings y `[vars]` en runtime. Ver README,
+> "Deploy en Cloudflare Workers + D1". Se conserva como registro del cutover
+> ya ejecutado.
+
 Every command below is copy-pasted from what actually exists in this repo
 today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 — nothing here is aspirational. If a command's flags have drifted, re-run

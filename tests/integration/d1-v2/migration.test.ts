@@ -194,7 +194,7 @@ describe("WP9 migration tool", () => {
     }
 
     const v1Parity = computeV1Parity(state);
-    const v2Parity = await computeV2Parity(testDb.db, report.userId, state.year, ENCRYPTION_ENV);
+    const v2Parity = await computeV2Parity(testDb.db, report.userId, state.year);
     expect(diffParity(v1Parity, v2Parity)).toEqual([]);
   });
 

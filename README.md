@@ -68,13 +68,13 @@ wrangler secret put TWELVE_DATA_API_KEY
 wrangler secret put COINGECKO_API_KEY
 ```
 
-## Deploy en Cloudflare Pages + D1
+## Deploy en Cloudflare Workers + D1
 
 ### 1) Configuración D1
 
 Este repo ya incluye:
 
-- `wrangler.toml` con binding `finance_tracker_db`
+- `wrangler.toml` con los bindings `finance_tracker_db` y `finance_tracker_db_v2`
 - `migrations/0001_create_app_state.sql`
 - `migrations/0002_import_seeded_state.sql` (import de namespaces persistentes)
 
@@ -91,15 +91,41 @@ Si cambias `wrangler.toml`, regenera tipos:
 pnpm cf:types
 ```
 
-### 2) Build/Deploy en Pages
+### 2) Build/Deploy con Workers Builds
 
-- Build command: `pnpm build`
-- Output directory: `dist`
-- Binding D1 en Pages: `finance_tracker_db` (mismo nombre que `wrangler.toml`)
+El deploy lo hace **Workers Builds** (integración Git del Worker `finance-tracker`),
+no GitHub Actions. Configuración en el dashboard (Workers → finance-tracker →
+Settings → Build):
+
+| Campo | Valor |
+|---|---|
+| Build command | `pnpm build` |
+| Deploy command | `pnpm deploy:cf` |
+| Production branch | `main` |
+
+`pnpm deploy:cf` usa `--config dist/server/wrangler.json`: el adapter de Astro
+genera ese fichero en el build a partir de `wrangler.toml`, y es el que lleva
+`main`, `assets` y los bindings. El `wrangler.toml` de raíz por sí solo no
+sirve para desplegar (no declara `main` ni `assets`).
+
+A diferencia de Pages, aquí **los bindings y las `[vars]` de `wrangler.toml`
+son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
+(`DATA_ENCRYPTION_KEY`, `TWELVE_DATA_API_KEY`, …) siguen viviendo en
+`wrangler secret put` y no se tocan en el deploy.
+
+`PUBLIC_SYNC_V2=true` viene de `.env.production` (versionado), así que no hay
+que declararlo como variable de build.
+
+Toolchain del build: `.node-version` (24) y el campo `packageManager` de
+`package.json` fijan Node y pnpm para que Workers Builds coincida con el CI.
+
+El deploy ocurre en el push a `main`, **en paralelo al CI y sin esperarlo**: si
+los E2E fallan, el deploy sale igual. Compensación aceptada a cambio de
+latencia de deploy.
 
 ### 3) Proteger acceso con Cloudflare Access
 
-- Crear app Access tipo **Self-hosted** sobre tu dominio de producción (`*.pages.dev` o custom).
+- Crear app Access tipo **Self-hosted** sobre tu dominio de producción (`*.workers.dev` o custom).
 - Política `Allow` solo para tu email (OTP por email).
 - Sin reglas `Allow` adicionales (deny implícito al resto).
 

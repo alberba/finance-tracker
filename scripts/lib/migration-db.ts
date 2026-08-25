@@ -126,7 +126,12 @@ function sqlLiteral(value: unknown): string {
  * `INSERT ... ON CONFLICT(id) DO NOTHING` statements — ready for
  * `wrangler d1 execute finance-tracker-db-v2 --remote --file=<out>`.
  */
-export function dumpUserRowsAsSql(sqlite: Database.Database, userId: string, outPath: string): void {
+export function dumpUserRowsAsSql(
+  sqlite: Database.Database,
+  userId: string,
+  outPath: string,
+  replaceExistingUserData = false,
+): void {
   const userScopedTables = [
     "users",
     "accounts",
@@ -154,10 +159,25 @@ export function dumpUserRowsAsSql(sqlite: Database.Database, userId: string, out
     "",
   ];
 
+  if (replaceExistingUserData) {
+    const userIdSql = sqlLiteral(userId);
+    const deleteOrder = [
+      "contribution_allocations", "snapshot_balances", "investment_trade_details",
+      "pending_movements", "recurring_rules", "subscriptions", "budget_entries", "goals",
+      "transactions", "twr_liquidity_accounts", "stockevents_symbol_mappings",
+      "user_instruments", "contributions", "wealth_snapshots", "categories", "accounts",
+      "sync_changes", "sync_commands", "audit_events", "user_revisions",
+    ];
+    statements.push("-- Replace only this user's financial/read-model data; identity and credentials survive.");
+    for (const table of deleteOrder) statements.push(`DELETE FROM ${table} WHERE user_id = ${userIdSql};`);
+    statements.push("");
+  }
+
   const instrumentIds = new Set<string>();
 
   for (const table of userScopedTables) {
-    const rows = sqlite.prepare(`SELECT * FROM ${table} WHERE user_id = ?`).all(userId) as Array<Record<string, unknown>>;
+    const ownerColumn = table === "users" ? "id" : "user_id";
+    const rows = sqlite.prepare(`SELECT * FROM ${table} WHERE ${ownerColumn} = ?`).all(userId) as Array<Record<string, unknown>>;
     for (const row of rows) {
       if (table === "user_instruments" && row.instrument_id) {
         instrumentIds.add(String(row.instrument_id));

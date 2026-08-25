@@ -23,6 +23,8 @@ import { useFinancialStateStore } from "../stores/financial-state";
 import { pinia } from "../stores/pinia";
 import { useUiStore } from "../stores/ui";
 import { useRecurringStore } from "../stores/recurring";
+import { isSyncV2Enabled } from "../lib/client/feature-flags";
+import { useSyncStore } from "../stores/sync";
 
 (() => {
   "use strict";
@@ -58,11 +60,11 @@ import { useRecurringStore } from "../stores/recurring";
   // Persist whenever a Pinia mutation lands so the canonical state stays saved.
   financialStateStore.registerStateCommitHandler((nextState) => {
     state = nextState;
-    saveState();
+    if (!isSyncV2Enabled()) saveState();
   });
   financialStateStore.registerStateReloadHandler((nextState) => {
     state = nextState;
-    saveState();
+    if (!isSyncV2Enabled()) saveState();
   });
 
   void init();
@@ -86,6 +88,17 @@ import { useRecurringStore } from "../stores/recurring";
    * On conflict the server wins to avoid clobbering another device's change.
    */
   async function hydrateState() {
+    if (isSyncV2Enabled()) {
+      const response = await fetch('/api/session');
+      if (!response.ok) throw new Error('No se pudo resolver la sesión para sync v2.');
+      const session = await response.json() as { user?: { id?: string; email?: string } };
+      if (!session.user?.id) throw new Error('La sesión no contiene una identidad válida.');
+      await useSyncStore(pinia).init(session.user.id, { email: session.user.email ?? null });
+      state = financialStateStore.state;
+      recurringStore.refreshPending();
+      return;
+    }
+
     // Capture the version we last confirmed BEFORE loadServerState overwrites it
     // as a side effect — we need it to tell "server unchanged since our last
     // sync" (safe to push local edits) from "another device moved it ahead".
