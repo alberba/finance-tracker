@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/astro'
 
 Sentry.init({
-  dsn: 'https://8557422dab61d50fd0c95814431f78f6@o4511755834884096.ingest.de.sentry.io/4511755846680656',
+  dsn: 'https://f69ab9e853e8908f49a260af8ed822d4@o4511755834884096.ingest.de.sentry.io/4511972407902288',
   dataCollection: {
     userInfo: false,
     httpBodies: [],
