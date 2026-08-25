@@ -181,6 +181,9 @@ export async function resetStateInD1(
   const nextVersion = (row ? Number(row.version ?? 0) : 0) + 1;
   const seed = seedClone(key);
   const updatedAt = new Date().toISOString();
-  await writeRow(db, key, seed, nextVersion, updatedAt);
+  // Remove the row and let the next GET lazily seed it. This keeps reset
+  // independent from the large-payload write path and avoids repeatedly
+  // replacing the same blob during E2E setup.
+  await db.prepare("DELETE FROM app_state WHERE id = ?").bind(key).run();
   return { state: seed, version: nextVersion, updatedAt };
 }
