@@ -10,7 +10,7 @@
 // keeps this file resolvable under plain Vitest, which doesn't run Astro's
 // Vite pipeline (see `tests/unit/auth-middleware.test.ts`).
 import { defineMiddleware } from "astro/middleware";
-import { verifyAccessJwt } from "./lib/server/auth/jwks";
+import { parseAudiences, verifyAccessJwt } from "./lib/server/auth/jwks";
 import { resolvePrincipal, CF_ACCESS_PROVIDER } from "./lib/server/auth/principal";
 import { getDb } from "./db/client";
 import { getRuntimeEnv, type RuntimeEnv } from "./lib/server/cloudflare-env";
@@ -84,8 +84,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   const teamDomain = env?.CF_ACCESS_TEAM_DOMAIN;
-  const audience = env?.CF_ACCESS_AUD;
-  if (!teamDomain || !audience) {
+  const audience = parseAudiences(env?.CF_ACCESS_AUD);
+  if (!teamDomain || audience.length === 0) {
     return jsonUnauthorized("Cf-Access no está configurado en este entorno.");
   }
 
