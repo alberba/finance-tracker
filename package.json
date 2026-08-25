@@ -79,15 +79,15 @@
     "@sentry/astro": "^10.70.0",
     "@sentry/browser": "10.70.0",
     "@sentry/cloudflare": "^10.70.0",
-    "@tailwindcss/vite": "^4.2.2",
-    "chart.js": "4.4.7",
+    "@tailwindcss/vite": "^4.3.3",
+    "chart.js": "4.5.1",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.2",
-    "jose": "^6.2.3",
+    "jose": "^6.2.10",
     "pinia": "^3.0.4",
-    "prettier-plugin-tailwindcss": "^0.8.0",
-    "tailwindcss": "^4.2.2",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.3",
     "vue": "^3.5.41",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }
