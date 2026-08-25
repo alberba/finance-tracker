@@ -40,6 +40,7 @@ function parseCliArgs(argv: string[]) {
       "v1-namespace": { type: "string", default: "default" },
       "v2-sqlite": { type: "string", default: ".data/finance-tracker-v2.sqlite" },
       "remote-sql-out": { type: "string" },
+      "replace-existing-user-data": { type: "boolean", default: false },
       "legacy-owner-email": { type: "string" },
       "report-out": { type: "string" },
       "dry-run": { type: "boolean", default: false },
@@ -65,6 +66,9 @@ Options:
                            (default: .data/finance-tracker-v2.sqlite)
   --remote-sql-out=<path> After a successful run, dump the migrated rows as SQL
                            for 'wrangler d1 execute finance-tracker-db-v2 --remote --file=...'
+  --replace-existing-user-data
+                           Prepend user-scoped financial DELETEs before the remote inserts.
+                           Keeps users, user_identities and encrypted credentials intact.
   --legacy-owner-email=<e> Reserved legacy-owner user email
                            (default: $LEGACY_OWNER_EMAIL or legacy-owner@finance-tracker.local)
   --report-out=<path>      Write the JSON report to a file instead of stdout
@@ -126,7 +130,12 @@ async function main(): Promise<void> {
     }
 
     if (!args["dry-run"] && args["remote-sql-out"]) {
-      dumpUserRowsAsSql(sqlite, report.userId, resolve(args["remote-sql-out"]));
+      dumpUserRowsAsSql(
+        sqlite,
+        report.userId,
+        resolve(args["remote-sql-out"]),
+        args["replace-existing-user-data"],
+      );
       console.log(`Remote-apply SQL written to ${args["remote-sql-out"]}`);
     }
   } finally {

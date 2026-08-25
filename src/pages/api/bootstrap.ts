@@ -25,6 +25,7 @@ import * as contributionsRepository from "../../db/repositories/contributions";
 import * as marketRepository from "../../db/repositories/market";
 import * as userSettingsRepository from "../../db/repositories/user-settings";
 import * as syncRepository from "../../db/repositories/sync";
+import * as stockeventsSymbolMappingsRepository from "../../db/repositories/stockevents-symbol-mappings";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../lib/server/api-auth";
 
 function parseYear(raw: string | null): number | undefined | "invalid" {
@@ -63,6 +64,8 @@ export const GET: APIRoute = async ({ request, locals }) =>
       wealthSnapshots,
       contributions,
       userInstruments,
+      twrLiquidityAccounts,
+      stockeventsSymbolMappings,
       revisionRow,
     ] = await Promise.all([
       userSettingsRepository.get(db, userId),
@@ -77,6 +80,8 @@ export const GET: APIRoute = async ({ request, locals }) =>
       wealthRepository.listByUser(db, userId),
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
+      accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
+      stockeventsSymbolMappingsRepository.listByUser(db, userId),
       syncRepository.getRevision(db, userId),
     ]);
 
@@ -105,6 +110,22 @@ export const GET: APIRoute = async ({ request, locals }) =>
       })),
     );
 
+    const transactionsWithTradeDetails = await Promise.all(
+      filteredTransactions.map(async (transaction) => ({
+        ...transaction,
+        tradeDetail: await transactionsRepository.getTradeDetailByTransaction(db, userId, transaction.id),
+      })),
+    );
+
+    const instruments = await Promise.all(
+      userInstruments.map(async (userInstrument) => {
+        const instrument = await marketRepository.getInstrument(db, userInstrument.instrumentId);
+        if (!instrument) return null;
+        const quotes = await marketRepository.listQuotesByInstrument(db, instrument.id);
+        return { ...instrument, userInstrument, quotes };
+      }),
+    );
+
     return jsonResponse(
       {
         year: year ?? null,
@@ -112,7 +133,7 @@ export const GET: APIRoute = async ({ request, locals }) =>
         settings: settings ?? null,
         accounts,
         categories,
-        transactions: filteredTransactions,
+        transactions: transactionsWithTradeDetails,
         subscriptions,
         recurringRules,
         pendingMovements,
@@ -121,6 +142,9 @@ export const GET: APIRoute = async ({ request, locals }) =>
         wealthSnapshots: wealthSnapshotsWithBalances,
         contributions: contributionsWithAllocations,
         userInstruments,
+        instruments: instruments.filter((instrument) => instrument !== null),
+        twrLiquidityAccounts,
+        stockeventsSymbolMappings,
       },
       200,
     );
