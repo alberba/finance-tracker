@@ -19,6 +19,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "deploy:cf": "wrangler deploy --config dist/server/wrangler.json",
+    "versions:cf": "wrangler versions upload --config dist/server/wrangler.json",
     "deploy:worker": "pnpm build && pnpm deploy:cf",
     "audit:prod": "pnpm audit --prod --audit-level high",
     "benchmark:performance": "node scripts/benchmark-performance.mjs",
