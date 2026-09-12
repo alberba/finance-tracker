@@ -128,6 +128,11 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   if (!existing) {
     return false;
   }
+  // The FK has no ON DELETE CASCADE and D1 always enforces it.
+  await db.delete(investmentTradeDetails).where(and(
+    eq(investmentTradeDetails.transactionId, id),
+    eq(investmentTradeDetails.userId, userId),
+  ));
   const deleted = await db.delete(transactions).where(and(
     eq(transactions.id, id),
     eq(transactions.userId, userId),

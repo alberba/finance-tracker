@@ -131,6 +131,18 @@ export async function runInTransaction<T>(db: Db, fn: (db: Db) => Promise<T>): P
 }
 
 /**
+ * A write that can never succeed as submitted (dangling/foreign reference,
+ * entity still in use). `applyOneCommand` turns it into a terminal
+ * `rejected` outcome instead of a 500 the client would retry forever.
+ */
+export class RejectedCommandError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RejectedCommandError";
+  }
+}
+
+/**
  * Cross-tenant FK-ownership guard (WP10 security fix).
  *
  * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,
@@ -162,7 +174,7 @@ export async function assertOwnedReferences(
       .from(schema.accounts)
       .where(and(eq(schema.accounts.id, refs.accountId), eq(schema.accounts.userId, userId)));
     if (!account) {
-      throw new Error("La cuenta indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La cuenta indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.categoryId) {
@@ -171,7 +183,7 @@ export async function assertOwnedReferences(
       .from(schema.categories)
       .where(and(eq(schema.categories.id, refs.categoryId), eq(schema.categories.userId, userId)));
     if (!category) {
-      throw new Error("La categoría indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La categoría indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.recurringRuleId) {
@@ -182,7 +194,7 @@ export async function assertOwnedReferences(
         and(eq(schema.recurringRules.id, refs.recurringRuleId), eq(schema.recurringRules.userId, userId)),
       );
     if (!rule) {
-      throw new Error("La regla recurrente indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La regla recurrente indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.snapshotId) {
@@ -193,7 +205,7 @@ export async function assertOwnedReferences(
         and(eq(schema.wealthSnapshots.id, refs.snapshotId), eq(schema.wealthSnapshots.userId, userId)),
       );
     if (!snapshot) {
-      throw new Error("La instantánea indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La instantánea indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.contributionId) {
@@ -204,7 +216,7 @@ export async function assertOwnedReferences(
         and(eq(schema.contributions.id, refs.contributionId), eq(schema.contributions.userId, userId)),
       );
     if (!contribution) {
-      throw new Error("La aportación indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La aportación indicada no existe o no pertenece al usuario.");
     }
   }
 }

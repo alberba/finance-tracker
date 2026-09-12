@@ -27,11 +27,16 @@ import {
   findPendingCreate,
   openOutbox,
   peekBatch,
+  recordFailure,
   type OutboxCommandInput,
   type OutboxEntry,
 } from '../lib/client/outbox'
 import { wipeAllClientData } from '../lib/client/wipe'
-import type { SyncCommandInput, SyncEntityType } from '../lib/server/sync/command-schemas'
+import {
+  SYNC_ENTITY_TYPES,
+  type SyncCommandInput,
+  type SyncEntityType,
+} from '../lib/server/sync/command-schemas'
 
 export type ConnectionState = 'online' | 'offline'
 export type SyncStatus = 'idle' | 'syncing' | 'error'
@@ -70,7 +75,7 @@ export interface SyncConflict {
  */
 interface SyncCommandResult {
   commandId: string
-  status: 'applied' | 'conflict' | 'not_found' | 'noop'
+  status: 'applied' | 'conflict' | 'not_found' | 'noop' | 'rejected'
   entity?: unknown
   currentVersion?: number
   message?: string
@@ -78,6 +83,12 @@ interface SyncCommandResult {
 
 const RETRY_BASE_DELAY_MS = 1000
 const RETRY_MAX_DELAY_MS = 30_000
+/**
+ * The outbox is FIFO, so a head entry the server keeps failing on (5xx)
+ * would block every later command forever (audit §2.1). After this many
+ * failed sends it is discarded and surfaced via `lastError`.
+ */
+const MAX_SEND_ATTEMPTS = 5
 
 export const useSyncStore = defineStore('sync', () => {
   const enabled = isSyncV2Enabled()
@@ -301,19 +312,24 @@ export const useSyncStore = defineStore('sync', () => {
     if (connection.value === 'offline') {
       return
     }
-    const batch = await peekBatch(outboxDb, 5)
+    // Once the head has failed, send it alone so a failure is charged to
+    // the entry that caused it, not to whichever command led the batch.
+    const [head] = await peekBatch(outboxDb, 1)
+    const batch = head && head.attempts > 0 ? [head] : await peekBatch(outboxDb, 5)
     if (batch.length === 0) {
       return
     }
 
     flushing = true
     syncStatus.value = 'syncing'
+    let reachedServer = false
     try {
       const response = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commands: batch.map((entry) => entry.command) }),
       })
+      reachedServer = true
 
       if (!response.ok && response.status !== 409) {
         throw new Error(`El servidor respondió ${response.status}`)
@@ -325,6 +341,7 @@ export const useSyncStore = defineStore('sync', () => {
         halted: boolean
       }
       const acked: number[] = []
+      let lastDropMessage: string | null = null
       for (const [index, result] of body.results.entries()) {
         const entry = batch[index]
         if (!entry) {
@@ -358,13 +375,12 @@ export const useSyncStore = defineStore('sync', () => {
           // Conflicted commands stay in the outbox until the user resolves
           // them explicitly (`resolveConflict`) — no auto-merge, per design.
         } else {
-          // `not_found`: the entity this command addressed no longer
-          // exists server-side (e.g. removed by another device). Retrying
-          // can never succeed, so acknowledge it out of the outbox instead
-          // of `recordFailure`'s indefinite backoff — surfaced via
+          // `not_found` (entity removed elsewhere) and `rejected` (invalid
+          // payload, dangling reference, entity in use) can never succeed on
+          // retry, so acknowledge them out of the outbox — surfaced via
           // `lastError` rather than silently dropped.
           acked.push(entry.seq)
-          lastError.value = result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+          lastDropMessage = result.message ?? `No se pudo aplicar un cambio (${result.status}).`
         }
       }
 
@@ -375,7 +391,7 @@ export const useSyncStore = defineStore('sync', () => {
         await setCachedRevision(cacheDb, body.revision)
       }
 
-      lastError.value = null
+      lastError.value = lastDropMessage
       syncStatus.value = 'idle'
       retryAttempt = 0
 
@@ -387,7 +403,18 @@ export const useSyncStore = defineStore('sync', () => {
       }
     } catch (error) {
       syncStatus.value = 'error'
-      lastError.value = error instanceof Error ? error.message : 'Error de sincronización'
+      const message = error instanceof Error ? error.message : 'Error de sincronización'
+      lastError.value = message
+      // Network failures never count: a flaky connection must not discard
+      // edits the server has never seen.
+      const failed = batch[0]
+      if (reachedServer && failed.attempts + 1 >= MAX_SEND_ATTEMPTS) {
+        await discardOutboxEntry(outboxDb, failed.seq)
+        pendingCount.value = await countOutbox(outboxDb)
+        lastError.value = `Se descartó un cambio que el servidor no pudo aplicar tras ${MAX_SEND_ATTEMPTS} intentos: ${message}`
+      } else if (reachedServer) {
+        await recordFailure(outboxDb, failed.seq, message)
+      }
       scheduleRetry()
     } finally {
       flushing = false
@@ -436,17 +463,19 @@ export const useSyncStore = defineStore('sync', () => {
       changes: SyncChangeRow[]
     }
     for (const change of body.changes) {
-      if (change.changeType === 'remove') {
-        await removeCachedEntity(cacheDb, change.entityType, change.entityId)
-        continue
-      }
-      let entity: unknown
+      // The change log also carries non-entity rows (`userSettings`) that
+      // have no object store; applying them used to throw and pin the
+      // cursor forever (audit §2.5). Bootstrap rehydrates settings.
+      if (!(SYNC_ENTITY_TYPES as readonly string[]).includes(change.entityType)) continue
       try {
-        entity = JSON.parse(change.payload)
-      } catch {
-        continue
+        if (change.changeType === 'remove') {
+          await removeCachedEntity(cacheDb, change.entityType, change.entityId)
+        } else {
+          await applyResultToCache(change.entityType, JSON.parse(change.payload))
+        }
+      } catch (error) {
+        console.warn('[sync] No se pudo aplicar un cambio remoto', change.entityType, change.entityId, error)
       }
-      await applyResultToCache(change.entityType, entity)
     }
     revision.value = body.revision
     await setCachedRevision(cacheDb, body.revision)
@@ -476,13 +505,13 @@ export const useSyncStore = defineStore('sync', () => {
     // keepLocal: drop the stale command, re-enqueue with a fresh commandId so
     // it isn't treated as a replay, against whatever version the server sent.
     await acknowledge(outboxDb, [seq])
-    const server = conflict.server as { version?: number } | null
+    const server = conflict.server as { currentVersion?: number } | null
     if (conflict.local.action === 'update') {
       await enqueueCommand({
         action: 'update',
         entityType: conflict.local.entityType,
         entityId: conflict.local.entityId,
-        baseVersion: server?.version ?? conflict.local.baseVersion,
+        baseVersion: server?.currentVersion ?? conflict.local.baseVersion,
         patch: conflict.local.patch,
       })
     } else if (conflict.local.action === 'remove') {
@@ -490,7 +519,7 @@ export const useSyncStore = defineStore('sync', () => {
         action: 'remove',
         entityType: conflict.local.entityType,
         entityId: conflict.local.entityId,
-        baseVersion: server?.version ?? conflict.local.baseVersion,
+        baseVersion: server?.currentVersion ?? conflict.local.baseVersion,
       })
     }
   }
