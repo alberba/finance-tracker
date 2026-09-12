@@ -8,8 +8,44 @@
 
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { accounts, categories, twrLiquidityAccounts } from "../schema";
-import { assertOwnedReferences, fromFlag, nowIso, toFlag, type Db } from "./shared";
+import {
+  accounts,
+  budgetEntries,
+  categories,
+  contributionAllocations,
+  pendingMovements,
+  recurringRules,
+  snapshotBalances,
+  stockeventsSymbolMappings,
+  subscriptions,
+  transactions,
+  twrLiquidityAccounts,
+  userInstruments,
+} from "../schema";
+import { assertOwnedReferences, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
+
+/**
+ * No FK in the v2 DDL cascades and D1 always enforces them, so deleting a
+ * still-referenced account/category would fail with a raw constraint error.
+ * Rejecting it up front keeps the sync queue moving (audit §2.6).
+ */
+async function isReferenced(
+  db: Db,
+  userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any table with `userId` + the referencing column
+  refs: Array<{ table: any; column: any }>,
+  id: string,
+): Promise<boolean> {
+  for (const { table, column } of refs) {
+    const [row] = await db
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(column, id), eq(table.userId, userId)))
+      .limit(1);
+    if (row) return true;
+  }
+  return false;
+}
 
 export type AccountRow = Omit<typeof accounts.$inferSelect, "openingBalanceMinor" | "isArchived"> & {
   openingBalance: number;
@@ -114,6 +150,18 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
+  }
+  const inUse = await isReferenced(db, userId, [
+    { table: transactions, column: transactions.accountId },
+    { table: pendingMovements, column: pendingMovements.accountId },
+    { table: recurringRules, column: recurringRules.accountId },
+    { table: subscriptions, column: subscriptions.accountId },
+    { table: twrLiquidityAccounts, column: twrLiquidityAccounts.accountId },
+    { table: contributionAllocations, column: contributionAllocations.accountId },
+    { table: snapshotBalances, column: snapshotBalances.accountId },
+  ], id);
+  if (inUse) {
+    throw new RejectedCommandError("La cuenta tiene movimientos u otros datos asociados y no se puede eliminar.");
   }
   const deleted = await db.delete(accounts).where(and(
     eq(accounts.id, id),
@@ -237,6 +285,18 @@ export async function removeCategory(
   const existing = await getCategory(db, userId, id);
   if (!existing) {
     return false;
+  }
+  const inUse = await isReferenced(db, userId, [
+    { table: transactions, column: transactions.categoryId },
+    { table: pendingMovements, column: pendingMovements.categoryId },
+    { table: recurringRules, column: recurringRules.categoryId },
+    { table: subscriptions, column: subscriptions.categoryId },
+    { table: budgetEntries, column: budgetEntries.categoryId },
+    { table: userInstruments, column: userInstruments.categoryId },
+    { table: stockeventsSymbolMappings, column: stockeventsSymbolMappings.categoryId },
+  ], id);
+  if (inUse) {
+    throw new RejectedCommandError("La categoría está en uso y no se puede eliminar.");
   }
   const deleted = await db.delete(categories).where(and(
     eq(categories.id, id),

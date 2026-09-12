@@ -21,7 +21,7 @@
  * "repositories are the sole caller of Drizzle" design decision.
  */
 
-import { runInTransaction, type Db } from "../../../db/repositories/shared";
+import { RejectedCommandError, runInTransaction, type Db } from "../../../db/repositories/shared";
 import * as accountsRepository from "../../../db/repositories/accounts";
 import * as transactionsRepository from "../../../db/repositories/transactions";
 import * as subscriptionsRepository from "../../../db/repositories/subscriptions";
@@ -42,7 +42,12 @@ import {
   type SyncEntityType,
 } from "./command-schemas";
 
-export type CommandStatus = "applied" | "conflict" | "not_found" | "noop";
+/**
+ * `rejected` is terminal: the command can never succeed as sent (invalid
+ * payload, dangling reference, entity in use), so the client drops it
+ * instead of blocking the FIFO outbox behind it (audit §2.1/§2.3).
+ */
+export type CommandStatus = "applied" | "conflict" | "not_found" | "noop" | "rejected";
 const PROCESSING_LEASE_MS = 30_000;
 
 export interface CommandOutcome {
@@ -264,6 +269,14 @@ async function recordChange(
   return revisionRow.revision;
 }
 
+function rejectInvalidPayload(
+  entityType: SyncEntityType,
+  error: { issues: Array<{ path: PropertyKey[]; message: string }> },
+): Omit<CommandOutcome, "commandId" | "replayed"> {
+  const detail = error.issues.map((issue) => `${issue.path.map(String).join(".") || "(raíz)"}: ${issue.message}`).join("; ");
+  return { status: "rejected", entityType, message: `Datos inválidos para ${entityType}: ${detail}` };
+}
+
 /** Runs the actual mutation for one command inside an already-open transaction. */
 async function performMutation(
   db: Db,
@@ -285,7 +298,9 @@ async function performMutation(
 
     case "create": {
       const schema = entityCreateSchemas[command.entityType];
-      const parsed = schema.parse(command.data);
+      const validation = schema.safeParse(command.data);
+      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
+      const parsed = validation.data;
       const existing = await findByLegacyId(
         db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
       );
@@ -324,7 +339,9 @@ async function performMutation(
         };
       }
       const schema = entityUpdateSchemas[command.entityType];
-      const parsed = schema.parse(command.patch);
+      const validation = schema.safeParse(command.patch);
+      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
+      const parsed = validation.data;
       const row = await updateEntity(
         db,
         userId,
@@ -508,17 +525,31 @@ export async function applyOneCommand(
     return replay;
   }
 
-  return runInTransaction(db, async (tx) => {
-    const outcome = await performMutation(tx, userId, command);
-    await syncRepository.finalizeCommand(
-      tx,
-      userId,
-      command.commandId,
-      outcome.status,
-      JSON.stringify(outcome),
-    );
+  try {
+    return await runInTransaction(db, async (tx) => {
+      const outcome = await performMutation(tx, userId, command);
+      await syncRepository.finalizeCommand(
+        tx,
+        userId,
+        command.commandId,
+        outcome.status,
+        JSON.stringify(outcome),
+      );
+      return { commandId: command.commandId, replayed: false, ...outcome };
+    });
+  } catch (error) {
+    if (!(error instanceof RejectedCommandError)) throw error;
+    // Finalize with the outer handle (the SQLite transaction was rolled
+    // back; D1 has none) so the reservation never stays `processing` and a
+    // replay returns the rejection. Guards throw before any write.
+    const outcome: Omit<CommandOutcome, "commandId" | "replayed"> = {
+      status: "rejected",
+      ...("entityType" in command ? { entityType: command.entityType } : {}),
+      message: error.message,
+    };
+    await syncRepository.finalizeCommand(db, userId, command.commandId, outcome.status, JSON.stringify(outcome));
     return { commandId: command.commandId, replayed: false, ...outcome };
-  });
+  }
 }
 
 export interface SyncBatchResult {

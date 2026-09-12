@@ -133,12 +133,10 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       kind: "expense",
     });
 
-    // The repository-level guard throws (uncaught by `apply-command`'s
-    // per-command try/catch, which only expects unique-constraint races),
-    // rolling back the whole-command transaction — never a silently
-    // B-owned row pointing at A's category.
-    await expect(
-      applyOneCommand(db, userB.id, {
+    // The repository-level guard throws `RejectedCommandError`, which
+    // `apply-command` turns into a terminal `rejected` outcome — never a
+    // silently B-owned row pointing at A's category.
+    const outcome = await applyOneCommand(db, userB.id, {
         commandId: "attack-create-1",
         action: "create",
         entityType: "subscription",
@@ -149,8 +147,8 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
           currency: "EUR",
           frequency: "monthly",
         },
-      } as never),
-    ).rejects.toThrow();
+      } as never)
+    expect(outcome.status).toBe("rejected");
     expect(await subscriptionsRepository.listByUser(db, userB.id)).toHaveLength(0);
   });
 

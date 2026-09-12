@@ -30,7 +30,12 @@ import {
   normalizeInvestmentSymbol,
 } from '../scripts/investment-movements'
 import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
-import { resolveCategoryId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
+import {
+  resolveCategoryId,
+  resolveEntityId,
+  syncListDiff,
+  type CategoryKind,
+} from '../lib/client/command-mapping'
 import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -39,9 +44,13 @@ import { useUiStore } from './ui'
 
 /** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
 async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+  // The server only knows its own account ids; sending the local one made
+  // every investment movement fail the ownership check (audit §1).
+  const accountId = await resolveEntityId('account', tx.accountId)
+  if (!accountId) return null
   const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
   return {
-    accountId: tx.accountId,
+    accountId,
     categoryId,
     type: tx.type,
     date: tx.date,
