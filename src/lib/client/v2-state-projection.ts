@@ -193,7 +193,6 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     lastExecutionDate: rule.lastExecutionDate ? String(rule.lastExecutionDate) : null,
     nextOccurrenceDate: rule.nextRunDate ? String(rule.nextRunDate) : null,
   }))
-  console.log('PROJECTED RULES', JSON.stringify(projected.recurringRules))
   projected.pendingMovements = bootstrap.pendingMovements.map((pending) => ({
     id: legacyId(pending), occurrenceKey: `${recurringRuleIds.get(String(pending.recurringRuleId)) || pending.recurringRuleId}:${pending.dueDate}`,
     ruleId: recurringRuleIds.get(String(pending.recurringRuleId)) || String(pending.recurringRuleId),
