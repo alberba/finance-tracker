@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { subscriptions } from "../schema";
-import { assertOwnedReferences, fromFlag, nowIso, toFlag, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, fromFlag, nowIso, toFlag, type Db } from "./shared";
 
 export type SubscriptionRow = Omit<
   typeof subscriptions.$inferSelect,
@@ -11,6 +11,8 @@ export type SubscriptionRow = Omit<
 > & { amount: number; isActive: boolean };
 
 export interface CreateSubscriptionInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   categoryId?: string | null;
@@ -64,6 +66,7 @@ export async function create(
   const [row] = await db
     .insert(subscriptions)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -144,6 +147,7 @@ export async function bulkInsert(
     .insert(subscriptions)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,

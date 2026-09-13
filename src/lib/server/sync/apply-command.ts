@@ -36,7 +36,7 @@ import * as userSettingsRepository from "../../../db/repositories/user-settings"
 import * as syncRepository from "../../../db/repositories/sync";
 import * as auditEventsRepository from "../../../db/repositories/audit-events";
 import {
-  entityCreateSchemas,
+  entityCreatePayloadSchemas,
   entityUpdateSchemas,
   type SyncCommandInput,
   type SyncEntityType,
@@ -131,7 +131,24 @@ async function loadForMutation(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreateSchemas` before this is called.
+/**
+ * Looks up the row the client's own identity addresses (ADR 0001).
+ *
+ * Same lookup `loadForMutation` does — an entity carrying client identity is
+ * addressable by that id from its very first `create`, with no table of
+ * equivalences and no waiting for an ack.
+ */
+async function findByClientId(
+  db: Db,
+  userId: string,
+  entityType: SyncEntityType,
+  id: unknown,
+): Promise<VersionedRow | undefined> {
+  if (typeof id !== "string" || !id) return undefined;
+  return loadForMutation(db, userId, entityType, id);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreatePayloadSchemas` before this is called.
 async function createEntity(db: Db, userId: string, entityType: SyncEntityType, data: any): Promise<VersionedRow> {
   switch (entityType) {
     case "account":
@@ -297,13 +314,19 @@ async function performMutation(
     }
 
     case "create": {
-      const schema = entityCreateSchemas[command.entityType];
+      const schema = entityCreatePayloadSchemas[command.entityType];
       const validation = schema.safeParse(command.data);
       if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
       const parsed = validation.data;
-      const existing = await findByLegacyId(
-        db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
-      );
+      // The client's own identity wins when it sent one: re-sending a `create`
+      // is then a no-op instead of a duplicate, even under a fresh commandId
+      // that `sync_commands`'s replay guard no longer recognises. Falling back
+      // to the derived identifier keeps the rows migrated from v1 reconcilable.
+      const existing =
+        (await findByClientId(db, userId, command.entityType, (parsed as { id?: unknown }).id))
+        ?? (await findByLegacyId(
+          db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
+        ));
       if (existing) return { status: "noop", entityType: command.entityType, entityId: existing.id, entity: existing };
       const row = await createEntity(db, userId, command.entityType, parsed);
       const revision = await recordChange(db, userId, command.entityType, row.id, "create", row);

@@ -10,7 +10,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { investmentTradeDetails, transactions } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type TransactionRow = Omit<typeof transactions.$inferSelect, "amountMinor"> & {
   amount: number;
@@ -24,6 +24,8 @@ export type InvestmentTradeDetailRow = Omit<
 };
 
 export interface CreateTransactionInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   accountId: string;
   categoryId?: string | null;
@@ -71,6 +73,7 @@ export async function create(
   const [row] = await db
     .insert(transactions)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       accountId: input.accountId,
@@ -154,6 +157,7 @@ export async function bulkInsert(
     .insert(transactions)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         accountId: input.accountId,

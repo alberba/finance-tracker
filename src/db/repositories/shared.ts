@@ -34,6 +34,18 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Identity the client minted for a new entity (ADR 0001), ready to spread into
+ * an insert's values.
+ *
+ * During the expand phase it is optional: a client that has not migrated a
+ * section yet sends no `id`, the column's own server-side UUIDv7 default
+ * applies, and that row stays reconcilable by its derived `legacyId` as before.
+ */
+export function clientIdentity(id: string | undefined): { id?: string } {
+  return id ? { id } : {};
+}
+
 /** Converts a boolean domain flag to the `0`/`1` integer flag columns use. */
 export function toFlag(value: boolean | undefined, fallback = 0): number {
   if (value === undefined) {

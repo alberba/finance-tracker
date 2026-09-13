@@ -10,7 +10,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
@@ -26,6 +26,8 @@ export type ContributionAllocationRow = Omit<
 > & { amount: number };
 
 export interface CreateContributionInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   date: string;
   amount: number;
@@ -89,6 +91,7 @@ export async function create(
   const [row] = await db
     .insert(contributions)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       date: input.date,
@@ -169,6 +172,7 @@ export async function bulkInsert(
     .insert(contributions)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         date: input.date,

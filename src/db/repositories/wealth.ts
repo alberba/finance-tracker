@@ -9,7 +9,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { snapshotBalances, wealthSnapshots } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type WealthSnapshotRow = typeof wealthSnapshots.$inferSelect;
 export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "balanceMinor"> & {
@@ -17,6 +17,8 @@ export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "bal
 };
 
 export interface CreateWealthSnapshotInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   snapshotDate: string;
   year: number;
@@ -57,6 +59,7 @@ export async function create(
   const [row] = await db
     .insert(wealthSnapshots)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       snapshotDate: input.snapshotDate,
@@ -124,6 +127,7 @@ export async function bulkInsert(
     .insert(wealthSnapshots)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         snapshotDate: input.snapshotDate,
