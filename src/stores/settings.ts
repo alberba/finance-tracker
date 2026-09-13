@@ -13,22 +13,29 @@ export type ReorderDirection = 'up' | 'down'
 
 export type EntityField = 'name' | 'openingBalance'
 
-/**
- * WP7b — maps a legacy `Entity` (accounts store only — see the module's
- * leftover note below) to an `account` sync command payload. Legacy state
- * has no per-account `kind`; `'checking'` is used as a fixed default since
- * the app has no UI to set anything else today (documented approximation).
- */
-function buildAccountData(entity: Entity, currency: string) {
-  return {
-    name: entity.name,
-    // `cash` is the canonical account kind in the v2 projection. The old
-    // `checking` value is not one of the three kinds the UI can render, so a
-    // queued account would disappear on an offline reload before it ever
-    // reached the server.
-    kind: 'cash',
-    currency,
-    openingBalance: entity.openingBalance,
+const ACCOUNT_KIND_BY_KEY: Record<EntityKey, 'cash' | 'investment' | 'liability'> = {
+  accounts: 'cash',
+  investmentAssets: 'investment',
+  liabilities: 'liability',
+}
+
+function buildAccountData(key: EntityKey, currency: string) {
+  return (entity: Entity, previous?: Entity): Record<string, unknown> => {
+    if (previous) {
+      return {
+        ...(entity.name !== previous.name ? { name: entity.name } : {}),
+        ...(entity.openingBalance !== previous.openingBalance
+          ? { openingBalance: entity.openingBalance }
+          : {}),
+      }
+    }
+
+    return {
+      name: entity.name,
+      kind: ACCOUNT_KIND_BY_KEY[key],
+      currency,
+      openingBalance: entity.openingBalance,
+    }
   }
 }
 
@@ -80,6 +87,15 @@ export const useSettingsStore = defineStore('settings', () => {
     showToast('Configuración general guardada.')
   }
 
+  function syncEntities(key: EntityKey, before: readonly Entity[]): void {
+    void syncListDiff(
+      'account',
+      before,
+      financialStateStore.state[key],
+      buildAccountData(key, financialStateStore.currency),
+    )
+  }
+
   function addEntity(key: EntityKey, name: string, openingBalance: string): boolean {
     const trimmedName = name.trim()
     if (!trimmedName) {
@@ -93,7 +109,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return false
     }
 
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       draft[key].push({
         id,
@@ -101,14 +117,7 @@ export const useSettingsStore = defineStore('settings', () => {
         openingBalance: round2(parseFloatSafe(openingBalance, 0)),
       })
     })
-    // WP7b — only `accounts` maps to a `SyncEntityType` ('account');
-    // `investmentAssets`/`liabilities` have no corresponding v2 table today
-    // and are intentionally left unsynced (documented leftover).
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
-      )
-    }
+    syncEntities(key, before)
     showToast('Elemento agregado.')
     return true
   }
@@ -119,7 +128,7 @@ export const useSettingsStore = defineStore('settings', () => {
     field: EntityField,
     value: string,
   ): void {
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       const item = draft[key].find((entry) => entry.id === id)
       if (!item) {
@@ -136,15 +145,11 @@ export const useSettingsStore = defineStore('settings', () => {
         syncInvestmentCategoriesWithAssets(draft)
       }
     })
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
-      )
-    }
+    syncEntities(key, before)
   }
 
   function removeEntity(key: EntityKey, id: string): void {
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item.id !== id)
 
@@ -159,16 +164,7 @@ export const useSettingsStore = defineStore('settings', () => {
         syncInvestmentCategoriesWithAssets(draft)
       }
     })
-    // Note (documented leftover): the cascade above also drops the
-    // account's transactions/subscriptions from local state, but only the
-    // `account` row's own removal is synced here — cascading those deletes
-    // server-side is left to the `account` row's FK behavior rather than
-    // emitting a `remove` per affected transaction/subscription.
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
-      )
-    }
+    syncEntities(key, before)
     showToast('Elemento eliminado.')
   }
 

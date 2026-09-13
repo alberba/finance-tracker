@@ -83,9 +83,8 @@
  *   (WP12 owns encryption) and `stockevents_symbol_mappings` ("no version
  *   column to drive optimistic concurrency") are both explicitly excluded
  *   from `SYNC_ENTITY_TYPES` in `command-schemas.ts`.
- * - `settings.ts`'s `EntityKey` values `investmentAssets`/`liabilities`
- *   have no corresponding v2 table/`SyncEntityType` today — only
- *   `accounts` is wired.
+ * - `settings.ts`'s three `EntityKey` values all map to the single v2
+ *   `account` entity; the list shown in the UI determines its `kind`.
  * - `data.ts`'s import/reset/start-fresh flows use `reloadState` (whole
  *   blob), not `commitState`, and already have dedicated v2 endpoints
  *   (`/api/data/import`, `/api/state/reset`, `/api/state/initialize` via
@@ -371,8 +370,9 @@ export async function resolveOrCreateCategoryId(kind: CategoryKind, name: string
  * recurring-rule materialization) fall out of this for free: every row
  * that actually changed between the two snapshots gets its own command.
  *
- * `buildData` may return `null` to skip an item (used when a required
- * cross-entity reference — e.g. a pending movement's parent recurring rule
+ * `buildData` receives the current item and, for updates, its previous value
+ * so callers can emit a minimal patch. It may return `null` to skip an item
+ * (used when a required cross-entity reference — e.g. a pending movement's parent recurring rule
  * — hasn't synced yet) and otherwise must return plain JSON-serializable
  * data matching `entityCreateSchemas`/`entityUpdateSchemas` for
  * `entityType`.
@@ -381,7 +381,7 @@ export async function syncListDiff<T extends { id: string }>(
   entityType: SyncEntityType,
   before: readonly T[],
   after: readonly T[],
-  buildData: (item: T) => Promise<JsonRecord | null> | JsonRecord | null,
+  buildData: (item: T, previous?: T) => Promise<JsonRecord | null> | JsonRecord | null,
 ): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -400,7 +400,7 @@ export async function syncListDiff<T extends { id: string }>(
     if (prev && JSON.stringify(prev) === JSON.stringify(item)) {
       continue;
     }
-    const data = await buildData(item);
+    const data = await buildData(item, prev);
     if (data === null) {
       continue;
     }
