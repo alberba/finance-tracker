@@ -26,6 +26,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "lint": "eslint .",
+    "gate": "pnpm lint && pnpm check && pnpm test",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",

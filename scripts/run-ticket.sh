@@ -32,13 +32,7 @@ say() { printf '\n\033[1m[%s]\033[0m %s\n' "$ISSUE" "$1" | tee -a "$LOG"; }
 # --- the gate -----------------------------------------------------------
 # Runs in the worktree, before anything is published. A ticket that cannot
 # pass this has not been done, whatever the agent says about it.
-gate() (
-  cd "$WORKTREE"
-  npx eslint src tests --max-warnings 0 \
-    && npx tsc --noEmit -p tsconfig.json 2>&1 | grep -v "\.vue'" | { ! grep -q "error TS"; } \
-    && npx vitest run --project integration \
-    && npx vitest run --project unit
-)
+gate() ( cd "$WORKTREE" && pnpm gate )
 
 # --- setup --------------------------------------------------------------
 if git -C "$REPO_ROOT" worktree list | grep -q "$WORKTREE"; then
@@ -53,25 +47,9 @@ fi
 TITLE="$(gh issue view "$ISSUE" --json title -q .title)"
 say "$TITLE"
 
-PROMPT=$(cat <<EOF
-Implementa el issue #${ISSUE} de este repositorio ("${TITLE}").
-
-Lee el issue completo con: gh issue view ${ISSUE}
-Lee también el spec padre (#136), CONTEXT.md y los ADRs en docs/adr/ antes de tocar código.
-
-Reglas:
-- El criterio de "hecho" son los criterios de aceptación del issue. Varios tickets
-  tienen ya su test en rojo escrito en tests/integration/d1-v2/round-trip/: ponlos
-  en verde sin relajar ninguna aserción ni cambiar lo que afirman.
-- Usa el vocabulario de CONTEXT.md y respeta los ADRs.
-- No toques ficheros que este ticket no necesita: hay otros agentes trabajando en
-  paralelo sobre la misma base.
-- Antes de terminar, deja pasando: eslint, tsc y las suites unit e integration.
-- No hagas commit, push ni abras PR: de eso se encarga el runner.
-
-Cuando termines, resume en una línea qué cambiaste y por qué.
-EOF
-)
+# El encargo es el mismo que recibe cualquier orquestador: una sola fuente.
+PROMPT="$(sed -e "s/{{issue}}/${ISSUE}/g" -e "s|{{title}}|${TITLE}|g" \
+  "${REPO_ROOT}/.agents/ticket-prompt.md")"
 
 # --- the loop -----------------------------------------------------------
 for attempt in $(seq 1 "$ATTEMPTS"); do
@@ -103,11 +81,7 @@ for attempt in $(seq 1 "$ATTEMPTS"); do
   fi
   PROMPT="${PROMPT}
 
-El intento anterior no pasó el gate. Ejecuta el gate tú mismo, lee el fallo y corrígelo:
-  npx eslint src tests --max-warnings 0
-  npx tsc --noEmit -p tsconfig.json
-  npx vitest run --project integration
-  npx vitest run --project unit"
+El intento anterior no pasó el gate. Ejecútalo tú mismo, lee el fallo y corrígelo: pnpm gate"
 done
 
 # --- publish ------------------------------------------------------------
