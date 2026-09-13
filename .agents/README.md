@@ -18,6 +18,9 @@ que se cierren.
 Un orquestador no necesita saber nada de este proyecto más allá de estos
 ficheros.
 
+El encargo del propio orquestador está en `orchestrator-brief.md`: pásaselo como
+prompt inicial y no necesitas explicarle nada más.
+
 ## `tickets.json`
 
 Un objeto por ticket:
