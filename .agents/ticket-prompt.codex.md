@@ -1,8 +1,8 @@
 # Encargo de un ticket — runner Codex
 
-Mismo encargo que `ticket-prompt.claude.md`, escrito por extenso: Codex no ve
-las skills de `.claude/`, así que el flujo que allí aporta `/implement` —TDD por
-rebanadas, revisión al cerrar— va explicado aquí.
+Mismo encargo que `ticket-prompt.claude.md`. Codex no expande `/implement`,
+pero sí puede leer la skill: `.agents/skills/` es un espejo completo de
+`.claude/skills/`, así que el flujo se referencia en vez de reescribirse.
 
 ---
 
@@ -31,6 +31,10 @@ bloqueado y termina, en vez de empezar a ciegas.
 
 ## 2. Implementa
 
+Sigue el flujo de `.agents/skills/implement/SKILL.md`, que se apoya en
+`.agents/skills/tdd/SKILL.md` para construir y en `.agents/skills/code-review/SKILL.md`
+para cerrar. Léelos: son el mismo flujo que sigue el runner de Claude Code.
+
 Lee antes de tocar código:
 
 - el issue completo — `gh issue view {{issue}}`
@@ -39,17 +43,13 @@ Lee antes de tocar código:
 - `docs/adr/`, decisiones ya tomadas que no se revisitan aquí
 - `docs/migration/d1-v2-persistence-audit.md` si el issue cita un hallazgo (§X.Y)
 
-Trabaja dirigido por los tests, una rebanada cada vez: un test en rojo, el
-código mínimo que lo pone en verde, limpieza. La costura acordada es el tier de
-ida y vuelta, `tests/integration/d1-v2/round-trip/`, que afirma lo que el
-usuario percibe —tecleo esto, recargo, ¿sigue ahí?— y nunca funciones internas.
-**Muchos tickets traen ya su test en rojo**: ponlos en verde sin relajar ninguna
-aserción, sin cambiar lo que afirman y sin omitirlos. Si crees que un test
-afirma algo incorrecto, para y dilo en vez de editarlo.
-
-Antes de darlo por terminado, revisa tu propio diff contra dos preguntas: ¿sigue
-los estándares del repositorio (`AGENTS.md`, el código de alrededor)? ¿hace lo
-que el issue pedía, ni más ni menos?
+La costura acordada para el TDD es el tier de ida y vuelta,
+`tests/integration/d1-v2/round-trip/`, que afirma lo que el usuario percibe
+—tecleo esto, recargo, ¿sigue ahí?— y nunca funciones internas. **Muchos tickets
+traen ya su test en rojo**, así que el ciclo empieza con el rojo puesto. Ponlos
+en verde sin relajar ninguna aserción, sin cambiar lo que afirman y sin
+omitirlos. Si crees que un test afirma algo incorrecto, para y dilo en vez de
+editarlo.
 
 **No amplíes el alcance**: hay otros agentes en paralelo sobre la misma base.
 

@@ -41,12 +41,12 @@ Un objeto por ticket:
 
 ## El encargo
 
-Hay una plantilla por runner, y no es una duplicación gratuita: `/implement`
-—que conduce `/tdd` por dentro y cierra pasando `/code-review`— es una skill de
-Claude Code, así que Codex no la ve. `ticket-prompt.claude.md` la invoca;
-`ticket-prompt.codex.md` explica el mismo flujo por extenso. Lo que ninguna de
-las dos da por sabido es el contexto de esta tanda: el glosario, los ADRs, la
-auditoría, y que la costura de test es el tier de ida y vuelta.
+Hay una plantilla por runner porque cambia cómo se llega al mismo flujo, no el
+flujo: `ticket-prompt.claude.md` invoca `/implement`; `ticket-prompt.codex.md`
+apunta a `.agents/skills/implement/SKILL.md`, el espejo que Codex sí puede leer.
+Lo que ninguna de las dos da por sabido es el contexto de esta tanda: el
+glosario, los ADRs, la auditoría, y que la costura de test es el tier de ida y
+vuelta.
 
 El agente lo hace todo: espera, implementa, commitea, pasa el gate, publica la
 PR y comenta el enlace en el issue. Cierra el issue la propia PR, vía
