@@ -103,11 +103,16 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       category: categories.get(String(transaction.categoryId)) || 'Sin categoría',
       description: String(transaction.description || ''), amount: Number(transaction.amount || 0),
       createdAt: String(transaction.createdAt || ''),
+      ...(transaction.time ? { time: String(transaction.time) } : {}),
+      declared: Boolean(transaction.declared),
       ...(trade ? {
         side: String(trade.side) as State['transactions'][number]['side'],
         units: Number(trade.quantity || 0), unitPrice: Number(trade.price || 0),
         fee: Number(trade.fee || 0), movementCurrency: String(trade.currency || projected.currency),
-        ...(instrument ? { symbol: String(instrument.symbol), instrumentId: legacyId(instrument) } : {}),
+        // The stored ticker is what the user typed; the instrument is only a
+        // fallback for rows migrated from v1, which have no `symbol` column.
+        ...(trade.symbol || instrument ? { symbol: String(trade.symbol || instrument?.symbol) } : {}),
+        ...(instrument ? { instrumentId: legacyId(instrument) } : {}),
       } : {}),
     }
   })
