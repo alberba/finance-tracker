@@ -174,8 +174,11 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
   }))
 
   projected.snapshots = Object.fromEntries(bootstrap.wealthSnapshots.map((snapshot) => {
+    // `snapshot.month` is the server's canonical 1-12; `State.snapshots` is
+    // keyed (and stores `.month`) 0-based, matching `ui.snapshotMonth`.
+    const month = Number(snapshot.month) - 1
     const balances: State['snapshots'][string] = {
-      month: Number(snapshot.month),
+      month,
       accounts: {},
       investments: {},
       liabilities: {},
@@ -188,7 +191,7 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       else if (kind === 'liability') balances.liabilities[accountId] = Number(balance.balance || 0)
       else balances.accounts[accountId] = Number(balance.balance || 0)
     }
-    return [String(snapshot.month), balances]
+    return [String(month), balances]
   }))
 
   const recurringRuleIds = new Map(bootstrap.recurringRules.map((rule) => [rule.id, legacyId(rule)]))

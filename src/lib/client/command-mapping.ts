@@ -69,10 +69,10 @@
  *   explicitly out of the 11 `SYNC_ENTITY_TYPES` per `command-schemas.ts`'s
  *   own doc comment. Wiring it needs either a command-contract extension
  *   or decomposing that domain function's output — left as a follow-up.
- * - `wealth.ts`'s `saveSnapshot` only sync-upserts the `wealthSnapshot`
- *   *existence* row (snapshotDate/year/month); the actual balance edits
- *   (`snapshot.accounts/investments/liabilities`) map to `snapshot_balances`,
- *   also explicitly out of scope.
+ * - `wealth.ts`'s `saveSnapshot` sync-upserts the `wealthSnapshot` row with
+ *   its balances nested under `data.balances` (resolved to server `account`
+ *   ids via `resolveEntityId`) — see `command-schemas.ts`'s doc comment for
+ *   why `snapshot_balances` travels nested instead of as its own command.
  * - `market.ts`'s `instruments` conflates a global instrument definition
  *   (symbol/market/provider — `market_instruments`, an explicitly
  *   out-of-scope *global* reference table) with the per-user link

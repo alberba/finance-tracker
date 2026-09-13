@@ -68,6 +68,11 @@ interface VersionedRow {
   [key: string]: unknown;
 }
 
+/** The `balances` nested inside a `wealthSnapshot` create/update payload — see `command-schemas.ts`. */
+interface WealthSnapshotBalancesField {
+  balances?: Omit<wealthRepository.CreateSnapshotBalanceInput, "snapshotId">[];
+}
+
 async function findByLegacyId(
   db: Db,
   userId: string,
@@ -171,8 +176,15 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
       return (await contributionsRepository.create(db, userId, data)) as VersionedRow;
     case "userInstrument":
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow;
-    case "wealthSnapshot":
-      return (await wealthRepository.create(db, userId, data)) as VersionedRow;
+    case "wealthSnapshot": {
+      const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.create(db, userId, snapshotInput);
+      const balanceRows = balances?.length
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : [];
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 
@@ -222,8 +234,16 @@ async function updateEntity(
       return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
-    case "wealthSnapshot":
-      return (await wealthRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
+    case "wealthSnapshot": {
+      const { balances, ...snapshotPatch } = patch as Partial<wealthRepository.CreateWealthSnapshotInput> &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.update(db, userId, entityId, snapshotPatch, expectedVersion);
+      if (!row) return undefined;
+      const balanceRows = balances
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : await wealthRepository.listBalancesBySnapshot(db, userId, row.id);
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 

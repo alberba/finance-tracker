@@ -230,6 +230,19 @@ export async function removeBalance(db: Db, userId: string, id: string): Promise
   return true;
 }
 
+/** Replaces every balance of a snapshot with `inputs`, atomically within the caller's transaction. */
+export async function replaceBalances(
+  db: Db,
+  userId: string,
+  snapshotId: string,
+  inputs: Omit<CreateSnapshotBalanceInput, "snapshotId">[],
+): Promise<SnapshotBalanceRow[]> {
+  await db
+    .delete(snapshotBalances)
+    .where(and(eq(snapshotBalances.userId, userId), eq(snapshotBalances.snapshotId, snapshotId)));
+  return bulkInsertBalances(db, userId, inputs.map((input) => ({ ...input, snapshotId })));
+}
+
 export async function bulkInsertBalances(
   db: Db,
   userId: string,

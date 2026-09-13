@@ -11,8 +11,11 @@
  *
  * Deliberately out of scope (left for a later WP, see WP4 report):
  * `investment_trade_details`, `contribution_allocations`,
- * `snapshot_balances`, `twr_liquidity_accounts` (sub-entities of an
- * aggregate root, not addressed directly by a sync command here),
+ * `twr_liquidity_accounts` (sub-entities of an aggregate root, not addressed
+ * directly by a sync command here). `snapshot_balances` is the exception:
+ * it travels nested inside the `wealthSnapshot` command's `balances`, the
+ * same way an investment operation travels nested inside its transaction
+ * (ADR 0002) — never as its own sync command.
  * `stockevents_symbol_mappings` (no `version` column to drive optimistic
  * concurrency), `integration_credentials` (WP12 owns encryption semantics),
  * and the global `market_instruments`/`market_quotes` reference tables
@@ -41,6 +44,13 @@ const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES);
 
 const nullableString = z.string().nullable();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** One account's balance nested inside a `wealthSnapshot` command — see the module doc comment. */
+const wealthSnapshotBalanceSchema = z.object({
+  accountId: z.string().min(1),
+  balance: z.number(),
+  currency: z.string().min(1),
+});
 
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
@@ -159,6 +169,7 @@ export const entityCreateSchemas = {
       snapshotDate: z.string().min(1),
       year: z.number().int(),
       month: z.number().int().min(1).max(12),
+      balances: z.array(wealthSnapshotBalanceSchema).optional(),
     })
     .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
