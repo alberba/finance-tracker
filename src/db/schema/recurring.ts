@@ -37,8 +37,13 @@ export const subscriptions = sqliteTable(
 );
 
 /**
- * A recurring generation rule (income/expense/investment) that produces
- * `pending_movements` rows on its schedule.
+ * The movement template ("plantilla de movimiento", CONTEXT.md) plus a
+ * calendar: what movement to create (type, amount, category, description,
+ * account and, when it is an investment, the operation) and when.
+ *
+ * The operation columns mirror `investment_trade_details`: `units` is TEXT
+ * so a fractional share survives verbatim, price and fee are INTEGER minor
+ * units.
  */
 export const recurringRules = sqliteTable(
   "recurring_rules",
@@ -55,7 +60,17 @@ export const recurringRules = sqliteTable(
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),
     frequency: text("frequency").notNull(),
+    interval: integer("interval").notNull().default(1),
+    startDate: text("start_date"),
+    endDate: text("end_date"),
+    lastExecutionDate: text("last_execution_date"),
     nextRunDate: text("next_run_date"),
+    symbol: text("symbol"),
+    side: text("side"),
+    units: text("units"),
+    unitPriceMinor: integer("unit_price_minor"),
+    feeMinor: integer("fee_minor"),
+    time: text("time"),
     status: text("status").notNull().default("active"),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
@@ -71,7 +86,14 @@ export const recurringRules = sqliteTable(
   ],
 );
 
-/** A single generated (not-yet-confirmed) occurrence of a recurring rule. */
+/**
+ * A single generated (not-yet-confirmed) occurrence of a recurring rule:
+ * the same movement template as its rule, plus a date. It carries its own
+ * copy because the user may edit the occurrence without touching the rule,
+ * and `transaction_id` records the movement a confirmation produced — by
+ * the client's own movement id, the one `transactions.legacy_id` carries —
+ * so confirming twice cannot produce it twice.
+ */
 export const pendingMovements = sqliteTable(
   "pending_movements",
   {
@@ -88,6 +110,15 @@ export const pendingMovements = sqliteTable(
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),
     dueDate: text("due_date").notNull(),
+    type: text("type"),
+    description: text("description"),
+    symbol: text("symbol"),
+    side: text("side"),
+    units: text("units"),
+    unitPriceMinor: integer("unit_price_minor"),
+    feeMinor: integer("fee_minor"),
+    time: text("time"),
+    transactionId: text("transaction_id"),
     status: text("status").notNull().default("pending"),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
