@@ -1,10 +1,13 @@
 {
-  "$comment": "Contrato entre este repositorio y cualquier orquestador de agentes. El repo define qué hay que hacer, en qué orden y cómo se sabe que está hecho; el orquestador decide cuándo y con qué concurrencia. Ver .agents/README.md.",
+  "$comment": "Contrato entre este repositorio y cualquier orquestador de agentes. El repo define qué hay que hacer, en qué orden y cómo se sabe que está hecho; el orquestador decide cuándo y con qué concurrencia. Ver .agents/README.md. El agente commitea en su rama; publicar (push + PR) es del orquestador, y sólo si `pnpm gate` pasa.",
   "repo": "alberba/finance-tracker",
   "spec": 136,
   "base": "mal-guardado-v2-multiusuario",
   "gate": "pnpm gate",
-  "promptTemplate": ".agents/ticket-prompt.md",
+  "promptTemplate": {
+    "claude": ".agents/ticket-prompt.claude.md",
+    "codex": ".agents/ticket-prompt.codex.md"
+  },
   "tickets": [
     {
       "issue": 137,

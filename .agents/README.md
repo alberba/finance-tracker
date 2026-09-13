@@ -7,7 +7,7 @@ de agentes. El reparto es deliberado:
 |---|---|
 | Qué hay que hacer y en qué orden (`tickets.json`) | Cuándo lanzar cada ticket |
 | Cómo se sabe que está hecho (`pnpm gate`) | Cuánta concurrencia tolerar |
-| Qué se le dice al agente (`ticket-prompt.md`) | Qué hacer cuando un gate falla |
+| Qué se le dice al agente (`ticket-prompt.<runner>.md`) | Qué hacer cuando un gate falla |
 
 Un orquestador no necesita saber nada de este proyecto más allá de estos tres
 ficheros.
@@ -33,6 +33,18 @@ Un objeto por ticket:
   persona: el script de reparación y el cierre del esquema escriben sobre datos
   reales. El agente puede prepararlos; ejecutarlos es un acto humano.
 
+## El encargo
+
+Hay una plantilla por runner, y no es una duplicación gratuita: `/implement`
+—que conduce `/tdd` por dentro y cierra pasando `/code-review`— es una skill de
+Claude Code, así que Codex no la ve. `ticket-prompt.claude.md` la invoca;
+`ticket-prompt.codex.md` explica el mismo flujo por extenso. Lo que ninguna de
+las dos da por sabido es el contexto de esta tanda: el glosario, los ADRs, la
+auditoría, y que la costura de test es el tier de ida y vuelta.
+
+El agente **commitea en su rama**; el push y la PR son del orquestador, y sólo
+si el gate pasa.
+
 ## El gate
 
 ```
@@ -47,9 +59,9 @@ segunda vuelta.
 
 ```
 worktree nuevo desde la rama del ticket anterior de su carril
-  → agente con ticket-prompt.md
+  → agente con la plantilla de su runner (commitea él)
   → pnpm gate
-  → verde: commit, push, PR hacia esa misma base, comentario en el issue
+  → verde: push, PR hacia esa misma base, comentario en el issue
   → rojo: un reintento pasándole el fallo; si vuelve a fallar, para el carril
 ```
 

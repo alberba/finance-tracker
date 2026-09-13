@@ -47,9 +47,12 @@ fi
 TITLE="$(gh issue view "$ISSUE" --json title -q .title)"
 say "$TITLE"
 
-# El encargo es el mismo que recibe cualquier orquestador: una sola fuente.
-PROMPT="$(sed -e "s/{{issue}}/${ISSUE}/g" -e "s|{{title}}|${TITLE}|g" \
-  "${REPO_ROOT}/.agents/ticket-prompt.md")"
+# El encargo sale del mismo sitio que lee el orquestador. Hay uno por runner:
+# /implement sólo existe como skill de Claude Code, así que a Codex se le
+# explica el flujo por extenso.
+TEMPLATE="${REPO_ROOT}/.agents/ticket-prompt.${RUNNER}.md"
+PROMPT="$(sed -e "s/{{issue}}/${ISSUE}/g" -e "s|{{title}}|${TITLE}|g" "$TEMPLATE" \
+  | sed -n '/^---$/,$p' | tail -n +2)"
 
 # --- the loop -----------------------------------------------------------
 for attempt in $(seq 1 "$ATTEMPTS"); do
@@ -86,14 +89,19 @@ done
 
 # --- publish ------------------------------------------------------------
 cd "$WORKTREE"
-if [ -z "$(git status --porcelain)" ]; then
+if [ -z "$(git status --porcelain)" ] && [ -z "$(git log --oneline "origin/${BASE}..HEAD" 2>/dev/null)" ]; then
   say "nothing changed — not publishing"
   exit 1
 fi
 
-git add -A
-git commit -q -m "$(printf '%s\n\n%s\n\nCloses #%s\n\nCo-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>' \
-  "feat: ${TITLE}" "Implementa el ticket #${ISSUE} (spec #136)." "$ISSUE")"
+# El agente commitea su propio trabajo (/implement lo hace, y a Codex se le
+# pide). Esto es la red por si dejó algo sin commitear.
+if [ -n "$(git status --porcelain)" ]; then
+  say "committing what the agent left uncommitted"
+  git add -A
+  git commit -q -m "$(printf '%s\n\nImplementa el ticket #%s (spec #136).\n\nCloses #%s' \
+    "feat: ${TITLE}" "$ISSUE" "$ISSUE")"
+fi
 git push -q -u origin "$BRANCH"
 
 # `gh pr create` has been flaky on this repo (GraphQL 502); REST is the fallback.
