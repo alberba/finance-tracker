@@ -16,6 +16,7 @@ import {
   setCachedBootstrap,
   type CachedEntity,
 } from '../lib/client/idb-cache'
+import { applyPendingCommands } from '../lib/client/pending-overlay'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
 import { useFinancialStateStore } from './financial-state'
 import {
@@ -25,6 +26,7 @@ import {
   discard as discardOutboxEntry,
   enqueue,
   findPendingCreate,
+  listAll as listOutbox,
   openOutbox,
   peekBatch,
   recordFailure,
@@ -201,13 +203,24 @@ export const useSyncStore = defineStore('sync', () => {
   async function bootstrapState(): Promise<void> {
     if (!cacheDb) return
     let bootstrap: SyncV2Bootstrap | null = null
+    let reachedServer = false
     try {
       const response = await fetch('/api/bootstrap')
+      reachedServer = response.ok
       if (response.ok) bootstrap = await response.json() as SyncV2Bootstrap
     } catch {
       // Offline reload falls back to the last complete identity-partitioned read model.
     }
     bootstrap ??= await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+    if (!bootstrap && !reachedServer) {
+      // Audit §5.2: only the server can tell us this identity has no data yet.
+      // When the request itself failed we know nothing, so we must not write
+      // an empty read model over the cache or reset the cursor to 0 — doing so
+      // makes every later edit look like a brand-new entity and duplicates it.
+      lastError.value = 'No se pudo cargar tus datos. Reintentando…'
+      syncStatus.value = 'error'
+      return
+    }
     // A brand-new identity has no read model yet. Start from an empty
     // projection; the first command will create its server-side entities.
     // Existing identities still hydrate from the network/cache above.
@@ -231,13 +244,25 @@ export const useSyncStore = defineStore('sync', () => {
       userInstrument: bootstrap.userInstruments,
       wealthSnapshot: bootstrap.wealthSnapshots,
     } satisfies Record<SyncEntityType, CachedEntity[]>
-    await Promise.all(Object.entries(collections).map(([entityType, entities]) =>
-      replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
-    ))
-    await setCachedSettings(cacheDb, bootstrap.settings)
-    await setCachedBootstrap(cacheDb, bootstrap)
-    await setCachedRevision(cacheDb, bootstrap.revision)
-    useFinancialStateStore().reloadState(projectSyncV2State(bootstrap))
+    if (reachedServer) {
+      // Only a payload that actually came from the server may replace the
+      // cache. Rewriting it from its own (possibly stale) copy would drop
+      // rows this device has since learned about through `pullChanges`, with
+      // the same duplicate-`create` consequence as §5.2's empty fallback.
+      await Promise.all(Object.entries(collections).map(([entityType, entities]) =>
+        replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
+      ))
+      await setCachedSettings(cacheDb, bootstrap.settings)
+      await setCachedBootstrap(cacheDb, bootstrap)
+      await setCachedRevision(cacheDb, bootstrap.revision)
+    }
+    // Audit §5.4: what is still queued is shown as if it had already been
+    // saved — because for the user it has been.
+    const pending = outboxDb ? await listOutbox(outboxDb) : []
+    const withPending = pending.length
+      ? applyPendingCommands(bootstrap, pending.map((entry) => entry.command))
+      : bootstrap
+    useFinancialStateStore().reloadState(projectSyncV2State(withPending))
   }
 
   /** Validates and appends a command to the outbox, then attempts an immediate flush. */
@@ -386,10 +411,11 @@ export const useSyncStore = defineStore('sync', () => {
 
       await acknowledge(outboxDb, acked)
       pendingCount.value = await countOutbox(outboxDb)
-      revision.value = body.revision
-      if (cacheDb) {
-        await setCachedRevision(cacheDb, body.revision)
-      }
+      // The cursor deliberately does NOT move here (audit §5.3). `body.revision`
+      // is the user's *global* revision after this batch, which includes changes
+      // other devices made and this one has never applied — adopting it would
+      // put them below the cursor and they would never be pulled again. Only
+      // `pullChanges`, which actually applies changes, may advance it.
 
       lastError.value = lastDropMessage
       syncStatus.value = 'idle'

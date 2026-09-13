@@ -27,10 +27,18 @@ import { users } from "../../../../src/db/schema";
 import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
 import { buildBootstrapPayload } from "../../../../src/lib/server/bootstrap-payload";
 import { listChangesSince } from "../../../../src/db/repositories/sync";
-import { projectSyncV2State } from "../../../../src/lib/client/v2-state-projection";
-import type { SyncV2Bootstrap } from "../../../../src/lib/client/v2-state-projection";
 import type { State } from "../../../../src/scripts/types";
 import { createTestDb, type TestDatabase } from "../setup";
+import type { Db } from "../../../../src/db/client";
+
+/**
+ * The test database is better-sqlite3-backed, so it lacks D1's `batch`. No
+ * server code under test uses it; this keeps the seam honest without widening
+ * the production type.
+ */
+function asServerDb(db: TestDatabase["db"]): Db {
+  return db as unknown as Db;
+}
 
 export interface RoundTrip {
   /** The user every command is applied as. */
@@ -105,16 +113,16 @@ export async function startRoundTrip(
         throw new TypeError("Failed to fetch");
       }
       if (url.startsWith("/api/bootstrap")) {
-        return json(await buildBootstrapPayload(testDb.db, user.id));
+        return json(await buildBootstrapPayload(asServerDb(testDb.db), user.id));
       }
       if (url.startsWith("/api/changes")) {
         const since = Number(new URL(url, "https://test.local").searchParams.get("since") ?? 0);
-        const changes = await listChangesSince(testDb.db, user.id, since);
+        const changes = await listChangesSince(asServerDb(testDb.db), user.id, since);
         return json({ revision: changes.at(-1)?.revision ?? since, changes });
       }
       if (url === "/api/sync") {
         const { commands } = JSON.parse(String(init?.body));
-        return json(await applySyncBatch(testDb.db, user.id, commands));
+        return json(await applySyncBatch(asServerDb(testDb.db), user.id, commands));
       }
       throw new Error(`unexpected fetch ${url}`);
     }),
@@ -159,7 +167,7 @@ export async function startRoundTrip(
       offline = next;
     },
     asOtherDevice: async (commands) => {
-      await applySyncBatch(testDb.db, user.id, commands as never);
+      await applySyncBatch(asServerDb(testDb.db), user.id, commands as never);
     },
     reloadOffline: async () => {
       await settle();
