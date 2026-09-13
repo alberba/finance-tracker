@@ -153,10 +153,26 @@ async function resolveRecurringRuleId(localRuleId: string): Promise<string | nul
     if (!syncStore.enabled) {
       return null
     }
+    // `flush()` returns at once when another flush is already in flight —
+    // and `addRule` starts one. Asking again in the next tick would burn
+    // every attempt without the rule ever crossing, and the occurrence is
+    // dropped for good. So wait for the flush that *is* running to land.
     await syncStore.flush()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await waitWhileSyncing(syncStore)
   }
   return null
+}
+
+/** How many macrotasks to give an in-flight flush before asking again. */
+const FLUSH_SETTLE_TICKS = 20
+
+async function waitWhileSyncing(syncStore: ReturnType<typeof useSyncStore>): Promise<void> {
+  for (let tick = 0; tick < FLUSH_SETTLE_TICKS; tick += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    if (syncStore.syncStatus !== 'syncing') {
+      return
+    }
+  }
 }
 
 /** WP7b — maps a legacy `Transaction` row to a `transaction` sync command payload. See the WP10 fix note on `buildRecurringRuleData` above for `accountId`. */
