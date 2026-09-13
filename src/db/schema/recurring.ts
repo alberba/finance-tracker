@@ -26,7 +26,10 @@ export const subscriptions = sqliteTable(
     accountId: text("account_id").references(() => accounts.id),
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),
-    billingDay: integer("billing_day"),
+    /** Kept only to recover subscriptions written before start dates existed. */
+    legacyBillingDay: integer("billing_day"),
+    startDate: text("start_date"),
+    nextChargeDate: text("next_charge_date"),
     frequency: text("frequency").notNull(),
     isActive: integer("is_active").notNull().default(1),
     createdAt: createdAtColumn(),

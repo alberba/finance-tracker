@@ -426,7 +426,6 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
       if (!v2CategoryId) {
         anomaly("subscriptions", sub.id, `Category '${sub.category}' not found; categoryId left null.`);
       }
-      const dayMatch = /^\d{4}-\d{2}-(\d{2})$/.exec(sub.startDate);
       toInsert.push({
         legacyId: sub.id,
         name: sub.name,
@@ -434,7 +433,8 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         accountId: v2AccountId,
         amount: sub.amount,
         currency: state.currency,
-        billingDay: dayMatch ? Number(dayMatch[1]) : null,
+        startDate: sub.startDate,
+        nextChargeDate: sub.nextChargeDate,
         frequency: sub.frequency,
         isActive: sub.active,
       });

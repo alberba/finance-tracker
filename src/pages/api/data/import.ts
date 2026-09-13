@@ -161,7 +161,8 @@ export const POST: APIRoute = async ({ request, locals }) =>
           categoryId: categoryId ?? null,
           amount: typeof row.amount === "number" ? row.amount : 0,
           currency: String(row.currency ?? "EUR"),
-          billingDay: typeof row.billingDay === "number" ? row.billingDay : null,
+          startDate: typeof row.startDate === "string" ? row.startDate : null,
+          nextChargeDate: typeof row.nextChargeDate === "string" ? row.nextChargeDate : null,
           frequency: String(row.frequency ?? "monthly"),
           isActive: row.isActive === undefined ? true : Boolean(row.isActive),
         });

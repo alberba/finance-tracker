@@ -40,6 +40,7 @@ export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number];
 const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES);
 
 const nullableString = z.string().nullable();
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
@@ -78,10 +79,12 @@ export const entityCreateSchemas = {
       legacyId: nullableString.optional(),
       name: z.string().min(1),
       categoryId: nullableString.optional(),
+      categoryName: z.string().min(1).optional(),
       accountId: nullableString.optional(),
       amount: z.number(),
       currency: z.string().min(1),
-      billingDay: z.number().int().nullable().optional(),
+      startDate: isoDate,
+      nextChargeDate: isoDate,
       frequency: z.string().min(1),
       isActive: z.boolean().optional(),
     })
