@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { recurringRules } from "../schema";
+import { pendingMovements, recurringRules } from "../schema";
 import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type RecurringRuleRow = Omit<typeof recurringRules.$inferSelect, "amountMinor"> & {
@@ -125,6 +125,13 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   if (!existing) {
     return false;
   }
+  // A pending movement is a generated occurrence of its rule (`recurring_rule_id`
+  // is NOT NULL, no ON DELETE CASCADE, and D1 always enforces it), so it goes
+  // with the rule instead of blocking its removal (audit §2.6 pattern).
+  await db.delete(pendingMovements).where(and(
+    eq(pendingMovements.recurringRuleId, id),
+    eq(pendingMovements.userId, userId),
+  ));
   const deleted = await db.delete(recurringRules).where(and(
     eq(recurringRules.id, id),
     eq(recurringRules.userId, userId),
