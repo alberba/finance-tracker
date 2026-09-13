@@ -3,6 +3,7 @@ import { shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { useToast } from '../composables/useToast'
 import {
   getAllEntities,
   getCachedBootstrap,
@@ -94,6 +95,7 @@ const MAX_SEND_ATTEMPTS = 5
 
 export const useSyncStore = defineStore('sync', () => {
   const enabled = isSyncV2Enabled()
+  const { showToast } = useToast()
 
   const userId = shallowRef<string | null>(null)
   const email = shallowRef<string | null>(null)
@@ -418,7 +420,10 @@ export const useSyncStore = defineStore('sync', () => {
       // `pullChanges`, which actually applies changes, may advance it.
 
       lastError.value = lastDropMessage
-      syncStatus.value = 'idle'
+      if (lastDropMessage) {
+        showToast(`⚠️ No se pudo guardar este cambio: ${lastDropMessage}`)
+      }
+      syncStatus.value = lastDropMessage ? 'error' : 'idle'
       retryAttempt = 0
 
       // A conflict deliberately keeps its command in the outbox until the
@@ -438,6 +443,7 @@ export const useSyncStore = defineStore('sync', () => {
         await discardOutboxEntry(outboxDb, failed.seq)
         pendingCount.value = await countOutbox(outboxDb)
         lastError.value = `Se descartó un cambio que el servidor no pudo aplicar tras ${MAX_SEND_ATTEMPTS} intentos: ${message}`
+        showToast(`⚠️ ${lastError.value}`)
       } else if (reachedServer) {
         await recordFailure(outboxDb, failed.seq, message)
       }
@@ -480,7 +486,17 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !cacheDb) {
       return
     }
-    const response = await fetch(`/api/changes?since=${revision.value}`)
+    let response: Response
+    try {
+      response = await fetch(`/api/changes?since=${revision.value}`)
+    } catch {
+      // Same principle as `bootstrapState`'s §5.2 fix: a network failure here
+      // must leave the cursor and cache untouched, not be treated as "nothing
+      // changed" and definitely not thrown — a reload while offline still
+      // needs `init()` to finish so the pending-overlay in `bootstrapState`
+      // can render what the user queued (audit §5.4).
+      return
+    }
     if (!response.ok) {
       return
     }

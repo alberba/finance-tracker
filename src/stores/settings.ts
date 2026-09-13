@@ -22,7 +22,11 @@ export type EntityField = 'name' | 'openingBalance'
 function buildAccountData(entity: Entity, currency: string) {
   return {
     name: entity.name,
-    kind: 'checking',
+    // `cash` is the canonical account kind in the v2 projection. The old
+    // `checking` value is not one of the three kinds the UI can render, so a
+    // queued account would disappear on an offline reload before it ever
+    // reached the server.
+    kind: 'cash',
     currency,
     openingBalance: entity.openingBalance,
   }
