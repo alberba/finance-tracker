@@ -185,11 +185,20 @@ export async function syncRemove(entityType: SyncEntityType, localId: string): P
  * Create-if-unknown, update-otherwise — for aggregates addressed by a
  * stable natural key (category `${kind}:${name}`, goal key, budget-entry
  * composite key) rather than a UI-visible "add"/"edit" distinction.
+ *
+ * `updateData` (defaults to `data`) is what's sent as the `update` patch —
+ * distinct from `data` for an entity whose identity is a natural key that
+ * must never travel in an update, like `budgetEntry`'s `(categoryId, year,
+ * month)` (`entityUpdateSchemas.budgetEntry` only declares `amount`/
+ * `currency`, unlike every other entity's update schema): the caller passes
+ * the full create-shaped `data` for the first write and a narrower
+ * `updateData` for the identity-preserving edits that follow.
  */
 export async function syncUpsert(
   entityType: SyncEntityType,
   localId: string,
   data: JsonRecord,
+  updateData: JsonRecord = data,
 ): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -202,7 +211,7 @@ export async function syncUpsert(
       entityType,
       entityId: ref.entityId,
       baseVersion: ref.version,
-      patch: data,
+      patch: updateData,
     });
     return;
   }

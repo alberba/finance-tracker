@@ -82,7 +82,12 @@ export const useBudgetStore = defineStore('budget', () => {
     void (async () => {
       const data = await buildBudgetEntryData(type, category, year, month + 1, amount, currency)
       if (data) {
-        await syncUpsert('budgetEntry', localId, data)
+        // `entityUpdateSchemas.budgetEntry` only declares `amount`/`currency`
+        // — its identity (`categoryId`/`year`/`month`) never travels in an
+        // update, so a later edit of an already-synced cell must not resend
+        // it (would now fail strict-schema validation instead of being
+        // silently stripped, issue #138).
+        await syncUpsert('budgetEntry', localId, data, { amount, currency })
       }
     })()
   }

@@ -27,6 +27,7 @@ import {
   discard as discardOutboxEntry,
   enqueue,
   findPendingCreate,
+  InvalidCommandError,
   listAll as listOutbox,
   openOutbox,
   peekBatch,
@@ -267,7 +268,28 @@ export const useSyncStore = defineStore('sync', () => {
     useFinancialStateStore().reloadState(projectSyncV2State(withPending))
   }
 
-  /** Validates and appends a command to the outbox, then attempts an immediate flush. */
+  /**
+   * Surfaces a command that failed to encolar (an invalid payload rejected
+   * by `enqueue`/`amendPendingCreate`'s per-entity validation, or any other
+   * write failure) the same visible way an already-queued command the
+   * server rejects is (`lastError`/`showToast`) — never left to reject a
+   * caller's promise. Every domain-store call site fires the command-mapping
+   * functions fire-and-forget (`void syncListDiff(...)`, `void
+   * syncUpsert(...)`, …), so an unhandled rejection here would reach the
+   * user as nothing at all (audit's transversal guardrail, issue #138).
+   */
+  function surfaceEnqueueError(error: unknown): void {
+    const message = error instanceof InvalidCommandError
+      ? error.message
+      : error instanceof Error
+        ? `No se pudo encolar el cambio: ${error.message}`
+        : 'No se pudo encolar el cambio.'
+    lastError.value = message
+    syncStatus.value = 'error'
+    showToast(`⚠️ ${message}`)
+  }
+
+  /** Validates and appends a command to the cola de comandos, then attempts an immediate flush. */
   async function enqueueCommand(command: OutboxCommandInput): Promise<OutboxEntry | null> {
     if (isReadOnlyDemoActive()) {
       // Demo mutations stay in its isolated local cache and never enter the
@@ -277,7 +299,13 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !outboxDb) {
       return null
     }
-    const entry = await enqueue(outboxDb, command)
+    let entry: OutboxEntry
+    try {
+      entry = await enqueue(outboxDb, command)
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
     pendingCount.value = await countOutbox(outboxDb)
     void flush()
     return entry
@@ -604,6 +632,14 @@ export const useSyncStore = defineStore('sync', () => {
    * its `create` command has synced (so there is no server id to address
    * an `update` command to yet). Returns whether a pending create was
    * found.
+   *
+   * `amendPendingCreate` validates the merged payload per entity (issue
+   * #138) and leaves the still-queued create untouched if it doesn't match
+   * — surfaced the same visible way `enqueueCommand` surfaces a bad command,
+   * never thrown. A pending create counts as "found" either way: returning
+   * `false` here would make `syncUpsert`'s caller fall through to
+   * `syncCreate` and enqueue a *second*, duplicate create for the same
+   * entity.
    */
   async function mergeIntoPendingCreate(
     entityType: SyncEntityType,
@@ -617,7 +653,11 @@ export const useSyncStore = defineStore('sync', () => {
     if (!pending) {
       return false
     }
-    await amendPendingCreate(outboxDb, pending.seq, patch)
+    try {
+      await amendPendingCreate(outboxDb, pending.seq, patch)
+    } catch (error) {
+      surfaceEnqueueError(error)
+    }
     return true
   }
 

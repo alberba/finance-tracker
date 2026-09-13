@@ -98,6 +98,30 @@ describe("command-mapping (WP7b)", () => {
       outboxDb.close();
     });
 
+    it("surfaces an invalid payload as a visible error instead of an unhandled rejection (issue #138)", async () => {
+      const store = await initSyncStore();
+
+      // `syncCreate`/`syncListDiff` are always fired with `void` from the
+      // domain stores (no `.catch`), so a rejected promise here would be an
+      // unhandled rejection in production — this must resolve.
+      await expect(
+        syncCreate("account", "local-acc-bad", {
+          name: "Cuenta",
+          kind: "checking",
+          currency: "EUR",
+          openingBalance: 10,
+          // `entityCreateSchemas.account` doesn't declare this field.
+          bogusField: "no destino",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(store.lastError).toBeTruthy();
+
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
+      outboxDb.close();
+    });
+
     it("syncUpdate resolves a cached server entity and enqueues an update with its version", async () => {
       await initSyncStore();
       const cacheDb = await openIdbCache(USER_ID);
@@ -273,7 +297,16 @@ describe("command-mapping (WP7b)", () => {
           { id: "tx-3", amount: 5 }, // new — create
         ];
 
-        await syncListDiff("transaction", before, after, (item) => ({ amount: item.amount }));
+        // A full, schema-valid transaction payload — `entityCreateSchemas.transaction`
+        // requires `accountId`/`type`/`date`/`currency` too (strict, issue #138),
+        // so `tx-3`'s create needs them even though only `amount` varies per row.
+        await syncListDiff("transaction", before, after, (item) => ({
+          accountId: "acc-1",
+          type: "expense",
+          date: "2026-01-01",
+          amount: item.amount,
+          currency: "EUR",
+        }));
 
         const outboxDb = await openOutbox(USER_ID);
         const entries = await listAll(outboxDb);

@@ -43,99 +43,121 @@ const nullableString = z.string().nullable();
 
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
-  account: z.object({
-    legacyId: nullableString.optional(),
-    name: z.string().min(1),
-    kind: z.string().min(1),
-    currency: z.string().min(1),
-    openingBalance: z.number(),
-    isArchived: z.boolean().optional(),
-  }),
-  category: z.object({
-    legacyId: nullableString.optional(),
-    name: z.string().min(1),
-    kind: z.string().min(1),
-    sortOrder: z.number().int().optional(),
-  }),
-  transaction: z.object({
-    legacyId: nullableString.optional(),
-    accountId: z.string().min(1),
-    categoryId: nullableString.optional(),
-    type: z.string().min(1),
-    date: z.string().min(1),
-    description: nullableString.optional(),
-    amount: z.number(),
-    currency: z.string().min(1),
-  }),
-  subscription: z.object({
-    legacyId: nullableString.optional(),
-    name: z.string().min(1),
-    categoryId: nullableString.optional(),
-    accountId: nullableString.optional(),
-    amount: z.number(),
-    currency: z.string().min(1),
-    billingDay: z.number().int().nullable().optional(),
-    frequency: z.string().min(1),
-    isActive: z.boolean().optional(),
-  }),
-  recurringRule: z.object({
-    legacyId: nullableString.optional(),
-    name: z.string().min(1),
-    type: z.string().min(1),
-    accountId: nullableString.optional(),
-    categoryId: nullableString.optional(),
-    amount: z.number(),
-    currency: z.string().min(1),
-    frequency: z.string().min(1),
-    nextRunDate: nullableString.optional(),
-    status: z.string().optional(),
-  }),
-  pendingMovement: z.object({
-    legacyId: nullableString.optional(),
-    recurringRuleId: z.string().min(1),
-    accountId: nullableString.optional(),
-    categoryId: nullableString.optional(),
-    amount: z.number(),
-    currency: z.string().min(1),
-    dueDate: z.string().min(1),
-    status: z.string().optional(),
-  }),
-  budgetEntry: z.object({
-    legacyId: nullableString.optional(),
-    categoryId: z.string().min(1),
-    year: z.number().int(),
-    month: z.number().int().min(1).max(12),
-    amount: z.number(),
-    currency: z.string().min(1),
-  }),
-  goal: z.object({
-    legacyId: nullableString.optional(),
-    key: z.string().min(1),
-    name: z.string().min(1),
-    targetYear: z.number().int().nullable().optional(),
-    targetAmount: z.number(),
-    currency: z.string().min(1),
-  }),
-  contribution: z.object({
-    legacyId: nullableString.optional(),
-    date: z.string().min(1),
-    amount: z.number(),
-    currency: z.string().min(1),
-    portfolioDate: nullableString.optional(),
-    portfolioValue: z.number().nullable().optional(),
-    flow: z.number().nullable().optional(),
-  }),
-  userInstrument: z.object({
-    instrumentId: z.string().min(1),
-    categoryId: nullableString.optional(),
-    alias: nullableString.optional(),
-  }),
-  wealthSnapshot: z.object({
-    legacyId: nullableString.optional(),
-    snapshotDate: z.string().min(1),
-    year: z.number().int(),
-    month: z.number().int().min(1).max(12),
-  }),
+  account: z
+    .object({
+      legacyId: nullableString.optional(),
+      name: z.string().min(1),
+      kind: z.string().min(1),
+      currency: z.string().min(1),
+      openingBalance: z.number(),
+      isArchived: z.boolean().optional(),
+    })
+    .strict(),
+  category: z
+    .object({
+      legacyId: nullableString.optional(),
+      name: z.string().min(1),
+      kind: z.string().min(1),
+      sortOrder: z.number().int().optional(),
+    })
+    .strict(),
+  transaction: z
+    .object({
+      legacyId: nullableString.optional(),
+      accountId: z.string().min(1),
+      categoryId: nullableString.optional(),
+      type: z.string().min(1),
+      date: z.string().min(1),
+      description: nullableString.optional(),
+      amount: z.number(),
+      currency: z.string().min(1),
+    })
+    .strict(),
+  subscription: z
+    .object({
+      legacyId: nullableString.optional(),
+      name: z.string().min(1),
+      categoryId: nullableString.optional(),
+      accountId: nullableString.optional(),
+      amount: z.number(),
+      currency: z.string().min(1),
+      billingDay: z.number().int().nullable().optional(),
+      frequency: z.string().min(1),
+      isActive: z.boolean().optional(),
+    })
+    .strict(),
+  recurringRule: z
+    .object({
+      legacyId: nullableString.optional(),
+      name: z.string().min(1),
+      type: z.string().min(1),
+      accountId: nullableString.optional(),
+      categoryId: nullableString.optional(),
+      amount: z.number(),
+      currency: z.string().min(1),
+      frequency: z.string().min(1),
+      nextRunDate: nullableString.optional(),
+      status: z.string().optional(),
+    })
+    .strict(),
+  pendingMovement: z
+    .object({
+      legacyId: nullableString.optional(),
+      recurringRuleId: z.string().min(1),
+      accountId: nullableString.optional(),
+      categoryId: nullableString.optional(),
+      amount: z.number(),
+      currency: z.string().min(1),
+      dueDate: z.string().min(1),
+      status: z.string().optional(),
+    })
+    .strict(),
+  budgetEntry: z
+    .object({
+      legacyId: nullableString.optional(),
+      categoryId: z.string().min(1),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+      amount: z.number(),
+      currency: z.string().min(1),
+    })
+    .strict(),
+  goal: z
+    .object({
+      legacyId: nullableString.optional(),
+      key: z.string().min(1),
+      name: z.string().min(1),
+      targetYear: z.number().int().nullable().optional(),
+      targetAmount: z.number(),
+      currency: z.string().min(1),
+    })
+    .strict(),
+  contribution: z
+    .object({
+      legacyId: nullableString.optional(),
+      date: z.string().min(1),
+      amount: z.number(),
+      currency: z.string().min(1),
+      portfolioDate: nullableString.optional(),
+      portfolioValue: z.number().nullable().optional(),
+      flow: z.number().nullable().optional(),
+    })
+    .strict(),
+  userInstrument: z
+    .object({
+      instrumentId: z.string().min(1),
+      categoryId: nullableString.optional(),
+      alias: nullableString.optional(),
+    })
+    .strict(),
+  wealthSnapshot: z
+    .object({
+      legacyId: nullableString.optional(),
+      snapshotDate: z.string().min(1),
+      year: z.number().int(),
+      month: z.number().int().min(1).max(12),
+    })
+    .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
 /** Update-payload (patch) shape per entity type — every field optional. */
@@ -146,16 +168,20 @@ export const entityUpdateSchemas = {
   subscription: entityCreateSchemas.subscription.partial(),
   recurringRule: entityCreateSchemas.recurringRule.partial(),
   pendingMovement: entityCreateSchemas.pendingMovement.partial(),
-  budgetEntry: z.object({
-    amount: z.number().optional(),
-    currency: z.string().min(1).optional(),
-  }),
+  budgetEntry: z
+    .object({
+      amount: z.number().optional(),
+      currency: z.string().min(1).optional(),
+    })
+    .strict(),
   goal: entityCreateSchemas.goal.partial(),
   contribution: entityCreateSchemas.contribution.partial(),
-  userInstrument: z.object({
-    categoryId: nullableString.optional(),
-    alias: nullableString.optional(),
-  }),
+  userInstrument: z
+    .object({
+      categoryId: nullableString.optional(),
+      alias: nullableString.optional(),
+    })
+    .strict(),
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.partial(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
