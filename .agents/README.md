@@ -3,13 +3,19 @@
 Este directorio es la frontera entre el repositorio y **cualquier** orquestador
 de agentes. El reparto es deliberado:
 
-| Lo define el repositorio | Lo decide el orquestador |
-|---|---|
-| Qué hay que hacer y en qué orden (`tickets.json`) | Cuándo lanzar cada ticket |
-| Cómo se sabe que está hecho (`pnpm gate`) | Cuánta concurrencia tolerar |
-| Qué se le dice al agente (`ticket-prompt.<runner>.md`) | Qué hacer cuando un gate falla |
+| Lo define el repositorio | Lo hace el orquestador | Lo hace el agente |
+|---|---|---|
+| Qué hay que hacer y en qué orden (`tickets.json`) | Crear el worktree y la rama | Esperar a sus bloqueadores |
+| Cómo se sabe que está hecho (`pnpm gate`) | Lanzar una sesión por ticket | Implementar y pasar el gate |
+| Qué se le dice al agente (`ticket-prompt.<runner>.md`) | Elegir modelo y esfuerzo | Commit, push, PR y comentario |
 
-Un orquestador no necesita saber nada de este proyecto más allá de estos tres
+**El orquestador sólo arranca sesiones.** No espera, no vigila el gate, no
+publica: un ticket es una sesión que se lanza y se olvida. El agente que la
+ocupa es responsable de su ticket de principio a fin, y si su ticket está
+bloqueado, de esperar consultando el estado de los issues que lo bloquean hasta
+que se cierren.
+
+Un orquestador no necesita saber nada de este proyecto más allá de estos
 ficheros.
 
 ## `tickets.json`
@@ -42,8 +48,10 @@ Claude Code, así que Codex no la ve. `ticket-prompt.claude.md` la invoca;
 las dos da por sabido es el contexto de esta tanda: el glosario, los ADRs, la
 auditoría, y que la costura de test es el tier de ida y vuelta.
 
-El agente **commitea en su rama**; el push y la PR son del orquestador, y sólo
-si el gate pasa.
+El agente lo hace todo: espera, implementa, commitea, pasa el gate, publica la
+PR y comenta el enlace en el issue. Cierra el issue la propia PR, vía
+`Closes #<issue>`, que es también lo que desbloquea a los agentes que estén
+esperando.
 
 ## El gate
 
@@ -58,13 +66,17 @@ segunda vuelta.
 ## Ciclo de un ticket
 
 ```
-worktree nuevo desde la rama del ticket anterior de su carril
-  → agente con la plantilla de su runner (commitea él)
-  → pnpm gate
-  → verde: push, PR hacia esa misma base, comentario en el issue
-  → rojo: un reintento pasándole el fallo; si vuelve a fallar, para el carril
+orquestador: worktree nuevo + rama ticket/<issue> + una sesión
+        agente: ¿bloqueadores cerrados? ─ no → esperar y volver a mirar
+                                         └ sí → rebase sobre la base
+                → implementar (TDD sobre el tier de ida y vuelta)
+                → pnpm gate ─ rojo → arreglar; si no sale, comentar y parar
+                            └ verde → commit, push, PR (Closes #issue), comentar
 ```
 
-`scripts/run-ticket.sh` y `scripts/run-lane.sh` implementan exactamente eso en
-bash, y sirven como referencia ejecutable de lo que se espera — o como plan B si
-el orquestador no está disponible.
+Un ticket cerrado desbloquea al siguiente por sí solo: los agentes que esperan
+lo ven al consultar el estado del issue. No hace falta que nadie les avise.
+
+`scripts/run-ticket.sh` y `scripts/run-lane.sh` siguen sirviendo como plan B si
+el orquestador no está disponible, pero hacen más de lo que aquí se pide: son de
+la época en que publicaba el runner.

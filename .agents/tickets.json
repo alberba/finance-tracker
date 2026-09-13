@@ -1,5 +1,5 @@
 {
-  "$comment": "Contrato entre este repositorio y cualquier orquestador de agentes. El repo define qué hay que hacer, en qué orden y cómo se sabe que está hecho; el orquestador decide cuándo y con qué concurrencia. Ver .agents/README.md. El agente commitea en su rama; publicar (push + PR) es del orquestador, y sólo si `pnpm gate` pasa.",
+  "$comment": "Contrato entre este repositorio y cualquier orquestador de agentes. El orquestador SÓLO abre una sesión por ticket, en un worktree propio sobre la rama del ticket; el agente hace el resto por su cuenta: espera a sus bloqueadores consultando el estado de esos issues, implementa, pasa `pnpm gate`, commitea, publica la PR y comenta el enlace. Ver .agents/README.md.",
   "repo": "alberba/finance-tracker",
   "spec": 136,
   "base": "mal-guardado-v2-multiusuario",
@@ -253,5 +253,20 @@
       "hasFailingTest": false,
       "humanRun": false
     }
-  ]
+  ],
+  "branchPattern": "ticket/{issue}",
+  "ownership": {
+    "orchestrator": [
+      "crear el worktree y la rama",
+      "lanzar la sesión con la plantilla del runner",
+      "elegir modelo y esfuerzo"
+    ],
+    "agent": [
+      "esperar a los bloqueadores",
+      "implementar",
+      "pasar el gate",
+      "commit, push y PR",
+      "comentar en el issue"
+    ]
+  }
 }
