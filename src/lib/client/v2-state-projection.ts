@@ -114,7 +114,11 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     if (!(kind in projected.budget)) continue
     const category = categories.get(String(entry.categoryId)) || 'Sin categoría'
     const amounts = projected.budget[kind][category] || Array(12).fill(0)
-    amounts[Number(entry.month)] = Number(entry.amount || 0)
+    // `entry.month` is canonical 1-12 (ADR: month is 1-12 in DB/commands/domain);
+    // the UI's array is 0-11, so the conversion happens here, at the edge of
+    // the projection (audit §4.5 — without it, every month is off by one and
+    // December has no slot to land in at all).
+    amounts[Number(entry.month) - 1] = Number(entry.amount || 0)
     projected.budget[kind][category] = amounts
   }
 
