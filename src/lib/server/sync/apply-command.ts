@@ -73,6 +73,11 @@ interface WealthSnapshotBalancesField {
   balances?: Omit<wealthRepository.CreateSnapshotBalanceInput, "snapshotId">[];
 }
 
+/** The `allocations` nested inside a `contribution` create/update payload — see `command-schemas.ts`. */
+interface ContributionAllocationsField {
+  allocations?: Omit<contributionsRepository.CreateContributionAllocationInput, "contributionId" | "currency">[];
+}
+
 async function findByLegacyId(
   db: Db,
   userId: string,
@@ -172,8 +177,17 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
       return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow;
     case "goal":
       return (await goalsRepository.create(db, userId, data)) as VersionedRow;
-    case "contribution":
-      return (await contributionsRepository.create(db, userId, data)) as VersionedRow;
+    case "contribution": {
+      const { allocations, ...contributionInput } = data as contributionsRepository.CreateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.create(db, userId, contributionInput);
+      const allocationRows = allocations?.length
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : [];
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow;
     case "wealthSnapshot": {
@@ -226,10 +240,18 @@ async function updateEntity(
         | undefined;
     case "goal":
       return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
-    case "contribution":
-      return (await contributionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
-        | VersionedRow
-        | undefined;
+    case "contribution": {
+      const { allocations, ...contributionPatch } = patch as contributionsRepository.UpdateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.update(db, userId, entityId, contributionPatch, expectedVersion);
+      if (!row) return undefined;
+      const allocationRows = allocations
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : await contributionsRepository.listAllocationsByContribution(db, userId, row.id);
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
@@ -325,12 +347,22 @@ async function performMutation(
       return { status: "noop" };
 
     case "settingsUpdate": {
+      const { twrLiquidityAccountIds, ...settingsPatch } = command.patch;
       const existing = await userSettingsRepository.get(db, userId);
       const row = existing
-        ? await userSettingsRepository.update(db, userId, command.patch)
-        : await userSettingsRepository.create(db, userId, command.patch);
+        ? await userSettingsRepository.update(db, userId, settingsPatch)
+        : await userSettingsRepository.create(db, userId, settingsPatch);
+      const twrLiquidityAccounts = twrLiquidityAccountIds
+        ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
+        : undefined;
       const revision = await recordChange(db, userId, "userSettings", userId, "update", command.patch);
-      return { status: "applied", entityType: "userSettings", entityId: userId, entity: row, revision };
+      return {
+        status: "applied",
+        entityType: "userSettings",
+        entityId: userId,
+        entity: twrLiquidityAccounts ? { ...row, twrLiquidityAccounts } : row,
+        revision,
+      };
     }
 
     case "create": {

@@ -47,6 +47,8 @@ export const categories = sqliteTable(
     name: text("name").notNull(),
     kind: text("kind").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** User-chosen emoji override; null falls back to the built-in map. */
+    emoji: text("emoji"),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),

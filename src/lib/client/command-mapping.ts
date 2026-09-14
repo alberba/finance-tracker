@@ -62,13 +62,12 @@
  *   for the "created dependency and dependent row in the same instant,
  *   offline" case, not a data-loss bug (nothing is ever double-applied or
  *   silently dropped from local state).
- * - `investment.ts`'s `saveContribution` (the multi-entity contribution +
- *   wealth-snapshot + snapshot-balances workflow save) is NOT wired: its
- *   domain function (`applyContributionSave`) produces a combined update
- *   spanning `contribution_allocations`/`snapshot_balances`, both
- *   explicitly out of the 11 `SYNC_ENTITY_TYPES` per `command-schemas.ts`'s
- *   own doc comment. Wiring it needs either a command-contract extension
- *   or decomposing that domain function's output — left as a follow-up.
+ * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
+ *   its flow allocations nested under `data.allocations`; the snapshot
+ *   balances that same workflow save touches are not re-synced from there.
+ * - `settings.ts`'s TWR liquidity toggle sends the whole selection through
+ *   `syncTwrLiquidityAccounts` (a `settingsUpdate`), resolved to server
+ *   `account` ids.
  * - `wealth.ts`'s `saveSnapshot` sync-upserts the `wealthSnapshot` row with
  *   its balances nested under `data.balances` (resolved to server `account`
  *   ids via `resolveEntityId`) — see `command-schemas.ts`'s doc comment for
@@ -230,6 +229,7 @@ export async function syncSettingsUpdate(patch: {
   currency?: string;
   locale?: string | null;
   theme?: string | null;
+  twrLiquidityAccountIds?: string[];
 }): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -252,6 +252,27 @@ export async function resolveEntityId(entityType: SyncEntityType, localId: strin
   const syncStore = useSyncStore();
   const ref = await syncStore.getEntityRef(entityType, localId, kind);
   return ref?.entityId ?? null;
+}
+
+/**
+ * Sends the whole TWR liquidity selection, resolved to server `account` ids.
+ * An account that hasn't synced yet is left out with a warning; the next
+ * toggle sends it once it has.
+ */
+export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[]): Promise<void> {
+  if (!isSyncV2Enabled()) {
+    return;
+  }
+  const twrLiquidityAccountIds: string[] = [];
+  for (const localId of localAccountIds) {
+    const accountId = await resolveEntityId("account", localId);
+    if (accountId) {
+      twrLiquidityAccountIds.push(accountId);
+    } else {
+      warn("account", localId, "marcar como liquidez TWR");
+    }
+  }
+  await syncSettingsUpdate({ twrLiquidityAccountIds });
 }
 
 export type CategoryKind = "income" | "expense" | "investment";

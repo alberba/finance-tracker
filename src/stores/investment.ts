@@ -72,6 +72,22 @@ function buildContributionData(contribution: Contribution, currency: string) {
   }
 }
 
+/** Resolves a contribution's flow allocations to server `account` ids for its sync command. */
+async function buildContributionAllocations(contribution: Contribution) {
+  const allocations: Array<{ accountId: string; amount: number }> = []
+  for (const allocation of contribution.flowAllocations || []) {
+    const accountId = await resolveEntityId('account', allocation.accountId)
+    if (!accountId) {
+      console.warn(
+        `[sync-v2] No se pudo incluir el reparto a la cuenta local "${allocation.accountId}" en el aporte: todavía no se ha sincronizado con el servidor.`,
+      )
+      continue
+    }
+    allocations.push({ accountId, amount: allocation.amount })
+  }
+  return allocations
+}
+
 export interface NewInvestmentMovementInput {
   date: string
   time: string
@@ -405,13 +421,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     warnings: string[],
     options: SaveContributionOptions = {},
   ): boolean {
-    // WP7b leftover (documented, not wired): `applyContributionSave` folds a
-    // contribution + wealth-snapshot + snapshot-balances update into one
-    // draft mutation. `contribution_allocations`/`snapshot_balances` are
-    // explicitly out of `SYNC_ENTITY_TYPES` (see `command-schemas.ts`'s doc
-    // comment), so this workflow save cannot be expressed as today's
-    // discrete sync commands without either a command-contract extension
-    // or decomposing this domain function's output — left unsynced.
+    const before = financialStateStore.contributions
     let result: ContributionSaveResult = { ok: false, hadWarnings: false }
     financialStateStore.commitState((draft) => {
       result = applyContributionSave(draft, { date, month, snapshotInputs, allocations, warnings })
@@ -428,6 +438,11 @@ export const useInvestmentStore = defineStore('investment', () => {
       }
       return false
     }
+    const currency = financialStateStore.currency
+    void syncListDiff('contribution', before, financialStateStore.contributions, async (contribution) => ({
+      ...buildContributionData(contribution, currency),
+      allocations: await buildContributionAllocations(contribution),
+    }))
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
     if (options.syncStockEventsCash) {
       void stockEventsStore.syncContributionCash(date, allocations)

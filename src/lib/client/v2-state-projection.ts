@@ -1,3 +1,4 @@
+import { categoryEmojiKey } from '../../scripts/category-emoji'
 import { normalizeState } from '../../scripts/state'
 import { getFirstUpcomingChargeDate } from '../../scripts/subscriptions'
 import { isSubscriptionFrequency, type GoalKey, type State } from '../../scripts/types'
@@ -87,12 +88,20 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     .map((entry) => accountIds.get(String(entry.accountId)) || String(entry.legacyId || ''))
     .filter(Boolean)
 
+  const categoryEmojis: Record<string, string> = {}
   for (const [kind, stateKey] of Object.entries(CATEGORY_STATE_KEYS)) {
-    projected[stateKey] = bootstrap.categories
+    const categoriesOfKind = bootstrap.categories
       .filter((category) => category.kind === kind)
       .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0))
-      .map((category) => String(category.name))
+    projected[stateKey] = categoriesOfKind.map((category) => String(category.name))
+    for (const category of categoriesOfKind) {
+      if (category.emoji) {
+        categoryEmojis[categoryEmojiKey(kind as keyof typeof CATEGORY_STATE_KEYS, String(category.name))] =
+          String(category.emoji)
+      }
+    }
   }
+  projected.categoryEmojis = categoryEmojis
 
   projected.transactions = bootstrap.transactions.map((transaction) => {
     const trade = transaction.tradeDetail as CachedEntity | null | undefined

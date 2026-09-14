@@ -189,4 +189,21 @@ describe("round trip: inversión", () => {
 
     expect(reloaded.transactions.find((tx) => tx.id === movementId)?.declared).toBe(true);
   });
+
+  it("keeps how a contribution's flow was split across accounts (§5)", async () => {
+    const { useInvestmentStore } = await import("../../../../src/stores/investment");
+    const saved = useInvestmentStore().saveContribution(
+      "2026-03-31",
+      2,
+      [{ kind: "investments", id: "indexa", value: "1000" }],
+      [{ accountId: "myinvestor", amount: 200 }],
+      [],
+    );
+    expect(saved).toBe(true);
+
+    const reloaded = await trip.reload();
+
+    const contribution = reloaded.contributions.find((item) => item.date === "2026-03-31");
+    expect(contribution?.flowAllocations).toEqual([{ accountId: "myinvestor", amount: 200 }]);
+  });
 });

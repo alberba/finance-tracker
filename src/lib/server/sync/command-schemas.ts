@@ -10,12 +10,14 @@
  * `sync_commands.id`'s primary key, enforcing idempotent replay.
  *
  * Deliberately out of scope (left for a later WP, see WP4 report):
- * `investment_trade_details`, `contribution_allocations`,
- * `twr_liquidity_accounts` (sub-entities of an aggregate root, not addressed
- * directly by a sync command here). `snapshot_balances` is the exception:
- * it travels nested inside the `wealthSnapshot` command's `balances`, the
- * same way an investment operation travels nested inside its transaction
- * (ADR 0002) — never as its own sync command.
+ * `investment_trade_details` (a sub-entity of an aggregate root, not addressed
+ * directly by a sync command here). Sub-entities the user edits travel nested
+ * instead, the same way an investment operation travels nested inside its
+ * transaction (ADR 0002) — never as their own sync command:
+ * `snapshot_balances` inside `wealthSnapshot.balances`,
+ * `contribution_allocations` inside `contribution.allocations`, and
+ * `twr_liquidity_accounts` as the whole selection in
+ * `settingsUpdate.patch.twrLiquidityAccountIds`.
  * `stockevents_symbol_mappings` (no `version` column to drive optimistic
  * concurrency), `integration_credentials` (WP12 owns encryption semantics),
  * and the global `market_instruments`/`market_quotes` reference tables
@@ -52,6 +54,12 @@ const wealthSnapshotBalanceSchema = z.object({
   currency: z.string().min(1),
 });
 
+/** One account's share of a contribution's flow, nested inside a `contribution` command. */
+const contributionAllocationSchema = z.object({
+  accountId: nullableString,
+  amount: z.number(),
+});
+
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
   account: z
@@ -70,6 +78,7 @@ export const entityCreateSchemas = {
       name: z.string().min(1),
       kind: z.string().min(1),
       sortOrder: z.number().int().optional(),
+      emoji: nullableString.optional(),
     })
     .strict(),
   transaction: z
@@ -154,6 +163,7 @@ export const entityCreateSchemas = {
       portfolioDate: nullableString.optional(),
       portfolioValue: z.number().nullable().optional(),
       flow: z.number().nullable().optional(),
+      allocations: z.array(contributionAllocationSchema).optional(),
     })
     .strict(),
   userInstrument: z
@@ -258,6 +268,8 @@ export const settingsUpdateCommandSchema = z.object({
     currency: z.string().min(1).optional(),
     locale: nullableString.optional(),
     theme: nullableString.optional(),
+    /** Server `account` ids — replaces the whole TWR liquidity selection. */
+    twrLiquidityAccountIds: z.array(z.string().min(1)).optional(),
   }),
 });
 
