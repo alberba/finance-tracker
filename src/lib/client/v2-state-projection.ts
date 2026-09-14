@@ -1,6 +1,6 @@
 import { normalizeState } from '../../scripts/state'
 import { getFirstUpcomingChargeDate } from '../../scripts/subscriptions'
-import { isSubscriptionFrequency, type GoalKey, type State } from '../../scripts/types'
+import { isSubscriptionFrequency, type GoalKey, type InvestmentSide, type State } from '../../scripts/types'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
 
@@ -28,6 +28,22 @@ const CATEGORY_STATE_KEYS = {
   expense: 'expenseCategories',
   investment: 'investmentCategories',
 } as const
+
+/**
+ * The operation of an investment movement template, as the domain types
+ * want it: absent rather than zeroed when the template is not an
+ * investment, so reopening an expense rule does not offer it a symbol.
+ */
+function projectOperation(entity: CachedEntity): Record<string, unknown> {
+  return {
+    ...(entity.symbol ? { symbol: String(entity.symbol) } : {}),
+    ...(entity.side ? { side: String(entity.side) as InvestmentSide } : {}),
+    ...(entity.units === null || entity.units === undefined ? {} : { units: Number(entity.units) }),
+    ...(entity.unitPrice === null || entity.unitPrice === undefined ? {} : { unitPrice: Number(entity.unitPrice) }),
+    ...(entity.fee === null || entity.fee === undefined ? {} : { fee: Number(entity.fee) }),
+    ...(entity.time ? { time: String(entity.time) } : {}),
+  }
+}
 
 function legacyId(entity: CachedEntity): string {
   return String(entity.legacyId || entity.id)
@@ -105,11 +121,16 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       category: categories.get(String(transaction.categoryId)) || 'Sin categoría',
       description: String(transaction.description || ''), amount: Number(transaction.amount || 0),
       createdAt: String(transaction.createdAt || ''),
+      ...(transaction.time ? { time: String(transaction.time) } : {}),
+      declared: Boolean(transaction.declared),
       ...(trade ? {
         side: String(trade.side) as State['transactions'][number]['side'],
         units: Number(trade.quantity || 0), unitPrice: Number(trade.price || 0),
         fee: Number(trade.fee || 0), movementCurrency: String(trade.currency || projected.currency),
-        ...(instrument ? { symbol: String(instrument.symbol), instrumentId: legacyId(instrument) } : {}),
+        // The stored ticker is what the user typed; the instrument is only a
+        // fallback for rows migrated from v1, which have no `symbol` column.
+        ...(trade.symbol || instrument ? { symbol: String(trade.symbol || instrument?.symbol) } : {}),
+        ...(instrument ? { instrumentId: legacyId(instrument) } : {}),
       } : {}),
     }
   })
@@ -197,18 +218,27 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     accountId: accountIds.get(String(rule.accountId)) || '',
     category: categories.get(String(rule.categoryId)) || 'Sin categoría',
     description: String(rule.name || ''), amount: Number(rule.amount || 0),
-    frequency: String(rule.frequency) as State['recurringRules'][number]['frequency'], interval: 1,
-    startDate: String(rule.nextRunDate || ''), endDate: null, active: rule.status === 'active',
-    lastExecutionDate: null, nextOccurrenceDate: rule.nextRunDate ? String(rule.nextRunDate) : null,
+    ...projectOperation(rule),
+    frequency: String(rule.frequency) as State['recurringRules'][number]['frequency'],
+    interval: Number(rule.interval || 1),
+    startDate: String(rule.startDate || rule.nextRunDate || ''),
+    endDate: rule.endDate ? String(rule.endDate) : null, active: rule.status === 'active',
+    lastExecutionDate: rule.lastExecutionDate ? String(rule.lastExecutionDate) : null,
+    nextOccurrenceDate: rule.nextRunDate ? String(rule.nextRunDate) : null,
   }))
   projected.pendingMovements = bootstrap.pendingMovements.map((pending) => ({
     id: legacyId(pending), occurrenceKey: `${recurringRuleIds.get(String(pending.recurringRuleId)) || pending.recurringRuleId}:${pending.dueDate}`,
     ruleId: recurringRuleIds.get(String(pending.recurringRuleId)) || String(pending.recurringRuleId),
-    occurrenceDate: String(pending.dueDate), type: 'expense',
+    occurrenceDate: String(pending.dueDate),
+    type: String(pending.type || 'expense') as State['pendingMovements'][number]['type'],
     accountId: accountIds.get(String(pending.accountId)) || '',
-    category: categories.get(String(pending.categoryId)) || 'Sin categoría', description: '',
-    amount: Number(pending.amount || 0), status: String(pending.status) as State['pendingMovements'][number]['status'],
-    createdAt: String(pending.createdAt || ''), updatedAt: String(pending.updatedAt || ''), transactionId: null,
+    category: categories.get(String(pending.categoryId)) || 'Sin categoría',
+    description: String(pending.description || ''),
+    amount: Number(pending.amount || 0),
+    ...projectOperation(pending),
+    status: String(pending.status) as State['pendingMovements'][number]['status'],
+    createdAt: String(pending.createdAt || ''), updatedAt: String(pending.updatedAt || ''),
+    transactionId: pending.transactionId ? String(pending.transactionId) : null,
   }))
 
   projected.instruments = (bootstrap.instruments || []).map((instrument) => ({

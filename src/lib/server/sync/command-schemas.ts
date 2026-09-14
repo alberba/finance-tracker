@@ -42,6 +42,34 @@ const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES);
 const nullableString = z.string().nullable();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/**
+ * The operation ("Operación", CONTEXT.md) that gives an investment movement
+ * its content. A recurring rule and a pending movement are both a movement
+ * template, so both carry it — and both leave it absent when they are not
+ * investments.
+ */
+const operationFields = {
+  symbol: nullableString.optional(),
+  side: nullableString.optional(),
+  units: z.number().nullable().optional(),
+  unitPrice: z.number().nullable().optional(),
+  fee: z.number().nullable().optional(),
+  time: nullableString.optional(),
+};
+
+/**
+ * The same operation, as it travels nested inside a movement's command. The
+ * movement's own `time` lives beside it on the movement, not in here.
+ */
+const operationSchema = z.object({
+  symbol: nullableString.optional(),
+  instrumentId: nullableString.optional(),
+  side: z.string().min(1),
+  units: z.number(),
+  unitPrice: z.number(),
+  fee: z.number(),
+});
+
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
   account: z
@@ -72,6 +100,13 @@ export const entityCreateSchemas = {
       description: nullableString.optional(),
       amount: z.number(),
       currency: z.string().min(1),
+      // `time` and `declared` are the movement's own, not the operation's: a
+      // gasto can carry an hour and be marked as declarado too (ADR 0002).
+      time: nullableString.optional(),
+      declared: z.boolean().optional(),
+      // Nested, so amount and operation are written in the same command and
+      // cannot drift apart. `null` says this movement has no operation.
+      operation: operationSchema.nullable().optional(),
     })
     .strict(),
   subscription: z
@@ -99,7 +134,12 @@ export const entityCreateSchemas = {
       amount: z.number(),
       currency: z.string().min(1),
       frequency: z.string().min(1),
+      interval: z.number().int().min(1).optional(),
+      startDate: nullableString.optional(),
+      endDate: nullableString.optional(),
+      lastExecutionDate: nullableString.optional(),
       nextRunDate: nullableString.optional(),
+      ...operationFields,
       status: z.string().optional(),
     })
     .strict(),
@@ -112,6 +152,10 @@ export const entityCreateSchemas = {
       amount: z.number(),
       currency: z.string().min(1),
       dueDate: z.string().min(1),
+      type: nullableString.optional(),
+      description: nullableString.optional(),
+      ...operationFields,
+      transactionId: nullableString.optional(),
       status: z.string().optional(),
     })
     .strict(),
