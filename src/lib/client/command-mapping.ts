@@ -44,7 +44,11 @@
  * are plain name arrays), while v2 has real `category` rows with server
  * ids. `resolveCategoryId` treats `${kind}:${name}` as the category's
  * stable `legacyId` and lazily create-syncs it the first time it's
- * referenced.
+ * referenced — but the v1 migration (`migration-runner.ts`) has no concept
+ * of that composite key, and writes the bare category *name* as `legacyId`
+ * instead (audit §4.7). `resolveCategoryId` falls back to that bare-name
+ * lookup before deciding a category is unseen, so referencing a category
+ * migrated from v1 resolves to its existing row instead of duplicating it.
  *
  * Known, documented leftovers (exotic edge flows intentionally NOT covered
  * here — see the WP7b report for the full list):
@@ -233,12 +237,12 @@ export async function syncSettingsUpdate(patch: {
  * decide whether that's acceptable (optional FK) or means the command must
  * be skipped (required FK).
  */
-export async function resolveEntityId(entityType: SyncEntityType, localId: string): Promise<string | null> {
+export async function resolveEntityId(entityType: SyncEntityType, localId: string, kind?: string): Promise<string | null> {
   if (!isSyncV2Enabled()) {
     return null;
   }
   const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
+  const ref = await syncStore.getEntityRef(entityType, localId, kind);
   return ref?.entityId ?? null;
 }
 
@@ -255,6 +259,16 @@ export function categoryLocalId(kind: CategoryKind, name: string): string {
  * hasn't synced yet (freshly referenced in this same batch, or offline) —
  * see the module doc comment's "known leftovers" for how required-field
  * callers (`budgetEntry`) must handle that.
+ *
+ * Checks the `${kind}:${name}` convention this client itself creates rows
+ * under first, then falls back to the bare `name` the v1 migration writes
+ * (audit §4.7) before concluding the category is genuinely unseen — so a
+ * migrated category resolves to its existing row on first reference instead
+ * of a duplicate being created and every referencing command losing its
+ * category. The fallback is scoped to `kind` too: the migration writes
+ * `legacyId = name` per row with no `kind` in the id itself, so an income
+ * and an expense category sharing a name would otherwise collide on the
+ * first migrated category found with that bare name.
  */
 export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
   if (!isSyncV2Enabled()) {
@@ -264,6 +278,10 @@ export async function resolveCategoryId(kind: CategoryKind, name: string): Promi
   const resolved = await resolveEntityId("category", localId);
   if (resolved) {
     return resolved;
+  }
+  const migrated = await resolveEntityId("category", name, kind);
+  if (migrated) {
+    return migrated;
   }
   await syncUpsert("category", localId, { name, kind });
   return null;
