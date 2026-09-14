@@ -7,7 +7,7 @@
  * every other amount column.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { investmentTradeDetails, transactions } from "../schema";
 import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
@@ -212,6 +212,37 @@ export async function getTradeDetailByTransaction(
       ),
     );
   return row ? toInvestmentTradeDetailRow(row) : undefined;
+}
+
+/**
+ * Batched form of {@link getTradeDetailByTransaction} for bootstrap
+ * assembly (audit §5.1): one query for every transaction's trade detail
+ * instead of one query per transaction. Each transaction has at most one
+ * trade detail, so the map is keyed one-to-one.
+ */
+export async function listTradeDetailsByTransactions(
+  db: Db,
+  userId: string,
+  transactionIds: string[],
+): Promise<Map<string, InvestmentTradeDetailRow>> {
+  const byTransaction = new Map<string, InvestmentTradeDetailRow>();
+  if (transactionIds.length === 0) {
+    return byTransaction;
+  }
+  const rows = await db
+    .select()
+    .from(investmentTradeDetails)
+    .where(
+      and(
+        eq(investmentTradeDetails.userId, userId),
+        inArray(investmentTradeDetails.transactionId, transactionIds),
+      ),
+    );
+  for (const row of rows) {
+    const detail = toInvestmentTradeDetailRow(row);
+    byTransaction.set(detail.transactionId, detail);
+  }
+  return byTransaction;
 }
 
 export async function createTradeDetail(

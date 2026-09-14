@@ -123,5 +123,33 @@ describe("transactions repository", () => {
 
       expect(await transactionsRepo.removeTradeDetail(db, userA.id, created.id)).toBe(true);
     });
+
+    it("removing the transaction deletes its trade detail with it instead of a raw FK violation (audit §2.6)", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+      const transaction = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-01-15",
+        amount: 100,
+        currency: "EUR",
+      });
+      const detail = await transactionsRepo.createTradeDetail(db, user.id, {
+        transactionId: transaction.id,
+        side: "buy",
+        quantity: "1.5",
+        price: 66.66,
+        fee: 1.5,
+        currency: "EUR",
+      });
+
+      expect(await transactionsRepo.remove(db, user.id, transaction.id)).toBe(true);
+
+      expect(
+        await transactionsRepo.getTradeDetailByTransaction(db, user.id, transaction.id),
+      ).toBeUndefined();
+      expect(await transactionsRepo.removeTradeDetail(db, user.id, detail.id)).toBe(false);
+    });
   });
 });
