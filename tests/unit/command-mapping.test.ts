@@ -13,6 +13,7 @@ import {
   categoryLocalId,
   resolveCategoryId,
   resolveEntityId,
+  resolveOrCreateCategoryId,
   syncCreate,
   syncListDiff,
   syncRemove,
@@ -263,6 +264,46 @@ describe("command-mapping (WP7b)", () => {
 
       const third = await resolveCategoryId("expense", "Comida");
       expect(third).toBe("server-cat-1");
+    });
+
+    it("resolveOrCreateCategoryId mints an id for an unknown category instead of returning null (audit §4.7)", async () => {
+      await initSyncStore();
+      const first = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(first).toEqual(expect.any(String));
+
+      const outboxDb = await openOutbox(USER_ID);
+      const entries = await listAll(outboxDb);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.command).toMatchObject({
+        action: "create",
+        entityType: "category",
+        data: { name: "Ocio", kind: "expense", id: first, legacyId: categoryLocalId("expense", "Ocio") },
+      });
+      outboxDb.close();
+
+      // A second reference before the create has synced reuses the same
+      // minted id instead of minting (and creating) a second category.
+      const second = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(second).toBe(first);
+      const outboxDb2 = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb2)).toHaveLength(1);
+      outboxDb2.close();
+    });
+
+    it("resolveOrCreateCategoryId resolves an already-cached category without minting a new id", async () => {
+      await initSyncStore();
+      const cacheDb = await openIdbCache(USER_ID);
+      await putEntity(cacheDb, "category", {
+        id: "server-cat-2",
+        legacyId: categoryLocalId("expense", "Comida"),
+        version: 0,
+      });
+      cacheDb.close();
+
+      expect(await resolveOrCreateCategoryId("expense", "Comida")).toBe("server-cat-2");
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
+      outboxDb.close();
     });
 
     it("resolveEntityId resolves a known ref and returns null for an unknown one", async () => {
