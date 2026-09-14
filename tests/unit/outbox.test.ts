@@ -60,6 +60,30 @@ describe("outbox", () => {
     expect(await count(db)).toBe(0);
   });
 
+  it("rejects a create whose per-entity data carries a field the schema doesn't declare (issue #138)", async () => {
+    await expect(
+      enqueue(db, {
+        action: "create",
+        entityType: "account",
+        data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 0, bogusField: "no destino" },
+      }),
+    ).rejects.toBeInstanceOf(InvalidCommandError);
+    expect(await count(db)).toBe(0);
+  });
+
+  it("rejects an update whose per-entity patch carries a field the schema doesn't declare (issue #138)", async () => {
+    await expect(
+      enqueue(db, {
+        action: "update",
+        entityType: "account",
+        entityId: "acc-1",
+        baseVersion: 0,
+        patch: { name: "Nueva", bogusField: "no destino" },
+      }),
+    ).rejects.toBeInstanceOf(InvalidCommandError);
+    expect(await count(db)).toBe(0);
+  });
+
   it("lists entries FIFO and peekBatch caps at the requested limit", async () => {
     for (let i = 0; i < 7; i += 1) {
       await enqueue(db, { action: "noop" });
