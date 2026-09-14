@@ -23,6 +23,21 @@ export type InvestmentTradeDetailRow = Omit<
   fee: number;
 };
 
+/**
+ * The operation ("Operación", CONTEXT.md) that gives an investment movement
+ * its content. It travels inside the movement's own input, never as a command
+ * of its own (ADR 0002), so amount and operation are written together or not
+ * at all.
+ */
+export interface MovementOperationInput {
+  symbol?: string | null;
+  instrumentId?: string | null;
+  side: string;
+  units: number;
+  unitPrice: number;
+  fee: number;
+}
+
 export interface CreateTransactionInput {
   /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
   id?: string;
@@ -34,6 +49,9 @@ export interface CreateTransactionInput {
   description?: string | null;
   amount: number;
   currency: string;
+  time?: string | null;
+  declared?: boolean;
+  operation?: MovementOperationInput | null;
 }
 
 export interface UpdateTransactionInput {
@@ -44,6 +62,9 @@ export interface UpdateTransactionInput {
   description?: string | null;
   amount?: number;
   currency?: string;
+  time?: string | null;
+  declared?: boolean;
+  operation?: MovementOperationInput | null;
 }
 
 function toTransactionRow(row: typeof transactions.$inferSelect): TransactionRow {
@@ -83,10 +104,13 @@ export async function create(
       description: input.description ?? null,
       amountMinor: toMinorUnits(input.amount, input.currency),
       currency: input.currency,
+      time: input.time ?? null,
+      declared: input.declared ?? false,
       createdAt: now,
       updatedAt: now,
     })
     .returning();
+  await writeOperation(db, userId, row.id, input.type, input.currency, input.operation);
   return toTransactionRow(row);
 }
 
@@ -104,16 +128,19 @@ export async function update(
   await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
   const nextCurrency = input.currency ?? existing.currency;
   const nextAmount = input.amount ?? existing.amount;
+  const nextType = input.type ?? existing.type;
   const [row] = await db
     .update(transactions)
     .set({
       accountId: input.accountId ?? existing.accountId,
       categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
-      type: input.type ?? existing.type,
+      type: nextType,
       date: input.date ?? existing.date,
       description: input.description === undefined ? existing.description : input.description,
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,
+      time: input.time === undefined ? existing.time : input.time,
+      declared: input.declared === undefined ? existing.declared : input.declared,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
@@ -123,7 +150,12 @@ export async function update(
       expectedVersion === undefined ? undefined : eq(transactions.version, expectedVersion),
     ))
     .returning();
-  return row ? toTransactionRow(row) : undefined;
+  if (!row) {
+    return undefined;
+  }
+  // Same write as the amount: an edit can never leave the two disagreeing.
+  await writeOperation(db, userId, row.id, nextType, nextCurrency, input.operation);
+  return toTransactionRow(row);
 }
 
 export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
@@ -180,6 +212,7 @@ export async function bulkInsert(
 export interface CreateInvestmentTradeDetailInput {
   transactionId: string;
   instrumentId?: string | null;
+  symbol?: string | null;
   side: string;
   quantity: string;
   price: number;
@@ -257,6 +290,7 @@ export async function createTradeDetail(
       userId,
       transactionId: input.transactionId,
       instrumentId: input.instrumentId ?? null,
+      symbol: input.symbol ?? null,
       side: input.side,
       quantity: input.quantity,
       priceMinor: toMinorUnits(input.price, input.currency),
@@ -267,6 +301,65 @@ export async function createTradeDetail(
     })
     .returning();
   return toInvestmentTradeDetailRow(row);
+}
+
+/**
+ * Writes the operation that travels with a movement (ADR 0002): inserts it,
+ * updates it in place, or — when the movement stops being an investment —
+ * removes it. `undefined` means the caller said nothing about the operation
+ * and the stored one is left alone; `null` means there is none.
+ */
+async function writeOperation(
+  db: Db,
+  userId: string,
+  transactionId: string,
+  type: string,
+  currency: string,
+  operation: MovementOperationInput | null | undefined,
+): Promise<void> {
+  // Only an investment movement has an operation. Turning one into a gasto
+  // drops it, even when the caller said nothing: otherwise the movement would
+  // keep títulos and precio it no longer has any meaning for.
+  if (type !== "investment") {
+    const stale = await getTradeDetailByTransaction(db, userId, transactionId);
+    if (stale) {
+      await removeTradeDetail(db, userId, stale.id);
+    }
+    return;
+  }
+  if (operation === undefined) {
+    return;
+  }
+  const existing = await getTradeDetailByTransaction(db, userId, transactionId);
+  if (!operation) {
+    if (existing) {
+      await removeTradeDetail(db, userId, existing.id);
+    }
+    return;
+  }
+  const values = {
+    instrumentId: operation.instrumentId ?? null,
+    symbol: operation.symbol ?? null,
+    side: operation.side,
+    quantity: String(operation.units),
+    priceMinor: toMinorUnits(operation.unitPrice, currency),
+    feeMinor: toMinorUnits(operation.fee, currency),
+    currency,
+    updatedAt: nowIso(),
+  };
+  if (existing) {
+    await db
+      .update(investmentTradeDetails)
+      .set(values)
+      .where(and(eq(investmentTradeDetails.id, existing.id), eq(investmentTradeDetails.userId, userId)));
+    return;
+  }
+  await db.insert(investmentTradeDetails).values({
+    ...values,
+    userId,
+    transactionId,
+    createdAt: values.updatedAt,
+  });
 }
 
 export async function removeTradeDetail(db: Db, userId: string, id: string): Promise<boolean> {
