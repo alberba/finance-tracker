@@ -7,7 +7,7 @@
  * `amountMinor`, just without their own separate currency column.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
 import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
@@ -207,6 +207,41 @@ export async function listAllocationsByContribution(
       ),
     );
   return rows.map(toAllocationRow);
+}
+
+/**
+ * Batched form of {@link listAllocationsByContribution} for bootstrap
+ * assembly (audit §5.1): one query for every contribution's allocations
+ * instead of one query per contribution.
+ */
+export async function listAllocationsByContributions(
+  db: Db,
+  userId: string,
+  contributionIds: string[],
+): Promise<Map<string, ContributionAllocationRow[]>> {
+  const byContribution = new Map<string, ContributionAllocationRow[]>();
+  if (contributionIds.length === 0) {
+    return byContribution;
+  }
+  const rows = await db
+    .select()
+    .from(contributionAllocations)
+    .where(
+      and(
+        eq(contributionAllocations.userId, userId),
+        inArray(contributionAllocations.contributionId, contributionIds),
+      ),
+    );
+  for (const row of rows) {
+    const allocation = toAllocationRow(row);
+    const existing = byContribution.get(allocation.contributionId);
+    if (existing) {
+      existing.push(allocation);
+    } else {
+      byContribution.set(allocation.contributionId, [allocation]);
+    }
+  }
+  return byContribution;
 }
 
 export async function getAllocation(

@@ -10,7 +10,7 @@
  * usual `userId`-scoped CRUD surface.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
 import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
@@ -64,6 +64,18 @@ export async function listInstruments(db: Db): Promise<MarketInstrumentRow[]> {
 export async function getInstrument(db: Db, id: string): Promise<MarketInstrumentRow | undefined> {
   const [row] = await db.select().from(marketInstruments).where(eq(marketInstruments.id, id));
   return row;
+}
+
+/**
+ * Batched form of {@link getInstrument} for bootstrap assembly (audit
+ * §5.1): one query for every tracked instrument instead of one query per
+ * instrument.
+ */
+export async function listInstrumentsByIds(db: Db, ids: string[]): Promise<MarketInstrumentRow[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  return db.select().from(marketInstruments).where(inArray(marketInstruments.id, ids));
 }
 
 export async function getInstrumentBySymbol(
@@ -145,6 +157,35 @@ export async function listQuotesByInstrument(db: Db, instrumentId: string): Prom
     .from(marketQuotes)
     .where(eq(marketQuotes.instrumentId, instrumentId));
   return rows.map(toQuoteRow);
+}
+
+/**
+ * Batched form of {@link listQuotesByInstrument} for bootstrap assembly
+ * (audit §5.1): one query for every tracked instrument's quotes instead of
+ * one query per instrument.
+ */
+export async function listQuotesByInstruments(
+  db: Db,
+  instrumentIds: string[],
+): Promise<Map<string, MarketQuoteRow[]>> {
+  const byInstrument = new Map<string, MarketQuoteRow[]>();
+  if (instrumentIds.length === 0) {
+    return byInstrument;
+  }
+  const rows = await db
+    .select()
+    .from(marketQuotes)
+    .where(inArray(marketQuotes.instrumentId, instrumentIds));
+  for (const row of rows) {
+    const quote = toQuoteRow(row);
+    const existing = byInstrument.get(quote.instrumentId);
+    if (existing) {
+      existing.push(quote);
+    } else {
+      byInstrument.set(quote.instrumentId, [quote]);
+    }
+  }
+  return byInstrument;
 }
 
 export async function getQuote(db: Db, id: string): Promise<MarketQuoteRow | undefined> {
