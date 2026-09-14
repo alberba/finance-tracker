@@ -568,12 +568,17 @@ export const useSyncStore = defineStore('sync', () => {
   async function getEntityRef(
     entityType: SyncEntityType,
     legacyId: string,
+    kind?: string,
   ): Promise<{ entityId: string; version: number } | null> {
     if (!isReady() || !cacheDb) {
       return null
     }
     const entities = await getAllEntities(cacheDb, entityType)
-    const match = entities.find((entity) => (entity as { legacyId?: unknown }).legacyId === legacyId)
+    const match = entities.find((entity) => {
+      if ((entity as { legacyId?: unknown }).legacyId !== legacyId) return false
+      if (kind !== undefined && (entity as { kind?: unknown }).kind !== kind) return false
+      return true
+    })
     if (!match) {
       return null
     }

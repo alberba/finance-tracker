@@ -13,7 +13,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type MarketInstrumentRow = typeof marketInstruments.$inferSelect;
 export type MarketQuoteRow = Omit<typeof marketQuotes.$inferSelect, "priceMinor"> & {
@@ -39,6 +39,8 @@ export interface CreateMarketQuoteInput {
 }
 
 export interface CreateUserInstrumentInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   instrumentId: string;
   categoryId?: string | null;
   alias?: string | null;
@@ -224,6 +226,7 @@ export async function createUserInstrument(
   const [row] = await db
     .insert(userInstruments)
     .values({
+      ...clientIdentity(input.id),
       userId,
       instrumentId: input.instrumentId,
       categoryId: input.categoryId ?? null,
@@ -295,6 +298,7 @@ export async function bulkInsertUserInstruments(
     .insert(userInstruments)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         instrumentId: input.instrumentId,
         categoryId: input.categoryId ?? null,

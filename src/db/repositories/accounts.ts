@@ -22,7 +22,7 @@ import {
   twrLiquidityAccounts,
   userInstruments,
 } from "../schema";
-import { assertOwnedReferences, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
 
 /**
  * No FK in the v2 DDL cascades and D1 always enforces them, so deleting a
@@ -55,6 +55,8 @@ export type CategoryRow = typeof categories.$inferSelect;
 export type TwrLiquidityAccountRow = typeof twrLiquidityAccounts.$inferSelect;
 
 export interface CreateAccountInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   kind: string;
@@ -99,6 +101,7 @@ export async function create(db: Db, userId: string, input: CreateAccountInput):
   const [row] = await db
     .insert(accounts)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -184,6 +187,7 @@ export async function bulkInsert(
     .insert(accounts)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,
@@ -202,6 +206,8 @@ export async function bulkInsert(
 // -- categories ---------------------------------------------------------------
 
 export interface CreateCategoryInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   kind: string;
@@ -235,6 +241,7 @@ export async function createCategory(
   const [row] = await db
     .insert(categories)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -319,6 +326,7 @@ export async function bulkInsertCategories(
     .insert(categories)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,

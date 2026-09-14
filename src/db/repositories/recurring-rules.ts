@@ -3,13 +3,15 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { recurringRules } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type RecurringRuleRow = Omit<typeof recurringRules.$inferSelect, "amountMinor"> & {
   amount: number;
 };
 
 export interface CreateRecurringRuleInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   type: string;
@@ -61,6 +63,7 @@ export async function create(
   const [row] = await db
     .insert(recurringRules)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -143,6 +146,7 @@ export async function bulkInsert(
     .insert(recurringRules)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,

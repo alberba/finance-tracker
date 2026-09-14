@@ -3,13 +3,15 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type PendingMovementRow = Omit<typeof pendingMovements.$inferSelect, "amountMinor"> & {
   amount: number;
 };
 
 export interface CreatePendingMovementInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   recurringRuleId: string;
   accountId?: string | null;
@@ -60,6 +62,7 @@ export async function create(
   const [row] = await db
     .insert(pendingMovements)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       recurringRuleId: input.recurringRuleId,
@@ -140,6 +143,7 @@ export async function bulkInsert(
     .insert(pendingMovements)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         recurringRuleId: input.recurringRuleId,

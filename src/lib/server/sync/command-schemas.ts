@@ -138,6 +138,29 @@ export const entityCreateSchemas = {
   }),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
+/**
+ * What a `create` command may actually carry: the per-entity shape above plus
+ * `id`, the identity the client minted for the entity (ADR 0001).
+ *
+ * Kept apart from `entityCreateSchemas` on purpose — the update schemas below
+ * derive from that map, and an entity's identity is not a patchable field.
+ */
+const clientIdentityFields = { id: z.string().min(1).optional() };
+
+export const entityCreatePayloadSchemas = {
+  account: entityCreateSchemas.account.extend(clientIdentityFields),
+  category: entityCreateSchemas.category.extend(clientIdentityFields),
+  transaction: entityCreateSchemas.transaction.extend(clientIdentityFields),
+  subscription: entityCreateSchemas.subscription.extend(clientIdentityFields),
+  recurringRule: entityCreateSchemas.recurringRule.extend(clientIdentityFields),
+  pendingMovement: entityCreateSchemas.pendingMovement.extend(clientIdentityFields),
+  budgetEntry: entityCreateSchemas.budgetEntry.extend(clientIdentityFields),
+  goal: entityCreateSchemas.goal.extend(clientIdentityFields),
+  contribution: entityCreateSchemas.contribution.extend(clientIdentityFields),
+  userInstrument: entityCreateSchemas.userInstrument.extend(clientIdentityFields),
+  wealthSnapshot: entityCreateSchemas.wealthSnapshot.extend(clientIdentityFields),
+} satisfies Record<SyncEntityType, z.ZodTypeAny>;
+
 /** Update-payload (patch) shape per entity type — every field optional. */
 export const entityUpdateSchemas = {
   account: entityCreateSchemas.account.partial(),
