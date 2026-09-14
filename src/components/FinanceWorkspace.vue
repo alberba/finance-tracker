@@ -7,7 +7,6 @@ import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
 import DashboardSection from './sections/DashboardSection.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
-import ConflictResolutionDialog from './sync/ConflictResolutionDialog.vue'
 
 const sectionLoaders = {
   budget: () => import('./sections/BudgetSection.vue'),
@@ -80,6 +79,5 @@ const isReportDialogOpen = shallowRef(false)
   <div class="contents" data-finance-workspace>
     <component :is="activeSectionComponent" :key="currentSection" :is-active="true" />
     <GlobalReportLauncher v-model:open="isReportDialogOpen" />
-    <ConflictResolutionDialog />
   </div>
 </template>
