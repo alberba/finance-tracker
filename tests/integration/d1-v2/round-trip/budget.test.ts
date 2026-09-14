@@ -110,5 +110,20 @@ describe("round trip: presupuesto y categorías", () => {
         ]),
       );
     });
+
+    it("keeps both cells when two are edited back-to-back for a category that has never synced (§4.7)", async () => {
+      const { useBudgetStore } = await import("../../../../src/stores/budget");
+      const budget = useBudgetStore();
+
+      // Neither call awaits the other — this is what filling in January then
+      // February looks like before either edit's category-create has synced.
+      budget.updateBudgetValue("expense", "Ocio", 0, 120);
+      budget.updateBudgetValue("expense", "Ocio", 1, 80);
+
+      const reloaded = await trip.reload();
+
+      expect(reloaded.budget.expense.Ocio?.[0]).toBe(120);
+      expect(reloaded.budget.expense.Ocio?.[1]).toBe(80);
+    });
   });
 });

@@ -254,37 +254,103 @@ export function categoryLocalId(kind: CategoryKind, name: string): string {
 }
 
 /**
- * Resolves (lazily create-syncing if necessary) the server `category` row
- * id for a legacy category *name* + kind. Returns `null` when the category
- * hasn't synced yet (freshly referenced in this same batch, or offline) —
- * see the module doc comment's "known leftovers" for how required-field
- * callers (`budgetEntry`) must handle that.
- *
- * Checks the `${kind}:${name}` convention this client itself creates rows
- * under first, then falls back to the bare `name` the v1 migration writes
- * (audit §4.7) before concluding the category is genuinely unseen — so a
- * migrated category resolves to its existing row on first reference instead
- * of a duplicate being created and every referencing command losing its
- * category. The fallback is scoped to `kind` too: the migration writes
- * `legacyId = name` per row with no `kind` in the id itself, so an income
- * and an expense category sharing a name would otherwise collide on the
- * first migrated category found with that bare name.
+ * Looks up an already-synced (or migrated) category row without creating
+ * anything. Checks the `${kind}:${name}` convention this client itself
+ * creates rows under first, then falls back to the bare `name` the v1
+ * migration writes (audit §4.7) before concluding the category is genuinely
+ * unseen — so a migrated category resolves to its existing row on first
+ * reference instead of a duplicate being created and every referencing
+ * command losing its category. The fallback is scoped to `kind` too: the
+ * migration writes `legacyId = name` per row with no `kind` in the id
+ * itself, so an income and an expense category sharing a name would
+ * otherwise collide on the first migrated category found with that bare
+ * name.
  */
-export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
-  }
+async function resolveExistingCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
   const localId = categoryLocalId(kind, name);
   const resolved = await resolveEntityId("category", localId);
   if (resolved) {
     return resolved;
   }
-  const migrated = await resolveEntityId("category", name, kind);
-  if (migrated) {
-    return migrated;
+  return resolveEntityId("category", name, kind);
+}
+
+/**
+ * Resolves (lazily create-syncing if necessary) the server `category` row
+ * id for a legacy category *name* + kind. Returns `null` when the category
+ * hasn't synced yet (freshly referenced in this same batch, or offline) —
+ * see the module doc comment's "known leftovers" for how required-field
+ * callers (`budgetEntry`) must handle that; those use
+ * `resolveOrCreateCategoryId` instead.
+ */
+export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
+  if (!isSyncV2Enabled()) {
+    return null;
   }
-  await syncUpsert("category", localId, { name, kind });
+  const existing = await resolveExistingCategoryId(kind, name);
+  if (existing) {
+    return existing;
+  }
+  await syncUpsert("category", categoryLocalId(kind, name), { name, kind });
   return null;
+}
+
+/**
+ * In-flight mints of a not-yet-synced category, keyed by its local id.
+ * `resolveOrCreateCategoryId`'s own "is one already pending?" check
+ * (`peekPendingCreateId`) only sees a mint once its `create` command has
+ * actually been written to the outbox — an `await` away. Two budget cells
+ * for the *same* brand-new category, edited back-to-back (e.g. filling in
+ * January then February before either has synced), would otherwise both
+ * observe "nothing pending yet" and each mint its own id, corrupting
+ * whichever create actually lands. Every caller within this session awaits
+ * the same in-flight mint instead.
+ */
+const pendingCategoryMints = new Map<string, Promise<string>>();
+
+/**
+ * Like `resolveCategoryId`, but never returns `null` for a genuinely new
+ * category: `entityCreateSchemas.budgetEntry.categoryId` is required, so a
+ * `null` here means silently dropping the edit (audit §4.7 — "la primera
+ * edición de cada celda de presupuesto se pierde entera"), which is exactly
+ * ticket #145's first acceptance criterion. Mints the category's id itself
+ * (ADR 0001, "sin esperar al ack") instead of waiting for a round trip, so
+ * the category's `create` and the budget entry's `create` land in the same
+ * outbox flush — the category row exists by the time the entry references
+ * it. A second reference before either has synced reuses the id already
+ * minted for the pending category create (via the outbox, or — before that
+ * create has even been written — via `pendingCategoryMints`) instead of
+ * minting (and creating) a second one.
+ */
+export async function resolveOrCreateCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
+  if (!isSyncV2Enabled()) {
+    return null;
+  }
+  const existing = await resolveExistingCategoryId(kind, name);
+  if (existing) {
+    return existing;
+  }
+  const localId = categoryLocalId(kind, name);
+  const syncStore = useSyncStore();
+  const pendingId = await syncStore.peekPendingCreateId("category", localId);
+  if (pendingId) {
+    return pendingId;
+  }
+  const inFlight = pendingCategoryMints.get(localId);
+  if (inFlight) {
+    return inFlight;
+  }
+  const mint = (async () => {
+    const id = crypto.randomUUID();
+    await syncUpsert("category", localId, { name, kind, id });
+    return id;
+  })();
+  pendingCategoryMints.set(localId, mint);
+  try {
+    return await mint;
+  } finally {
+    pendingCategoryMints.delete(localId);
+  }
 }
 
 /**

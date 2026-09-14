@@ -588,6 +588,27 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Reads the client-minted id (ADR 0001) off a still-queued, not-yet-
+   * acknowledged `create` command for this legacy id, without amending or
+   * removing it. Used by callers that need to *reference* the entity (as a
+   * foreign key on another command in the same batch) before its own create
+   * has been acknowledged — e.g. a budget entry pointing at a category
+   * that hasn't synced yet. `null` if nothing is pending or the pending
+   * create wasn't minted with an id.
+   */
+  async function peekPendingCreateId(entityType: SyncEntityType, legacyId: string): Promise<string | null> {
+    if (!outboxDb) {
+      return null
+    }
+    const pending = await findPendingCreate(outboxDb, entityType, legacyId)
+    if (!pending || pending.command.action !== 'create') {
+      return null
+    }
+    const id = (pending.command.data as { id?: unknown }).id
+    return typeof id === 'string' ? id : null
+  }
+
+  /**
    * Folds a patch into a still-queued, not-yet-acknowledged `create`
    * command for this legacy id — used when the user edits an entity before
    * its `create` command has synced (so there is no server id to address
@@ -664,6 +685,7 @@ export const useSyncStore = defineStore('sync', () => {
     resolveConflict,
     logout,
     getEntityRef,
+    peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,
   }
