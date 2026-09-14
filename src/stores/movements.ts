@@ -60,14 +60,15 @@ async function buildSubscriptionData(subscription: Subscription, currency: strin
     return null
   }
   const categoryId = await resolveCategoryId('expense', subscription.category)
-  const billingDay = Number.parseInt(subscription.startDate.slice(8, 10), 10)
   return {
     name: subscription.name,
     categoryId,
+    categoryName: subscription.category,
     accountId,
     amount: subscription.amount,
     currency,
-    billingDay: Number.isFinite(billingDay) ? billingDay : null,
+    startDate: subscription.startDate,
+    nextChargeDate: subscription.nextChargeDate,
     frequency: subscription.frequency,
     isActive: subscription.active,
   }

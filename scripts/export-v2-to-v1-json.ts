@@ -183,8 +183,8 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       accountId: accountLegacyId(s.accountId),
       category: categoryName(s.categoryId),
       frequency: s.frequency as Subscription["frequency"],
-      startDate: "",
-      nextChargeDate: "",
+      startDate: s.startDate ?? "",
+      nextChargeDate: s.nextChargeDate ?? s.startDate ?? "",
       active: s.isActive,
     }));
 

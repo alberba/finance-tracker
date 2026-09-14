@@ -3,7 +3,13 @@ import { computed } from 'vue'
 
 import { buildSettingsViewModel, categoryKeyToType } from '../domain/settings/view-model'
 import { useToast } from '../composables/useToast'
-import { categoryLocalId, syncListDiff, syncSettingsUpdate } from '../lib/client/command-mapping'
+import {
+  categoryLocalId,
+  syncListDiff,
+  syncSettingsUpdate,
+  syncTwrLiquidityAccounts,
+  syncUpsert,
+} from '../lib/client/command-mapping'
 import { categoryEmojiKey } from '../scripts/category-emoji'
 import type { CategoryKey, Entity, EntityKey, State } from '../scripts/types'
 import { parseFloatSafe, parseIntSafe, round2, slug } from '../scripts/utils'
@@ -59,6 +65,11 @@ function flattenCategories(key: CategoryKey, names: string[]): CategoryDiffRow[]
 /** WP7b — maps a flattened category row to a `category` sync command payload. */
 function buildCategoryData(key: CategoryKey, row: CategoryDiffRow) {
   return { name: row.name, kind: CATEGORY_KIND_BY_KEY[key], sortOrder: row.sortOrder }
+}
+
+function syncCategoryEmoji(key: CategoryKey, name: string, emoji: string | null) {
+  const kind = CATEGORY_KIND_BY_KEY[key]
+  return syncUpsert('category', categoryLocalId(kind, name), { name, kind, emoji })
 }
 
 function syncInvestmentCategoriesWithAssets(draft: State): void {
@@ -150,6 +161,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function removeEntity(key: EntityKey, id: string): void {
     const before = financialStateStore.state[key]
+    const wasTwrLiquidity =
+      key === 'accounts' && (financialStateStore.state.twrLiquidityAccountIds || []).includes(id)
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item.id !== id)
 
@@ -164,7 +177,19 @@ export const useSettingsStore = defineStore('settings', () => {
         syncInvestmentCategoriesWithAssets(draft)
       }
     })
-    syncEntities(key, before)
+    // Note (documented leftover): the cascade above also drops the
+    // account's transactions/subscriptions from local state, but only the
+    // `account` row's own removal is synced here — cascading those deletes
+    // server-side is left to the `account` row's FK behavior rather than
+    // emitting a `remove` per affected transaction/subscription.
+    if (wasTwrLiquidity) {
+      // The liquidity mark references the account, so it goes first.
+      void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds).then(() =>
+        syncEntities(key, before),
+      )
+    } else {
+      syncEntities(key, before)
+    }
     showToast('Elemento eliminado.')
   }
 
@@ -226,6 +251,7 @@ export const useSettingsStore = defineStore('settings', () => {
     financialStateStore.commitState((draft) => {
       draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)] = trimmedEmoji
     })
+    void syncCategoryEmoji(key, name, trimmedEmoji)
     showToast('Emoji actualizado.')
   }
 
@@ -233,6 +259,7 @@ export const useSettingsStore = defineStore('settings', () => {
     financialStateStore.commitState((draft) => {
       delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]
     })
+    void syncCategoryEmoji(key, name, null)
     showToast('Emoji restablecido.')
   }
 
@@ -251,6 +278,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       draft.twrLiquidityAccountIds = Array.from(selection)
     })
+    void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds)
     showToast('Configuración TWR actualizada.')
   }
 

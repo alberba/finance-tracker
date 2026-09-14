@@ -320,3 +320,21 @@ export async function bulkInsertAllocations(
     .returning();
   return rows.map(toAllocationRow);
 }
+
+/** Replaces how a contribution's flow splits across accounts, atomically with the contribution. */
+export async function replaceAllocations(
+  db: Db,
+  userId: string,
+  contributionId: string,
+  inputs: Omit<CreateContributionAllocationInput, "contributionId">[],
+): Promise<ContributionAllocationRow[]> {
+  await db
+    .delete(contributionAllocations)
+    .where(
+      and(
+        eq(contributionAllocations.userId, userId),
+        eq(contributionAllocations.contributionId, contributionId),
+      ),
+    );
+  return bulkInsertAllocations(db, userId, inputs.map((input) => ({ ...input, contributionId })));
+}

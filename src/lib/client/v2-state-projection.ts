@@ -1,6 +1,8 @@
+import { categoryEmojiKey } from '../../scripts/category-emoji'
 import { normalizeState } from '../../scripts/state'
-import type { GoalKey, InvestmentSide, State } from '../../scripts/types'
-import { monthFromISO } from '../../scripts/utils'
+import { getFirstUpcomingChargeDate } from '../../scripts/subscriptions'
+import { isSubscriptionFrequency, type GoalKey, type InvestmentSide, type State } from '../../scripts/types'
+import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
 
 export interface SyncV2Bootstrap {
@@ -56,6 +58,23 @@ function accountLegacyIdsById(entities: CachedEntity[]): Map<string, string> {
   return new Map(entities.map((entity) => [entity.id, legacyId(entity)]))
 }
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+function subscriptionStartDate(subscription: CachedEntity): string {
+  const startDate = String(subscription.startDate || '').slice(0, 10)
+  if (ISO_DATE_PATTERN.test(startDate)) return startDate
+
+  const createdDate = String(subscription.createdAt || '').slice(0, 10)
+  if (!ISO_DATE_PATTERN.test(createdDate)) return ''
+
+  const billingDay = Number(subscription.legacyBillingDay)
+  if (!Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31) return createdDate
+
+  const [year, month] = createdDate.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return `${createdDate.slice(0, 8)}${String(Math.min(billingDay, lastDay)).padStart(2, '0')}`
+}
+
 /** Projects the relational sync-v2 read model into the UI's current State model. */
 export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
   const projected = normalizeState({
@@ -85,12 +104,20 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     .map((entry) => accountIds.get(String(entry.accountId)) || String(entry.legacyId || ''))
     .filter(Boolean)
 
+  const categoryEmojis: Record<string, string> = {}
   for (const [kind, stateKey] of Object.entries(CATEGORY_STATE_KEYS)) {
-    projected[stateKey] = bootstrap.categories
+    const categoriesOfKind = bootstrap.categories
       .filter((category) => category.kind === kind)
       .sort((left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0))
-      .map((category) => String(category.name))
+    projected[stateKey] = categoriesOfKind.map((category) => String(category.name))
+    for (const category of categoriesOfKind) {
+      if (category.emoji) {
+        categoryEmojis[categoryEmojiKey(kind as keyof typeof CATEGORY_STATE_KEYS, String(category.name))] =
+          String(category.emoji)
+      }
+    }
   }
+  projected.categoryEmojis = categoryEmojis
 
   projected.transactions = bootstrap.transactions.map((transaction) => {
     const trade = transaction.tradeDetail as CachedEntity | null | undefined
@@ -117,17 +144,27 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     }
   })
 
-  projected.subscriptions = bootstrap.subscriptions.map((subscription) => ({
-    id: legacyId(subscription),
-    name: String(subscription.name || ''),
-    amount: Number(subscription.amount || 0),
-    accountId: accountIds.get(String(subscription.accountId)) || '',
-    category: categories.get(String(subscription.categoryId)) || 'Sin categoría',
-    frequency: String(subscription.frequency) as State['subscriptions'][number]['frequency'],
-    startDate: String(subscription.createdAt || ''),
-    nextChargeDate: '',
-    active: subscription.isActive !== false,
-  }))
+  projected.subscriptions = bootstrap.subscriptions.map((subscription) => {
+    const frequencyCandidate = String(subscription.frequency)
+    const frequency = isSubscriptionFrequency(frequencyCandidate) ? frequencyCandidate : 'monthly'
+    const startDate = subscriptionStartDate(subscription)
+    const storedNextChargeDate = String(subscription.nextChargeDate || '')
+    const nextChargeDate = ISO_DATE_PATTERN.test(storedNextChargeDate)
+      ? storedNextChargeDate
+      : getFirstUpcomingChargeDate({ frequency, startDate, nextChargeDate: startDate }, todayISO())
+
+    return {
+      id: legacyId(subscription),
+      name: String(subscription.name || ''),
+      amount: Number(subscription.amount || 0),
+      accountId: accountIds.get(String(subscription.accountId)) || '',
+      category: categories.get(String(subscription.categoryId)) || 'Sin categoría',
+      frequency,
+      startDate,
+      nextChargeDate,
+      active: subscription.isActive !== false,
+    }
+  })
 
   projected.budget = { income: {}, expense: {}, investment: {} }
   for (const entry of bootstrap.budgetEntries) {
@@ -167,8 +204,11 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
   }))
 
   projected.snapshots = Object.fromEntries(bootstrap.wealthSnapshots.map((snapshot) => {
+    // `snapshot.month` is the server's canonical 1-12; `State.snapshots` is
+    // keyed (and stores `.month`) 0-based, matching `ui.snapshotMonth`.
+    const month = Number(snapshot.month) - 1
     const balances: State['snapshots'][string] = {
-      month: Number(snapshot.month),
+      month,
       accounts: {},
       investments: {},
       liabilities: {},
@@ -181,7 +221,7 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       else if (kind === 'liability') balances.liabilities[accountId] = Number(balance.balance || 0)
       else balances.accounts[accountId] = Number(balance.balance || 0)
     }
-    return [String(snapshot.month), balances]
+    return [String(month), balances]
   }))
 
   const recurringRuleIds = new Map(bootstrap.recurringRules.map((rule) => [rule.id, legacyId(rule)]))

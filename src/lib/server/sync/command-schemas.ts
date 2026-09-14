@@ -10,9 +10,14 @@
  * `sync_commands.id`'s primary key, enforcing idempotent replay.
  *
  * Deliberately out of scope (left for a later WP, see WP4 report):
- * `investment_trade_details`, `contribution_allocations`,
- * `snapshot_balances`, `twr_liquidity_accounts` (sub-entities of an
- * aggregate root, not addressed directly by a sync command here),
+ * `investment_trade_details` (a sub-entity of an aggregate root, not addressed
+ * directly by a sync command here). Sub-entities the user edits travel nested
+ * instead, the same way an investment operation travels nested inside its
+ * transaction (ADR 0002) — never as their own sync command:
+ * `snapshot_balances` inside `wealthSnapshot.balances`,
+ * `contribution_allocations` inside `contribution.allocations`, and
+ * `twr_liquidity_accounts` as the whole selection in
+ * `settingsUpdate.patch.twrLiquidityAccountIds`.
  * `stockevents_symbol_mappings` (no `version` column to drive optimistic
  * concurrency), `integration_credentials` (WP12 owns encryption semantics),
  * and the global `market_instruments`/`market_quotes` reference tables
@@ -40,6 +45,20 @@ export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number];
 const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES);
 
 const nullableString = z.string().nullable();
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** One account's balance nested inside a `wealthSnapshot` command — see the module doc comment. */
+const wealthSnapshotBalanceSchema = z.object({
+  accountId: z.string().min(1),
+  balance: z.number(),
+  currency: z.string().min(1),
+});
+
+/** One account's share of a contribution's flow, nested inside a `contribution` command. */
+const contributionAllocationSchema = z.object({
+  accountId: nullableString,
+  amount: z.number(),
+});
 
 /**
  * The operation ("Operación", CONTEXT.md) that gives an investment movement
@@ -87,6 +106,7 @@ export const entityCreateSchemas = {
       name: z.string().min(1),
       kind: z.string().min(1),
       sortOrder: z.number().int().optional(),
+      emoji: nullableString.optional(),
     })
     .strict(),
   transaction: z
@@ -113,10 +133,12 @@ export const entityCreateSchemas = {
       legacyId: nullableString.optional(),
       name: z.string().min(1),
       categoryId: nullableString.optional(),
+      categoryName: z.string().min(1).optional(),
       accountId: nullableString.optional(),
       amount: z.number(),
       currency: z.string().min(1),
-      billingDay: z.number().int().nullable().optional(),
+      startDate: isoDate,
+      nextChargeDate: isoDate,
       frequency: z.string().min(1),
       isActive: z.boolean().optional(),
     })
@@ -185,6 +207,7 @@ export const entityCreateSchemas = {
       portfolioDate: nullableString.optional(),
       portfolioValue: z.number().nullable().optional(),
       flow: z.number().nullable().optional(),
+      allocations: z.array(contributionAllocationSchema).optional(),
     })
     .strict(),
   userInstrument: z
@@ -200,6 +223,7 @@ export const entityCreateSchemas = {
       snapshotDate: z.string().min(1),
       year: z.number().int(),
       month: z.number().int().min(1).max(12),
+      balances: z.array(wealthSnapshotBalanceSchema).optional(),
     })
     .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
@@ -288,6 +312,8 @@ export const settingsUpdateCommandSchema = z.object({
     currency: z.string().min(1).optional(),
     locale: nullableString.optional(),
     theme: nullableString.optional(),
+    /** Server `account` ids — replaces the whole TWR liquidity selection. */
+    twrLiquidityAccountIds: z.array(z.string().min(1)).optional(),
   }),
 });
 
