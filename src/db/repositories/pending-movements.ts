@@ -5,8 +5,15 @@ import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements } from "../schema";
 import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
-export type PendingMovementRow = Omit<typeof pendingMovements.$inferSelect, "amountMinor"> & {
+export type PendingMovementRow = Omit<
+  typeof pendingMovements.$inferSelect,
+  "amountMinor" | "unitPriceMinor" | "feeMinor" | "units"
+> & {
   amount: number;
+  /** Operation fields — present only on an investment occurrence. */
+  units: number | null;
+  unitPrice: number | null;
+  fee: number | null;
 };
 
 export interface CreatePendingMovementInput {
@@ -19,6 +26,15 @@ export interface CreatePendingMovementInput {
   amount: number;
   currency: string;
   dueDate: string;
+  type?: string | null;
+  description?: string | null;
+  symbol?: string | null;
+  side?: string | null;
+  units?: number | null;
+  unitPrice?: number | null;
+  fee?: number | null;
+  time?: string | null;
+  transactionId?: string | null;
   status?: string;
 }
 
@@ -28,11 +44,55 @@ export interface UpdatePendingMovementInput {
   amount?: number;
   currency?: string;
   dueDate?: string;
+  type?: string | null;
+  description?: string | null;
+  symbol?: string | null;
+  side?: string | null;
+  units?: number | null;
+  unitPrice?: number | null;
+  fee?: number | null;
+  time?: string | null;
+  transactionId?: string | null;
   status?: string;
 }
 
 function toRow(row: typeof pendingMovements.$inferSelect): PendingMovementRow {
-  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) };
+  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row;
+  return {
+    ...rest,
+    amount: fromMinorUnits(amountMinor, row.currency),
+    units: units === null ? null : Number(units),
+    unitPrice: unitPriceMinor === null ? null : fromMinorUnits(unitPriceMinor, row.currency),
+    fee: feeMinor === null ? null : fromMinorUnits(feeMinor, row.currency),
+  };
+}
+
+/** The movement-template columns beyond amount/date, in write shape. */
+function templateValues(
+  input: {
+    type?: string | null;
+    description?: string | null;
+    symbol?: string | null;
+    side?: string | null;
+    units?: number | null;
+    unitPrice?: number | null;
+    fee?: number | null;
+    time?: string | null;
+    transactionId?: string | null;
+  },
+  currency: string,
+) {
+  return {
+    type: input.type ?? null,
+    description: input.description ?? null,
+    symbol: input.symbol ?? null,
+    side: input.side ?? null,
+    units: input.units === null || input.units === undefined ? null : String(input.units),
+    unitPriceMinor: input.unitPrice === null || input.unitPrice === undefined ? null : toMinorUnits(input.unitPrice, currency),
+    feeMinor: input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
+    time: input.time ?? null,
+    transactionId: input.transactionId ?? null,
+  };
 }
 
 export async function listByUser(db: Db, userId: string): Promise<PendingMovementRow[]> {
@@ -71,6 +131,7 @@ export async function create(
       amountMinor: toMinorUnits(input.amount, input.currency),
       currency: input.currency,
       dueDate: input.dueDate,
+      ...templateValues(input, input.currency),
       status: input.status ?? "pending",
       createdAt: now,
       updatedAt: now,
@@ -101,6 +162,20 @@ export async function update(
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,
       dueDate: input.dueDate ?? existing.dueDate,
+      ...templateValues(
+        {
+          type: input.type === undefined ? existing.type : input.type,
+          description: input.description === undefined ? existing.description : input.description,
+          symbol: input.symbol === undefined ? existing.symbol : input.symbol,
+          side: input.side === undefined ? existing.side : input.side,
+          units: input.units === undefined ? existing.units : input.units,
+          unitPrice: input.unitPrice === undefined ? existing.unitPrice : input.unitPrice,
+          fee: input.fee === undefined ? existing.fee : input.fee,
+          time: input.time === undefined ? existing.time : input.time,
+          transactionId: input.transactionId === undefined ? existing.transactionId : input.transactionId,
+        },
+        nextCurrency,
+      ),
       status: input.status ?? existing.status,
       updatedAt: nowIso(),
       version: existing.version + 1,
@@ -152,6 +227,7 @@ export async function bulkInsert(
         amountMinor: toMinorUnits(input.amount, input.currency),
         currency: input.currency,
         dueDate: input.dueDate,
+        ...templateValues(input, input.currency),
         status: input.status ?? "pending",
         createdAt: now,
         updatedAt: now,

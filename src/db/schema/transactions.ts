@@ -1,6 +1,6 @@
 /** Transactions and their optional investment-trade extension. */
 
-import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -35,6 +35,11 @@ export const transactions = sqliteTable(
     description: text("description"),
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),
+    // Both belong to the movement, not to the operation: a gasto can also be
+    // stamped with an hour, and "declarado" is a flag the user sets on any
+    // movement (ADR 0002).
+    time: text("time"),
+    declared: integer("declared", { mode: "boolean" }).notNull().default(false),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),
@@ -67,6 +72,10 @@ export const investmentTradeDetails = sqliteTable(
       .unique()
       .references(() => transactions.id),
     instrumentId: text("instrument_id").references(() => marketInstruments.id),
+    // The ticker the user typed. `instrument_id` only resolves once the symbol
+    // matches a known instrument, so without this column the symbol of every
+    // movement on an untracked ticker is lost (audit §4.3).
+    symbol: text("symbol"),
     side: text("side").notNull(),
     quantity: text("quantity").notNull(),
     priceMinor: moneyMinorColumn("price_minor"),
