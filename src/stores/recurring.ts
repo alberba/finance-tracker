@@ -21,6 +21,7 @@ import type {
 import { monthFromISO, round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
+import { useSyncStore } from './sync'
 
 /**
  * WP7b — maps a legacy `RecurringRule` row to a `recurringRule` sync
@@ -56,21 +57,50 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
     amount: rule.amount,
     currency,
     frequency: rule.frequency,
+    interval: rule.interval,
+    startDate: rule.startDate,
+    endDate: rule.endDate,
+    lastExecutionDate: rule.lastExecutionDate,
     nextRunDate: rule.nextOccurrenceDate,
+    ...operationData(rule),
     status: rule.active ? 'active' : 'paused',
+  }
+}
+
+/**
+ * The operation of an investment template, flattened into the command
+ * payload. Sent as explicit `null`s rather than omitted so turning an
+ * investment rule into an expense clears the columns instead of leaving
+ * yesterday's symbol behind.
+ */
+function operationData(template: {
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
+}) {
+  return {
+    symbol: template.symbol ?? null,
+    side: template.side ?? null,
+    units: template.units ?? null,
+    unitPrice: template.unitPrice ?? null,
+    fee: template.fee ?? null,
+    time: template.time ?? null,
   }
 }
 
 /**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
  * command payload. Returns `null` (skip, see `syncListDiff`) when the
- * parent recurring rule *or* account hasn't synced yet — both
- * `recurringRuleId` and `accountId` are required fields in
- * `entityCreateSchemas.pendingMovement` (see the WP10 fix note on
- * `buildRecurringRuleData` above for `accountId`).
+ * account hasn't synced yet; the parent rule is waited for rather than
+ * skipped (see `resolveRecurringRuleId`). Both `recurringRuleId` and
+ * `accountId` are required fields in `entityCreateSchemas.pendingMovement`
+ * (see the WP10 fix note on `buildRecurringRuleData` above for `accountId`).
  */
 async function buildPendingMovementData(pending: PendingMovement, currency: string) {
-  const recurringRuleId = await resolveEntityId('recurringRule', pending.ruleId)
+  const recurringRuleId = await resolveRecurringRuleId(pending.ruleId)
   if (!recurringRuleId) {
     return null
   }
@@ -86,7 +116,62 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
     amount: pending.amount,
     currency,
     dueDate: pending.occurrenceDate,
+    type: pending.type,
+    description: pending.description,
+    ...operationData(pending),
+    transactionId: pending.transactionId,
     status: pending.status,
+  }
+}
+
+/**
+ * How many times `resolveRecurringRuleId` re-asks for a rule's server id
+ * before giving up. Each attempt costs one flush plus one macrotask.
+ */
+const RULE_RESOLUTION_ATTEMPTS = 10
+
+/**
+ * A pending movement cannot exist server-side before the rule that
+ * generated it: `recurringRuleId` is a required reference
+ * (`entityCreateSchemas.pendingMovement`). But `addRule` enqueues the
+ * rule's `create` and generates its first occurrences in the same tick, so
+ * at that instant the rule has no server id yet — and a skipped occurrence
+ * is never mutated again, so it used to be skipped forever and the pending
+ * movement simply never reached D1 (audit §3.2c).
+ *
+ * So wait for the rule to cross instead of giving up: each attempt asks
+ * the outbox to flush and re-reads the local cache, which is where the
+ * server's answer lands.
+ */
+async function resolveRecurringRuleId(localRuleId: string): Promise<string | null> {
+  for (let attempt = 0; attempt < RULE_RESOLUTION_ATTEMPTS; attempt += 1) {
+    const resolved = await resolveEntityId('recurringRule', localRuleId)
+    if (resolved) {
+      return resolved
+    }
+    const syncStore = useSyncStore()
+    if (!syncStore.enabled) {
+      return null
+    }
+    // `flush()` returns at once when another flush is already in flight —
+    // and `addRule` starts one. Asking again in the next tick would burn
+    // every attempt without the rule ever crossing, and the occurrence is
+    // dropped for good. So wait for the flush that *is* running to land.
+    await syncStore.flush()
+    await waitWhileSyncing(syncStore)
+  }
+  return null
+}
+
+/** How many macrotasks to give an in-flight flush before asking again. */
+const FLUSH_SETTLE_TICKS = 20
+
+async function waitWhileSyncing(syncStore: ReturnType<typeof useSyncStore>): Promise<void> {
+  for (let tick = 0; tick < FLUSH_SETTLE_TICKS; tick += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    if (syncStore.syncStatus !== 'syncing') {
+      return
+    }
   }
 }
 
@@ -207,6 +292,13 @@ export const useRecurringStore = defineStore('recurring', () => {
     const hasExistingExecution = currentRule.lastExecutionDate !== null
       || pendingMovements.value.some((pending) => pending.ruleId === id)
 
+    // Snapshot *before* the mutation: `refreshPending`'s own diff is taken
+    // after it, and compares against a copy `generatePendingMovements`
+    // rebuilt from the edited rule — identical but for the dates. So an
+    // edit that does not move the calendar produced no command at all, and
+    // was lost on the next reload (audit §3.2a).
+    const before = financialStateStore.state.recurringRules
+
     financialStateStore.commitState((draft) => {
       const rule = draft.recurringRules.find((item) => item.id === id)
       if (!rule) return
@@ -240,6 +332,9 @@ export const useRecurringStore = defineStore('recurring', () => {
         if (input.time) rule.time = input.time
       }
     })
+    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
+      buildRecurringRuleData(item, financialStateStore.currency),
+    )
     refreshPending()
     return true
   }

@@ -57,6 +57,26 @@ async function buildInvestmentTransactionData(tx: Transaction, currency: string)
     description: tx.description,
     amount: tx.amount,
     currency: tx.movementCurrency || currency,
+    time: tx.time ?? null,
+    declared: Boolean(tx.declared),
+    // The operation travels nested, so importe and operación reach D1 in the
+    // same write and cannot end up disagreeing (ADR 0002).
+    operation: buildOperationData(tx),
+  }
+}
+
+/**
+ * The operation of an investment movement, or `null` when the movement has
+ * none — which is also how the server is told to drop the one it had stored.
+ */
+function buildOperationData(tx: Transaction) {
+  if (tx.type !== 'investment' || !tx.side) return null
+  return {
+    symbol: tx.symbol ?? null,
+    side: tx.side,
+    units: Number(tx.units) || 0,
+    unitPrice: Number(tx.unitPrice) || 0,
+    fee: Number(tx.fee) || 0,
   }
 }
 
