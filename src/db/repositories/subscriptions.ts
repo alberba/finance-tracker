@@ -4,12 +4,13 @@ import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { categories, subscriptions } from "../schema";
 import {
+  type Db,
   assertOwnedReferences,
   clientIdentity,
   fromFlag,
   nowIso,
   toFlag,
-  type Db,
+  versionGuard,
 } from "./shared";
 
 export type SubscriptionRow = Omit<
@@ -154,7 +155,7 @@ export async function update(
     .where(and(
       eq(subscriptions.id, id),
       eq(subscriptions.userId, userId),
-      expectedVersion === undefined ? undefined : eq(subscriptions.version, expectedVersion),
+      versionGuard(subscriptions.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -168,7 +169,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(subscriptions).where(and(
     eq(subscriptions.id, id),
     eq(subscriptions.userId, userId),
-    expectedVersion === undefined ? undefined : eq(subscriptions.version, expectedVersion),
+    versionGuard(subscriptions.version, expectedVersion),
   )).returning({ id: subscriptions.id });
   return deleted.length > 0;
 }

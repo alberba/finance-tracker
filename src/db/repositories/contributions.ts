@@ -10,7 +10,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
@@ -140,7 +140,7 @@ export async function update(
     .where(and(
       eq(contributions.id, id),
       eq(contributions.userId, userId),
-      expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+      versionGuard(contributions.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -154,7 +154,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(contributions).where(and(
     eq(contributions.id, id),
     eq(contributions.userId, userId),
-    expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+    versionGuard(contributions.version, expectedVersion),
   )).returning({ id: contributions.id });
   return deleted.length > 0;
 }

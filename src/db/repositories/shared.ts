@@ -35,6 +35,21 @@ export function nowIso(): string {
 }
 
 /**
+ * `WHERE` condition for the optimistic-concurrency guard, or `undefined` when
+ * the caller has no version to pin.
+ *
+ * Every `update`/`remove` in this layer repeats the same ternary; keeping it
+ * here means the guard has one definition instead of twenty-six copies.
+ */
+export function versionGuard(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each table's version column is a different integer column type
+  column: any,
+  expectedVersion?: number,
+) {
+  return expectedVersion === undefined ? undefined : eq(column, expectedVersion);
+}
+
+/**
  * Identity the client minted for a new entity (ADR 0001), ready to spread into
  * an insert's values.
  *

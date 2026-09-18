@@ -10,7 +10,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { integrationCredentials } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { type Db, nowIso, versionGuard } from "./shared";
 import {
   decryptValue,
   encryptValue,
@@ -161,7 +161,7 @@ export async function update(
     .where(and(
       eq(integrationCredentials.id, id),
       eq(integrationCredentials.userId, userId),
-      expectedVersion === undefined ? undefined : eq(integrationCredentials.version, expectedVersion),
+      versionGuard(integrationCredentials.version, expectedVersion),
     ))
     .returning();
   return row ? toPublicRow(env, row) : undefined;
@@ -185,7 +185,7 @@ export async function remove(
     .where(and(
       eq(integrationCredentials.id, id),
       eq(integrationCredentials.userId, userId),
-      expectedVersion === undefined ? undefined : eq(integrationCredentials.version, expectedVersion),
+      versionGuard(integrationCredentials.version, expectedVersion),
     ))
     .returning({ id: integrationCredentials.id });
   return deleted.length > 0;

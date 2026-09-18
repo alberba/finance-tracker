@@ -13,7 +13,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type MarketInstrumentRow = typeof marketInstruments.$inferSelect;
 export type MarketQuoteRow = Omit<typeof marketQuotes.$inferSelect, "priceMinor"> & {
@@ -302,7 +302,7 @@ export async function updateUserInstrument(
     .where(and(
       eq(userInstruments.id, id),
       eq(userInstruments.userId, userId),
-      expectedVersion === undefined ? undefined : eq(userInstruments.version, expectedVersion),
+      versionGuard(userInstruments.version, expectedVersion),
     ))
     .returning();
   return row;
@@ -321,7 +321,7 @@ export async function removeUserInstrument(
   const deleted = await db.delete(userInstruments).where(and(
     eq(userInstruments.id, id),
     eq(userInstruments.userId, userId),
-    expectedVersion === undefined ? undefined : eq(userInstruments.version, expectedVersion),
+    versionGuard(userInstruments.version, expectedVersion),
   )).returning({ id: userInstruments.id });
   return deleted.length > 0;
 }

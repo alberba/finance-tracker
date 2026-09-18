@@ -11,8 +11,6 @@
     "d1:migrate:remote": "wrangler d1 migrations apply finance-tracker-db --remote",
     "d1:migrate:local:v2": "wrangler d1 migrations apply finance-tracker-db-v2 --local --persist-to .wrangler/state",
     "d1:migrate:remote:v2": "wrangler d1 migrations apply finance-tracker-db-v2 --remote",
-    "db:generate": "drizzle-kit generate",
-    "db:check": "drizzle-kit check",
     "db:repair": "tsx scripts/repair-corrupted-data.ts",
     "migrate:v1-to-v2": "tsx scripts/migrate-v1-to-v2.ts",
     "migrate:export-v1-json": "tsx scripts/export-v2-to-v1-json.ts",

@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { userSettings } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { type Db, nowIso, versionGuard } from "./shared";
 
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 
@@ -65,7 +65,7 @@ export async function update(
     .where(and(
       eq(userSettings.id, existing.id),
       eq(userSettings.userId, userId),
-      expectedVersion === undefined ? undefined : eq(userSettings.version, expectedVersion),
+      versionGuard(userSettings.version, expectedVersion),
     ))
     .returning();
   return row;
@@ -79,7 +79,7 @@ export async function remove(db: Db, userId: string, expectedVersion?: number): 
   const deleted = await db.delete(userSettings).where(and(
     eq(userSettings.id, existing.id),
     eq(userSettings.userId, userId),
-    expectedVersion === undefined ? undefined : eq(userSettings.version, expectedVersion),
+    versionGuard(userSettings.version, expectedVersion),
   )).returning({ id: userSettings.id });
   return deleted.length > 0;
 }
