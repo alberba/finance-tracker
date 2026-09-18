@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import * as pendingMovementsRepo from "../../../../src/db/repositories/pending-movements";
 import * as recurringRulesRepo from "../../../../src/db/repositories/recurring-rules";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
@@ -60,5 +61,27 @@ describe("recurring-rules repository", () => {
 
     expect(await recurringRulesRepo.get(db, userB.id, created.id)).toBeUndefined();
     expect(await recurringRulesRepo.listByUser(db, userB.id)).toHaveLength(0);
+  });
+
+  it("deletes a rule's pending occurrences with it instead of a raw FK violation (audit §2.6)", async () => {
+    const { db } = testDb;
+    const user = await seedUser(db);
+    const rule = await recurringRulesRepo.create(db, user.id, {
+      name: "Alquiler",
+      type: "expense",
+      amount: 750,
+      currency: "EUR",
+      frequency: "monthly",
+    });
+    const pending = await pendingMovementsRepo.create(db, user.id, {
+      recurringRuleId: rule.id,
+      amount: 750,
+      currency: "EUR",
+      dueDate: "2026-10-01",
+    });
+
+    expect(await recurringRulesRepo.remove(db, user.id, rule.id)).toBe(true);
+
+    expect(await pendingMovementsRepo.get(db, user.id, pending.id)).toBeUndefined();
   });
 });

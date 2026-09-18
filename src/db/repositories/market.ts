@@ -10,10 +10,10 @@
  * usual `userId`-scoped CRUD surface.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type MarketInstrumentRow = typeof marketInstruments.$inferSelect;
 export type MarketQuoteRow = Omit<typeof marketQuotes.$inferSelect, "priceMinor"> & {
@@ -39,6 +39,8 @@ export interface CreateMarketQuoteInput {
 }
 
 export interface CreateUserInstrumentInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   instrumentId: string;
   categoryId?: string | null;
   alias?: string | null;
@@ -62,6 +64,18 @@ export async function listInstruments(db: Db): Promise<MarketInstrumentRow[]> {
 export async function getInstrument(db: Db, id: string): Promise<MarketInstrumentRow | undefined> {
   const [row] = await db.select().from(marketInstruments).where(eq(marketInstruments.id, id));
   return row;
+}
+
+/**
+ * Batched form of {@link getInstrument} for bootstrap assembly (audit
+ * §5.1): one query for every tracked instrument instead of one query per
+ * instrument.
+ */
+export async function listInstrumentsByIds(db: Db, ids: string[]): Promise<MarketInstrumentRow[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  return db.select().from(marketInstruments).where(inArray(marketInstruments.id, ids));
 }
 
 export async function getInstrumentBySymbol(
@@ -145,6 +159,35 @@ export async function listQuotesByInstrument(db: Db, instrumentId: string): Prom
   return rows.map(toQuoteRow);
 }
 
+/**
+ * Batched form of {@link listQuotesByInstrument} for bootstrap assembly
+ * (audit §5.1): one query for every tracked instrument's quotes instead of
+ * one query per instrument.
+ */
+export async function listQuotesByInstruments(
+  db: Db,
+  instrumentIds: string[],
+): Promise<Map<string, MarketQuoteRow[]>> {
+  const byInstrument = new Map<string, MarketQuoteRow[]>();
+  if (instrumentIds.length === 0) {
+    return byInstrument;
+  }
+  const rows = await db
+    .select()
+    .from(marketQuotes)
+    .where(inArray(marketQuotes.instrumentId, instrumentIds));
+  for (const row of rows) {
+    const quote = toQuoteRow(row);
+    const existing = byInstrument.get(quote.instrumentId);
+    if (existing) {
+      existing.push(quote);
+    } else {
+      byInstrument.set(quote.instrumentId, [quote]);
+    }
+  }
+  return byInstrument;
+}
+
 export async function getQuote(db: Db, id: string): Promise<MarketQuoteRow | undefined> {
   const [row] = await db.select().from(marketQuotes).where(eq(marketQuotes.id, id));
   return row ? toQuoteRow(row) : undefined;
@@ -224,6 +267,7 @@ export async function createUserInstrument(
   const [row] = await db
     .insert(userInstruments)
     .values({
+      ...clientIdentity(input.id),
       userId,
       instrumentId: input.instrumentId,
       categoryId: input.categoryId ?? null,
@@ -295,6 +339,7 @@ export async function bulkInsertUserInstruments(
     .insert(userInstruments)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         instrumentId: input.instrumentId,
         categoryId: input.categoryId ?? null,

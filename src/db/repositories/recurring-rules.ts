@@ -2,14 +2,23 @@
 
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { recurringRules } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { pendingMovements, recurringRules } from "../schema";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
-export type RecurringRuleRow = Omit<typeof recurringRules.$inferSelect, "amountMinor"> & {
+export type RecurringRuleRow = Omit<
+  typeof recurringRules.$inferSelect,
+  "amountMinor" | "unitPriceMinor" | "feeMinor" | "units"
+> & {
   amount: number;
+  /** Operation fields — present only on an investment rule. */
+  units: number | null;
+  unitPrice: number | null;
+  fee: number | null;
 };
 
 export interface CreateRecurringRuleInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   type: string;
@@ -18,7 +27,17 @@ export interface CreateRecurringRuleInput {
   amount: number;
   currency: string;
   frequency: string;
+  interval?: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  lastExecutionDate?: string | null;
   nextRunDate?: string | null;
+  symbol?: string | null;
+  side?: string | null;
+  units?: number | null;
+  unitPrice?: number | null;
+  fee?: number | null;
+  time?: string | null;
   status?: string;
 }
 
@@ -30,12 +49,44 @@ export interface UpdateRecurringRuleInput {
   amount?: number;
   currency?: string;
   frequency?: string;
+  interval?: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  lastExecutionDate?: string | null;
   nextRunDate?: string | null;
+  symbol?: string | null;
+  side?: string | null;
+  units?: number | null;
+  unitPrice?: number | null;
+  fee?: number | null;
+  time?: string | null;
   status?: string;
 }
 
 function toRow(row: typeof recurringRules.$inferSelect): RecurringRuleRow {
-  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) };
+  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row;
+  return {
+    ...rest,
+    amount: fromMinorUnits(amountMinor, row.currency),
+    units: units === null ? null : Number(units),
+    unitPrice: unitPriceMinor === null ? null : fromMinorUnits(unitPriceMinor, row.currency),
+    fee: feeMinor === null ? null : fromMinorUnits(feeMinor, row.currency),
+  };
+}
+
+/** The operation columns, in write shape — `null` on a non-investment rule. */
+function operationValues(
+  input: { symbol?: string | null; side?: string | null; units?: number | null; unitPrice?: number | null; fee?: number | null; time?: string | null },
+  currency: string,
+) {
+  return {
+    symbol: input.symbol ?? null,
+    side: input.side ?? null,
+    units: input.units === null || input.units === undefined ? null : String(input.units),
+    unitPriceMinor: input.unitPrice === null || input.unitPrice === undefined ? null : toMinorUnits(input.unitPrice, currency),
+    feeMinor: input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
+    time: input.time ?? null,
+  };
 }
 
 export async function listByUser(db: Db, userId: string): Promise<RecurringRuleRow[]> {
@@ -61,6 +112,7 @@ export async function create(
   const [row] = await db
     .insert(recurringRules)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -70,7 +122,12 @@ export async function create(
       amountMinor: toMinorUnits(input.amount, input.currency),
       currency: input.currency,
       frequency: input.frequency,
+      interval: input.interval ?? 1,
+      startDate: input.startDate ?? null,
+      endDate: input.endDate ?? null,
+      lastExecutionDate: input.lastExecutionDate ?? null,
       nextRunDate: input.nextRunDate ?? null,
+      ...operationValues(input, input.currency),
       status: input.status ?? "active",
       createdAt: now,
       updatedAt: now,
@@ -103,7 +160,23 @@ export async function update(
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,
       frequency: input.frequency ?? existing.frequency,
+      interval: input.interval ?? existing.interval,
+      startDate: input.startDate === undefined ? existing.startDate : input.startDate,
+      endDate: input.endDate === undefined ? existing.endDate : input.endDate,
+      lastExecutionDate:
+        input.lastExecutionDate === undefined ? existing.lastExecutionDate : input.lastExecutionDate,
       nextRunDate: input.nextRunDate === undefined ? existing.nextRunDate : input.nextRunDate,
+      ...operationValues(
+        {
+          symbol: input.symbol === undefined ? existing.symbol : input.symbol,
+          side: input.side === undefined ? existing.side : input.side,
+          units: input.units === undefined ? existing.units : input.units,
+          unitPrice: input.unitPrice === undefined ? existing.unitPrice : input.unitPrice,
+          fee: input.fee === undefined ? existing.fee : input.fee,
+          time: input.time === undefined ? existing.time : input.time,
+        },
+        nextCurrency,
+      ),
       status: input.status ?? existing.status,
       updatedAt: nowIso(),
       version: existing.version + 1,
@@ -122,6 +195,13 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   if (!existing) {
     return false;
   }
+  // A pending movement is a generated occurrence of its rule (`recurring_rule_id`
+  // is NOT NULL, no ON DELETE CASCADE, and D1 always enforces it), so it goes
+  // with the rule instead of blocking its removal (audit §2.6 pattern).
+  await db.delete(pendingMovements).where(and(
+    eq(pendingMovements.recurringRuleId, id),
+    eq(pendingMovements.userId, userId),
+  ));
   const deleted = await db.delete(recurringRules).where(and(
     eq(recurringRules.id, id),
     eq(recurringRules.userId, userId),
@@ -143,6 +223,7 @@ export async function bulkInsert(
     .insert(recurringRules)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,
@@ -152,7 +233,12 @@ export async function bulkInsert(
         amountMinor: toMinorUnits(input.amount, input.currency),
         currency: input.currency,
         frequency: input.frequency,
+        interval: input.interval ?? 1,
+        startDate: input.startDate ?? null,
+        endDate: input.endDate ?? null,
+        lastExecutionDate: input.lastExecutionDate ?? null,
         nextRunDate: input.nextRunDate ?? null,
+        ...operationValues(input, input.currency),
         status: input.status ?? "active",
         createdAt: now,
         updatedAt: now,

@@ -36,7 +36,7 @@ import * as userSettingsRepository from "../../../db/repositories/user-settings"
 import * as syncRepository from "../../../db/repositories/sync";
 import * as auditEventsRepository from "../../../db/repositories/audit-events";
 import {
-  entityCreateSchemas,
+  entityCreatePayloadSchemas,
   entityUpdateSchemas,
   type SyncCommandInput,
   type SyncEntityType,
@@ -66,6 +66,16 @@ interface VersionedRow {
   id: string;
   version: number;
   [key: string]: unknown;
+}
+
+/** The `balances` nested inside a `wealthSnapshot` create/update payload — see `command-schemas.ts`. */
+interface WealthSnapshotBalancesField {
+  balances?: Omit<wealthRepository.CreateSnapshotBalanceInput, "snapshotId">[];
+}
+
+/** The `allocations` nested inside a `contribution` create/update payload — see `command-schemas.ts`. */
+interface ContributionAllocationsField {
+  allocations?: Omit<contributionsRepository.CreateContributionAllocationInput, "contributionId" | "currency">[];
 }
 
 async function findByLegacyId(
@@ -131,7 +141,24 @@ async function loadForMutation(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreateSchemas` before this is called.
+/**
+ * Looks up the row the client's own identity addresses (ADR 0001).
+ *
+ * Same lookup `loadForMutation` does — an entity carrying client identity is
+ * addressable by that id from its very first `create`, with no table of
+ * equivalences and no waiting for an ack.
+ */
+async function findByClientId(
+  db: Db,
+  userId: string,
+  entityType: SyncEntityType,
+  id: unknown,
+): Promise<VersionedRow | undefined> {
+  if (typeof id !== "string" || !id) return undefined;
+  return loadForMutation(db, userId, entityType, id);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreatePayloadSchemas` before this is called.
 async function createEntity(db: Db, userId: string, entityType: SyncEntityType, data: any): Promise<VersionedRow> {
   switch (entityType) {
     case "account":
@@ -150,12 +177,28 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
       return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow;
     case "goal":
       return (await goalsRepository.create(db, userId, data)) as VersionedRow;
-    case "contribution":
-      return (await contributionsRepository.create(db, userId, data)) as VersionedRow;
+    case "contribution": {
+      const { allocations, ...contributionInput } = data as contributionsRepository.CreateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.create(db, userId, contributionInput);
+      const allocationRows = allocations?.length
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : [];
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow;
-    case "wealthSnapshot":
-      return (await wealthRepository.create(db, userId, data)) as VersionedRow;
+    case "wealthSnapshot": {
+      const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.create(db, userId, snapshotInput);
+      const balanceRows = balances?.length
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : [];
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 
@@ -197,16 +240,32 @@ async function updateEntity(
         | undefined;
     case "goal":
       return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
-    case "contribution":
-      return (await contributionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
-        | VersionedRow
-        | undefined;
+    case "contribution": {
+      const { allocations, ...contributionPatch } = patch as contributionsRepository.UpdateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.update(db, userId, entityId, contributionPatch, expectedVersion);
+      if (!row) return undefined;
+      const allocationRows = allocations
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : await contributionsRepository.listAllocationsByContribution(db, userId, row.id);
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
-    case "wealthSnapshot":
-      return (await wealthRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
+    case "wealthSnapshot": {
+      const { balances, ...snapshotPatch } = patch as Partial<wealthRepository.CreateWealthSnapshotInput> &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.update(db, userId, entityId, snapshotPatch, expectedVersion);
+      if (!row) return undefined;
+      const balanceRows = balances
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : await wealthRepository.listBalancesBySnapshot(db, userId, row.id);
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 
@@ -288,22 +347,38 @@ async function performMutation(
       return { status: "noop" };
 
     case "settingsUpdate": {
+      const { twrLiquidityAccountIds, ...settingsPatch } = command.patch;
       const existing = await userSettingsRepository.get(db, userId);
       const row = existing
-        ? await userSettingsRepository.update(db, userId, command.patch)
-        : await userSettingsRepository.create(db, userId, command.patch);
+        ? await userSettingsRepository.update(db, userId, settingsPatch)
+        : await userSettingsRepository.create(db, userId, settingsPatch);
+      const twrLiquidityAccounts = twrLiquidityAccountIds
+        ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
+        : undefined;
       const revision = await recordChange(db, userId, "userSettings", userId, "update", command.patch);
-      return { status: "applied", entityType: "userSettings", entityId: userId, entity: row, revision };
+      return {
+        status: "applied",
+        entityType: "userSettings",
+        entityId: userId,
+        entity: twrLiquidityAccounts ? { ...row, twrLiquidityAccounts } : row,
+        revision,
+      };
     }
 
     case "create": {
-      const schema = entityCreateSchemas[command.entityType];
+      const schema = entityCreatePayloadSchemas[command.entityType];
       const validation = schema.safeParse(command.data);
       if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
       const parsed = validation.data;
-      const existing = await findByLegacyId(
-        db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
-      );
+      // The client's own identity wins when it sent one: re-sending a `create`
+      // is then a no-op instead of a duplicate, even under a fresh commandId
+      // that `sync_commands`'s replay guard no longer recognises. Falling back
+      // to the derived identifier keeps the rows migrated from v1 reconcilable.
+      const existing =
+        (await findByClientId(db, userId, command.entityType, (parsed as { id?: unknown }).id))
+        ?? (await findByLegacyId(
+          db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
+        ));
       if (existing) return { status: "noop", entityType: command.entityType, entityId: existing.id, entity: existing };
       const row = await createEntity(db, userId, command.entityType, parsed);
       const revision = await recordChange(db, userId, command.entityType, row.id, "create", row);

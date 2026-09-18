@@ -1,0 +1,272 @@
+{
+  "$comment": "Contrato entre este repositorio y cualquier orquestador de agentes. El orquestador SÓLO abre una sesión por ticket, en un worktree propio sobre la rama del ticket; el agente hace el resto por su cuenta: espera a sus bloqueadores consultando el estado de esos issues, implementa, pasa `pnpm gate`, commitea, publica la PR y comenta el enlace. Ver .agents/README.md.",
+  "repo": "alberba/finance-tracker",
+  "spec": 136,
+  "base": "mal-guardado-v2-multiusuario",
+  "gate": "pnpm gate",
+  "promptTemplate": {
+    "claude": ".agents/ticket-prompt.claude.md",
+    "codex": ".agents/ticket-prompt.codex.md"
+  },
+  "tickets": [
+    {
+      "issue": 137,
+      "title": "Lo encolado se ve, y lo rechazado se dice",
+      "blockedBy": [],
+      "lane": "A",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 138,
+      "title": "Un payload sin destino falla en vez de desaparecer",
+      "blockedBy": [
+        137
+      ],
+      "lane": "A",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 139,
+      "title": "Un conflicto se resuelve solo, sin congelar la cola",
+      "blockedBy": [
+        138
+      ],
+      "lane": "A",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 140,
+      "title": "Una cuenta es una cuenta: efectivo, inversión y pasivo",
+      "blockedBy": [],
+      "lane": "B",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 141,
+      "title": "Borrar avisa en vez de fallar",
+      "blockedBy": [
+        140
+      ],
+      "lane": "B",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 142,
+      "title": "El bootstrap deja de hacer una consulta por fila",
+      "blockedBy": [
+        141
+      ],
+      "lane": "B",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "medium",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 155,
+      "title": "La red de seguridad del refactor, la reparación y el esquema",
+      "blockedBy": [],
+      "lane": "C",
+      "runner": "claude",
+      "model": "claude-sonnet-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 143,
+      "title": "Expandir: el servidor acepta la identidad del cliente",
+      "blockedBy": [
+        155
+      ],
+      "lane": "C",
+      "runner": "claude",
+      "model": "claude-opus-5",
+      "effort": "medium",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 144,
+      "title": "Migrar: categorías",
+      "blockedBy": [
+        143
+      ],
+      "lane": "C",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 145,
+      "title": "Migrar: presupuesto",
+      "blockedBy": [
+        143
+      ],
+      "lane": "C",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 146,
+      "title": "Migrar: snapshots de patrimonio",
+      "blockedBy": [
+        143
+      ],
+      "lane": "C",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 147,
+      "title": "Contraer: se retira la correlación por datos de negocio",
+      "blockedBy": [
+        144,
+        145,
+        146,
+        155
+      ],
+      "lane": "C",
+      "runner": "claude",
+      "model": "claude-opus-5",
+      "effort": "medium",
+      "hasFailingTest": false,
+      "humanRun": false
+    },
+    {
+      "issue": 148,
+      "title": "Reparar los datos ya corrompidos",
+      "blockedBy": [
+        144,
+        145,
+        146,
+        155
+      ],
+      "lane": null,
+      "runner": "claude",
+      "model": "claude-opus-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": true
+    },
+    {
+      "issue": 149,
+      "title": "Cerrar el esquema: claves únicas y cascadas",
+      "blockedBy": [
+        148,
+        155
+      ],
+      "lane": null,
+      "runner": "claude",
+      "model": "claude-opus-5",
+      "effort": "high",
+      "hasFailingTest": false,
+      "humanRun": true
+    },
+    {
+      "issue": 151,
+      "title": "La plantilla de movimiento: regla, pendiente y movimiento",
+      "blockedBy": [],
+      "lane": "D",
+      "runner": "claude",
+      "model": "claude-opus-5",
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 152,
+      "title": "La operación de inversión viaja con su movimiento",
+      "blockedBy": [
+        151
+      ],
+      "lane": "D",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 150,
+      "title": "Suscripciones visibles: fecha de inicio y frecuencia",
+      "blockedBy": [],
+      "lane": "E",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 153,
+      "title": "Los saldos del snapshot de patrimonio se guardan",
+      "blockedBy": [
+        150
+      ],
+      "lane": "E",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": true,
+      "humanRun": false
+    },
+    {
+      "issue": 154,
+      "title": "Lo que hoy no emite nada: liquidez TWR, reparto y emoji",
+      "blockedBy": [
+        153
+      ],
+      "lane": "E",
+      "runner": "codex",
+      "model": null,
+      "effort": "medium",
+      "hasFailingTest": false,
+      "humanRun": false
+    }
+  ],
+  "branchPattern": "ticket/{issue}",
+  "ownership": {
+    "orchestrator": [
+      "crear el worktree y la rama",
+      "lanzar la sesión con la plantilla del runner",
+      "elegir modelo y esfuerzo"
+    ],
+    "agent": [
+      "esperar a los bloqueadores",
+      "implementar",
+      "pasar el gate",
+      "commit, push y PR",
+      "comentar en el issue"
+    ]
+  }
+}

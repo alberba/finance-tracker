@@ -13,6 +13,7 @@ import {
   categoryLocalId,
   resolveCategoryId,
   resolveEntityId,
+  resolveOrCreateCategoryId,
   syncCreate,
   syncListDiff,
   syncRemove,
@@ -95,6 +96,30 @@ describe("command-mapping (WP7b)", () => {
         data: { name: "Cuenta", legacyId: "local-acc-1" },
       });
       expect(store.pendingCount).toBeGreaterThanOrEqual(0);
+      outboxDb.close();
+    });
+
+    it("surfaces an invalid payload as a visible error instead of an unhandled rejection (issue #138)", async () => {
+      const store = await initSyncStore();
+
+      // `syncCreate`/`syncListDiff` are always fired with `void` from the
+      // domain stores (no `.catch`), so a rejected promise here would be an
+      // unhandled rejection in production — this must resolve.
+      await expect(
+        syncCreate("account", "local-acc-bad", {
+          name: "Cuenta",
+          kind: "checking",
+          currency: "EUR",
+          openingBalance: 10,
+          // `entityCreateSchemas.account` doesn't declare this field.
+          bogusField: "no destino",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(store.lastError).toBeTruthy();
+
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
       outboxDb.close();
     });
 
@@ -241,6 +266,46 @@ describe("command-mapping (WP7b)", () => {
       expect(third).toBe("server-cat-1");
     });
 
+    it("resolveOrCreateCategoryId mints an id for an unknown category instead of returning null (audit §4.7)", async () => {
+      await initSyncStore();
+      const first = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(first).toEqual(expect.any(String));
+
+      const outboxDb = await openOutbox(USER_ID);
+      const entries = await listAll(outboxDb);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.command).toMatchObject({
+        action: "create",
+        entityType: "category",
+        data: { name: "Ocio", kind: "expense", id: first, legacyId: categoryLocalId("expense", "Ocio") },
+      });
+      outboxDb.close();
+
+      // A second reference before the create has synced reuses the same
+      // minted id instead of minting (and creating) a second category.
+      const second = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(second).toBe(first);
+      const outboxDb2 = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb2)).toHaveLength(1);
+      outboxDb2.close();
+    });
+
+    it("resolveOrCreateCategoryId resolves an already-cached category without minting a new id", async () => {
+      await initSyncStore();
+      const cacheDb = await openIdbCache(USER_ID);
+      await putEntity(cacheDb, "category", {
+        id: "server-cat-2",
+        legacyId: categoryLocalId("expense", "Comida"),
+        version: 0,
+      });
+      cacheDb.close();
+
+      expect(await resolveOrCreateCategoryId("expense", "Comida")).toBe("server-cat-2");
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
+      outboxDb.close();
+    });
+
     it("resolveEntityId resolves a known ref and returns null for an unknown one", async () => {
       await initSyncStore();
       expect(await resolveEntityId("recurringRule", "rule-1")).toBeNull();
@@ -273,7 +338,16 @@ describe("command-mapping (WP7b)", () => {
           { id: "tx-3", amount: 5 }, // new — create
         ];
 
-        await syncListDiff("transaction", before, after, (item) => ({ amount: item.amount }));
+        // A full, schema-valid transaction payload — `entityCreateSchemas.transaction`
+        // requires `accountId`/`type`/`date`/`currency` too (strict, issue #138),
+        // so `tx-3`'s create needs them even though only `amount` varies per row.
+        await syncListDiff("transaction", before, after, (item) => ({
+          accountId: "acc-1",
+          type: "expense",
+          date: "2026-01-01",
+          amount: item.amount,
+          currency: "EUR",
+        }));
 
         const outboxDb = await openOutbox(USER_ID);
         const entries = await listAll(outboxDb);

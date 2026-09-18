@@ -12,7 +12,13 @@
  * the queue survives reloads/offline periods by design.
  */
 
-import { syncCommandSchema, type SyncCommandInput, type SyncEntityType } from "../server/sync/command-schemas";
+import {
+  entityCreatePayloadSchemas,
+  entityUpdateSchemas,
+  syncCommandSchema,
+  type SyncCommandInput,
+  type SyncEntityType,
+} from "../server/sync/command-schemas";
 
 const DB_VERSION = 1;
 const STORE = "commands";
@@ -84,23 +90,47 @@ export function generateCommandId(): string {
   return `cmd_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+function formatIssues(issues: { path: PropertyKey[]; message: string }[]): string {
+  return issues.map((issue) => `${issue.path.map(String).join(".") || "(raíz)"}: ${issue.message}`).join("; ");
+}
+
 export class InvalidCommandError extends Error {
-  constructor(public readonly issues: unknown) {
-    super("Comando de sincronización inválido.");
+  constructor(public readonly issues: { path: PropertyKey[]; message: string }[]) {
+    super(`Comando de sincronización inválido: ${formatIssues(issues)}`);
   }
 }
 
 /**
  * Validates and appends a command to the outbox. Adds `commandId` if the
  * caller didn't supply one. Rejects (throws `InvalidCommandError`) if the
- * command doesn't match the server's schema — enqueueing a bad command
- * would otherwise poison the batch (WP4's fail-fast semantics).
+ * command doesn't match the server's schema, or if its per-entity `data`/
+ * `patch` doesn't match `entityCreatePayloadSchemas`/`entityUpdateSchemas` —
+ * the same schemas `apply-command.ts` validates against server-side, applied
+ * here too so a payload with no destination in the model fails visibly at
+ * the moment it's typed, not silently once it reaches the server (audit
+ * §2.3, issue #138). The *payload* schemas, not the bare create ones, because
+ * the client may mint the entity's own identity (`id`, ADR 0001) and the
+ * server accepts it in the same `create` — the bare schemas would reject it
+ * and drop the write (issue #143). Enqueueing a bad command would otherwise
+ * poison the batch (WP4's fail-fast semantics).
  */
 export async function enqueue(db: IDBDatabase, command: OutboxCommandInput): Promise<OutboxEntry> {
   const withId = { ...command, commandId: command.commandId ?? generateCommandId() };
   const parsed = syncCommandSchema.safeParse(withId);
   if (!parsed.success) {
     throw new InvalidCommandError(parsed.error.issues);
+  }
+
+  if (parsed.data.action === "create") {
+    const entityCheck = entityCreatePayloadSchemas[parsed.data.entityType].safeParse(parsed.data.data);
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.error.issues);
+    }
+  } else if (parsed.data.action === "update") {
+    const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch);
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.error.issues);
+    }
   }
 
   const entry: Omit<OutboxEntry, "seq"> = {
@@ -193,6 +223,14 @@ export async function findPendingCreate(
  * Merges additional fields into a still-queued `create` command's `data`
  * payload (no-op if the entry no longer exists or isn't a pending create —
  * defensive against a race with `acknowledge`).
+ *
+ * Validates the merged `data` against `entityCreatePayloadSchemas` before
+ * writing (rejects, throwing `InvalidCommandError`, leaving the still-queued
+ * create untouched) — folding a patch in is as much "encolar" as a fresh
+ * `enqueue` call, so it gets the same guarantee: a field with no destination
+ * fails here instead of silently corrupting the pending create (issue #138).
+ * The payload schema, not the bare create one, so a create that already
+ * carries the client-minted identity keeps accepting patches (ADR 0001).
  */
 export async function amendPendingCreate(
   db: IDBDatabase,
@@ -203,9 +241,14 @@ export async function amendPendingCreate(
   const store = tx.objectStore(STORE);
   const existing = await requestToPromise(store.get(seq) as IDBRequest<OutboxEntry | undefined>);
   if (existing && existing.command.action === "create") {
+    const mergedData = { ...existing.command.data, ...patch };
+    const entityCheck = entityCreatePayloadSchemas[existing.command.entityType].safeParse(mergedData);
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.error.issues);
+    }
     store.put({
       ...existing,
-      command: { ...existing.command, data: { ...existing.command.data, ...patch } },
+      command: { ...existing.command, data: mergedData },
     });
   }
   await txDone(tx);

@@ -6,10 +6,10 @@
  * converted independently, since accounts can carry different currencies).
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { snapshotBalances, wealthSnapshots } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
 
 export type WealthSnapshotRow = typeof wealthSnapshots.$inferSelect;
 export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "balanceMinor"> & {
@@ -17,6 +17,8 @@ export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "bal
 };
 
 export interface CreateWealthSnapshotInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   snapshotDate: string;
   year: number;
@@ -57,6 +59,7 @@ export async function create(
   const [row] = await db
     .insert(wealthSnapshots)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       snapshotDate: input.snapshotDate,
@@ -124,6 +127,7 @@ export async function bulkInsert(
     .insert(wealthSnapshots)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         snapshotDate: input.snapshotDate,
@@ -148,6 +152,36 @@ export async function listBalancesBySnapshot(
     .from(snapshotBalances)
     .where(and(eq(snapshotBalances.userId, userId), eq(snapshotBalances.snapshotId, snapshotId)));
   return rows.map(toBalanceRow);
+}
+
+/**
+ * Batched form of {@link listBalancesBySnapshot} for bootstrap assembly
+ * (audit §5.1): one query for every snapshot's balances instead of one
+ * query per snapshot.
+ */
+export async function listBalancesBySnapshots(
+  db: Db,
+  userId: string,
+  snapshotIds: string[],
+): Promise<Map<string, SnapshotBalanceRow[]>> {
+  const bySnapshot = new Map<string, SnapshotBalanceRow[]>();
+  if (snapshotIds.length === 0) {
+    return bySnapshot;
+  }
+  const rows = await db
+    .select()
+    .from(snapshotBalances)
+    .where(and(eq(snapshotBalances.userId, userId), inArray(snapshotBalances.snapshotId, snapshotIds)));
+  for (const row of rows) {
+    const balance = toBalanceRow(row);
+    const existing = bySnapshot.get(balance.snapshotId);
+    if (existing) {
+      existing.push(balance);
+    } else {
+      bySnapshot.set(balance.snapshotId, [balance]);
+    }
+  }
+  return bySnapshot;
 }
 
 export async function getBalance(
@@ -194,6 +228,19 @@ export async function removeBalance(db: Db, userId: string, id: string): Promise
     .delete(snapshotBalances)
     .where(and(eq(snapshotBalances.id, id), eq(snapshotBalances.userId, userId)));
   return true;
+}
+
+/** Replaces every balance of a snapshot with `inputs`, atomically within the caller's transaction. */
+export async function replaceBalances(
+  db: Db,
+  userId: string,
+  snapshotId: string,
+  inputs: Omit<CreateSnapshotBalanceInput, "snapshotId">[],
+): Promise<SnapshotBalanceRow[]> {
+  await db
+    .delete(snapshotBalances)
+    .where(and(eq(snapshotBalances.userId, userId), eq(snapshotBalances.snapshotId, snapshotId)));
+  return bulkInsertBalances(db, userId, inputs.map((input) => ({ ...input, snapshotId })));
 }
 
 export async function bulkInsertBalances(

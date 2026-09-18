@@ -123,5 +123,127 @@ describe("transactions repository", () => {
 
       expect(await transactionsRepo.removeTradeDetail(db, userA.id, created.id)).toBe(true);
     });
+
+    it("removing the transaction deletes its trade detail with it instead of a raw FK violation (audit §2.6)", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+      const transaction = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-01-15",
+        amount: 100,
+        currency: "EUR",
+      });
+      const detail = await transactionsRepo.createTradeDetail(db, user.id, {
+        transactionId: transaction.id,
+        side: "buy",
+        quantity: "1.5",
+        price: 66.66,
+        fee: 1.5,
+        currency: "EUR",
+      });
+
+      expect(await transactionsRepo.remove(db, user.id, transaction.id)).toBe(true);
+
+      expect(
+        await transactionsRepo.getTradeDetailByTransaction(db, user.id, transaction.id),
+      ).toBeUndefined();
+      expect(await transactionsRepo.removeTradeDetail(db, user.id, detail.id)).toBe(false);
+    });
+
+    it("writes the operation that travels with the movement, and replaces it on an edit", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+
+      const movement = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-09-12",
+        amount: -1206.2,
+        currency: "EUR",
+        time: "10:30",
+        declared: false,
+        operation: { symbol: "VWCE", side: "buy", units: 10, unitPrice: 120.5, fee: 1.2 },
+      });
+
+      const stored = await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id);
+      expect(stored).toMatchObject({ symbol: "VWCE", side: "buy", quantity: "10", price: 120.5, fee: 1.2 });
+      expect(movement.time).toBe("10:30");
+
+      await transactionsRepo.update(db, user.id, movement.id, {
+        operation: { symbol: "VWCE", side: "sell", units: 4, unitPrice: 130, fee: 0.8 },
+      });
+
+      const edited = await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id);
+      // Replaced in place: an edit must not leave a second operation behind.
+      expect(edited).toMatchObject({ side: "sell", quantity: "4", price: 130, fee: 0.8 });
+      expect(edited?.id).toBe(stored?.id);
+    });
+
+    it("drops the operation when the movement stops being an investment", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+
+      const movement = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-09-12",
+        amount: -1206.2,
+        currency: "EUR",
+        operation: { symbol: "VWCE", side: "buy", units: 10, unitPrice: 120.5, fee: 1.2 },
+      });
+      expect(await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id)).toBeDefined();
+
+      // The caller says nothing about the operation: turning the movement into
+      // a gasto must still drop it, or it would keep títulos it cannot have.
+      await transactionsRepo.update(db, user.id, movement.id, { type: "expense" });
+
+      expect(await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id)).toBeUndefined();
+    });
+
+    it("drops the operation when the movement is edited with an explicit null", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+
+      const movement = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-09-12",
+        amount: -1206.2,
+        currency: "EUR",
+        operation: { symbol: "VWCE", side: "buy", units: 10, unitPrice: 120.5, fee: 1.2 },
+      });
+
+      await transactionsRepo.update(db, user.id, movement.id, { operation: null });
+
+      expect(await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id)).toBeUndefined();
+    });
+
+    it("leaves the stored operation alone when an edit does not mention it", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await seedAccount(db, user.id);
+
+      const movement = await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        type: "investment",
+        date: "2026-09-12",
+        amount: -1206.2,
+        currency: "EUR",
+        operation: { symbol: "VWCE", side: "buy", units: 10, unitPrice: 120.5, fee: 1.2 },
+      });
+
+      // This is what a builder that knows nothing about operations emits.
+      await transactionsRepo.update(db, user.id, movement.id, { description: "Compra VWCE" });
+
+      expect(await transactionsRepo.getTradeDetailByTransaction(db, user.id, movement.id)).toMatchObject({
+        symbol: "VWCE",
+        quantity: "10",
+      });
+    });
   });
 });

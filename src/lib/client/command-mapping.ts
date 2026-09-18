@@ -44,7 +44,11 @@
  * are plain name arrays), while v2 has real `category` rows with server
  * ids. `resolveCategoryId` treats `${kind}:${name}` as the category's
  * stable `legacyId` and lazily create-syncs it the first time it's
- * referenced.
+ * referenced — but the v1 migration (`migration-runner.ts`) has no concept
+ * of that composite key, and writes the bare category *name* as `legacyId`
+ * instead (audit §4.7). `resolveCategoryId` falls back to that bare-name
+ * lookup before deciding a category is unseen, so referencing a category
+ * migrated from v1 resolves to its existing row instead of duplicating it.
  *
  * Known, documented leftovers (exotic edge flows intentionally NOT covered
  * here — see the WP7b report for the full list):
@@ -58,17 +62,16 @@
  *   for the "created dependency and dependent row in the same instant,
  *   offline" case, not a data-loss bug (nothing is ever double-applied or
  *   silently dropped from local state).
- * - `investment.ts`'s `saveContribution` (the multi-entity contribution +
- *   wealth-snapshot + snapshot-balances workflow save) is NOT wired: its
- *   domain function (`applyContributionSave`) produces a combined update
- *   spanning `contribution_allocations`/`snapshot_balances`, both
- *   explicitly out of the 11 `SYNC_ENTITY_TYPES` per `command-schemas.ts`'s
- *   own doc comment. Wiring it needs either a command-contract extension
- *   or decomposing that domain function's output — left as a follow-up.
- * - `wealth.ts`'s `saveSnapshot` only sync-upserts the `wealthSnapshot`
- *   *existence* row (snapshotDate/year/month); the actual balance edits
- *   (`snapshot.accounts/investments/liabilities`) map to `snapshot_balances`,
- *   also explicitly out of scope.
+ * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
+ *   its flow allocations nested under `data.allocations`; the snapshot
+ *   balances that same workflow save touches are not re-synced from there.
+ * - `settings.ts`'s TWR liquidity toggle sends the whole selection through
+ *   `syncTwrLiquidityAccounts` (a `settingsUpdate`), resolved to server
+ *   `account` ids.
+ * - `wealth.ts`'s `saveSnapshot` sync-upserts the `wealthSnapshot` row with
+ *   its balances nested under `data.balances` (resolved to server `account`
+ *   ids via `resolveEntityId`) — see `command-schemas.ts`'s doc comment for
+ *   why `snapshot_balances` travels nested instead of as its own command.
  * - `market.ts`'s `instruments` conflates a global instrument definition
  *   (symbol/market/provider — `market_instruments`, an explicitly
  *   out-of-scope *global* reference table) with the per-user link
@@ -79,9 +82,8 @@
  *   (WP12 owns encryption) and `stockevents_symbol_mappings` ("no version
  *   column to drive optimistic concurrency") are both explicitly excluded
  *   from `SYNC_ENTITY_TYPES` in `command-schemas.ts`.
- * - `settings.ts`'s `EntityKey` values `investmentAssets`/`liabilities`
- *   have no corresponding v2 table/`SyncEntityType` today — only
- *   `accounts` is wired.
+ * - `settings.ts`'s three `EntityKey` values all map to the single v2
+ *   `account` entity; the list shown in the UI determines its `kind`.
  * - `data.ts`'s import/reset/start-fresh flows use `reloadState` (whole
  *   blob), not `commitState`, and already have dedicated v2 endpoints
  *   (`/api/data/import`, `/api/state/reset`, `/api/state/initialize` via
@@ -185,11 +187,20 @@ export async function syncRemove(entityType: SyncEntityType, localId: string): P
  * Create-if-unknown, update-otherwise — for aggregates addressed by a
  * stable natural key (category `${kind}:${name}`, goal key, budget-entry
  * composite key) rather than a UI-visible "add"/"edit" distinction.
+ *
+ * `updateData` (defaults to `data`) is what's sent as the `update` patch —
+ * distinct from `data` for an entity whose identity is a natural key that
+ * must never travel in an update, like `budgetEntry`'s `(categoryId, year,
+ * month)` (`entityUpdateSchemas.budgetEntry` only declares `amount`/
+ * `currency`, unlike every other entity's update schema): the caller passes
+ * the full create-shaped `data` for the first write and a narrower
+ * `updateData` for the identity-preserving edits that follow.
  */
 export async function syncUpsert(
   entityType: SyncEntityType,
   localId: string,
   data: JsonRecord,
+  updateData: JsonRecord = data,
 ): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -202,7 +213,7 @@ export async function syncUpsert(
       entityType,
       entityId: ref.entityId,
       baseVersion: ref.version,
-      patch: data,
+      patch: updateData,
     });
     return;
   }
@@ -218,6 +229,7 @@ export async function syncSettingsUpdate(patch: {
   currency?: string;
   locale?: string | null;
   theme?: string | null;
+  twrLiquidityAccountIds?: string[];
 }): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -233,13 +245,34 @@ export async function syncSettingsUpdate(patch: {
  * decide whether that's acceptable (optional FK) or means the command must
  * be skipped (required FK).
  */
-export async function resolveEntityId(entityType: SyncEntityType, localId: string): Promise<string | null> {
+export async function resolveEntityId(entityType: SyncEntityType, localId: string, kind?: string): Promise<string | null> {
   if (!isSyncV2Enabled()) {
     return null;
   }
   const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
+  const ref = await syncStore.getEntityRef(entityType, localId, kind);
   return ref?.entityId ?? null;
+}
+
+/**
+ * Sends the whole TWR liquidity selection, resolved to server `account` ids.
+ * An account that hasn't synced yet is left out with a warning; the next
+ * toggle sends it once it has.
+ */
+export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[]): Promise<void> {
+  if (!isSyncV2Enabled()) {
+    return;
+  }
+  const twrLiquidityAccountIds: string[] = [];
+  for (const localId of localAccountIds) {
+    const accountId = await resolveEntityId("account", localId);
+    if (accountId) {
+      twrLiquidityAccountIds.push(accountId);
+    } else {
+      warn("account", localId, "marcar como liquidez TWR");
+    }
+  }
+  await syncSettingsUpdate({ twrLiquidityAccountIds });
 }
 
 export type CategoryKind = "income" | "expense" | "investment";
@@ -250,23 +283,103 @@ export function categoryLocalId(kind: CategoryKind, name: string): string {
 }
 
 /**
- * Resolves (lazily create-syncing if necessary) the server `category` row
- * id for a legacy category *name* + kind. Returns `null` when the category
- * hasn't synced yet (freshly referenced in this same batch, or offline) —
- * see the module doc comment's "known leftovers" for how required-field
- * callers (`budgetEntry`) must handle that.
+ * Looks up an already-synced (or migrated) category row without creating
+ * anything. Checks the `${kind}:${name}` convention this client itself
+ * creates rows under first, then falls back to the bare `name` the v1
+ * migration writes (audit §4.7) before concluding the category is genuinely
+ * unseen — so a migrated category resolves to its existing row on first
+ * reference instead of a duplicate being created and every referencing
+ * command losing its category. The fallback is scoped to `kind` too: the
+ * migration writes `legacyId = name` per row with no `kind` in the id
+ * itself, so an income and an expense category sharing a name would
+ * otherwise collide on the first migrated category found with that bare
+ * name.
  */
-export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
-  }
+async function resolveExistingCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
   const localId = categoryLocalId(kind, name);
   const resolved = await resolveEntityId("category", localId);
   if (resolved) {
     return resolved;
   }
-  await syncUpsert("category", localId, { name, kind });
+  return resolveEntityId("category", name, kind);
+}
+
+/**
+ * Resolves (lazily create-syncing if necessary) the server `category` row
+ * id for a legacy category *name* + kind. Returns `null` when the category
+ * hasn't synced yet (freshly referenced in this same batch, or offline) —
+ * see the module doc comment's "known leftovers" for how required-field
+ * callers (`budgetEntry`) must handle that; those use
+ * `resolveOrCreateCategoryId` instead.
+ */
+export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
+  if (!isSyncV2Enabled()) {
+    return null;
+  }
+  const existing = await resolveExistingCategoryId(kind, name);
+  if (existing) {
+    return existing;
+  }
+  await syncUpsert("category", categoryLocalId(kind, name), { name, kind });
   return null;
+}
+
+/**
+ * In-flight mints of a not-yet-synced category, keyed by its local id.
+ * `resolveOrCreateCategoryId`'s own "is one already pending?" check
+ * (`peekPendingCreateId`) only sees a mint once its `create` command has
+ * actually been written to the outbox — an `await` away. Two budget cells
+ * for the *same* brand-new category, edited back-to-back (e.g. filling in
+ * January then February before either has synced), would otherwise both
+ * observe "nothing pending yet" and each mint its own id, corrupting
+ * whichever create actually lands. Every caller within this session awaits
+ * the same in-flight mint instead.
+ */
+const pendingCategoryMints = new Map<string, Promise<string>>();
+
+/**
+ * Like `resolveCategoryId`, but never returns `null` for a genuinely new
+ * category: `entityCreateSchemas.budgetEntry.categoryId` is required, so a
+ * `null` here means silently dropping the edit (audit §4.7 — "la primera
+ * edición de cada celda de presupuesto se pierde entera"), which is exactly
+ * ticket #145's first acceptance criterion. Mints the category's id itself
+ * (ADR 0001, "sin esperar al ack") instead of waiting for a round trip, so
+ * the category's `create` and the budget entry's `create` land in the same
+ * outbox flush — the category row exists by the time the entry references
+ * it. A second reference before either has synced reuses the id already
+ * minted for the pending category create (via the outbox, or — before that
+ * create has even been written — via `pendingCategoryMints`) instead of
+ * minting (and creating) a second one.
+ */
+export async function resolveOrCreateCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
+  if (!isSyncV2Enabled()) {
+    return null;
+  }
+  const existing = await resolveExistingCategoryId(kind, name);
+  if (existing) {
+    return existing;
+  }
+  const localId = categoryLocalId(kind, name);
+  const syncStore = useSyncStore();
+  const pendingId = await syncStore.peekPendingCreateId("category", localId);
+  if (pendingId) {
+    return pendingId;
+  }
+  const inFlight = pendingCategoryMints.get(localId);
+  if (inFlight) {
+    return inFlight;
+  }
+  const mint = (async () => {
+    const id = crypto.randomUUID();
+    await syncUpsert("category", localId, { name, kind, id });
+    return id;
+  })();
+  pendingCategoryMints.set(localId, mint);
+  try {
+    return await mint;
+  } finally {
+    pendingCategoryMints.delete(localId);
+  }
 }
 
 /**
@@ -278,8 +391,9 @@ export async function resolveCategoryId(kind: CategoryKind, name: string): Promi
  * recurring-rule materialization) fall out of this for free: every row
  * that actually changed between the two snapshots gets its own command.
  *
- * `buildData` may return `null` to skip an item (used when a required
- * cross-entity reference — e.g. a pending movement's parent recurring rule
+ * `buildData` receives the current item and, for updates, its previous value
+ * so callers can emit a minimal patch. It may return `null` to skip an item
+ * (used when a required cross-entity reference — e.g. a pending movement's parent recurring rule
  * — hasn't synced yet) and otherwise must return plain JSON-serializable
  * data matching `entityCreateSchemas`/`entityUpdateSchemas` for
  * `entityType`.
@@ -288,7 +402,7 @@ export async function syncListDiff<T extends { id: string }>(
   entityType: SyncEntityType,
   before: readonly T[],
   after: readonly T[],
-  buildData: (item: T) => Promise<JsonRecord | null> | JsonRecord | null,
+  buildData: (item: T, previous?: T) => Promise<JsonRecord | null> | JsonRecord | null,
 ): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -307,7 +421,7 @@ export async function syncListDiff<T extends { id: string }>(
     if (prev && JSON.stringify(prev) === JSON.stringify(item)) {
       continue;
     }
-    const data = await buildData(item);
+    const data = await buildData(item, prev);
     if (data === null) {
       continue;
     }

@@ -3,7 +3,13 @@ import { computed } from 'vue'
 
 import { buildSettingsViewModel, categoryKeyToType } from '../domain/settings/view-model'
 import { useToast } from '../composables/useToast'
-import { categoryLocalId, syncListDiff, syncSettingsUpdate } from '../lib/client/command-mapping'
+import {
+  categoryLocalId,
+  syncListDiff,
+  syncSettingsUpdate,
+  syncTwrLiquidityAccounts,
+  syncUpsert,
+} from '../lib/client/command-mapping'
 import { categoryEmojiKey } from '../scripts/category-emoji'
 import type { CategoryKey, Entity, EntityKey, State } from '../scripts/types'
 import { parseFloatSafe, parseIntSafe, round2, slug } from '../scripts/utils'
@@ -13,18 +19,29 @@ export type ReorderDirection = 'up' | 'down'
 
 export type EntityField = 'name' | 'openingBalance'
 
-/**
- * WP7b — maps a legacy `Entity` (accounts store only — see the module's
- * leftover note below) to an `account` sync command payload. Legacy state
- * has no per-account `kind`; `'checking'` is used as a fixed default since
- * the app has no UI to set anything else today (documented approximation).
- */
-function buildAccountData(entity: Entity, currency: string) {
-  return {
-    name: entity.name,
-    kind: 'checking',
-    currency,
-    openingBalance: entity.openingBalance,
+const ACCOUNT_KIND_BY_KEY: Record<EntityKey, 'cash' | 'investment' | 'liability'> = {
+  accounts: 'cash',
+  investmentAssets: 'investment',
+  liabilities: 'liability',
+}
+
+function buildAccountData(key: EntityKey, currency: string) {
+  return (entity: Entity, previous?: Entity): Record<string, unknown> => {
+    if (previous) {
+      return {
+        ...(entity.name !== previous.name ? { name: entity.name } : {}),
+        ...(entity.openingBalance !== previous.openingBalance
+          ? { openingBalance: entity.openingBalance }
+          : {}),
+      }
+    }
+
+    return {
+      name: entity.name,
+      kind: ACCOUNT_KIND_BY_KEY[key],
+      currency,
+      openingBalance: entity.openingBalance,
+    }
   }
 }
 
@@ -48,6 +65,11 @@ function flattenCategories(key: CategoryKey, names: string[]): CategoryDiffRow[]
 /** WP7b — maps a flattened category row to a `category` sync command payload. */
 function buildCategoryData(key: CategoryKey, row: CategoryDiffRow) {
   return { name: row.name, kind: CATEGORY_KIND_BY_KEY[key], sortOrder: row.sortOrder }
+}
+
+function syncCategoryEmoji(key: CategoryKey, name: string, emoji: string | null) {
+  const kind = CATEGORY_KIND_BY_KEY[key]
+  return syncUpsert('category', categoryLocalId(kind, name), { name, kind, emoji })
 }
 
 function syncInvestmentCategoriesWithAssets(draft: State): void {
@@ -76,6 +98,15 @@ export const useSettingsStore = defineStore('settings', () => {
     showToast('Configuración general guardada.')
   }
 
+  function syncEntities(key: EntityKey, before: readonly Entity[]): void {
+    void syncListDiff(
+      'account',
+      before,
+      financialStateStore.state[key],
+      buildAccountData(key, financialStateStore.currency),
+    )
+  }
+
   function addEntity(key: EntityKey, name: string, openingBalance: string): boolean {
     const trimmedName = name.trim()
     if (!trimmedName) {
@@ -89,7 +120,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return false
     }
 
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       draft[key].push({
         id,
@@ -97,14 +128,7 @@ export const useSettingsStore = defineStore('settings', () => {
         openingBalance: round2(parseFloatSafe(openingBalance, 0)),
       })
     })
-    // WP7b — only `accounts` maps to a `SyncEntityType` ('account');
-    // `investmentAssets`/`liabilities` have no corresponding v2 table today
-    // and are intentionally left unsynced (documented leftover).
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
-      )
-    }
+    syncEntities(key, before)
     showToast('Elemento agregado.')
     return true
   }
@@ -115,7 +139,7 @@ export const useSettingsStore = defineStore('settings', () => {
     field: EntityField,
     value: string,
   ): void {
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       const item = draft[key].find((entry) => entry.id === id)
       if (!item) {
@@ -132,15 +156,13 @@ export const useSettingsStore = defineStore('settings', () => {
         syncInvestmentCategoriesWithAssets(draft)
       }
     })
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
-      )
-    }
+    syncEntities(key, before)
   }
 
   function removeEntity(key: EntityKey, id: string): void {
-    const before = financialStateStore.accounts
+    const before = financialStateStore.state[key]
+    const wasTwrLiquidity =
+      key === 'accounts' && (financialStateStore.state.twrLiquidityAccountIds || []).includes(id)
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item.id !== id)
 
@@ -160,10 +182,13 @@ export const useSettingsStore = defineStore('settings', () => {
     // `account` row's own removal is synced here — cascading those deletes
     // server-side is left to the `account` row's FK behavior rather than
     // emitting a `remove` per affected transaction/subscription.
-    if (key === 'accounts') {
-      void syncListDiff('account', before, financialStateStore.accounts, (entity) =>
-        buildAccountData(entity, financialStateStore.currency),
+    if (wasTwrLiquidity) {
+      // The liquidity mark references the account, so it goes first.
+      void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds).then(() =>
+        syncEntities(key, before),
       )
+    } else {
+      syncEntities(key, before)
     }
     showToast('Elemento eliminado.')
   }
@@ -226,6 +251,7 @@ export const useSettingsStore = defineStore('settings', () => {
     financialStateStore.commitState((draft) => {
       draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)] = trimmedEmoji
     })
+    void syncCategoryEmoji(key, name, trimmedEmoji)
     showToast('Emoji actualizado.')
   }
 
@@ -233,6 +259,7 @@ export const useSettingsStore = defineStore('settings', () => {
     financialStateStore.commitState((draft) => {
       delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]
     })
+    void syncCategoryEmoji(key, name, null)
     showToast('Emoji restablecido.')
   }
 
@@ -251,6 +278,7 @@ export const useSettingsStore = defineStore('settings', () => {
       }
       draft.twrLiquidityAccountIds = Array.from(selection)
     })
+    void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds)
     showToast('Configuración TWR actualizada.')
   }
 

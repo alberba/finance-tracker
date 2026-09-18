@@ -37,6 +37,16 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     expect(result.halted).toBe(false);
   });
 
+  it("rejects a create carrying a field the entity schema doesn't declare, instead of dropping it silently (issue #138)", async () => {
+    const result = await applySyncBatch(testDb.db, userId, [{
+      commandId: "unknown-field", action: "create", entityType: "account",
+      data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 0, notARealColumn: "x" },
+    }]);
+    await expectRejectedAndFinalized("unknown-field", result);
+    const accounts = await accountsRepository.listByUser(testDb.db, userId);
+    expect(accounts).toHaveLength(0);
+  });
+
   it("rejects an update whose patch fails the entity schema", async () => {
     const account = await seedAccount(testDb.db, userId);
     const result = await applySyncBatch(testDb.db, userId, [{

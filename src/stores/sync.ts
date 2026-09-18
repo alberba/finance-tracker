@@ -3,6 +3,7 @@ import { shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { useToast } from '../composables/useToast'
 import {
   getAllEntities,
   getCachedBootstrap,
@@ -26,6 +27,7 @@ import {
   discard as discardOutboxEntry,
   enqueue,
   findPendingCreate,
+  InvalidCommandError,
   listAll as listOutbox,
   openOutbox,
   peekBatch,
@@ -36,25 +38,11 @@ import {
 import { wipeAllClientData } from '../lib/client/wipe'
 import {
   SYNC_ENTITY_TYPES,
-  type SyncCommandInput,
   type SyncEntityType,
 } from '../lib/server/sync/command-schemas'
 
 export type ConnectionState = 'online' | 'offline'
 export type SyncStatus = 'idle' | 'syncing' | 'error'
-
-/**
- * One command's result came back as a version conflict. The plan is explicit
- * that financial conflicts are never auto-merged — this is exactly the
- * local/server pair the conflict-resolution UI needs, nothing more.
- */
-export interface SyncConflict {
-  seq: number
-  entityType: SyncEntityType
-  entityId: string
-  local: SyncCommandInput
-  server: unknown
-}
 
 /**
  * Shape of one entry in `POST /api/sync`'s `results` array
@@ -72,8 +60,7 @@ export interface SyncConflict {
  * `getEntityRef` lookup (`command-mapping.ts`'s `syncUpdate`/`syncRemove`/
  * `resolveEntityId`) for anything but same-command-cycle self-reference.
  * `currentVersion`/`message` (present on `conflict`/`not_found`) are also
- * added here to match the real payload — the dialog's `serverEntity` read
- * was consequently always `undefined`.
+ * added here to match the real payload.
  */
 interface SyncCommandResult {
   commandId: string
@@ -94,6 +81,7 @@ const MAX_SEND_ATTEMPTS = 5
 
 export const useSyncStore = defineStore('sync', () => {
   const enabled = isSyncV2Enabled()
+  const { showToast } = useToast()
 
   const userId = shallowRef<string | null>(null)
   const email = shallowRef<string | null>(null)
@@ -104,7 +92,6 @@ export const useSyncStore = defineStore('sync', () => {
   const syncStatus = shallowRef<SyncStatus>('idle')
   const revision = shallowRef(0)
   const pendingCount = shallowRef(0)
-  const conflicts = shallowRef<SyncConflict[]>([])
   const lastError = shallowRef<string | null>(null)
 
   let cacheDb: IDBDatabase | null = null
@@ -139,7 +126,7 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       await pullChanges()
       await flush()
-      if (pendingCount.value === 0 && conflicts.value.length === 0) await bootstrapState()
+      if (pendingCount.value === 0) await bootstrapState()
     } finally {
       if (syncStatus.value === 'syncing') {
         syncStatus.value = 'idle'
@@ -265,7 +252,28 @@ export const useSyncStore = defineStore('sync', () => {
     useFinancialStateStore().reloadState(projectSyncV2State(withPending))
   }
 
-  /** Validates and appends a command to the outbox, then attempts an immediate flush. */
+  /**
+   * Surfaces a command that failed to encolar (an invalid payload rejected
+   * by `enqueue`/`amendPendingCreate`'s per-entity validation, or any other
+   * write failure) the same visible way an already-queued command the
+   * server rejects is (`lastError`/`showToast`) — never left to reject a
+   * caller's promise. Every domain-store call site fires the command-mapping
+   * functions fire-and-forget (`void syncListDiff(...)`, `void
+   * syncUpsert(...)`, …), so an unhandled rejection here would reach the
+   * user as nothing at all (audit's transversal guardrail, issue #138).
+   */
+  function surfaceEnqueueError(error: unknown): void {
+    const message = error instanceof InvalidCommandError
+      ? error.message
+      : error instanceof Error
+        ? `No se pudo encolar el cambio: ${error.message}`
+        : 'No se pudo encolar el cambio.'
+    lastError.value = message
+    syncStatus.value = 'error'
+    showToast(`⚠️ ${message}`)
+  }
+
+  /** Validates and appends a command to the cola de comandos, then attempts an immediate flush. */
   async function enqueueCommand(command: OutboxCommandInput): Promise<OutboxEntry | null> {
     if (isReadOnlyDemoActive()) {
       // Demo mutations stay in its isolated local cache and never enter the
@@ -275,7 +283,13 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !outboxDb) {
       return null
     }
-    const entry = await enqueue(outboxDb, command)
+    let entry: OutboxEntry
+    try {
+      entry = await enqueue(outboxDb, command)
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
     pendingCount.value = await countOutbox(outboxDb)
     void flush()
     return entry
@@ -327,9 +341,6 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !outboxDb) {
       return
     }
-    if (conflicts.value.length > 0) {
-      return
-    }
     if (flushing) {
       flushAgainRequested = true
       return
@@ -366,6 +377,11 @@ export const useSyncStore = defineStore('sync', () => {
         halted: boolean
       }
       const acked: number[] = []
+      // ADR 0003: a same-user conflict is never worth a modal — it is
+      // reapplied over the server's current version and the queue keeps
+      // moving, instead of parking the command and freezing everything
+      // behind it (audit §2.4).
+      const retries: OutboxCommandInput[] = []
       let lastDropMessage: string | null = null
       for (const [index, result] of body.results.entries()) {
         const entry = batch[index]
@@ -384,21 +400,25 @@ export const useSyncStore = defineStore('sync', () => {
         } else if (result.status === 'conflict') {
           const command = entry.command
           if (command.action === 'update' || command.action === 'remove') {
-            if (!conflicts.value.some((conflict) => conflict.seq === entry.seq)) {
-              conflicts.value = [...conflicts.value, {
-                seq: entry.seq,
-                entityType: command.entityType,
-                entityId: command.entityId,
-                local: command,
-                server: {
-                  currentVersion: result.currentVersion,
-                  message: result.message,
-                },
-              }]
-            }
+            acked.push(entry.seq)
+            const baseVersion = result.currentVersion ?? command.baseVersion
+            retries.push(
+              command.action === 'update'
+                ? {
+                    action: 'update',
+                    entityType: command.entityType,
+                    entityId: command.entityId,
+                    baseVersion,
+                    patch: command.patch,
+                  }
+                : {
+                    action: 'remove',
+                    entityType: command.entityType,
+                    entityId: command.entityId,
+                    baseVersion,
+                  },
+            )
           }
-          // Conflicted commands stay in the outbox until the user resolves
-          // them explicitly (`resolveConflict`) — no auto-merge, per design.
         } else {
           // `not_found` (entity removed elsewhere) and `rejected` (invalid
           // payload, dangling reference, entity in use) can never succeed on
@@ -418,13 +438,24 @@ export const useSyncStore = defineStore('sync', () => {
       // `pullChanges`, which actually applies changes, may advance it.
 
       lastError.value = lastDropMessage
-      syncStatus.value = 'idle'
+      syncStatus.value = lastDropMessage ? 'error' : 'idle'
       retryAttempt = 0
 
-      // A conflict deliberately keeps its command in the outbox until the
-      // user picks a side. Retrying it here can reopen the dialog while that
-      // resolution is being persisted.
-      if (conflicts.value.length === 0 && (body.halted || (await countOutbox(outboxDb)) > 0)) {
+      for (const retry of retries) {
+        await enqueueCommand(retry)
+      }
+      // The discreet conflict notice goes first: if the same batch also had
+      // a hard failure, that more actionable message is the one left on
+      // screen — `showToast` is a single shared banner (`useToast.ts`), so
+      // whichever call lands last wins the visible text.
+      if (retries.length > 0) {
+        showToast('Un cambio tuyo se reaplicó sobre la versión más reciente del servidor.')
+      }
+      if (lastDropMessage) {
+        showToast(`⚠️ No se pudo guardar este cambio: ${lastDropMessage}`)
+      }
+
+      if (body.halted || (await countOutbox(outboxDb)) > 0) {
         flushAgainRequested = true
       }
     } catch (error) {
@@ -438,6 +469,7 @@ export const useSyncStore = defineStore('sync', () => {
         await discardOutboxEntry(outboxDb, failed.seq)
         pendingCount.value = await countOutbox(outboxDb)
         lastError.value = `Se descartó un cambio que el servidor no pudo aplicar tras ${MAX_SEND_ATTEMPTS} intentos: ${message}`
+        showToast(`⚠️ ${lastError.value}`)
       } else if (reachedServer) {
         await recordFailure(outboxDb, failed.seq, message)
       }
@@ -446,7 +478,7 @@ export const useSyncStore = defineStore('sync', () => {
       flushing = false
       if (flushAgainRequested) {
         flushAgainRequested = false
-        if (conflicts.value.length === 0) void flush()
+        void flush()
       }
     }
   }
@@ -480,7 +512,17 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !cacheDb) {
       return
     }
-    const response = await fetch(`/api/changes?since=${revision.value}`)
+    let response: Response
+    try {
+      response = await fetch(`/api/changes?since=${revision.value}`)
+    } catch {
+      // Same principle as `bootstrapState`'s §5.2 fix: a network failure here
+      // must leave the cursor and cache untouched, not be treated as "nothing
+      // changed" and definitely not thrown — a reload while offline still
+      // needs `init()` to finish so the pending-overlay in `bootstrapState`
+      // can render what the user queued (audit §5.4).
+      return
+    }
     if (!response.ok) {
       return
     }
@@ -508,49 +550,6 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * User picked a side of a conflict. `keepServer` discards the local
-   * command (server value already applied by the failed sync response's
-   * `serverEntity`, so we just drop the outbox entry). `keepLocal` re-enqueues
-   * the same patch against the server's current version, retrying the write.
-   */
-  async function resolveConflict(seq: number, resolution: 'keepLocal' | 'keepServer'): Promise<void> {
-    const conflict = conflicts.value.find((item) => item.seq === seq)
-    if (!conflict || !outboxDb) {
-      return
-    }
-    conflicts.value = conflicts.value.filter((item) => item.seq !== seq)
-
-    if (resolution === 'keepServer') {
-      await acknowledge(outboxDb, [seq])
-      pendingCount.value = await countOutbox(outboxDb)
-      await bootstrapState()
-      if (conflicts.value.length === 0) void flush()
-      return
-    }
-
-    // keepLocal: drop the stale command, re-enqueue with a fresh commandId so
-    // it isn't treated as a replay, against whatever version the server sent.
-    await acknowledge(outboxDb, [seq])
-    const server = conflict.server as { currentVersion?: number } | null
-    if (conflict.local.action === 'update') {
-      await enqueueCommand({
-        action: 'update',
-        entityType: conflict.local.entityType,
-        entityId: conflict.local.entityId,
-        baseVersion: server?.currentVersion ?? conflict.local.baseVersion,
-        patch: conflict.local.patch,
-      })
-    } else if (conflict.local.action === 'remove') {
-      await enqueueCommand({
-        action: 'remove',
-        entityType: conflict.local.entityType,
-        entityId: conflict.local.entityId,
-        baseVersion: server?.currentVersion ?? conflict.local.baseVersion,
-      })
-    }
-  }
-
-  /**
    * Resolves a locally-known entity (a legacy/client-generated id — the
    * `uid('tx')`-style id the legacy `State` domain model uses, a category
    * name, a goal key, etc.) to its server-issued `{entityId, version}`, by
@@ -568,12 +567,17 @@ export const useSyncStore = defineStore('sync', () => {
   async function getEntityRef(
     entityType: SyncEntityType,
     legacyId: string,
+    kind?: string,
   ): Promise<{ entityId: string; version: number } | null> {
     if (!isReady() || !cacheDb) {
       return null
     }
     const entities = await getAllEntities(cacheDb, entityType)
-    const match = entities.find((entity) => (entity as { legacyId?: unknown }).legacyId === legacyId)
+    const match = entities.find((entity) => {
+      if ((entity as { legacyId?: unknown }).legacyId !== legacyId) return false
+      if (kind !== undefined && (entity as { kind?: unknown }).kind !== kind) return false
+      return true
+    })
     if (!match) {
       return null
     }
@@ -583,11 +587,40 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Reads the client-minted id (ADR 0001) off a still-queued, not-yet-
+   * acknowledged `create` command for this legacy id, without amending or
+   * removing it. Used by callers that need to *reference* the entity (as a
+   * foreign key on another command in the same batch) before its own create
+   * has been acknowledged — e.g. a budget entry pointing at a category
+   * that hasn't synced yet. `null` if nothing is pending or the pending
+   * create wasn't minted with an id.
+   */
+  async function peekPendingCreateId(entityType: SyncEntityType, legacyId: string): Promise<string | null> {
+    if (!outboxDb) {
+      return null
+    }
+    const pending = await findPendingCreate(outboxDb, entityType, legacyId)
+    if (!pending || pending.command.action !== 'create') {
+      return null
+    }
+    const id = (pending.command.data as { id?: unknown }).id
+    return typeof id === 'string' ? id : null
+  }
+
+  /**
    * Folds a patch into a still-queued, not-yet-acknowledged `create`
    * command for this legacy id — used when the user edits an entity before
    * its `create` command has synced (so there is no server id to address
    * an `update` command to yet). Returns whether a pending create was
    * found.
+   *
+   * `amendPendingCreate` validates the merged payload per entity (issue
+   * #138) and leaves the still-queued create untouched if it doesn't match
+   * — surfaced the same visible way `enqueueCommand` surfaces a bad command,
+   * never thrown. A pending create counts as "found" either way: returning
+   * `false` here would make `syncUpsert`'s caller fall through to
+   * `syncCreate` and enqueue a *second*, duplicate create for the same
+   * entity.
    */
   async function mergeIntoPendingCreate(
     entityType: SyncEntityType,
@@ -601,7 +634,11 @@ export const useSyncStore = defineStore('sync', () => {
     if (!pending) {
       return false
     }
-    await amendPendingCreate(outboxDb, pending.seq, patch)
+    try {
+      await amendPendingCreate(outboxDb, pending.seq, patch)
+    } catch (error) {
+      surfaceEnqueueError(error)
+    }
     return true
   }
 
@@ -637,7 +674,6 @@ export const useSyncStore = defineStore('sync', () => {
     email.value = null
     revision.value = 0
     pendingCount.value = 0
-    conflicts.value = []
     syncStatus.value = 'idle'
   }
 
@@ -650,15 +686,14 @@ export const useSyncStore = defineStore('sync', () => {
     syncStatus,
     revision,
     pendingCount,
-    conflicts,
     lastError,
     init,
     enqueueCommand,
     flush,
     pullChanges,
-    resolveConflict,
     logout,
     getEntityRef,
+    peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,
   }

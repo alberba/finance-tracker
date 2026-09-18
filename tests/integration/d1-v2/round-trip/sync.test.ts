@@ -65,4 +65,41 @@ describe("round trip: sincronización", () => {
 
     expect(reloaded.accounts.map((account) => account.name)).toContain("Sin conexión");
   });
+
+  it("resolves a same-row conflict on its own: no dialog, the queue keeps flowing, and the user gets a discreet notice (ADR 0003, audit §2.4)", async () => {
+    const toast = document.createElement("div");
+    toast.id = "toast";
+    document.body.append(toast);
+
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const settingsStore = useSettingsStore();
+    settingsStore.addEntity("accounts", "Cuenta con prisa", "0");
+    await trip.reload();
+
+    // Two edits to the same row, queued back to back while offline: both
+    // read the same cached version, so whichever one the server applies
+    // first bumps the version out from under the other — a same-device
+    // conflict, no second device needed (audit §2.4's exact repro).
+    trip.setOffline(true);
+    settingsStore.updateEntityField("accounts", "cuenta-con-prisa", "openingBalance", "10");
+    settingsStore.updateEntityField("accounts", "cuenta-con-prisa", "openingBalance", "20");
+    // An unrelated change, queued alongside — the conflict on the row above
+    // must not freeze it behind the conflicted commands.
+    settingsStore.addEntity("accounts", "Cuenta ajena", "5");
+    trip.setOffline(false);
+
+    const state = await trip.reload();
+
+    // Nothing is left parked waiting on a manual choice.
+    expect(await trip.pending()).toHaveLength(0);
+    // The later edit is the one the user actually made last, reapplied over
+    // whatever version the earlier one left on the server.
+    expect(state.accounts.find((account) => account.id === "cuenta-con-prisa")?.openingBalance).toBe(20);
+    // The unrelated command sent alongside the conflict still went through.
+    expect(state.accounts.map((account) => account.name)).toContain("Cuenta ajena");
+    // The retry was silent — no modal — but not invisible.
+    expect(toast.textContent).toContain("se reaplicó sobre la versión más reciente");
+
+    toast.remove();
+  });
 });

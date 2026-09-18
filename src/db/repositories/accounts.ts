@@ -6,7 +6,7 @@
  * `opening_balance_minor` integer directly.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import {
   accounts,
@@ -22,7 +22,7 @@ import {
   twrLiquidityAccounts,
   userInstruments,
 } from "../schema";
-import { assertOwnedReferences, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
+import { assertOwnedReferences, clientIdentity, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
 
 /**
  * No FK in the v2 DDL cascades and D1 always enforces them, so deleting a
@@ -55,6 +55,8 @@ export type CategoryRow = typeof categories.$inferSelect;
 export type TwrLiquidityAccountRow = typeof twrLiquidityAccounts.$inferSelect;
 
 export interface CreateAccountInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   kind: string;
@@ -99,6 +101,7 @@ export async function create(db: Db, userId: string, input: CreateAccountInput):
   const [row] = await db
     .insert(accounts)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
@@ -184,6 +187,7 @@ export async function bulkInsert(
     .insert(accounts)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,
@@ -202,16 +206,20 @@ export async function bulkInsert(
 // -- categories ---------------------------------------------------------------
 
 export interface CreateCategoryInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   name: string;
   kind: string;
   sortOrder?: number;
+  emoji?: string | null;
 }
 
 export interface UpdateCategoryInput {
   name?: string;
   kind?: string;
   sortOrder?: number;
+  emoji?: string | null;
 }
 
 export async function listCategoriesByUser(db: Db, userId: string): Promise<CategoryRow[]> {
@@ -235,11 +243,13 @@ export async function createCategory(
   const [row] = await db
     .insert(categories)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       name: input.name,
       kind: input.kind,
       sortOrder: input.sortOrder ?? 0,
+      emoji: input.emoji ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -264,6 +274,7 @@ export async function updateCategory(
       name: input.name ?? existing.name,
       kind: input.kind ?? existing.kind,
       sortOrder: input.sortOrder ?? existing.sortOrder,
+      emoji: input.emoji === undefined ? existing.emoji : input.emoji,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
@@ -319,11 +330,13 @@ export async function bulkInsertCategories(
     .insert(categories)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         name: input.name,
         kind: input.kind,
         sortOrder: input.sortOrder ?? 0,
+        emoji: input.emoji ?? null,
         createdAt: now,
         updatedAt: now,
       })),
@@ -388,4 +401,63 @@ export async function removeTwrLiquidityAccount(db: Db, userId: string, id: stri
     .delete(twrLiquidityAccounts)
     .where(and(eq(twrLiquidityAccounts.id, id), eq(twrLiquidityAccounts.userId, userId)));
   return true;
+}
+
+export async function bulkInsertTwrLiquidityAccounts(
+  db: Db,
+  userId: string,
+  inputs: CreateTwrLiquidityAccountInput[],
+): Promise<TwrLiquidityAccountRow[]> {
+  if (inputs.length === 0) {
+    return [];
+  }
+  for (const input of inputs) {
+    await assertOwnedReferences(db, userId, { accountId: input.accountId });
+  }
+  const now = nowIso();
+  return db
+    .insert(twrLiquidityAccounts)
+    .values(
+      inputs.map((input) => ({
+        userId,
+        legacyId: input.legacyId ?? null,
+        accountId: input.accountId,
+        name: input.name,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+    .returning();
+}
+
+/**
+ * Replaces the user's whole TWR liquidity selection with `accountIds` — the
+ * selection is a set the user toggles, so it is written as one unit.
+ */
+export async function replaceTwrLiquidityAccounts(
+  db: Db,
+  userId: string,
+  accountIds: string[],
+): Promise<TwrLiquidityAccountRow[]> {
+  await db.delete(twrLiquidityAccounts).where(eq(twrLiquidityAccounts.userId, userId));
+  const ids = [...new Set(accountIds)];
+  if (ids.length === 0) {
+    return [];
+  }
+  const ownedAccounts = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), inArray(accounts.id, ids)));
+  const byId = new Map(ownedAccounts.map((account) => [account.id, account]));
+  return bulkInsertTwrLiquidityAccounts(
+    db,
+    userId,
+    ids.map((accountId) => {
+      const account = byId.get(accountId);
+      if (!account) {
+        throw new RejectedCommandError("La cuenta indicada no existe o no pertenece al usuario.");
+      }
+      return { accountId, name: account.name };
+    }),
+  );
 }
