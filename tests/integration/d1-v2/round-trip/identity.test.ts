@@ -83,7 +83,19 @@ describe("round trip: identidad propia para entidades nuevas", () => {
 
   it("reenviar el mismo create es un no-op, no un duplicado", async () => {
     const id = crypto.randomUUID();
-    const data = { id, name: "Netflix", categoryId: null, accountId: null, amount: 12.99, currency: "EUR", frequency: "monthly" };
+    const data = {
+      id,
+      name: "Netflix",
+      categoryId: null,
+      accountId: null,
+      amount: 12.99,
+      currency: "EUR",
+      frequency: "monthly",
+      // A subscription's start date and next charge are required columns
+      // (issue #150); the client always sends both.
+      startDate: "2026-01-01",
+      nextChargeDate: "2026-02-01",
+    };
 
     await trip.asOtherDevice([
       { commandId: crypto.randomUUID(), action: "create", entityType: "subscription", data },

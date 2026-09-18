@@ -86,11 +86,16 @@ describe("budget store — sync wiring keeps identity out of the update patch (i
 
     // Simulate the create having synced: seed the cache with the server row
     // so the next edit resolves it as an update instead of folding into the
-    // still-pending create.
+    // still-pending create. The correlation id is read off the create the
+    // store just emitted, so this fixture can't drift from the store's own
+    // `(type, category, year, month)` convention.
+    const created = afterFirstEdit[0]?.command;
+    if (created?.action !== "create") throw new Error("expected a pending create");
+    const { year, month } = created.data as { year: number; month: number };
     const cacheDb2 = await openIdbCache(USER_ID);
     await putEntity(cacheDb2, "budgetEntry", {
       id: "server-budget-entry-1",
-      legacyId: "expense:Ocio:1",
+      legacyId: `expense:Ocio:${year}:${month}`,
       version: 0,
     });
     cacheDb2.close();

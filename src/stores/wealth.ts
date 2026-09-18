@@ -24,6 +24,16 @@ interface SnapshotBalanceCommand {
 }
 
 /**
+ * Correlation id for one snapshot — its natural key, `(year, month)` (ADR
+ * 0001); the string the sync path addresses it by. The month in the id is the
+ * canonical 1-12 the command carries, and the year is what keeps March of two
+ * different years from resolving to the same row (audit §4.6).
+ */
+function snapshotLocalId(year: number, monthIndex: number): string {
+  return `${year}-${monthIndex + 1}`
+}
+
+/**
  * Resolves every account-kind entry of a snapshot to the server `account` id
  * it needs to travel with. A balance whose account hasn't synced yet is left
  * out (warned, not silently dropped) rather than sent with a bogus id — it
@@ -85,7 +95,7 @@ export const useWealthStore = defineStore('wealth', () => {
     const year = financialStateStore.year
     const currency = financialStateStore.state.currency
     void buildSnapshotBalances(snapshot, currency).then((balances) =>
-      syncUpsert('wealthSnapshot', String(month), {
+      syncUpsert('wealthSnapshot', snapshotLocalId(year, month), {
         snapshotDate: `${year}-${String(month + 1).padStart(2, '0')}-01`,
         year,
         month: month + 1,
