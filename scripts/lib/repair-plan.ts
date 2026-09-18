@@ -344,12 +344,17 @@ function budgetRestorations(
       if (!category) {
         return []
       }
-      const existing = rows.find(
+      const candidates = rows.filter(
         (row) =>
           canonicalCategoryId(categoriesRows, row.categoryId) === category.id &&
           row.year === cell.year &&
           row.month === cell.month,
       )
+      // A duplicate category's cell maps to the canonical id too, but the
+      // category merge deletes it when the canonical row already has a cell for
+      // the same (year, month). Prefer the row that survives so the planned
+      // update cannot be silently dropped.
+      const existing = candidates.find((row) => row.categoryId === category.id) ?? candidates[0]
       if (
         existing &&
         existing.amountMinor === cell.amountMinor &&
@@ -468,21 +473,71 @@ export async function buildRepairPlan(
   }
 }
 
+const REPAIR_BACKUP_ERROR =
+  'Se exige un export de respaldo válido antes de ejecutar la reparación.'
+
+function isRepairBackupBudgetCell(value: unknown): value is RepairBackupBudgetCell {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const cell = value as Record<string, unknown>
+  return (
+    typeof cell.categoryName === 'string' &&
+    typeof cell.categoryKind === 'string' &&
+    typeof cell.year === 'number' &&
+    typeof cell.month === 'number' &&
+    typeof cell.amountMinor === 'number' &&
+    typeof cell.currency === 'string'
+  )
+}
+
+function isRepairBackupSnapshotBalance(value: unknown): value is RepairBackupSnapshotBalance {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const balance = value as Record<string, unknown>
+  return (
+    (balance.accountLegacyId === null || typeof balance.accountLegacyId === 'string') &&
+    typeof balance.balanceMinor === 'number' &&
+    typeof balance.currency === 'string'
+  )
+}
+
+function isRepairBackupSnapshot(value: unknown): value is RepairBackupSnapshot {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const snapshot = value as Record<string, unknown>
+  return (
+    typeof snapshot.year === 'number' &&
+    typeof snapshot.month === 'number' &&
+    typeof snapshot.snapshotDate === 'string' &&
+    Array.isArray(snapshot.balances) &&
+    snapshot.balances.every(isRepairBackupSnapshotBalance)
+  )
+}
+
 /**
  * Validates and converts an external backup input into a typed RepairBackup.
  * Supports both direct RepairBackup JSON and legacy v1 State JSON exports.
  */
 export function loadRepairBackup(data: unknown): RepairBackup {
   if (!data || typeof data !== 'object') {
-    throw new Error('Se exige un export de respaldo válido antes de ejecutar la reparación.')
+    throw new Error(REPAIR_BACKUP_ERROR)
   }
 
   const obj = data as Record<string, unknown>
 
   if (Array.isArray(obj.budgetCells) && Array.isArray(obj.snapshots)) {
+    if (
+      !obj.budgetCells.every(isRepairBackupBudgetCell) ||
+      !obj.snapshots.every(isRepairBackupSnapshot)
+    ) {
+      throw new Error(REPAIR_BACKUP_ERROR)
+    }
     return {
-      budgetCells: obj.budgetCells as RepairBackupBudgetCell[],
-      snapshots: obj.snapshots as RepairBackupSnapshot[],
+      budgetCells: obj.budgetCells,
+      snapshots: obj.snapshots,
     }
   }
 
@@ -561,7 +616,7 @@ export function loadRepairBackup(data: unknown): RepairBackup {
     return { budgetCells, snapshots }
   }
 
-  throw new Error('Se exige un export de respaldo válido antes de ejecutar la reparación.')
+  throw new Error(REPAIR_BACKUP_ERROR)
 }
 
 export interface FormatRepairPlanOptions {
@@ -742,10 +797,12 @@ export async function applyRepairPlan(
                 ),
               )
             if (conflict) {
+              // The canonical category already owns a cell for this (year,
+              // month); dropping the duplicate's row is not a reference that
+              // gets repointed.
               await db
                 .delete(budgetEntries)
                 .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, ref.rowId)))
-              referencesRepointed++
               continue
             }
           }
@@ -756,12 +813,12 @@ export async function applyRepairPlan(
         } else if (ref.table === 'user_instruments') {
           await db
             .update(userInstruments)
-            .set({ categoryId: merge.canonicalCategoryId })
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
             .where(and(eq(userInstruments.userId, userId), eq(userInstruments.id, ref.rowId)))
         } else if (ref.table === 'stockevents_symbol_mappings') {
           await db
             .update(stockeventsSymbolMappings)
-            .set({ categoryId: merge.canonicalCategoryId })
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
             .where(
               and(
                 eq(stockeventsSymbolMappings.userId, userId),
@@ -790,25 +847,30 @@ export async function applyRepairPlan(
     // 3. Restore budget cells
     for (const cell of plan.budgetRestorations) {
       if (cell.action === 'update') {
-        if (cell.budgetEntryId) {
-          await db
-            .update(budgetEntries)
-            .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
-            .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, cell.budgetEntryId)))
-        } else {
-          await db
-            .update(budgetEntries)
-            .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
-            .where(
-              and(
-                eq(budgetEntries.userId, userId),
-                eq(budgetEntries.categoryId, cell.categoryId),
-                eq(budgetEntries.year, cell.year),
-                eq(budgetEntries.month, cell.month),
-              ),
-            )
+        const updated = cell.budgetEntryId
+          ? await db
+              .update(budgetEntries)
+              .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
+              .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, cell.budgetEntryId)))
+              .returning({ id: budgetEntries.id })
+          : await db
+              .update(budgetEntries)
+              .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
+              .where(
+                and(
+                  eq(budgetEntries.userId, userId),
+                  eq(budgetEntries.categoryId, cell.categoryId),
+                  eq(budgetEntries.year, cell.year),
+                  eq(budgetEntries.month, cell.month),
+                ),
+              )
+              .returning({ id: budgetEntries.id })
+        if (updated.length === 0) {
+          throw new Error(
+            `No se pudo restaurar la celda de presupuesto ${cell.categoryId} ${cell.year}-${cell.month}: la fila planificada ya no existe.`,
+          )
         }
-        budgetEntriesUpdated++
+        budgetEntriesUpdated += updated.length
       } else if (cell.action === 'insert') {
         await db.insert(budgetEntries).values({
           id: uuidv7(),

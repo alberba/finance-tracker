@@ -87,6 +87,10 @@ export async function runRepairCli(argv: string[]): Promise<{
 
   const isSimulation = args['dry-run'] || !args.execute
 
+  // With --json, stdout must stay a single parseable JSON document: every
+  // human-readable trace goes to stderr instead.
+  const log = args.json ? console.error : console.log
+
   // Acceptance criterion: Exige un export de respaldo antes de ejecutar
   if (!args.backup && !isSimulation) {
     throw new Error(
@@ -111,7 +115,7 @@ export async function runRepairCli(argv: string[]): Promise<{
     }
     backup = loadRepairBackup(rawBackup)
   } else {
-    console.log(
+    log(
       '\n[AVISO] No se ha especificado --backup=<ruta>. La simulación muestra fusiones de categorías y correcciones de cuentas, pero no restauraciones de presupuesto.',
     )
   }
@@ -136,35 +140,34 @@ export async function runRepairCli(argv: string[]): Promise<{
     // 1. Acceptance criterion: Produce su plan como un dato y lo imprime en modo simulación antes de escribir nada
     const plan = await buildRepairPlan(db, userId, backup)
 
-    if (args.json && isSimulation) {
-      console.log(JSON.stringify({ simulation: true, plan }, null, 2))
-    } else {
-      console.log(formatRepairPlan(plan, { simulation: true }))
-    }
+    log(formatRepairPlan(plan, { simulation: true }))
 
     if (isSimulation) {
-      console.log('\n[SIMULACIÓN] Modo simulación completado. Para aplicar los cambios, ejecuta con --execute.')
+      log('\n[SIMULACIÓN] Modo simulación completado. Para aplicar los cambios, ejecuta con --execute.')
+      if (args.json) {
+        console.log(JSON.stringify({ simulation: true, plan }, null, 2))
+      }
       return { plan, executed: false }
     }
 
     // 2. Modo ejecución: aplica el plan tras haber impreso la simulación
-    console.log('\n[EJECUCIÓN] Aplicando el plan de reparación en la base de datos...')
+    log('\n[EJECUCIÓN] Aplicando el plan de reparación en la base de datos...')
     const report = await applyRepairPlan(db, userId, plan)
 
     if (args.json) {
       console.log(JSON.stringify({ simulation: false, plan, report }, null, 2))
     } else {
-      console.log('\n======================================================================')
-      console.log('  REPARACIÓN COMPLETADA CON ÉXITO')
-      console.log('======================================================================')
-      console.log(`  • Categorías fusionadas: ${report.categoryMerges}`)
-      console.log(`  • Referencias repuntadas: ${report.referencesRepointed}`)
-      console.log(`  • Cuentas corregidas: ${report.accountsCorrected}`)
-      console.log(`  • Celdas de presupuesto actualizadas: ${report.budgetEntriesUpdated}`)
-      console.log(`  • Celdas de presupuesto insertadas: ${report.budgetEntriesInserted}`)
-      console.log(`  • Snapshots de patrimonio actualizados: ${report.snapshotsUpdated}`)
-      console.log(`  • Snapshots de patrimonio insertados: ${report.snapshotsInserted}`)
-      console.log('======================================================================')
+      log('\n======================================================================')
+      log('  REPARACIÓN COMPLETADA CON ÉXITO')
+      log('======================================================================')
+      log(`  • Categorías fusionadas: ${report.categoryMerges}`)
+      log(`  • Referencias repuntadas: ${report.referencesRepointed}`)
+      log(`  • Cuentas corregidas: ${report.accountsCorrected}`)
+      log(`  • Celdas de presupuesto actualizadas: ${report.budgetEntriesUpdated}`)
+      log(`  • Celdas de presupuesto insertadas: ${report.budgetEntriesInserted}`)
+      log(`  • Snapshots de patrimonio actualizados: ${report.snapshotsUpdated}`)
+      log(`  • Snapshots de patrimonio insertados: ${report.snapshotsInserted}`)
+      log('======================================================================')
     }
 
     return { plan, executed: true, report }

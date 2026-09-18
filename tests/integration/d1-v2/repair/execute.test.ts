@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   applyRepairPlan,
   buildRepairPlan,
@@ -32,6 +32,17 @@ describe('v2 repair execution', () => {
     expect(() => loadRepairBackup(null)).toThrow(/export de respaldo/i)
     expect(() => loadRepairBackup({})).toThrow(/export de respaldo/i)
     expect(() => loadRepairBackup({ budgetCells: 'invalid' })).toThrow(/export de respaldo/i)
+    expect(() => loadRepairBackup({ budgetCells: [{}], snapshots: [] })).toThrow(
+      /export de respaldo/i,
+    )
+    expect(() =>
+      loadRepairBackup({
+        budgetCells: [],
+        snapshots: [
+          { year: 2025, month: 3, snapshotDate: '2025-03-01', balances: [{ balanceMinor: 1 }] },
+        ],
+      }),
+    ).toThrow(/export de respaldo/i)
   })
 
   it('loads backup from direct RepairBackup structure', () => {
@@ -176,6 +187,49 @@ describe('v2 repair execution', () => {
     )
   })
 
+  it('restores the canonical cell when the duplicate category also had a cell', async () => {
+    const { sqlite, db } = testDb
+    const ts = '2026-09-13T00:00:00.000Z'
+
+    // Replace the fixture's canonical cell with a sequence that forces the
+    // duplicate's cell to be scanned first, so only an explicit preference for
+    // the surviving canonical row can target it.
+    sqlite.prepare('DELETE FROM budget_entries WHERE id = ?').run(fixture.budgetEntryId)
+    sqlite
+      .prepare(
+        `INSERT INTO budget_entries
+          (id, user_id, legacy_id, category_id, year, month, amount_minor, currency, created_at, updated_at, version)
+         VALUES (?, ?, NULL, ?, 2025, 1, 999, 'EUR', ?, ?, 1)`,
+      )
+      .run('repair-budget-duplicate', fixture.userId, fixture.duplicateCategoryId, ts, ts)
+    sqlite
+      .prepare(
+        `INSERT INTO budget_entries
+          (id, user_id, legacy_id, category_id, year, month, amount_minor, currency, created_at, updated_at, version)
+         VALUES (?, ?, NULL, ?, 2025, 1, 25000, 'EUR', ?, ?, 1)`,
+      )
+      .run('repair-budget-canonical', fixture.userId, fixture.migratedCategoryId, ts, ts)
+
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    expect(plan.budgetRestorations[0]).toMatchObject({
+      action: 'update',
+      budgetEntryId: 'repair-budget-canonical',
+      amountMinor: 10000,
+    })
+
+    const report = await applyRepairPlan(db, fixture.userId, plan)
+    expect(report.budgetEntriesUpdated).toBe(1)
+    expect(report.referencesRepointed).toBe(1)
+
+    const canonicalCell = sqlite
+      .prepare(
+        `SELECT amount_minor FROM budget_entries
+          WHERE category_id = ? AND year = 2025 AND month = 1`,
+      )
+      .get(fixture.migratedCategoryId)
+    expect(canonicalCell).toEqual({ amount_minor: 10000 })
+  })
+
   it('restores budget cells from clean export', async () => {
     const { sqlite, db } = testDb
     const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
@@ -304,6 +358,52 @@ describe('v2 repair execution', () => {
       if (existsSync(backupPath)) rmSync(backupPath)
       if (existsSync(dbPath)) rmSync(dbPath)
     }
+  })
+
+  it('keeps stdout as a single JSON document when --json is passed', async () => {
+    const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
+
+    mkdirSync('.scratch', { recursive: true })
+    const backupPath = resolve('.scratch/test-repair-backup-json.json')
+    const dbPath = resolve('.scratch/test-repair-db-json.sqlite')
+    writeFileSync(backupPath, JSON.stringify(REPAIR_FIXTURE_BACKUP), 'utf8')
+
+    const stdout: string[] = []
+    const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
+      stdout.push(args.map(String).join(' '))
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    try {
+      if (existsSync(dbPath)) rmSync(dbPath)
+
+      const staging = openLocalV2Db(dbPath)
+      const fixtureIds = seedRepairFixture({
+        db: staging.db,
+        sqlite: staging.sqlite,
+        close: staging.close,
+      })
+      staging.close()
+
+      const result = await runRepairCli([
+        `--backup=${backupPath}`,
+        `--v2-sqlite=${dbPath}`,
+        `--user-id=${fixtureIds.userId}`,
+        '--json',
+      ])
+      expect(result.executed).toBe(false)
+    } finally {
+      logSpy.mockRestore()
+      errorSpy.mockRestore()
+      if (existsSync(backupPath)) rmSync(backupPath)
+      if (existsSync(dbPath)) rmSync(dbPath)
+    }
+
+    expect(stdout).toHaveLength(1)
+    const parsed = JSON.parse(stdout.join('\n')) as { simulation: boolean }
+    expect(parsed.simulation).toBe(true)
   })
 
   it('runs CLI in execution mode when --execute is passed applying all repairs', async () => {
