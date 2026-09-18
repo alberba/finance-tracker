@@ -39,28 +39,37 @@
 
 ## Secuencia
 
-1. **Mergear y desplegar el código.** PR de `mal-guardado-v2-multiusuario` (con
-   esta rama dentro) a `main`. Ojo: el push a `main` despliega por Workers
-   Builds en paralelo al CI, sin esperarlo.
-2. **Aplicar las migraciones aditivas.** El orden importa: el reparador consulta
-   `categories.emoji`, que solo existe desde `0003`.
+Todo esto es una sola sentada, y **no uses la app entre el paso 1 y el paso 4**:
+el código desplegado hoy da por hecho meses en base 0 (`amounts[entry.month]`,
+sin restar uno), así que desde el desplazamiento de meses hasta el deploy lee
+los presupuestos corridos un mes y una edición los reescribiría en base 0.
+
+1. **Migraciones aditivas.** El orden importa: el reparador consulta
+   `categories.emoji`, que solo existe desde `0003`, así que van antes que él.
 
    ```bash
    pnpm d1:migrate:remote:v2
    ```
 
    Con wrangler no se pueden aplicar por tramos, así que hay **dos pasadas**:
-   esta primera aplica las aditivas y, si el cierre entra en la misma pasada,
-   `0004` falla y se revierte solo (el resto queda aplicado). Si eso pasa, es lo
-   esperado hasta que el paso 4 haya corrido.
-3. **Desplegar** el merge del paso 1, ahora que las columnas existen.
-4. **Reparar.** El reparador escribe solo en una copia local de producción, así
-   que primero hay que traerla:
+   esta primera aplica las aditivas y, al llegar al cierre, `0004` falla y se
+   revierte solo (lo anterior queda aplicado). Es lo esperado: el paso 3 lo mete.
+2. **Reparar.** El reparador escribe solo en una copia local de producción, así
+   que primero hay que traerla. **El export tiene que ser con esquema**, tal cual
+   sale de wrangler: así el fichero local queda con el mismo esquema que D1 y
+   con los datos dentro. No vale crear el esqueleto con `openLocalV2Db` y cargar
+   un dump de solo datos encima, porque `openLocalV2Db` aplica el juego completo
+   —incluido el `0004`— y el cargue entonces choca con el `UNIQUE` de
+   `contributions`, que es justo el duplicado que la reparación viene a resolver.
    ```bash
-   wrangler d1 export finance-tracker-db-v2 --remote --output=.data/v2-data.sql --no-schema -y
-   npx tsx -e "import {openLocalV2Db} from './scripts/lib/migration-db'; openLocalV2Db('.data/v2-work.sqlite').close()"
-   sqlite3 .data/v2-work.sqlite < .data/v2-data.sql   # avisa de app_state, es inofensivo
+   wrangler d1 export finance-tracker-db-v2 --remote --output=.data/v2-prod.sql -y
+   sqlite3 .data/v2-work.sqlite < .data/v2-prod.sql
    ```
+   **Este export va después del paso 1, no antes.** El SQL que emite el paso 2
+   reemplaza tablas enteras del usuario con las columnas que existan en la copia
+   local; sobre una copia hecha al nivel del `0001`, los `INSERT` omitirían las
+   columnas aditivas y el cargue en D1 las dejaría a `NULL` —incluido el
+   `start_date` de las suscripciones que rellena `0002_subscription_dates`.
    Ensayo en seco y revisión del plan:
    ```bash
    pnpm db:repair --v2-sqlite=.data/v2-work.sqlite \
@@ -82,11 +91,15 @@
    `categories`, `contributions`, `transactions`) y deja intactos
    `sync_changes`, `sync_commands`, `audit_events` y `user_revisions`:
    borrarlos haría que cualquier otro dispositivo se perdiera la reparación.
-5. **Aplicar el cierre.**
+3. **Aplicar el cierre.**
    ```bash
    pnpm d1:migrate:remote:v2   # ahora 0004 entra sola
    ```
-6. **Comprobar.** Un movimiento nuevo persiste al recargar, las 11 categorías
+4. **Mergear y desplegar.** Ahora que la base tiene las columnas, el merge:
+   primero la PR de esta rama a `mal-guardado-v2-multiusuario`, y después la de
+   `mal-guardado-v2-multiusuario` a `main`. El push a `main` despliega por
+   Workers Builds en paralelo al CI, sin esperarlo, y tarda un par de minutos.
+5. **Comprobar.** Un movimiento nuevo persiste al recargar, las 11 categorías
    fusionadas no duplican historial y el presupuesto aparece en el mes correcto.
 
 ## Trampas verificadas
@@ -103,4 +116,3 @@
 - **Ventana cerrada.** El paso 4 lee producción y la vuelve a escribir, así que
   cualquier escritura intermedia se pierde. Con un solo usuario basta con no
   usar la app durante el proceso.
-
