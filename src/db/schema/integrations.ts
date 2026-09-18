@@ -6,7 +6,7 @@
  * JSON blob).
  */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { idColumn, createdAtColumn, updatedAtColumn, versionColumn } from "./_helpers";
 import { users } from "./users";
 import { categories } from "./accounts";
@@ -28,7 +28,7 @@ export const integrationCredentials = sqliteTable(
   },
   (table) => [
     index("integration_credentials_user_id_idx").on(table.userId),
-    index("integration_credentials_user_id_provider_idx").on(table.userId, table.provider),
+    uniqueIndex("integration_credentials_user_id_provider_idx").on(table.userId, table.provider),
   ],
 );
 
@@ -48,9 +48,13 @@ export const stockeventsSymbolMappings = sqliteTable(
   },
   (table) => [
     index("stockevents_symbol_mappings_user_id_idx").on(table.userId),
-    index("stockevents_symbol_mappings_user_id_symbol_idx").on(
+    uniqueIndex("stockevents_symbol_mappings_user_id_symbol_idx").on(
       table.userId,
       table.stockeventsSymbol,
+    ),
+    uniqueIndex("stockevents_symbol_mappings_user_id_legacy_id_idx").on(
+      table.userId,
+      table.legacyId,
     ),
   ],
 );

@@ -95,25 +95,79 @@ describe("useSyncStore — queue never stays poisoned (audit §2)", () => {
     expect(store.revision).toBe(1);
   });
 
-  it("keepLocal re-sends the update against the server's currentVersion", async () => {
+  it("auto-retries a conflicted update against the server's currentVersion, with no manual resolution (ADR 0003)", async () => {
     const sent: Array<{ baseVersion?: number }> = [];
+    let conflictReturned = false;
     onSync = (commands) => {
       sent.push(...(commands as Array<{ baseVersion?: number }>));
-      return json({
-        results: commands.map((c) => ({ commandId: c.commandId, status: "conflict", currentVersion: 7 })),
-        revision: 0, halted: true,
-      }, 409);
+      if (!conflictReturned) {
+        conflictReturned = true;
+        return json({
+          results: commands.map((c) => ({ commandId: c.commandId, status: "conflict", currentVersion: 7 })),
+          revision: 0, halted: true,
+        }, 409);
+      }
+      return json({ results: commands.map((c) => ({ commandId: c.commandId, status: "applied" })), revision: 1, halted: false });
     };
     const store = useSyncStore();
     await store.init(userId);
     await store.enqueueCommand({ action: "update", entityType: "account", entityId: "acc-1", baseVersion: 3, patch: { name: "x" } });
-    await vi.waitFor(() => expect(store.conflicts).toHaveLength(1));
 
+    // No dialog, no manual choice: the retry fires on its own and the
+    // outbox drains without anyone calling a resolution function.
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
+    expect(sent.at(-1)?.baseVersion).toBe(7);
+  });
+
+  it("keeps flushing an unrelated queued command after another one conflicts (ADR 0003)", async () => {
+    let batchCount = 0;
     onSync = (commands) => {
-      sent.push(...(commands as Array<{ baseVersion?: number }>));
+      batchCount += 1;
+      if (batchCount === 1) {
+        // Mirrors `applySyncBatch`'s real fail-fast semantics: it halts on
+        // the first conflict and never even attempts what came after it in
+        // the same batch — those wait for the next round.
+        return json({
+          results: [{ commandId: commands[0].commandId, status: "conflict", currentVersion: 9 }],
+          revision: 0, halted: true,
+        }, 409);
+      }
       return json({ results: commands.map((c) => ({ commandId: c.commandId, status: "applied" })), revision: 1, halted: false });
     };
-    await store.resolveConflict(store.conflicts[0].seq, "keepLocal");
-    await vi.waitFor(() => expect(sent.at(-1)?.baseVersion).toBe(7));
+    const store = useSyncStore();
+    await store.init(userId);
+
+    await store.enqueueCommand({ action: "update", entityType: "account", entityId: "acc-1", baseVersion: 3, patch: { name: "x" } });
+    await store.enqueueCommand({ action: "noop" });
+
+    // The conflict on the first command must not freeze the second one
+    // behind it forever.
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
+  });
+
+  it("rebases a conflicted settingsUpdate over the server's version instead of parking it (audit §6.4)", async () => {
+    const sent: Array<{ action: string; baseVersion?: number }> = [];
+    let conflictReturned = false;
+    onSync = (commands) => {
+      sent.push(...(commands as unknown as Array<{ action: string; baseVersion?: number }>));
+      if (!conflictReturned) {
+        conflictReturned = true;
+        return json({
+          results: commands.map((c) => ({ commandId: c.commandId, status: "conflict", currentVersion: 4 })),
+          revision: 0, halted: true,
+        }, 409);
+      }
+      return json({ results: commands.map((c) => ({ commandId: c.commandId, status: "applied" })), revision: 1, halted: false });
+    };
+    const store = useSyncStore();
+    await store.init(userId);
+
+    await store.enqueueCommand({ action: "settingsUpdate", baseVersion: 2, patch: { currency: "USD" } });
+
+    // The settings singleton has no `entityId`, so without the explicit
+    // rebase the stale `baseVersion` would conflict forever and the entry
+    // would never leave the outbox.
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
+    expect(sent.at(-1)).toMatchObject({ action: "settingsUpdate", baseVersion: 4 });
   });
 });

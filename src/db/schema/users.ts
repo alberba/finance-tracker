@@ -7,7 +7,7 @@
  * an explicit `user_id` FK, per WP1's design decision.
  */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { idColumn, createdAtColumn, updatedAtColumn, versionColumn } from "./_helpers";
 
 /** A v2 account holder. Reserved "legacy owner" row is created by WP9. */
@@ -40,7 +40,7 @@ export const userIdentities = sqliteTable(
   },
   (table) => [
     index("user_identities_user_id_idx").on(table.userId),
-    index("user_identities_provider_subject_idx").on(table.provider, table.subject),
+    uniqueIndex("user_identities_provider_subject_idx").on(table.provider, table.subject),
   ],
 );
 

@@ -3,13 +3,15 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { goals } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { type Db, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type GoalRow = Omit<typeof goals.$inferSelect, "targetAmountMinor"> & {
   targetAmount: number;
 };
 
 export interface CreateGoalInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   key: string;
   name: string;
@@ -47,6 +49,7 @@ export async function create(db: Db, userId: string, input: CreateGoalInput): Pr
   const [row] = await db
     .insert(goals)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       key: input.key,
@@ -87,7 +90,7 @@ export async function update(
     .where(and(
       eq(goals.id, id),
       eq(goals.userId, userId),
-      expectedVersion === undefined ? undefined : eq(goals.version, expectedVersion),
+      versionGuard(goals.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -101,7 +104,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(goals).where(and(
     eq(goals.id, id),
     eq(goals.userId, userId),
-    expectedVersion === undefined ? undefined : eq(goals.version, expectedVersion),
+    versionGuard(goals.version, expectedVersion),
   )).returning({ id: goals.id });
   return deleted.length > 0;
 }
@@ -115,6 +118,7 @@ export async function bulkInsert(db: Db, userId: string, inputs: CreateGoalInput
     .insert(goals)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         key: input.key,

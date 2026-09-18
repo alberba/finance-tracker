@@ -6,7 +6,7 @@
  * `user_id` FK and links a user to the instruments they track.
  */
 
-import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -35,7 +35,7 @@ export const marketInstruments = sqliteTable(
     updatedAt: updatedAtColumn(),
   },
   (table) => [
-    index("market_instruments_provider_symbol_idx").on(table.provider, table.normalizedSymbol),
+    uniqueIndex("market_instruments_provider_symbol_idx").on(table.provider, table.normalizedSymbol),
   ],
 );
 
@@ -58,7 +58,7 @@ export const userInstruments = sqliteTable(
   },
   (table) => [
     index("user_instruments_user_id_idx").on(table.userId),
-    index("user_instruments_user_id_instrument_id_idx").on(table.userId, table.instrumentId),
+    uniqueIndex("user_instruments_user_id_instrument_id_idx").on(table.userId, table.instrumentId),
   ],
 );
 

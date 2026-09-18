@@ -58,11 +58,14 @@ export function applyPendingCommands(
 
     if (command.action === "create") {
       const data = command.data as Record<string, unknown>;
-      const legacyId = String(data.legacyId ?? "");
+      // An entity created from now on carries its own identity (ADR 0001),
+      // so the queued row is addressed by `data.id` — the same id the server
+      // will store it under.
+      const id = String(data.id ?? "");
       // A create whose row already arrived from the server is not re-added:
       // the server's version is the better one.
-      if (!legacyId || !rows.some((row) => matches(row, legacyId))) {
-        rows.push({ ...data, id: legacyId || String(data.id ?? ""), legacyId } as CachedEntity);
+      if (!id || !rows.some((row) => matches(row, id))) {
+        rows.push({ ...data, id } as CachedEntity);
       }
     } else if (command.action === "update") {
       const index = rows.findIndex((row) => matches(row, String(command.entityId)));

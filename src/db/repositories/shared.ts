@@ -34,6 +34,35 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * `WHERE` condition for the optimistic-concurrency guard, or `undefined` when
+ * the caller has no version to pin.
+ *
+ * Every `update`/`remove` in this layer repeats the same ternary; keeping it
+ * here means the guard has one definition instead of twenty-six copies.
+ */
+export function versionGuard(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each table's version column is a different integer column type
+  column: any,
+  expectedVersion?: number,
+) {
+  return expectedVersion === undefined ? undefined : eq(column, expectedVersion);
+}
+
+/**
+ * Identity the client minted for a new entity (ADR 0001), ready to spread into
+ * an insert's values.
+ *
+ * Optional because the two writers differ: the client always sends one for an
+ * entity it creates (the identity is its primary key from the first instant),
+ * while the v1 migration (`scripts/lib/migration-runner.ts`) writes no `id` at
+ * all — the column's server-side UUIDv7 default applies and the row stays
+ * reconcilable by its derived `legacyId`.
+ */
+export function clientIdentity(id: string | undefined): { id?: string } {
+  return id ? { id } : {};
+}
+
 /** Converts a boolean domain flag to the `0`/`1` integer flag columns use. */
 export function toFlag(value: boolean | undefined, fallback = 0): number {
   if (value === undefined) {

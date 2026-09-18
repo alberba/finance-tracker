@@ -9,6 +9,9 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined
  */
 export function useToast() {
   function showToast(message: string): void {
+    if (typeof document === 'undefined') {
+      return
+    }
     const toast = document.getElementById('toast')
     if (!toast) {
       return

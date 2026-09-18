@@ -2,35 +2,10 @@ import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildBudgetViewModel } from '../domain/budget/view-model'
-import { resolveCategoryId, syncUpsert, type CategoryKind } from '../lib/client/command-mapping'
+import { resolveOrCreateCategoryId, syncBudgetEntry, type CategoryKind } from '../lib/client/command-mapping'
 import type { BudgetType } from '../scripts/types'
 import { round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
-
-/**
- * WP7b — maps one `budget[type][category][month]` cell to a `budgetEntry`
- * sync command payload, keyed by the synthetic legacy id
- * `${type}:${category}:${month}` (legacy `State` has no per-entry id —
- * budget values are plain nested arrays). Returns `null` when the
- * category hasn't synced yet: `entityCreateSchemas.budgetEntry.categoryId`
- * is a required field (unlike most other cross-entity references), so
- * there is no optional fallback — the edit will sync on the next change to
- * the same cell once the category has caught up (documented leftover).
- */
-async function buildBudgetEntryData(
-  type: BudgetType,
-  category: string,
-  year: number,
-  month: number,
-  amount: number,
-  currency: string,
-) {
-  const categoryId = await resolveCategoryId(type as CategoryKind, category)
-  if (!categoryId) {
-    return null
-  }
-  return { categoryId, year, month, amount, currency }
-}
 
 export const useBudgetStore = defineStore('budget', () => {
   const financialStateStore = useFinancialStateStore()
@@ -75,15 +50,21 @@ export const useBudgetStore = defineStore('budget', () => {
       draft.budget[type][category][month] = round2(value)
     })
 
-    const localId = `${type}:${category}:${month + 1}`
     const amount = round2(value)
     const year = financialStateStore.year
     const currency = financialStateStore.currency
     void (async () => {
-      const data = await buildBudgetEntryData(type, category, year, month + 1, amount, currency)
-      if (data) {
-        await syncUpsert('budgetEntry', localId, data)
+      // `resolveOrCreateCategoryId`, not `resolveCategoryId`: a cell's
+      // `categoryId` is required, so a category that hasn't synced yet must
+      // not make this drop the cell's first edit (audit §4.7).
+      const categoryId = await resolveOrCreateCategoryId(type as CategoryKind, category)
+      if (!categoryId) {
+        return
       }
+      // Addressed by the cell's own natural key — category, year, month
+      // (ADR 0001; audit §4.4 — a year-less key let a same-month edit in
+      // another year resolve to last year's row).
+      await syncBudgetEntry(categoryId, year, month + 1, amount, currency)
     })()
   }
 

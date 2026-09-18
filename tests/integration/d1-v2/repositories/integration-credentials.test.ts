@@ -85,4 +85,33 @@ describe("integration-credentials repository", () => {
     ).toBeUndefined();
     expect(await integrationCredentialsRepo.listByUser(db, userB.id, env)).toHaveLength(0);
   });
+
+  it("rejects updates and deletes based on a stale version", async () => {
+    const { db } = testDb;
+    const user = await seedUser(db);
+    const created = await integrationCredentialsRepo.create(
+      db,
+      user.id,
+      { provider: "stockevents", secret: "original" },
+      env,
+    );
+
+    expect(
+      await integrationCredentialsRepo.update(
+        db,
+        user.id,
+        created.id,
+        { secret: "stale" },
+        env,
+        created.version + 1,
+      ),
+    ).toBeUndefined();
+    expect(
+      await integrationCredentialsRepo.remove(db, user.id, created.id, created.version + 1),
+    ).toBe(false);
+    expect(await integrationCredentialsRepo.get(db, user.id, created.id, env)).toMatchObject({
+      secret: "original",
+      version: 1,
+    });
+  });
 });

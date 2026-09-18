@@ -57,6 +57,26 @@ async function buildInvestmentTransactionData(tx: Transaction, currency: string)
     description: tx.description,
     amount: tx.amount,
     currency: tx.movementCurrency || currency,
+    time: tx.time ?? null,
+    declared: Boolean(tx.declared),
+    // The operation travels nested, so importe and operación reach D1 in the
+    // same write and cannot end up disagreeing (ADR 0002).
+    operation: buildOperationData(tx),
+  }
+}
+
+/**
+ * The operation of an investment movement, or `null` when the movement has
+ * none — which is also how the server is told to drop the one it had stored.
+ */
+function buildOperationData(tx: Transaction) {
+  if (tx.type !== 'investment' || !tx.side) return null
+  return {
+    symbol: tx.symbol ?? null,
+    side: tx.side,
+    units: Number(tx.units) || 0,
+    unitPrice: Number(tx.unitPrice) || 0,
+    fee: Number(tx.fee) || 0,
   }
 }
 
@@ -70,6 +90,22 @@ function buildContributionData(contribution: Contribution, currency: string) {
     portfolioValue: contribution.portfolioValue,
     flow: contribution.flow,
   }
+}
+
+/** Resolves a contribution's flow allocations to server `account` ids for its sync command. */
+async function buildContributionAllocations(contribution: Contribution) {
+  const allocations: Array<{ accountId: string; amount: number }> = []
+  for (const allocation of contribution.flowAllocations || []) {
+    const accountId = await resolveEntityId('account', allocation.accountId)
+    if (!accountId) {
+      console.warn(
+        `[sync-v2] No se pudo incluir el reparto a la cuenta local "${allocation.accountId}" en el aporte: todavía no se ha sincronizado con el servidor.`,
+      )
+      continue
+    }
+    allocations.push({ accountId, amount: allocation.amount })
+  }
+  return allocations
 }
 
 export interface NewInvestmentMovementInput {
@@ -405,13 +441,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     warnings: string[],
     options: SaveContributionOptions = {},
   ): boolean {
-    // WP7b leftover (documented, not wired): `applyContributionSave` folds a
-    // contribution + wealth-snapshot + snapshot-balances update into one
-    // draft mutation. `contribution_allocations`/`snapshot_balances` are
-    // explicitly out of `SYNC_ENTITY_TYPES` (see `command-schemas.ts`'s doc
-    // comment), so this workflow save cannot be expressed as today's
-    // discrete sync commands without either a command-contract extension
-    // or decomposing this domain function's output — left unsynced.
+    const before = financialStateStore.contributions
     let result: ContributionSaveResult = { ok: false, hadWarnings: false }
     financialStateStore.commitState((draft) => {
       result = applyContributionSave(draft, { date, month, snapshotInputs, allocations, warnings })
@@ -428,6 +458,11 @@ export const useInvestmentStore = defineStore('investment', () => {
       }
       return false
     }
+    const currency = financialStateStore.currency
+    void syncListDiff('contribution', before, financialStateStore.contributions, async (contribution) => ({
+      ...buildContributionData(contribution, currency),
+      allocations: await buildContributionAllocations(contribution),
+    }))
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
     if (options.syncStockEventsCash) {
       void stockEventsStore.syncContributionCash(date, allocations)

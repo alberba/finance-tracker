@@ -65,35 +65,53 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
   const filteredWealthSnapshots =
     year === undefined ? wealthSnapshots : wealthSnapshots.filter((snapshot) => snapshot.year === year);
 
-  const wealthSnapshotsWithBalances = await Promise.all(
-    filteredWealthSnapshots.map(async (snapshot) => ({
-      ...snapshot,
-      balances: await wealthRepository.listBalancesBySnapshot(db, userId, snapshot.id),
-    })),
-  );
+  const [balancesBySnapshot, allocationsByContribution, tradeDetailsByTransaction] = await Promise.all([
+    wealthRepository.listBalancesBySnapshots(
+      db,
+      userId,
+      filteredWealthSnapshots.map((snapshot) => snapshot.id),
+    ),
+    contributionsRepository.listAllocationsByContributions(
+      db,
+      userId,
+      contributions.map((contribution) => contribution.id),
+    ),
+    transactionsRepository.listTradeDetailsByTransactions(
+      db,
+      userId,
+      filteredTransactions.map((transaction) => transaction.id),
+    ),
+  ]);
 
-  const contributionsWithAllocations = await Promise.all(
-    contributions.map(async (contribution) => ({
-      ...contribution,
-      allocations: await contributionsRepository.listAllocationsByContribution(db, userId, contribution.id),
-    })),
-  );
+  const wealthSnapshotsWithBalances = filteredWealthSnapshots.map((snapshot) => ({
+    ...snapshot,
+    balances: balancesBySnapshot.get(snapshot.id) ?? [],
+  }));
 
-  const transactionsWithTradeDetails = await Promise.all(
-    filteredTransactions.map(async (transaction) => ({
-      ...transaction,
-      tradeDetail: await transactionsRepository.getTradeDetailByTransaction(db, userId, transaction.id),
-    })),
-  );
+  const contributionsWithAllocations = contributions.map((contribution) => ({
+    ...contribution,
+    allocations: allocationsByContribution.get(contribution.id) ?? [],
+  }));
 
-  const instruments = await Promise.all(
-    userInstruments.map(async (userInstrument) => {
-      const instrument = await marketRepository.getInstrument(db, userInstrument.instrumentId);
+  const transactionsWithTradeDetails = filteredTransactions.map((transaction) => ({
+    ...transaction,
+    tradeDetail: tradeDetailsByTransaction.get(transaction.id),
+  }));
+
+  const instrumentIds = userInstruments.map((userInstrument) => userInstrument.instrumentId);
+  const [instrumentRows, quotesByInstrument] = await Promise.all([
+    marketRepository.listInstrumentsByIds(db, instrumentIds),
+    marketRepository.listQuotesByInstruments(db, instrumentIds),
+  ]);
+  const instrumentsById = new Map(instrumentRows.map((instrument) => [instrument.id, instrument]));
+  const instruments = userInstruments
+    .map((userInstrument) => {
+      const instrument = instrumentsById.get(userInstrument.instrumentId);
       if (!instrument) return null;
-      const quotes = await marketRepository.listQuotesByInstrument(db, instrument.id);
+      const quotes = quotesByInstrument.get(instrument.id) ?? [];
       return { ...instrument, userInstrument, quotes };
-    }),
-  );
+    })
+    .filter((instrument) => instrument !== null);
 
   return {
     year: year ?? null,
@@ -110,7 +128,7 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     wealthSnapshots: wealthSnapshotsWithBalances,
     contributions: contributionsWithAllocations,
     userInstruments,
-    instruments: instruments.filter((instrument) => instrument !== null),
+    instruments,
     twrLiquidityAccounts,
     stockeventsSymbolMappings,
   };

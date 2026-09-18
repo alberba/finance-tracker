@@ -69,4 +69,55 @@ describe("round trip: cuentas, activos y pasivos", () => {
 
     expect(reloaded.liabilities).toHaveLength(1);
   });
+
+  it("a category's emoji is still there after a reload (§5)", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const { categoryEmojiKey } = await import("../../../../src/scripts/category-emoji");
+    const settings = useSettingsStore();
+    settings.addCategory("expenseCategories", "Ocio");
+    await trip.reload();
+
+    useSettingsStore().setCategoryEmoji("expenseCategories", "Ocio", "🎮");
+    const reloaded = await trip.reload();
+
+    expect(reloaded.categoryEmojis[categoryEmojiKey("expense", "Ocio")]).toBe("🎮");
+  });
+
+  it("the order of the categories is still there after a reload (§5)", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const settings = useSettingsStore();
+    settings.addCategory("expenseCategories", "Ocio");
+    settings.addCategory("expenseCategories", "Transporte");
+    await trip.reload();
+
+    settings.reorderCategory("expenseCategories", "Transporte", "up");
+    const reloaded = await trip.reload();
+
+    expect(reloaded.expenseCategories).toEqual(["Transporte", "Ocio"]);
+  });
+
+  it("the TWR liquidity mark persists and the TWR comes out the same after a reload (§5)", async () => {
+    trip.cleanup();
+    trip = await startRoundTrip(async (db, userId) => {
+      const accountsRepository = await import("../../../../src/db/repositories/accounts");
+      for (const [name, legacyId, openingBalance] of [["Revolut", "revolut", 285.67], ["Santander", "santander", 31.09]] as const) {
+        await accountsRepository.create(db, userId, { name, kind: "cash", currency: "EUR", openingBalance, legacyId });
+      }
+    });
+    await trip.reload();
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
+    const { computeTwrLiquidityValue } = await import("../../../../src/domain/investment/calculations");
+
+    useSettingsStore().toggleTwrLiquidity("revolut", true);
+    const before = computeTwrLiquidityValue(useFinancialStateStore().state, 11);
+
+    const reloaded = await trip.reload();
+    const again = await trip.reload();
+
+    expect(reloaded.twrLiquidityAccountIds).toEqual(["revolut"]);
+    expect(before).toBe(285.67);
+    expect(computeTwrLiquidityValue(reloaded, 11)).toBe(before);
+    expect(computeTwrLiquidityValue(again, 11)).toBe(before);
+  });
 });

@@ -10,15 +10,15 @@ import { openIdbCache, putEntity } from "../../src/lib/client/idb-cache";
 import { openOutbox, wipeOutbox, listAll } from "../../src/lib/client/outbox";
 import { wipeIdbCache } from "../../src/lib/client/idb-cache";
 import {
-  categoryLocalId,
   resolveCategoryId,
   resolveEntityId,
+  resolveOrCreateCategoryId,
+  syncGoalUpsert,
   syncCreate,
   syncListDiff,
   syncRemove,
   syncSettingsUpdate,
   syncUpdate,
-  syncUpsert,
 } from "../../src/lib/client/command-mapping";
 import { useSyncStore } from "../../src/stores/sync";
 
@@ -64,7 +64,7 @@ describe("command-mapping (WP7b)", () => {
       await expect(syncCreate("account", "local-1", { name: "x" })).resolves.toBeUndefined();
       await expect(syncUpdate("account", "local-1", { name: "y" })).resolves.toBeUndefined();
       await expect(syncRemove("account", "local-1")).resolves.toBeUndefined();
-      await expect(syncUpsert("account", "local-1", { name: "z" })).resolves.toBeUndefined();
+      await expect(syncGoalUpsert("short", { name: "z" })).resolves.toBeUndefined();
       await expect(syncSettingsUpdate({ currency: "EUR" })).resolves.toBeUndefined();
       await expect(resolveEntityId("account", "local-1")).resolves.toBeNull();
       await expect(resolveCategoryId("expense", "Comida")).resolves.toBeNull();
@@ -77,7 +77,7 @@ describe("command-mapping (WP7b)", () => {
       vi.stubEnv("PUBLIC_SYNC_V2", "true");
     });
 
-    it("syncCreate enqueues a create command tagged with legacyId", async () => {
+    it("syncCreate enqueues a create command carrying the entity's own identity", async () => {
       const store = await initSyncStore();
       await syncCreate("account", "local-acc-1", {
         name: "Cuenta",
@@ -92,9 +92,33 @@ describe("command-mapping (WP7b)", () => {
       expect(entries[0]?.command).toMatchObject({
         action: "create",
         entityType: "account",
-        data: { name: "Cuenta", legacyId: "local-acc-1" },
+        data: { name: "Cuenta", id: "local-acc-1" },
       });
       expect(store.pendingCount).toBeGreaterThanOrEqual(0);
+      outboxDb.close();
+    });
+
+    it("surfaces an invalid payload as a visible error instead of an unhandled rejection (issue #138)", async () => {
+      const store = await initSyncStore();
+
+      // `syncCreate`/`syncListDiff` are always fired with `void` from the
+      // domain stores (no `.catch`), so a rejected promise here would be an
+      // unhandled rejection in production — this must resolve.
+      await expect(
+        syncCreate("account", "local-acc-bad", {
+          name: "Cuenta",
+          kind: "checking",
+          currency: "EUR",
+          openingBalance: 10,
+          // `entityCreateSchemas.account` doesn't declare this field.
+          bogusField: "no destino",
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(store.lastError).toBeTruthy();
+
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
       outboxDb.close();
     });
 
@@ -129,7 +153,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries).toHaveLength(1);
       expect(entries[0]?.command).toMatchObject({
         action: "create",
-        data: { name: "Editada", legacyId: "local-acc-2" },
+        data: { name: "Editada", id: "local-acc-2" },
       });
       outboxDb.close();
     });
@@ -172,9 +196,9 @@ describe("command-mapping (WP7b)", () => {
       outboxDb.close();
     });
 
-    it("syncUpsert creates when unknown and updates when a server ref exists", async () => {
+    it("syncGoalUpsert creates when unknown and updates when a server ref exists", async () => {
       await initSyncStore();
-      await syncUpsert("goal", "short", { key: "short", name: "Meta", targetYear: 2030, targetAmount: 1000, currency: "EUR" });
+      await syncGoalUpsert("short", { key: "short", name: "Meta", targetYear: 2030, targetAmount: 1000, currency: "EUR" });
 
       const outboxDbFirst = await openOutbox(USER_ID);
       const firstEntries = await listAll(outboxDbFirst);
@@ -182,14 +206,14 @@ describe("command-mapping (WP7b)", () => {
       outboxDbFirst.close();
 
       // Simulate the create having synced by seeding the cache directly
-      // (getEntityRef is checked before the still-pending outbox create, so
-      // this alone is enough to flip the next call onto the update path —
-      // no need to touch/close the outbox's live connection mid-test).
+      // (the natural-key lookup is checked before the still-pending outbox
+      // create, so this alone is enough to flip the next call onto the
+      // update path — no need to touch/close the outbox's live connection).
       const cacheDb = await openIdbCache(USER_ID);
-      await putEntity(cacheDb, "goal", { id: "server-goal-1", legacyId: "short", version: 1 });
+      await putEntity(cacheDb, "goal", { id: "server-goal-1", key: "short", version: 1 });
       cacheDb.close();
 
-      await syncUpsert("goal", "short", { name: "Meta actualizada" });
+      await syncGoalUpsert("short", { key: "short", name: "Meta actualizada" });
       const outboxDbSecond = await openOutbox(USER_ID);
       const secondEntries = await listAll(outboxDbSecond);
       const update = secondEntries.find((entry) => entry.command.action === "update");
@@ -217,7 +241,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries[0]?.command).toMatchObject({
         action: "create",
         entityType: "category",
-        data: { name: "Comida", kind: "expense", legacyId: categoryLocalId("expense", "Comida") },
+        data: { name: "Comida", kind: "expense", id: expect.any(String) },
       });
       outboxDb.close();
 
@@ -228,17 +252,60 @@ describe("command-mapping (WP7b)", () => {
       expect(await listAll(outboxDb2)).toHaveLength(1);
       outboxDb2.close();
 
-      // Once the category is cached (server round-trip), it resolves.
+      // Once the category is cached (server round-trip), it resolves — found
+      // by its real name+kind, not by a derived correlation id (ADR 0001).
       const cacheDb = await openIdbCache(USER_ID);
       await putEntity(cacheDb, "category", {
         id: "server-cat-1",
-        legacyId: categoryLocalId("expense", "Comida"),
+        name: "Comida",
+        kind: "expense",
         version: 0,
       });
       cacheDb.close();
 
       const third = await resolveCategoryId("expense", "Comida");
       expect(third).toBe("server-cat-1");
+    });
+
+    it("resolveOrCreateCategoryId mints an id for an unknown category instead of returning null (audit §4.7)", async () => {
+      await initSyncStore();
+      const first = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(first).toEqual(expect.any(String));
+
+      const outboxDb = await openOutbox(USER_ID);
+      const entries = await listAll(outboxDb);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.command).toMatchObject({
+        action: "create",
+        entityType: "category",
+        data: { name: "Ocio", kind: "expense", id: first },
+      });
+      outboxDb.close();
+
+      // A second reference before the create has synced reuses the same
+      // minted id instead of minting (and creating) a second category.
+      const second = await resolveOrCreateCategoryId("expense", "Ocio");
+      expect(second).toBe(first);
+      const outboxDb2 = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb2)).toHaveLength(1);
+      outboxDb2.close();
+    });
+
+    it("resolveOrCreateCategoryId resolves an already-cached category without minting a new id", async () => {
+      await initSyncStore();
+      const cacheDb = await openIdbCache(USER_ID);
+      await putEntity(cacheDb, "category", {
+        id: "server-cat-2",
+        name: "Comida",
+        kind: "expense",
+        version: 0,
+      });
+      cacheDb.close();
+
+      expect(await resolveOrCreateCategoryId("expense", "Comida")).toBe("server-cat-2");
+      const outboxDb = await openOutbox(USER_ID);
+      expect(await listAll(outboxDb)).toHaveLength(0);
+      outboxDb.close();
     });
 
     it("resolveEntityId resolves a known ref and returns null for an unknown one", async () => {
@@ -273,7 +340,16 @@ describe("command-mapping (WP7b)", () => {
           { id: "tx-3", amount: 5 }, // new — create
         ];
 
-        await syncListDiff("transaction", before, after, (item) => ({ amount: item.amount }));
+        // A full, schema-valid transaction payload — `entityCreateSchemas.transaction`
+        // requires `accountId`/`type`/`date`/`currency` too (strict, issue #138),
+        // so `tx-3`'s create needs them even though only `amount` varies per row.
+        await syncListDiff("transaction", before, after, (item) => ({
+          accountId: "acc-1",
+          type: "expense",
+          date: "2026-01-01",
+          amount: item.amount,
+          currency: "EUR",
+        }));
 
         const outboxDb = await openOutbox(USER_ID);
         const entries = await listAll(outboxDb);
