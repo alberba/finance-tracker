@@ -47,6 +47,58 @@ describe("round trip: patrimonio", () => {
     expect(reloaded.snapshots["2"]?.accounts?.revolut).toBe(2000);
   });
 
+  it("keeps November and December apart (§4.6)", async () => {
+    const { useWealthStore } = await import("../../../../src/stores/wealth");
+    const wealth = useWealthStore();
+
+    wealth.setMonth(10);
+    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "1000" }]);
+    wealth.setMonth(11);
+    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "2000" }]);
+
+    const reloaded = await trip.reload();
+
+    expect(reloaded.snapshots["10"]?.accounts?.revolut).toBe(1000);
+    expect(reloaded.snapshots["11"]?.accounts?.revolut).toBe(2000);
+  });
+
+  it("reads the snapshot of the state's year, not another year's, for the same month (§4.6)", async () => {
+    const accountsRepository = await import("../../../../src/db/repositories/accounts");
+    const wealthRepository = await import("../../../../src/db/repositories/wealth");
+    const [account] = await accountsRepository.listByUser(trip.testDb.db, trip.userId);
+    if (!account) throw new Error("missing account fixture");
+
+    // The previous year's row is written *after* this year's, so a projection
+    // that drops the year and keys by month alone would let it win the slot.
+    const year = new Date().getFullYear();
+    const currentYear = await wealthRepository.create(trip.testDb.db, trip.userId, {
+      snapshotDate: `${year}-03-01`,
+      year,
+      month: 3,
+    });
+    await wealthRepository.createBalance(trip.testDb.db, trip.userId, {
+      snapshotId: currentYear.id,
+      accountId: account.id,
+      balance: 2000,
+      currency: "EUR",
+    });
+    const previousYear = await wealthRepository.create(trip.testDb.db, trip.userId, {
+      snapshotDate: `${year - 1}-03-01`,
+      year: year - 1,
+      month: 3,
+    });
+    await wealthRepository.createBalance(trip.testDb.db, trip.userId, {
+      snapshotId: previousYear.id,
+      accountId: account.id,
+      balance: 1000,
+      currency: "EUR",
+    });
+
+    const reloaded = await trip.reload();
+
+    expect(reloaded.snapshots["2"]?.accounts?.revolut).toBe(2000);
+  });
+
   it("does not mix up snapshots from two different years (§4.6)", async () => {
     const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
     const { useWealthStore } = await import("../../../../src/stores/wealth");
