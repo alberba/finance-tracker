@@ -358,9 +358,48 @@ async function performMutation(
     case "settingsUpdate": {
       const { twrLiquidityAccountIds, ...settingsPatch } = command.patch;
       const existing = await userSettingsRepository.get(db, userId);
+      // Same contract as `update`: a stale `baseVersion` is a replay when the
+      // server already holds the patch, and a conflict otherwise (ADR 0003 —
+      // the client rebases over `currentVersion` instead of freezing the
+      // queue). `settingsPatch` is empty when the command only replaces the
+      // TWR liquidity selection, and an empty patch is trivially "already
+      // held", so that case must not be read as a replay: replacing the
+      // selection is a write of its own.
+      if (existing && command.baseVersion !== undefined && existing.version !== command.baseVersion) {
+        if (
+          Object.keys(settingsPatch).length > 0 &&
+          includesPatch(existing as unknown as VersionedRow, settingsPatch)
+        ) {
+          return { status: "noop", entityType: "userSettings", entityId: userId, entity: existing };
+        }
+        return {
+          status: "conflict",
+          entityType: "userSettings",
+          entityId: userId,
+          currentVersion: existing.version,
+          message: "La versión base no coincide con la versión actual del servidor.",
+        };
+      }
       const row = existing
-        ? await userSettingsRepository.update(db, userId, settingsPatch)
+        ? await userSettingsRepository.update(db, userId, settingsPatch, command.baseVersion)
         : await userSettingsRepository.create(db, userId, settingsPatch);
+      if (existing && !row) {
+        const current = await userSettingsRepository.get(db, userId);
+        return current
+          ? {
+              status: "conflict",
+              entityType: "userSettings",
+              entityId: userId,
+              currentVersion: current.version,
+              message: "Los ajustes cambiaron mientras se aplicaba el comando.",
+            }
+          : {
+              status: "not_found",
+              entityType: "userSettings",
+              entityId: userId,
+              message: "Ajustes no encontrados.",
+            };
+      }
       const twrLiquidityAccounts = twrLiquidityAccountIds
         ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
         : undefined;

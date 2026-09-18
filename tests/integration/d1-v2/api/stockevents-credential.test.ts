@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
+import * as integrationCredentialsRepository from "../../../../src/db/repositories/integration-credentials";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
 
@@ -86,5 +87,30 @@ describe("/api/integrations/stockevents", () => {
     expect(await removed.json()).toEqual({ configured: false });
     const status = await GET({ locals: locals(owner) } as never);
     expect(await status.json()).toEqual({ configured: false });
+  });
+
+  it("keeps the key the user just typed when the credential changed after the read (audit §6.1)", async () => {
+    const { PUT } = await import("../../../../src/pages/api/integrations/stockevents");
+    await PUT({ request: request("PUT", "se_first"), locals: locals(owner) } as never);
+
+    const row = testDb.sqlite
+      .prepare("SELECT id FROM integration_credentials WHERE user_id = ?")
+      .get(owner.userId) as { id: string };
+    // Another writer rotates the credential between this request's read and its write.
+    testDb.sqlite
+      .prepare("UPDATE integration_credentials SET version = version + 1 WHERE id = ?")
+      .run(row.id);
+
+    const rotated = await PUT({ request: request("PUT", "se_second"), locals: locals(owner) } as never);
+    expect(rotated.status).toBe(200);
+
+    const stored = await integrationCredentialsRepository.getByProvider(
+      testDb.db,
+      owner.userId,
+      "stockevents",
+      { DATA_ENCRYPTION_KEY: ENCRYPTION_KEY },
+    );
+    expect(stored?.secret).toBe("se_second");
+    expect(stored?.version).toBe(3);
   });
 });
