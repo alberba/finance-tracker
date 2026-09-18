@@ -6,15 +6,6 @@ type Sqlite = TestDatabase['sqlite']
 
 const NOW = '2026-09-13T00:00:00.000Z'
 
-/**
- * These checks are deliberately marked as expected failures until #149 lands.
- * They keep the intended `0003` contract executable while the repair in #148
- * is still allowed to run against the duplicate rows from #155. Once the
- * closing migration is applied, remove `.fails` from each check: a passing
- * expected-failure is then a signal that the guard can be promoted to a normal
- * green assertion.
- */
-
 function hasUniqueIndex(sqlite: Sqlite, table: string, columns: readonly string[]): boolean {
   const indexes = sqlite.prepare(`PRAGMA index_list(${table})`).all() as Array<{
     name: string
@@ -121,7 +112,7 @@ describe('v2 schema integrity contract', () => {
     expect(tables).toContain('snapshot_balances')
   })
 
-  it.fails('declares every natural and migration-correlation key as UNIQUE', () => {
+  it('declares every natural and migration-correlation key as UNIQUE', () => {
     const expectedUniqueKeys: Array<[string, readonly string[]]> = [
       ['user_identities', ['provider', 'subject']],
       ['accounts', ['user_id', 'legacy_id']],
@@ -153,7 +144,7 @@ describe('v2 schema integrity contract', () => {
     }
   })
 
-  it.fails('rejects a duplicate migration identity for one user', async () => {
+  it('rejects a duplicate migration identity for one user', async () => {
     const user = await seedUser(testDb.db)
     insertCategory(testDb.sqlite, {
       id: 'category-correlation-one',
@@ -170,7 +161,7 @@ describe('v2 schema integrity contract', () => {
     ).toThrow(/unique/i)
   })
 
-  it.fails('rejects two budget entries for the same category, year and month', async () => {
+  it('rejects two budget entries for the same category, year and month', async () => {
     const user = await seedUser(testDb.db)
     const category = await seedCategory(testDb.db, user.id)
     insertBudget(testDb.sqlite, {
@@ -188,7 +179,7 @@ describe('v2 schema integrity contract', () => {
     ).toThrow(/unique/i)
   })
 
-  it.fails('rejects two wealth snapshots for the same year and month', async () => {
+  it('rejects two wealth snapshots for the same year and month', async () => {
     const user = await seedUser(testDb.db)
     insertSnapshot(testDb.sqlite, { id: 'snapshot-natural-one', userId: user.id })
 
@@ -197,7 +188,7 @@ describe('v2 schema integrity contract', () => {
     ).toThrow(/unique/i)
   })
 
-  it.fails('cascades an investment operation when its movement is deleted', async () => {
+  it('cascades an investment operation when its movement is deleted', async () => {
     const user = await seedUser(testDb.db)
     const account = await seedAccount(testDb.db, user.id)
     insertTransaction(testDb.sqlite, {
@@ -236,7 +227,7 @@ describe('v2 schema integrity contract', () => {
     ).toEqual({ count: 0 })
   })
 
-  it.fails('cascades snapshot balances when their wealth snapshot is deleted', async () => {
+  it('cascades snapshot balances when their wealth snapshot is deleted', async () => {
     const user = await seedUser(testDb.db)
     const account = await seedAccount(testDb.db, user.id)
     insertSnapshot(testDb.sqlite, { id: 'snapshot-cascade', userId: user.id })
@@ -258,7 +249,7 @@ describe('v2 schema integrity contract', () => {
     ).toEqual({ count: 0 })
   })
 
-  it.fails('cascades contribution allocations when their contribution is deleted', async () => {
+  it('cascades contribution allocations when their contribution is deleted', async () => {
     const user = await seedUser(testDb.db)
     const account = await seedAccount(testDb.db, user.id)
     testDb.sqlite
@@ -300,7 +291,7 @@ describe('v2 schema integrity contract', () => {
     ).toEqual({ count: 0 })
   })
 
-  it.fails('cascades pending movements when their recurring rule is deleted', async () => {
+  it('cascades pending movements when their recurring rule is deleted', async () => {
     const user = await seedUser(testDb.db)
     const account = await seedAccount(testDb.db, user.id)
     testDb.sqlite

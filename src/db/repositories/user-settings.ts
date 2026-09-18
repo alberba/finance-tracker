@@ -47,6 +47,7 @@ export async function update(
   db: Db,
   userId: string,
   input: UpdateUserSettingsInput,
+  expectedVersion?: number,
 ): Promise<UserSettingsRow | undefined> {
   const existing = await get(db, userId);
   if (!existing) {
@@ -61,16 +62,24 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(userSettings.id, existing.id), eq(userSettings.userId, userId)))
+    .where(and(
+      eq(userSettings.id, existing.id),
+      eq(userSettings.userId, userId),
+      expectedVersion === undefined ? undefined : eq(userSettings.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function remove(db: Db, userId: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId);
   if (!existing) {
     return false;
   }
-  await db.delete(userSettings).where(and(eq(userSettings.id, existing.id), eq(userSettings.userId, userId)));
-  return true;
+  const deleted = await db.delete(userSettings).where(and(
+    eq(userSettings.id, existing.id),
+    eq(userSettings.userId, userId),
+    expectedVersion === undefined ? undefined : eq(userSettings.version, expectedVersion),
+  )).returning({ id: userSettings.id });
+  return deleted.length > 0;
 }

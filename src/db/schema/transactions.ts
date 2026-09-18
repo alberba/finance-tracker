@@ -1,6 +1,6 @@
 /** Transactions and their optional investment-trade extension. */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -50,6 +50,7 @@ export const transactions = sqliteTable(
     index("transactions_user_id_date_idx").on(table.userId, table.date),
     // Per-account statement view.
     index("transactions_user_id_account_id_date_idx").on(table.userId, table.accountId, table.date),
+    uniqueIndex("transactions_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );
 
@@ -70,7 +71,7 @@ export const investmentTradeDetails = sqliteTable(
     transactionId: text("transaction_id")
       .notNull()
       .unique()
-      .references(() => transactions.id),
+      .references(() => transactions.id, { onDelete: "cascade" }),
     instrumentId: text("instrument_id").references(() => marketInstruments.id),
     // The ticker the user typed. `instrument_id` only resolves once the symbol
     // matches a known instrument, so without this column the symbol of every

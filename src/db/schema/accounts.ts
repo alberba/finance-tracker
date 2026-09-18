@@ -1,6 +1,6 @@
 /** Accounts and categories — the core reference tables transactions hang off. */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -31,7 +31,7 @@ export const accounts = sqliteTable(
   },
   (table) => [
     index("accounts_user_id_idx").on(table.userId),
-    index("accounts_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+    uniqueIndex("accounts_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );
 
@@ -56,6 +56,7 @@ export const categories = sqliteTable(
   (table) => [
     index("categories_user_id_idx").on(table.userId),
     index("categories_user_id_kind_idx").on(table.userId, table.kind),
+    uniqueIndex("categories_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );
 
@@ -80,5 +81,8 @@ export const twrLiquidityAccounts = sqliteTable(
     updatedAt: updatedAtColumn(),
     version: versionColumn(),
   },
-  (table) => [index("twr_liquidity_accounts_user_id_idx").on(table.userId)],
+  (table) => [
+    index("twr_liquidity_accounts_user_id_idx").on(table.userId),
+    uniqueIndex("twr_liquidity_accounts_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+  ],
 );
