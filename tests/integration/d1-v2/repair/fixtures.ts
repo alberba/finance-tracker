@@ -26,7 +26,15 @@ export const REPAIR_FIXTURE_IDS = {
   budgetEntry: 'repair-budget-overwritten',
   snapshot: 'repair-snapshot-march-2026',
   snapshotBalance: 'repair-snapshot-balance',
+  contributionEarly: 'repair-contribution-1',
+  contributionLate: 'repair-contribution-2',
 } as const
+
+/**
+ * The correlation id v1 handed to two different March contributions, which the
+ * v1→v2 migration then copied onto both rows.
+ */
+export const REPAIR_FIXTURE_COLLIDING_LEGACY_ID = 'contrib-snapshot-2026-3'
 
 const FIXTURE_TIMESTAMP = '2026-09-13T00:00:00.000Z'
 
@@ -255,6 +263,43 @@ export function seedRepairFixture(testDb: TestDatabase): RepairFixture {
         'EUR',
         FIXTURE_TIMESTAMP,
       )
+
+    // v1 already keyed contributions by an id that was not unique: two March
+    // entries shared this one. Both are real records and the migration copied
+    // both, so the closing UNIQUE on `(user_id, legacy_id)` rejects the pair
+    // until the later row's correlation id moves aside.
+    //
+    // The tier applies every migration, so that UNIQUE is already in place
+    // here. Production is still one migration behind it, which is the state
+    // this fixture reproduces: drop the index so the pair can be seeded, and
+    // let the repair be what makes it creatable again.
+    sqlite.exec('DROP INDEX contributions_user_id_legacy_id_idx')
+    for (const [id, date] of [
+      [ids.contributionEarly, '2026-03-02'],
+      [ids.contributionLate, '2026-03-31'],
+    ] as const) {
+      sqlite
+        .prepare(
+          `INSERT INTO contributions
+            (id, user_id, legacy_id, date, amount_minor, currency, portfolio_date,
+             portfolio_value_minor, flow_minor, created_at, updated_at, version)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          ids.user,
+          REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
+          date,
+          52000,
+          'EUR',
+          date,
+          1317047,
+          52000,
+          FIXTURE_TIMESTAMP,
+          FIXTURE_TIMESTAMP,
+          1,
+        )
+    }
   })
 
   insert()

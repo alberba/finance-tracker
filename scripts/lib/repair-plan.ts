@@ -10,16 +10,21 @@
  */
 
 import { and, eq } from 'drizzle-orm'
+import type Database from 'better-sqlite3'
+import { writeFileSync } from 'node:fs'
 import {
   accounts,
   budgetEntries,
   categories,
+  contributions,
+  goals,
   pendingMovements,
   recurringRules,
   snapshotBalances,
   stockeventsSymbolMappings,
   subscriptions,
   transactions,
+  twrLiquidityAccounts,
   userInstruments,
   wealthSnapshots,
 } from '../../src/db/schema'
@@ -113,12 +118,30 @@ export interface SnapshotRepair {
   reason: RepairReason
 }
 
+/**
+ * One row whose migration correlation id collides with another row's.
+ *
+ * The row is renamed, never deleted: v1 already keyed contributions by an id
+ * that was not unique (two March entries shared `contrib-snapshot-2026-3`) and
+ * the v1→v2 migration copied both rows with that same derived value. They are
+ * distinct records, and the correlation id is only a reconciliation key
+ * (ADR 0001), so moving one aside keeps the data and lets the closing UNIQUE
+ * on `(user_id, legacy_id)` hold.
+ */
+export interface CorrelationIdRepair {
+  table: string
+  rowId: string
+  fromLegacyId: string
+  toLegacyId: string
+}
+
 /** Every change the eventual write step may apply, in deterministic order. */
 export interface RepairPlan {
   categoryMerges: CategoryMerge[]
   accountKindCorrections: AccountKindCorrection[]
   budgetRestorations: BudgetCellRepair[]
   snapshotRestorations: SnapshotRepair[]
+  correlationIdFixes: CorrelationIdRepair[]
 }
 
 const VALID_ACCOUNT_KINDS = new Set(['cash', 'investment', 'liability'])
@@ -298,6 +321,103 @@ function accountKindCorrections(
     }))
 }
 
+/**
+ * Reads the correlation id of every row in every table that carries one, so
+ * `correlationIdFixes` can find the colliding groups from data alone.
+ */
+async function correlationIdRows(
+  db: Db,
+  userId: string,
+): Promise<Array<{ table: string; rows: Array<{ id: string; legacyId: string | null }> }>> {
+  const [
+    accountRows,
+    categoryRows,
+    liquidityRows,
+    transactionRows,
+    subscriptionRows,
+    ruleRows,
+    pendingRows,
+    budgetRows,
+    goalRows,
+    snapshotRows,
+    contributionRows,
+    mappingRows,
+  ] = await Promise.all([
+    db.select({ id: accounts.id, legacyId: accounts.legacyId }).from(accounts).where(eq(accounts.userId, userId)),
+    db.select({ id: categories.id, legacyId: categories.legacyId }).from(categories).where(eq(categories.userId, userId)),
+    db
+      .select({ id: twrLiquidityAccounts.id, legacyId: twrLiquidityAccounts.legacyId })
+      .from(twrLiquidityAccounts)
+      .where(eq(twrLiquidityAccounts.userId, userId)),
+    db.select({ id: transactions.id, legacyId: transactions.legacyId }).from(transactions).where(eq(transactions.userId, userId)),
+    db.select({ id: subscriptions.id, legacyId: subscriptions.legacyId }).from(subscriptions).where(eq(subscriptions.userId, userId)),
+    db.select({ id: recurringRules.id, legacyId: recurringRules.legacyId }).from(recurringRules).where(eq(recurringRules.userId, userId)),
+    db.select({ id: pendingMovements.id, legacyId: pendingMovements.legacyId }).from(pendingMovements).where(eq(pendingMovements.userId, userId)),
+    db.select({ id: budgetEntries.id, legacyId: budgetEntries.legacyId }).from(budgetEntries).where(eq(budgetEntries.userId, userId)),
+    db.select({ id: goals.id, legacyId: goals.legacyId }).from(goals).where(eq(goals.userId, userId)),
+    db.select({ id: wealthSnapshots.id, legacyId: wealthSnapshots.legacyId }).from(wealthSnapshots).where(eq(wealthSnapshots.userId, userId)),
+    db.select({ id: contributions.id, legacyId: contributions.legacyId }).from(contributions).where(eq(contributions.userId, userId)),
+    db
+      .select({ id: stockeventsSymbolMappings.id, legacyId: stockeventsSymbolMappings.legacyId })
+      .from(stockeventsSymbolMappings)
+      .where(eq(stockeventsSymbolMappings.userId, userId)),
+  ])
+
+  return [
+    { table: 'accounts', rows: accountRows },
+    { table: 'categories', rows: categoryRows },
+    { table: 'twr_liquidity_accounts', rows: liquidityRows },
+    { table: 'transactions', rows: transactionRows },
+    { table: 'subscriptions', rows: subscriptionRows },
+    { table: 'recurring_rules', rows: ruleRows },
+    { table: 'pending_movements', rows: pendingRows },
+    { table: 'budget_entries', rows: budgetRows },
+    { table: 'goals', rows: goalRows },
+    { table: 'wealth_snapshots', rows: snapshotRows },
+    { table: 'contributions', rows: contributionRows },
+    { table: 'stockevents_symbol_mappings', rows: mappingRows },
+  ]
+}
+
+/**
+ * Rows sharing a correlation id within one table, the earliest keeping it.
+ * Deterministic in both table and id order, so the same database always yields
+ * the same plan and the same renames.
+ */
+function correlationIdFixes(
+  sources: Array<{ table: string; rows: Array<{ id: string; legacyId: string | null }> }>,
+): CorrelationIdRepair[] {
+  const fixes: CorrelationIdRepair[] = []
+
+  for (const { table, rows } of sources) {
+    const groups = new Map<string, string[]>()
+    const taken = new Set<string>()
+    for (const row of rows) {
+      if (!row.legacyId) continue
+      taken.add(row.legacyId)
+      const group = groups.get(row.legacyId)
+      if (group) group.push(row.id)
+      else groups.set(row.legacyId, [row.id])
+    }
+
+    for (const legacyId of Array.from(groups.keys()).sort()) {
+      // UUIDv7 ids sort by creation time, so the earliest row keeps the id the
+      // migration derived and the later ones move aside.
+      const ids = (groups.get(legacyId) ?? []).slice().sort()
+      for (const rowId of ids.slice(1)) {
+        let candidate = `${legacyId}@2`
+        for (let suffix = 2; taken.has(candidate); suffix += 1) {
+          candidate = `${legacyId}@${suffix + 1}`
+        }
+        taken.add(candidate)
+        fixes.push({ table, rowId, fromLegacyId: legacyId, toLegacyId: candidate })
+      }
+    }
+  }
+
+  return fixes
+}
+
 function backupCategory(
   rows: Array<typeof categories.$inferSelect>,
   name: string,
@@ -452,16 +572,21 @@ export async function buildRepairPlan(
   userId: string,
   backup: RepairBackup,
 ): Promise<RepairPlan> {
-  const [categoryRows, accountRows, budgetRows, snapshotRows, balanceRows] = await Promise.all([
-    db.select().from(categories).where(eq(categories.userId, userId)),
-    db.select().from(accounts).where(eq(accounts.userId, userId)),
-    db.select().from(budgetEntries).where(eq(budgetEntries.userId, userId)),
-    db.select().from(wealthSnapshots).where(eq(wealthSnapshots.userId, userId)),
-    db.select().from(snapshotBalances).where(eq(snapshotBalances.userId, userId)),
-  ])
+  const [categoryRows, accountRows, budgetRows, snapshotRows, balanceRows, correlationRows] =
+    await Promise.all([
+      db.select().from(categories).where(eq(categories.userId, userId)),
+      db.select().from(accounts).where(eq(accounts.userId, userId)),
+      db.select().from(budgetEntries).where(eq(budgetEntries.userId, userId)),
+      db.select().from(wealthSnapshots).where(eq(wealthSnapshots.userId, userId)),
+      db.select().from(snapshotBalances).where(eq(snapshotBalances.userId, userId)),
+      correlationIdRows(db, userId),
+    ])
+
+  const merges = await categoryMerges(db, userId, categoryRows)
+  const mergedAway = new Set(merges.map((merge) => merge.duplicateCategoryId))
 
   return {
-    categoryMerges: await categoryMerges(db, userId, categoryRows),
+    categoryMerges: merges,
     accountKindCorrections: accountKindCorrections(accountRows),
     budgetRestorations: budgetRestorations(budgetRows, categoryRows, backup.budgetCells),
     snapshotRestorations: snapshotRestorations(
@@ -469,6 +594,11 @@ export async function buildRepairPlan(
       balanceRows,
       accountRows,
       backup.snapshots,
+    ),
+    // A row the merge deletes needs no rename, and renaming it first would be
+    // a change the plan then undoes.
+    correlationIdFixes: correlationIdFixes(correlationRows).filter(
+      (fix) => !mergedAway.has(fix.rowId),
     ),
   }
 }
@@ -697,10 +827,23 @@ export function formatRepairPlan(plan: RepairPlan, options?: FormatRepairPlanOpt
     }
   }
 
+  // 5. Correlation id collisions
+  lines.push('')
+  lines.push(`5. Colisiones de clave de correlación (${plan.correlationIdFixes.length}):`)
+  if (plan.correlationIdFixes.length === 0) {
+    lines.push('   Ninguna colisión detectada.')
+  } else {
+    for (const fix of plan.correlationIdFixes) {
+      lines.push(
+        `   • ${fix.table}: fila ${fix.rowId} -> "${fix.toLegacyId}" (antes "${fix.fromLegacyId}")`,
+      )
+    }
+  }
+
   lines.push('')
   lines.push('----------------------------------------------------------------------')
   lines.push(
-    `Total acciones: ${plan.categoryMerges.length} fusiones, ${plan.accountKindCorrections.length} correcciones de cuenta, ${plan.budgetRestorations.length} restauraciones de presupuesto, ${plan.snapshotRestorations.length} restauraciones de snapshot.`,
+    `Total acciones: ${plan.categoryMerges.length} fusiones, ${plan.accountKindCorrections.length} correcciones de cuenta, ${plan.budgetRestorations.length} restauraciones de presupuesto, ${plan.snapshotRestorations.length} restauraciones de snapshot, ${plan.correlationIdFixes.length} renombrados de correlación.`,
   )
   lines.push('----------------------------------------------------------------------')
 
@@ -715,6 +858,108 @@ export interface RepairExecutionReport {
   budgetEntriesInserted: number
   snapshotsUpdated: number
   snapshotsInserted: number
+  correlationIdsRenamed: number
+}
+
+/**
+ * The tables the repair can touch, parents before children. The order is load
+ * bearing on both ends: the emitted SQL deletes in reverse (a child row cannot
+ * outlive the parent it points at) and inserts in this order, so applying it
+ * with `wrangler d1 execute --remote` never trips a foreign key.
+ */
+const REPAIR_TABLE_ORDER = [
+  'accounts',
+  'categories',
+  'wealth_snapshots',
+  'contributions',
+  'twr_liquidity_accounts',
+  'transactions',
+  'recurring_rules',
+  'pending_movements',
+  'subscriptions',
+  'budget_entries',
+  'goals',
+  'snapshot_balances',
+  'contribution_allocations',
+  'user_instruments',
+  'stockevents_symbol_mappings',
+] as const
+
+/** Which of those tables the plan actually writes to. */
+function affectedTables(plan: RepairPlan): string[] {
+  const touched = new Set<string>()
+  for (const fix of plan.correlationIdFixes) touched.add(fix.table)
+  if (plan.categoryMerges.length > 0) {
+    touched.add('categories')
+    for (const merge of plan.categoryMerges) {
+      for (const reference of merge.references) touched.add(reference.table)
+    }
+  }
+  if (plan.accountKindCorrections.length > 0) touched.add('accounts')
+  if (plan.budgetRestorations.length > 0) touched.add('budget_entries')
+  if (plan.snapshotRestorations.length > 0) {
+    touched.add('wealth_snapshots')
+    touched.add('snapshot_balances')
+  }
+  return REPAIR_TABLE_ORDER.filter((table) => touched.has(table))
+}
+
+function sqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return 'NULL'
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL'
+  if (typeof value === 'bigint') return String(value)
+  if (typeof value === 'boolean') return value ? '1' : '0'
+  return `'${String(value).replace(/'/g, "''")}'`
+}
+
+/**
+ * Writes the repaired state of every table the plan touched as SQL for
+ * `wrangler d1 execute finance-tracker-db-v2 --remote --file=<out>`.
+ *
+ * The repair itself only writes to a local copy of production (no Workers
+ * runtime is available from a plain Node script), so this is the step that
+ * carries the result back. It replaces whole tables per user rather than
+ * replaying each change, which keeps it exact: the local copy *is* the
+ * intended end state. It deliberately leaves `sync_changes`, `sync_commands`,
+ * `audit_events` and `user_revisions` alone — deleting the change log or the
+ * revision cursor would make every other device miss the repair.
+ */
+export function writeRemoteRepairSql(
+  sqlite: Database.Database,
+  userId: string,
+  plan: RepairPlan,
+  outPath: string,
+): string[] {
+  const tables = affectedTables(plan)
+  const userIdSql = sqlLiteral(userId)
+  const statements: string[] = []
+
+  for (const table of [...tables].reverse()) {
+    statements.push(`DELETE FROM ${table} WHERE user_id = ${userIdSql};`)
+  }
+  for (const table of tables) {
+    const rows = sqlite
+      .prepare(`SELECT * FROM ${table} WHERE user_id = ? ORDER BY id`)
+      .all(userId) as Array<Record<string, unknown>>
+    for (const row of rows) {
+      const columns = Object.keys(row)
+      statements.push(
+        `INSERT INTO ${table} (${columns.map((column) => `"${column}"`).join(', ')}) VALUES (${columns
+          .map((column) => sqlLiteral(row[column]))
+          .join(', ')});`,
+      )
+    }
+  }
+
+  const file = [
+    '-- Generado por scripts/repair-corrupted-data.ts (--remote-sql-out).',
+    '-- Aplicar con: wrangler d1 execute finance-tracker-db-v2 --remote --file=<este fichero>',
+    '',
+    ...statements,
+    '',
+  ].join('\n')
+  writeFileSync(outPath, file, 'utf8')
+  return tables
 }
 
 async function insertSnapshotBalances(
@@ -753,6 +998,7 @@ export async function applyRepairPlan(
     let budgetEntriesInserted = 0
     let snapshotsUpdated = 0
     let snapshotsInserted = 0
+    let correlationIdsRenamed = 0
 
     const now = nowIso()
 
@@ -925,6 +1171,86 @@ export async function applyRepairPlan(
       }
     }
 
+    // 5. Move colliding correlation ids aside, so the closing UNIQUE on
+    // `(user_id, legacy_id)` can hold without deleting a real row.
+    for (const fix of plan.correlationIdFixes) {
+      const changes = { legacyId: fix.toLegacyId, updatedAt: now }
+      if (fix.table === 'accounts') {
+        await db
+          .update(accounts)
+          .set(changes)
+          .where(and(eq(accounts.userId, userId), eq(accounts.id, fix.rowId)))
+      } else if (fix.table === 'categories') {
+        await db
+          .update(categories)
+          .set(changes)
+          .where(and(eq(categories.userId, userId), eq(categories.id, fix.rowId)))
+      } else if (fix.table === 'twr_liquidity_accounts') {
+        await db
+          .update(twrLiquidityAccounts)
+          .set(changes)
+          .where(
+            and(
+              eq(twrLiquidityAccounts.userId, userId),
+              eq(twrLiquidityAccounts.id, fix.rowId),
+            ),
+          )
+      } else if (fix.table === 'transactions') {
+        await db
+          .update(transactions)
+          .set(changes)
+          .where(and(eq(transactions.userId, userId), eq(transactions.id, fix.rowId)))
+      } else if (fix.table === 'subscriptions') {
+        await db
+          .update(subscriptions)
+          .set(changes)
+          .where(and(eq(subscriptions.userId, userId), eq(subscriptions.id, fix.rowId)))
+      } else if (fix.table === 'recurring_rules') {
+        await db
+          .update(recurringRules)
+          .set(changes)
+          .where(and(eq(recurringRules.userId, userId), eq(recurringRules.id, fix.rowId)))
+      } else if (fix.table === 'pending_movements') {
+        await db
+          .update(pendingMovements)
+          .set(changes)
+          .where(and(eq(pendingMovements.userId, userId), eq(pendingMovements.id, fix.rowId)))
+      } else if (fix.table === 'budget_entries') {
+        await db
+          .update(budgetEntries)
+          .set(changes)
+          .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, fix.rowId)))
+      } else if (fix.table === 'goals') {
+        await db
+          .update(goals)
+          .set(changes)
+          .where(and(eq(goals.userId, userId), eq(goals.id, fix.rowId)))
+      } else if (fix.table === 'wealth_snapshots') {
+        await db
+          .update(wealthSnapshots)
+          .set(changes)
+          .where(and(eq(wealthSnapshots.userId, userId), eq(wealthSnapshots.id, fix.rowId)))
+      } else if (fix.table === 'contributions') {
+        await db
+          .update(contributions)
+          .set(changes)
+          .where(and(eq(contributions.userId, userId), eq(contributions.id, fix.rowId)))
+      } else if (fix.table === 'stockevents_symbol_mappings') {
+        await db
+          .update(stockeventsSymbolMappings)
+          .set(changes)
+          .where(
+            and(
+              eq(stockeventsSymbolMappings.userId, userId),
+              eq(stockeventsSymbolMappings.id, fix.rowId),
+            ),
+          )
+      } else {
+        throw new Error(`Tabla desconocida en el plan de reparación: ${fix.table}`)
+      }
+      correlationIdsRenamed++
+    }
+
     return {
       categoryMerges,
       referencesRepointed,
@@ -933,7 +1259,7 @@ export async function applyRepairPlan(
       budgetEntriesInserted,
       snapshotsUpdated,
       snapshotsInserted,
+      correlationIdsRenamed,
     }
   })
 }
-
