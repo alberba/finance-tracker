@@ -23,7 +23,8 @@ import {
   userInstruments,
   wealthSnapshots,
 } from '../../src/db/schema'
-import type { Db } from '../../src/db/repositories/shared'
+import { nowIso, runInTransaction, type Db } from '../../src/db/repositories/shared'
+import { uuidv7 } from '../../src/lib/server/uuidv7'
 
 /** A budget cell from the clean export used as the repair source of truth. */
 export interface RepairBackupBudgetCell {
@@ -466,3 +467,387 @@ export async function buildRepairPlan(
     ),
   }
 }
+
+/**
+ * Validates and converts an external backup input into a typed RepairBackup.
+ * Supports both direct RepairBackup JSON and legacy v1 State JSON exports.
+ */
+export function loadRepairBackup(data: unknown): RepairBackup {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Se exige un export de respaldo válido antes de ejecutar la reparación.')
+  }
+
+  const obj = data as Record<string, unknown>
+
+  if (Array.isArray(obj.budgetCells) && Array.isArray(obj.snapshots)) {
+    return {
+      budgetCells: obj.budgetCells as RepairBackupBudgetCell[],
+      snapshots: obj.snapshots as RepairBackupSnapshot[],
+    }
+  }
+
+  if ('budget' in obj && typeof obj.budget === 'object' && obj.budget !== null) {
+    const year = typeof obj.year === 'number' ? obj.year : new Date().getFullYear()
+    const currency = typeof obj.currency === 'string' ? obj.currency : 'EUR'
+    const budgetObj = obj.budget as Record<string, Record<string, unknown[]>>
+    const budgetCells: RepairBackupBudgetCell[] = []
+    const kinds = ['income', 'expense', 'investment'] as const
+
+    for (const kind of kinds) {
+      const group = budgetObj[kind] || {}
+      for (const [categoryName, monthly] of Object.entries(group)) {
+        if (!Array.isArray(monthly)) continue
+        for (let m = 0; m < monthly.length && m < 12; m++) {
+          const amount = monthly[m]
+          if (typeof amount === 'number' && amount > 0) {
+            budgetCells.push({
+              categoryName,
+              categoryKind: kind,
+              year,
+              month: m + 1,
+              amountMinor: Math.round(amount * 100),
+              currency,
+            })
+          }
+        }
+      }
+    }
+
+    const snapshots: RepairBackupSnapshot[] = []
+    if ('snapshots' in obj && typeof obj.snapshots === 'object' && obj.snapshots !== null) {
+      const snapshotsObj = obj.snapshots as Record<
+        string,
+        {
+          month?: number
+          accounts?: Record<string, number>
+          investments?: Record<string, number>
+          liabilities?: Record<string, number>
+        }
+      >
+
+      for (const [key, raw] of Object.entries(snapshotsObj)) {
+        if (!raw) continue
+        const monthNum = typeof raw.month === 'number' ? raw.month + 1 : Number(key)
+        const pad2 = (n: number) => String(n).padStart(2, '0')
+        const snapshotDate = `${year}-${pad2(monthNum)}-01`
+        const balances: RepairBackupSnapshotBalance[] = []
+
+        const addBalances = (group?: Record<string, number>) => {
+          if (!group) return
+          for (const [accId, val] of Object.entries(group)) {
+            if (typeof val === 'number') {
+              balances.push({
+                accountLegacyId: accId,
+                balanceMinor: Math.round(val * 100),
+                currency,
+              })
+            }
+          }
+        }
+
+        addBalances(raw.accounts)
+        addBalances(raw.investments)
+        addBalances(raw.liabilities)
+
+        snapshots.push({
+          year,
+          month: monthNum,
+          snapshotDate,
+          balances,
+        })
+      }
+    }
+
+    return { budgetCells, snapshots }
+  }
+
+  throw new Error('Se exige un export de respaldo válido antes de ejecutar la reparación.')
+}
+
+export interface FormatRepairPlanOptions {
+  simulation?: boolean
+}
+
+/**
+ * Formats a RepairPlan into a human-readable simulation report.
+ */
+export function formatRepairPlan(plan: RepairPlan, options?: FormatRepairPlanOptions): string {
+  const lines: string[] = []
+
+  if (options?.simulation) {
+    lines.push('======================================================================')
+    lines.push('  [SIMULACIÓN] PLAN DE REPARACIÓN DE DATOS CORROMPIDOS (SOLO LECTURA)')
+    lines.push('  Ningún cambio ha sido escrito en la base de datos.')
+    lines.push('======================================================================')
+  } else {
+    lines.push('======================================================================')
+    lines.push('  PLAN DE REPARACIÓN DE DATOS CORROMPIDOS')
+    lines.push('======================================================================')
+  }
+
+  // 1. Categories
+  lines.push('')
+  lines.push(`1. Fusión de categorías duplicadas (${plan.categoryMerges.length}):`)
+  if (plan.categoryMerges.length === 0) {
+    lines.push('   Ninguna categoría duplicada detectada.')
+  } else {
+    for (const merge of plan.categoryMerges) {
+      lines.push(
+        `   • "${merge.name}" (${merge.kind}): duplicado ${merge.duplicateCategoryId} -> migrada ${merge.canonicalCategoryId}`,
+      )
+      lines.push(`     Referencias a repuntar (${merge.references.length}):`)
+      for (const ref of merge.references) {
+        lines.push(`       - ${ref.table}.${ref.column} (fila id: ${ref.rowId})`)
+      }
+    }
+  }
+
+  // 2. Accounts
+  lines.push('')
+  lines.push(`2. Corrección de cuentas con tipo erróneo (${plan.accountKindCorrections.length}):`)
+  if (plan.accountKindCorrections.length === 0) {
+    lines.push('   Ninguna cuenta con tipo erróneo detectada.')
+  } else {
+    for (const acc of plan.accountKindCorrections) {
+      lines.push(`   • "${acc.name}" (${acc.accountId}): tipo "${acc.fromKind}" -> "${acc.toKind}"`)
+    }
+  }
+
+  // 3. Budget cells
+  lines.push('')
+  lines.push(`3. Restauración de celdas de presupuesto (${plan.budgetRestorations.length}):`)
+  if (plan.budgetRestorations.length === 0) {
+    lines.push('   Ninguna celda de presupuesto pendiente de restauración.')
+  } else {
+    for (const cell of plan.budgetRestorations) {
+      const formattedMonth = String(cell.month).padStart(2, '0')
+      const amount = (cell.amountMinor / 100).toFixed(2)
+      lines.push(
+        `   • [${cell.action.toUpperCase()}] Categoría ${cell.categoryId}, ${cell.year}-${formattedMonth}: ${amount} ${cell.currency} (motivo: ${cell.reason})`,
+      )
+    }
+  }
+
+  // 4. Wealth snapshots
+  lines.push('')
+  lines.push(`4. Restauración de snapshots de patrimonio (${plan.snapshotRestorations.length}):`)
+  if (plan.snapshotRestorations.length === 0) {
+    lines.push('   Ningún snapshot pendiente de restauración.')
+  } else {
+    for (const snapshot of plan.snapshotRestorations) {
+      const formattedMonth = String(snapshot.month).padStart(2, '0')
+      lines.push(
+        `   • [${snapshot.action.toUpperCase()}] Snapshot fecha ${snapshot.snapshotDate} (${snapshot.year}-${formattedMonth}): ${snapshot.balances.length} saldo(s) (motivo: ${snapshot.reason})`,
+      )
+    }
+  }
+
+  lines.push('')
+  lines.push('----------------------------------------------------------------------')
+  lines.push(
+    `Total acciones: ${plan.categoryMerges.length} fusiones, ${plan.accountKindCorrections.length} correcciones de cuenta, ${plan.budgetRestorations.length} restauraciones de presupuesto, ${plan.snapshotRestorations.length} restauraciones de snapshot.`,
+  )
+  lines.push('----------------------------------------------------------------------')
+
+  return lines.join('\n')
+}
+
+export interface RepairExecutionReport {
+  categoryMerges: number
+  referencesRepointed: number
+  accountsCorrected: number
+  budgetEntriesUpdated: number
+  budgetEntriesInserted: number
+  snapshotsUpdated: number
+  snapshotsInserted: number
+}
+
+/**
+ * Applies the repair plan inside a transaction.
+ */
+export async function applyRepairPlan(
+  db: Db,
+  userId: string,
+  plan: RepairPlan,
+): Promise<RepairExecutionReport> {
+  return runInTransaction(db, async () => {
+    let referencesRepointed = 0
+    let categoryMerges = 0
+    let accountsCorrected = 0
+    let budgetEntriesUpdated = 0
+    let budgetEntriesInserted = 0
+    let snapshotsUpdated = 0
+    let snapshotsInserted = 0
+
+    const now = nowIso()
+
+    // 1. Repoint references and remove duplicate categories
+    for (const merge of plan.categoryMerges) {
+      for (const ref of merge.references) {
+        if (ref.table === 'transactions') {
+          await db
+            .update(transactions)
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
+            .where(and(eq(transactions.userId, userId), eq(transactions.id, ref.rowId)))
+        } else if (ref.table === 'pending_movements') {
+          await db
+            .update(pendingMovements)
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
+            .where(and(eq(pendingMovements.userId, userId), eq(pendingMovements.id, ref.rowId)))
+        } else if (ref.table === 'recurring_rules') {
+          await db
+            .update(recurringRules)
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
+            .where(and(eq(recurringRules.userId, userId), eq(recurringRules.id, ref.rowId)))
+        } else if (ref.table === 'subscriptions') {
+          await db
+            .update(subscriptions)
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
+            .where(and(eq(subscriptions.userId, userId), eq(subscriptions.id, ref.rowId)))
+        } else if (ref.table === 'budget_entries') {
+          await db
+            .update(budgetEntries)
+            .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
+            .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, ref.rowId)))
+        } else if (ref.table === 'user_instruments') {
+          await db
+            .update(userInstruments)
+            .set({ categoryId: merge.canonicalCategoryId })
+            .where(and(eq(userInstruments.userId, userId), eq(userInstruments.id, ref.rowId)))
+        } else if (ref.table === 'stockevents_symbol_mappings') {
+          await db
+            .update(stockeventsSymbolMappings)
+            .set({ categoryId: merge.canonicalCategoryId })
+            .where(
+              and(
+                eq(stockeventsSymbolMappings.userId, userId),
+                eq(stockeventsSymbolMappings.id, ref.rowId),
+              ),
+            )
+        }
+        referencesRepointed++
+      }
+
+      await db
+        .delete(categories)
+        .where(and(eq(categories.userId, userId), eq(categories.id, merge.duplicateCategoryId)))
+      categoryMerges++
+    }
+
+    // 2. Correct account kinds
+    for (const correction of plan.accountKindCorrections) {
+      await db
+        .update(accounts)
+        .set({ kind: correction.toKind, updatedAt: now })
+        .where(and(eq(accounts.userId, userId), eq(accounts.id, correction.accountId)))
+      accountsCorrected++
+    }
+
+    // 3. Restore budget cells
+    for (const cell of plan.budgetRestorations) {
+      if (cell.action === 'update') {
+        if (cell.budgetEntryId) {
+          await db
+            .update(budgetEntries)
+            .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
+            .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, cell.budgetEntryId)))
+        } else {
+          await db
+            .update(budgetEntries)
+            .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
+            .where(
+              and(
+                eq(budgetEntries.userId, userId),
+                eq(budgetEntries.categoryId, cell.categoryId),
+                eq(budgetEntries.year, cell.year),
+                eq(budgetEntries.month, cell.month),
+              ),
+            )
+        }
+        budgetEntriesUpdated++
+      } else if (cell.action === 'insert') {
+        await db.insert(budgetEntries).values({
+          id: uuidv7(),
+          userId,
+          categoryId: cell.categoryId,
+          year: cell.year,
+          month: cell.month,
+          amountMinor: cell.amountMinor,
+          currency: cell.currency,
+          createdAt: now,
+          updatedAt: now,
+          version: 1,
+        })
+        budgetEntriesInserted++
+      }
+    }
+
+    // 4. Restore snapshots
+    for (const snapshot of plan.snapshotRestorations) {
+      if (snapshot.action === 'insert') {
+        const snapshotId = uuidv7()
+        await db.insert(wealthSnapshots).values({
+          id: snapshotId,
+          userId,
+          snapshotDate: snapshot.snapshotDate,
+          year: snapshot.year,
+          month: snapshot.month,
+          createdAt: now,
+          updatedAt: now,
+          version: 1,
+        })
+        for (const balance of snapshot.balances) {
+          await db.insert(snapshotBalances).values({
+            id: uuidv7(),
+            userId,
+            snapshotId,
+            accountId: balance.accountId,
+            balanceMinor: balance.balanceMinor,
+            currency: balance.currency,
+            createdAt: now,
+          })
+        }
+        snapshotsInserted++
+      } else if (snapshot.action === 'update') {
+        const snapshotId = snapshot.snapshotId!
+        await db
+          .update(wealthSnapshots)
+          .set({ snapshotDate: snapshot.snapshotDate, updatedAt: now })
+          .where(and(eq(wealthSnapshots.userId, userId), eq(wealthSnapshots.id, snapshotId)))
+
+        await db
+          .delete(snapshotBalances)
+          .where(
+            and(
+              eq(snapshotBalances.userId, userId),
+              eq(snapshotBalances.snapshotId, snapshotId),
+            ),
+          )
+
+        for (const balance of snapshot.balances) {
+          await db.insert(snapshotBalances).values({
+            id: uuidv7(),
+            userId,
+            snapshotId,
+            accountId: balance.accountId,
+            balanceMinor: balance.balanceMinor,
+            currency: balance.currency,
+            createdAt: now,
+          })
+        }
+        snapshotsUpdated++
+      }
+    }
+
+    return {
+      categoryMerges,
+      referencesRepointed,
+      accountsCorrected,
+      budgetEntriesUpdated,
+      budgetEntriesInserted,
+      snapshotsUpdated,
+      snapshotsInserted,
+    }
+  })
+}
+
