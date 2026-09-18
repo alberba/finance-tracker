@@ -3,12 +3,13 @@ import { computed } from 'vue'
 
 import { buildSettingsViewModel, categoryKeyToType } from '../domain/settings/view-model'
 import { useToast } from '../composables/useToast'
+import { newId } from '../lib/client/ids'
 import {
-  categoryLocalId,
+  syncCategoryRemove,
+  syncCategoryUpsert,
   syncListDiff,
   syncSettingsUpdate,
   syncTwrLiquidityAccounts,
-  syncUpsert,
 } from '../lib/client/command-mapping'
 import { categoryEmojiKey } from '../scripts/category-emoji'
 import type { CategoryKey, Entity, EntityKey, State } from '../scripts/types'
@@ -51,25 +52,8 @@ const CATEGORY_KIND_BY_KEY: Record<CategoryKey, 'income' | 'expense' | 'investme
   investmentCategories: 'investment',
 }
 
-interface CategoryDiffRow {
-  id: string
-  name: string
-  sortOrder: number
-}
-
-function flattenCategories(key: CategoryKey, names: string[]): CategoryDiffRow[] {
-  const kind = CATEGORY_KIND_BY_KEY[key]
-  return names.map((name, index) => ({ id: categoryLocalId(kind, name), name, sortOrder: index }))
-}
-
-/** WP7b — maps a flattened category row to a `category` sync command payload. */
-function buildCategoryData(key: CategoryKey, row: CategoryDiffRow) {
-  return { name: row.name, kind: CATEGORY_KIND_BY_KEY[key], sortOrder: row.sortOrder }
-}
-
 function syncCategoryEmoji(key: CategoryKey, name: string, emoji: string | null) {
-  const kind = CATEGORY_KIND_BY_KEY[key]
-  return syncUpsert('category', categoryLocalId(kind, name), { name, kind, emoji })
+  return syncCategoryUpsert(CATEGORY_KIND_BY_KEY[key], name, { emoji })
 }
 
 function syncInvestmentCategoriesWithAssets(draft: State): void {
@@ -114,8 +98,13 @@ export const useSettingsStore = defineStore('settings', () => {
       return false
     }
 
-    const id = slug(trimmedName)
-    if (financialStateStore.state[key].some((item) => item.id === id)) {
+    // The entity's identity is minted here and never derived from its name
+    // (ADR 0001): renaming it later leaves the identity — and the row — alone.
+    const id = newId()
+    // The duplicate check still compares normalized names, so `Revolut` and
+    // `revolut` keep colliding exactly as they did when the slug was the id.
+    const normalized = slug(trimmedName)
+    if (financialStateStore.state[key].some((item) => slug(item.name) === normalized)) {
       showToast('Ese elemento ya existe.')
       return false
     }
@@ -199,33 +188,29 @@ export const useSettingsStore = defineStore('settings', () => {
       return false
     }
 
-    const before = flattenCategories(key, financialStateStore.state[key])
     financialStateStore.commitState((draft) => {
       if (!draft[key].includes(trimmedName)) {
         draft[key].push(trimmedName)
       }
     })
-    void syncListDiff('category', before, flattenCategories(key, financialStateStore.state[key]), (row) =>
-      buildCategoryData(key, row),
-    )
+    void syncCategoryUpsert(CATEGORY_KIND_BY_KEY[key], trimmedName, {
+      sortOrder: financialStateStore.state[key].indexOf(trimmedName),
+    })
     showToast('Categoría agregada.')
     return true
   }
 
   function removeCategory(key: CategoryKey, name: string): void {
-    const before = flattenCategories(key, financialStateStore.state[key])
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item !== name)
       delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]
     })
-    void syncListDiff('category', before, flattenCategories(key, financialStateStore.state[key]), (row) =>
-      buildCategoryData(key, row),
-    )
+    void syncCategoryRemove(CATEGORY_KIND_BY_KEY[key], name)
     showToast('Categoría eliminada.')
   }
 
   function reorderCategory(key: CategoryKey, name: string, direction: ReorderDirection): void {
-    const before = flattenCategories(key, financialStateStore.state[key])
+    const beforeIndex = new Map(financialStateStore.state[key].map((item, index) => [item, index]))
     financialStateStore.commitState((draft) => {
       const list = draft[key]
       const index = list.indexOf(name)
@@ -237,9 +222,16 @@ export const useSettingsStore = defineStore('settings', () => {
       const [moved] = list.splice(index, 1)
       list.splice(targetIndex, 0, moved)
     })
-    void syncListDiff('category', before, flattenCategories(key, financialStateStore.state[key]), (row) =>
-      buildCategoryData(key, row),
-    )
+    // Only the rows whose position actually moved get a command.
+    const kind = CATEGORY_KIND_BY_KEY[key]
+    const reordered = [...financialStateStore.state[key]]
+    void (async () => {
+      for (const [index, category] of reordered.entries()) {
+        if (beforeIndex.get(category) !== index) {
+          await syncCategoryUpsert(kind, category, { sortOrder: index })
+        }
+      }
+    })()
   }
 
   function setCategoryEmoji(key: CategoryKey, name: string, emoji: string): void {

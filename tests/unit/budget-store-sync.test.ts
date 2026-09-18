@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/scripts/demo-mode", () => ({ isDemoMode: vi.fn(() => false) }));
 
-import { categoryLocalId } from "../../src/lib/client/command-mapping";
 import { openIdbCache, putEntity, wipeIdbCache } from "../../src/lib/client/idb-cache";
 import { listAll, openOutbox, wipeOutbox } from "../../src/lib/client/outbox";
 import { useBudgetStore } from "../../src/stores/budget";
@@ -56,12 +55,14 @@ describe("budget store — sync wiring keeps identity out of the update patch (i
     syncStore.connection = "offline"
     activeStore = syncStore;
 
-    // The category has already synced, so `resolveCategoryId` resolves
-    // immediately instead of deferring the budget entry to a later edit.
+    // The category has already synced, so `resolveOrCreateCategoryId`
+    // resolves it (by its real name+kind, ADR 0001) immediately instead of
+    // minting and creating it again.
     const cacheDb = await openIdbCache(USER_ID);
     await putEntity(cacheDb, "category", {
       id: "server-cat-1",
-      legacyId: categoryLocalId("expense", "Ocio"),
+      name: "Ocio",
+      kind: "expense",
       version: 0,
     });
     cacheDb.close();
@@ -84,18 +85,23 @@ describe("budget store — sync wiring keeps identity out of the update patch (i
     });
     outboxDb.close();
 
-    // Simulate the create having synced: seed the cache with the server row
-    // so the next edit resolves it as an update instead of folding into the
-    // still-pending create. The correlation id is read off the create the
-    // store just emitted, so this fixture can't drift from the store's own
-    // `(type, category, year, month)` convention.
+    // Simulate the create having synced: seed the cache with the server row,
+    // identified by the same natural key (`categoryId`, year, month) the
+    // store addresses a cell by (ADR 0001), so the next edit resolves it as
+    // an update instead of folding into the still-pending create.
     const created = afterFirstEdit[0]?.command;
     if (created?.action !== "create") throw new Error("expected a pending create");
-    const { year, month } = created.data as { year: number; month: number };
+    const { categoryId, year, month } = created.data as {
+      categoryId: string;
+      year: number;
+      month: number;
+    };
     const cacheDb2 = await openIdbCache(USER_ID);
     await putEntity(cacheDb2, "budgetEntry", {
       id: "server-budget-entry-1",
-      legacyId: `expense:Ocio:${year}:${month}`,
+      categoryId,
+      year,
+      month,
       version: 0,
     });
     cacheDb2.close();

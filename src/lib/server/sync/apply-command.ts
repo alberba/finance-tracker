@@ -78,6 +78,15 @@ interface ContributionAllocationsField {
   allocations?: Omit<contributionsRepository.CreateContributionAllocationInput, "contributionId" | "currency">[];
 }
 
+/**
+ * Looks a row up by the identifier derived from its v1 data.
+ *
+ * The only remaining use of that identifier (ADR 0001): a `create` that
+ * carries no client-minted `id` — a row coming from the v1 migration, or a
+ * client that has not migrated that section yet — must reconcile against the
+ * row already there instead of duplicating it. Everything created from now on
+ * is found by its own `id` instead (`findByClientId`).
+ */
 async function findByLegacyId(
   db: Db,
   userId: string,

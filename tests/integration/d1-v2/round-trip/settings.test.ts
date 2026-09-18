@@ -83,6 +83,19 @@ describe("round trip: cuentas, activos y pasivos", () => {
     expect(reloaded.categoryEmojis[categoryEmojiKey("expense", "Ocio")]).toBe("🎮");
   });
 
+  it("the order of the categories is still there after a reload (§5)", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const settings = useSettingsStore();
+    settings.addCategory("expenseCategories", "Ocio");
+    settings.addCategory("expenseCategories", "Transporte");
+    await trip.reload();
+
+    settings.reorderCategory("expenseCategories", "Transporte", "up");
+    const reloaded = await trip.reload();
+
+    expect(reloaded.expenseCategories).toEqual(["Transporte", "Ocio"]);
+  });
+
   it("the TWR liquidity mark persists and the TWR comes out the same after a reload (§5)", async () => {
     trip.cleanup();
     trip = await startRoundTrip(async (db, userId) => {

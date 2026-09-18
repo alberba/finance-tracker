@@ -2,35 +2,10 @@ import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildBudgetViewModel } from '../domain/budget/view-model'
-import { resolveOrCreateCategoryId, syncUpsert, type CategoryKind } from '../lib/client/command-mapping'
+import { resolveOrCreateCategoryId, syncBudgetEntry, type CategoryKind } from '../lib/client/command-mapping'
 import type { BudgetType } from '../scripts/types'
 import { round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
-
-/**
- * Maps one `budget[type][category][month]` cell to a `budgetEntry` sync
- * command payload, keyed by the cell's identity — category, year and month
- * (ADR 0001; audit §4.4 — the year-less legacy id let a same-month edit in
- * another year resolve to last year's row). Uses
- * `resolveOrCreateCategoryId`, not `resolveCategoryId`: `budgetEntry.categoryId`
- * is required, so a category that hasn't synced yet must not make this
- * return `null` — that would drop the cell's first edit entirely (audit
- * §4.7).
- */
-async function buildBudgetEntryData(
-  type: BudgetType,
-  category: string,
-  year: number,
-  month: number,
-  amount: number,
-  currency: string,
-) {
-  const categoryId = await resolveOrCreateCategoryId(type as CategoryKind, category)
-  if (!categoryId) {
-    return null
-  }
-  return { categoryId, year, month, amount, currency }
-}
 
 export const useBudgetStore = defineStore('budget', () => {
   const financialStateStore = useFinancialStateStore()
@@ -78,17 +53,18 @@ export const useBudgetStore = defineStore('budget', () => {
     const amount = round2(value)
     const year = financialStateStore.year
     const currency = financialStateStore.currency
-    const localId = `${type}:${category}:${year}:${month + 1}`
     void (async () => {
-      const data = await buildBudgetEntryData(type, category, year, month + 1, amount, currency)
-      if (data) {
-        // `entityUpdateSchemas.budgetEntry` only declares `amount`/`currency`
-        // — its identity (`categoryId`/`year`/`month`) never travels in an
-        // update, so a later edit of an already-synced cell must not resend
-        // it (would now fail strict-schema validation instead of being
-        // silently stripped, issue #138).
-        await syncUpsert('budgetEntry', localId, data, { amount, currency })
+      // `resolveOrCreateCategoryId`, not `resolveCategoryId`: a cell's
+      // `categoryId` is required, so a category that hasn't synced yet must
+      // not make this drop the cell's first edit (audit §4.7).
+      const categoryId = await resolveOrCreateCategoryId(type as CategoryKind, category)
+      if (!categoryId) {
+        return
       }
+      // Addressed by the cell's own natural key — category, year, month
+      // (ADR 0001; audit §4.4 — a year-less key let a same-month edit in
+      // another year resolve to last year's row).
+      await syncBudgetEntry(categoryId, year, month + 1, amount, currency)
     })()
   }
 

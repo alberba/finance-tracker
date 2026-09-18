@@ -28,27 +28,25 @@
  *
  * Id/entity-reference correlation this module solves:
  *
- * Legacy `State` entities carry client-generated ids (`uid('tx')`,
- * category *names*, goal keys, budget-entry `(type, category, month)`
- * tuples, …), but v2 rows get a server-generated UUIDv7 `id` (WP1) with the
- * client's original id preserved in a `legacyId` column specifically so
- * this correlation is possible. `syncUpdate`/`syncRemove`/`syncUpsert`
- * resolve a local id to `{entityId, version}` via
- * `useSyncStore().getEntityRef()` (a scan of the local IndexedDB cache),
- * and fall back to folding the change into a still-unacknowledged `create`
- * command (`mergeIntoPendingCreate`/`cancelPendingCreate`) when the entity
- * hasn't synced yet — see those functions' doc comments in `src/stores/sync.ts`.
+ * An entity created from now on carries the identity the client minted for
+ * it — a UUID sent as `data.id` in its `create`, which is its primary key in
+ * D1 too (ADR 0001). The write path never invents a correlation id from the
+ * entity's own data: `syncUpdate`/`syncRemove` address that same id, and
+ * `getEntityRef` finds it directly in the local IndexedDB cache. The one
+ * remaining use of the data-derived identifier is recognising a row that
+ * came from v1, whose `legacyId` column still holds the v1 id the local
+ * `State` knows it by — `getEntityRef` falls back to it only when no row
+ * carries the requested id.
  *
- * Categories are a special case: legacy `State` has no category-id concept
- * at all (`incomeCategories`/`expenseCategories`/`investmentCategories`
- * are plain name arrays), while v2 has real `category` rows with server
- * ids. `resolveCategoryId` treats `${kind}:${name}` as the category's
- * stable `legacyId` and lazily create-syncs it the first time it's
- * referenced — but the v1 migration (`migration-runner.ts`) has no concept
- * of that composite key, and writes the bare category *name* as `legacyId`
- * instead (audit §4.7). `resolveCategoryId` falls back to that bare-name
- * lookup before deciding a category is unseen, so referencing a category
- * migrated from v1 resolves to its existing row instead of duplicating it.
+ * Aggregates whose identity is a real natural key are matched on those
+ * attributes instead (`syncUpsertByKey`): a category on its name+kind, a goal
+ * on its key, a budget cell on `(categoryId, year, month)`, a snapshot on
+ * `(year, month)`. Those are the entity's own columns, not a string agreed
+ * between the client and the migrator.
+ *
+ * Anything not yet acknowledged is folded into its still-queued `create`
+ * (`mergeIntoPendingCreate`/`cancelPendingCreate`) — see those functions' doc
+ * comments in `src/stores/sync.ts`.
  *
  * Known, documented leftovers (exotic edge flows intentionally NOT covered
  * here — see the WP7b report for the full list):
@@ -94,8 +92,24 @@
 import { useSyncStore } from "../../stores/sync";
 import type { SyncEntityType } from "../server/sync/command-schemas";
 import { isSyncV2Enabled } from "./feature-flags";
+import { newId } from "./ids";
+import type { PendingCreateMatch } from "./outbox";
 
 type JsonRecord = Record<string, unknown>;
+
+/**
+ * Predicate over a row: it selects a cached entity out of the local cache,
+ * and separately matches a still-queued `create`'s payload. One type because
+ * it is one concept — the identity the client can address an entity by,
+ * before and after the server acknowledges it — and before/after forms of the
+ * same entity always agree.
+ */
+export type EntityMatch = PendingCreateMatch;
+
+/** Matches a still-queued `create` by the identity the client gave it. */
+function identityMatch(id: string): EntityMatch {
+  return (entity) => entity.id === id;
+}
 
 function warn(entityType: SyncEntityType, localId: string, verb: string): void {
   if (typeof console !== "undefined") {
@@ -105,24 +119,58 @@ function warn(entityType: SyncEntityType, localId: string, verb: string): void {
   }
 }
 
+/** Enqueues an `update` addressed at the server row a resolved ref points to. */
+function enqueueUpdate(
+  syncStore: ReturnType<typeof useSyncStore>,
+  entityType: SyncEntityType,
+  ref: { entityId: string; version: number },
+  patch: JsonRecord,
+): Promise<unknown> {
+  return syncStore.enqueueCommand({
+    action: "update",
+    entityType,
+    entityId: ref.entityId,
+    baseVersion: ref.version,
+    patch,
+  });
+}
+
+/** Enqueues a `remove` addressed at the server row a resolved ref points to. */
+function enqueueRemove(
+  syncStore: ReturnType<typeof useSyncStore>,
+  entityType: SyncEntityType,
+  ref: { entityId: string; version: number },
+): Promise<unknown> {
+  return syncStore.enqueueCommand({
+    action: "remove",
+    entityType,
+    entityId: ref.entityId,
+    baseVersion: ref.version,
+  });
+}
+
 /**
- * Enqueues a `create` command, tagging `data.legacyId` with the local id so
- * the server row can be correlated back to it later. No-op when sync-v2 is
- * off.
+ * Enqueues a `create` command carrying the entity's own identity (`id`),
+ * which the server stores as the row's primary key (ADR 0001) — re-sending
+ * it is a no-op instead of a duplicate. No-op when sync-v2 is off.
+ *
+ * `data.id` wins over the `id` argument when the caller already minted one
+ * (e.g. a category that another command in the same batch has to reference).
  */
 export async function syncCreate(
   entityType: SyncEntityType,
-  localId: string,
+  id: string,
   data: JsonRecord,
 ): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
   }
   const syncStore = useSyncStore();
+  const entityId = typeof data.id === "string" && data.id ? data.id : id;
   await syncStore.enqueueCommand({
     action: "create",
     entityType,
-    data: { ...data, legacyId: localId },
+    data: { ...data, id: entityId },
   });
 }
 
@@ -142,16 +190,10 @@ export async function syncUpdate(
   const syncStore = useSyncStore();
   const ref = await syncStore.getEntityRef(entityType, localId);
   if (ref) {
-    await syncStore.enqueueCommand({
-      action: "update",
-      entityType,
-      entityId: ref.entityId,
-      baseVersion: ref.version,
-      patch,
-    });
+    await enqueueUpdate(syncStore, entityType, ref, patch);
     return;
   }
-  const merged = await syncStore.mergeIntoPendingCreate(entityType, localId, patch);
+  const merged = await syncStore.mergeIntoPendingCreate(entityType, identityMatch(localId), patch);
   if (!merged) {
     warn(entityType, localId, "actualizar");
   }
@@ -169,36 +211,36 @@ export async function syncRemove(entityType: SyncEntityType, localId: string): P
   const syncStore = useSyncStore();
   const ref = await syncStore.getEntityRef(entityType, localId);
   if (ref) {
-    await syncStore.enqueueCommand({
-      action: "remove",
-      entityType,
-      entityId: ref.entityId,
-      baseVersion: ref.version,
-    });
+    await enqueueRemove(syncStore, entityType, ref);
     return;
   }
-  const cancelled = await syncStore.cancelPendingCreate(entityType, localId);
+  const cancelled = await syncStore.cancelPendingCreate(entityType, identityMatch(localId));
   if (!cancelled) {
     warn(entityType, localId, "eliminar");
   }
 }
 
 /**
- * Create-if-unknown, update-otherwise — for aggregates addressed by a
- * stable natural key (category `${kind}:${name}`, goal key, budget-entry
- * composite key) rather than a UI-visible "add"/"edit" distinction.
+ * Create-if-absent, update-otherwise — for aggregates whose identity is a
+ * real natural key (`matches` over the row's own columns) rather than the
+ * UI-visible "add"/"edit" distinction: a category (name+kind), a goal
+ * (key), a budget cell `(categoryId, year, month)`, a snapshot
+ * `(year, month)`.
  *
  * `updateData` (defaults to `data`) is what's sent as the `update` patch —
  * distinct from `data` for an entity whose identity is a natural key that
- * must never travel in an update, like `budgetEntry`'s `(categoryId, year,
+ * must never travel in an update, like a budget cell's `(categoryId, year,
  * month)` (`entityUpdateSchemas.budgetEntry` only declares `amount`/
- * `currency`, unlike every other entity's update schema): the caller passes
- * the full create-shaped `data` for the first write and a narrower
- * `updateData` for the identity-preserving edits that follow.
+ * `currency`): the caller passes the full create-shaped `data` for the first
+ * write and a narrower `updateData` for the edits that follow.
+ *
+ * The `create` carries a client-minted UUID as `data.id` when the caller
+ * supplied one, and one is minted here otherwise (ADR 0001) — the local id
+ * *is* the row's primary key, so nothing correlates the two afterwards.
  */
-export async function syncUpsert(
+export async function syncUpsertByKey(
   entityType: SyncEntityType,
-  localId: string,
+  matches: EntityMatch,
   data: JsonRecord,
   updateData: JsonRecord = data,
 ): Promise<void> {
@@ -206,22 +248,40 @@ export async function syncUpsert(
     return;
   }
   const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
+  const ref = await syncStore.findEntityRef(entityType, matches);
   if (ref) {
-    await syncStore.enqueueCommand({
-      action: "update",
-      entityType,
-      entityId: ref.entityId,
-      baseVersion: ref.version,
-      patch: updateData,
-    });
+    await enqueueUpdate(syncStore, entityType, ref, updateData);
     return;
   }
-  const merged = await syncStore.mergeIntoPendingCreate(entityType, localId, data);
+  const merged = await syncStore.mergeIntoPendingCreate(entityType, matches, data);
   if (merged) {
     return;
   }
-  await syncCreate(entityType, localId, data);
+  await syncCreate(entityType, newId(), data);
+}
+
+/**
+ * Removes an entity addressed by its natural key: the synced row, or its
+ * still-queued `create` if it never crossed. Warns if neither is found.
+ */
+export async function syncRemoveByKey(
+  entityType: SyncEntityType,
+  matches: EntityMatch,
+  label: string,
+): Promise<void> {
+  if (!isSyncV2Enabled()) {
+    return;
+  }
+  const syncStore = useSyncStore();
+  const ref = await syncStore.findEntityRef(entityType, matches);
+  if (ref) {
+    await enqueueRemove(syncStore, entityType, ref);
+    return;
+  }
+  const cancelled = await syncStore.cancelPendingCreate(entityType, matches);
+  if (!cancelled) {
+    warn(entityType, label, "eliminar");
+  }
 }
 
 /** `user_settings` singleton update — no entity id/version to resolve. */
@@ -245,12 +305,12 @@ export async function syncSettingsUpdate(patch: {
  * decide whether that's acceptable (optional FK) or means the command must
  * be skipped (required FK).
  */
-export async function resolveEntityId(entityType: SyncEntityType, localId: string, kind?: string): Promise<string | null> {
+export async function resolveEntityId(entityType: SyncEntityType, localId: string): Promise<string | null> {
   if (!isSyncV2Enabled()) {
     return null;
   }
   const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId, kind);
+  const ref = await syncStore.getEntityRef(entityType, localId);
   return ref?.entityId ?? null;
 }
 
@@ -277,31 +337,29 @@ export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[
 
 export type CategoryKind = "income" | "expense" | "investment";
 
-/** Stable correlation id for a legacy category name — see the module doc comment. */
-export function categoryLocalId(kind: CategoryKind, name: string): string {
-  return `${kind}:${name}`;
+/**
+ * Matches a cached category by the attributes that identify it: its name
+ * within its kind. Those are the row's own columns, not the
+ * `${kind}:${name}` string the write path used to correlate by (ADR 0001).
+ */
+function categoryMatches(kind: CategoryKind, name: string): EntityMatch {
+  return (category) => category.kind === kind && category.name === name;
 }
 
 /**
- * Looks up an already-synced (or migrated) category row without creating
- * anything. Checks the `${kind}:${name}` convention this client itself
- * creates rows under first, then falls back to the bare `name` the v1
- * migration writes (audit §4.7) before concluding the category is genuinely
- * unseen — so a migrated category resolves to its existing row on first
- * reference instead of a duplicate being created and every referencing
- * command losing its category. The fallback is scoped to `kind` too: the
- * migration writes `legacyId = name` per row with no `kind` in the id
- * itself, so an income and an expense category sharing a name would
- * otherwise collide on the first migrated category found with that bare
- * name.
+ * Resolves a cached row to its server entity id only, by attributes rather
+ * than by id — the match-based counterpart of `resolveEntityId`. Returns
+ * `null` when nothing matches, or when sync-v2 isn't ready.
  */
-async function resolveExistingCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  const localId = categoryLocalId(kind, name);
-  const resolved = await resolveEntityId("category", localId);
-  if (resolved) {
-    return resolved;
+async function resolveEntityIdByMatch(
+  entityType: SyncEntityType,
+  matches: EntityMatch,
+): Promise<string | null> {
+  if (!isSyncV2Enabled()) {
+    return null;
   }
-  return resolveEntityId("category", name, kind);
+  const ref = await useSyncStore().findEntityRef(entityType, matches);
+  return ref?.entityId ?? null;
 }
 
 /**
@@ -316,11 +374,11 @@ export async function resolveCategoryId(kind: CategoryKind, name: string): Promi
   if (!isSyncV2Enabled()) {
     return null;
   }
-  const existing = await resolveExistingCategoryId(kind, name);
+  const existing = await resolveEntityIdByMatch("category", categoryMatches(kind, name));
   if (existing) {
     return existing;
   }
-  await syncUpsert("category", categoryLocalId(kind, name), { name, kind });
+  await syncUpsertByKey("category", categoryMatches(kind, name), { name, kind });
   return null;
 }
 
@@ -355,31 +413,101 @@ export async function resolveOrCreateCategoryId(kind: CategoryKind, name: string
   if (!isSyncV2Enabled()) {
     return null;
   }
-  const existing = await resolveExistingCategoryId(kind, name);
+  const existing = await resolveEntityIdByMatch("category", categoryMatches(kind, name));
   if (existing) {
     return existing;
   }
-  const localId = categoryLocalId(kind, name);
+  const matches = categoryMatches(kind, name);
   const syncStore = useSyncStore();
-  const pendingId = await syncStore.peekPendingCreateId("category", localId);
+  const pendingId = await syncStore.peekPendingCreateId("category", matches);
   if (pendingId) {
     return pendingId;
   }
-  const inFlight = pendingCategoryMints.get(localId);
+  // Memo key for the in-flight mint below. Purely local (never sent) — the
+  // category's identity is the UUID minted here.
+  const memoKey = `${kind}:${name}`;
+  const inFlight = pendingCategoryMints.get(memoKey);
   if (inFlight) {
     return inFlight;
   }
   const mint = (async () => {
-    const id = crypto.randomUUID();
-    await syncUpsert("category", localId, { name, kind, id });
+    const id = newId();
+    await syncUpsertByKey("category", matches, { name, kind, id });
     return id;
   })();
-  pendingCategoryMints.set(localId, mint);
+  pendingCategoryMints.set(memoKey, mint);
   try {
     return await mint;
   } finally {
-    pendingCategoryMints.delete(localId);
+    pendingCategoryMints.delete(memoKey);
   }
+}
+
+/**
+ * Create-if-absent / update-otherwise for a category, addressed by its real
+ * name+kind.
+ *
+ * The name is the only key the local `State` model carries for a category
+ * (`expenseCategories` is a plain name array, `CONTEXT.md`'s "Cuenta"/category
+ * vocabulary), so a rename would still read as a new entity here — latent,
+ * since no rename path exists (`settings.ts` exposes add/remove/reorder/emoji).
+ * The row's *identity* is not name-derived: it is the id the client minted on
+ * create (ADR 0001), and that id is what `update`/`remove` address.
+ */
+export async function syncCategoryUpsert(
+  kind: CategoryKind,
+  name: string,
+  data: JsonRecord = {},
+): Promise<void> {
+  await syncUpsertByKey("category", categoryMatches(kind, name), { name, kind, ...data });
+}
+
+/** Removes a category addressed by its real name+kind. */
+export async function syncCategoryRemove(kind: CategoryKind, name: string): Promise<void> {
+  await syncRemoveByKey("category", categoryMatches(kind, name), name);
+}
+
+/** Create-if-absent / update-otherwise for a goal, addressed by its key. */
+export async function syncGoalUpsert(key: string, data: JsonRecord): Promise<void> {
+  await syncUpsertByKey("goal", (goal) => goal.key === key, data);
+}
+
+/**
+ * Upserts one budget cell, addressed by the natural key that identifies it in
+ * `budget_entries`: its category, year and month (ADR 0001). Its identity
+ * never travels in the update patch — `entityUpdateSchemas.budgetEntry` only
+ * declares `amount`/`currency`.
+ */
+export async function syncBudgetEntry(
+  categoryId: string,
+  year: number,
+  month: number,
+  amount: number,
+  currency: string,
+): Promise<void> {
+  await syncUpsertByKey(
+    "budgetEntry",
+    (entry) => entry.categoryId === categoryId && entry.year === year && entry.month === month,
+    { categoryId, year, month, amount, currency },
+    { amount, currency },
+  );
+}
+
+/**
+ * Upserts a wealth snapshot, addressed by the year and month it belongs to
+ * (ADR 0001). The snapshot's date is derived from those two, so they cannot
+ * drift apart.
+ */
+export async function syncWealthSnapshot(
+  year: number,
+  month: number,
+  balances: unknown,
+): Promise<void> {
+  await syncUpsertByKey(
+    "wealthSnapshot",
+    (snapshot) => snapshot.year === year && snapshot.month === month,
+    { snapshotDate: `${year}-${String(month).padStart(2, "0")}-01`, year, month, balances },
+  );
 }
 
 /**
