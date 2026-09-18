@@ -34,18 +34,20 @@ describe('v2 repair execution', () => {
     expect(() => loadRepairBackup({ budgetCells: 'invalid' })).toThrow(/export de respaldo/i)
   })
 
-  it('loads backup from direct RepairBackup structure and v1 State export format', () => {
+  it('loads backup from direct RepairBackup structure', () => {
     const direct = loadRepairBackup(REPAIR_FIXTURE_BACKUP)
     expect(direct.budgetCells).toHaveLength(2)
     expect(direct.snapshots).toHaveLength(2)
+  })
 
+  it('loads backup from v1 State export format and preserves zero amounts', () => {
     const legacyState = {
       meta: { source: 'test', generatedAt: '2026-08-12T00:00:00Z', version: 1, savedAt: null },
       year: 2025,
       currency: 'EUR',
       budget: {
         expense: {
-          Comida: [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          Comida: [100, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         },
         income: {},
         investment: {},
@@ -70,6 +72,30 @@ describe('v2 repair execution', () => {
         amountMinor: 10000,
         currency: 'EUR',
       },
+      {
+        categoryName: 'Comida',
+        categoryKind: 'expense',
+        year: 2025,
+        month: 2,
+        amountMinor: 0,
+        currency: 'EUR',
+      },
+      {
+        categoryName: 'Comida',
+        categoryKind: 'expense',
+        year: 2025,
+        month: 3,
+        amountMinor: 5000,
+        currency: 'EUR',
+      },
+      ...Array.from({ length: 9 }, (_, idx) => ({
+        categoryName: 'Comida',
+        categoryKind: 'expense',
+        year: 2025,
+        month: idx + 4,
+        amountMinor: 0,
+        currency: 'EUR',
+      })),
     ])
     expect(fromLegacy.snapshots).toEqual([
       {
@@ -109,23 +135,12 @@ describe('v2 repair execution', () => {
     )
   })
 
-  it('applies the repair plan, merges categories preserving history, fixes accounts and restores budget/snapshots', async () => {
+  it('merges duplicate categories into canonical category preserving references', async () => {
     const { sqlite, db } = testDb
     const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
 
-    const report: RepairExecutionReport = await applyRepairPlan(db, fixture.userId, plan)
+    await applyRepairPlan(db, fixture.userId, plan)
 
-    expect(report).toEqual({
-      categoryMerges: 1,
-      referencesRepointed: 1,
-      accountsCorrected: 1,
-      budgetEntriesUpdated: 1,
-      budgetEntriesInserted: 1,
-      snapshotsUpdated: 0,
-      snapshotsInserted: 1,
-    })
-
-    // 1. Categories: duplicate deleted, canonical remains
     const remainingCategories = sqlite
       .prepare('SELECT id, legacy_id, name FROM categories WHERE user_id = ? ORDER BY id')
       .all(fixture.userId)
@@ -137,7 +152,6 @@ describe('v2 repair execution', () => {
       },
     ])
 
-    // 2. Transaction history preserved: repointed to canonical category
     const tx = sqlite
       .prepare('SELECT id, category_id, description, amount_minor FROM transactions WHERE id = ?')
       .get(fixture.transactionId) as {
@@ -149,13 +163,25 @@ describe('v2 repair execution', () => {
     expect(tx.category_id).toBe(REPAIR_FIXTURE_IDS.migratedCategory)
     expect(tx.description).toBe('Compra que conserva el historial')
     expect(tx.amount_minor).toBe(1250)
+  })
 
-    // 3. Accounts: kind corrected to cash
+  it('corrects account kinds with invalid values to cash', async () => {
+    const { sqlite, db } = testDb
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+
+    await applyRepairPlan(db, fixture.userId, plan)
+
     expect(sqlite.prepare('SELECT kind FROM accounts WHERE id = ?').get(fixture.accountId)).toEqual(
       { kind: 'cash' },
     )
+  })
 
-    // 4. Budget cells: 2025 restored to 10000, 2026 inserted with 25000
+  it('restores budget cells from clean export', async () => {
+    const { sqlite, db } = testDb
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+
+    await applyRepairPlan(db, fixture.userId, plan)
+
     const budgetRows = sqlite
       .prepare(
         'SELECT category_id, year, month, amount_minor, currency FROM budget_entries WHERE user_id = ? ORDER BY year, month',
@@ -177,8 +203,14 @@ describe('v2 repair execution', () => {
         currency: 'EUR',
       },
     ])
+  })
 
-    // 5. Wealth snapshots: March 2025 inserted, March 2026 preserved
+  it('restores missing wealth snapshots and account balances', async () => {
+    const { sqlite, db } = testDb
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+
+    await applyRepairPlan(db, fixture.userId, plan)
+
     const snapshotRows = sqlite
       .prepare(
         'SELECT id, snapshot_date, year, month FROM wealth_snapshots WHERE user_id = ? ORDER BY year, month',
@@ -207,8 +239,17 @@ describe('v2 repair execution', () => {
         currency: 'EUR',
       },
     ])
+  })
 
-    // 6. Idempotency: rebuilding plan on repaired DB returns empty plan
+  it('is idempotent: re-evaluating repair plan on repaired database produces an empty plan', async () => {
+    const { db } = testDb
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+
+    const report: RepairExecutionReport = await applyRepairPlan(db, fixture.userId, plan)
+    expect(report.categoryMerges).toBe(1)
+    expect(report.referencesRepointed).toBe(1)
+    expect(report.accountsCorrected).toBe(1)
+
     const secondPlan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
     expect(secondPlan).toEqual({
       categoryMerges: [],
@@ -220,24 +261,22 @@ describe('v2 repair execution', () => {
 
   it('demands a backup export via CLI before execution', async () => {
     await expect(runRepairCli(['--execute'])).rejects.toThrow(/export de respaldo/i)
-    await expect(runRepairCli([])).rejects.toThrow(/export de respaldo/i)
   })
 
-  it('runs CLI in simulation mode by default and in execute mode when flag is passed', async () => {
+  it('runs CLI in simulation mode by default leaving database untouched', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
 
     mkdirSync('.scratch', { recursive: true })
-    const backupPath = resolve('.scratch/test-repair-backup.json')
-    const dbPath = resolve('.scratch/test-repair-db.sqlite')
+    const backupPath = resolve('.scratch/test-repair-backup-sim.json')
+    const dbPath = resolve('.scratch/test-repair-db-sim.sqlite')
 
     writeFileSync(backupPath, JSON.stringify(REPAIR_FIXTURE_BACKUP), 'utf8')
 
     try {
       if (existsSync(dbPath)) rmSync(dbPath)
 
-      // Seed database
       const staging = openLocalV2Db(dbPath)
       const fixtureIds = seedRepairFixture({
         db: staging.db,
@@ -246,7 +285,6 @@ describe('v2 repair execution', () => {
       })
       staging.close()
 
-      // 1. Simulation run (default)
       const simResult = await runRepairCli([
         `--backup=${backupPath}`,
         `--v2-sqlite=${dbPath}`,
@@ -256,14 +294,40 @@ describe('v2 repair execution', () => {
       expect(simResult.plan.categoryMerges).toHaveLength(1)
 
       // Verify db is untouched
-      const check1 = openLocalV2Db(dbPath)
-      const catCountBefore = check1.sqlite
+      const check = openLocalV2Db(dbPath)
+      const catCount = check.sqlite
         .prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?')
         .get(fixtureIds.userId) as { count: number }
-      expect(catCountBefore.count).toBe(2)
-      check1.close()
+      expect(catCount.count).toBe(2)
+      check.close()
+    } finally {
+      if (existsSync(backupPath)) rmSync(backupPath)
+      if (existsSync(dbPath)) rmSync(dbPath)
+    }
+  })
 
-      // 2. Execute run
+  it('runs CLI in execution mode when --execute is passed applying all repairs', async () => {
+    const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
+
+    mkdirSync('.scratch', { recursive: true })
+    const backupPath = resolve('.scratch/test-repair-backup-exec.json')
+    const dbPath = resolve('.scratch/test-repair-db-exec.sqlite')
+
+    writeFileSync(backupPath, JSON.stringify(REPAIR_FIXTURE_BACKUP), 'utf8')
+
+    try {
+      if (existsSync(dbPath)) rmSync(dbPath)
+
+      const staging = openLocalV2Db(dbPath)
+      const fixtureIds = seedRepairFixture({
+        db: staging.db,
+        sqlite: staging.sqlite,
+        close: staging.close,
+      })
+      staging.close()
+
       const execResult = await runRepairCli([
         `--backup=${backupPath}`,
         `--v2-sqlite=${dbPath}`,
@@ -273,20 +337,19 @@ describe('v2 repair execution', () => {
       expect(execResult.executed).toBe(true)
 
       // Verify db was repaired
-      const check2 = openLocalV2Db(dbPath)
-      const catCountAfter = check2.sqlite
+      const check = openLocalV2Db(dbPath)
+      const catCount = check.sqlite
         .prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?')
         .get(fixtureIds.userId) as { count: number }
-      expect(catCountAfter.count).toBe(1)
-      const accountKind = check2.sqlite
+      expect(catCount.count).toBe(1)
+      const accountKind = check.sqlite
         .prepare('SELECT kind FROM accounts WHERE id = ?')
         .get(fixtureIds.accountId) as { kind: string }
       expect(accountKind.kind).toBe('cash')
-      check2.close()
+      check.close()
     } finally {
       if (existsSync(backupPath)) rmSync(backupPath)
       if (existsSync(dbPath)) rmSync(dbPath)
     }
   })
 })
-

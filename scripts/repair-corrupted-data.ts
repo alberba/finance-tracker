@@ -85,30 +85,37 @@ export async function runRepairCli(argv: string[]): Promise<{
     return { plan: { categoryMerges: [], accountKindCorrections: [], budgetRestorations: [], snapshotRestorations: [] }, executed: false }
   }
 
+  const isSimulation = args['dry-run'] || !args.execute
+
   // Acceptance criterion: Exige un export de respaldo antes de ejecutar
-  if (!args.backup) {
+  if (!args.backup && !isSimulation) {
     throw new Error(
       'Se exige un export de respaldo antes de ejecutar la reparación. Pasa la ruta con --backup=<fichero.json>.',
     )
   }
 
-  const backupPath = resolve(args.backup)
-  if (!existsSync(backupPath)) {
-    throw new Error(`El archivo de respaldo especificado no existe: ${backupPath}`)
+  let backup: RepairBackup = { budgetCells: [], snapshots: [] }
+  if (args.backup) {
+    const backupPath = resolve(args.backup)
+    if (!existsSync(backupPath)) {
+      throw new Error(`El archivo de respaldo especificado no existe: ${backupPath}`)
+    }
+
+    let rawBackup: unknown
+    try {
+      rawBackup = JSON.parse(readFileSync(backupPath, 'utf8'))
+    } catch (err) {
+      throw new Error(`Error al leer el archivo de respaldo JSON (${backupPath}): ${(err as Error).message}`, {
+        cause: err,
+      })
+    }
+    backup = loadRepairBackup(rawBackup)
+  } else {
+    console.log(
+      '\n[AVISO] No se ha especificado --backup=<ruta>. La simulación muestra fusiones de categorías y correcciones de cuentas, pero no restauraciones de presupuesto.',
+    )
   }
 
-  let rawBackup: unknown
-  try {
-    rawBackup = JSON.parse(readFileSync(backupPath, 'utf8'))
-  } catch (err) {
-    throw new Error(`Error al leer el archivo de respaldo JSON (${backupPath}): ${(err as Error).message}`, {
-      cause: err,
-    })
-  }
-
-  const backup: RepairBackup = loadRepairBackup(rawBackup)
-
-  const isSimulation = args['dry-run'] || !args.execute
   const v2Path = resolve(args['v2-sqlite'] ?? '.data/finance-tracker-v2.sqlite')
   const { db, close } = openLocalV2Db(v2Path)
 
@@ -132,7 +139,7 @@ export async function runRepairCli(argv: string[]): Promise<{
     if (args.json && isSimulation) {
       console.log(JSON.stringify({ simulation: true, plan }, null, 2))
     } else {
-      console.log(formatRepairPlan(plan, { simulation: isSimulation }))
+      console.log(formatRepairPlan(plan, { simulation: true }))
     }
 
     if (isSimulation) {
@@ -140,7 +147,7 @@ export async function runRepairCli(argv: string[]): Promise<{
       return { plan, executed: false }
     }
 
-    // 2. Modo ejecución: aplica el plan
+    // 2. Modo ejecución: aplica el plan tras haber impreso la simulación
     console.log('\n[EJECUCIÓN] Aplicando el plan de reparación en la base de datos...')
     const report = await applyRepairPlan(db, userId, plan)
 

@@ -499,7 +499,7 @@ export function loadRepairBackup(data: unknown): RepairBackup {
         if (!Array.isArray(monthly)) continue
         for (let m = 0; m < monthly.length && m < 12; m++) {
           const amount = monthly[m]
-          if (typeof amount === 'number' && amount > 0) {
+          if (typeof amount === 'number' && Number.isFinite(amount)) {
             budgetCells.push({
               categoryName,
               categoryKind: kind,
@@ -662,6 +662,26 @@ export interface RepairExecutionReport {
   snapshotsInserted: number
 }
 
+async function insertSnapshotBalances(
+  db: Db,
+  userId: string,
+  snapshotId: string,
+  balances: readonly SnapshotBalanceRepair[],
+  now: string,
+): Promise<void> {
+  for (const balance of balances) {
+    await db.insert(snapshotBalances).values({
+      id: uuidv7(),
+      userId,
+      snapshotId,
+      accountId: balance.accountId,
+      balanceMinor: balance.balanceMinor,
+      currency: balance.currency,
+      createdAt: now,
+    })
+  }
+}
+
 /**
  * Applies the repair plan inside a transaction.
  */
@@ -705,6 +725,30 @@ export async function applyRepairPlan(
             .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
             .where(and(eq(subscriptions.userId, userId), eq(subscriptions.id, ref.rowId)))
         } else if (ref.table === 'budget_entries') {
+          const [entry] = await db
+            .select({ year: budgetEntries.year, month: budgetEntries.month })
+            .from(budgetEntries)
+            .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, ref.rowId)))
+          if (entry) {
+            const [conflict] = await db
+              .select({ id: budgetEntries.id })
+              .from(budgetEntries)
+              .where(
+                and(
+                  eq(budgetEntries.userId, userId),
+                  eq(budgetEntries.categoryId, merge.canonicalCategoryId),
+                  eq(budgetEntries.year, entry.year),
+                  eq(budgetEntries.month, entry.month),
+                ),
+              )
+            if (conflict) {
+              await db
+                .delete(budgetEntries)
+                .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, ref.rowId)))
+              referencesRepointed++
+              continue
+            }
+          }
           await db
             .update(budgetEntries)
             .set({ categoryId: merge.canonicalCategoryId, updatedAt: now })
@@ -796,17 +840,7 @@ export async function applyRepairPlan(
           updatedAt: now,
           version: 1,
         })
-        for (const balance of snapshot.balances) {
-          await db.insert(snapshotBalances).values({
-            id: uuidv7(),
-            userId,
-            snapshotId,
-            accountId: balance.accountId,
-            balanceMinor: balance.balanceMinor,
-            currency: balance.currency,
-            createdAt: now,
-          })
-        }
+        await insertSnapshotBalances(db, userId, snapshotId, snapshot.balances, now)
         snapshotsInserted++
       } else if (snapshot.action === 'update') {
         const snapshotId = snapshot.snapshotId!
@@ -824,17 +858,7 @@ export async function applyRepairPlan(
             ),
           )
 
-        for (const balance of snapshot.balances) {
-          await db.insert(snapshotBalances).values({
-            id: uuidv7(),
-            userId,
-            snapshotId,
-            accountId: balance.accountId,
-            balanceMinor: balance.balanceMinor,
-            currency: balance.currency,
-            createdAt: now,
-          })
-        }
+        await insertSnapshotBalances(db, userId, snapshotId, snapshot.balances, now)
         snapshotsUpdated++
       }
     }
