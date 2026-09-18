@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { buildWealthViewModel } from '../domain/wealth/view-model'
-import { resolveEntityId, syncUpsert } from '../lib/client/command-mapping'
+import { resolveEntityId, syncWealthSnapshot } from '../lib/client/command-mapping'
 import type { SnapshotKind, SnapshotRow } from '../scripts/types'
 import { parseFloatSafe, round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -21,16 +21,6 @@ interface SnapshotBalanceCommand {
   accountId: string
   balance: number
   currency: string
-}
-
-/**
- * Correlation id for one snapshot — its natural key, `(year, month)` (ADR
- * 0001); the string the sync path addresses it by. The month in the id is the
- * canonical 1-12 the command carries, and the year is what keeps March of two
- * different years from resolving to the same row (audit §4.6).
- */
-function snapshotLocalId(year: number, monthIndex: number): string {
-  return `${year}-${monthIndex + 1}`
 }
 
 /**
@@ -95,12 +85,10 @@ export const useWealthStore = defineStore('wealth', () => {
     const year = financialStateStore.year
     const currency = financialStateStore.state.currency
     void buildSnapshotBalances(snapshot, currency).then((balances) =>
-      syncUpsert('wealthSnapshot', snapshotLocalId(year, month), {
-        snapshotDate: `${year}-${String(month + 1).padStart(2, '0')}-01`,
-        year,
-        month: month + 1,
-        balances,
-      }),
+      // Addressed by its natural key, `(year, month)` (ADR 0001): the year is
+      // what keeps March of two different years from resolving to the same
+      // row (audit §4.6).
+      syncWealthSnapshot(year, month + 1, balances),
     )
     showToast('Snapshot guardado.')
   }

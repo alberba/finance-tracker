@@ -145,4 +145,64 @@ describe("round trip: identidad propia para entidades nuevas", () => {
       .where(and(eq(categories.userId, trip.userId), eq(categories.legacyId, "expense:Comida")));
     expect(rows).toHaveLength(1);
   });
+
+  // -- contraer: el camino de escritura deja de correlacionar por datos ----
+
+  it("una entidad nueva se almacena con la identidad que le dio el cliente, no con una derivada de sus datos", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
+
+    useSettingsStore().addEntity("accounts", "Revolut", "285.67");
+    const accountId = useFinancialStateStore().accounts[0].id;
+
+    await trip.reload();
+
+    const rows = await trip.testDb.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.userId, trip.userId));
+    expect(rows).toHaveLength(1);
+    // La identidad es la que fijó el cliente, y nada la ata a su nombre: no
+    // queda ningún identificador derivado de los datos con el que
+    // correlacionarla.
+    expect(rows[0].id).toBe(accountId);
+    expect(rows[0].legacyId).toBeNull();
+  });
+
+  it("renombrar una cuenta nueva conserva su identidad y su fila", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
+    const settings = useSettingsStore();
+
+    settings.addEntity("accounts", "Revolut", "0");
+    const accountId = useFinancialStateStore().accounts[0].id;
+    await trip.reload();
+
+    settings.updateEntityField("accounts", accountId, "name", "Revolut Nómina");
+    const reloaded = await trip.reload();
+
+    const rows = await trip.testDb.db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.userId, trip.userId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(accountId);
+    expect(rows[0].name).toBe("Revolut Nómina");
+    expect(reloaded.accounts).toHaveLength(1);
+    expect(reloaded.accounts[0]).toMatchObject({ name: "Revolut Nómina" });
+  });
+
+  it("una categoría nueva lleva identidad propia en vez de una derivada de su nombre", async () => {
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+
+    useSettingsStore().addCategory("expenseCategories", "Ocio");
+    await trip.reload();
+
+    const rows = await trip.testDb.db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.userId, trip.userId), eq(categories.name, "Ocio")));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].legacyId).toBeNull();
+  });
 });

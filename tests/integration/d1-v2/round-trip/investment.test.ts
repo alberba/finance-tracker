@@ -12,20 +12,26 @@ import { startRoundTrip, type RoundTrip } from "./harness";
 async function seedAccountAndCategory(trip: RoundTrip) {
   const { useSettingsStore } = await import("../../../../src/stores/settings");
   const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
-  useFinancialStateStore().commitState((draft) => {
+  const financialState = useFinancialStateStore();
+  financialState.commitState((draft) => {
     draft.investmentCategories = ["Acciones"];
     draft.expenseCategories = ["Ocio"];
   });
   useSettingsStore().addEntity("accounts", "MyInvestor", "0");
+  // The account's own identity, read from the state instead of assumed from
+  // its name: a new entity carries the id the client minted (ADR 0001).
+  const accountId = financialState.accounts[0].id;
   await trip.reload();
+  return accountId;
 }
 
 describe("round trip: inversión", () => {
   let trip: RoundTrip;
+  let accountId: string;
 
   beforeEach(async () => {
     trip = await startRoundTrip();
-    await seedAccountAndCategory(trip);
+    accountId = await seedAccountAndCategory(trip);
   });
 
   afterEach(() => {
@@ -45,7 +51,7 @@ describe("round trip: inversión", () => {
         units: "10",
         fee: "1.20",
         movementCurrency: "EUR",
-        accountId: "myinvestor",
+        accountId,
         declared: false,
       }),
     ).toBe(true);
@@ -68,7 +74,7 @@ describe("round trip: inversión", () => {
     expect(
       useRecurringStore().addRule({
         type: "investment",
-        accountId: "myinvestor",
+        accountId,
         category: "Acciones",
         description: "Aportación mensual VWCE",
         amount: 200,
@@ -106,7 +112,7 @@ describe("round trip: inversión", () => {
     const recurring = useRecurringStore();
     recurring.addRule({
       type: "expense",
-      accountId: "myinvestor",
+      accountId,
       category: "Ocio",
       description: "Gimnasio",
       amount: 30,
@@ -119,7 +125,7 @@ describe("round trip: inversión", () => {
 
     recurring.updateRule(ruleId, {
       type: "expense",
-      accountId: "myinvestor",
+      accountId,
       category: "Ocio",
       description: "Gimnasio Premium",
       amount: 45,
@@ -140,7 +146,7 @@ describe("round trip: inversión", () => {
     const { useRecurringStore } = await import("../../../../src/stores/recurring");
     useRecurringStore().addRule({
       type: "investment",
-      accountId: "myinvestor",
+      accountId,
       category: "Acciones",
       description: "Aportación mensual VWCE",
       amount: 200,
@@ -177,7 +183,7 @@ describe("round trip: inversión", () => {
       units: "10",
       fee: "1.20",
       movementCurrency: "EUR",
-      accountId: "myinvestor",
+      accountId,
       declared: false,
     });
     const first = await trip.reload();
@@ -196,7 +202,7 @@ describe("round trip: inversión", () => {
       "2026-03-31",
       2,
       [{ kind: "investments", id: "indexa", value: "1000" }],
-      [{ accountId: "myinvestor", amount: 200 }],
+      [{ accountId, amount: 200 }],
       [],
     );
     expect(saved).toBe(true);
@@ -204,6 +210,6 @@ describe("round trip: inversión", () => {
     const reloaded = await trip.reload();
 
     const contribution = reloaded.contributions.find((item) => item.date === "2026-03-31");
-    expect(contribution?.flowAllocations).toEqual([{ accountId: "myinvestor", amount: 200 }]);
+    expect(contribution?.flowAllocations).toEqual([{ accountId, amount: 200 }]);
   });
 });

@@ -10,11 +10,17 @@ import { startRoundTrip, type RoundTrip } from "./harness";
 
 describe("round trip: patrimonio", () => {
   let trip: RoundTrip;
+  // The account's own identity — read from the state, not assumed from its
+  // name: an entity created from now on carries the id the client minted for
+  // it (ADR 0001).
+  let accountId: string;
 
   beforeEach(async () => {
     trip = await startRoundTrip();
     const { useSettingsStore } = await import("../../../../src/stores/settings");
+    const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
     useSettingsStore().addEntity("accounts", "Revolut", "0");
+    accountId = useFinancialStateStore().accounts[0].id;
     await trip.reload();
   });
 
@@ -25,26 +31,26 @@ describe("round trip: patrimonio", () => {
   it("keeps the balances the user typed (§4.2)", async () => {
     const { useWealthStore } = await import("../../../../src/stores/wealth");
     useWealthStore().setMonth(2);
-    useWealthStore().saveSnapshot([{ kind: "accounts", id: "revolut", value: "1250.40" }]);
+    useWealthStore().saveSnapshot([{ kind: "accounts", id: accountId, value: "1250.40" }]);
 
     const reloaded = await trip.reload();
 
-    expect(reloaded.snapshots["2"]?.accounts?.revolut).toBe(1250.4);
+    expect(reloaded.snapshots["2"]?.accounts?.[accountId]).toBe(1250.4);
   });
 
   it("keeps editing an existing snapshot (§4.2)", async () => {
     const { useWealthStore } = await import("../../../../src/stores/wealth");
     const wealth = useWealthStore();
     wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "1000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "1000" }]);
     await trip.reload();
 
     wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "2000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
 
     const reloaded = await trip.reload();
 
-    expect(reloaded.snapshots["2"]?.accounts?.revolut).toBe(2000);
+    expect(reloaded.snapshots["2"]?.accounts?.[accountId]).toBe(2000);
   });
 
   it("keeps November and December apart (§4.6)", async () => {
@@ -52,14 +58,14 @@ describe("round trip: patrimonio", () => {
     const wealth = useWealthStore();
 
     wealth.setMonth(10);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "1000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "1000" }]);
     wealth.setMonth(11);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "2000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
 
     const reloaded = await trip.reload();
 
-    expect(reloaded.snapshots["10"]?.accounts?.revolut).toBe(1000);
-    expect(reloaded.snapshots["11"]?.accounts?.revolut).toBe(2000);
+    expect(reloaded.snapshots["10"]?.accounts?.[accountId]).toBe(1000);
+    expect(reloaded.snapshots["11"]?.accounts?.[accountId]).toBe(2000);
   });
 
   it("reads the snapshot of the state's year, not another year's, for the same month (§4.6)", async () => {
@@ -96,7 +102,7 @@ describe("round trip: patrimonio", () => {
 
     const reloaded = await trip.reload();
 
-    expect(reloaded.snapshots["2"]?.accounts?.revolut).toBe(2000);
+    expect(reloaded.snapshots["2"]?.accounts?.[accountId]).toBe(2000);
   });
 
   it("does not mix up snapshots from two different years (§4.6)", async () => {
@@ -109,14 +115,14 @@ describe("round trip: patrimonio", () => {
       draft.year = 2025;
     });
     wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "1000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "1000" }]);
     await trip.reload();
 
     financialState.commitState((draft) => {
       draft.year = 2026;
     });
     wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: "revolut", value: "2000" }]);
+    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
     await trip.reload();
 
     const wealthRepository = await import("../../../../src/db/repositories/wealth");

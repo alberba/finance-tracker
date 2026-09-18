@@ -13,20 +13,26 @@ import { startRoundTrip, type RoundTrip } from "./harness";
 async function seedAccountAndCategory(trip: RoundTrip) {
   const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
   const { useSettingsStore } = await import("../../../../src/stores/settings");
-  useFinancialStateStore().commitState((draft) => {
+  const financialState = useFinancialStateStore();
+  financialState.commitState((draft) => {
     draft.expenseCategories = ["Ocio"];
     draft.investmentCategories = ["Acciones"];
   });
   useSettingsStore().addEntity("accounts", "Revolut", "100");
+  // The account's own identity, read from the state instead of assumed from
+  // its name: a new entity carries the id the client minted (ADR 0001).
+  const accountId = financialState.accounts[0].id;
   await trip.reload();
+  return accountId;
 }
 
 describe("round trip: borrar avisa en vez de fallar", () => {
   let trip: RoundTrip;
+  let accountId: string;
 
   beforeEach(async () => {
     trip = await startRoundTrip();
-    await seedAccountAndCategory(trip);
+    accountId = await seedAccountAndCategory(trip);
   });
 
   afterEach(() => {
@@ -46,7 +52,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
       units: "10",
       fee: "1.20",
       movementCurrency: "EUR",
-      accountId: "revolut",
+      accountId,
       declared: false,
     });
     const withMovement = await trip.reload();
@@ -71,7 +77,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
       date: "2026-09-01",
       month: 9,
       type: "expense",
-      accountId: "revolut",
+      accountId,
       category: "Ocio",
       description: "Cine",
       amount: 12,
@@ -79,7 +85,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
     await trip.reload();
 
     const { useSettingsStore } = await import("../../../../src/stores/settings");
-    useSettingsStore().removeEntity("accounts", "revolut");
+    useSettingsStore().removeEntity("accounts", accountId);
 
     await vi.waitFor(async () => {
       await trip.syncStore.flush();
@@ -106,7 +112,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
       date: "2026-09-01",
       month: 9,
       type: "expense",
-      accountId: "revolut",
+      accountId,
       category: "Transporte",
       description: "Metro",
       amount: 12,

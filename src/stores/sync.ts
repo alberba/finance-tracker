@@ -34,6 +34,7 @@ import {
   recordFailure,
   type OutboxCommandInput,
   type OutboxEntry,
+  type PendingCreateMatch,
 } from '../lib/client/outbox'
 import { wipeAllClientData } from '../lib/client/wipe'
 import {
@@ -550,14 +551,17 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Resolves a locally-known entity (a legacy/client-generated id — the
-   * `uid('tx')`-style id the legacy `State` domain model uses, a category
-   * name, a goal key, etc.) to its server-issued `{entityId, version}`, by
-   * scanning the local IndexedDB cache (populated by bootstrap/pull and by
-   * prior successful `create`/`update` sync results — see
-   * `applyResultToCache`). Every v2 row carries the original client id in
-   * its `legacyId` column (WP1) specifically so this correlation is
-   * possible without the client ever learning server ids up front.
+   * Resolves a locally-known entity to its `{entityId, version}` by scanning
+   * the local IndexedDB cache (populated by bootstrap/pull and by prior
+   * successful `create`/`update` sync results — see `applyResultToCache`).
+   *
+   * The entity's own id is tried first: an entity created from now on carries
+   * the identity the client minted for it (ADR 0001) as its primary key in
+   * D1 too, so the local id *is* the server id and no correlation is needed.
+   * Only when no row carries that id does the `legacyId` column come into
+   * play — the one remaining use of the identifier derived from v1's data,
+   * kept so a row migrated from v1 stays addressable by the id the local
+   * `State` still knows it by.
    *
    * Returns `null` when sync-v2 isn't ready or the entity hasn't
    * synced/been created server-side yet — `src/lib/client/command-mapping.ts`
@@ -566,18 +570,39 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function getEntityRef(
     entityType: SyncEntityType,
-    legacyId: string,
-    kind?: string,
+    localId: string,
   ): Promise<{ entityId: string; version: number } | null> {
     if (!isReady() || !cacheDb) {
       return null
     }
     const entities = await getAllEntities(cacheDb, entityType)
-    const match = entities.find((entity) => {
-      if ((entity as { legacyId?: unknown }).legacyId !== legacyId) return false
-      if (kind !== undefined && (entity as { kind?: unknown }).kind !== kind) return false
-      return true
-    })
+    const match =
+      entities.find((entity) => entity.id === localId) ??
+      entities.find((entity) => (entity as { legacyId?: unknown }).legacyId === localId)
+    if (!match) {
+      return null
+    }
+    const rawVersion = (match as { version?: unknown }).version
+    const version = typeof rawVersion === 'number' ? rawVersion : 0
+    return { entityId: match.id, version }
+  }
+
+  /**
+   * Resolves an entity by a predicate over its cached row instead of by id
+   * — for aggregates whose identity is a real natural key (a category's
+   * name+kind, a budget cell's `(categoryId, year, month)`, a snapshot's
+   * `(year, month)`). Matching on the row's own columns is a query, not a
+   * derived correlation id (ADR 0001).
+   */
+  async function findEntityRef(
+    entityType: SyncEntityType,
+    matches: (entity: Record<string, unknown>) => boolean,
+  ): Promise<{ entityId: string; version: number } | null> {
+    if (!isReady() || !cacheDb) {
+      return null
+    }
+    const entities = await getAllEntities(cacheDb, entityType)
+    const match = entities.find((entity) => matches(entity as Record<string, unknown>))
     if (!match) {
       return null
     }
@@ -588,18 +613,21 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Reads the client-minted id (ADR 0001) off a still-queued, not-yet-
-   * acknowledged `create` command for this legacy id, without amending or
+   * acknowledged `create` command matching `matches`, without amending or
    * removing it. Used by callers that need to *reference* the entity (as a
    * foreign key on another command in the same batch) before its own create
    * has been acknowledged — e.g. a budget entry pointing at a category
    * that hasn't synced yet. `null` if nothing is pending or the pending
    * create wasn't minted with an id.
    */
-  async function peekPendingCreateId(entityType: SyncEntityType, legacyId: string): Promise<string | null> {
+  async function peekPendingCreateId(
+    entityType: SyncEntityType,
+    matches: PendingCreateMatch,
+  ): Promise<string | null> {
     if (!outboxDb) {
       return null
     }
-    const pending = await findPendingCreate(outboxDb, entityType, legacyId)
+    const pending = await findPendingCreate(outboxDb, entityType, matches)
     if (!pending || pending.command.action !== 'create') {
       return null
     }
@@ -609,7 +637,7 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Folds a patch into a still-queued, not-yet-acknowledged `create`
-   * command for this legacy id — used when the user edits an entity before
+   * command matching `matches` — used when the user edits an entity before
    * its `create` command has synced (so there is no server id to address
    * an `update` command to yet). Returns whether a pending create was
    * found.
@@ -624,13 +652,13 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function mergeIntoPendingCreate(
     entityType: SyncEntityType,
-    legacyId: string,
+    matches: PendingCreateMatch,
     patch: Record<string, unknown>,
   ): Promise<boolean> {
     if (!outboxDb) {
       return false
     }
-    const pending = await findPendingCreate(outboxDb, entityType, legacyId)
+    const pending = await findPendingCreate(outboxDb, entityType, matches)
     if (!pending) {
       return false
     }
@@ -643,15 +671,18 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Cancels a still-queued, not-yet-acknowledged `create` command for this
-   * legacy id — used when the user deletes an entity before its `create`
+   * Cancels a still-queued, not-yet-acknowledged `create` command matching
+   * `matches` — used when the user deletes an entity before its `create`
    * command has synced. Returns whether a pending create was found.
    */
-  async function cancelPendingCreate(entityType: SyncEntityType, legacyId: string): Promise<boolean> {
+  async function cancelPendingCreate(
+    entityType: SyncEntityType,
+    matches: PendingCreateMatch,
+  ): Promise<boolean> {
     if (!outboxDb) {
       return false
     }
-    const pending = await findPendingCreate(outboxDb, entityType, legacyId)
+    const pending = await findPendingCreate(outboxDb, entityType, matches)
     if (!pending) {
       return false
     }
@@ -693,6 +724,7 @@ export const useSyncStore = defineStore('sync', () => {
     pullChanges,
     logout,
     getEntityRef,
+    findEntityRef,
     peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,

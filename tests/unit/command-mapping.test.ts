@@ -10,16 +10,15 @@ import { openIdbCache, putEntity } from "../../src/lib/client/idb-cache";
 import { openOutbox, wipeOutbox, listAll } from "../../src/lib/client/outbox";
 import { wipeIdbCache } from "../../src/lib/client/idb-cache";
 import {
-  categoryLocalId,
   resolveCategoryId,
   resolveEntityId,
   resolveOrCreateCategoryId,
+  syncGoalUpsert,
   syncCreate,
   syncListDiff,
   syncRemove,
   syncSettingsUpdate,
   syncUpdate,
-  syncUpsert,
 } from "../../src/lib/client/command-mapping";
 import { useSyncStore } from "../../src/stores/sync";
 
@@ -65,7 +64,7 @@ describe("command-mapping (WP7b)", () => {
       await expect(syncCreate("account", "local-1", { name: "x" })).resolves.toBeUndefined();
       await expect(syncUpdate("account", "local-1", { name: "y" })).resolves.toBeUndefined();
       await expect(syncRemove("account", "local-1")).resolves.toBeUndefined();
-      await expect(syncUpsert("account", "local-1", { name: "z" })).resolves.toBeUndefined();
+      await expect(syncGoalUpsert("short", { name: "z" })).resolves.toBeUndefined();
       await expect(syncSettingsUpdate({ currency: "EUR" })).resolves.toBeUndefined();
       await expect(resolveEntityId("account", "local-1")).resolves.toBeNull();
       await expect(resolveCategoryId("expense", "Comida")).resolves.toBeNull();
@@ -78,7 +77,7 @@ describe("command-mapping (WP7b)", () => {
       vi.stubEnv("PUBLIC_SYNC_V2", "true");
     });
 
-    it("syncCreate enqueues a create command tagged with legacyId", async () => {
+    it("syncCreate enqueues a create command carrying the entity's own identity", async () => {
       const store = await initSyncStore();
       await syncCreate("account", "local-acc-1", {
         name: "Cuenta",
@@ -93,7 +92,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries[0]?.command).toMatchObject({
         action: "create",
         entityType: "account",
-        data: { name: "Cuenta", legacyId: "local-acc-1" },
+        data: { name: "Cuenta", id: "local-acc-1" },
       });
       expect(store.pendingCount).toBeGreaterThanOrEqual(0);
       outboxDb.close();
@@ -154,7 +153,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries).toHaveLength(1);
       expect(entries[0]?.command).toMatchObject({
         action: "create",
-        data: { name: "Editada", legacyId: "local-acc-2" },
+        data: { name: "Editada", id: "local-acc-2" },
       });
       outboxDb.close();
     });
@@ -197,9 +196,9 @@ describe("command-mapping (WP7b)", () => {
       outboxDb.close();
     });
 
-    it("syncUpsert creates when unknown and updates when a server ref exists", async () => {
+    it("syncGoalUpsert creates when unknown and updates when a server ref exists", async () => {
       await initSyncStore();
-      await syncUpsert("goal", "short", { key: "short", name: "Meta", targetYear: 2030, targetAmount: 1000, currency: "EUR" });
+      await syncGoalUpsert("short", { key: "short", name: "Meta", targetYear: 2030, targetAmount: 1000, currency: "EUR" });
 
       const outboxDbFirst = await openOutbox(USER_ID);
       const firstEntries = await listAll(outboxDbFirst);
@@ -207,14 +206,14 @@ describe("command-mapping (WP7b)", () => {
       outboxDbFirst.close();
 
       // Simulate the create having synced by seeding the cache directly
-      // (getEntityRef is checked before the still-pending outbox create, so
-      // this alone is enough to flip the next call onto the update path —
-      // no need to touch/close the outbox's live connection mid-test).
+      // (the natural-key lookup is checked before the still-pending outbox
+      // create, so this alone is enough to flip the next call onto the
+      // update path — no need to touch/close the outbox's live connection).
       const cacheDb = await openIdbCache(USER_ID);
-      await putEntity(cacheDb, "goal", { id: "server-goal-1", legacyId: "short", version: 1 });
+      await putEntity(cacheDb, "goal", { id: "server-goal-1", key: "short", version: 1 });
       cacheDb.close();
 
-      await syncUpsert("goal", "short", { name: "Meta actualizada" });
+      await syncGoalUpsert("short", { key: "short", name: "Meta actualizada" });
       const outboxDbSecond = await openOutbox(USER_ID);
       const secondEntries = await listAll(outboxDbSecond);
       const update = secondEntries.find((entry) => entry.command.action === "update");
@@ -242,7 +241,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries[0]?.command).toMatchObject({
         action: "create",
         entityType: "category",
-        data: { name: "Comida", kind: "expense", legacyId: categoryLocalId("expense", "Comida") },
+        data: { name: "Comida", kind: "expense", id: expect.any(String) },
       });
       outboxDb.close();
 
@@ -253,11 +252,13 @@ describe("command-mapping (WP7b)", () => {
       expect(await listAll(outboxDb2)).toHaveLength(1);
       outboxDb2.close();
 
-      // Once the category is cached (server round-trip), it resolves.
+      // Once the category is cached (server round-trip), it resolves — found
+      // by its real name+kind, not by a derived correlation id (ADR 0001).
       const cacheDb = await openIdbCache(USER_ID);
       await putEntity(cacheDb, "category", {
         id: "server-cat-1",
-        legacyId: categoryLocalId("expense", "Comida"),
+        name: "Comida",
+        kind: "expense",
         version: 0,
       });
       cacheDb.close();
@@ -277,7 +278,7 @@ describe("command-mapping (WP7b)", () => {
       expect(entries[0]?.command).toMatchObject({
         action: "create",
         entityType: "category",
-        data: { name: "Ocio", kind: "expense", id: first, legacyId: categoryLocalId("expense", "Ocio") },
+        data: { name: "Ocio", kind: "expense", id: first },
       });
       outboxDb.close();
 
@@ -295,7 +296,8 @@ describe("command-mapping (WP7b)", () => {
       const cacheDb = await openIdbCache(USER_ID);
       await putEntity(cacheDb, "category", {
         id: "server-cat-2",
-        legacyId: categoryLocalId("expense", "Comida"),
+        name: "Comida",
+        kind: "expense",
         version: 0,
       });
       cacheDb.close();

@@ -198,24 +198,34 @@ export async function clear(db: IDBDatabase): Promise<void> {
 }
 
 /**
- * Finds a still-queued `create` command for one entity type whose
- * `data.legacyId` matches — used by the client-side command-mapping layer
+ * Predicate over a still-queued `create`'s payload — the identity it is
+ * addressable by before the server has acknowledged it.
+ */
+export type PendingCreateMatch = (data: Record<string, unknown>) => boolean;
+
+/**
+ * Finds a still-queued `create` command for one entity type whose payload
+ * matches — used by the client-side command-mapping layer
  * (`src/lib/client/command-mapping.ts`, WP7b) to fold a later edit into an
  * unacknowledged create, or cancel it outright, instead of emitting an
- * `update`/`remove` command the server can't yet address (the entity has
- * no server-issued id until the create is applied).
+ * `update`/`remove` command the server can't yet address.
+ *
+ * The match is over the payload itself, not a data-derived correlation id:
+ * an entity created from now on carries its own identity (`data.id`, ADR
+ * 0001) from the first instant, and one with a real natural key (category
+ * name+kind, budget cell, snapshot) is matched on those attributes.
  */
 export async function findPendingCreate(
   db: IDBDatabase,
   entityType: SyncEntityType,
-  legacyId: string,
+  match: PendingCreateMatch,
 ): Promise<OutboxEntry | undefined> {
   const all = await listAll(db);
   return all.find(
     (entry) =>
       entry.command.action === "create" &&
       entry.command.entityType === entityType &&
-      (entry.command.data as Record<string, unknown>).legacyId === legacyId,
+      match(entry.command.data as Record<string, unknown>),
   );
 }
 
