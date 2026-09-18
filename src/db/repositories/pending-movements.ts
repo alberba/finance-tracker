@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type PendingMovementRow = Omit<
   typeof pendingMovements.$inferSelect,
@@ -183,7 +183,7 @@ export async function update(
     .where(and(
       eq(pendingMovements.id, id),
       eq(pendingMovements.userId, userId),
-      expectedVersion === undefined ? undefined : eq(pendingMovements.version, expectedVersion),
+      versionGuard(pendingMovements.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -199,7 +199,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
     .where(and(
       eq(pendingMovements.id, id),
       eq(pendingMovements.userId, userId),
-      expectedVersion === undefined ? undefined : eq(pendingMovements.version, expectedVersion),
+      versionGuard(pendingMovements.version, expectedVersion),
     ))
     .returning({ id: pendingMovements.id });
   return deleted.length > 0;

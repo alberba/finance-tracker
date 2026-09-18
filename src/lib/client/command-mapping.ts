@@ -284,7 +284,12 @@ export async function syncRemoveByKey(
   }
 }
 
-/** `user_settings` singleton update — no entity id/version to resolve. */
+/**
+ * `user_settings` singleton update. There is no entity id to resolve, so the
+ * cached row's `version` is the only optimistic-concurrency guard this command
+ * carries (audit §6.4); `null` means this device has never seen the row, which
+ * the server reads as "create it".
+ */
 export async function syncSettingsUpdate(patch: {
   currency?: string;
   locale?: string | null;
@@ -295,7 +300,12 @@ export async function syncSettingsUpdate(patch: {
     return;
   }
   const syncStore = useSyncStore();
-  await syncStore.enqueueCommand({ action: "settingsUpdate", patch });
+  const baseVersion = await syncStore.getSettingsVersion();
+  await syncStore.enqueueCommand({
+    action: "settingsUpdate",
+    ...(baseVersion === null ? {} : { baseVersion }),
+    patch,
+  });
 }
 
 /**

@@ -144,4 +144,30 @@ describe("useSyncStore — queue never stays poisoned (audit §2)", () => {
     // behind it forever.
     await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
   });
+
+  it("rebases a conflicted settingsUpdate over the server's version instead of parking it (audit §6.4)", async () => {
+    const sent: Array<{ action: string; baseVersion?: number }> = [];
+    let conflictReturned = false;
+    onSync = (commands) => {
+      sent.push(...(commands as unknown as Array<{ action: string; baseVersion?: number }>));
+      if (!conflictReturned) {
+        conflictReturned = true;
+        return json({
+          results: commands.map((c) => ({ commandId: c.commandId, status: "conflict", currentVersion: 4 })),
+          revision: 0, halted: true,
+        }, 409);
+      }
+      return json({ results: commands.map((c) => ({ commandId: c.commandId, status: "applied" })), revision: 1, halted: false });
+    };
+    const store = useSyncStore();
+    await store.init(userId);
+
+    await store.enqueueCommand({ action: "settingsUpdate", baseVersion: 2, patch: { currency: "USD" } });
+
+    // The settings singleton has no `entityId`, so without the explicit
+    // rebase the stale `baseVersion` would conflict forever and the entry
+    // would never leave the outbox.
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
+    expect(sent.at(-1)).toMatchObject({ action: "settingsUpdate", baseVersion: 4 });
+  });
 });

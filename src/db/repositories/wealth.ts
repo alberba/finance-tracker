@@ -9,7 +9,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { snapshotBalances, wealthSnapshots } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type WealthSnapshotRow = typeof wealthSnapshots.$inferSelect;
 export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "balanceMinor"> & {
@@ -95,7 +95,7 @@ export async function update(
     .where(and(
       eq(wealthSnapshots.id, id),
       eq(wealthSnapshots.userId, userId),
-      expectedVersion === undefined ? undefined : eq(wealthSnapshots.version, expectedVersion),
+      versionGuard(wealthSnapshots.version, expectedVersion),
     ))
     .returning();
   return row;
@@ -109,7 +109,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(wealthSnapshots).where(and(
     eq(wealthSnapshots.id, id),
     eq(wealthSnapshots.userId, userId),
-    expectedVersion === undefined ? undefined : eq(wealthSnapshots.version, expectedVersion),
+    versionGuard(wealthSnapshots.version, expectedVersion),
   )).returning({ id: wealthSnapshots.id });
   return deleted.length > 0;
 }

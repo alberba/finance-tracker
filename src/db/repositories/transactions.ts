@@ -10,7 +10,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { investmentTradeDetails, transactions } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type TransactionRow = Omit<typeof transactions.$inferSelect, "amountMinor"> & {
   amount: number;
@@ -147,7 +147,7 @@ export async function update(
     .where(and(
       eq(transactions.id, id),
       eq(transactions.userId, userId),
-      expectedVersion === undefined ? undefined : eq(transactions.version, expectedVersion),
+      versionGuard(transactions.version, expectedVersion),
     ))
     .returning();
   if (!row) {
@@ -171,7 +171,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(transactions).where(and(
     eq(transactions.id, id),
     eq(transactions.userId, userId),
-    expectedVersion === undefined ? undefined : eq(transactions.version, expectedVersion),
+    versionGuard(transactions.version, expectedVersion),
   )).returning({ id: transactions.id });
   return deleted.length > 0;
 }

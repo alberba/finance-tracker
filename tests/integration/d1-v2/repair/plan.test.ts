@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { buildRepairPlan } from '../../../../scripts/lib/repair-plan'
 import { createTestDb, type TestDatabase } from '../setup'
-import { REPAIR_FIXTURE_BACKUP, REPAIR_FIXTURE_IDS, seedRepairFixture } from './fixtures'
+import {
+  REPAIR_FIXTURE_BACKUP,
+  REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
+  REPAIR_FIXTURE_IDS,
+  seedRepairFixture,
+} from './fixtures'
 
 const REPAIR_TABLES = [
   'accounts',
@@ -126,6 +131,14 @@ describe('v2 repair planner', () => {
             },
           ],
           reason: 'missing',
+        },
+      ],
+      correlationIdFixes: [
+        {
+          table: 'contributions',
+          rowId: REPAIR_FIXTURE_IDS.contributionLate,
+          fromLegacyId: REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
+          toLegacyId: `${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`,
         },
       ],
     })

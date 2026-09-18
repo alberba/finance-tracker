@@ -50,4 +50,15 @@ describe("user-settings repository", () => {
     expect(await userSettingsRepo.update(db, userB.id, { currency: "USD" })).toBeUndefined();
     expect(await userSettingsRepo.remove(db, userB.id)).toBe(false);
   });
+
+  it("rejects updates and deletes based on a stale version", async () => {
+    const { db } = testDb;
+    const user = await seedUser(db);
+    const created = await userSettingsRepo.create(db, user.id);
+
+    expect(await userSettingsRepo.update(db, user.id, { currency: "USD" }, created.version + 1))
+      .toBeUndefined();
+    expect(await userSettingsRepo.remove(db, user.id, created.version + 1)).toBe(false);
+    expect(await userSettingsRepo.get(db, user.id)).toMatchObject({ currency: "EUR", version: 1 });
+  });
 });

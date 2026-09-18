@@ -22,7 +22,16 @@ import {
   twrLiquidityAccounts,
   userInstruments,
 } from "../schema";
-import { assertOwnedReferences, clientIdentity, fromFlag, nowIso, RejectedCommandError, toFlag, type Db } from "./shared";
+import {
+  type Db,
+  RejectedCommandError,
+  assertOwnedReferences,
+  clientIdentity,
+  fromFlag,
+  nowIso,
+  toFlag,
+  versionGuard,
+} from "./shared";
 
 /**
  * No FK in the v2 DDL cascades and D1 always enforces them, so deleting a
@@ -143,7 +152,7 @@ export async function update(
     .where(and(
       eq(accounts.id, id),
       eq(accounts.userId, userId),
-      expectedVersion === undefined ? undefined : eq(accounts.version, expectedVersion),
+      versionGuard(accounts.version, expectedVersion),
     ))
     .returning();
   return row ? toAccountRow(row) : undefined;
@@ -169,7 +178,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(accounts).where(and(
     eq(accounts.id, id),
     eq(accounts.userId, userId),
-    expectedVersion === undefined ? undefined : eq(accounts.version, expectedVersion),
+    versionGuard(accounts.version, expectedVersion),
   )).returning({ id: accounts.id });
   return deleted.length > 0;
 }
@@ -281,7 +290,7 @@ export async function updateCategory(
     .where(and(
       eq(categories.id, id),
       eq(categories.userId, userId),
-      expectedVersion === undefined ? undefined : eq(categories.version, expectedVersion),
+      versionGuard(categories.version, expectedVersion),
     ))
     .returning();
   return row;
@@ -312,7 +321,7 @@ export async function removeCategory(
   const deleted = await db.delete(categories).where(and(
     eq(categories.id, id),
     eq(categories.userId, userId),
-    expectedVersion === undefined ? undefined : eq(categories.version, expectedVersion),
+    versionGuard(categories.version, expectedVersion),
   )).returning({ id: categories.id });
   return deleted.length > 0;
 }

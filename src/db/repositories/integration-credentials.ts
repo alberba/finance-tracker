@@ -10,7 +10,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { integrationCredentials } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { type Db, nowIso, versionGuard } from "./shared";
 import {
   decryptValue,
   encryptValue,
@@ -137,6 +137,7 @@ export async function update(
   id: string,
   input: UpdateIntegrationCredentialInput,
   env: DataEncryptionEnv,
+  expectedVersion?: number,
 ): Promise<IntegrationCredentialRow | undefined> {
   const [existing] = await db
     .select()
@@ -157,12 +158,21 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
+    .where(and(
+      eq(integrationCredentials.id, id),
+      eq(integrationCredentials.userId, userId),
+      versionGuard(integrationCredentials.version, expectedVersion),
+    ))
     .returning();
-  return toPublicRow(env, row);
+  return row ? toPublicRow(env, row) : undefined;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
   const [existing] = await db
     .select()
     .from(integrationCredentials)
@@ -170,10 +180,15 @@ export async function remove(db: Db, userId: string, id: string): Promise<boolea
   if (!existing) {
     return false;
   }
-  await db
+  const deleted = await db
     .delete(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)));
-  return true;
+    .where(and(
+      eq(integrationCredentials.id, id),
+      eq(integrationCredentials.userId, userId),
+      versionGuard(integrationCredentials.version, expectedVersion),
+    ))
+    .returning({ id: integrationCredentials.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(

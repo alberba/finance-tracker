@@ -9,6 +9,7 @@ import {
 import { createTestDb, type TestDatabase } from '../setup'
 import {
   REPAIR_FIXTURE_BACKUP,
+  REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
   REPAIR_FIXTURE_IDS,
   seedRepairFixture,
   type RepairFixture,
@@ -295,6 +296,98 @@ describe('v2 repair execution', () => {
     ])
   })
 
+  it('moves a colliding correlation id aside instead of dropping the row', async () => {
+    const { db } = testDb
+    const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+
+    expect(plan.correlationIdFixes).toEqual([
+      {
+        table: 'contributions',
+        rowId: REPAIR_FIXTURE_IDS.contributionLate,
+        fromLegacyId: REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
+        toLegacyId: `${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`,
+      },
+    ])
+
+    const report: RepairExecutionReport = await applyRepairPlan(db, fixture.userId, plan)
+    expect(report.correlationIdsRenamed).toBe(1)
+
+    // Both rows survive with their own values: this is a reconciliation key
+    // moving aside, not a delete.
+    expect(
+      testDb.sqlite
+        .prepare('SELECT id, legacy_id FROM contributions WHERE user_id = ? ORDER BY id')
+        .all(fixture.userId),
+    ).toEqual([
+      {
+        id: REPAIR_FIXTURE_IDS.contributionEarly,
+        legacy_id: REPAIR_FIXTURE_COLLIDING_LEGACY_ID,
+      },
+      {
+        id: REPAIR_FIXTURE_IDS.contributionLate,
+        legacy_id: `${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`,
+      },
+    ])
+
+    // The point of the rename: the closing migration's UNIQUE can now be
+    // created, which is what production is waiting on.
+    expect(() =>
+      testDb.sqlite.exec(
+        'CREATE UNIQUE INDEX contributions_user_id_legacy_id_idx ON contributions (user_id, legacy_id)',
+      ),
+    ).not.toThrow()
+  })
+
+  it('emits SQL that carries the repaired state back to D1', async () => {
+    const { mkdirSync, readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const { writeRemoteRepairSql } = await import('../../../../scripts/lib/repair-plan')
+
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    await applyRepairPlan(testDb.db, fixture.userId, plan)
+
+    mkdirSync('.scratch', { recursive: true })
+    const outPath = resolve('.scratch/test-repair-remote.sql')
+    const tables = writeRemoteRepairSql(testDb.sqlite, fixture.userId, plan, outPath)
+    const sql = readFileSync(outPath, 'utf8')
+
+    // The parent table has to be inserted before the rows that point at it.
+    expect(tables.indexOf('categories')).toBeLessThan(tables.indexOf('transactions'))
+    expect(tables.indexOf('wealth_snapshots')).toBeLessThan(tables.indexOf('snapshot_balances'))
+    expect(sql).toContain('DELETE FROM categories WHERE user_id = ')
+    expect(sql).toContain(`${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`)
+    // The change log and the revision cursor stay out of it: deleting them
+    // would make every other device miss the repair.
+    expect(sql).not.toContain('sync_changes')
+    expect(sql).not.toContain('user_revisions')
+
+    // Round trip: replayed onto a database seeded with the same corruption, the
+    // file has to reproduce the repaired state exactly.
+    const replay = createTestDb()
+    try {
+      seedRepairFixture(replay)
+      replay.sqlite.exec(sql)
+
+      const contributions = (db: TestDatabase) =>
+        db.sqlite
+          .prepare('SELECT id, legacy_id FROM contributions WHERE user_id = ? ORDER BY id')
+          .all(fixture.userId)
+      expect(contributions(replay)).toEqual(contributions(testDb))
+      expect(
+        replay.sqlite
+          .prepare('SELECT COUNT(*) AS n FROM categories WHERE user_id = ?')
+          .get(fixture.userId),
+      ).toEqual({ n: 1 })
+      expect(
+        replay.sqlite
+          .prepare('SELECT kind FROM accounts WHERE id = ?')
+          .get(REPAIR_FIXTURE_IDS.account),
+      ).toEqual({ kind: 'cash' })
+    } finally {
+      replay.close()
+    }
+  })
+
   it('is idempotent: re-evaluating repair plan on repaired database produces an empty plan', async () => {
     const { db } = testDb
     const plan = await buildRepairPlan(db, fixture.userId, REPAIR_FIXTURE_BACKUP)
@@ -310,6 +403,7 @@ describe('v2 repair execution', () => {
       accountKindCorrections: [],
       budgetRestorations: [],
       snapshotRestorations: [],
+      correlationIdFixes: [],
     })
   })
 

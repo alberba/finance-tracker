@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements, recurringRules } from "../schema";
-import { assertOwnedReferences, clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type RecurringRuleRow = Omit<
   typeof recurringRules.$inferSelect,
@@ -184,7 +184,7 @@ export async function update(
     .where(and(
       eq(recurringRules.id, id),
       eq(recurringRules.userId, userId),
-      expectedVersion === undefined ? undefined : eq(recurringRules.version, expectedVersion),
+      versionGuard(recurringRules.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -205,7 +205,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(recurringRules).where(and(
     eq(recurringRules.id, id),
     eq(recurringRules.userId, userId),
-    expectedVersion === undefined ? undefined : eq(recurringRules.version, expectedVersion),
+    versionGuard(recurringRules.version, expectedVersion),
   )).returning({ id: recurringRules.id });
   return deleted.length > 0;
 }

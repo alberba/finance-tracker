@@ -1,6 +1,6 @@
 /** Monthly budget entries and long-term goals. */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -35,6 +35,13 @@ export const budgetEntries = sqliteTable(
   (table) => [
     index("budget_entries_user_id_idx").on(table.userId),
     index("budget_entries_user_id_year_month_idx").on(table.userId, table.year, table.month),
+    uniqueIndex("budget_entries_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+    uniqueIndex("budget_entries_user_id_category_year_month_idx").on(
+      table.userId,
+      table.categoryId,
+      table.year,
+      table.month,
+    ),
   ],
 );
 
@@ -56,5 +63,9 @@ export const goals = sqliteTable(
     updatedAt: updatedAtColumn(),
     version: versionColumn(),
   },
-  (table) => [index("goals_user_id_idx").on(table.userId)],
+  (table) => [
+    index("goals_user_id_idx").on(table.userId),
+    uniqueIndex("goals_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+    uniqueIndex("goals_user_id_key_idx").on(table.userId, table.key),
+  ],
 );

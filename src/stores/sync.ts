@@ -7,6 +7,7 @@ import { useToast } from '../composables/useToast'
 import {
   getAllEntities,
   getCachedBootstrap,
+  getCachedSettings,
   getRevision as getCachedRevision,
   openIdbCache,
   putEntities,
@@ -394,9 +395,17 @@ export const useSyncStore = defineStore('sync', () => {
           const command = entry.command
           if (
             result.entity !== undefined &&
-            (command.action === 'create' || command.action === 'update')
+            cacheDb !== null
           ) {
-            await applyResultToCache(command.entityType, result.entity)
+            if (command.action === 'settingsUpdate') {
+              // Keeps this device's `user_settings.version` current, so the next
+              // settings command sends the right `baseVersion` (audit §6.4).
+              // `pullChanges` deliberately skips `userSettings` (it has no
+              // object store), so nothing else refreshes it.
+              await setCachedSettings(cacheDb, result.entity)
+            } else if (command.action === 'create' || command.action === 'update') {
+              await applyResultToCache(command.entityType, result.entity)
+            }
           }
         } else if (result.status === 'conflict') {
           const command = entry.command
@@ -417,8 +426,18 @@ export const useSyncStore = defineStore('sync', () => {
                     entityType: command.entityType,
                     entityId: command.entityId,
                     baseVersion,
-                  },
+                },
             )
+          } else if (command.action === 'settingsUpdate') {
+            // ADR 0003 for the settings singleton: rebase over the server's
+            // version instead of leaving the entry queued, where a stale
+            // `baseVersion` would conflict forever.
+            acked.push(entry.seq)
+            retries.push({
+              action: 'settingsUpdate',
+              baseVersion: result.currentVersion ?? command.baseVersion,
+              patch: command.patch,
+            })
           }
         } else {
           // `not_found` (entity removed elsewhere) and `rejected` (invalid
@@ -548,6 +567,23 @@ export const useSyncStore = defineStore('sync', () => {
     }
     revision.value = body.revision
     await setCachedRevision(cacheDb, body.revision)
+  }
+
+  /**
+   * The `user_settings.version` this device last saw (audit §6.4).
+   * `syncSettingsUpdate` sends it as the command's `baseVersion`, so a
+   * settings write from a device that is behind becomes a conflict the queue
+   * rebases, instead of silently overwriting another device's currency or
+   * theme. `null` before this device has ever seen the row, which the server
+   * reads as "create it".
+   */
+  async function getSettingsVersion(): Promise<number | null> {
+    if (!isReady() || !cacheDb) {
+      return null
+    }
+    const settings = await getCachedSettings<{ version?: unknown } | null>(cacheDb)
+    const version = settings?.version
+    return typeof version === 'number' ? version : null
   }
 
   /**
@@ -724,6 +760,7 @@ export const useSyncStore = defineStore('sync', () => {
     pullChanges,
     logout,
     getEntityRef,
+    getSettingsVersion,
     findEntityRef,
     peekPendingCreateId,
     mergeIntoPendingCreate,

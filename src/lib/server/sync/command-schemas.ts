@@ -4,7 +4,8 @@
  * A sync command is one of five discriminated shapes (on the `action`
  * field): `create`, `update`, `remove` (each scoped to one of the
  * `SYNC_ENTITY_TYPES` aggregates below), `settingsUpdate` (the `user_settings`
- * singleton, which has no `id`/`version` of its own to address), and `noop`
+ * singleton, which has no `entityId` to address and so carries an optional
+ * `baseVersion` as its only optimistic-concurrency guard), and `noop`
  * (a no-op command — useful for idempotency-replay tests without mutating
  * anything). `commandId` is the client-supplied id that becomes
  * `sync_commands.id`'s primary key, enforcing idempotent replay.
@@ -304,10 +305,18 @@ export const removeCommandSchema = z.object({
   baseVersion: z.number().int().nonnegative(),
 });
 
-/** `user_settings` is a per-user singleton — addressed by `userId` alone, no `entityId`/`baseVersion`. */
+/**
+ * `user_settings` is a per-user singleton: addressed by `userId` alone, so
+ * there is no `entityId` to point at. `baseVersion` is the row's `version` as
+ * the client last saw it, sent when the client knows one, so a settings write
+ * from a device that is behind is a conflict the queue rebases instead of
+ * silently overwriting the other device's currency or theme (audit §6.4).
+ * Optional because a client that has never seen the row still creates it.
+ */
 export const settingsUpdateCommandSchema = z.object({
   ...baseCommandFields,
   action: z.literal("settingsUpdate"),
+  baseVersion: z.number().int().nonnegative().optional(),
   patch: z.object({
     currency: z.string().min(1).optional(),
     locale: nullableString.optional(),

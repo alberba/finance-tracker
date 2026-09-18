@@ -1,6 +1,6 @@
 /** Subscriptions, recurring rules, and their generated pending movements. */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -36,7 +36,10 @@ export const subscriptions = sqliteTable(
     updatedAt: updatedAtColumn(),
     version: versionColumn(),
   },
-  (table) => [index("subscriptions_user_id_idx").on(table.userId)],
+  (table) => [
+    index("subscriptions_user_id_idx").on(table.userId),
+    uniqueIndex("subscriptions_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+  ],
 );
 
 /**
@@ -86,6 +89,7 @@ export const recurringRules = sqliteTable(
       table.status,
       table.nextRunDate,
     ),
+    uniqueIndex("recurring_rules_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );
 
@@ -107,7 +111,7 @@ export const pendingMovements = sqliteTable(
     legacyId: text("legacy_id"),
     recurringRuleId: text("recurring_rule_id")
       .notNull()
-      .references(() => recurringRules.id),
+      .references(() => recurringRules.id, { onDelete: "cascade" }),
     accountId: text("account_id").references(() => accounts.id),
     categoryId: text("category_id").references(() => categories.id),
     amountMinor: moneyMinorColumn("amount_minor"),
@@ -134,5 +138,6 @@ export const pendingMovements = sqliteTable(
       table.status,
       table.dueDate,
     ),
+    uniqueIndex("pending_movements_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );

@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { goals } from "../schema";
-import { clientIdentity, nowIso, type Db } from "./shared";
+import { type Db, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type GoalRow = Omit<typeof goals.$inferSelect, "targetAmountMinor"> & {
   targetAmount: number;
@@ -90,7 +90,7 @@ export async function update(
     .where(and(
       eq(goals.id, id),
       eq(goals.userId, userId),
-      expectedVersion === undefined ? undefined : eq(goals.version, expectedVersion),
+      versionGuard(goals.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -104,7 +104,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(goals).where(and(
     eq(goals.id, id),
     eq(goals.userId, userId),
-    expectedVersion === undefined ? undefined : eq(goals.version, expectedVersion),
+    versionGuard(goals.version, expectedVersion),
   )).returning({ id: goals.id });
   return deleted.length > 0;
 }
