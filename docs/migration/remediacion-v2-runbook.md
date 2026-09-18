@@ -104,6 +104,17 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
 
 ## Trampas verificadas
 
+- **El SQL que emite hoy `--remote-sql-out` no cabe por la puerta de D1.** El
+  reparador vuelca las tablas enteras del usuario en vez de solo lo que cambia:
+  sobre estos datos fueron 210 KB y 421 sentencias, y
+  `wrangler d1 execute --remote --file=` falló dos veces seguidas con
+  `D1_RESET_DO` al procesar la carga. Reintentar no sirve: el fichero se sube
+  bien y lo que falla es el procesado («File already uploaded. Processing.»).
+  Lo que sí entró fue un fichero con **solo las sentencias del plan** —los
+  repuntes de referencia, los borrados de categoría y el renombrado—, que son
+  idempotentes y se pueden repetir sin miedo si la ejecución falla a medias.
+  Hasta que se corrija el emisor (issue #187), reduce el fichero a lo que el
+  plan cambia antes de lanzarlo.
 - **El orden meses → cierre no es negociable.** `0003_months_canonical` corre
   `month = month + 1`; con los índices únicos de `0004` ya creados, el
   desplazamiento falla porque cada mes destino lo ocupa la fila del mes
