@@ -64,4 +64,21 @@ describe('reportApiRouteFailure', () => {
     expect(Object.keys(sentry)).toEqual(['captureException', 'withScope'])
     expect(sentry.withScope).toHaveBeenCalledTimes(1)
   })
+
+  it('no relanza si el SDK falla al reportar, y deja el fallo en el log', () => {
+    // El reporte es best-effort: la respuesta HTTP que el wrap está por
+    // devolver no puede caerse porque la telemetría falló.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sentry.withScope.mockImplementation(() => {
+      throw new Error('el SDK de Sentry falló')
+    })
+
+    expect(() => {
+      reportApiRouteFailure(routeError(), { route: '/api/issues/report', status: 500 })
+    }).not.toThrow()
+
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    expect(consoleError.mock.calls[0]?.[0]).toContain('/api/issues/report')
+  })
 })

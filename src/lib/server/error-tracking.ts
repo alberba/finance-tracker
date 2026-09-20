@@ -22,9 +22,18 @@ export interface ApiRouteFailure {
  * breadcrumb never reaches Sentry).
  */
 export function reportApiRouteFailure(error: unknown, failure: ApiRouteFailure): void {
-  Sentry.withScope((scope) => {
-    scope.setTag("api.route", failure.route);
-    scope.setTag("http.response.status_code", String(failure.status));
-    Sentry.captureException(error);
-  });
+  try {
+    Sentry.withScope((scope) => {
+      scope.setTag("api.route", failure.route);
+      scope.setTag("http.response.status_code", String(failure.status));
+      Sentry.captureException(error);
+    });
+  } catch {
+    // El reporte es best-effort: la respuesta HTTP no puede fallar porque la
+    // telemetría falló. Por eso no se relanza, y el fallo queda en un log fijo
+    // que no incluye el error (evita arrastrar datos del evento). El SDK del
+    // servidor no adjunta la integración `Console`, así que este log no vuelve
+    // a entrar a Sentry.
+    console.error(`[api] No se pudo reportar a Sentry el fallo de ${failure.route}.`);
+  }
 }
