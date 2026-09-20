@@ -182,3 +182,38 @@ export async function upsertSyncEntry(
     .returning();
   return row;
 }
+
+/**
+ * Replaces the whole cash-mapping selection (settings-update semantics):
+ * entries with a non-empty `watchlistId` are upserted, accounts absent
+ * from the list (or with an empty `watchlistId`) lose their mapping.
+ */
+export async function replaceMappings(
+  db: Db,
+  userId: string,
+  entries: Array<{ accountId: string | null; watchlistId: string }>,
+): Promise<StockeventsCashMappingRow[]> {
+  const wanted = new Map<string, string>();
+  for (const entry of entries) {
+    const key = entry.accountId ?? "";
+    if (entry.watchlistId) {
+      wanted.set(key, entry.watchlistId);
+    }
+  }
+  const current = await listMappingsByUser(db, userId);
+  for (const row of current) {
+    const key = row.accountId ?? "";
+    const watchlistId = wanted.get(key);
+    if (watchlistId === undefined) {
+      await removeMapping(db, userId, row.id);
+    } else if (watchlistId !== row.watchlistId) {
+      await upsertMapping(db, userId, { accountId: row.accountId, watchlistId });
+    }
+  }
+  for (const [key, watchlistId] of wanted) {
+    if (!current.some((row) => (row.accountId ?? "") === key)) {
+      await upsertMapping(db, userId, { accountId: key === "" ? null : key, watchlistId });
+    }
+  }
+  return listMappingsByUser(db, userId);
+}

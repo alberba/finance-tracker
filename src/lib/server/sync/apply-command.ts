@@ -33,6 +33,8 @@ import * as contributionsRepository from "../../../db/repositories/contributions
 import * as marketRepository from "../../../db/repositories/market";
 import * as wealthRepository from "../../../db/repositories/wealth";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
+import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as syncRepository from "../../../db/repositories/sync";
 import * as auditEventsRepository from "../../../db/repositories/audit-events";
 import {
@@ -107,6 +109,9 @@ async function findByLegacyId(
     case "contribution": rows = await contributionsRepository.listByUser(db, userId) as VersionedRow[]; break;
     case "wealthSnapshot": rows = await wealthRepository.listByUser(db, userId) as VersionedRow[]; break;
     case "userInstrument": return undefined;
+    case "stockeventsMapping":
+      rows = await stockeventsSymbolMappingsRepository.listByUser(db, userId) as VersionedRow[];
+      break;
   }
   return rows.find((row) => row.legacyId === value);
 }
@@ -147,6 +152,10 @@ async function loadForMutation(
         | undefined;
     case "wealthSnapshot":
       return (await wealthRepository.get(db, userId, entityId)) as VersionedRow | undefined;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.get(db, userId, entityId)) as
+        | VersionedRow
+        | undefined;
   }
 }
 
@@ -199,6 +208,16 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
     }
     case "userInstrument":
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.create(db, userId, {
+        id: typeof data.id === "string" ? data.id : undefined,
+        legacyId: data.legacyId ?? null,
+        categoryId: data.categoryId ?? null,
+        stockeventsSymbol: String(data.stockeventsSymbol),
+        sync: data.sync === true,
+        watchlistId: typeof data.watchlistId === "string" && data.watchlistId ? data.watchlistId : null,
+        hidden: data.hidden === true,
+      })) as VersionedRow;
     case "wealthSnapshot": {
       const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
         WealthSnapshotBalancesField;
@@ -265,6 +284,20 @@ async function updateEntity(
       return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.update(
+        db,
+        userId,
+        entityId,
+        {
+          categoryId: patch.categoryId,
+          stockeventsSymbol: patch.stockeventsSymbol,
+          sync: patch.sync,
+          watchlistId: patch.watchlistId,
+          hidden: patch.hidden,
+        },
+        expectedVersion,
+      )) as VersionedRow | undefined;
     case "wealthSnapshot": {
       const { balances, ...snapshotPatch } = patch as Partial<wealthRepository.CreateWealthSnapshotInput> &
         WealthSnapshotBalancesField;
@@ -306,6 +339,8 @@ async function removeEntity(
       return contributionsRepository.remove(db, userId, entityId, expectedVersion);
     case "userInstrument":
       return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion);
+    case "stockeventsMapping":
+      return stockeventsSymbolMappingsRepository.remove(db, userId, entityId, expectedVersion);
     case "wealthSnapshot":
       return wealthRepository.remove(db, userId, entityId, expectedVersion);
   }
@@ -356,7 +391,15 @@ async function performMutation(
       return { status: "noop" };
 
     case "settingsUpdate": {
-      const { twrLiquidityAccountIds, ...settingsPatch } = command.patch;
+      const { twrLiquidityAccountIds, stockeventsCashMappings, ...settingsPatch } = command.patch;
+      // The row stores the flag as `0`/`1`; the patch carries a boolean, so
+      // replay detection must compare like with like.
+      const settingsPatchForCompare = {
+        ...settingsPatch,
+        ...(typeof settingsPatch.stockeventsEnabled === "boolean"
+          ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
+          : {}),
+      };
       const existing = await userSettingsRepository.get(db, userId);
       // Same contract as `update`: a stale `baseVersion` is a replay when the
       // server already holds the patch, and a conflict otherwise (ADR 0003 —
@@ -368,7 +411,7 @@ async function performMutation(
       if (existing && command.baseVersion !== undefined && existing.version !== command.baseVersion) {
         if (
           Object.keys(settingsPatch).length > 0 &&
-          includesPatch(existing as unknown as VersionedRow, settingsPatch)
+          includesPatch(existing as unknown as VersionedRow, settingsPatchForCompare)
         ) {
           return { status: "noop", entityType: "userSettings", entityId: userId, entity: existing };
         }
@@ -403,12 +446,15 @@ async function performMutation(
       const twrLiquidityAccounts = twrLiquidityAccountIds
         ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
         : undefined;
+      const cashMappings = stockeventsCashMappings
+        ? await stockeventsCashMappingsRepository.replaceMappings(db, userId, stockeventsCashMappings)
+        : undefined;
       const revision = await recordChange(db, userId, "userSettings", userId, "update", command.patch);
       return {
         status: "applied",
         entityType: "userSettings",
         entityId: userId,
-        entity: twrLiquidityAccounts ? { ...row, twrLiquidityAccounts } : row,
+        entity: { ...row, ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}), ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}) },
         revision,
       };
     }

@@ -28,9 +28,11 @@ import {
   marketRepository,
   pendingMovementsRepository,
   recurringRulesRepository,
+  stockeventsCashMappingsRepository,
   stockeventsSymbolMappingsRepository,
   subscriptionsRepository,
   transactionsRepository,
+  userSettingsRepository,
   usersRepository,
   wealthRepository,
 } from "../src/db/repositories";
@@ -72,6 +74,9 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       contributions,
       userInstruments,
       stockeventsSymbolMappings,
+      stockeventsCashMappings,
+      stockeventsCashSyncEntries,
+      userSettings,
     ] = await Promise.all([
       accountsRepository.listByUser(db, userId),
       accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
@@ -86,6 +91,9 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
       stockeventsSymbolMappingsRepository.listByUser(db, userId),
+      stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
+      stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+      userSettingsRepository.get(db, userId),
     ]);
 
     const accountLegacyId = (v2Id: string | null): string => {
@@ -325,14 +333,24 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       recurringRules: v1RecurringRules,
       pendingMovements: v1PendingMovements,
       stockEvents: {
-        enabled: Boolean(apiKey),
+        enabled: (userSettings?.stockeventsEnabled ?? 0) === 1,
         apiKey,
         symbolMappings: stockeventsSymbolMappings.map((m) => ({
           symbol: m.legacyId ?? m.stockeventsSymbol,
-          sync: false,
-          watchlistId: "",
+          sync: m.sync === 1,
+          watchlistId: m.watchlistId ?? "",
           targetSymbol: m.stockeventsSymbol,
-          hidden: false,
+          hidden: m.hidden === 1,
+        })),
+        cashMappings: stockeventsCashMappings.map((m) => ({
+          accountId: m.accountId ? accountLegacyId(m.accountId) : "",
+          watchlistId: m.watchlistId,
+        })),
+        cashSyncEntries: stockeventsCashSyncEntries.map((e) => ({
+          contributionDate: e.contributionDate,
+          accountId: e.accountId ? accountLegacyId(e.accountId) : "",
+          watchlistId: e.watchlistId,
+          syncedAmount: e.syncedAmount,
         })),
       },
     };

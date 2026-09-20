@@ -19,10 +19,11 @@
  * `contribution_allocations` inside `contribution.allocations`, and
  * `twr_liquidity_accounts` as the whole selection in
  * `settingsUpdate.patch.twrLiquidityAccountIds`.
- * `stockevents_symbol_mappings` (no `version` column to drive optimistic
- * concurrency), `integration_credentials` (WP12 owns encryption semantics),
- * and the global `market_instruments`/`market_quotes` reference tables
- * (not per-user data).
+ * `integration_credentials` (WP12 owns encryption semantics) and the
+ * global `market_instruments`/`market_quotes` reference tables (not
+ * per-user data). `stockevents_symbol_mappings` carries its own `version`
+ * column, so it syncs as the `stockeventsMapping` entity; the Stock Events
+ * `enabled` flag and cash mappings travel inside `settingsUpdate`.
  */
 
 import { z } from "zod";
@@ -39,6 +40,7 @@ export const SYNC_ENTITY_TYPES = [
   "contribution",
   "userInstrument",
   "wealthSnapshot",
+  "stockeventsMapping",
 ] as const;
 
 export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number];
@@ -227,6 +229,16 @@ export const entityCreateSchemas = {
       balances: z.array(wealthSnapshotBalanceSchema).optional(),
     })
     .strict(),
+  stockeventsMapping: z
+    .object({
+      legacyId: nullableString.optional(),
+      categoryId: nullableString.optional(),
+      stockeventsSymbol: z.string().min(1),
+      sync: z.boolean().optional(),
+      watchlistId: nullableString.optional(),
+      hidden: z.boolean().optional(),
+    })
+    .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
 /**
@@ -275,6 +287,15 @@ export const entityUpdateSchemas = {
     })
     .strict(),
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.partial(),
+  stockeventsMapping: z
+    .object({
+      categoryId: nullableString.optional(),
+      stockeventsSymbol: z.string().min(1).optional(),
+      sync: z.boolean().optional(),
+      watchlistId: nullableString.optional(),
+      hidden: z.boolean().optional(),
+    })
+    .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
 const baseCommandFields = {
@@ -323,6 +344,22 @@ export const settingsUpdateCommandSchema = z.object({
     theme: nullableString.optional(),
     /** Server `account` ids — replaces the whole TWR liquidity selection. */
     twrLiquidityAccountIds: z.array(z.string().min(1)).optional(),
+    /** Stock Events "sincronizar nuevos movimientos" flag. */
+    stockeventsEnabled: z.boolean().optional(),
+    /**
+     * Whole Stock Events cash-mapping selection — replaces it. `accountId`
+     * is the server `account` id (`null` clears that row's mapping only
+     * when paired with an empty `watchlistId`; entries with an empty
+     * `watchlistId` remove the mapping).
+     */
+    stockeventsCashMappings: z
+      .array(
+        z.object({
+          accountId: nullableString,
+          watchlistId: z.string(),
+        }),
+      )
+      .optional(),
   }),
 });
 

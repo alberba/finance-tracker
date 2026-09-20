@@ -32,10 +32,12 @@ import {
   marketRepository,
   pendingMovementsRepository,
   recurringRulesRepository,
+  stockeventsCashMappingsRepository,
   stockeventsSymbolMappingsRepository,
   subscriptionsRepository,
   transactionsRepository,
   usersRepository,
+  userSettingsRepository,
   wealthRepository,
 } from "../../src/db/repositories";
 import { runInTransaction, type Db } from "../../src/db/repositories/shared";
@@ -843,11 +845,45 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         legacyId: mapping.symbol,
         categoryId: null,
         stockeventsSymbol: mapping.targetSymbol || mapping.symbol,
+        sync: mapping.sync === true,
+        watchlistId: mapping.watchlistId || null,
+        hidden: mapping.hidden === true,
       });
     }
     if (toInsert.length) {
       await stockeventsSymbolMappingsRepository.bulkInsert(db, userId, toInsert);
       bump("stockeventsSymbolMappings", "inserted", toInsert.length);
+    }
+  }
+
+  // -- 15b. Stock Events settings (enabled flag + cash mappings) --------------
+  {
+    if (state.stockEvents.enabled) {
+      const existingSettings = await userSettingsRepository.get(db, userId);
+      if (existingSettings) {
+        await userSettingsRepository.update(db, userId, { stockeventsEnabled: true });
+      } else {
+        await userSettingsRepository.create(db, userId, { stockeventsEnabled: true });
+      }
+    }
+    const cashMappings = state.stockEvents.cashMappings || [];
+    for (const cashMapping of cashMappings) {
+      if (!cashMapping.watchlistId) continue;
+      const serverAccountId = accountIdByKey.get(`cash:${cashMapping.accountId}`)
+        ?? accountIdByKey.get(`investment:${cashMapping.accountId}`)
+        ?? accountIdByKey.get(`liability:${cashMapping.accountId}`);
+      if (!serverAccountId) {
+        anomaly(
+          "stockeventsCashMappings",
+          cashMapping.accountId,
+          "Referenced account not found; Stock Events cash mapping dropped.",
+        );
+        continue;
+      }
+      await stockeventsCashMappingsRepository.upsertMapping(db, userId, {
+        accountId: serverAccountId,
+        watchlistId: cashMapping.watchlistId,
+      });
     }
   }
 
