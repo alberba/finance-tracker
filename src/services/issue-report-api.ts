@@ -1,3 +1,5 @@
+import { ApiClientError } from '../lib/client/api-error'
+import { requestApiJson } from '../lib/client/api-client'
 import { isDemoMode } from '../scripts/demo-mode'
 
 export type ReportType = 'bug' | 'feature' | 'enhancement'
@@ -38,24 +40,23 @@ export type ReportSubmissionPayload = Omit<ReportPayload, 'mentionClaude'> & {
 
 export const ISSUE_REPORT_ENDPOINT = '/api/issues/report'
 
+const FALLBACK_MESSAGE = 'No se pudo crear la issue.'
+
 export async function submitIssueReport(payload: ReportSubmissionPayload): Promise<ReportResponse> {
   if (isDemoMode()) {
     return { ok: false, error: 'Los reportes no se envían desde el modo demo.' }
   }
 
-  const response = await fetch(ISSUE_REPORT_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
-
-  const data = (await response.json()) as ReportResponse
-  if (!response.ok) {
-    const errorMessage = 'error' in data ? data.error : 'No se pudo crear la issue.'
-    return { ok: false, error: errorMessage }
+  try {
+    return await requestApiJson<ReportResponse>(ISSUE_REPORT_ENDPOINT, {
+      method: 'POST',
+      body: payload,
+      fallbackMessage: FALLBACK_MESSAGE,
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof ApiClientError ? error.message : FALLBACK_MESSAGE,
+    }
   }
-  return data
 }
