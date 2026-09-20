@@ -5,6 +5,7 @@ import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
   resolveCategoryId,
+  resolveOrCreateCategoryId,
   resolveEntityId,
   syncListDiff,
   type CategoryKind,
@@ -48,7 +49,7 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(rule.type as CategoryKind, rule.category)
+  const categoryId = await resolveOrCreateCategoryId(rule.type as CategoryKind, rule.category)
   return {
     name: rule.description,
     type: rule.type,
@@ -91,6 +92,22 @@ function operationData(template: {
   }
 }
 
+function clearInvestmentFields(target: {
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
+}): void {
+  delete target.symbol
+  delete target.side
+  delete target.units
+  delete target.unitPrice
+  delete target.fee
+  delete target.time
+}
+
 /**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
  * command payload. Returns `null` (skip, see `syncListDiff`) when the
@@ -108,7 +125,7 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(pending.type as CategoryKind, pending.category)
+  const categoryId = await resolveOrCreateCategoryId(pending.type as CategoryKind, pending.category)
   return {
     recurringRuleId,
     accountId,
@@ -428,12 +445,7 @@ export const useRecurringStore = defineStore('recurring', () => {
           if (fee !== undefined) current.fee = fee
           if (time !== undefined) current.time = time
         } else {
-          delete current.symbol
-          delete current.side
-          delete current.units
-          delete current.unitPrice
-          delete current.fee
-          delete current.time
+          clearInvestmentFields(current)
         }
       }
     })
@@ -486,12 +498,7 @@ export const useRecurringStore = defineStore('recurring', () => {
           else delete current.time
         }
       } else {
-        delete current.symbol
-        delete current.side
-        delete current.units
-        delete current.unitPrice
-        delete current.fee
-        delete current.time
+        clearInvestmentFields(current)
       }
       current.updatedAt = new Date().toISOString()
     })

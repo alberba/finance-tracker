@@ -51,71 +51,82 @@ describe('PendingMovementsPanel', () => {
     return { financialStore, recurringStore: useRecurringStore() }
   }
 
-  it('renders type selector, category dropdown by type, and allows reclassifying to investment', async () => {
-    const { recurringStore } = setupState()
-    const wrapper = mount(PendingMovementsPanel)
-
-    expect(wrapper.text()).toContain('Gasto mensual')
-
-    // Click edit
+  async function openEditForm(wrapper: ReturnType<typeof mount>) {
     const editButton = wrapper.findAll('button').find((b) => b.text() === 'Editar')
     expect(editButton).toBeDefined()
     await editButton!.trigger('click')
+    return wrapper.get('form')
+  }
 
-    // 1. Check type selector exists
-    const typeSelect = wrapper.find('select[v-model="edit.type"], form select')
-    expect(typeSelect.exists()).toBe(true)
+  it('renders type selector and category select populated with categories of current type', async () => {
+    setupState()
+    const wrapper = mount(PendingMovementsPanel)
+    const form = await openEditForm(wrapper)
 
-    // Form elements
-    const form = wrapper.find('form')
-    expect(form.exists()).toBe(true)
+    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
+    expect(typeSelect).toBeDefined()
 
-    // Category select should be a <select>, not a text input
-    const categorySelect = form.findAll('select').find((s) => s.element.labels?.[0]?.textContent?.includes('Categoría') || s.html().includes('Vivienda'))
+    const categorySelect = form.findAll('select').find((s) => s.text().includes('Vivienda'))
     expect(categorySelect).toBeDefined()
     expect(categorySelect?.findAll('option').map((o) => o.text())).toContain('Vivienda')
+    expect(categorySelect?.findAll('option').map((o) => o.text())).not.toContain('Fondos Indexados')
+  })
 
-    // Before reclassifying, investment fields should not be visible
+  it('shows investment fields and accounts when reclassifying type to investment', async () => {
+    setupState()
+    const wrapper = mount(PendingMovementsPanel)
+    const form = await openEditForm(wrapper)
+
     expect(form.text()).not.toContain('Símbolo')
 
-    // Reclassify to investment
-    const typeSelectEl = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
-    expect(typeSelectEl).toBeDefined()
-    await typeSelectEl!.setValue('investment')
+    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
+    await typeSelect!.setValue('investment')
 
-    // Investment fields should now be visible
     expect(form.text()).toContain('Símbolo')
     expect(form.text()).toContain('Títulos')
     expect(form.text()).toContain('Precio por título')
 
-    // Category select should now contain investment categories
-    expect(categorySelect?.findAll('option').map((o) => o.text())).toContain('Fondos Indexados')
+    const categorySelect = form.findAll('select').find((s) => s.text().includes('Fondos Indexados'))
+    expect(categorySelect).toBeDefined()
 
-    // Account select should now contain investment asset 'Broker Interactive'
-    const accountSelect = form.findAll('select').find((s) => s.text().includes('Broker Interactive') || s.text().includes('Cuenta Principal'))
+    const accountSelect = form.findAll('select').find((s) => s.text().includes('Broker Interactive'))
     expect(accountSelect).toBeDefined()
-    expect(accountSelect?.text()).toContain('Broker Interactive')
+  })
 
-    // Fill investment fields and save
-    await accountSelect!.setValue('asset-broker')
+  it('submits updated investment fields to recurring store', async () => {
+    const { recurringStore } = setupState()
+    const wrapper = mount(PendingMovementsPanel)
+    const form = await openEditForm(wrapper)
+
+    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
+    await typeSelect!.setValue('investment')
+
+    const categorySelect = form.findAll('select').find((s) => s.text().includes('Fondos Indexados'))
     await categorySelect!.setValue('Fondos Indexados')
+
+    const accountSelect = form.findAll('select').find((s) => s.text().includes('Broker Interactive'))
+    await accountSelect!.setValue('asset-broker')
+
     const symbolInput = form.find('input[placeholder="VWCE"]')
     await symbolInput.setValue('VWCE')
+
     const unitsInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Títulos'))
     await unitsInput!.setValue(10)
+
     const priceInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
     await priceInput!.setValue(100)
 
     await form.trigger('submit')
 
-    // Pending movement should be updated to investment
     const updated = recurringStore.openPendingMovements[0]
-    expect(updated.type).toBe('investment')
-    expect(updated.accountId).toBe('asset-broker')
-    expect(updated.category).toBe('Fondos Indexados')
-    expect(updated.symbol).toBe('VWCE')
-    expect(updated.units).toBe(10)
-    expect(updated.unitPrice).toBe(100)
+    expect(updated).toMatchObject({
+      type: 'investment',
+      accountId: 'asset-broker',
+      category: 'Fondos Indexados',
+      symbol: 'VWCE',
+      units: 10,
+      unitPrice: 100,
+    })
   })
 
   it('renders and preserves existing investment pending movement fields on edit', async () => {
@@ -147,17 +158,8 @@ describe('PendingMovementsPanel', () => {
     })
 
     const wrapper = mount(PendingMovementsPanel)
-    expect(wrapper.text()).toContain('Aporte Cripto')
-    expect(wrapper.text()).toContain('0.1 × 3000 ETH')
+    const form = await openEditForm(wrapper)
 
-    // Click edit
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Editar')
-    await editButton!.trigger('click')
-
-    const form = wrapper.find('form')
-    expect(form.exists()).toBe(true)
-
-    // Verify investment fields are directly visible and populated
     const symbolInput = form.find<HTMLInputElement>('input[placeholder="VWCE"]')
     expect(symbolInput.element.value).toBe('ETH')
 
@@ -166,5 +168,38 @@ describe('PendingMovementsPanel', () => {
 
     const priceInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
     expect(priceInput?.element.value).toBe('3000')
+  })
+
+  it('preserves legacy category without clobbering when opening edit form', async () => {
+    const { financialStore } = setupState()
+    financialStore.commitState((draft) => {
+      draft.pendingMovements = [
+        {
+          id: 'pm-legacy',
+          occurrenceKey: 'rule-1:2026-02-01',
+          ruleId: 'rule-1',
+          occurrenceDate: '2026-02-01',
+          type: 'investment',
+          accountId: 'asset-broker',
+          category: 'Categoría Antigua Desconocida',
+          description: 'Movimiento heredado',
+          amount: 100,
+          symbol: 'BTC',
+          units: 1,
+          unitPrice: 100,
+          status: 'pending',
+          createdAt: '2026-02-01T00:00:00.000Z',
+          updatedAt: '2026-02-01T00:00:00.000Z',
+          transactionId: null,
+        },
+      ]
+    })
+
+    const wrapper = mount(PendingMovementsPanel)
+    const form = await openEditForm(wrapper)
+
+    const categorySelect = form.findAll('select').find((s) => s.text().includes('Categoría Antigua Desconocida'))
+    expect(categorySelect).toBeDefined()
+    expect(categorySelect?.element.value).toBe('Categoría Antigua Desconocida')
   })
 })

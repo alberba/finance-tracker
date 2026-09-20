@@ -39,17 +39,15 @@ const availableCategories = computed(() => {
   return financialStateStore.state.expenseCategories
 })
 
+let isInitializingEdit = false
+
 watch(pending, (items) => {
   if (editingId.value && !items.some((item) => item.id === editingId.value)) editingId.value = ''
 })
 
 watch(() => edit.type, (newType, oldType) => {
-  if (!oldType) return
-  const cats = newType === 'income'
-    ? financialStateStore.state.incomeCategories
-    : newType === 'investment'
-      ? financialStateStore.state.investmentCategories
-      : financialStateStore.state.expenseCategories
+  if (isInitializingEdit || !oldType) return
+  const cats = availableCategories.value
   if (!cats.includes(edit.category)) {
     edit.category = cats[0] || ''
   }
@@ -61,6 +59,9 @@ watch(() => edit.type, (newType, oldType) => {
       edit.accountId = financialStateStore.investmentAssets[0]?.id || financialStateStore.accounts[0]?.id || ''
     }
   } else {
+    if (oldType === 'investment' && investmentTotal.value > 0) {
+      edit.amount = investmentTotal.value
+    }
     const isInvestmentAsset = financialStateStore.investmentAssets.some((a) => a.id === edit.accountId)
     if (isInvestmentAsset && financialStateStore.accounts[0]) {
       edit.accountId = financialStateStore.accounts[0].id
@@ -74,6 +75,7 @@ function openTransactions(): void {
 }
 
 function startEdit(item: (typeof pending.value)[number]): void {
+  isInitializingEdit = true
   editingId.value = item.id
   edit.type = item.type || 'expense'
   edit.date = item.occurrenceDate
@@ -87,6 +89,9 @@ function startEdit(item: (typeof pending.value)[number]): void {
   edit.unitPrice = item.unitPrice ?? 0
   edit.fee = item.fee ?? 0
   edit.time = item.time || ''
+  queueMicrotask(() => {
+    isInitializingEdit = false
+  })
 }
 
 function saveEdit(): void {

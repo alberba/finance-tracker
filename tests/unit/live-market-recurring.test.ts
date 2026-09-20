@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildPortfolioValuation } from '../../src/domain/investment/valuation'
 import { generatePendingMovements } from '../../src/domain/recurring/pending'
@@ -23,6 +23,10 @@ function stateWithRecurring(rule: RecurringRule): Pick<State, 'recurringRules' |
 }
 
 describe('reglas recurrentes y pendientes', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('calcula frecuencias, intervalos y fin de mes', () => {
     expect(getDueOccurrences(recurringRule({ frequency: 'daily', interval: 2, startDate: '2024-01-01', nextOccurrenceDate: '2024-01-01' }), '2024-01-06')).toEqual([
       '2024-01-01', '2024-01-03', '2024-01-05',
