@@ -21,7 +21,8 @@
  * "repositories are the sole caller of Drizzle" design decision.
  */
 
-import { RejectedCommandError, runInTransaction, type Db } from "../../../db/repositories/shared";
+import { assertOwnedReferences, RejectedCommandError, runInTransaction, type Db } from "../../../db/repositories/shared";
+import { fromMinorUnits } from "../../../lib/money";
 import * as accountsRepository from "../../../db/repositories/accounts";
 import * as transactionsRepository from "../../../db/repositories/transactions";
 import * as subscriptionsRepository from "../../../db/repositories/subscriptions";
@@ -112,6 +113,8 @@ async function findByLegacyId(
     case "stockeventsMapping":
       rows = await stockeventsSymbolMappingsRepository.listByUser(db, userId) as VersionedRow[];
       break;
+    case "stockeventsCashEntry":
+      return undefined;
   }
   return rows.find((row) => row.legacyId === value);
 }
@@ -156,6 +159,10 @@ async function loadForMutation(
       return (await stockeventsSymbolMappingsRepository.get(db, userId, entityId)) as
         | VersionedRow
         | undefined;
+    case "stockeventsCashEntry": {
+      const entries = await stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId);
+      return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined;
+    }
   }
 }
 
@@ -218,6 +225,30 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
         watchlistId: typeof data.watchlistId === "string" && data.watchlistId ? data.watchlistId : null,
         hidden: data.hidden === true,
       })) as VersionedRow;
+    case "stockeventsCashEntry": {
+      const accountId = typeof data.accountId === "string" && data.accountId ? data.accountId : null;
+      if (accountId) {
+        await assertOwnedReferences(db, userId, { accountId });
+      }
+      const duplicate = await stockeventsCashMappingsRepository.findEntry(
+        db, userId, String(data.contributionDate), accountId, String(data.watchlistId),
+      );
+      if (duplicate) {
+        return {
+          ...duplicate,
+          syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
+        } as VersionedRow;
+      }
+      const entry = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+        id: typeof data.id === "string" ? data.id : undefined,
+        contributionDate: String(data.contributionDate),
+        accountId,
+        watchlistId: String(data.watchlistId),
+        syncedAmount: Number(data.syncedAmount),
+        currency: String(data.currency),
+      });
+      return { ...entry, syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency) } as VersionedRow;
+    }
     case "wealthSnapshot": {
       const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
         WealthSnapshotBalancesField;
@@ -298,6 +329,20 @@ async function updateEntity(
         },
         expectedVersion,
       )) as VersionedRow | undefined;
+    case "stockeventsCashEntry": {
+      const updated = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+        contributionDate: String(patch.contributionDate),
+        accountId:
+          typeof patch.accountId === "string" && patch.accountId ? patch.accountId : null,
+        watchlistId: String(patch.watchlistId),
+        syncedAmount: Number(patch.syncedAmount),
+        currency: String(patch.currency),
+      });
+      return {
+        ...updated,
+        syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
+      } as VersionedRow | undefined;
+    }
     case "wealthSnapshot": {
       const { balances, ...snapshotPatch } = patch as Partial<wealthRepository.CreateWealthSnapshotInput> &
         WealthSnapshotBalancesField;
@@ -341,6 +386,8 @@ async function removeEntity(
       return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion);
     case "stockeventsMapping":
       return stockeventsSymbolMappingsRepository.remove(db, userId, entityId, expectedVersion);
+    case "stockeventsCashEntry":
+      return stockeventsCashMappingsRepository.removeSyncEntry(db, userId, entityId, expectedVersion);
     case "wealthSnapshot":
       return wealthRepository.remove(db, userId, entityId, expectedVersion);
   }

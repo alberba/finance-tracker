@@ -31,6 +31,7 @@ const COLLECTION_BY_ENTITY: Record<SyncEntityType, keyof SyncV2Bootstrap> = {
   userInstrument: "userInstruments",
   wealthSnapshot: "wealthSnapshots",
   stockeventsMapping: "stockeventsSymbolMappings",
+  stockeventsCashEntry: "stockeventsCashSyncEntries",
 };
 
 function matches(entity: CachedEntity, reference: string): boolean {

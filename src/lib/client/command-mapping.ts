@@ -76,10 +76,10 @@
  *   (`user_instruments`: `instrumentId`/`categoryId`/`alias` only) and
  *   holdings tracking. Reconciling this needs a `market_instruments`
  *   materialization step this WP doesn't own — left unwired.
- * - `stockevents.ts` is entirely unwired on purpose: `integration_credentials`
- *   (WP12 owns encryption) and `stockevents_symbol_mappings` ("no version
- *   column to drive optimistic concurrency") are both explicitly excluded
- *   from `SYNC_ENTITY_TYPES` in `command-schemas.ts`.
+ * - `stockevents.ts` syncs its settings through `settingsUpdate`
+ *   (`stockeventsEnabled`, `stockeventsCashMappings`) and its symbol/cash
+ *   rows through the `stockeventsMapping`/`stockeventsCashEntry` entities.
+ *   Only `integration_credentials` stays excluded (WP12 owns encryption).
  * - `settings.ts`'s three `EntityKey` values all map to the single v2
  *   `account` entity; the list shown in the UI determines its `kind`.
  * - `data.ts`'s import/reset/start-fresh flows use `reloadState` (whole
@@ -295,6 +295,8 @@ export async function syncSettingsUpdate(patch: {
   locale?: string | null;
   theme?: string | null;
   twrLiquidityAccountIds?: string[];
+  stockeventsEnabled?: boolean;
+  stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>;
 }): Promise<void> {
   if (!isSyncV2Enabled()) {
     return;
@@ -569,4 +571,64 @@ export async function syncListDiff<T extends { id: string }>(
       await syncCreate(entityType, item.id, data);
     }
   }
+}
+
+/**
+ * Matches a synced Stock Events symbol row by the local symbol: rows
+ * migrated from v1 carry it as `legacyId`, rows created from now on carry
+ * the client-minted id but the same `legacyId` (ADR 0001).
+ */
+function stockeventsMappingMatches(symbol: string): EntityMatch {
+  return (entity) =>
+    entity.legacyId === symbol ||
+    (entity.legacyId == null && entity.stockeventsSymbol === symbol);
+}
+
+/** Create-if-absent / update-otherwise for one Stock Events symbol mapping. */
+export async function syncStockeventsMappingUpsert(
+  symbol: string,
+  data: { stockeventsSymbol: string; sync: boolean; watchlistId: string | null; hidden: boolean },
+): Promise<void> {
+  await syncUpsertByKey(
+    "stockeventsMapping",
+    stockeventsMappingMatches(symbol),
+    { legacyId: symbol, categoryId: null, ...data },
+    { ...data },
+  );
+}
+
+/** Removes a Stock Events symbol mapping addressed by its local symbol. */
+export async function syncStockeventsMappingRemove(symbol: string): Promise<void> {
+  await syncRemoveByKey("stockeventsMapping", stockeventsMappingMatches(symbol), symbol);
+}
+
+/**
+ * Matches a synced contribution-cash entry by its natural key
+ * (`contributionDate`, server `accountId`, `watchlistId`).
+ */
+function stockeventsCashEntryMatches(
+  contributionDate: string,
+  accountId: string | null,
+  watchlistId: string,
+): EntityMatch {
+  return (entity) =>
+    entity.contributionDate === contributionDate &&
+    (entity.accountId ?? null) === (accountId ?? null) &&
+    entity.watchlistId === watchlistId;
+}
+
+/** Create-if-absent / update-otherwise for one contribution-cash sync entry. */
+export async function syncStockeventsCashEntryUpsert(
+  contributionDate: string,
+  accountId: string | null,
+  watchlistId: string,
+  syncedAmount: number,
+  currency: string,
+): Promise<void> {
+  const matches = stockeventsCashEntryMatches(contributionDate, accountId, watchlistId);
+  await syncUpsertByKey(
+    "stockeventsCashEntry",
+    matches,
+    { contributionDate, accountId, watchlistId, syncedAmount, currency },
+  );
 }

@@ -41,6 +41,7 @@ export const SYNC_ENTITY_TYPES = [
   "userInstrument",
   "wealthSnapshot",
   "stockeventsMapping",
+  "stockeventsCashEntry",
 ] as const;
 
 export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number];
@@ -239,6 +240,16 @@ export const entityCreateSchemas = {
       hidden: z.boolean().optional(),
     })
     .strict(),
+  stockeventsCashEntry: z
+    .object({
+      legacyId: nullableString.optional(),
+      contributionDate: isoDate,
+      accountId: nullableString.optional(),
+      watchlistId: z.string().min(1),
+      syncedAmount: z.number(),
+      currency: z.string().min(1),
+    })
+    .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
 /**
@@ -262,6 +273,8 @@ export const entityCreatePayloadSchemas = {
   contribution: entityCreateSchemas.contribution.extend(clientIdentityFields),
   userInstrument: entityCreateSchemas.userInstrument.extend(clientIdentityFields),
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.extend(clientIdentityFields),
+  stockeventsMapping: entityCreateSchemas.stockeventsMapping.extend(clientIdentityFields),
+  stockeventsCashEntry: entityCreateSchemas.stockeventsCashEntry.extend(clientIdentityFields),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;
 
 /** Update-payload (patch) shape per entity type — every field optional. */
@@ -294,6 +307,15 @@ export const entityUpdateSchemas = {
       sync: z.boolean().optional(),
       watchlistId: nullableString.optional(),
       hidden: z.boolean().optional(),
+    })
+    .strict(),
+  stockeventsCashEntry: z
+    .object({
+      contributionDate: isoDate.optional(),
+      accountId: nullableString.optional(),
+      watchlistId: z.string().min(1).optional(),
+      syncedAmount: z.number().optional(),
+      currency: z.string().min(1).optional(),
     })
     .strict(),
 } satisfies Record<SyncEntityType, z.ZodTypeAny>;

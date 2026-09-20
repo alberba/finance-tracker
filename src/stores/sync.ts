@@ -219,6 +219,7 @@ export const useSyncStore = defineStore('sync', () => {
       accounts: [], categories: [], transactions: [], subscriptions: [],
       recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
       contributions: [], userInstruments: [], wealthSnapshots: [],
+      stockeventsSymbolMappings: [], stockeventsCashMappings: [], stockeventsCashSyncEntries: [],
     }
     const collections = {
       account: bootstrap.accounts,
@@ -232,6 +233,8 @@ export const useSyncStore = defineStore('sync', () => {
       contribution: bootstrap.contributions,
       userInstrument: bootstrap.userInstruments,
       wealthSnapshot: bootstrap.wealthSnapshots,
+      stockeventsMapping: bootstrap.stockeventsSymbolMappings ?? [],
+      stockeventsCashEntry: bootstrap.stockeventsCashSyncEntries ?? [],
     } satisfies Record<SyncEntityType, CachedEntity[]>
     if (reachedServer) {
       // Only a payload that actually came from the server may replace the

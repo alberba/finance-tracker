@@ -133,6 +133,26 @@ export async function listSyncEntriesByUser(
   return rows.map((row) => ({ ...row, syncedAmount: fromMinorUnits(row.syncedAmountMinor, row.currency) }));
 }
 
+export async function findEntry(
+  db: Db,
+  userId: string,
+  contributionDate: string,
+  accountId: string | null,
+  watchlistId: string,
+): Promise<StockeventsCashSyncEntryRow | undefined> {
+  const rows = await db
+    .select()
+    .from(stockeventsCashSyncEntries)
+    .where(
+      and(
+        eq(stockeventsCashSyncEntries.userId, userId),
+        eq(stockeventsCashSyncEntries.contributionDate, contributionDate),
+        eq(stockeventsCashSyncEntries.watchlistId, watchlistId),
+      ),
+    );
+  return rows.find((row) => (row.accountId ?? null) === (accountId ?? null));
+}
+
 export async function upsertSyncEntry(
   db: Db,
   userId: string,
@@ -181,6 +201,23 @@ export async function upsertSyncEntry(
     })
     .returning();
   return row;
+}
+
+export async function removeSyncEntry(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(stockeventsCashSyncEntries)
+    .where(and(
+      eq(stockeventsCashSyncEntries.id, id),
+      eq(stockeventsCashSyncEntries.userId, userId),
+      versionGuard(stockeventsCashSyncEntries.version, expectedVersion),
+    ))
+    .returning({ id: stockeventsCashSyncEntries.id });
+  return deleted.length > 0;
 }
 
 /**
