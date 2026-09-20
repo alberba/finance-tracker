@@ -23,7 +23,7 @@ import * as userSettingsRepository from "../../../db/repositories/user-settings"
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 
 export const GET: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/data/export", async () => {
     const principal = requirePrincipal(locals);
     const db = getDb(locals);
     const userId = principal.userId;

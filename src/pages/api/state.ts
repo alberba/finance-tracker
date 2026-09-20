@@ -8,7 +8,7 @@ import {
 } from "../../lib/server/api-auth";
 
 export const GET: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/state", async () => {
     requireLegacyOwner(locals);
     const db = getD1FromLocals(locals);
     const snapshot = await loadStateFromD1(db);
@@ -16,7 +16,7 @@ export const GET: APIRoute = async ({ locals }) =>
   });
 
 export const PUT: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/state", async () => {
     requireLegacyOwner(locals);
     const db = getD1FromLocals(locals);
     const body = (await request.json()) as {

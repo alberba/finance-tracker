@@ -61,7 +61,7 @@ interface ImportSummary {
 }
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/data/import", async () => {
     const principal = requirePrincipal(locals);
 
     let body: Row;

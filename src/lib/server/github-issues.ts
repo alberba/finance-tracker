@@ -177,17 +177,23 @@ export async function createIssueFromWebReport(
     if (TYPE_RETRY_STATUS.has(response.status)) {
       response = await requestIssue(baseRequestBody);
     } else {
-      throw new Error(
-        `GitHub API devolvió ${response.status}: ${details.slice(0, 500)}`,
+      // El cuerpo de GitHub queda del lado del servidor: el mensaje del error
+      // viaja a Sentry con `reportApiRouteFailure` y no debe repetirlo.
+      console.error(
+        `[github] GitHub API devolvió ${response.status}`,
+        details.slice(0, 500),
       );
+      throw new Error(`GitHub API devolvió ${response.status}.`);
     }
   }
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(
-      `GitHub API devolvió ${response.status}: ${details.slice(0, 500)}`,
+    console.error(
+      `[github] GitHub API devolvió ${response.status}`,
+      details.slice(0, 500),
     );
+    throw new Error(`GitHub API devolvió ${response.status}.`);
   }
 
   const data = (await response.json()) as {

@@ -31,7 +31,7 @@ function parseYear(raw: string | null): number | undefined | "invalid" {
 }
 
 export const GET: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/bootstrap", async () => {
     const principal = requirePrincipal(locals);
     const url = new URL(request.url);
     const year = parseYear(url.searchParams.get("year"));

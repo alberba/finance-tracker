@@ -20,7 +20,7 @@ const DEFAULT_CATEGORIES: Array<{ name: string; kind: string; sortOrder: number 
 ];
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/state/initialize", async () => {
     const principal = requirePrincipal(locals);
     const db = getDb(locals);
     const userId = principal.userId;

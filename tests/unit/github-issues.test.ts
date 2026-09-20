@@ -15,6 +15,17 @@ const payload: IssueReportPayload = {
   },
 };
 
+/** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
+async function captureError(promise: Promise<unknown>): Promise<Error> {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof Error) return error;
+    throw error;
+  }
+  throw new Error("Se esperaba que la promesa fallara");
+}
+
 describe("github issues service", () => {
   it("crea issue y devuelve número/url", async () => {
     const fakeFetch = vi.fn<typeof fetch>(
@@ -214,6 +225,61 @@ describe("github issues service", () => {
         { fetch: fakeFetch as unknown as typeof fetch },
       ),
     ).rejects.toThrowError(/GitHub API devolvió 403/);
+  });
+
+  it("nombra el estado sin filtrar el cuerpo de GitHub en un fallo directo", async () => {
+    const upstreamBody = "UPSTREAM_BODY_MARKER_UNAUTHORIZED";
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () => new Response(upstreamBody, { status: 401 }),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const error = await captureError(
+      createIssueFromWebReport(
+        payload,
+        {
+          GITHUB_ISSUE_TOKEN: "token",
+          GITHUB_OWNER: "org",
+          GITHUB_REPO: "repo",
+        },
+        { fetch: fakeFetch as unknown as typeof fetch },
+      ),
+    );
+
+    expect(error.message).toContain("GitHub API devolvió 401");
+    expect(error.message).not.toContain(upstreamBody);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[github] GitHub API devolvió 401",
+      upstreamBody,
+    );
+  });
+
+  it("nombra el estado sin filtrar el cuerpo de GitHub cuando el reintento vuelve a fallar", async () => {
+    const upstreamBody = "UPSTREAM_BODY_MARKER_FORBIDDEN";
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () => new Response(upstreamBody, { status: 403 }),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const error = await captureError(
+      createIssueFromWebReport(
+        payload,
+        {
+          GITHUB_ISSUE_TOKEN: "token",
+          GITHUB_OWNER: "org",
+          GITHUB_REPO: "repo",
+        },
+        { fetch: fakeFetch as unknown as typeof fetch },
+      ),
+    );
+
+    expect(fakeFetch).toHaveBeenCalledTimes(2);
+    expect(error.message).toContain("GitHub API devolvió 403");
+    expect(error.message).not.toContain(upstreamBody);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[github] GitHub API devolvió 403",
+      upstreamBody,
+    );
   });
 
   it("usa GITHUB_TOKEN cuando GITHUB_ISSUE_TOKEN no está definido", async () => {

@@ -105,8 +105,10 @@ Settings → Build):
 
 `pnpm deploy:cf` usa `--config dist/server/wrangler.json`: el adapter de Astro
 genera ese fichero en el build a partir de `wrangler.toml`, y es el que lleva
-`main`, `assets` y los bindings. El `wrangler.toml` de raíz por sí solo no
-sirve para desplegar (no declara `main` ni `assets`).
+`main`, `assets` y los bindings. El `wrangler.toml` de raíz ahora sí declara
+`main` (la entrada de Sentry, que el build compila a `dist/server/entry.mjs`) y
+las `[vars]`; `assets` y los bindings se materializan en ese fichero generado,
+que sigue siendo el que se despliega.
 
 A diferencia de Pages, aquí **los bindings y las `[vars]` de `wrangler.toml`
 son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
@@ -135,6 +137,39 @@ latencia de deploy.
 pnpm build
 pnpm astro check
 ```
+
+## Sentry
+
+Los errores llegan a Sentry por dos caminos independientes:
+
+- Cliente: `@sentry/astro` inyecta `sentry.client.config.js`. La pieza
+  compartida de cliente (`src/lib/client/error-reporting.ts`) marca cada fallo
+  de API que no provocó quien usa la app con `api.endpoint` (sin query string),
+  `api.category` y `api.status`.
+- Servidor: `wrangler.toml` apunta `main` a `sentry.server.config.ts`, que
+  envuelve el handler de `@astrojs/cloudflare` con `Sentry.withSentry()` de
+  `@sentry/cloudflare`. `withApiErrorHandling`
+  (`src/lib/server/api-auth.ts`) marca los fallos de ruta no controlados con
+  `api.route` y `http.response.status_code`.
+
+La entrada del Worker se cablea a mano en lugar de apoyarse en la integración de
+`@sentry/astro` (que en `astro.config.ts` queda con `server: false`): con
+`@astrojs/cloudflare` v14 esa integración ya no aplica su envoltorio automático
+a la entrada emitida
+([getsentry/sentry-javascript#21901](https://github.com/getsentry/sentry-javascript/issues/21901)),
+así que el Worker se desplegaría con Sentry del lado servidor desactivado en
+silencio.
+
+El DSN vive en `[vars] SENTRY_DSN` de `wrangler.toml` y no es un secreto: el
+mismo valor ya viaja en el bundle de cliente.
+
+Contrato de privacidad: con `dataCollection.userInfo` desactivado y sin cuerpos
+HTTP en ninguno de los dos SDK —y con la integración `Console` fuera del SDK
+del servidor, así sus eventos tampoco llevan los argumentos de `console.*`—,
+ningún evento lleva credenciales, cuerpos de petición ni datos financieros; los
+eventos de servidor llevan solo nuestros tags (`api.route` y
+`http.response.status_code`) y la excepción, cuyo mensaje nunca repite el cuerpo
+de una respuesta de proveedor aunque su stack sí viaje.
 
 ## Testing (Vitest + Playwright)
 

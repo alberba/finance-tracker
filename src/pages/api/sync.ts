@@ -12,7 +12,7 @@ import { syncBatchSchema } from "../../lib/server/sync/command-schemas";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../lib/server/api-auth";
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/sync", async () => {
     const principal = requirePrincipal(locals);
 
     let body: unknown;

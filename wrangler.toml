@@ -1,4 +1,7 @@
 name = "finance-tracker"
+# Sentry owns the Worker entry: it wraps the Astro handler with
+# `@sentry/cloudflare` (see `sentry.server.config.ts`).
+main = "./sentry.server.config.ts"
 compatibility_date = "2026-02-23"
 compatibility_flags = ["nodejs_compat"]
 
@@ -31,3 +34,6 @@ LEGACY_OWNER_EMAIL = "albertsalomv@proton.me"
 MARKET_DATA_PROVIDER = "twelve-data"
 MARKET_QUOTE_STALE_MINUTES = "15"
 MARKET_QUOTE_CACHE_SECONDS = "300"
+# Sentry DSN for the server runtime. It is not a secret: the same value ships
+# in the client bundle (`sentry.client.config.js`).
+SENTRY_DSN = "https://f69ab9e853e8908f49a260af8ed822d4@o4511755834884096.ingest.de.sentry.io/4511972407902288"
