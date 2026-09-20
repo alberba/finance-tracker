@@ -93,3 +93,14 @@ export function apiEndpointPath(endpoint: string): string {
 export function shouldReportApiError(error: ApiClientError): boolean {
   return error.category !== 'api-error'
 }
+
+/**
+ * Resumen de una línea armado solo con lo que este cliente sabe: categoría,
+ * ruta sin query ni hash y estado. Es el único texto del error que viaja a
+ * Sentry; `ApiClientError.message` sigue siendo la copia para la persona y
+ * puede llevar, tal cual, texto del proveedor.
+ */
+export function apiErrorTitle(error: ApiClientError): string {
+  const status = error.status === undefined ? 'sin respuesta' : String(error.status)
+  return `Fallo de API [${error.category}] en ${apiEndpointPath(error.endpoint)} (${status})`
+}

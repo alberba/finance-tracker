@@ -6,7 +6,7 @@ const sentry = vi.hoisted(() => ({ captureException: vi.fn(), withScope: vi.fn()
 
 vi.mock('@sentry/browser', () => sentry)
 
-import { ApiClientError } from '../../src/lib/client/api-error'
+import { ApiClientError, apiErrorTitle } from '../../src/lib/client/api-error'
 import { reportApiErrorToSentry } from '../../src/lib/client/error-reporting'
 
 type ScopeHandler = (scope: { setTag: ReturnType<typeof vi.fn> }) => void
@@ -29,6 +29,24 @@ function serverError(): ApiClientError {
   })
 }
 
+/** El texto que un 5xx del proveedor deja en `message`, y que NO debe viajar. */
+const PROVIDER_TEXT = 'Stock Events respondió: {"error":"invalid api key"}'
+
+function serverErrorWithProviderText(): ApiClientError {
+  return new ApiClientError('server-error', {
+    endpoint: '/api/stockevents/sync?symbol=AAPL#top',
+    status: 503,
+    serverMessage: PROVIDER_TEXT,
+    fallbackMessage: 'No se pudo sincronizar',
+  })
+}
+
+function capturedError(): Error {
+  const captured = sentry.captureException.mock.calls[0]?.[0]
+  if (!(captured instanceof Error)) throw new Error('Sentry no capturó un Error')
+  return captured
+}
+
 describe('reportApiErrorToSentry', () => {
   it('manda solo la ruta sin query, la categoría y el estado, en ese orden', () => {
     const error = serverError()
@@ -41,7 +59,19 @@ describe('reportApiErrorToSentry', () => {
       ['api.status', '503'],
     ])
     expect(sentry.captureException).toHaveBeenCalledTimes(1)
-    expect(sentry.captureException).toHaveBeenCalledWith(error)
+    expect(capturedError().message).toBe(apiErrorTitle(error))
+  })
+
+  it('captura un resumen propio y nunca el mensaje que trajo la API', () => {
+    const error = serverErrorWithProviderText()
+
+    reportApiErrorToSentry(error)
+
+    const captured = capturedError()
+    expect(captured.message).toBe('Fallo de API [server-error] en /api/stockevents/sync (503)')
+    expect(error.message).toBe(PROVIDER_TEXT)
+    expect(captured.message).not.toContain('invalid api key')
+    expect(captured.message).not.toContain('Stock Events respondió')
   })
 
   it('omite el tag de estado cuando el error no trae status', () => {
@@ -56,6 +86,7 @@ describe('reportApiErrorToSentry', () => {
       ['api.endpoint', '/api/state'],
       ['api.category', 'offline'],
     ])
+    expect(capturedError().message).toBe('Fallo de API [offline] en /api/state (sin respuesta)')
   })
 
   it('no usa ningún otro punto de entrada del SDK', () => {

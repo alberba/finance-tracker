@@ -4,6 +4,7 @@ import {
   ApiClientError,
   INVALID_RESPONSE_MESSAGE,
   OFFLINE_MESSAGE,
+  SERVER_ERROR_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
   apiEndpointPath,
 } from '../../src/lib/client/api-error'
@@ -22,6 +23,11 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+/** Cuerpo de una pantalla de borde (Cloudflare Access) o de un 502 HTML. */
+function htmlResponse(status: number): Response {
+  return new Response('<!doctype html><html><body>Access denied</body></html>', { status })
 }
 
 async function captureApiError(promise: Promise<unknown>): Promise<ApiClientError> {
@@ -117,6 +123,45 @@ describe('requestApiJson con cuerpo que no es JSON', () => {
     expect(error.message).toBe(INVALID_RESPONSE_MESSAGE)
     expect(error.status).toBe(200)
     expect(reportMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('un 401 con cuerpo HTML sigue siendo sesión vencida, no respuesta inválida', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(401)))
+
+    const error = await captureApiError(
+      requestApiJson('/api/stockevents', { fallbackMessage: FALLBACK_MESSAGE }),
+    )
+
+    expect(error.category).toBe('session-expired')
+    expect(error.message).toBe(SESSION_EXPIRED_MESSAGE)
+    expect(error.status).toBe(401)
+    expect(reportMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('un 503 con cuerpo HTML usa el texto por defecto del servidor caído', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(503)))
+
+    const error = await captureApiError(
+      requestApiJson('/api/stockevents/sync', { fallbackMessage: FALLBACK_MESSAGE }),
+    )
+
+    expect(error.category).toBe('server-error')
+    expect(error.message).toBe(SERVER_ERROR_MESSAGE)
+    expect(error.status).toBe(503)
+    expect(reportMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('un 400 con cuerpo HTML cae al mensaje del flujo y queda fuera de Sentry', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(htmlResponse(400)))
+
+    const error = await captureApiError(
+      requestApiJson('/api/stockevents', { fallbackMessage: FALLBACK_MESSAGE }),
+    )
+
+    expect(error.category).toBe('api-error')
+    expect(error.message).toBe(FALLBACK_MESSAGE)
+    expect(error.status).toBe(400)
+    expect(reportMock).not.toHaveBeenCalled()
   })
 })
 
