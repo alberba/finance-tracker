@@ -661,9 +661,26 @@ async function performMutation(
   }
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /unique constraint|constraint failed|UNIQUE/i.test(message);
+/**
+ * Detects a primary-key/unique violation through any wrapping layer.
+ *
+ * D1 surfaces it as `D1_ERROR: UNIQUE constraint failed: ...`, but Drizzle
+ * rethrows as `DrizzleQueryError: Failed query: ...` with the D1 error as
+ * `cause` — matching only the outer message misses it (FINANCE-TRACKER-6:
+ * a retried command then 500s instead of replaying its stored result), so
+ * the whole `cause` chain is inspected.
+ */
+export function isUniqueConstraintError(error: unknown): boolean {
+  const pattern = /unique constraint|constraint failed/i;
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current !== null && current !== undefined && !seen.has(current)) {
+    seen.add(current);
+    const message = current instanceof Error ? current.message : String(current);
+    if (pattern.test(message)) return true;
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return false;
 }
 
 export class CommandInProgressError extends Error {
