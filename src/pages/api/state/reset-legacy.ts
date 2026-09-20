@@ -10,7 +10,7 @@ import {
 } from "../../../lib/server/api-auth";
 
 export const POST: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/state/reset-legacy", async () => {
     requireLegacyOwner(locals);
     const db = getD1FromLocals(locals);
     const snapshot = await resetStateInD1(db);

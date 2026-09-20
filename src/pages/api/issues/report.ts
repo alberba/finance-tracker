@@ -46,7 +46,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
 }
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/issues/report", async () => {
     const principal = requirePrincipal(locals);
     if (!consumeRateLimit(principal.userId)) {
       return jsonResponse(

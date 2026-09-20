@@ -26,13 +26,13 @@ async function getCredential(locals: App.Locals) {
 }
 
 export const GET: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const { credential } = await getCredential(locals);
     return jsonResponse({ configured: Boolean(credential) }, 200);
   });
 
 export const PUT: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const body = (await request.json()) as { apiKey?: unknown };
     const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
     if (!apiKey || apiKey.length > MAX_API_KEY_LENGTH) {
@@ -74,7 +74,7 @@ export const PUT: APIRoute = async ({ request, locals }) =>
   });
 
 export const DELETE: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const { credential, db, userId } = await getCredential(locals);
     if (credential) {
       await integrationCredentialsRepository.remove(db, userId, credential.id);

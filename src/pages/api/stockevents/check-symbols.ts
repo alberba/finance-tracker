@@ -11,7 +11,7 @@ interface CheckSymbolsBody {
 }
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling('/api/stockevents/check-symbols', async () => {
     const apiKey = await readApiKey(locals)
     if (!apiKey) return json({ error: 'Falta la API key de Stock Events' }, 400)
     const body = (await request.json().catch(() => ({}))) as CheckSymbolsBody
