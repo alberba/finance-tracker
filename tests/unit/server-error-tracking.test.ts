@@ -45,6 +45,19 @@ describe('reportApiRouteFailure', () => {
     expect(sentry.captureException).toHaveBeenCalledWith(error)
   })
 
+  it('captura el objeto de error original, así su stack sobrevive al reporte', () => {
+    const error = routeError()
+
+    reportApiRouteFailure(error, { route: '/api/sync', status: 500 })
+
+    // Es el precio documentado en el contrato: viaja el error entero (tipo,
+    // mensaje y stack) para que un fallo de servidor sea diagnosticable.
+    const captured = sentry.captureException.mock.calls[0]?.[0]
+    expect(captured).toBe(error)
+    expect(captured?.stack).toBe(error.stack)
+    expect(captured?.stack).toContain('routeError')
+  })
+
   it('no usa ningún otro punto de entrada del SDK', () => {
     reportApiRouteFailure(routeError(), { route: '/api/state', status: 500 })
 

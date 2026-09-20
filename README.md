@@ -166,7 +166,10 @@ mismo valor ya viaja en el bundle de cliente.
 Contrato de privacidad: con `dataCollection.userInfo` desactivado y sin cuerpos
 HTTP en ninguno de los dos SDK —y con la integración `Console` fuera del SDK
 del servidor, así sus eventos tampoco llevan los argumentos de `console.*`—,
-ningún evento lleva credenciales, cuerpos de petición ni datos financieros.
+ningún evento lleva credenciales, cuerpos de petición ni datos financieros; los
+eventos de servidor llevan solo nuestros tags (`api.route` y
+`http.response.status_code`) y la excepción, cuyo mensaje nunca repite el cuerpo
+de una respuesta de proveedor aunque su stack sí viaje.
 
 ## Testing (Vitest + Playwright)
 

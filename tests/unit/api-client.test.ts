@@ -11,9 +11,18 @@ import {
 import { requestApiJson } from '../../src/lib/client/api-client'
 import { reportApiErrorToSentry } from '../../src/lib/client/error-reporting'
 
-vi.mock('../../src/lib/client/error-reporting', () => ({
-  reportApiErrorToSentry: vi.fn(),
-}))
+const sentry = vi.hoisted(() => ({ captureException: vi.fn(), withScope: vi.fn() }))
+
+vi.mock('../../src/lib/client/error-reporting', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/lib/client/error-reporting')>()
+  // Espía que delega en la implementación real: el embudo queda aislado, pero
+  // el caso de telemetría caída ejerce la pieza de verdad.
+  return { reportApiErrorToSentry: vi.fn(actual.reportApiErrorToSentry) }
+})
+
+// El SDK real nunca se carga; el caso de fallo lo hace reventar sin red.
+vi.mock('@sentry/browser', () => sentry)
 
 const reportMock = vi.mocked(reportApiErrorToSentry)
 const FALLBACK_MESSAGE = 'No se pudieron cargar los eventos'
@@ -242,5 +251,29 @@ describe('privacidad del endpoint reportado', () => {
     const reported = reportMock.mock.calls[0]?.[0]
     expect(reported).toBe(error)
     expect(apiEndpointPath(reported?.endpoint ?? '')).toBe('/api/market/quotes')
+  })
+})
+
+describe('requestApiJson con la telemetría caída', () => {
+  it('rechaza igual con el error clasificado, sin que la telemetría lo reemplace', async () => {
+    // El SDK revienta dentro del reporter real: el embudo no puede perder el
+    // error que ya clasificó.
+    sentry.withScope.mockImplementation(() => {
+      throw new Error('Sentry no disponible')
+    })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const error = await captureApiError(
+      requestApiJson('/api/stockevents', { fallbackMessage: FALLBACK_MESSAGE }),
+    )
+
+    expect(error).toBeInstanceOf(ApiClientError)
+    expect(error.category).toBe('offline')
+    expect(error.message).toBe(OFFLINE_MESSAGE)
+    expect(error.status).toBeUndefined()
+    expect(reportMock).toHaveBeenCalledTimes(1)
+    expect(sentry.captureException).not.toHaveBeenCalled()
   })
 })
