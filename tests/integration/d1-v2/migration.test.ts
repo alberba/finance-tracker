@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as transactionsRepository from "../../../src/db/repositories/transactions";
-import { usersRepository } from "../../../src/db/repositories";
+import { usersRepository, recurringRulesRepository, pendingMovementsRepository } from "../../../src/db/repositories";
 import type { DataEncryptionEnv } from "../../../src/lib/server/crypto/data-encryption";
 import { normalizeState } from "../../../src/scripts/state";
 import type { State } from "../../../src/scripts/types";
@@ -87,6 +87,27 @@ function buildFixtureState(): State {
         lastExecutionDate: null,
         nextOccurrenceDate: "2024-02-01",
       },
+      {
+        id: "rule-inv",
+        type: "investment",
+        accountId: "asset-idx",
+        category: "Fondos Indexados",
+        description: "Aportación mensual",
+        amount: 752,
+        symbol: "AAPL",
+        side: "buy",
+        units: 5,
+        unitPrice: 150,
+        fee: 2,
+        time: "10:30",
+        frequency: "monthly",
+        interval: 1,
+        startDate: "2024-01-01",
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: "2024-02-01",
+      },
     ],
     pendingMovements: [
       {
@@ -99,6 +120,27 @@ function buildFixtureState(): State {
         category: "Vivienda",
         description: "",
         amount: 800,
+        status: "pending",
+        createdAt: "2024-02-01T00:00:00.000Z",
+        updatedAt: "2024-02-01T00:00:00.000Z",
+        transactionId: null,
+      },
+      {
+        id: "pm-inv",
+        occurrenceKey: "rule-inv:2024-02-01",
+        ruleId: "rule-inv",
+        occurrenceDate: "2024-02-01",
+        type: "investment",
+        accountId: "asset-idx",
+        category: "Fondos Indexados",
+        description: "Aportación mensual",
+        amount: 752,
+        symbol: "AAPL",
+        side: "buy",
+        units: 5,
+        unitPrice: 150,
+        fee: 2,
+        time: "10:30",
         status: "pending",
         createdAt: "2024-02-01T00:00:00.000Z",
         updatedAt: "2024-02-01T00:00:00.000Z",
@@ -196,6 +238,30 @@ describe("WP9 migration tool", () => {
     const v1Parity = computeV1Parity(state);
     const v2Parity = await computeV2Parity(testDb.db, report.userId, state.year);
     expect(diffParity(v1Parity, v2Parity)).toEqual([]);
+
+    const rules = await recurringRulesRepository.listByUser(testDb.db, report.userId);
+    const invRule = rules.find((r) => r.legacyId === "rule-inv");
+    expect(invRule).toBeDefined();
+    expect(invRule?.type).toBe("investment");
+    expect(invRule?.symbol).toBe("AAPL");
+    expect(invRule?.side).toBe("buy");
+    expect(invRule?.units).toBe(5);
+    expect(invRule?.unitPrice).toBe(150);
+    expect(invRule?.fee).toBe(2);
+    expect(invRule?.time).toBe("10:30");
+    expect(invRule?.accountId).toBeTruthy();
+
+    const pending = await pendingMovementsRepository.listByUser(testDb.db, report.userId);
+    const invPending = pending.find((p) => p.legacyId === "pm-inv");
+    expect(invPending).toBeDefined();
+    expect(invPending?.type).toBe("investment");
+    expect(invPending?.symbol).toBe("AAPL");
+    expect(invPending?.side).toBe("buy");
+    expect(invPending?.units).toBe(5);
+    expect(invPending?.unitPrice).toBe(150);
+    expect(invPending?.fee).toBe(2);
+    expect(invPending?.time).toBe("10:30");
+    expect(invPending?.accountId).toBe(invRule?.accountId);
   });
 
   it("is idempotent — a second run inserts nothing new and reproduces the same checksum", async () => {

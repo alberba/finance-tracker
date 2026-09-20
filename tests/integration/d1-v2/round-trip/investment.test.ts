@@ -170,6 +170,56 @@ describe("round trip: inversión", () => {
     });
   });
 
+  it("syncs edited pending movement without losing investment operation fields", async () => {
+    const { useRecurringStore } = await import("../../../../src/stores/recurring");
+    const recurring = useRecurringStore();
+    recurring.addRule({
+      type: "expense",
+      accountId,
+      category: "Ocio",
+      description: "Gasto original",
+      amount: 100,
+      frequency: "monthly",
+      interval: 1,
+      startDate: "2026-09-01",
+    });
+
+    let reloaded = await trip.reload();
+    expect(reloaded.pendingMovements.length).toBeGreaterThan(0);
+    const pmId = reloaded.pendingMovements[0].id;
+
+    // Edit and reclassify to investment
+    const ok = recurring.editPending(pmId, {
+      type: "investment",
+      date: "2026-09-02",
+      accountId,
+      category: "Acciones",
+      description: "Reclasificado a Inversión",
+      amount: 250,
+      symbol: "VWCE",
+      side: "buy",
+      units: 2,
+      unitPrice: 125,
+      fee: 1,
+      time: "15:00",
+    });
+    expect(ok).toBe(true);
+
+    // Reload from server after sync flush
+    reloaded = await trip.reload();
+    expect(reloaded.pendingMovements[0]).toMatchObject({
+      type: "investment",
+      description: "Reclasificado a Inversión",
+      category: "Acciones",
+      symbol: "VWCE",
+      side: "buy",
+      units: 2,
+      unitPrice: 125,
+      fee: 1,
+      time: "15:00",
+    });
+  });
+
   it("keeps the declared flag (§4.3)", async () => {
     const { useInvestmentStore } = await import("../../../../src/stores/investment");
     const investment = useInvestmentStore();

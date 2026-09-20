@@ -267,6 +267,73 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(tracker.transactionsSection).toContainText('212,50')
   })
 
+  test('permite reclasificar un pendiente de gasto a inversión con cuenta y categoría dinámica', async ({ page, tracker }) => {
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    await page.evaluate(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    await page.evaluate(() => {
+      const raw = localStorage.getItem('finance-tracker-state-v1')
+      if (!raw) throw new Error('No se encontró el estado local')
+      const state = JSON.parse(raw)
+      state.recurringRules.push({
+        id: 'rule-expense-reclass',
+        type: 'expense',
+        accountId: state.accounts[0].id,
+        category: state.expenseCategories[0],
+        description: 'Suscripción convertible',
+        amount: 50,
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-07-01',
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: '2026-07-01',
+      })
+      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
+    })
+    await mirrorStateToServer(page)
+    await page.reload()
+
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openDashboard()
+    await liveMarket.pendingAlert.getByRole('button', { name: 'Revisar pendientes' }).click()
+    await expect(liveMarket.pendingPanel).toBeVisible()
+
+    const pendingItem = await liveMarket.openFirstPendingEdit()
+    const typeSelect = pendingItem.getByLabel('Tipo')
+    const categorySelect = pendingItem.getByLabel('Categoría')
+    const accountSelect = pendingItem.getByLabel('Cuenta')
+
+    await expect(typeSelect).toHaveValue('expense')
+    await typeSelect.selectOption('investment')
+
+    await expect(categorySelect.locator('option[value="Fondos Indexados"]')).toBeAttached()
+    await categorySelect.selectOption('Fondos Indexados')
+
+    await expect(accountSelect.locator('optgroup[label="Activos de inversión"]')).toBeAttached()
+    await accountSelect.selectOption({ label: 'Fondos Indexados' })
+
+    await pendingItem.getByLabel('Símbolo').fill('IWDA')
+    await pendingItem.getByLabel('Títulos').fill('2')
+    await pendingItem.getByLabel('Precio por título').fill('90')
+    await pendingItem.getByLabel('Comisiones').fill('2')
+    await pendingItem.getByLabel('Hora').fill('11:00')
+
+    await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
+
+    await expect(liveMarket.pendingPanel).toContainText('182.00')
+    await expect(liveMarket.pendingPanel).toContainText('2 × 90 IWDA')
+
+    await liveMarket.confirmFirstPending()
+    await tracker.filterTransactionsMonth('JULIO')
+    await expect(tracker.transactionsSection).toContainText('Suscripción convertible')
+    await expect(tracker.transactionsSection).toContainText('182,00')
+  })
+
   test('permite editar una regla de inversión recurrente', async ({ page, tracker }) => {
     await page.addInitScript(() => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'

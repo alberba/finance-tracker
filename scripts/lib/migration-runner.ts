@@ -462,7 +462,11 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         bump("recurringRules", "skippedExisting");
         continue;
       }
-      const v2AccountId = accountIdByKey.get(`cash:${rule.accountId}`) ?? null;
+      const v2AccountId =
+        accountIdByKey.get(`cash:${rule.accountId}`) ??
+        accountIdByKey.get(`investment:${rule.accountId}`) ??
+        accountIdByKey.get(`liability:${rule.accountId}`) ??
+        null;
       if (!v2AccountId) {
         anomaly("recurringRules", rule.id, `Account '${rule.accountId}' not found; accountId left null.`);
       }
@@ -481,7 +485,17 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
           amount: rule.amount,
           currency: state.currency,
           frequency: rule.frequency,
+          interval: rule.interval,
+          startDate: rule.startDate,
+          endDate: rule.endDate,
+          lastExecutionDate: rule.lastExecutionDate,
           nextRunDate: rule.nextOccurrenceDate,
+          symbol: rule.symbol ?? null,
+          side: rule.side ?? null,
+          units: rule.units ?? null,
+          unitPrice: rule.unitPrice ?? null,
+          fee: rule.fee ?? null,
+          time: rule.time ?? null,
           status: rule.active ? "active" : "paused",
         },
       });
@@ -516,7 +530,14 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         bump("pendingMovements", "skippedAnomaly");
         continue;
       }
-      const v2AccountId = accountIdByKey.get(`cash:${pm.accountId}`) ?? null;
+      const v2AccountId =
+        accountIdByKey.get(`cash:${pm.accountId}`) ??
+        accountIdByKey.get(`investment:${pm.accountId}`) ??
+        accountIdByKey.get(`liability:${pm.accountId}`) ??
+        null;
+      if (!v2AccountId) {
+        anomaly("pendingMovements", pm.id, `Account '${pm.accountId}' not found; accountId left null.`);
+      }
       const v2CategoryId = categoryIdByKey.get(`${pm.type}:${pm.category}`) ?? null;
       toInsert.push({
         legacyId: pm.id,
@@ -527,6 +548,15 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         currency: state.currency,
         dueDate: pm.occurrenceDate,
         status: pm.status,
+        type: pm.type,
+        description: pm.description ?? null,
+        symbol: pm.symbol ?? null,
+        side: pm.side ?? null,
+        units: pm.units ?? null,
+        unitPrice: pm.unitPrice ?? null,
+        fee: pm.fee ?? null,
+        time: pm.time ?? null,
+        transactionId: pm.transactionId ?? null,
       });
     }
     if (toInsert.length) {
