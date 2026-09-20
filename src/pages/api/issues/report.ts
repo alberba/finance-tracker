@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { ZodError } from "zod";
 import { getRuntimeEnvFromLocals } from "../../../lib/server/cloudflare-env";
+import { reportApiRouteFailure } from "../../../lib/server/error-tracking";
 import { createIssueFromWebReport } from "../../../lib/server/github-issues";
 import { parseIssueReportPayload } from "../../../lib/server/issue-report-schema";
 import { requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
@@ -79,6 +80,9 @@ export const POST: APIRoute = async ({ request, locals }) =>
         );
       }
       console.error("[issues/report] Issue creation failed", error);
+      // El catch resuelve la respuesta, así que `withApiErrorHandling` nunca ve
+      // este fallo: se reporta acá, una sola vez y con la misma forma.
+      reportApiRouteFailure(error, { route: "/api/issues/report", status: 500 });
       return jsonResponse({ ok: false, error: "No se pudo crear la issue" }, 500);
     }
   });

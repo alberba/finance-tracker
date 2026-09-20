@@ -164,8 +164,9 @@ El DSN vive en `[vars] SENTRY_DSN` de `wrangler.toml` y no es un secreto: el
 mismo valor ya viaja en el bundle de cliente.
 
 Contrato de privacidad: con `dataCollection.userInfo` desactivado y sin cuerpos
-HTTP en ninguno de los dos SDK, ningún evento lleva credenciales, cuerpos de
-petición ni datos financieros.
+HTTP en ninguno de los dos SDK —y con la integración `Console` fuera del SDK
+del servidor, así sus eventos tampoco llevan los argumentos de `console.*`—,
+ningún evento lleva credenciales, cuerpos de petición ni datos financieros.
 
 ## Testing (Vitest + Playwright)
 
