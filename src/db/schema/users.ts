@@ -56,6 +56,7 @@ export const userSettings = sqliteTable(
     currency: text("currency").notNull().default("EUR"),
     locale: text("locale"),
     theme: text("theme"),
+    stockeventsEnabled: integer("stockevents_enabled").notNull().default(0),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),
