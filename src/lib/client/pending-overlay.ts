@@ -30,6 +30,8 @@ const COLLECTION_BY_ENTITY: Record<SyncEntityType, keyof SyncV2Bootstrap> = {
   contribution: "contributions",
   userInstrument: "userInstruments",
   wealthSnapshot: "wealthSnapshots",
+  stockeventsMapping: "stockeventsSymbolMappings",
+  stockeventsCashEntry: "stockeventsCashSyncEntries",
 };
 
 function matches(entity: CachedEntity, reference: string): boolean {
@@ -47,6 +49,23 @@ export function applyPendingCommands(
   const next: SyncV2Bootstrap = { ...bootstrap };
 
   for (const command of commands) {
+    if (command.action === "settingsUpdate") {
+      const patch = command.patch as Record<string, unknown>;
+      const settings = { ...((next.settings as Record<string, unknown> | null) ?? {}) };
+      for (const [key, value] of Object.entries(patch)) {
+        if (key === "stockeventsEnabled") {
+          settings["stockeventsEnabled"] = value === true ? 1 : 0;
+        } else if (key === "stockeventsCashMappings") {
+          settings["stockeventsCashMappings"] = value;
+        } else if (key === "twrLiquidityAccountIds") {
+          settings["twrLiquidityAccountIds"] = value;
+        } else {
+          settings[key] = value;
+        }
+      }
+      next.settings = settings as SyncV2Bootstrap["settings"];
+      continue;
+    }
     if (!("entityType" in command)) {
       continue;
     }

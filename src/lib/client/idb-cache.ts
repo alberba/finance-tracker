@@ -15,7 +15,7 @@
 
 import { SYNC_ENTITY_TYPES, type SyncEntityType } from "../server/sync/command-schemas";
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const META_STORE = "__meta";
 const REVISION_KEY = "revision";
 const SETTINGS_KEY = "settings";

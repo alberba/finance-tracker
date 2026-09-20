@@ -22,6 +22,7 @@ import * as marketRepository from "../../db/repositories/market";
 import * as userSettingsRepository from "../../db/repositories/user-settings";
 import * as syncRepository from "../../db/repositories/sync";
 import * as stockeventsSymbolMappingsRepository from "../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../db/repositories/stockevents-cash-mappings";
 
 export async function buildBootstrapPayload(db: Db, userId: string, year?: number) {
   const [
@@ -39,6 +40,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     userInstruments,
     twrLiquidityAccounts,
     stockeventsSymbolMappings,
+    stockeventsCashMappings,
+    stockeventsCashSyncEntries,
     revisionRow,
   ] = await Promise.all([
     userSettingsRepository.get(db, userId),
@@ -55,6 +58,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     marketRepository.listUserInstrumentsByUser(db, userId),
     accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
     stockeventsSymbolMappingsRepository.listByUser(db, userId),
+    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
+    stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
     syncRepository.getRevision(db, userId),
   ]);
 
@@ -131,5 +136,7 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     instruments,
     twrLiquidityAccounts,
     stockeventsSymbolMappings,
+    stockeventsCashMappings,
+    stockeventsCashSyncEntries,
   };
 }

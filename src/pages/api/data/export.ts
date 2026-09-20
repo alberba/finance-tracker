@@ -19,6 +19,7 @@ import * as wealthRepository from "../../../db/repositories/wealth";
 import * as contributionsRepository from "../../../db/repositories/contributions";
 import * as marketRepository from "../../../db/repositories/market";
 import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 
@@ -43,6 +44,8 @@ export const GET: APIRoute = async ({ locals }) =>
       contributions,
       userInstruments,
       stockeventsSymbolMappings,
+      stockeventsCashMappings,
+      stockeventsCashSyncEntries,
     ] = await Promise.all([
       userSettingsRepository.get(db, userId),
       accountsRepository.listByUser(db, userId),
@@ -58,6 +61,8 @@ export const GET: APIRoute = async ({ locals }) =>
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
       stockeventsSymbolMappingsRepository.listByUser(db, userId),
+      stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
+      stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
     ]);
 
     const wealthSnapshotsWithBalances = await Promise.all(
@@ -96,6 +101,8 @@ export const GET: APIRoute = async ({ locals }) =>
         contributions: contributionsWithAllocations,
         userInstruments,
         stockeventsSymbolMappings,
+        stockeventsCashMappings,
+        stockeventsCashSyncEntries,
       },
       200,
     );

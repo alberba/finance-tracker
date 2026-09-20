@@ -17,6 +17,12 @@ import {
   type SymbolCheckResult,
 } from '../services/stockevents-api'
 import type { StockEventsCashMapping, StockEventsSymbolMapping, Transaction } from '../scripts/types'
+import {
+  resolveEntityId,
+  syncSettingsUpdate,
+  syncStockeventsCashEntryUpsert,
+  syncStockeventsMappingUpsert,
+} from '../lib/client/command-mapping'
 import { useFinancialStateStore } from './financial-state'
 
 export interface StockEventsSymbolRow {
@@ -165,6 +171,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     financialStateStore.commitState((draft) => {
       draft.stockEvents.enabled = enabled
     })
+    void syncSettingsUpdate({ stockeventsEnabled: enabled })
     showToast(
       enabled
         ? 'Sincronización con Stock Events activada.'
@@ -199,6 +206,17 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         })
       }
     })
+    const mapping = financialStateStore.state.stockEvents.symbolMappings.find(
+      (item) => item.symbol === normalized,
+    )
+    if (mapping) {
+      void syncStockeventsMappingUpsert(normalized, {
+        stockeventsSymbol: mapping.targetSymbol || normalized,
+        sync: mapping.sync === true,
+        watchlistId: mapping.watchlistId || null,
+        hidden: mapping.hidden === true,
+      })
+    }
   }
 
   function updateCashMapping(accountId: string, watchlistId: string): void {
@@ -218,6 +236,28 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         draft.stockEvents.cashMappings.push(mapping)
       }
     })
+    void syncCashMappings()
+  }
+
+  /**
+   * Sends the whole cash-mapping selection, resolved to server `account`
+   * ids — the same whole-selection shape `syncTwrLiquidityAccounts` uses.
+   * An account that hasn't synced yet is left out with a warning; the next
+   * change sends it once it has.
+   */
+  async function syncCashMappings(): Promise<void> {
+    const entries: Array<{ accountId: string | null; watchlistId: string }> = []
+    for (const mapping of financialStateStore.state.stockEvents.cashMappings || []) {
+      const serverAccountId = await resolveEntityId('account', mapping.accountId)
+      if (serverAccountId) {
+        entries.push({ accountId: serverAccountId, watchlistId: mapping.watchlistId })
+      } else if (typeof console !== 'undefined') {
+        console.warn(
+          `[sync-v2] No se pudo sincronizar el efectivo de Stock Events (cuenta local "${mapping.accountId}"): todavía no se ha sincronizado con el servidor.`,
+        )
+      }
+    }
+    await syncSettingsUpdate({ stockeventsCashMappings: entries })
   }
 
   async function loadWatchlists(): Promise<void> {
@@ -334,38 +374,72 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const results = await Promise.allSettled(
       requests.map((request) => createStockEventsTransaction(request.payload)),
     )
-    results.forEach((result, index) => {
-      if (result.status !== 'fulfilled') return
+    const fulfilled = results.flatMap((result, index) => {
+      if (result.status !== 'fulfilled') return []
       const request = requests[index]
-      if (!request) return
+      return request ? [request] : []
+    })
+    if (fulfilled.length) {
       financialStateStore.commitState((draft) => {
         const entries = draft.stockEvents.cashSyncEntries || []
         draft.stockEvents.cashSyncEntries = entries
-        const existing = entries.find(
-          (entry) =>
-            entry.contributionDate === date &&
-            entry.accountId === request.allocation.accountId &&
-            entry.watchlistId === request.watchlistId,
-        )
-        const syncedAmount = Math.round(request.allocation.amount * 100) / 100
-        if (existing) {
-          existing.syncedAmount = syncedAmount
-        } else {
-          entries.push({
-            contributionDate: date,
-            accountId: request.allocation.accountId,
-            watchlistId: request.watchlistId,
-            syncedAmount,
-          })
+        for (const request of fulfilled) {
+          const existing = entries.find(
+            (entry) =>
+              entry.contributionDate === date &&
+              entry.accountId === request.allocation.accountId &&
+              entry.watchlistId === request.watchlistId,
+          )
+          const syncedAmount = Math.round(request.allocation.amount * 100) / 100
+          if (existing) {
+            existing.syncedAmount = syncedAmount
+          } else {
+            entries.push({
+              contributionDate: date,
+              accountId: request.allocation.accountId,
+              watchlistId: request.watchlistId,
+              syncedAmount,
+            })
+          }
         }
       })
-    })
+      void syncCashSyncEntries(
+        date,
+        fulfilled.map((request) => ({
+          accountId: request.allocation.accountId,
+          watchlistId: request.watchlistId,
+          syncedAmount: Math.round(request.allocation.amount * 100) / 100,
+        })),
+      )
+    }
     const failedCount = results.filter((result) => result.status === 'rejected').length
     if (failedCount > 0) {
       showToast(`Stock Events: ${failedCount} aporte(s) de efectivo no se pudieron sincronizar.`)
       return
     }
     showToast(`Efectivo actualizado en ${requests.length} lista(s) de Stock Events.`)
+  }
+
+  /**
+   * Persists the already-synced contribution-cash amounts so a reload
+   * computes deltas instead of re-sending the full allocation. Entries for
+   * accounts that haven't synced yet stay memory-only until the next run.
+   */
+  async function syncCashSyncEntries(
+    contributionDate: string,
+    entries: Array<{ accountId: string; watchlistId: string; syncedAmount: number }>,
+  ): Promise<void> {
+    for (const entry of entries) {
+      const serverAccountId = await resolveEntityId('account', entry.accountId)
+      if (!serverAccountId) continue
+      await syncStockeventsCashEntryUpsert(
+        contributionDate,
+        serverAccountId,
+        entry.watchlistId,
+        entry.syncedAmount,
+        financialStateStore.currency,
+      )
+    }
   }
 
   return {
