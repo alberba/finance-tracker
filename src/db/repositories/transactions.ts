@@ -10,7 +10,14 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { investmentTradeDetails, transactions } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import {
+  type Db,
+  assertOwnedReferences,
+  chunkIds,
+  clientIdentity,
+  nowIso,
+  versionGuard,
+} from "./shared";
 
 export type TransactionRow = Omit<typeof transactions.$inferSelect, "amountMinor"> & {
   amount: number;
@@ -262,15 +269,20 @@ export async function listTradeDetailsByTransactions(
   if (transactionIds.length === 0) {
     return byTransaction;
   }
-  const rows = await db
-    .select()
-    .from(investmentTradeDetails)
-    .where(
-      and(
-        eq(investmentTradeDetails.userId, userId),
-        inArray(investmentTradeDetails.transactionId, transactionIds),
-      ),
+  const rows: (typeof investmentTradeDetails.$inferSelect)[] = [];
+  for (const chunk of chunkIds(transactionIds)) {
+    rows.push(
+      ...(await db
+        .select()
+        .from(investmentTradeDetails)
+        .where(
+          and(
+            eq(investmentTradeDetails.userId, userId),
+            inArray(investmentTradeDetails.transactionId, chunk),
+          ),
+        )),
     );
+  }
   for (const row of rows) {
     const detail = toInvestmentTradeDetailRow(row);
     byTransaction.set(detail.transactionId, detail);

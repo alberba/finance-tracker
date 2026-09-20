@@ -10,7 +10,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, assertOwnedReferences, chunkIds, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
@@ -223,15 +223,20 @@ export async function listAllocationsByContributions(
   if (contributionIds.length === 0) {
     return byContribution;
   }
-  const rows = await db
-    .select()
-    .from(contributionAllocations)
-    .where(
-      and(
-        eq(contributionAllocations.userId, userId),
-        inArray(contributionAllocations.contributionId, contributionIds),
-      ),
+  const rows: (typeof contributionAllocations.$inferSelect)[] = [];
+  for (const chunk of chunkIds(contributionIds)) {
+    rows.push(
+      ...(await db
+        .select()
+        .from(contributionAllocations)
+        .where(
+          and(
+            eq(contributionAllocations.userId, userId),
+            inArray(contributionAllocations.contributionId, chunk),
+          ),
+        )),
     );
+  }
   for (const row of rows) {
     const allocation = toAllocationRow(row);
     const existing = byContribution.get(allocation.contributionId);

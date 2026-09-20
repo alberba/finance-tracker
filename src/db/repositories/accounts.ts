@@ -26,6 +26,7 @@ import {
   type Db,
   RejectedCommandError,
   assertOwnedReferences,
+  chunkIds,
   clientIdentity,
   fromFlag,
   nowIso,
@@ -453,10 +454,15 @@ export async function replaceTwrLiquidityAccounts(
   if (ids.length === 0) {
     return [];
   }
-  const ownedAccounts = await db
-    .select()
-    .from(accounts)
-    .where(and(eq(accounts.userId, userId), inArray(accounts.id, ids)));
+  const ownedAccounts: (typeof accounts.$inferSelect)[] = [];
+  for (const chunk of chunkIds(ids)) {
+    ownedAccounts.push(
+      ...(await db
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.userId, userId), inArray(accounts.id, chunk)))),
+    );
+  }
   const byId = new Map(ownedAccounts.map((account) => [account.id, account]));
   return bulkInsertTwrLiquidityAccounts(
     db,
