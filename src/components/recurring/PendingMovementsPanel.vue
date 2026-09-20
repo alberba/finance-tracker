@@ -15,12 +15,57 @@ const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
 const pending = computed(() => recurringStore.openPendingMovements)
 const editingId = ref('')
-const edit = reactive<PendingMovementEdit>({ date: '', accountId: '', category: '', description: '', amount: 0, symbol: '', side: 'buy', units: 0, unitPrice: 0, fee: 0, time: '' })
-const editingIsInvestment = computed(() => pending.value.find((item) => item.id === editingId.value)?.type === 'investment')
+const edit = reactive<PendingMovementEdit>({
+  type: 'expense',
+  date: '',
+  accountId: '',
+  category: '',
+  description: '',
+  amount: 0,
+  symbol: '',
+  side: 'buy',
+  units: 0,
+  unitPrice: 0,
+  fee: 0,
+  time: '',
+})
+const editingIsInvestment = computed(() => edit.type === 'investment')
 const investmentTotal = computed(() => round2((edit.units || 0) * (edit.unitPrice || 0) + (edit.fee || 0)))
+
+const availableCategories = computed(() => {
+  const type = edit.type || 'expense'
+  if (type === 'income') return financialStateStore.state.incomeCategories
+  if (type === 'investment') return financialStateStore.state.investmentCategories
+  return financialStateStore.state.expenseCategories
+})
 
 watch(pending, (items) => {
   if (editingId.value && !items.some((item) => item.id === editingId.value)) editingId.value = ''
+})
+
+watch(() => edit.type, (newType, oldType) => {
+  if (!oldType) return
+  const cats = newType === 'income'
+    ? financialStateStore.state.incomeCategories
+    : newType === 'investment'
+      ? financialStateStore.state.investmentCategories
+      : financialStateStore.state.expenseCategories
+  if (!cats.includes(edit.category)) {
+    edit.category = cats[0] || ''
+  }
+  if (newType === 'investment') {
+    const isKnownAccount =
+      financialStateStore.investmentAssets.some((a) => a.id === edit.accountId) ||
+      financialStateStore.accounts.some((a) => a.id === edit.accountId)
+    if (!isKnownAccount) {
+      edit.accountId = financialStateStore.investmentAssets[0]?.id || financialStateStore.accounts[0]?.id || ''
+    }
+  } else {
+    const isInvestmentAsset = financialStateStore.investmentAssets.some((a) => a.id === edit.accountId)
+    if (isInvestmentAsset && financialStateStore.accounts[0]) {
+      edit.accountId = financialStateStore.accounts[0].id
+    }
+  }
 })
 
 function openTransactions(): void {
@@ -30,6 +75,7 @@ function openTransactions(): void {
 
 function startEdit(item: (typeof pending.value)[number]): void {
   editingId.value = item.id
+  edit.type = item.type || 'expense'
   edit.date = item.occurrenceDate
   edit.accountId = item.accountId
   edit.category = item.category
@@ -73,9 +119,45 @@ function saveEdit(): void {
     <div v-else class="mt-4 grid gap-3">
       <article v-for="item in pending" :key="item.id" class="rounded-lg border border-[var(--line)] p-3" data-pending-item>
         <form v-if="editingId === item.id" class="settings-fields grid gap-3 md:grid-cols-5" @submit.prevent="saveEdit">
+          <label>Tipo
+            <select v-model="edit.type" required>
+              <option value="expense">Gasto</option>
+              <option value="income">Ingreso</option>
+              <option value="investment">Inversión</option>
+            </select>
+          </label>
           <label>Fecha<input v-model="edit.date" type="date" required /></label>
-          <label>Cuenta<select v-model="edit.accountId" required><option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
-          <label>Categoría<input v-model="edit.category" required /></label>
+          <label>Cuenta
+            <select v-model="edit.accountId" required>
+              <template v-if="edit.type === 'investment'">
+                <optgroup v-if="financialStateStore.investmentAssets.length" label="Activos de inversión">
+                  <option v-for="asset in financialStateStore.investmentAssets" :key="asset.id" :value="asset.id">
+                    {{ asset.name }}
+                  </option>
+                </optgroup>
+                <optgroup v-if="financialStateStore.accounts.length" label="Cuentas de efectivo">
+                  <option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">
+                    {{ account.name }}
+                  </option>
+                </optgroup>
+              </template>
+              <template v-else>
+                <option v-for="account in financialStateStore.accounts" :key="account.id" :value="account.id">
+                  {{ account.name }}
+                </option>
+              </template>
+            </select>
+          </label>
+          <label>Categoría
+            <select v-model="edit.category" required>
+              <option v-if="edit.category && !availableCategories.includes(edit.category)" :value="edit.category">
+                {{ edit.category }}
+              </option>
+              <option v-for="category in availableCategories" :key="category" :value="category">
+                {{ category }}
+              </option>
+            </select>
+          </label>
           <label>Descripción<input v-model="edit.description" required /></label>
           <template v-if="editingIsInvestment">
             <label>Hora<input v-model="edit.time" type="time" /></label>
