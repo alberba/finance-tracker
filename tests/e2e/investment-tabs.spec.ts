@@ -167,6 +167,95 @@ test.describe("inversión tabs y TWR", () => {
     ).toHaveCount(0);
   });
 
+  test("avisa y permite reenviar un movimiento salteado por Stock Events", async ({
+    tracker,
+    page,
+  }) => {
+    await page.route("**/api/integrations/stockevents", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: '{"configured":true}' }),
+    );
+    let syncedTransaction: Record<string, unknown> | undefined;
+    await page.route("**/api/stockevents/transactions", async (route) => {
+      const body = route.request().postDataJSON() as {
+        transaction?: Record<string, unknown>;
+      };
+      syncedTransaction = body.transaction;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          transaction: {
+            id: "se-resend-1",
+            watchlistId: "wl-etf",
+            symbol: "RESEND",
+          },
+        }),
+      });
+    });
+
+    // Warmup: compile the lazy investment chunk before the reload flow.
+    await tracker.openInvestmentMovementsTab();
+
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) throw new Error("No se encontró el estado financiero inicial");
+      const state = JSON.parse(raw);
+      state.stockEvents = { enabled: true, apiKey: "", symbolMappings: [] };
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
+    await tracker.openInvestmentMovementsTab();
+
+    // Sin mapeo el envío automático se salta con aviso visible y sin botón.
+    const section = tracker.investmentSection();
+    await section.locator("#investment-movement-date").fill("2026-09-04");
+    await section.locator("#investment-movement-time").fill("16:11");
+    await section.locator("#investment-movement-side").selectOption("buy");
+    await section.locator("#investment-movement-symbol").fill("RESEND");
+    await section.locator("#investment-movement-unit-price").fill("2110.3");
+    await section.locator("#investment-movement-units").fill("0.0047");
+    await section.locator("#investment-movement-fee").fill("0.03");
+    await section
+      .locator("#investment-movement-broker")
+      .selectOption({ label: "Revolut" });
+    await section.getByRole("button", { name: "Guardar movimiento" }).click();
+    await expect(page.getByRole("status")).toContainText(
+      "no tiene sincronización activada",
+    );
+    await expect(
+      section.getByRole("button", { name: /Reenviar movimiento/ }),
+    ).toHaveCount(0);
+
+    // El mapeo llega después: aparece el botón y el reenvío crea la transacción.
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("finance-tracker-state-v1");
+      if (!raw) throw new Error("No se encontró el estado financiero inicial");
+      const state = JSON.parse(raw);
+      state.stockEvents.symbolMappings = [
+        { symbol: "RESEND", sync: true, watchlistId: "wl-etf", targetSymbol: "", hidden: false },
+      ];
+      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+    });
+    await mirrorStateToServer(page);
+    await page.reload();
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
+    await tracker.openInvestmentMovementsTab();
+    const resend = tracker
+      .investmentSection()
+      .getByRole("button", { name: "Reenviar movimiento del 2026-09-04 a Stock Events" });
+    await expect(resend).toBeVisible();
+    await resend.click();
+    await expect.poll(() => syncedTransaction).toMatchObject({
+      watchlistId: "wl-etf",
+      symbol: "RESEND",
+      type: "buy",
+    });
+    expect(Number(syncedTransaction?.change)).toBeCloseTo(0.0047, 8);
+    expect(Number(syncedTransaction?.price)).toBeCloseTo(2110.3, 6);
+  });
+
   test("editar y eliminar en movimientos de inversión se refleja en movimientos generales", async ({
     tracker,
   }) => {
