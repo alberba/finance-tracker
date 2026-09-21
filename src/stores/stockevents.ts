@@ -39,6 +39,13 @@ export interface StockEventsSyncOptions {
   toCash?: boolean
 }
 
+/**
+ * Outcome of a single movement sync attempt: `skipped` means nothing was
+ * sent (no mapping, or the movement has no valid payload) and `failed` means
+ * Stock Events rejected the request.
+ */
+export type StockEventsSyncResult = 'synced' | 'skipped' | 'failed'
+
 export interface StockEventsCashMappingRow {
   accountId: string
   accountName: string
@@ -313,28 +320,57 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   /**
    * Fire-and-forget sync of a freshly created investment movement. Never
-   * blocks the local save: failures only surface as a toast.
+   * blocks the local save: the result is returned to the caller (so a manual
+   * resend can react to it) and failures only surface as a toast.
+   *
+   * A movement that resolves no synced mapping used to return silently, which
+   * is how a buy could be saved locally and never reach Stock Events without
+   * anyone noticing. When there is a live connection it now warns instead.
    */
   async function syncMovement(
     tx: Transaction,
     options: StockEventsSyncOptions = {},
-  ): Promise<void> {
+  ): Promise<StockEventsSyncResult> {
+    const symbol = (tx.symbol || '').trim().toUpperCase()
+    const symbolLabel = symbol || 'ese símbolo'
     const mapping = findSyncedMapping(settings.value, tx.symbol)
-    if (!mapping) return
+    if (!mapping) {
+      if (isConnected.value) {
+        showToast(
+          `Stock Events: ${symbolLabel} no tiene sincronización activada o lista asignada.`,
+        )
+        console.warn(
+          `[stockevents] Movimiento de ${symbolLabel} no sincronizado: no tiene sincronización activada o lista asignada.`,
+        )
+      }
+      return 'skipped'
+    }
     const payload = buildStockEventsTransactionPayload(
       tx,
       mapping.watchlistId,
       mapping.targetSymbol,
       options.toCash,
     )
-    if (!payload) return
+    if (!payload) {
+      if (isConnected.value) {
+        showToast(
+          `Stock Events: el movimiento de ${symbolLabel} no tiene datos válidos para sincronizar.`,
+        )
+        console.warn(
+          `[stockevents] Movimiento de ${symbolLabel} no sincronizado: no tiene datos válidos (títulos o precio).`,
+        )
+      }
+      return 'skipped'
+    }
     try {
       await createStockEventsTransaction(payload)
       showToast(`Movimiento de ${payload.symbol} sincronizado con Stock Events.`)
+      return 'synced'
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'No se pudo sincronizar con Stock Events'
       showToast(`Stock Events: ${message}`)
+      return 'failed'
     }
   }
 

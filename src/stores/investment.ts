@@ -352,7 +352,35 @@ export const useInvestmentStore = defineStore('investment', () => {
     )
     ui.investmentTxEditingId = ''
     showToast('Movimiento de inversión actualizado.')
+    // Editing a movement that already exists in Stock Events cannot update the
+    // remote row (the API only creates), so the edit is re-sent to keep the
+    // remote side consistent with what the user just saved.
+    const updated = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === id && item.type === 'investment',
+    )
+    if (updated) {
+      void stockEventsStore.syncMovement(updated)
+    }
     return true
+  }
+
+  /**
+   * Manual resend of one movement to Stock Events, for the case the automatic
+   * fire-and-forget sync skipped it (no mapping then, mapping now).
+   */
+  async function resyncMovement(transactionId: string): Promise<boolean> {
+    const tx = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === transactionId && item.type === 'investment',
+    )
+    if (!tx) {
+      showToast('Movimiento no encontrado.')
+      return false
+    }
+    const result = await stockEventsStore.syncMovement(tx)
+    if (result === 'skipped' && !stockEventsStore.isConnected) {
+      showToast('Activa la conexión con Stock Events para reenviar.')
+    }
+    return result === 'synced'
   }
 
   function deleteMovement(id: string): void {
@@ -489,6 +517,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     cancelEditMovement,
     addMovement,
     saveEditedMovement,
+    resyncMovement,
     deleteMovement,
     toggleDeclared,
     setContributionFlow,

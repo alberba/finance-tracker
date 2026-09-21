@@ -7,11 +7,13 @@ import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { computeInvestmentMovement } from '../../scripts/investment-movements'
 import type { Transaction } from '../../scripts/types'
 import { useInvestmentStore } from '../../stores/investment'
+import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
 
 defineProps<{ isActive: boolean }>()
 
 const investmentStore = useInvestmentStore()
+const stockEventsStore = useStockEventsStore()
 const uiStore = useUiStore()
 const ui = uiStore.ui
 const { movementRows, yearOptions, investmentCategories } = storeToRefs(investmentStore)
@@ -220,6 +222,16 @@ function fmt(value: number | undefined, digits: number): string {
                 </td>
                 <td>
                   <div class="inline-actions">
+                    <button
+                      v-if="stockEventsStore.canSyncSymbol(row.tx.symbol || '')"
+                      class="resend-btn icon-action-btn"
+                      type="button"
+                      :aria-label="`Reenviar movimiento del ${row.tx.date} a Stock Events`"
+                      title="Reenviar a Stock Events"
+                      @click="investmentStore.resyncMovement(row.tx.id)"
+                    >
+                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"></path></svg>
+                    </button>
                     <button
                       class="edit-btn icon-action-btn"
                       type="button"
