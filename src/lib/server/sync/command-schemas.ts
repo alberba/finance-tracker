@@ -28,6 +28,25 @@
 
 import { z } from "zod";
 
+/**
+ * Outcome of one command in `POST /api/sync`'s `results`, shared with the
+ * client outbox (`src/stores/sync.ts`).
+ *
+ * `rejected` is terminal: the command can never succeed as sent (invalid
+ * payload, dangling reference, entity in use), so the client drops it
+ * instead of blocking the FIFO outbox behind it (audit §2.1/§2.3).
+ *
+ * `in_progress` is transient: another request still holds the command's
+ * reservation (a retry or second tab racing the first send). Nothing is
+ * stored; the batch halts and the client resends later.
+ */
+export type CommandStatus = "applied" | "conflict" | "not_found" | "noop" | "rejected" | "in_progress";
+
+/** Statuses after which `applySyncBatch` stops: later commands must wait (FIFO). */
+export function haltsBatch(status: CommandStatus): boolean {
+  return status === "conflict" || status === "in_progress";
+}
+
 export const SYNC_ENTITY_TYPES = [
   "account",
   "category",

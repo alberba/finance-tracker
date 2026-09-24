@@ -41,16 +41,12 @@ import * as auditEventsRepository from "../../../db/repositories/audit-events";
 import {
   entityCreatePayloadSchemas,
   entityUpdateSchemas,
+  haltsBatch,
+  type CommandStatus,
   type SyncCommandInput,
   type SyncEntityType,
 } from "./command-schemas";
 
-/**
- * `rejected` is terminal: the command can never succeed as sent (invalid
- * payload, dangling reference, entity in use), so the client drops it
- * instead of blocking the FIFO outbox behind it (audit §2.1/§2.3).
- */
-export type CommandStatus = "applied" | "conflict" | "not_found" | "noop" | "rejected";
 const PROCESSING_LEASE_MS = 30_000;
 
 export interface CommandOutcome {
@@ -683,19 +679,17 @@ export function isUniqueConstraintError(error: unknown): boolean {
   return false;
 }
 
-export class CommandInProgressError extends Error {
-  constructor(commandId: string) {
-    super(`El comando ${commandId} ya se está procesando.`);
-    this.name = "CommandInProgressError";
-  }
-}
-
 function replayStoredCommand(
   commandId: string,
   command: syncRepository.SyncCommandRow,
 ): CommandOutcome {
   if (!command.result) {
-    throw new CommandInProgressError(commandId);
+    return {
+      commandId,
+      replayed: false,
+      status: "in_progress",
+      message: `El comando ${commandId} ya se está procesando.`,
+    };
   }
   const stored = JSON.parse(command.result) as Partial<CommandOutcome>;
   return {
@@ -792,8 +786,8 @@ export interface SyncBatchResult {
 }
 
 /**
- * Applies a batch of ≤5 commands, halting on the first `conflict` outcome
- * (fail-fast semantics —
+ * Applies a batch of ≤5 commands, halting on the first `conflict` or
+ * `in_progress` outcome (fail-fast semantics —
  * the client must resolve the conflict before any later command in the
  * batch is considered).
  */
@@ -807,7 +801,7 @@ export async function applySyncBatch(
   for (const command of commands) {
     const outcome = await applyOneCommand(db, userId, command);
     results.push(outcome);
-    if (outcome.status === "conflict") {
+    if (haltsBatch(outcome.status)) {
       halted = true;
       break;
     }
