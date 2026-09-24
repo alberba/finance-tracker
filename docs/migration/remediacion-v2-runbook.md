@@ -88,7 +88,10 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    El SQL contiene solo las sentencias que el plan cambia (hoy: los `UPDATE`
    que repuntan referencias, los `DELETE` de las categorías duplicadas y el
    `UPDATE` del `legacy_id`), en el mismo orden que el paso local. Volcar tablas
-   enteras hacía caer a D1 con `D1_RESET_DO` (#187). Deja intactos
+   enteras hacía caer a D1 con `D1_RESET_DO` (#187). Los repuntes, borrados y
+   renombrados se pueden repetir sin daño; los `INSERT` de celdas o snapshots
+   no, porque llevan ids generados en local y la segunda vez chocan. Si una
+   celda planificada ya no existe en D1, el fichero aborta en ese punto. Deja intactos
    `sync_changes`, `sync_commands`, `audit_events` y `user_revisions`:
    borrarlos haría que cualquier otro dispositivo se perdiera la reparación.
 3. **Aplicar el cierre.**

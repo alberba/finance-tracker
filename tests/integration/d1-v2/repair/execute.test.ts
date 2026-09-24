@@ -273,7 +273,12 @@ describe('v2 repair execution', () => {
       .prepare(
         'SELECT id, snapshot_date, year, month FROM wealth_snapshots WHERE user_id = ? ORDER BY year, month',
       )
-      .all(fixture.userId) as Array<{ id: string; snapshot_date: string; year: number; month: number }>
+      .all(fixture.userId) as Array<{
+      id: string
+      snapshot_date: string
+      year: number
+      month: number
+    }>
     expect(snapshotRows).toHaveLength(2)
     expect(snapshotRows[0]).toMatchObject({
       snapshot_date: '2025-03-31',
@@ -288,7 +293,9 @@ describe('v2 repair execution', () => {
     })
 
     const balance2025 = sqlite
-      .prepare('SELECT account_id, balance_minor, currency FROM snapshot_balances WHERE snapshot_id = ?')
+      .prepare(
+        'SELECT account_id, balance_minor, currency FROM snapshot_balances WHERE snapshot_id = ?',
+      )
       .all(snapshotRows[0].id)
     expect(balance2025).toEqual([
       {
@@ -388,15 +395,19 @@ describe('v2 repair execution', () => {
     return statements.join('\n')
   }
 
-  it('emits only the statements the plan changes, reproducing the applied repair', async () => {
+  it('emits SQL that reproduces the applied repair', async () => {
     const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
-    const sql = await expectSqlMatchesApply(plan)
+    await expectSqlMatchesApply(plan)
+  })
+
+  it('emits only the statements the plan changes', async () => {
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    const sql = repairPlanSql(fixture.userId, plan).join('\n')
 
     // No table dumps: the rows the plan never touches stay out of the file.
     expect(sql).not.toMatch(/DELETE FROM \w+ WHERE user_id = '[^']*';/)
     expect(sql).not.toContain('INSERT INTO transactions')
     expect(sql).not.toContain('INSERT INTO contributions')
-    expect(sql).toContain(`${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`)
     // References are repointed before the duplicate they pointed at goes away.
     expect(sql.indexOf('UPDATE transactions SET category_id')).toBeLessThan(
       sql.indexOf('DELETE FROM categories'),
@@ -405,6 +416,15 @@ describe('v2 repair execution', () => {
     // would make every other device miss the repair.
     expect(sql).not.toContain('sync_changes')
     expect(sql).not.toContain('user_revisions')
+  })
+
+  it('emits SQL that aborts when a planned budget cell no longer exists', async () => {
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    testDb.sqlite.prepare('DELETE FROM budget_entries WHERE id = ?').run(fixture.budgetEntryId)
+
+    expect(() => testDb.sqlite.exec(repairPlanSql(fixture.userId, plan).join('\n'))).toThrow(
+      /malformed JSON/,
+    )
   })
 
   it('emits SQL that rewrites an existing snapshot and its balances', async () => {
