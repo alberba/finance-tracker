@@ -25,7 +25,7 @@
  *   --execute             Aplica los cambios tras mostrar el plan de simulación (por defecto: modo simulación)
  *   --dry-run             Fuerza el modo simulación (solo lectura)
  *   --json                Imprime el resultado como JSON
- *   --remote-sql-out=<r>  Tras --execute, escribe el SQL de las tablas tocadas para
+ *   --remote-sql-out=<r>  Tras --execute, escribe como SQL los cambios del plan para
  *                         `wrangler d1 execute finance-tracker-db-v2 --remote --file=<r>`
  *   --help                Muestra esta ayuda
  */
@@ -78,7 +78,7 @@ Opciones:
   --execute             Aplica los cambios en la base de datos (por defecto solo simula)
   --dry-run             Fuerza el modo simulación (sin escrituras)
   --json                Emite el plan y reporte en formato JSON
-  --remote-sql-out=<r>  Tras --execute, escribe el SQL de las tablas tocadas para
+  --remote-sql-out=<r>  Tras --execute, escribe como SQL los cambios del plan para
                         wrangler d1 execute finance-tracker-db-v2 --remote --file=<r>
   --help                Muestra esta ayuda
 `)
@@ -141,7 +141,7 @@ export async function runRepairCli(argv: string[]): Promise<{
   }
 
   const v2Path = resolve(args['v2-sqlite'] ?? '.data/finance-tracker-v2.sqlite')
-  const { db, sqlite, close } = openLocalV2Db(v2Path)
+  const { db, close } = openLocalV2Db(v2Path)
 
   try {
     let userId = args['user-id']
@@ -180,13 +180,13 @@ export async function runRepairCli(argv: string[]): Promise<{
     const remoteSqlOut = args['remote-sql-out']
       ? resolve(args['remote-sql-out'])
       : undefined
-    const repairedTables = remoteSqlOut
-      ? writeRemoteRepairSql(sqlite, userId, plan, remoteSqlOut)
+    const remoteSqlStatements = remoteSqlOut
+      ? writeRemoteRepairSql(userId, plan, remoteSqlOut)
       : undefined
 
     if (args.json) {
       console.log(
-        JSON.stringify({ simulation: false, plan, report, remoteSqlOut, repairedTables }, null, 2),
+        JSON.stringify({ simulation: false, plan, report, remoteSqlOut, remoteSqlStatements }, null, 2),
       )
     } else {
       log('\n======================================================================')
@@ -202,7 +202,7 @@ export async function runRepairCli(argv: string[]): Promise<{
       log(`  • Claves de correlación renombradas: ${report.correlationIdsRenamed}`)
       log('======================================================================')
       if (remoteSqlOut) {
-        log(`\nSQL para D1 escrito en ${remoteSqlOut} (tablas: ${repairedTables?.join(', ')}).`)
+        log(`\nSQL para D1 escrito en ${remoteSqlOut} (${remoteSqlStatements} sentencias).`)
         log(
           `Aplícalo con: wrangler d1 execute finance-tracker-db-v2 --remote --file=${remoteSqlOut}`,
         )

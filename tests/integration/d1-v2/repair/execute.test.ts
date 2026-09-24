@@ -4,7 +4,10 @@ import {
   buildRepairPlan,
   formatRepairPlan,
   loadRepairBackup,
+  repairPlanSql,
+  writeRemoteRepairSql,
   type RepairExecutionReport,
+  type RepairPlan,
 } from '../../../../scripts/lib/repair-plan'
 import { createTestDb, type TestDatabase } from '../setup'
 import {
@@ -338,54 +341,107 @@ describe('v2 repair execution', () => {
     ).not.toThrow()
   })
 
-  it('emits SQL that carries the repaired state back to D1', async () => {
-    const { mkdirSync, readFileSync } = await import('node:fs')
-    const { resolve } = await import('node:path')
-    const { writeRemoteRepairSql } = await import('../../../../scripts/lib/repair-plan')
+  /**
+   * The user's rows with generated ids and timestamps left out, so a database
+   * repaired by `applyRepairPlan` and one repaired by the emitted SQL compare
+   * equal even though each generated its own ids for inserted rows.
+   */
+  function repairedState(target: TestDatabase) {
+    const rows = (query: string) => target.sqlite.prepare(query).all(fixture.userId)
+    return {
+      categories: rows('SELECT id, legacy_id, name FROM categories WHERE user_id = ? ORDER BY id'),
+      accounts: rows('SELECT id, kind FROM accounts WHERE user_id = ? ORDER BY id'),
+      transactions: rows('SELECT id, category_id FROM transactions WHERE user_id = ? ORDER BY id'),
+      budget: rows(
+        `SELECT category_id, year, month, amount_minor, currency FROM budget_entries
+          WHERE user_id = ? ORDER BY year, month, category_id`,
+      ),
+      snapshots: rows(
+        `SELECT s.year, s.month, s.snapshot_date, b.account_id, b.balance_minor, b.currency
+           FROM wealth_snapshots s LEFT JOIN snapshot_balances b ON b.snapshot_id = s.id
+          WHERE s.user_id = ? ORDER BY s.year, s.month, b.account_id`,
+      ),
+      contributions: rows('SELECT id, legacy_id FROM contributions WHERE user_id = ? ORDER BY id'),
+    }
+  }
 
-    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+  /**
+   * Applies `plan` locally and, separately, replays its emitted SQL onto a
+   * database seeded with the same corruption; both must end up identical.
+   */
+  async function expectSqlMatchesApply(
+    plan: RepairPlan,
+    corrupt: (target: TestDatabase) => void = () => {},
+  ): Promise<string> {
+    const statements = repairPlanSql(fixture.userId, plan)
     await applyRepairPlan(testDb.db, fixture.userId, plan)
 
-    mkdirSync('.scratch', { recursive: true })
-    const outPath = resolve('.scratch/test-repair-remote.sql')
-    const tables = writeRemoteRepairSql(testDb.sqlite, fixture.userId, plan, outPath)
-    const sql = readFileSync(outPath, 'utf8')
+    const replay = createTestDb()
+    try {
+      seedRepairFixture(replay)
+      corrupt(replay)
+      replay.sqlite.exec(statements.join('\n'))
+      expect(repairedState(replay)).toEqual(repairedState(testDb))
+    } finally {
+      replay.close()
+    }
+    return statements.join('\n')
+  }
 
-    // The parent table has to be inserted before the rows that point at it.
-    expect(tables.indexOf('categories')).toBeLessThan(tables.indexOf('transactions'))
-    expect(tables.indexOf('wealth_snapshots')).toBeLessThan(tables.indexOf('snapshot_balances'))
-    expect(sql).toContain('DELETE FROM categories WHERE user_id = ')
+  it('emits only the statements the plan changes, reproducing the applied repair', async () => {
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    const sql = await expectSqlMatchesApply(plan)
+
+    // No table dumps: the rows the plan never touches stay out of the file.
+    expect(sql).not.toMatch(/DELETE FROM \w+ WHERE user_id = '[^']*';/)
+    expect(sql).not.toContain('INSERT INTO transactions')
+    expect(sql).not.toContain('INSERT INTO contributions')
     expect(sql).toContain(`${REPAIR_FIXTURE_COLLIDING_LEGACY_ID}@2`)
+    // References are repointed before the duplicate they pointed at goes away.
+    expect(sql.indexOf('UPDATE transactions SET category_id')).toBeLessThan(
+      sql.indexOf('DELETE FROM categories'),
+    )
     // The change log and the revision cursor stay out of it: deleting them
     // would make every other device miss the repair.
     expect(sql).not.toContain('sync_changes')
     expect(sql).not.toContain('user_revisions')
+  })
 
-    // Round trip: replayed onto a database seeded with the same corruption, the
-    // file has to reproduce the repaired state exactly.
-    const replay = createTestDb()
-    try {
-      seedRepairFixture(replay)
-      replay.sqlite.exec(sql)
+  it('emits SQL that rewrites an existing snapshot and its balances', async () => {
+    const corrupt = (target: TestDatabase) =>
+      target.sqlite
+        .prepare('UPDATE snapshot_balances SET balance_minor = 1 WHERE id = ?')
+        .run(REPAIR_FIXTURE_IDS.snapshotBalance)
+    corrupt(testDb)
 
-      const contributions = (db: TestDatabase) =>
-        db.sqlite
-          .prepare('SELECT id, legacy_id FROM contributions WHERE user_id = ? ORDER BY id')
-          .all(fixture.userId)
-      expect(contributions(replay)).toEqual(contributions(testDb))
-      expect(
-        replay.sqlite
-          .prepare('SELECT COUNT(*) AS n FROM categories WHERE user_id = ?')
-          .get(fixture.userId),
-      ).toEqual({ n: 1 })
-      expect(
-        replay.sqlite
-          .prepare('SELECT kind FROM accounts WHERE id = ?')
-          .get(REPAIR_FIXTURE_IDS.account),
-      ).toEqual({ kind: 'cash' })
-    } finally {
-      replay.close()
-    }
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    expect(plan.snapshotRestorations).toContainEqual(
+      expect.objectContaining({ action: 'update', snapshotId: REPAIR_FIXTURE_IDS.snapshot }),
+    )
+    await expectSqlMatchesApply(plan, corrupt)
+  })
+
+  it('emits SQL that updates a budget cell located by key when the plan has no id', async () => {
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    for (const cell of plan.budgetRestorations) delete cell.budgetEntryId
+    expect(plan.budgetRestorations.some((cell) => cell.action === 'update')).toBe(true)
+
+    await expectSqlMatchesApply(plan)
+  })
+
+  it('writes the emitted statements to the --remote-sql-out file', async () => {
+    const { mkdirSync, readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+
+    const plan = await buildRepairPlan(testDb.db, fixture.userId, REPAIR_FIXTURE_BACKUP)
+    mkdirSync('.scratch', { recursive: true })
+    const outPath = resolve('.scratch/test-repair-remote.sql')
+    const count = writeRemoteRepairSql(fixture.userId, plan, outPath)
+
+    const lines = readFileSync(outPath, 'utf8')
+      .split('\n')
+      .filter((line) => line && !line.startsWith('--'))
+    expect(lines).toHaveLength(count)
   })
 
   it('is idempotent: re-evaluating repair plan on repaired database produces an empty plan', async () => {

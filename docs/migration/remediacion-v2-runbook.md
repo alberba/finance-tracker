@@ -65,11 +65,9 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    wrangler d1 export finance-tracker-db-v2 --remote --output=.data/v2-prod.sql -y
    sqlite3 .data/v2-work.sqlite < .data/v2-prod.sql
    ```
-   **Este export va después del paso 1, no antes.** El SQL que emite el paso 2
-   reemplaza tablas enteras del usuario con las columnas que existan en la copia
-   local; sobre una copia hecha al nivel del `0001`, los `INSERT` omitirían las
-   columnas aditivas y el cargue en D1 las dejaría a `NULL` —incluido el
-   `start_date` de las suscripciones que rellena `0002_subscription_dates`.
+   **Este export va después del paso 1, no antes.** El plan se calcula sobre
+   esta copia; si está por detrás de D1, planifica contra datos que ya no son
+   los de producción.
    Ensayo en seco y revisión del plan:
    ```bash
    pnpm db:repair --v2-sqlite=.data/v2-work.sqlite \
@@ -87,8 +85,10 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
 
    wrangler d1 execute finance-tracker-db-v2 --remote --file=.data/reparacion-remote.sql
    ```
-   El SQL reemplaza por usuario solo las tablas que el plan toca (hoy:
-   `categories`, `contributions`, `transactions`) y deja intactos
+   El SQL contiene solo las sentencias que el plan cambia (hoy: los `UPDATE`
+   que repuntan referencias, los `DELETE` de las categorías duplicadas y el
+   `UPDATE` del `legacy_id`), en el mismo orden que el paso local. Volcar tablas
+   enteras hacía caer a D1 con `D1_RESET_DO` (#187). Deja intactos
    `sync_changes`, `sync_commands`, `audit_events` y `user_revisions`:
    borrarlos haría que cualquier otro dispositivo se perdiera la reparación.
 3. **Aplicar el cierre.**
