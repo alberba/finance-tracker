@@ -220,6 +220,49 @@ describe("round trip: inversión", () => {
     });
   });
 
+  it("keeps investment operation fields when a pending movement is confirmed (#205)", async () => {
+    const { useRecurringStore } = await import("../../../../src/stores/recurring");
+    const recurring = useRecurringStore();
+    recurring.addRule({
+      type: "expense",
+      accountId,
+      category: "Ocio",
+      description: "Gasto original",
+      amount: 100,
+      frequency: "monthly",
+      interval: 1,
+      startDate: "2026-09-01",
+    });
+    let reloaded = await trip.reload();
+    const pmId = reloaded.pendingMovements[0].id;
+    recurring.editPending(pmId, {
+      type: "investment",
+      date: "2026-09-02",
+      accountId,
+      category: "Acciones",
+      description: "Aportación VWCE",
+      amount: 250,
+      symbol: "VWCE",
+      side: "buy",
+      units: 2,
+      unitPrice: 125,
+      fee: 1,
+      time: "15:00",
+    });
+    await trip.reload();
+    expect(recurring.confirmPending(pmId)).toBe(true);
+
+    reloaded = await trip.reload();
+    expect(reloaded.transactions.find((tx) => tx.type === "investment")).toMatchObject({
+      symbol: "VWCE",
+      side: "buy",
+      units: 2,
+      unitPrice: 125,
+      fee: 1,
+      time: "15:00",
+    });
+  });
+
   it("keeps the declared flag (§4.3)", async () => {
     const { useInvestmentStore } = await import("../../../../src/stores/investment");
     const investment = useInvestmentStore();
