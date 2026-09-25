@@ -10,7 +10,6 @@
  */
 
 import { and, eq } from 'drizzle-orm'
-import type Database from 'better-sqlite3'
 import { writeFileSync } from 'node:fs'
 import {
   accounts,
@@ -343,20 +342,50 @@ async function correlationIdRows(
     contributionRows,
     mappingRows,
   ] = await Promise.all([
-    db.select({ id: accounts.id, legacyId: accounts.legacyId }).from(accounts).where(eq(accounts.userId, userId)),
-    db.select({ id: categories.id, legacyId: categories.legacyId }).from(categories).where(eq(categories.userId, userId)),
+    db
+      .select({ id: accounts.id, legacyId: accounts.legacyId })
+      .from(accounts)
+      .where(eq(accounts.userId, userId)),
+    db
+      .select({ id: categories.id, legacyId: categories.legacyId })
+      .from(categories)
+      .where(eq(categories.userId, userId)),
     db
       .select({ id: twrLiquidityAccounts.id, legacyId: twrLiquidityAccounts.legacyId })
       .from(twrLiquidityAccounts)
       .where(eq(twrLiquidityAccounts.userId, userId)),
-    db.select({ id: transactions.id, legacyId: transactions.legacyId }).from(transactions).where(eq(transactions.userId, userId)),
-    db.select({ id: subscriptions.id, legacyId: subscriptions.legacyId }).from(subscriptions).where(eq(subscriptions.userId, userId)),
-    db.select({ id: recurringRules.id, legacyId: recurringRules.legacyId }).from(recurringRules).where(eq(recurringRules.userId, userId)),
-    db.select({ id: pendingMovements.id, legacyId: pendingMovements.legacyId }).from(pendingMovements).where(eq(pendingMovements.userId, userId)),
-    db.select({ id: budgetEntries.id, legacyId: budgetEntries.legacyId }).from(budgetEntries).where(eq(budgetEntries.userId, userId)),
-    db.select({ id: goals.id, legacyId: goals.legacyId }).from(goals).where(eq(goals.userId, userId)),
-    db.select({ id: wealthSnapshots.id, legacyId: wealthSnapshots.legacyId }).from(wealthSnapshots).where(eq(wealthSnapshots.userId, userId)),
-    db.select({ id: contributions.id, legacyId: contributions.legacyId }).from(contributions).where(eq(contributions.userId, userId)),
+    db
+      .select({ id: transactions.id, legacyId: transactions.legacyId })
+      .from(transactions)
+      .where(eq(transactions.userId, userId)),
+    db
+      .select({ id: subscriptions.id, legacyId: subscriptions.legacyId })
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId)),
+    db
+      .select({ id: recurringRules.id, legacyId: recurringRules.legacyId })
+      .from(recurringRules)
+      .where(eq(recurringRules.userId, userId)),
+    db
+      .select({ id: pendingMovements.id, legacyId: pendingMovements.legacyId })
+      .from(pendingMovements)
+      .where(eq(pendingMovements.userId, userId)),
+    db
+      .select({ id: budgetEntries.id, legacyId: budgetEntries.legacyId })
+      .from(budgetEntries)
+      .where(eq(budgetEntries.userId, userId)),
+    db
+      .select({ id: goals.id, legacyId: goals.legacyId })
+      .from(goals)
+      .where(eq(goals.userId, userId)),
+    db
+      .select({ id: wealthSnapshots.id, legacyId: wealthSnapshots.legacyId })
+      .from(wealthSnapshots)
+      .where(eq(wealthSnapshots.userId, userId)),
+    db
+      .select({ id: contributions.id, legacyId: contributions.legacyId })
+      .from(contributions)
+      .where(eq(contributions.userId, userId)),
     db
       .select({ id: stockeventsSymbolMappings.id, legacyId: stockeventsSymbolMappings.legacyId })
       .from(stockeventsSymbolMappings)
@@ -603,8 +632,7 @@ export async function buildRepairPlan(
   }
 }
 
-const REPAIR_BACKUP_ERROR =
-  'Se exige un export de respaldo válido antes de ejecutar la reparación.'
+const REPAIR_BACKUP_ERROR = 'Se exige un export de respaldo válido antes de ejecutar la reparación.'
 
 function isRepairBackupBudgetCell(value: unknown): value is RepairBackupBudgetCell {
   if (!value || typeof value !== 'object') {
@@ -861,48 +889,32 @@ export interface RepairExecutionReport {
   correlationIdsRenamed: number
 }
 
-/**
- * The tables the repair can touch, parents before children. The order is load
- * bearing on both ends: the emitted SQL deletes in reverse (a child row cannot
- * outlive the parent it points at) and inserts in this order, so applying it
- * with `wrangler d1 execute --remote` never trips a foreign key.
- */
-const REPAIR_TABLE_ORDER = [
-  'accounts',
-  'categories',
-  'wealth_snapshots',
-  'contributions',
-  'twr_liquidity_accounts',
+/** Tables whose `category_id` a category merge can repoint. */
+const CATEGORY_REFERENCE_TABLES = new Set([
   'transactions',
-  'recurring_rules',
   'pending_movements',
+  'recurring_rules',
   'subscriptions',
   'budget_entries',
-  'goals',
-  'snapshot_balances',
-  'contribution_allocations',
   'user_instruments',
   'stockevents_symbol_mappings',
-] as const
+])
 
-/** Which of those tables the plan actually writes to. */
-function affectedTables(plan: RepairPlan): string[] {
-  const touched = new Set<string>()
-  for (const fix of plan.correlationIdFixes) touched.add(fix.table)
-  if (plan.categoryMerges.length > 0) {
-    touched.add('categories')
-    for (const merge of plan.categoryMerges) {
-      for (const reference of merge.references) touched.add(reference.table)
-    }
-  }
-  if (plan.accountKindCorrections.length > 0) touched.add('accounts')
-  if (plan.budgetRestorations.length > 0) touched.add('budget_entries')
-  if (plan.snapshotRestorations.length > 0) {
-    touched.add('wealth_snapshots')
-    touched.add('snapshot_balances')
-  }
-  return REPAIR_TABLE_ORDER.filter((table) => touched.has(table))
-}
+/** Tables whose `legacy_id` a correlation id fix can rename. */
+const CORRELATION_ID_TABLES = new Set([
+  'accounts',
+  'categories',
+  'twr_liquidity_accounts',
+  'transactions',
+  'subscriptions',
+  'recurring_rules',
+  'pending_movements',
+  'budget_entries',
+  'goals',
+  'wealth_snapshots',
+  'contributions',
+  'stockevents_symbol_mappings',
+])
 
 function sqlLiteral(value: unknown): string {
   if (value === null || value === undefined) return 'NULL'
@@ -912,45 +924,200 @@ function sqlLiteral(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`
 }
 
+function sqlInsert(table: string, row: Record<string, unknown>): string {
+  const columns = Object.keys(row)
+  return `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns
+    .map((column) => sqlLiteral(row[column]))
+    .join(', ')});`
+}
+
+interface SqlContext {
+  userId: string
+  /** `userId` already quoted, for `WHERE user_id = …`. */
+  userSql: string
+  now: string
+}
+
 /**
- * Writes the repaired state of every table the plan touched as SQL for
+ * Aborts the file when the preceding UPDATE matched no row, as
+ * `applyRepairPlan` throws in that case. SQLite only allows `RAISE` inside
+ * triggers, so the abort is a deliberately invalid `json()` call; the string
+ * shows up in the error D1 reports.
+ */
+function sqlExpectChanged(what: string): string {
+  return `SELECT CASE WHEN changes() = 0 THEN json(${sqlLiteral(`fila planificada ya no existe: ${what}`)}) END;`
+}
+
+function snapshotBalanceInserts(
+  ctx: SqlContext,
+  snapshotId: string,
+  balances: readonly SnapshotBalanceRepair[],
+): string[] {
+  return balances.map((balance) =>
+    sqlInsert('snapshot_balances', {
+      id: uuidv7(),
+      user_id: ctx.userId,
+      snapshot_id: snapshotId,
+      account_id: balance.accountId,
+      balance_minor: balance.balanceMinor,
+      currency: balance.currency,
+      created_at: ctx.now,
+    }),
+  )
+}
+
+/**
+ * One translator per plan section, mirroring the steps of `applyRepairPlan`.
+ * The mapped type is what keeps the two in step: a section added to
+ * `RepairPlan` without a translator here fails to compile instead of being
+ * left out of the emitted SQL.
+ */
+const REPAIR_SQL_TRANSLATORS: {
+  [K in keyof RepairPlan]: (ctx: SqlContext, items: RepairPlan[K]) => string[]
+} = {
+  categoryMerges: ({ userSql, now }, merges) =>
+    merges.flatMap((merge) => {
+      const canonical = sqlLiteral(merge.canonicalCategoryId)
+      const statements = merge.references.flatMap((ref) => {
+        if (!CATEGORY_REFERENCE_TABLES.has(ref.table)) {
+          throw new Error(`Tabla desconocida en el plan de reparación: ${ref.table}`)
+        }
+        const row = sqlLiteral(ref.rowId)
+        const repoint = `UPDATE ${ref.table} SET category_id = ${canonical}, updated_at = ${sqlLiteral(now)} WHERE user_id = ${userSql} AND id = ${row};`
+        if (ref.table !== 'budget_entries') return [repoint]
+        // The canonical category may already own a cell for this (year,
+        // month): the duplicate's row is dropped instead of repointed, which
+        // leaves the UPDATE after it matching nothing.
+        return [
+          `DELETE FROM budget_entries WHERE user_id = ${userSql} AND id = ${row} AND EXISTS (SELECT 1 FROM budget_entries AS other WHERE other.user_id = budget_entries.user_id AND other.category_id = ${canonical} AND other.year = budget_entries.year AND other.month = budget_entries.month);`,
+          repoint,
+        ]
+      })
+      statements.push(
+        `DELETE FROM categories WHERE user_id = ${userSql} AND id = ${sqlLiteral(merge.duplicateCategoryId)};`,
+      )
+      return statements
+    }),
+
+  accountKindCorrections: ({ userSql, now }, corrections) =>
+    corrections.map(
+      (correction) =>
+        `UPDATE accounts SET kind = ${sqlLiteral(correction.toKind)}, updated_at = ${sqlLiteral(now)} WHERE user_id = ${userSql} AND id = ${sqlLiteral(correction.accountId)};`,
+    ),
+
+  budgetRestorations: (ctx, cells) =>
+    cells.flatMap((cell) => {
+      if (cell.action === 'insert') {
+        return [
+          sqlInsert('budget_entries', {
+            id: uuidv7(),
+            user_id: ctx.userId,
+            category_id: cell.categoryId,
+            year: cell.year,
+            month: cell.month,
+            amount_minor: cell.amountMinor,
+            currency: cell.currency,
+            created_at: ctx.now,
+            updated_at: ctx.now,
+            version: 1,
+          }),
+        ]
+      }
+      const target = cell.budgetEntryId
+        ? `id = ${sqlLiteral(cell.budgetEntryId)}`
+        : `category_id = ${sqlLiteral(cell.categoryId)} AND year = ${cell.year} AND month = ${cell.month}`
+      return [
+        `UPDATE budget_entries SET amount_minor = ${cell.amountMinor}, currency = ${sqlLiteral(cell.currency)}, updated_at = ${sqlLiteral(ctx.now)} WHERE user_id = ${ctx.userSql} AND ${target};`,
+        sqlExpectChanged(`presupuesto ${cell.categoryId} ${cell.year}-${cell.month}`),
+      ]
+    }),
+
+  snapshotRestorations: (ctx, snapshots) =>
+    snapshots.flatMap((snapshot) => {
+      if (snapshot.action === 'insert') {
+        const snapshotId = uuidv7()
+        return [
+          sqlInsert('wealth_snapshots', {
+            id: snapshotId,
+            user_id: ctx.userId,
+            snapshot_date: snapshot.snapshotDate,
+            year: snapshot.year,
+            month: snapshot.month,
+            created_at: ctx.now,
+            updated_at: ctx.now,
+            version: 1,
+          }),
+          ...snapshotBalanceInserts(ctx, snapshotId, snapshot.balances),
+        ]
+      }
+      const snapshotId = snapshot.snapshotId!
+      const id = sqlLiteral(snapshotId)
+      return [
+        `UPDATE wealth_snapshots SET snapshot_date = ${sqlLiteral(snapshot.snapshotDate)}, updated_at = ${sqlLiteral(ctx.now)} WHERE user_id = ${ctx.userSql} AND id = ${id};`,
+        `DELETE FROM snapshot_balances WHERE user_id = ${ctx.userSql} AND snapshot_id = ${id};`,
+        ...snapshotBalanceInserts(ctx, snapshotId, snapshot.balances),
+      ]
+    }),
+
+  correlationIdFixes: ({ userSql, now }, fixes) =>
+    fixes.map((fix) => {
+      if (!CORRELATION_ID_TABLES.has(fix.table)) {
+        throw new Error(`Tabla desconocida en el plan de reparación: ${fix.table}`)
+      }
+      return `UPDATE ${fix.table} SET legacy_id = ${sqlLiteral(fix.toLegacyId)}, updated_at = ${sqlLiteral(now)} WHERE user_id = ${userSql} AND id = ${sqlLiteral(fix.rowId)};`
+    }),
+}
+
+/** The sections in the order `applyRepairPlan` runs them. */
+const REPAIR_SQL_SECTION_ORDER = [
+  'categoryMerges',
+  'accountKindCorrections',
+  'budgetRestorations',
+  'snapshotRestorations',
+  'correlationIdFixes',
+] as const satisfies ReadonlyArray<keyof RepairPlan>
+
+// Fails to compile when a plan section is missing from the order above, so
+// its translator cannot be skipped in silence.
+void (true satisfies [
+  Exclude<keyof RepairPlan, (typeof REPAIR_SQL_SECTION_ORDER)[number]>,
+] extends [never]
+  ? true
+  : never)
+
+/**
+ * Translates the plan into the SQL statements that apply it, in the same
+ * order as `applyRepairPlan`. Only the rows the plan changes are touched, so
+ * the file stays small enough for D1 to process in one go. D1 has no
+ * `uuidv7()`, so the ids of inserted rows are generated here — which also
+ * means a second run of a file with INSERTs fails instead of being a no-op.
+ */
+export function repairPlanSql(userId: string, plan: RepairPlan): string[] {
+  const ctx: SqlContext = { userId, userSql: sqlLiteral(userId), now: nowIso() }
+  return REPAIR_SQL_SECTION_ORDER.flatMap((section) =>
+    (REPAIR_SQL_TRANSLATORS[section] as (ctx: SqlContext, items: unknown) => string[])(
+      ctx,
+      plan[section],
+    ),
+  )
+}
+
+/**
+ * Writes the plan as SQL for
  * `wrangler d1 execute finance-tracker-db-v2 --remote --file=<out>`.
  *
  * The repair itself only writes to a local copy of production (no Workers
  * runtime is available from a plain Node script), so this is the step that
- * carries the result back. It replaces whole tables per user rather than
- * replaying each change, which keeps it exact: the local copy *is* the
- * intended end state. It deliberately leaves `sync_changes`, `sync_commands`,
- * `audit_events` and `user_revisions` alone — deleting the change log or the
- * revision cursor would make every other device miss the repair.
+ * carries the result back. It replays each planned change rather than
+ * dumping whole tables: a table dump of production was too large for D1 to
+ * process (`D1_RESET_DO`, issue #187) and rewrote hundreds of rows the plan
+ * never changed. `sync_changes`, `sync_commands`, `audit_events` and
+ * `user_revisions` stay untouched, as they do in `applyRepairPlan`.
+ *
+ * Returns the number of statements written.
  */
-export function writeRemoteRepairSql(
-  sqlite: Database.Database,
-  userId: string,
-  plan: RepairPlan,
-  outPath: string,
-): string[] {
-  const tables = affectedTables(plan)
-  const userIdSql = sqlLiteral(userId)
-  const statements: string[] = []
-
-  for (const table of [...tables].reverse()) {
-    statements.push(`DELETE FROM ${table} WHERE user_id = ${userIdSql};`)
-  }
-  for (const table of tables) {
-    const rows = sqlite
-      .prepare(`SELECT * FROM ${table} WHERE user_id = ? ORDER BY id`)
-      .all(userId) as Array<Record<string, unknown>>
-    for (const row of rows) {
-      const columns = Object.keys(row)
-      statements.push(
-        `INSERT INTO ${table} (${columns.map((column) => `"${column}"`).join(', ')}) VALUES (${columns
-          .map((column) => sqlLiteral(row[column]))
-          .join(', ')});`,
-      )
-    }
-  }
-
+export function writeRemoteRepairSql(userId: string, plan: RepairPlan, outPath: string): number {
+  const statements = repairPlanSql(userId, plan)
   const file = [
     '-- Generado por scripts/repair-corrupted-data.ts (--remote-sql-out).',
     '-- Aplicar con: wrangler d1 execute finance-tracker-db-v2 --remote --file=<este fichero>',
@@ -959,7 +1126,7 @@ export function writeRemoteRepairSql(
     '',
   ].join('\n')
   writeFileSync(outPath, file, 'utf8')
-  return tables
+  return statements.length
 }
 
 async function insertSnapshotBalances(
@@ -1097,7 +1264,9 @@ export async function applyRepairPlan(
           ? await db
               .update(budgetEntries)
               .set({ amountMinor: cell.amountMinor, currency: cell.currency, updatedAt: now })
-              .where(and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, cell.budgetEntryId)))
+              .where(
+                and(eq(budgetEntries.userId, userId), eq(budgetEntries.id, cell.budgetEntryId)),
+              )
               .returning({ id: budgetEntries.id })
           : await db
               .update(budgetEntries)
@@ -1160,10 +1329,7 @@ export async function applyRepairPlan(
         await db
           .delete(snapshotBalances)
           .where(
-            and(
-              eq(snapshotBalances.userId, userId),
-              eq(snapshotBalances.snapshotId, snapshotId),
-            ),
+            and(eq(snapshotBalances.userId, userId), eq(snapshotBalances.snapshotId, snapshotId)),
           )
 
         await insertSnapshotBalances(db, userId, snapshotId, snapshot.balances, now)
@@ -1190,10 +1356,7 @@ export async function applyRepairPlan(
           .update(twrLiquidityAccounts)
           .set(changes)
           .where(
-            and(
-              eq(twrLiquidityAccounts.userId, userId),
-              eq(twrLiquidityAccounts.id, fix.rowId),
-            ),
+            and(eq(twrLiquidityAccounts.userId, userId), eq(twrLiquidityAccounts.id, fix.rowId)),
           )
       } else if (fix.table === 'transactions') {
         await db
