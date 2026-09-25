@@ -20,6 +20,7 @@ import type {
   TransactionType,
 } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
+import { buildInvestmentTransactionData } from './investment'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useSyncStore } from './sync'
@@ -449,8 +450,12 @@ export const useRecurringStore = defineStore('recurring', () => {
         }
       }
     })
+    // An investment carries its operación and hora, which the bare payload
+    // drops — the server copy would then come back without them (#205).
     void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+      tx.type === 'investment'
+        ? buildInvestmentTransactionData(tx, financialStateStore.currency)
+        : buildTransactionData(tx, financialStateStore.currency),
     )
     void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),

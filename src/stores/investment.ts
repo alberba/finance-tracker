@@ -43,7 +43,7 @@ import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
 
 /** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
-async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+export async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
   // The server only knows its own account ids; sending the local one made
   // every investment movement fail the ownership check (audit §1).
   const accountId = await resolveEntityId('account', tx.accountId)
