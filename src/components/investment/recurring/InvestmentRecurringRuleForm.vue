@@ -82,26 +82,26 @@ function submit(): void {
 </script>
 
 <template>
-  <form class="form-grid investment-recurring-form" autocomplete="off" @submit.prevent="submit">
+  <form class="inv-fieldset investment-recurring-form" autocomplete="off" @submit.prevent="submit">
     <label>
       Cuenta
-      <select v-model="form.accountId" required>
+      <span class="inv-select"><select v-model="form.accountId" required>
         <option value="">Selecciona una cuenta</option>
         <option v-for="account in accounts" :key="account.id" :value="account.id">
           {{ account.name }}
         </option>
-      </select>
+      </select></span>
     </label>
     <label>
       Categoría
-      <select v-model="form.category" required>
+      <span class="inv-select"><select v-model="form.category" required>
         <option v-if="!categories.length" value="Sin categoría">Sin categoría</option>
         <option v-for="category in categories" :key="category" :value="category">
           {{ category }}
         </option>
-      </select>
+      </select></span>
     </label>
-    <label>
+    <label class="is-wide">
       Descripción
       <input v-model="form.description" required placeholder="Ej. Compra mensual VWCE" />
     </label>
@@ -111,11 +111,11 @@ function submit(): void {
     </label>
     <label>
       Frecuencia
-      <select v-model="form.frequency">
+      <span class="inv-select"><select v-model="form.frequency">
         <option v-for="item in frequencies" :key="item.value" :value="item.value">
           {{ item.label }}
         </option>
-      </select>
+      </select></span>
     </label>
     <label>
       Intervalo
@@ -135,10 +135,10 @@ function submit(): void {
     </label>
     <label>
       Operación
-      <select v-model="form.side">
+      <span class="inv-select"><select v-model="form.side">
         <option value="buy">Compra</option>
         <option value="sell">Venta</option>
-      </select>
+      </select></span>
     </label>
     <label>
       Títulos
@@ -157,10 +157,10 @@ function submit(): void {
       <input v-model="form.time" type="time" />
     </label>
     <div class="investment-recurring-form__actions">
-      <button type="submit" class="primary-btn">
+      <button type="submit" class="inv-primary">
         {{ editingRule ? 'Guardar regla' : 'Crear compra recurrente' }}
       </button>
-      <button v-if="editingRule" type="button" class="secondary-btn" @click="emit('cancel')">
+      <button v-if="editingRule" type="button" class="inv-secondary" @click="emit('cancel')">
         Cancelar edición
       </button>
     </div>
@@ -168,14 +168,12 @@ function submit(): void {
 </template>
 
 <style scoped>
-.investment-recurring-form {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
 .investment-recurring-form__actions {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  justify-content: flex-end;
   gap: 0.5rem;
+  padding-top: 0.5rem;
 }
 </style>

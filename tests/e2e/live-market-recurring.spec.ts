@@ -348,7 +348,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     await liveMarket.editFirstRecurringRule({ description: 'Aportación VWCE actualizada', amount: 212.5, units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
     await expect(liveMarket.recurringRules).toContainText('Aportación VWCE actualizada')
-    await expect(liveMarket.recurringRules).toContainText('212.50')
+    await expect(liveMarket.recurringRules).toContainText('212,50')
   })
 
   test('avisa cuando el proveedor devuelve un dato obsoleto', async ({ page, tracker }) => {

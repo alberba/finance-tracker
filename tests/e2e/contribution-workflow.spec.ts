@@ -125,7 +125,7 @@ test.describe("recorrido guiado de aportes", () => {
     await expect(page.getByRole("status")).toContainText("Aporte guardado");
     const row = tracker
       .investmentSection()
-      .locator("#contribution-body tr", { hasText: "2026-04-15" });
+      .locator('#contribution-body tr[data-contribution-date="2026-04-15"]');
     await expect(row).toBeVisible();
     await expect(row.locator("td").nth(1)).toHaveText("15.850,00 €");
 
@@ -399,7 +399,7 @@ test.describe("recorrido guiado de aportes", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-04-30" }),
+        .locator('#contribution-body tr[data-contribution-date="2026-04-30"]'),
     ).toHaveCount(0);
   });
 });

@@ -8,7 +8,7 @@ const SECTION_CONFIG = {
   },
   budget: { buttonLabel: "Presupuesto", headingText: "Presupuesto" },
   wealth: { buttonLabel: "Patrimonio", headingText: "Patrimonio total" },
-  investment: { buttonLabel: "Inversión", headingText: "Inversión y aportes" },
+  investment: { buttonLabel: "Inversión", headingText: "Inversión" },
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
   data: { buttonLabel: "Datos", headingText: "Datos y backups" },
@@ -120,7 +120,7 @@ export class FinanceTrackerPage {
   async openInvestmentDashboardTab() {
     await this.openInvestment();
     await this.investmentSection()
-      .getByRole("tab", { name: "Dashboard" })
+      .getByRole("tab", { name: "Resumen" })
       .click();
   }
 
@@ -318,13 +318,10 @@ export class FinanceTrackerPage {
     declared?: boolean;
     stockEventsCash?: boolean;
   }) {
-    await this.openInvestmentMovementsTab();
-    const section = this.investmentSection();
+    const section = await this.openInvestmentMovementDrawer();
     await section.locator("#investment-movement-date").fill(params.date);
     await section.locator("#investment-movement-time").fill(params.time);
-    await section
-      .locator("#investment-movement-side")
-      .selectOption(params.side);
+    await section.locator(`[data-side="${params.side}"]`).click();
     await section.locator("#investment-movement-symbol").fill(params.symbol);
     if (params.category !== undefined) {
       const categorySelect = section.locator("#investment-movement-category");
@@ -367,6 +364,18 @@ export class FinanceTrackerPage {
     await expect(this.page.getByRole("status")).toContainText(
       "Movimiento de inversión guardado.",
     );
+  }
+
+  /** Opens the "Nuevo movimiento" side panel and returns it. */
+  async openInvestmentMovementDrawer() {
+    const drawer = this.page.locator("#investment-movement-dialog");
+    if (await drawer.isVisible()) return drawer;
+    await this.openInvestmentMovementsTab();
+    await this.investmentSection()
+      .getByRole("button", { name: "Nuevo movimiento" })
+      .click();
+    await expect(drawer).toBeVisible();
+    return drawer;
   }
 
   async addAccount(params: { name: string; openingBalance?: number }) {
@@ -820,55 +829,51 @@ export class FinanceTrackerPage {
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Editar" }).click();
 
-    const editRow = this.investmentSection()
-      .locator("tr[data-investment-editing-id]")
-      .first();
+    const editRow = this.page.locator("#investment-movement-dialog");
     await expect(editRow).toBeVisible();
 
     if (payload.date) {
-      await editRow.locator('[data-edit-field="date"]').fill(payload.date);
+      await editRow.locator("#investment-movement-date").fill(payload.date);
     }
     if (payload.time) {
-      await editRow.locator('[data-edit-field="time"]').fill(payload.time);
+      await editRow.locator("#investment-movement-time").fill(payload.time);
     }
     if (payload.side) {
-      await editRow
-        .locator('[data-edit-field="side"]')
-        .selectOption(payload.side);
+      await editRow.locator(`[data-side="${payload.side}"]`).click();
     }
     if (typeof payload.newSymbol === "string") {
       await editRow
-        .locator('[data-edit-field="symbol"]')
+        .locator("#investment-movement-symbol")
         .fill(payload.newSymbol);
     }
     if (typeof payload.category === "string") {
       await this.selectByLabelOrFirst(
-        editRow.locator('[data-edit-field="category"]'),
+        editRow.locator("#investment-movement-category"),
         payload.category,
       );
     }
     if (typeof payload.unitPrice === "number") {
       await editRow
-        .locator('[data-edit-field="unitPrice"]')
+        .locator("#investment-movement-unit-price")
         .fill(String(payload.unitPrice));
     }
     if (typeof payload.units === "number") {
       await editRow
-        .locator('[data-edit-field="units"]')
+        .locator("#investment-movement-units")
         .fill(String(payload.units));
     }
     if (typeof payload.fee === "number") {
       await editRow
-        .locator('[data-edit-field="fee"]')
+        .locator("#investment-movement-fee")
         .fill(String(payload.fee));
     }
     if (typeof payload.movementCurrency === "string") {
       await editRow
-        .locator('[data-edit-field="movementCurrency"]')
+        .locator("#investment-movement-currency")
         .fill(payload.movementCurrency);
     }
     if (typeof payload.declared === "boolean") {
-      const checkbox = editRow.locator('[data-edit-field="declared"]');
+      const checkbox = editRow.locator("#investment-movement-declared");
       if (payload.declared) {
         await checkbox.check();
       } else {
@@ -876,7 +881,7 @@ export class FinanceTrackerPage {
       }
     }
 
-    await editRow.getByRole("button", { name: "Guardar" }).click();
+    await editRow.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(this.page.getByRole("status")).toContainText(
       "Movimiento de inversión actualizado.",
     );
@@ -933,9 +938,9 @@ export class FinanceTrackerPage {
 
   async getContributionRowTexts(date: string): Promise<string[]> {
     await this.openInvestmentContributionsTab();
-    const row = this.investmentSection()
-      .locator("#contribution-body tr", { hasText: date })
-      .first();
+    const row = this.investmentSection().locator(
+      `#contribution-body tr[data-contribution-date="${date}"]`,
+    );
     await expect(row).toBeVisible();
     return row.locator("td").allInnerTexts();
   }
@@ -1083,9 +1088,9 @@ export class FinanceTrackerPage {
 
   async deleteManualContributionByDate(date: string) {
     await this.openInvestmentContributionsTab();
-    const row = this.investmentSection().locator("#contribution-body tr", {
-      hasText: date,
-    });
+    const row = this.investmentSection().locator(
+      `#contribution-body tr[data-contribution-date="${date}"]`,
+    );
     await expect(row).toBeVisible();
     await row
       .locator(`button[data-delete-contribution-date="${date}"]`)
@@ -1103,13 +1108,13 @@ export class FinanceTrackerPage {
   async getInvestmentMovementsOperations(): Promise<string[]> {
     await this.openInvestmentMovementsTab();
     const rows = this.investmentSection().locator(
-      "#investment-tx-table-body tr",
+      "#investment-tx-table-body tr[data-movement-id]",
     );
     const count = await rows.count();
     const operations: string[] = [];
     for (let index = 0; index < count; index += 1) {
       const operation = (
-        await rows.nth(index).locator("td").nth(2).innerText()
+        await rows.nth(index).locator("[data-operation]").innerText()
       ).trim();
       operations.push(operation);
     }

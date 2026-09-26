@@ -83,7 +83,7 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
     ).toBeVisible();
   });
 
-  test("el toggle permanece visible al cambiar entre subtabs de inversión", async ({
+  test("el modo de rentabilidad se conserva al cambiar entre subtabs de inversión", async ({
     tracker,
   }) => {
     await tracker.openInvestment();
@@ -95,12 +95,11 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
     await twrBtn.click();
     await expect(twrBtn).toHaveClass(/is-active/);
 
-    // Cambiar a pestaña Movimientos
+    // El selector solo afecta al Resumen, así que vive dentro de esa pestaña.
     await tracker.openInvestmentMovementsTab();
-    await expect(twrBtn).toBeVisible();
-    await expect(twrBtn).toHaveClass(/is-active/);
+    await expect(twrBtn).toBeHidden();
 
-    // Volver a Dashboard y el toggle sigue activo
+    // Volver al Resumen y el modo sigue activo
     await tracker.openInvestmentDashboardTab();
     await expect(twrBtn).toHaveClass(/is-active/);
     await expect(section.locator("#inv-return-label")).toHaveText(

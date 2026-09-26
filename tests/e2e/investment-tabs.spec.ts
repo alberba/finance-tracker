@@ -8,7 +8,7 @@ test.describe("inversión tabs y TWR", () => {
     const investmentSection = tracker.investmentSection();
 
     await expect(
-      investmentSection.getByRole("tab", { name: "Dashboard" }),
+      investmentSection.getByRole("tab", { name: "Resumen" }),
     ).toBeVisible();
     await expect(
       investmentSection.getByRole("tab", { name: "Movimientos" }),
@@ -102,7 +102,7 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
+    await tracker.openInvestmentMovementDrawer();
     await tracker
       .investmentSection()
       .locator("#investment-movement-symbol")
@@ -155,7 +155,8 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
+    await tracker.openInvestmentMovementDrawer();
 
     await tracker
       .investmentSection()
@@ -206,13 +207,13 @@ test.describe("inversión tabs y TWR", () => {
     await mirrorStateToServer(page);
     await page.reload();
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
-    await tracker.openInvestmentMovementsTab();
+    await tracker.openInvestmentMovementDrawer();
 
     // Sin mapeo el envío automático se salta con aviso visible y sin botón.
     const section = tracker.investmentSection();
     await section.locator("#investment-movement-date").fill("2026-09-04");
     await section.locator("#investment-movement-time").fill("16:11");
-    await section.locator("#investment-movement-side").selectOption("buy");
+    await section.locator('[data-side="buy"]').click();
     await section.locator("#investment-movement-symbol").fill("RESEND");
     await section.locator("#investment-movement-unit-price").fill("2110.3");
     await section.locator("#investment-movement-units").fill("0.0047");
@@ -348,7 +349,7 @@ test.describe("inversión tabs y TWR", () => {
   test("categoría de inversión: Bitvavo fija Crypto y otros brokers permiten elegir del desplegable", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
+    await tracker.openInvestmentMovementDrawer();
 
     const section = tracker.investmentSection();
     await section
@@ -409,7 +410,7 @@ test.describe("inversión tabs y TWR", () => {
   test("el símbolo en movimientos de inversión conserva espacios mientras se escribe", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
+    await tracker.openInvestmentMovementDrawer();
 
     const symbolInput = tracker
       .investmentSection()
@@ -446,22 +447,22 @@ test.describe("inversión tabs y TWR", () => {
       .locator("#investment-tab-contributions thead th")
       .allTextContents();
     expect(headers.map((value) => value.trim())).toEqual([
-      "Fecha",
-      "Valor cartera (cierre)",
-      "Flujo del día",
+      "Cierre",
+      "Valor cartera",
+      "Aporte",
       "VLE",
-      "Participaciones antes",
-      "Participaciones después",
-      "Retorno período",
-      "Retorno acumulado",
-      "Acciones",
+      "Participaciones",
+      "Periodo",
+      "Acumulado",
+      "Origen",
     ]);
 
-    const firstRow = section.locator("#contribution-body tr").first();
-    await expect(firstRow).toBeVisible();
-    await expect(firstRow.locator("td").nth(3)).toHaveText("100");
-    await expect(firstRow.locator("td").nth(6)).toHaveText("--");
-    await expect(firstRow.locator("td").nth(7)).toHaveText("--");
+    // Newest close first, so the base row is the last one.
+    const baseRow = section.locator("#contribution-body tr").last();
+    await expect(baseRow).toBeVisible();
+    await expect(baseRow.locator("td").nth(3)).toHaveText("100,0000");
+    await expect(baseRow.locator("td").nth(5)).toHaveText("—");
+    await expect(baseRow.locator("td").nth(6)).toHaveText("—");
   });
 
   test("editar flujo en aportes recalcula y persiste tras recarga", async ({
@@ -473,17 +474,11 @@ test.describe("inversión tabs y TWR", () => {
     // The auto month-end close rows carry no flow of their own (their input
     // defaults to "0") — only the manual (non-month-end) contribution row
     // has a real flow value to edit, so recalculation actually has an effect.
-    const editableRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-28",
-    });
+    const editableRow = section.locator('#contribution-body tr[data-contribution-date="2026-01-28"]');
     await expect(editableRow).toBeVisible();
-    const editableDate = (
-      await editableRow.locator("td").nth(0).innerText()
-    ).trim();
+    const editableDate = "2026-01-28";
 
-    const downstreamRow = section.locator("#contribution-body tr", {
-      hasText: "2026-02-28",
-    });
+    const downstreamRow = section.locator('#contribution-body tr[data-contribution-date="2026-02-28"]');
     await expect(downstreamRow).toBeVisible();
     const previousVle = (
       await downstreamRow.locator("td").nth(3).innerText()
@@ -501,7 +496,7 @@ test.describe("inversión tabs y TWR", () => {
     const persistedVle = (
       await tracker
         .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-02-28" })
+        .locator('#contribution-body tr[data-contribution-date="2026-02-28"]')
         .locator("td")
         .nth(3)
         .innerText()
@@ -515,9 +510,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentContributionsTab();
     const section = tracker.investmentSection();
 
-    const manualRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-28",
-    });
+    const manualRow = section.locator('#contribution-body tr[data-contribution-date="2026-01-28"]');
     await expect(manualRow).toBeVisible();
     await expect(
       manualRow.locator('input[data-contribution-flow-date="2026-01-28"]'),
@@ -530,9 +523,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentContributionsTab();
     const section = tracker.investmentSection();
 
-    const monthEndRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-31",
-    });
+    const monthEndRow = section.locator('#contribution-body tr[data-contribution-date="2026-01-31"]');
     await expect(monthEndRow).toBeVisible();
     await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.209,45 €");
     await expect(
@@ -555,7 +546,7 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-01-28" }),
+        .locator('#contribution-body tr[data-contribution-date="2026-01-28"]'),
     ).toHaveCount(0);
   });
 });

@@ -34,6 +34,7 @@ export class LiveMarketPage {
     type?: 'investment';
     symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
   }): Promise<void> {
+    await this.recurringRules.getByRole('button', { name: 'Nueva compra recurrente' }).click()
     const form = this.recurringRules.locator('form')
     await form.getByLabel('Cuenta').selectOption({ label: params.account })
     await form.getByLabel('Categoría').selectOption({ label: params.category })
@@ -55,7 +56,7 @@ export class LiveMarketPage {
   }
 
   async editFirstRecurringRule(params: { description: string; amount: number; units?: number; unitPrice?: number; fee?: number; time?: string }): Promise<void> {
-    const row = this.recurringRules.locator('.list-item').first()
+    const row = this.recurringRules.locator('[data-recurring-rule]').first()
     await row.getByRole('button', { name: 'Editar' }).click()
     const form = this.recurringRules.locator('form')
     await form.getByLabel('Descripción').fill(params.description)

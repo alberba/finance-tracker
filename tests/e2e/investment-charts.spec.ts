@@ -1,20 +1,37 @@
 import { test, expect } from "./fixtures";
+import type { Page } from "@playwright/test";
+
+/** The portfolio chart opens in €; the percentage view is one click away. */
+async function showPortfolioPercent(page: Page) {
+  await page
+    .locator("#investment")
+    .getByRole("group", { name: "Unidad del gráfico" })
+    .getByRole("button", { name: "%" })
+    .click();
+  await expect(page.locator("#investment-portfolio-chart")).toHaveAttribute(
+    "aria-label",
+    "Evolución cartera total",
+  );
+}
+
+/** Expands the first position so its per-asset chart renders. */
+async function openFirstPosition(page: Page) {
+  await page.locator("#investment .inv-pos-row").first().click();
+  await expect(page.locator("#investment-asset-chart")).toBeVisible();
+}
 
 test.describe("Investment charts E2E", () => {
-  test("inversión renderiza los 3 gráficos: 2 de líneas múltiples y 1 donut de distribución", { tag: "@smoke" }, async ({
+  test("inversión renderiza el gráfico de cartera, la barra de reparto y el gráfico por activo al desplegar", { tag: "@smoke" }, async ({
     tracker,
     page,
   }) => {
     await tracker.openInvestment();
 
-    // Verificar que los canvas de los gráficos existen
-    const portfolioChart = page.locator("#investment-portfolio-chart");
-    const assetsChart = page.locator("#investment-assets-chart");
-    const allocationChart = page.locator("#investment-allocation");
+    await expect(page.locator("#investment-portfolio-chart")).toBeVisible();
+    await expect(page.locator("#investment-allocation")).toBeVisible();
+    await expect(page.locator("#investment-asset-chart")).toHaveCount(0);
 
-    await expect(portfolioChart).toBeVisible();
-    await expect(assetsChart).toBeVisible();
-    await expect(allocationChart).toBeVisible();
+    await openFirstPosition(page);
   });
 
   test("inversión: gráficos de líneas muestran valores porcentuales", async ({
@@ -22,10 +39,12 @@ test.describe("Investment charts E2E", () => {
     page,
   }) => {
     await tracker.openInvestment();
+    await showPortfolioPercent(page);
+    await openFirstPosition(page);
 
     const chartData = await page.evaluate(() => {
       const portfolio = document.getElementById("investment-portfolio-chart");
-      const assets = document.getElementById("investment-assets-chart");
+      const assets = document.getElementById("investment-asset-chart");
       if (!portfolio || !assets) return null;
 
       const portfolioTooltips: string[] = JSON.parse(
@@ -59,10 +78,12 @@ test.describe("Investment charts E2E", () => {
     page,
   }) => {
     await tracker.openInvestment();
+    await showPortfolioPercent(page);
+    await openFirstPosition(page);
 
     const zeroTickStatus = await page.evaluate(() => {
       const portfolio = document.getElementById("investment-portfolio-chart");
-      const assets = document.getElementById("investment-assets-chart");
+      const assets = document.getElementById("investment-asset-chart");
       return {
         portfolio: portfolio?.dataset.chartHasZeroTick === "true",
         assets: assets?.dataset.chartHasZeroTick === "true",
@@ -73,28 +94,21 @@ test.describe("Investment charts E2E", () => {
     expect(zeroTickStatus.assets).toBe(true);
   });
 
-  test("inversión: ambos gráficos de líneas usan mayor altura", async ({
+  test("inversión: el gráfico de cartera tiene altura suficiente", async ({
     tracker,
     page,
   }) => {
     await tracker.openInvestment();
 
-    // Con Chart.js canvas, verificamos que los contenedores tienen altura adecuada
-    const heights = await page.evaluate(() => {
-      const portfolio = document
-        .getElementById("investment-portfolio-chart")
-        ?.closest(".chart-canvas-wrap") as HTMLElement | null;
-      const assets = document
-        .getElementById("investment-assets-chart")
-        ?.closest(".chart-canvas-wrap") as HTMLElement | null;
-      return {
-        portfolioHeight: portfolio?.offsetHeight || 0,
-        assetsHeight: assets?.offsetHeight || 0,
-      };
-    });
+    const height = await page.evaluate(
+      () =>
+        (
+          document.getElementById("investment-portfolio-chart")
+            ?.parentElement as HTMLElement | null
+        )?.offsetHeight || 0,
+    );
 
-    expect(heights.portfolioHeight).toBeGreaterThan(200);
-    expect(heights.assetsHeight).toBeGreaterThan(200);
+    expect(height).toBeGreaterThan(200);
   });
 
   test("inversión: el gráfico de cartera muestra solo la serie Cartera Total", async ({
@@ -102,6 +116,7 @@ test.describe("Investment charts E2E", () => {
     page,
   }) => {
     await tracker.openInvestment();
+    await showPortfolioPercent(page);
 
     const details = await page.evaluate(() => {
       const canvas = document.getElementById("investment-portfolio-chart");
@@ -139,6 +154,8 @@ test.describe("Investment charts E2E", () => {
   }) => {
     await tracker.openInvestment();
     await page.locator("#investment-month").selectOption({ label: "MARZO" });
+    await showPortfolioPercent(page);
+    await openFirstPosition(page);
 
     const result = await page.evaluate(() => {
       const storageKey = "finance-tracker-state-v1";
@@ -290,7 +307,7 @@ test.describe("Investment charts E2E", () => {
       const portfolioCanvas = document.getElementById(
         "investment-portfolio-chart",
       );
-      const assetsCanvas = document.getElementById("investment-assets-chart");
+      const assetsCanvas = document.getElementById("investment-asset-chart");
       if (!portfolioCanvas || !assetsCanvas) {
         return { error: "No se encontraron los canvas de los gráficos." };
       }
@@ -388,10 +405,12 @@ test.describe("Investment charts E2E", () => {
   }) => {
     await tracker.openInvestment();
     await page.locator("#investment-month").selectOption({ label: "ENERO" });
+    await showPortfolioPercent(page);
+    await openFirstPosition(page);
 
     const tooltips = await page.evaluate(() => {
       const portfolio = document.getElementById("investment-portfolio-chart");
-      const assets = document.getElementById("investment-assets-chart");
+      const assets = document.getElementById("investment-asset-chart");
       if (!portfolio || !assets) return null;
 
       const portfolioTooltipData: string[][] = JSON.parse(
@@ -415,90 +434,26 @@ test.describe("Investment charts E2E", () => {
     expect(tooltips.firstPortfolio).toMatch(/0[.,]00%/);
   });
 
-  test("inversión: gráfico de distribución usa donut chart y contiene segmentos", async ({
+  test("inversión: la barra de reparto tiene un segmento por posición con su tooltip", async ({
     tracker,
-    page,
   }) => {
     await tracker.openInvestment();
+    const section = tracker.investmentSection();
 
-    // Verificar que el canvas del donut tiene segmentos renderizados
-    const segmentCount = await page.evaluate(() => {
-      const canvas = document.getElementById("investment-allocation");
-      return parseInt(canvas?.dataset.chartSegmentCount || "0");
-    });
+    const segments = section.locator("#investment-allocation .inv-alloc__seg");
+    const positions = section.locator(".inv-pos-row");
+    const count = await positions.count();
+    expect(count).toBeGreaterThan(0);
+    await expect(segments).toHaveCount(count);
 
-    // Debe haber al menos 1 segmento
-    expect(segmentCount).toBeGreaterThan(0);
-  });
-
-  test("inversión: gráficos ocupan ancho equilibrado en dos columnas", async ({
-    tracker,
-    page,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile-chrome",
-      "En móvil los gráficos se apilan verticalmente.",
-    );
-    await tracker.openInvestment();
-
-    const layout = await page.evaluate(() => {
-      const portfolio = document
-        .getElementById("investment-portfolio-chart")
-        ?.closest("article");
-      const assets = document
-        .getElementById("investment-assets-chart")
-        ?.closest("article");
-
-      if (!portfolio || !assets) {
-        return null;
-      }
-
-      const portfolioRect = portfolio.getBoundingClientRect();
-      const assetsRect = assets.getBoundingClientRect();
-
-      return {
-        portfolioX: Math.round(portfolioRect.x),
-        portfolioWidth: Math.round(portfolioRect.width),
-        assetsX: Math.round(assetsRect.x),
-        assetsWidth: Math.round(assetsRect.width),
-        portfolioY: Math.round(portfolioRect.y),
-        assetsY: Math.round(assetsRect.y),
-      };
-    });
-
-    expect(layout).not.toBeNull();
-    if (!layout) {
-      return;
-    }
-
-    // Los gráficos deben estar en la misma fila (Y similar)
-    expect(Math.abs(layout.portfolioY - layout.assetsY)).toBeLessThanOrEqual(4);
-
-    // Los gráficos deben tener ancho similar (1fr 1fr)
-    expect(
-      Math.abs(layout.portfolioWidth - layout.assetsWidth),
-    ).toBeLessThanOrEqual(2);
-
-    // El segundo gráfico debe estar a la derecha del primero
-    expect(layout.assetsX).toBeGreaterThan(
-      layout.portfolioX + layout.portfolioWidth - 4,
-    );
-  });
-
-  test("inversión: donut chart renderiza leyenda con colores", async ({
-    tracker,
-    page,
-  }) => {
-    await tracker.openInvestment();
-
-    // Verificar que el canvas del donut tiene items de leyenda
-    const legendCount = await page.evaluate(() => {
-      const canvas = document.getElementById("investment-allocation");
-      return parseInt(canvas?.dataset.chartLegendCount || "0");
-    });
-
-    // Debe haber al menos 1 item de leyenda (1 por activo)
-    expect(legendCount).toBeGreaterThanOrEqual(1);
+    const firstName = (
+      await positions.first().locator("th").innerText()
+    ).trim();
+    await segments.first().hover();
+    const tip = segments.first().locator(".inv-alloc__tip");
+    await expect(tip).toBeVisible();
+    await expect(tip).toContainText(firstName);
+    await expect(tip).toContainText("%");
   });
 
   test("inversión: seleccionar mes diferente actualiza los gráficos", async ({

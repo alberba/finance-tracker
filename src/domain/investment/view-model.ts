@@ -29,9 +29,26 @@ const CHART_COLORS = [
   '#64748b',
 ]
 
+export interface InvestmentPosition {
+  id: string
+  name: string
+  color: string
+  value: number
+  invested: number
+  gain: number
+  returnPct: number
+  /** Share of the portfolio value, 0–100. */
+  weight: number
+  /** Gain over invested capital per chart point, same labels as the portfolio chart. */
+  series: MultiLineSeries[]
+}
+
 export interface InvestmentDashboardViewModel {
   portfolioValue: number
   investedCapital: number
+  gain: number
+  positions: InvestmentPosition[]
+  valueSeries: MultiLineSeries[]
   displayReturn: number
   returnIsGood: boolean
   returnLabel: string
@@ -98,6 +115,41 @@ export function buildInvestmentDashboardViewModel(
       }
     })
 
+  const positionTotal = state.investmentAssets.reduce(
+    (sum, asset) => sum + Math.max(0, computeInvestmentValue(state, asset.id, month)),
+    0,
+  )
+  const positions: InvestmentPosition[] = state.investmentAssets
+    .map((asset, idx) => {
+      const value = computeInvestmentValue(state, asset.id, month)
+      const invested = computeInvestedCapitalByAsset(state, asset.id, month)
+      const color = CHART_COLORS[idx % CHART_COLORS.length]
+      return {
+        id: asset.id,
+        name: asset.name,
+        color,
+        value,
+        invested,
+        gain: value - invested,
+        returnPct: toGainPercent(value, invested),
+        weight: positionTotal > 0 ? (value / positionTotal) * 100 : 0,
+        series: [
+          {
+            name: asset.name,
+            color,
+            values: chartPoints.map((m) =>
+              toGainPercent(
+                computeInvestmentValue(state, asset.id, m),
+                computeInvestedCapitalByAsset(state, asset.id, m),
+              ),
+            ),
+          },
+        ],
+      }
+    })
+    .filter((position) => position.value > 0)
+    .sort((a, b) => b.value - a.value)
+
   const allocation: DonutChartItem[] = state.investmentAssets
     .map((asset, idx) => ({
       label: asset.name,
@@ -109,6 +161,12 @@ export function buildInvestmentDashboardViewModel(
   return {
     portfolioValue,
     investedCapital,
+    gain: portfolioValue - investedCapital,
+    positions,
+    valueSeries: [
+      { name: 'Valor de cartera', color: '#3b6bf0', values: portfolioTotalValues },
+      { name: 'Capital aportado', color: '#8693a4', values: portfolioInvestedCapital },
+    ],
     displayReturn,
     returnIsGood: displayReturn >= 0,
     returnLabel: isTWR ? 'Rentabilidad TWR' : 'Rentabilidad estimada',
