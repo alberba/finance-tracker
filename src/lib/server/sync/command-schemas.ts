@@ -387,6 +387,8 @@ export const settingsUpdateCommandSchema = z.object({
     twrLiquidityAccountIds: z.array(z.string().min(1)).optional(),
     /** Stock Events "sincronizar nuevos movimientos" flag. */
     stockeventsEnabled: z.boolean().optional(),
+    /** Stock Events: buys/sells move the watchlist cash (`toCash`). */
+    stockeventsTradesToCash: z.boolean().optional(),
     /**
      * Whole Stock Events cash-mapping selection — replaces it. `accountId`
      * is the server `account` id (`null` clears that row's mapping only

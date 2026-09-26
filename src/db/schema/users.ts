@@ -57,6 +57,7 @@ export const userSettings = sqliteTable(
     locale: text("locale"),
     theme: text("theme"),
     stockeventsEnabled: integer("stockevents_enabled").notNull().default(0),
+    stockeventsTradesToCash: integer("stockevents_trades_to_cash").notNull().default(0),
     createdAt: createdAtColumn(),
     updatedAt: updatedAtColumn(),
     version: versionColumn(),

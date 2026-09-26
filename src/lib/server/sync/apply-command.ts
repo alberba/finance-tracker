@@ -442,6 +442,9 @@ async function performMutation(
         ...(typeof settingsPatch.stockeventsEnabled === "boolean"
           ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
           : {}),
+        ...(typeof settingsPatch.stockeventsTradesToCash === "boolean"
+          ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
+          : {}),
       };
       const existing = await userSettingsRepository.get(db, userId);
       // Same contract as `update`: a stale `baseVersion` is a replay when the

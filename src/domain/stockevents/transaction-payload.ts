@@ -38,11 +38,25 @@ export function findSyncedMapping(
   return mapping && mapping.sync && mapping.watchlistId ? mapping : null
 }
 
+export function resolveStockEventsSymbol(
+  symbol: string,
+  targetSymbol: string,
+  isCrypto: boolean,
+): string {
+  const local = symbol.trim().toUpperCase()
+  const target = targetSymbol.trim().toUpperCase()
+  if (isCrypto && (!target || target === local) && !local.endsWith('.CRYPTO')) {
+    return `${local}.CRYPTO`
+  }
+  return target || local
+}
+
 export function buildStockEventsTransactionPayload(
   tx: Transaction,
   watchlistId: string,
   targetSymbol = '',
   toCash = false,
+  isCrypto = tx.category.trim().toLowerCase() === 'crypto',
 ): StockEventsTransactionPayload | null {
   if (tx.type !== 'investment' || !tx.symbol || !watchlistId) {
     return null
@@ -57,7 +71,11 @@ export function buildStockEventsTransactionPayload(
   const fee = Number(tx.fee)
   return {
     watchlistId,
-    symbol: (targetSymbol.trim() || tx.symbol).trim().toUpperCase(),
+    symbol: resolveStockEventsSymbol(
+      tx.symbol,
+      targetSymbol,
+      isCrypto,
+    ),
     date: buildIsoDate(tx.date, tx.time),
     change: side === 'sell' ? -units : units,
     price,

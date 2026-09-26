@@ -6,6 +6,7 @@ import {
   buildStockEventsCashTransactionPayload,
   buildStockEventsTransactionPayload,
   findSyncedMapping,
+  resolveStockEventsSymbol,
 } from '../domain/stockevents/transaction-payload'
 import {
   checkStockEventsSymbols,
@@ -32,10 +33,12 @@ export interface StockEventsSymbolRow {
   targetSymbol: string
   hidden: boolean
   hasInstrument: boolean
+  isCrypto: boolean
   checkResult: SymbolCheckResult | null
 }
 
 export interface StockEventsSyncOptions {
+  /** Overrides `settings.tradesToCash` for this one movement. */
   toCash?: boolean
 }
 
@@ -112,6 +115,14 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const instrumentSymbols = new Set(
       financialStateStore.state.instruments.map((instrument) => instrument.symbol.toUpperCase()),
     )
+    const cryptoSymbols = new Set([
+      ...financialStateStore.state.instruments
+        .filter((instrument) => instrument.type === 'crypto')
+        .map((instrument) => instrument.symbol.toUpperCase()),
+      ...financialStateStore.state.transactions
+        .filter((tx) => tx.type === 'investment' && tx.category.trim().toLowerCase() === 'crypto')
+        .map((tx) => (tx.symbol || '').toUpperCase()),
+    ])
     return trackedSymbols.value.map((symbol) => {
       const mapping = mappingsBySymbol.get(symbol)
       return {
@@ -121,6 +132,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         targetSymbol: mapping?.targetSymbol || '',
         hidden: mapping?.hidden === true,
         hasInstrument: instrumentSymbols.has(symbol),
+        isCrypto: cryptoSymbols.has(symbol),
         checkResult: checkResults.value[symbol] || null,
       }
     })
@@ -184,6 +196,13 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         ? 'Sincronización con Stock Events activada.'
         : 'Sincronización con Stock Events desactivada.',
     )
+  }
+
+  function setTradesToCash(tradesToCash: boolean): void {
+    financialStateStore.commitState((draft) => {
+      draft.stockEvents.tradesToCash = tradesToCash
+    })
+    void syncSettingsUpdate({ stockeventsTradesToCash: tradesToCash })
   }
 
   function updateMapping(
@@ -286,7 +305,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     if (!credentialConfigured.value || isChecking.value) return
     const rows = symbolRows.value.filter((row) => row.sync && row.watchlistId)
     const checks = rows.map((row) => ({
-      symbol: row.targetSymbol || row.symbol,
+      symbol: resolveStockEventsSymbol(row.symbol, row.targetSymbol, row.isCrypto),
       watchlistId: row.watchlistId,
     }))
     if (!checks.length) {
@@ -349,7 +368,8 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
       tx,
       mapping.watchlistId,
       mapping.targetSymbol,
-      options.toCash,
+      options.toCash ?? settings.value.tradesToCash === true,
+      symbolRows.value.some((row) => row.symbol === symbol && row.isCrypto),
     )
     if (!payload) {
       if (isConnected.value) {
@@ -494,6 +514,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     initializeCredential,
     saveApiKey,
     setEnabled,
+    setTradesToCash,
     updateMapping,
     updateCashMapping,
     loadWatchlists,

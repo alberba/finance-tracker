@@ -386,6 +386,10 @@ export const POST: APIRoute = async ({ request, locals }) =>
             settingsRow.stockeventsEnabled === 1 || settingsRow.stockeventsEnabled === true
               ? true
               : undefined,
+          stockeventsTradesToCash:
+            settingsRow.stockeventsTradesToCash === 1 || settingsRow.stockeventsTradesToCash === true
+              ? true
+              : undefined,
         };
         if (existing) {
           await userSettingsRepository.update(tx, userId, patch);

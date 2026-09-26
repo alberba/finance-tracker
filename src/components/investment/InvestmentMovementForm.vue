@@ -59,8 +59,10 @@ function syncCategoryForBroker(): void {
 }
 
 watch(() => form.accountId, syncCategoryForBroker)
-watch(canSyncMovement, (canSync) => {
-  if (!canSync) form.toCash = false
+const defaultToCash = (): boolean =>
+  canSyncMovement.value && stockEventsStore.settings.tradesToCash === true
+watch(defaultToCash, (toCash) => {
+  form.toCash = toCash
 })
 
 function resetDefaults(keep: Partial<typeof form> = {}): void {
@@ -69,7 +71,7 @@ function resetDefaults(keep: Partial<typeof form> = {}): void {
   form.units = ''
   form.fee = '0'
   form.declared = false
-  form.toCash = false
+  form.toCash = defaultToCash()
   Object.assign(form, keep)
   syncCategoryForBroker()
 }
@@ -79,6 +81,7 @@ onMounted(() => {
   form.time = nowTime()
   form.movementCurrency = (financialStateStore.currency || 'EUR').toUpperCase()
   form.accountId = financialStateStore.accounts[0]?.id ?? ''
+  form.toCash = defaultToCash()
   syncCategoryForBroker()
 })
 
