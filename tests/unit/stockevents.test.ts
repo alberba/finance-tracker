@@ -65,6 +65,20 @@ describe('payload de transacción para Stock Events', () => {
     expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1', '  ')?.symbol).toBe('VWCE')
   })
 
+  it('usa el ticker .CRYPTO para movimientos cripto sin un destino distinto', () => {
+    const cryptoMovement = { ...buyMovement, symbol: 'ETH', category: 'Crypto' }
+    expect(buildStockEventsTransactionPayload(cryptoMovement, 'wl-1')?.symbol).toBe('ETH.CRYPTO')
+    expect(buildStockEventsTransactionPayload(cryptoMovement, 'wl-1', 'ETH')?.symbol).toBe(
+      'ETH.CRYPTO',
+    )
+    expect(buildStockEventsTransactionPayload(cryptoMovement, 'wl-1', 'ETH.CRYPTO')?.symbol).toBe(
+      'ETH.CRYPTO',
+    )
+    expect(buildStockEventsTransactionPayload(cryptoMovement, 'wl-1', 'ETH-USD')?.symbol).toBe(
+      'ETH-USD',
+    )
+  })
+
   it('incluye la operación de efectivo sólo cuando se solicita', () => {
     expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1')).not.toHaveProperty('toCash')
     expect(buildStockEventsTransactionPayload(buyMovement, 'wl-1', '', true)).toMatchObject({
@@ -129,6 +143,7 @@ describe('normalización del estado de Stock Events', () => {
     expect(state.stockEvents).toEqual({
       enabled: false,
       apiKey: '',
+      tradesToCash: false,
       symbolMappings: [],
       cashMappings: [],
       cashSyncEntries: [],

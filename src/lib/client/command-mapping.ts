@@ -296,6 +296,7 @@ export async function syncSettingsUpdate(patch: {
   theme?: string | null;
   twrLiquidityAccountIds?: string[];
   stockeventsEnabled?: boolean;
+  stockeventsTradesToCash?: boolean;
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>;
 }): Promise<void> {
   if (!isSyncV2Enabled()) {

@@ -53,8 +53,8 @@ export function applyPendingCommands(
       const patch = command.patch as Record<string, unknown>;
       const settings = { ...((next.settings as Record<string, unknown> | null) ?? {}) };
       for (const [key, value] of Object.entries(patch)) {
-        if (key === "stockeventsEnabled") {
-          settings["stockeventsEnabled"] = value === true ? 1 : 0;
+        if (key === "stockeventsEnabled" || key === "stockeventsTradesToCash") {
+          settings[key] = value === true ? 1 : 0;
         } else if (key === "stockeventsCashMappings") {
           settings["stockeventsCashMappings"] = value;
         } else if (key === "twrLiquidityAccountIds") {

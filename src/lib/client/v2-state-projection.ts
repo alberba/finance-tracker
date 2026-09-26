@@ -280,6 +280,9 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
   const stockeventsEnabledRaw =
     bootstrap.settings?.stockeventsEnabled ?? bootstrap.settings?.stockevents_enabled
   projected.stockEvents.enabled = stockeventsEnabledRaw === true || stockeventsEnabledRaw === 1
+  const tradesToCashRaw =
+    bootstrap.settings?.stockeventsTradesToCash ?? bootstrap.settings?.stockevents_trades_to_cash
+  projected.stockEvents.tradesToCash = tradesToCashRaw === true || tradesToCashRaw === 1
   projected.stockEvents.symbolMappings = (bootstrap.stockeventsSymbolMappings || []).map((mapping) => ({
     symbol: String(mapping.legacyId || mapping.stockeventsSymbol).toUpperCase(),
     sync: mapping.sync === true || mapping.sync === 1,

@@ -11,6 +11,7 @@ export interface CreateUserSettingsInput {
   locale?: string | null;
   theme?: string | null;
   stockeventsEnabled?: boolean;
+  stockeventsTradesToCash?: boolean;
 }
 
 export interface UpdateUserSettingsInput {
@@ -18,6 +19,7 @@ export interface UpdateUserSettingsInput {
   locale?: string | null;
   theme?: string | null;
   stockeventsEnabled?: boolean;
+  stockeventsTradesToCash?: boolean;
 }
 
 export async function get(db: Db, userId: string): Promise<UserSettingsRow | undefined> {
@@ -39,6 +41,7 @@ export async function create(
       locale: input.locale ?? null,
       theme: input.theme ?? null,
       stockeventsEnabled: input.stockeventsEnabled ? 1 : 0,
+      stockeventsTradesToCash: input.stockeventsTradesToCash ? 1 : 0,
       createdAt: now,
       updatedAt: now,
     })
@@ -66,6 +69,12 @@ export async function update(
         input.stockeventsEnabled === undefined
           ? existing.stockeventsEnabled
           : input.stockeventsEnabled
+            ? 1
+            : 0,
+      stockeventsTradesToCash:
+        input.stockeventsTradesToCash === undefined
+          ? existing.stockeventsTradesToCash
+          : input.stockeventsTradesToCash
             ? 1
             : 0,
       updatedAt: nowIso(),

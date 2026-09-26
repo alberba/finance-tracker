@@ -5,12 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/services/stockevents-api', () => ({
   fetchStockEventsCredentialStatus: vi.fn(),
   createStockEventsTransaction: vi.fn(),
+  checkStockEventsSymbols: vi.fn(),
 }))
 
 import { normalizeState } from '../../src/scripts/state'
 import type { Transaction } from '../../src/scripts/types'
 import {
   createStockEventsTransaction,
+  checkStockEventsSymbols,
   fetchStockEventsCredentialStatus,
 } from '../../src/services/stockevents-api'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
@@ -51,7 +53,7 @@ const btcBuy: Transaction = {
   description: 'Compra 0.0047 BTC',
 }
 
-function seedState(transactions: Transaction[]): void {
+function seedState(transactions: Transaction[], tradesToCash = false): void {
   useFinancialStateStore().reloadState(
     normalizeState({
       accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
@@ -60,6 +62,7 @@ function seedState(transactions: Transaction[]): void {
       stockEvents: {
         enabled: true,
         apiKey: '',
+        tradesToCash,
         symbolMappings: [
           { symbol: 'ETH', sync: true, watchlistId: 'wl-1', targetSymbol: '', hidden: false },
         ],
@@ -88,6 +91,7 @@ beforeEach(() => {
     watchlistId: 'wl-1',
     symbol: 'ETH',
   })
+  vi.mocked(checkStockEventsSymbols).mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -140,6 +144,18 @@ describe('stockEvents syncMovement — skip warning', () => {
   })
 })
 
+it('comprueba el ticker cripto efectivo en Stock Events', async () => {
+  seedState([ethBuy])
+  const store = useStockEventsStore()
+  await store.initializeCredential()
+
+  await store.checkSymbols()
+
+  expect(checkStockEventsSymbols).toHaveBeenCalledWith([
+    { symbol: 'ETH.CRYPTO', watchlistId: 'wl-1' },
+  ])
+})
+
 describe('stockEvents syncMovement — éxito y fallo', () => {
   it('envía la compra de ETH con el payload correcto y devuelve synced', async () => {
     seedState([ethBuy])
@@ -152,14 +168,14 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
     expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
     expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
       watchlistId: 'wl-1',
-      symbol: 'ETH',
+      symbol: 'ETH.CRYPTO',
       date: '2026-07-15T10:30:00Z',
       change: 0.0047,
       price: 2110.3,
       priceCurrency: 'EUR',
       type: 'buy',
     })
-    expect(toastText()).toBe('Movimiento de ETH sincronizado con Stock Events.')
+    expect(toastText()).toBe('Movimiento de ETH.CRYPTO sincronizado con Stock Events.')
   })
 
   it('devuelve failed cuando Stock Events rechaza la petición', async () => {
@@ -187,7 +203,7 @@ describe('investment store — reenvío manual', () => {
     expect(result).toBe(true)
     expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
     expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
-      symbol: 'ETH',
+      symbol: 'ETH.CRYPTO',
       change: 0.0047,
       price: 2110.3,
     })
@@ -247,11 +263,44 @@ describe('investment store — sincronización al editar', () => {
     expect(saved).toBe(true)
     expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
     expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
-      symbol: 'ETH',
+      symbol: 'ETH.CRYPTO',
       date: '2026-07-16T11:45:00Z',
       change: 0.0047,
       price: 2110.3,
       type: 'buy',
     })
+  })
+})
+
+describe('stockEvents syncMovement — ajuste global de efectivo', () => {
+  it('no envía toCash cuando el ajuste está desactivado', async () => {
+    seedState([ethBuy])
+    const store = useStockEventsStore()
+    await store.initializeCredential()
+
+    await store.syncMovement(ethBuy)
+
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
+  })
+
+  it('el reenvío manual descuenta efectivo cuando el ajuste está activado', async () => {
+    seedState([ethBuy], true)
+    await useStockEventsStore().initializeCredential()
+
+    await useInvestmentStore().resyncMovement(ethBuy.id)
+
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
+      toCash: true,
+    })
+  })
+
+  it('la opción del movimiento prevalece sobre el ajuste global', async () => {
+    seedState([ethBuy], true)
+    const store = useStockEventsStore()
+    await store.initializeCredential()
+
+    await store.syncMovement(ethBuy, { toCash: false })
+
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
   })
 })
