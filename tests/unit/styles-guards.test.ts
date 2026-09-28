@@ -89,21 +89,39 @@ function contrastRatio(foreground: string, background: string): number {
   return (lighter + 0.05) / (darker + 0.05)
 }
 
-/**
- * Text tokens and the surfaces they are meant to sit on. `--text-faint` is
- * left out on purpose: it is for placeholders and decoration, not for text
- * that has to be read. `--income` / `--expense` are fill colors; text uses
- * `--gain` / `--loss`.
- */
+/** Every token the app paints text with, and the surfaces that text sits on. */
 const PAGE_SURFACES = ['--bg-main', '--bg-panel', '--bg-subtle', '--bg-elevated']
 const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--text-main', surfaces: PAGE_SURFACES },
   { text: '--text-muted', surfaces: PAGE_SURFACES },
+  { text: '--text-faint', surfaces: PAGE_SURFACES },
   { text: '--gain', surfaces: PAGE_SURFACES },
   { text: '--loss', surfaces: PAGE_SURFACES },
+  { text: '--primary', surfaces: PAGE_SURFACES },
+  { text: '--income', surfaces: PAGE_SURFACES },
+  { text: '--expense', surfaces: PAGE_SURFACES },
+  { text: '--invest', surfaces: PAGE_SURFACES },
+  { text: '--accent', surfaces: PAGE_SURFACES },
   { text: '--ink-text', surfaces: ['--bg-sidebar'] },
   { text: '--ink-muted', surfaces: ['--bg-sidebar'] },
 ]
+
+/**
+ * Pairs that were already below AA when the guard landed. The list only
+ * shrinks: fix the token (or move its text to --gain / --loss) and delete the
+ * entry — the test fails while a listed pair passes. Never add to it.
+ * `--text-faint` is meant for placeholders and decoration; `--income` /
+ * `--expense` are fills whose text counterparts are `--gain` / `--loss`.
+ */
+const KNOWN_BELOW_AA = new Set([
+  ...PAGE_SURFACES.map((surface) => `light --text-faint on ${surface}`),
+  ...PAGE_SURFACES.map((surface) => `dark --text-faint on ${surface}`),
+  'light --primary on --bg-main',
+  'light --primary on --bg-subtle',
+  ...PAGE_SURFACES.map((surface) => `light --income on ${surface}`),
+  ...PAGE_SURFACES.map((surface) => `light --expense on ${surface}`),
+  ...PAGE_SURFACES.map((surface) => `light --accent on ${surface}`),
+])
 
 const AA_NORMAL_TEXT = 4.5
 
@@ -111,11 +129,18 @@ describe('token contrast (WCAG AA, normal text)', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const { text, surfaces } of TEXT_PAIRS) {
       for (const surface of surfaces) {
-        it(`${text} on ${surface} in ${theme}`, () => {
-          const ratio = contrastRatio(hexColor(theme, text), hexColor(theme, surface))
+        const pair = `${theme} ${text} on ${surface}`
+        const ratio = () => contrastRatio(hexColor(theme, text), hexColor(theme, surface))
 
-          expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
-        })
+        if (KNOWN_BELOW_AA.has(pair)) {
+          it(`${pair} is still below AA (known; remove it from the list once fixed)`, () => {
+            expect(ratio()).toBeLessThan(AA_NORMAL_TEXT)
+          })
+        } else {
+          it(`${pair} meets AA`, () => {
+            expect(ratio()).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+          })
+        }
       }
     }
   }
