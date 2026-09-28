@@ -77,7 +77,7 @@ test.describe("Finance tracker E2E", () => {
       {
         open: () => tracker.openInvestment(),
         path: /\/inversion$/,
-        heading: "Inversión y aportes",
+        heading: "Inversión",
       },
       {
         open: () => tracker.openGoals(),
@@ -100,7 +100,7 @@ test.describe("Finance tracker E2E", () => {
       await tab.open();
       await expect(page).toHaveURL(tab.path);
       await expect(
-        page.getByRole("heading", { name: tab.heading }),
+        page.getByRole("heading", { name: tab.heading, exact: true }),
       ).toBeVisible();
     }
   });

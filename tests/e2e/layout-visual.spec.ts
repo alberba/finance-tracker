@@ -20,6 +20,51 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
   data: 'Datos',
 }
 
+/**
+ * Sections and views whose touch targets were already under 24 px when the
+ * scan started looking at the active section (it used to find none). The list
+ * only shrinks: each zone's migration fixes its targets and removes its entry.
+ */
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals', 'settings', 'investment-recurring'])
+
+/** Investment views beyond the default tab: expanded row, sub-tabs and dialog. */
+const INVESTMENT_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  /** Scrolled into view for the snapshot instead of the top of the page. */
+  focus?: string
+}> = [
+  {
+    name: 'investment-position',
+    focus: '#investment [data-ledger-detail]',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentDashboardTab()
+      await page.locator('#investment [data-position]').first().click()
+      await expect(page.locator('#investment-asset-chart')).toBeVisible()
+    },
+  },
+  { name: 'investment-movements', open: (_page, tracker) => tracker.openInvestmentMovementsTab() },
+  {
+    name: 'investment-contributions',
+    open: (_page, tracker) => tracker.openInvestmentContributionsTab(),
+  },
+  { name: 'investment-recurring', open: (_page, tracker) => tracker.openInvestmentRecurringTab() },
+  {
+    name: 'investment-contribution-dialog',
+    open: (_page, tracker) => tracker.openContributionWorkflowModal(),
+  },
+  {
+    name: 'investment-contribution-delete-dialog',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentContributionsTab()
+      await page.locator('button[data-delete-contribution-date]').first().click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+    },
+  },
+]
+
+const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
+
 type LayoutIssue = {
   container: string
   first: string
@@ -35,9 +80,9 @@ type LayoutScanResult = {
   undersizedInteractiveElements: string[]
 }
 
-async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
-  return await page.evaluate(() => {
-    const activePanel = document.querySelector<HTMLElement>('.panel.is-active')
+async function getLayoutScanResult(page: Page, sectionId: FinanceSectionId): Promise<LayoutScanResult> {
+  return await page.evaluate((id) => {
+    const activePanel = document.getElementById(id)
     const overlapIssues: LayoutIssue[] = []
     const undersizedInteractiveElements: string[] = []
     const viewportWidth = document.documentElement.clientWidth
@@ -90,6 +135,10 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
     for (const container of containers) {
       const children = Array.from(container.children).filter((node): node is HTMLElement => {
         if (!(node instanceof HTMLElement)) {
+          return false
+        }
+        // An open modal dialog sits in the top layer, over the page on purpose.
+        if (node.matches('dialog:modal')) {
           return false
         }
         const styles = window.getComputedStyle(node)
@@ -167,7 +216,7 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
       overlapIssues: overlapIssues.slice(0, 10),
       undersizedInteractiveElements: undersizedInteractiveElements.slice(0, 10),
     }
-  })
+  }, sectionId)
 }
 
 async function openSectionForLayout(
@@ -193,19 +242,22 @@ async function openSectionForLayout(
 /** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
 const SNAPSHOT_NOW = new Date('2026-09-15T10:00:00+02:00')
 
-async function expectSectionSnapshot(
+async function expectViewSnapshot(
   page: Page,
   tracker: FinanceTrackerPage,
-  sectionId: FinanceSectionId,
+  open: () => Promise<void>,
   name: string,
+  focus?: string,
 ): Promise<void> {
   await page.clock.setFixedTime(SNAPSHOT_NOW)
   await tracker.goto()
-  await openSectionForLayout(page, tracker, sectionId)
-  await page.evaluate(async () => {
+  await open()
+  await page.evaluate(async (selector) => {
     await document.fonts.ready
-    window.scrollTo(0, 0)
-  })
+    const target = selector ? document.querySelector(selector) : null
+    if (target) target.scrollIntoView({ block: 'center' })
+    else window.scrollTo(0, 0)
+  }, focus)
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
     caret: 'hide',
@@ -214,18 +266,36 @@ async function expectSectionSnapshot(
   })
 }
 
+async function expectSectionSnapshot(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  sectionId: FinanceSectionId,
+  name: string,
+): Promise<void> {
+  await expectViewSnapshot(page, tracker, () => openSectionForLayout(page, tracker, sectionId), name)
+}
+
+async function expectSoundLayout(
+  page: Page,
+  sectionId: FinanceSectionId,
+  view: string = sectionId,
+): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+  })
+  const scan = await getLayoutScanResult(page, sectionId)
+  expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
+  expect(scan.overlapIssues).toEqual([])
+  if (!KNOWN_UNDERSIZED_TARGETS.has(view)) {
+    expect(scan.undersizedInteractiveElements).toEqual([])
+  }
+}
+
 test.describe('UI layout integrity', { tag: '@visual' }, () => {
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
       await openSectionForLayout(page, tracker, sectionId)
-      await page.evaluate(async () => {
-        await document.fonts.ready
-      })
-
-      const scan = await getLayoutScanResult(page)
-      expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
-      expect(scan.overlapIssues).toEqual([])
-      expect(scan.undersizedInteractiveElements).toEqual([])
+      await expectSoundLayout(page, sectionId)
     })
 
     test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
@@ -245,4 +315,56 @@ test.describe('UI layout integrity · tema oscuro', { tag: '@visual' }, () => {
       await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}-dark.png`)
     })
   }
+})
+
+test.describe('Inversión · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of INVESTMENT_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'investment', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of INVESTMENT_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "investment" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openInvestment()
+      await expectSoundLayout(page, 'investment')
+    })
+
+    for (const view of INVESTMENT_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'investment', view.name)
+      })
+    }
+  })
 })
