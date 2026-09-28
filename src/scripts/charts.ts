@@ -7,6 +7,9 @@ import {
   type TooltipOptions,
 } from 'chart.js'
 
+import { formatAxisLabel } from '../lib/format'
+import { readChartTheme, resolveColor } from './chart-theme'
+
 Chart.register(...registerables)
 
 declare global {
@@ -25,21 +28,19 @@ type ValueFormatter = (value: number) => string
    "Editorial" chart language: minimal chrome, hairline grids with no
    axis borders, thin smooth lines with gradient fills and no resting
    point markers, slim rounded bars, fine donut ring, refined legends.
-   Colors are read from CSS custom properties at render time so charts
-   follow the active light/dark theme (re-rendered on theme switch).
+   Colors and axis type come from the design tokens (chart-theme.ts) at
+   render time, so charts follow the active light/dark theme (re-rendered
+   on theme switch). Series colors may be token references (`var(--…)`).
    ────────────────────────────────────────────────────────────────── */
-function cssVar(name: string, fallback: string): string {
-  if (typeof document === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return value || fallback
-}
-const axisColor = () => cssVar('--chart-axis', '#7b8b8d')
-const gridColor = () => cssVar('--chart-grid', '#edf3f0')
-const legendColor = () => cssVar('--chart-legend', '#516164')
-const pointBorderColorVar = () => cssVar('--chart-point-border', '#ffffff')
-const emptyColor = () => cssVar('--chart-empty', '#e2ece7')
+const axisColor = () => readChartTheme().axis
+const gridColor = () => readChartTheme().grid
+const legendColor = () => readChartTheme().legend
+const pointBorderColorVar = () => readChartTheme().pointBorder
+const emptyColor = () => readChartTheme().empty
 
+// Legends name series (text, body font); axes carry figures (display font).
 const FONT_FAMILY = "'DM Sans', system-ui, sans-serif"
+const axisFont = (size: number) => ({ size, family: readChartTheme().fontFamily })
 
 // Append 8-bit alpha to a 6-digit hex color (e.g. "#3B6BF0" + 0.2 -> "#3B6BF033").
 function withAlpha(color: string, alpha: number): string {
@@ -96,19 +97,19 @@ function baseScales(
       grid: { display: false },
       border: { display: false },
       ticks: {
-        font: { size: 10, family: FONT_FAMILY },
+        font: axisFont(10),
         color: colors.axis || axisColor(),
         maxRotation: 0,
         autoSkipPadding: 16,
         padding: 6,
-        callback: (_value: string | number, index: number) => (labels[index] || '').slice(0, 3),
+        callback: (_value: string | number, index: number) => formatAxisLabel(labels[index]),
       },
     },
     y: {
       grid: { color: colors.grid || gridColor(), drawTicks: false, lineWidth: 1 },
       border: { display: false },
       ticks: {
-        font: { size: 10, family: FONT_FAMILY },
+        font: axisFont(10),
         color: colors.axis || axisColor(),
         maxTicksLimit: 5,
         padding: 10,
@@ -164,8 +165,11 @@ export interface DonutChartItem {
 
 export interface MultiLineSeries {
   name: string
+  /** A color or a token reference (`var(--chart-series-1)`). */
   color: string
   values: number[]
+  /** Dashed line, for reference series such as contributed capital. */
+  dashed?: boolean
 }
 
 export interface MultiLineChartOptions {
@@ -372,19 +376,19 @@ export function renderGroupedBarChart(
           grid: { display: false },
           border: { display: false },
           ticks: {
-            font: { size: 10, family: FONT_FAMILY },
+            font: axisFont(10),
             color: axisColor(),
             maxRotation: 0,
             padding: 6,
             callback: (_value: string | number, index: number) =>
-              (Array.from(labels)[index] || '').slice(0, 3),
+              formatAxisLabel(Array.from(labels)[index]),
           },
         },
         y: {
           grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
           border: { display: false },
           ticks: {
-            font: { size: 10, family: FONT_FAMILY },
+            font: axisFont(10),
             color: axisColor(),
             maxTicksLimit: 5,
             padding: 10,
@@ -559,7 +563,7 @@ export function renderHorizontalBarChart(
           grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
           border: { display: false },
           ticks: {
-            font: { size: 10, family: FONT_FAMILY },
+            font: axisFont(10),
             color: axisColor(),
             maxTicksLimit: 5,
             padding: 8,
@@ -571,7 +575,7 @@ export function renderHorizontalBarChart(
           grid: { display: false },
           border: { display: false },
           ticks: {
-            font: { size: 11, family: FONT_FAMILY },
+            font: axisFont(11),
             color: axisColor(),
             padding: 6,
           },
@@ -635,15 +639,19 @@ export function renderMultiLineChart(
     type: 'line',
     data: {
       labels,
-      datasets: series.map((s) => ({
-        label: s.name,
-        data: s.values.map((v) => Number(v || 0)),
-        borderColor: s.color,
-        backgroundColor: s.color,
-        pointBackgroundColor: s.color,
-        pointBorderColor: pointBorderColorVar(),
-        ...lineCommon,
-      })),
+      datasets: series.map((s) => {
+        const color = resolveColor(s.color)
+        return {
+          label: s.name,
+          data: s.values.map((v) => Number(v || 0)),
+          borderColor: color,
+          backgroundColor: color,
+          pointBackgroundColor: color,
+          pointBorderColor: pointBorderColorVar(),
+          borderDash: s.dashed ? [6, 5] : undefined,
+          ...lineCommon,
+        }
+      }),
     },
     options: {
       responsive: true,

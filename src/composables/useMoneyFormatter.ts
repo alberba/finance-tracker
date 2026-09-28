@@ -1,27 +1,13 @@
 import { computed } from 'vue'
 
+import { formatMoney as formatMoneyIn, formatSignedMoney as formatSignedMoneyIn } from '../lib/format'
 import { useFinancialStateStore } from '../stores/financial-state'
 
 /**
- * Currency formatter bound to the active state currency, mirroring the legacy
- * `formatMoney` helper (es-ES, 2 decimals) so migrated sections render amounts
- * identically.
+ * Money formatters from `lib/format` bound to the active state currency.
  */
 export function useMoneyFormatter() {
   const financialStateStore = useFinancialStateStore()
-
-  const formatter = computed(() => {
-    const currency = (financialStateStore.currency || 'EUR').toUpperCase()
-    try {
-      return new Intl.NumberFormat('es-ES', {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: 2,
-      })
-    } catch {
-      return null
-    }
-  })
 
   const compactFormatter = computed(() => {
     const currency = (financialStateStore.currency || 'EUR').toUpperCase()
@@ -38,12 +24,11 @@ export function useMoneyFormatter() {
   })
 
   function formatMoney(value: unknown): string {
-    const numeric = Number(value || 0)
-    const instance = formatter.value
-    if (!instance) {
-      return `${numeric.toFixed(2)} ${(financialStateStore.currency || 'EUR').toUpperCase()}`
-    }
-    return instance.format(numeric)
+    return formatMoneyIn(value, financialStateStore.currency || 'EUR')
+  }
+
+  function formatSignedMoney(value: unknown): string {
+    return formatSignedMoneyIn(value, financialStateStore.currency || 'EUR')
   }
 
   function formatMoneyCompact(value: unknown): string {
@@ -54,5 +39,5 @@ export function useMoneyFormatter() {
     return instance.format(Number(value || 0))
   }
 
-  return { formatMoney, formatMoneyCompact }
+  return { formatMoney, formatSignedMoney, formatMoneyCompact }
 }

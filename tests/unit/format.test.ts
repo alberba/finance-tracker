@@ -1,0 +1,137 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  formatAxisLabel,
+  formatLongDate,
+  formatMoney,
+  formatMonthYear,
+  formatPercent,
+  formatQuotePrice,
+  formatShortDate,
+  formatSignedMoney,
+  formatStamp,
+  MINUS,
+  splitDecimals,
+} from '../../src/lib/format'
+
+const NBSP = ' '
+
+describe('formatMoney', () => {
+  it('formatea en es-ES con dos decimales y el símbolo al final', () => {
+    expect(formatMoney(15850)).toBe(`15.850,00${NBSP}€`)
+    expect(formatMoney(3.5)).toBe(`3,50${NBSP}€`)
+  })
+
+  it('usa la moneda que se le pasa', () => {
+    expect(formatMoney(12, 'USD')).toBe(`12,00${NBSP}US$`)
+  })
+
+  it('trata lo que no es número como cero', () => {
+    expect(formatMoney(undefined)).toBe(`0,00${NBSP}€`)
+    expect(formatMoney('abc')).toBe(`0,00${NBSP}€`)
+  })
+
+  it('cae a un formato plano si la moneda no es válida', () => {
+    expect(formatMoney(12, 'XX')).toBe('12.00 XX')
+  })
+})
+
+describe('formatQuotePrice', () => {
+  it('conserva hasta seis decimales en la moneda de la cotización', () => {
+    expect(formatQuotePrice(0.000123, 'EUR')).toBe(`0,000123${NBSP}€`)
+    expect(formatQuotePrice(58412, 'EUR')).toBe(`58.412,00${NBSP}€`)
+  })
+
+  it('cae a un formato plano si la moneda no es válida', () => {
+    expect(formatQuotePrice(1.5, 'XX')).toBe('1.50 XX')
+  })
+})
+
+describe('formatSignedMoney', () => {
+  it('antepone + a las ganancias y el menos tipográfico a las pérdidas', () => {
+    expect(formatSignedMoney(374.59)).toBe(`+374,59${NBSP}€`)
+    expect(formatSignedMoney(-12)).toBe(`${MINUS}12,00${NBSP}€`)
+  })
+
+  it('deja el cero sin signo', () => {
+    expect(formatSignedMoney(0)).toBe(`0,00${NBSP}€`)
+  })
+})
+
+describe('formatPercent', () => {
+  it('usa coma decimal y espacio fino antes del símbolo', () => {
+    expect(formatPercent(3.5)).toBe(`3,50${NBSP}%`)
+    expect(formatPercent(43.456, { digits: 1 })).toBe(`43,5${NBSP}%`)
+  })
+
+  it('con signo, marca ganancias con + y pérdidas con −', () => {
+    expect(formatPercent(3.5, { signed: true })).toBe(`+3,50${NBSP}%`)
+    expect(formatPercent(-31.47, { signed: true })).toBe(`${MINUS}31,47${NBSP}%`)
+    expect(formatPercent(0, { signed: true })).toBe(`0,00${NBSP}%`)
+  })
+
+  it('sin signo, las pérdidas llevan igualmente el menos tipográfico', () => {
+    expect(formatPercent(-1.2)).toBe(`${MINUS}1,20${NBSP}%`)
+  })
+
+  it('no muestra −0 cuando el redondeo deja cero', () => {
+    expect(formatPercent(-0.001, { signed: true })).toBe(`0,00${NBSP}%`)
+  })
+})
+
+describe('splitDecimals', () => {
+  it('separa la parte entera de los decimales y la moneda', () => {
+    expect(splitDecimals(`11.062,68${NBSP}€`)).toEqual({ whole: '11.062', rest: `,68${NBSP}€` })
+  })
+
+  it('devuelve todo como parte entera si no hay decimales', () => {
+    expect(splitDecimals('—')).toEqual({ whole: '—', rest: '' })
+  })
+})
+
+describe('fechas', () => {
+  it('formatShortDate da día, mes abreviado y año', () => {
+    expect(formatShortDate('2026-07-15')).toBe('15 jul 2026')
+  })
+
+  it('formatLongDate da la fecha completa', () => {
+    expect(formatLongDate('2026-07-31')).toBe('31 de julio de 2026')
+  })
+
+  it('formatStamp da día/mes y hora de un instante', () => {
+    expect(formatStamp('2026-09-26T08:42:00Z', 'Europe/Madrid')).toBe('26/09, 10:42')
+  })
+
+  it('devuelve una raya para fechas vacías o inválidas', () => {
+    expect(formatShortDate('')).toBe('—')
+    expect(formatLongDate('no-date')).toBe('—')
+    expect(formatStamp('')).toBe('—')
+  })
+})
+
+describe('formatMonthYear', () => {
+  it('da el mes con mayúscula inicial y el año', () => {
+    expect(formatMonthYear(6, 2026)).toBe('Julio 2026')
+    expect(formatMonthYear(0, 2025)).toBe('Enero 2025')
+  })
+
+  it('devuelve solo el año si el mes no existe', () => {
+    expect(formatMonthYear(12, 2026)).toBe('2026')
+  })
+})
+
+describe('formatAxisLabel', () => {
+  it('abrevia los nombres de mes a tres letras', () => {
+    expect(formatAxisLabel('ENERO')).toBe('ENE')
+    expect(formatAxisLabel('Septiembre')).toBe('Sep')
+  })
+
+  it('no corta etiquetas de fecha', () => {
+    expect(formatAxisLabel('01/01')).toBe('01/01')
+    expect(formatAxisLabel('28/02')).toBe('28/02')
+  })
+
+  it('devuelve cadena vacía para etiquetas ausentes', () => {
+    expect(formatAxisLabel(undefined)).toBe('')
+  })
+})
