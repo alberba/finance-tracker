@@ -1,11 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /**
  * Guards for the style architecture of ADR 0004
  * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): the legacy
- * sheet can only shrink, it stays below Tailwind in the cascade, and the
- * text/surface token pairs keep AA contrast in both themes.
+ * sheet can only shrink, it stays below Tailwind in the cascade, the
+ * text/surface token pairs keep AA contrast in both themes, and every CSS
+ * variable the code reads is defined somewhere.
  */
 
 const globalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8')
@@ -144,4 +145,30 @@ describe('token contrast (WCAG AA, normal text)', () => {
       }
     }
   }
+})
+
+const srcDir = new URL('../../src/', import.meta.url)
+const sourceFiles = (readdirSync(srcDir, { recursive: true }) as string[])
+  .filter((path) => /\.(vue|astro|ts|js|css)$/.test(path))
+  .map((path) => ({ path, text: readFileSync(new URL(path, srcDir), 'utf8') }))
+
+describe('CSS variables', () => {
+  it('only reads variables that some source defines', () => {
+    const defined = new Set<string>()
+    for (const { text } of sourceFiles) {
+      // Declarations (`--x: …`) and names set from code (`'--x'`).
+      for (const [, name] of text.matchAll(/(--[a-zA-Z][\w-]*)\s*:/g)) defined.add(name)
+      for (const [, name] of text.matchAll(/['"`](--[a-zA-Z][\w-]*)['"`]/g)) defined.add(name)
+    }
+
+    const undefinedReads = sourceFiles.flatMap(({ path, text }) =>
+      // `var(--x)` in CSS and scoped styles, `bg-(--x)` in Tailwind classes.
+      [...text.matchAll(/var\(\s*(--[a-zA-Z][\w-]*)|[a-z]-\((--[a-zA-Z][\w-]*)/g)]
+        .map((match) => match[1] ?? match[2])
+        .filter((name) => !name.startsWith('--tw-') && !defined.has(name))
+        .map((name) => `${path}: ${name}`),
+    )
+
+    expect(undefinedReads).toEqual([])
+  })
 })
