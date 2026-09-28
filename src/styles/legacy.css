@@ -1,14 +1,11 @@
 /*
-  Finance Tracker — "Aurora Ledger" design system
-  Syne (display) · DM Sans (UI) · DM Mono (numbers)
-  Dual theme: refined light (default) + dark fintech.
-  Theme is driven by  :root[data-theme="dark"]  (set before paint).
-  ─────────────────────────────────────────────────────────────────
+  Legacy stylesheet — frozen (ADR 0004). No new rules: it only shrinks, zone
+  by zone, as each screen moves to utilities and base components.
+  tests/unit/styles-guards.test.ts pins a line ceiling that only goes down.
+
   Imported into the `legacy` layer (see global.css), below components and
-  utilities, so any Tailwind utility beats these rules.
-  NOTE: variable names below are part of the contract — they are
-  referenced from JS template strings and Tailwind arbitrary values
-  (e.g. bg-[var(--bg-panel)]). Rename values freely, not the keys.
+  utilities, so any Tailwind utility beats these rules. Theme tokens (light
+  and dark) live in global.css.
 */
 
 /* ══ BRIDGE · legacy control base ═══════════════════════════════ */
@@ -164,130 +161,6 @@
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--ring);
   }
-}
-
-/* ══ TOKENS · LIGHT (default) ════════════════════════════════════ */
-:root {
-  color-scheme: light;
-
-  /* Surfaces */
-  --bg-main: #eef1f6;
-  --bg-panel: #ffffff;
-  --bg-card: #ffffff;
-  --bg-subtle: #f3f5fa;
-  --bg-sidebar: #0b1120; /* dark "ink" surface — sidebar, hero, dialogs head, toast */
-  --bg-elevated: #ffffff;
-
-  /* Text */
-  --text-main: #0d1626;
-  --text-muted: #5a6678;
-  --text-faint: #95a0b1;
-  --ink-text: #e7ecf5; /* text placed on the dark ink surface */
-  --ink-muted: #8195b2;
-
-  /* Brand / interaction */
-  --primary: #3b6bf0;
-  --primary-dark: #2a53d4;
-  --primary-light: #eaf0fe;
-
-  /* Semantic */
-  --income: #0e9f6e;
-  --income-bg: #e6f7f0;
-  --expense: #e0463f;
-  --expense-bg: #fdeceb;
-  --invest: #6a52e8;
-  --invest-bg: #ece9fd;
-  --accent: #f59e0b;
-
-  /* Structure */
-  --line: #e4e8f1;
-  --line-strong: #ccd4e1;
-  --track-bg: #e7ebf3;
-
-  /* Shape */
-  --radius-lg: 18px;
-  --radius-md: 11px;
-  --radius-sm: 7px;
-
-  /* Shadows */
-  --shadow-soft: 0 1px 2px rgba(13, 22, 38, 0.04), 0 8px 24px rgba(13, 22, 38, 0.06);
-  --shadow-card: 0 0 0 1px rgba(13, 22, 38, 0.05);
-  --shadow-raised: 0 18px 50px rgba(13, 22, 38, 0.16);
-  --shadow-pop: 0 12px 36px rgba(13, 22, 38, 0.14);
-
-  /* Overlays / glows */
-  --overlay: rgba(11, 17, 32, 0.5);
-  --ring: color-mix(in srgb, var(--primary) 26%, transparent);
-  --glass-edge: rgba(255, 255, 255, 0.7);
-
-  /* Aurora backdrop accents */
-  --aurora-1: rgba(59, 107, 240, 0.16);
-  --aurora-2: rgba(106, 82, 232, 0.13);
-  --aurora-3: rgba(14, 159, 110, 0.1);
-
-  /* Charts */
-  --chart-axis: #7c8798;
-  --chart-grid: #e9edf4;
-  --chart-legend: #5a6678;
-  --chart-point-border: #ffffff;
-  --chart-empty: #e4e8f1;
-  --chart-center-label: #8693a4;
-  --chart-center-value: #0d1626;
-}
-
-/* ══ TOKENS · DARK ═══════════════════════════════════════════════ */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  --bg-main: #07080b;
-  --bg-panel: #121419;
-  --bg-card: #121419;
-  --bg-subtle: #1a1d25;
-  --bg-sidebar: #0c0e13;
-  --bg-elevated: #161922;
-
-  --text-main: #eceff5;
-  --text-muted: #9aa4b4;
-  --text-faint: #626b7b;
-  --ink-text: #e7ecf5;
-  --ink-muted: #8c99b2;
-
-  --primary: #5e8bff;
-  --primary-dark: #4a74ec;
-  --primary-light: #182238;
-
-  --income: #34d399;
-  --income-bg: #0e2a20;
-  --expense: #f87171;
-  --expense-bg: #2e1718;
-  --invest: #a78bfa;
-  --invest-bg: #211b38;
-  --accent: #fbbf24;
-
-  --line: #262a33;
-  --line-strong: #3a4150;
-  --track-bg: #23262f;
-
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-raised: 0 24px 60px rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 16px 44px rgba(0, 0, 0, 0.55);
-
-  --overlay: rgba(0, 0, 0, 0.62);
-  --ring: color-mix(in srgb, var(--primary) 40%, transparent);
-  --glass-edge: rgba(255, 255, 255, 0.06);
-
-  --aurora-1: rgba(94, 139, 255, 0.16);
-  --aurora-2: rgba(167, 139, 250, 0.14);
-  --aurora-3: rgba(52, 211, 153, 0.1);
-
-  --chart-axis: #8a93a3;
-  --chart-grid: #21252e;
-  --chart-legend: #9aa4b4;
-  --chart-point-border: #121419;
-  --chart-empty: #23262f;
-  --chart-center-label: #8a93a3;
-  --chart-center-value: #eceff5;
 }
 
 /* ══ RESET ═══════════════════════════════════════════════════════ */

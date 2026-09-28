@@ -1,6 +1,9 @@
-/* Cascade order. legacy.css sits below components and utilities, so a
-   Tailwind utility always beats a legacy rule whatever its specificity.
+/* Global CSS: cascade order, theme tokens and the Tailwind theme. Styles for a
+   screen live with its component (ADR 0004); legacy.css only shrinks.
    See docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md. */
+
+/* Cascade order. legacy.css sits below components and utilities, so a
+   Tailwind utility always beats a legacy rule whatever its specificity. */
 @layer theme, base, legacy, components, utilities;
 
 @import 'tailwindcss';
@@ -10,10 +13,140 @@
    would override it now that utilities win. Remove with the legacy class. */
 @source not inline('list-item');
 
-/* Font families exposed as Tailwind-native tokens so components can use
-   `font-sans` / `font-display` / `font-mono` utilities instead of raw
-   `font-family` declarations. See legacy.css header for the design system. */
+/* `dark:` follows the app theme attribute, not prefers-color-scheme. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/*
+  Theme tokens — "Aurora Ledger". Light is the default; dark applies under
+  :root[data-theme='dark'] (set before paint). The @theme blocks below expose
+  them as utilities; prefer those (bg-panel, text-gain…) over var(--…).
+  NOTE: variable names are part of the contract — they are referenced from
+  JS template strings, chart code and scoped styles. Rename values, not keys.
+*/
+@layer base {
+  /* ══ TOKENS · LIGHT (default) ══════════════════════════════════ */
+  :root {
+    color-scheme: light;
+
+    /* Surfaces */
+    --bg-main: #eef1f6;
+    --bg-panel: #ffffff;
+    --bg-card: #ffffff;
+    --bg-subtle: #f3f5fa;
+    --bg-sidebar: #0b1120; /* dark "ink" surface — sidebar, hero, dialogs head, toast */
+    --bg-elevated: #ffffff;
+
+    /* Text */
+    --text-main: #0d1626;
+    --text-muted: #5a6678;
+    --text-faint: #95a0b1; /* placeholders and decoration; below AA, not for text to read */
+    --ink-text: #e7ecf5; /* text placed on the dark ink surface */
+    --ink-muted: #8195b2;
+
+    /* Brand / interaction */
+    --primary: #3b6bf0;
+    --primary-light: #eaf0fe;
+
+    /* Semantic */
+    --income: #0e9f6e;
+    --income-bg: #e6f7f0;
+    --expense: #e0463f;
+    --expense-bg: #fdeceb;
+    --invest: #6a52e8;
+    --invest-bg: #ece9fd;
+    --accent: #f59e0b;
+
+    /* Gain / loss text: income and expense hues darkened to reach AA
+       (4.5:1) on every light surface. */
+    --gain: #0b7c56;
+    --loss: #d02922;
+
+    /* Structure */
+    --line: #e4e8f1;
+    --line-strong: #ccd4e1;
+    --track-bg: #e7ebf3;
+
+    /* Elevation — exposed as --shadow-* in @theme below */
+    --elevation-soft: 0 1px 2px rgba(13, 22, 38, 0.04), 0 8px 24px rgba(13, 22, 38, 0.06);
+    --elevation-card: 0 0 0 1px rgba(13, 22, 38, 0.05);
+    --elevation-raised: 0 18px 50px rgba(13, 22, 38, 0.16);
+    --elevation-pop: 0 12px 36px rgba(13, 22, 38, 0.14);
+
+    /* Overlays / glows */
+    --overlay: rgba(11, 17, 32, 0.5);
+    --ring: color-mix(in srgb, var(--primary) 26%, transparent);
+
+    /* Aurora backdrop accents */
+    --aurora-1: rgba(59, 107, 240, 0.16);
+    --aurora-2: rgba(106, 82, 232, 0.13);
+    --aurora-3: rgba(14, 159, 110, 0.1);
+
+    /* Charts */
+    --chart-axis: #7c8798;
+    --chart-grid: #e9edf4;
+    --chart-legend: #5a6678;
+    --chart-point-border: #ffffff;
+    --chart-empty: #e4e8f1;
+  }
+
+  /* ══ TOKENS · DARK ═════════════════════════════════════════════ */
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --bg-main: #07080b;
+    --bg-panel: #121419;
+    --bg-card: #121419;
+    --bg-subtle: #1a1d25;
+    --bg-sidebar: #0c0e13;
+    --bg-elevated: #161922;
+
+    --text-main: #eceff5;
+    --text-muted: #9aa4b4;
+    --text-faint: #626b7b;
+    --ink-text: #e7ecf5;
+    --ink-muted: #8c99b2;
+
+    --primary: #5e8bff;
+    --primary-light: #182238;
+
+    --income: #34d399;
+    --income-bg: #0e2a20;
+    --expense: #f87171;
+    --expense-bg: #2e1718;
+    --invest: #a78bfa;
+    --invest-bg: #211b38;
+    --accent: #fbbf24;
+
+    --gain: #34d399;
+    --loss: #f87171;
+
+    --line: #262a33;
+    --line-strong: #3a4150;
+    --track-bg: #23262f;
+
+    --elevation-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
+    --elevation-card: 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --elevation-raised: 0 24px 60px rgba(0, 0, 0, 0.6);
+    --elevation-pop: 0 16px 44px rgba(0, 0, 0, 0.55);
+
+    --overlay: rgba(0, 0, 0, 0.62);
+    --ring: color-mix(in srgb, var(--primary) 40%, transparent);
+
+    --aurora-1: rgba(94, 139, 255, 0.16);
+    --aurora-2: rgba(167, 139, 250, 0.14);
+    --aurora-3: rgba(52, 211, 153, 0.1);
+
+    --chart-axis: #8a93a3;
+    --chart-grid: #21252e;
+    --chart-legend: #9aa4b4;
+    --chart-point-border: #121419;
+    --chart-empty: #23262f;
+  }
+}
+
 @theme {
+  /* Typography: display = Syne (400–800), body = DM Sans, numbers and
+     symbols = DM Mono. */
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
@@ -21,9 +154,8 @@
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
   --animate-panel-in: panelIn 0.26s ease;
 
-  /* Brand, semantic and text color tokens — delegate to CSS variables defined
-     in legacy.css (so dark-theme overrides keep working). Exposed as
-     `text-*` / `bg-*` / `border-*` utilities. */
+  /* Colors delegate to the theme-aware variables above, so dark mode needs no
+     `dark:` variant. Exposed as `text-*` / `bg-*` / `border-*` utilities. */
   --color-primary: var(--primary);
   --color-income: var(--income);
   --color-expense: var(--expense);
@@ -32,6 +164,37 @@
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
+
+  /* Surfaces: page background, panels, subtle fills and the dark ink band. */
+  --color-page: var(--bg-main);
+  --color-panel: var(--bg-panel);
+  --color-subtle: var(--bg-subtle);
+  --color-elevated: var(--bg-elevated);
+  --color-ink: var(--bg-sidebar);
+  --color-ink-text: var(--ink-text);
+  --color-ink-muted: var(--ink-muted);
+
+  /* Rules and borders. */
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  /* Gain / loss text tones (AA on every surface, both themes). Pair them
+     with a sign so meaning never depends on color alone. */
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+}
+
+/* Radii and shadows are also read as var(--radius-md) / var(--shadow-soft)
+   from scoped styles Tailwind doesn't process, so `static` always emits them. */
+@theme static {
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+
+  --shadow-soft: var(--elevation-soft);
+  --shadow-card: var(--elevation-card);
+  --shadow-raised: var(--elevation-raised);
+  --shadow-pop: var(--elevation-pop);
 }
 
 @layer utilities {
