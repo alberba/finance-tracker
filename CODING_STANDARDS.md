@@ -56,16 +56,18 @@ Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md` y la not
   (`var(--…)`) y sin `@apply`.
 - El CSS global (`src/styles/global.css`) solo lleva orden de capas, tokens claro y oscuro, reset,
   tipografía base y shell.
-- `src/styles/legacy.css` está congelada: no admite reglas nuevas, solo borrados. Una zona que se
-  migra borra su bloque (y su parte responsive) y baja el techo de líneas de
-  `tests/unit/styles-guards.test.ts` en la misma PR. El techo nunca sube.
+- `src/styles/legacy.css` está congelada: no admite reglas nuevas, solo borrados. Su subcapa
+  `legacy.bridge` (la base de botones, tablas y campos heredados, que vivía en `global.css`) sigue
+  la misma norma. Una zona que se migra borra su bloque (y su parte responsive) y baja el techo de
+  líneas de `tests/unit/styles-guards.test.ts` en la misma PR. El techo nunca sube.
 - El tema oscuro va por tokens: los colores de `@theme` apuntan a variables que cambian con
   `[data-theme=dark]`. Cuando haga falta una variante, `dark:` está ligada a ese atributo, no a
   `prefers-color-scheme`.
 - Texto sobre superficie cumple AA (4,5:1) en claro y en oscuro. Para ganancias y pérdidas se usan
   `text-gain` / `text-loss`, siempre con signo; `--income` / `--expense` son rellenos. `text-faint`
   es para placeholders y decoración, no para texto que haya que leer. Un token de texto nuevo entra
-  en los pares del test de contraste.
+  en los pares del test de contraste. Los pares heredados por debajo de AA están listados en ese
+  test; la lista solo encoge y no admite entradas nuevas.
 - Nada de `style="…"` en línea salvo valores de datos dinámicos (anchos de barra, colores de serie).
 - Los tests localizan por rol, etiqueta, texto o `data-*`, nunca por clases de estilo.
 

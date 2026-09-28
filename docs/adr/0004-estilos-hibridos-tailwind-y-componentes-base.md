@@ -8,7 +8,8 @@ tokens y búsquedas que tenerlo junto al componente.
 Decidimos un híbrido. Las utilidades de Tailwind en la plantilla, solo con tokens de `@theme`,
 son lo predeterminado. Lo que se repite entre ficheros se convierte en un componente base, no en
 una clase global ni en `@apply`. `<style scoped>` queda para lo que las utilidades no expresan
-bien: animaciones, pseudo-elementos, `::backdrop` e internos de librerías. El CSS global se
+bien: animaciones, selectores estructurales y pseudo-elementos, `::backdrop`, internos de
+librerías y `v-bind()`. El CSS global se
 limita a tokens, reset, tipografía base y shell. La hoja heredada se congela en una capa por
 debajo de Tailwind y se vacía por zonas hasta desaparecer.
 
