@@ -93,8 +93,7 @@ function fmt(value: number | undefined, digits: number): string {
 <template>
   <div
     id="investment-tab-movements"
-    class="investment-subtab-panel"
-    :class="{ 'is-active': isActive }"
+    class="grid content-start gap-3.5"
     :hidden="!isActive"
     data-investment-tab-panel="movements"
     role="tabpanel"
