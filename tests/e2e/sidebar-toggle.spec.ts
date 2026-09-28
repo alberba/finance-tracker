@@ -10,6 +10,7 @@ test.describe("Sidebar toggle", () => {
     });
 
     await page.goto("/");
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible();
     await expect(page.locator("#dashboard")).toBeVisible();
 
     expect(

@@ -462,6 +462,7 @@ test.describe("Finance tracker E2E", () => {
   }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible();
     await tracker.openTransactions();
     await expect(
       tracker.transactionsSection.getByRole("heading", {
