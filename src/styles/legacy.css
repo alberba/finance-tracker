@@ -1421,15 +1421,6 @@ dialog {
 }
 
 /* ══ TRANSACTIONS LAYOUT ═════════════════════════════════════════ */
-.tx-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.4fr);
-  gap: 14px;
-  align-items: start;
-}
-.tx-layout > .table-wrap {
-  min-height: 340px;
-}
 .tx-summary-side {
   display: grid;
   gap: 14px;
@@ -2350,11 +2341,6 @@ td select {
 }
 
 /* ══ TAGS ════════════════════════════════════════════════════════ */
-.tag-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
 .tag {
   display: inline-flex;
   align-items: center;
@@ -2460,33 +2446,8 @@ td select {
 #reports {
   gap: 14px;
 }
-.reports-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: 20px;
-  align-items: start;
-  max-width: 1220px;
-  margin-inline: auto;
-  width: 100%;
-}
 .reports-form-card {
   gap: 18px;
-}
-.reports-entry-card {
-  display: grid;
-  gap: 14px;
-  min-height: 100%;
-  align-content: start;
-}
-.reports-entry-card > p:not(.reports-kicker) {
-  max-width: 60ch;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
-.reports-entry-action {
-  justify-self: start;
-  margin-top: 4px;
 }
 .reports-form-head {
   display: grid;
@@ -2584,38 +2545,6 @@ td select {
 }
 #issue-report-status a:hover {
   text-decoration: underline;
-}
-
-.reports-guide-card {
-  gap: 10px;
-  background: var(--bg-subtle);
-}
-.reports-guide-card h3 {
-  color: var(--text-main);
-}
-.reports-guide-list {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-.reports-guide-list code {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.82em;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 14%, var(--bg-panel));
-  color: color-mix(in srgb, var(--primary) 75%, var(--text-main));
-}
-.reports-guide-note {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 9px 13px;
 }
 
 /* ── Global report launcher ───────────────────────────────────── */
@@ -2891,7 +2820,6 @@ td select {
   .cards-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .tx-layout,
   .dual-grid,
   .goal-edit-grid,
   .goal-progress {
@@ -2922,15 +2850,6 @@ td select {
   }
   .tx-dialog-actions {
     justify-content: flex-start;
-  }
-  .reports-layout {
-    grid-template-columns: 1fr;
-  }
-  .budget-block-head {
-    flex-direction: column;
-  }
-  .budget-block-totals {
-    width: 100%;
   }
 }
 
@@ -3137,12 +3056,6 @@ td select {
   .tx-dialog-actions .tx-btn-secondary {
     width: 100%;
   }
-  .budget-block {
-    padding: 16px;
-  }
-  .budget-block-totals {
-    grid-template-columns: 1fr;
-  }
   .mini-form,
   .mini-form.compact-row {
     grid-template-columns: 1fr;
@@ -3154,9 +3067,6 @@ td select {
   #issue-report-submit {
     width: 100%;
     min-width: 0;
-  }
-  .reports-entry-action {
-    width: 100%;
   }
   .global-report-dialog-head {
     padding: 18px 18px 0;

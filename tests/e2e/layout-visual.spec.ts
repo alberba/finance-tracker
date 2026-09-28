@@ -82,7 +82,6 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
             '.settings-head',
             '.mini-form',
             '.data-actions',
-            '.tag-wrap',
           ].join(','),
         ),
       ),
