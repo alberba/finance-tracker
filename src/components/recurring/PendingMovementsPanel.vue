@@ -5,6 +5,7 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore, type PendingMovementEdit } from '../../stores/recurring'
 import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
 import { round2 } from '../../scripts/utils'
+import PanelHeading from '../ui/PanelHeading.vue'
 
 const props = withDefaults(
   defineProps<{ compact?: boolean }>(),
@@ -112,11 +113,9 @@ function saveEdit(): void {
 
   <article v-else-if="!props.compact && pending.length" class="card" data-pending-panel>
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p class="text-primary font-mono text-[0.65rem] tracking-[0.18em] uppercase">Revisión explícita</p>
-        <h3 class="font-display text-xl">Pendientes <span class="text-accent">({{ recurringStore.pendingCount }})</span></h3>
-        <p class="text-text-muted text-sm">No afectan balances ni patrimonio hasta confirmarlos.</p>
-      </div>
+      <PanelHeading kicker="Revisión explícita" description="No afectan balances ni patrimonio hasta confirmarlos.">
+        Pendientes <span class="text-accent">({{ recurringStore.pendingCount }})</span>
+      </PanelHeading>
       <button v-if="recurringStore.pendingCount" type="button" class="secondary-btn" @click="recurringStore.refreshPending()">Buscar vencimientos</button>
     </div>
 

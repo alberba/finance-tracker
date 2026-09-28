@@ -1,136 +1,166 @@
 /*
-  Finance Tracker — "Aurora Ledger" design system
-  Syne (display) · DM Sans (UI) · DM Mono (numbers)
-  Dual theme: refined light (default) + dark fintech.
-  Theme is driven by  :root[data-theme="dark"]  (set before paint).
-  ─────────────────────────────────────────────────────────────────
-  NOTE: variable names below are part of the contract — they are
-  referenced from JS template strings and Tailwind arbitrary values
-  (e.g. bg-[var(--bg-panel)]). Rename values freely, not the keys.
+  Legacy stylesheet — frozen (ADR 0004). No new rules: it only shrinks, zone
+  by zone, as each screen moves to utilities and base components.
+  tests/unit/styles-guards.test.ts pins a line ceiling that only goes down.
+
+  Imported into the `legacy` layer (see global.css), below components and
+  utilities, so any Tailwind utility beats these rules. Theme tokens (light
+  and dark) live in global.css.
 */
 
-/* ══ TOKENS · LIGHT (default) ════════════════════════════════════ */
-:root {
-  color-scheme: light;
+/* ══ BRIDGE · legacy control base ═══════════════════════════════ */
+/* Button, table and field base used only by legacy classes (.primary-btn,
+   .table-wrap, .investment-form…). It sits in the nested `legacy.bridge`
+   layer: below the rest of this sheet, which overrides it where needed, and
+   above preflight. Delete each part with its zone. */
+@layer bridge {
+  /* Shared button base — restores the form-control base the migration dropped,
+     scoped to the legacy btn classes (only used by not-yet-migrated sections)
+     so it can't leak into components already on Tailwind utilities. Colors come
+     from the variant rules further down. */
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn {
+    min-height: 42px;
+    padding: 9px 17px;
+    border: 0;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      box-shadow 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+  .primary-btn:disabled,
+  .secondary-btn:disabled,
+  .danger-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .primary-btn:focus-visible,
+  .secondary-btn:focus-visible,
+  .danger-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
 
-  /* Surfaces */
-  --bg-main: #eef1f6;
-  --bg-panel: #ffffff;
-  --bg-card: #ffffff;
-  --bg-subtle: #f3f5fa;
-  --bg-sidebar: #0b1120; /* dark "ink" surface — sidebar, hero, dialogs head, toast */
-  --bg-elevated: #ffffff;
+  /* Base grid for legacy data tables (transactions / investment / wealth),
+     scoped to .table-wrap so migrated tables that don't use it are untouched.
+     Class-scoped tables (.tx-summary-table, .budget-*) override via specificity. */
+  .table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .table-wrap thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-subtle);
+  }
+  .table-wrap :is(th, td) {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: middle;
+  }
+  .table-wrap th {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .table-wrap tbody tr {
+    transition: background 0.12s;
+  }
+  .table-wrap tbody tr:hover {
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+  }
 
-  /* Text */
-  --text-main: #0d1626;
-  --text-muted: #5a6678;
-  --text-faint: #95a0b1;
-  --ink-text: #e7ecf5; /* text placed on the dark ink surface */
-  --ink-muted: #8195b2;
-
-  /* Brand / interaction */
-  --primary: #3b6bf0;
-  --primary-dark: #2a53d4;
-  --primary-light: #eaf0fe;
-
-  /* Semantic */
-  --income: #0e9f6e;
-  --income-bg: #e6f7f0;
-  --expense: #e0463f;
-  --expense-bg: #fdeceb;
-  --invest: #6a52e8;
-  --invest-bg: #ece9fd;
-  --accent: #f59e0b;
-
-  /* Structure */
-  --line: #e4e8f1;
-  --line-strong: #ccd4e1;
-  --track-bg: #e7ebf3;
-
-  /* Shape */
-  --radius-lg: 18px;
-  --radius-md: 11px;
-  --radius-sm: 7px;
-
-  /* Shadows */
-  --shadow-soft: 0 1px 2px rgba(13, 22, 38, 0.04), 0 8px 24px rgba(13, 22, 38, 0.06);
-  --shadow-card: 0 0 0 1px rgba(13, 22, 38, 0.05);
-  --shadow-raised: 0 18px 50px rgba(13, 22, 38, 0.16);
-  --shadow-pop: 0 12px 36px rgba(13, 22, 38, 0.14);
-
-  /* Overlays / glows */
-  --overlay: rgba(11, 17, 32, 0.5);
-  --ring: color-mix(in srgb, var(--primary) 26%, transparent);
-  --glass-edge: rgba(255, 255, 255, 0.7);
-
-  /* Aurora backdrop accents */
-  --aurora-1: rgba(59, 107, 240, 0.16);
-  --aurora-2: rgba(106, 82, 232, 0.13);
-  --aurora-3: rgba(14, 159, 110, 0.1);
-
-  /* Charts */
-  --chart-axis: #7c8798;
-  --chart-grid: #e9edf4;
-  --chart-legend: #5a6678;
-  --chart-point-border: #ffffff;
-  --chart-empty: #e4e8f1;
-  --chart-center-label: #8693a4;
-  --chart-center-value: #0d1626;
-}
-
-/* ══ TOKENS · DARK ═══════════════════════════════════════════════ */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-
-  --bg-main: #07080b;
-  --bg-panel: #121419;
-  --bg-card: #121419;
-  --bg-subtle: #1a1d25;
-  --bg-sidebar: #0c0e13;
-  --bg-elevated: #161922;
-
-  --text-main: #eceff5;
-  --text-muted: #9aa4b4;
-  --text-faint: #626b7b;
-  --ink-text: #e7ecf5;
-  --ink-muted: #8c99b2;
-
-  --primary: #5e8bff;
-  --primary-dark: #4a74ec;
-  --primary-light: #182238;
-
-  --income: #34d399;
-  --income-bg: #0e2a20;
-  --expense: #f87171;
-  --expense-bg: #2e1718;
-  --invest: #a78bfa;
-  --invest-bg: #211b38;
-  --accent: #fbbf24;
-
-  --line: #262a33;
-  --line-strong: #3a4150;
-  --track-bg: #23262f;
-
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.45);
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --shadow-raised: 0 24px 60px rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 16px 44px rgba(0, 0, 0, 0.55);
-
-  --overlay: rgba(0, 0, 0, 0.62);
-  --ring: color-mix(in srgb, var(--primary) 40%, transparent);
-  --glass-edge: rgba(255, 255, 255, 0.06);
-
-  --aurora-1: rgba(94, 139, 255, 0.16);
-  --aurora-2: rgba(167, 139, 250, 0.14);
-  --aurora-3: rgba(52, 211, 153, 0.1);
-
-  --chart-axis: #8a93a3;
-  --chart-grid: #21252e;
-  --chart-legend: #9aa4b4;
-  --chart-point-border: #121419;
-  --chart-empty: #23262f;
-  --chart-center-label: #8a93a3;
-  --chart-center-value: #eceff5;
+  /* Form controls: inline edit rows in those tables + the not-yet-migrated
+     investment / wealth forms. Scoped to their container classes so header
+     dropdowns and already-migrated sections stay untouched. */
+  :is(
+      .investment-form,
+      .investment-table-controls,
+      .contribution-workflow-form,
+      .wealth-calc-form,
+      .settings-fields
+    )
+    label {
+    display: grid;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .table-wrap td :is(input, select):not([type='checkbox']),
+  :is(
+      .investment-form,
+      .investment-table-controls,
+      .contribution-workflow-form,
+      .wealth-calc-form,
+      .settings-fields,
+      .mini-form
+    )
+    :is(input, select):not([type='checkbox']):not([type='radio']),
+  .snapshot-field-stack input {
+    width: 100%;
+    max-width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    color: var(--text-main);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s,
+      background 0.15s;
+  }
+  :is(
+      .investment-form,
+      .investment-table-controls,
+      .contribution-workflow-form,
+      .wealth-calc-form,
+      .settings-fields
+    )
+    select,
+  .table-wrap td select {
+    cursor: pointer;
+  }
+  .snapshot-field-stack input::placeholder,
+  :is(
+      .investment-form,
+      .investment-table-controls,
+      .contribution-workflow-form,
+      .wealth-calc-form,
+      .settings-fields,
+      .mini-form
+    )
+    input::placeholder {
+    color: var(--text-faint);
+  }
+  .table-wrap td :is(input, select):focus-visible,
+  :is(
+      .investment-form,
+      .investment-table-controls,
+      .contribution-workflow-form,
+      .wealth-calc-form,
+      .settings-fields,
+      .mini-form
+    )
+    :is(input, select):focus-visible,
+  .snapshot-field-stack input:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
 }
 
 /* ══ RESET ═══════════════════════════════════════════════════════ */
@@ -1421,15 +1451,6 @@ dialog {
 }
 
 /* ══ TRANSACTIONS LAYOUT ═════════════════════════════════════════ */
-.tx-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.4fr);
-  gap: 14px;
-  align-items: start;
-}
-.tx-layout > .table-wrap {
-  min-height: 340px;
-}
 .tx-summary-side {
   display: grid;
   gap: 14px;
@@ -2350,11 +2371,6 @@ td select {
 }
 
 /* ══ TAGS ════════════════════════════════════════════════════════ */
-.tag-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
 .tag {
   display: inline-flex;
   align-items: center;
@@ -2460,33 +2476,8 @@ td select {
 #reports {
   gap: 14px;
 }
-.reports-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: 20px;
-  align-items: start;
-  max-width: 1220px;
-  margin-inline: auto;
-  width: 100%;
-}
 .reports-form-card {
   gap: 18px;
-}
-.reports-entry-card {
-  display: grid;
-  gap: 14px;
-  min-height: 100%;
-  align-content: start;
-}
-.reports-entry-card > p:not(.reports-kicker) {
-  max-width: 60ch;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
-.reports-entry-action {
-  justify-self: start;
-  margin-top: 4px;
 }
 .reports-form-head {
   display: grid;
@@ -2584,38 +2575,6 @@ td select {
 }
 #issue-report-status a:hover {
   text-decoration: underline;
-}
-
-.reports-guide-card {
-  gap: 10px;
-  background: var(--bg-subtle);
-}
-.reports-guide-card h3 {
-  color: var(--text-main);
-}
-.reports-guide-list {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 8px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-.reports-guide-list code {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.82em;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 14%, var(--bg-panel));
-  color: color-mix(in srgb, var(--primary) 75%, var(--text-main));
-}
-.reports-guide-note {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 9px 13px;
 }
 
 /* ── Global report launcher ───────────────────────────────────── */
@@ -2891,7 +2850,6 @@ td select {
   .cards-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .tx-layout,
   .dual-grid,
   .goal-edit-grid,
   .goal-progress {
@@ -2922,15 +2880,6 @@ td select {
   }
   .tx-dialog-actions {
     justify-content: flex-start;
-  }
-  .reports-layout {
-    grid-template-columns: 1fr;
-  }
-  .budget-block-head {
-    flex-direction: column;
-  }
-  .budget-block-totals {
-    width: 100%;
   }
 }
 
@@ -3137,12 +3086,6 @@ td select {
   .tx-dialog-actions .tx-btn-secondary {
     width: 100%;
   }
-  .budget-block {
-    padding: 16px;
-  }
-  .budget-block-totals {
-    grid-template-columns: 1fr;
-  }
   .mini-form,
   .mini-form.compact-row {
     grid-template-columns: 1fr;
@@ -3154,9 +3097,6 @@ td select {
   #issue-report-submit {
     width: 100%;
     min-width: 0;
-  }
-  .reports-entry-action {
-    width: 100%;
   }
   .global-report-dialog-head {
     padding: 18px 18px 0;

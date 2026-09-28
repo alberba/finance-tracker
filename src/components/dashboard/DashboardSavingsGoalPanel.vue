@@ -44,3 +44,16 @@ function remainingGoalClass(tone: DashboardTone): string {
     </template>
   </div>
 </template>
+
+<style scoped>
+/* Conic progress ring; --p (0–100) comes from the template. */
+.progress-ring {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 9999px;
+  background: conic-gradient(
+    var(--income, #2f9e44) calc(var(--p, 0) * 1%),
+    var(--track-bg, rgba(255, 255, 255, 0.12)) 0
+  );
+}
+</style>

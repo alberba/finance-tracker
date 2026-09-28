@@ -1133,6 +1133,11 @@ export class FinanceTrackerPage {
     sectionId: string,
     headingText: string,
   ) {
+    // Callers often reload or navigate right before this; the nav buttons do
+    // nothing until the app has booted.
+    await expect(
+      this.page.locator('html[data-finance-ready="true"]'),
+    ).toBeVisible();
     const section = this.page.locator(`#${sectionId}`);
     if (!(await section.isVisible())) {
       await this.clickNavButton(buttonLabel, sectionId);

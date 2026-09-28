@@ -15,6 +15,7 @@ test.describe('Mobile smoke', () => {
       value: 9_999_999_999.99,
     })
     await page.goto('/')
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(
       tracker.dashboardSection.getByRole('heading', { name: 'Resumen financiero' }),
     ).toBeVisible()
@@ -178,6 +179,7 @@ test.describe('Mobile smoke', () => {
       headers: { 'x-finance-namespace': 'demo' },
     })
     await page.goto('/')
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Resumen financiero' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Más secciones' }).click()

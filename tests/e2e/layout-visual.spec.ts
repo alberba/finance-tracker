@@ -82,7 +82,6 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
             '.settings-head',
             '.mini-form',
             '.data-actions',
-            '.tag-wrap',
           ].join(','),
         ),
       ),
@@ -191,6 +190,30 @@ async function openSectionForLayout(
   await tracker.open(sectionId)
 }
 
+/** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
+const SNAPSHOT_NOW = new Date('2026-09-15T10:00:00+02:00')
+
+async function expectSectionSnapshot(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  sectionId: FinanceSectionId,
+  name: string,
+): Promise<void> {
+  await page.clock.setFixedTime(SNAPSHOT_NOW)
+  await tracker.goto()
+  await openSectionForLayout(page, tracker, sectionId)
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    window.scrollTo(0, 0)
+  })
+  await expect(page).toHaveScreenshot(name, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+    stylePath: './tests/e2e/screenshot-stable.css',
+  })
+}
+
 test.describe('UI layout integrity', { tag: '@visual' }, () => {
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
@@ -206,19 +229,20 @@ test.describe('UI layout integrity', { tag: '@visual' }, () => {
     })
 
     test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
-      await openSectionForLayout(page, tracker, sectionId)
-      await page.evaluate(async () => {
-        await document.fonts.ready
-      })
-      await page.evaluate(() => {
-        window.scrollTo(0, 0)
-      })
-      await expect(page).toHaveScreenshot(`page-${sectionId}.png`, {
-        animations: 'disabled',
-        caret: 'hide',
-        scale: 'css',
-        stylePath: './tests/e2e/screenshot-stable.css',
-      })
+      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}.png`)
+    })
+  }
+})
+
+test.describe('UI layout integrity · tema oscuro', { tag: '@visual' }, () => {
+  // No stored theme, so the pre-paint script follows prefers-color-scheme and
+  // the whole app (charts included) renders dark from the first frame.
+  test.use({ colorScheme: 'dark' })
+
+  for (const sectionId of SECTION_IDS) {
+    test(`snapshot visual estable en "${sectionId}" (oscuro)`, async ({ tracker, page }) => {
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}-dark.png`)
     })
   }
 })

@@ -64,6 +64,7 @@ test.describe('Modo demo', () => {
     page,
   }) => {
     await page.goto('/')
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
 
     const userMenuButton = page.getByRole('button', { name: 'Abrir menú de usuario' })
     await userMenuButton.click()

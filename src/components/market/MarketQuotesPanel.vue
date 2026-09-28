@@ -4,6 +4,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMarketStore } from '../../stores/market'
+import PanelHeading from '../ui/PanelHeading.vue'
 
 withDefaults(
   defineProps<{ title?: string }>(),
@@ -48,11 +49,9 @@ function formatTimestamp(value: string): string {
 <template>
   <article v-if="marketStore.instruments.length" class="card" data-market-panel>
     <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <p class="text-primary font-mono text-[0.65rem] tracking-[0.18em] uppercase">Mercado</p>
-        <h3 class="font-display text-xl">{{ title }}</h3>
-        <p class="text-text-muted text-sm">Precio orientativo; no sustituye snapshots confirmados.</p>
-      </div>
+      <PanelHeading kicker="Mercado" description="Precio orientativo; no sustituye snapshots confirmados.">
+        {{ title }}
+      </PanelHeading>
       <div class="text-right">
         <strong class="block text-2xl">{{ formatMoney(totalValue) }}</strong>
         <span v-if="dailyChange !== null" :class="dailyChange >= 0 ? 'text-income' : 'text-expense'">
