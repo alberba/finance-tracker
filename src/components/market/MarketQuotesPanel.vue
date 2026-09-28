@@ -50,7 +50,7 @@ function formatTimestamp(value: string): string {
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p class="text-primary font-mono text-[0.65rem] tracking-[0.18em] uppercase">Mercado</p>
-        <h3 class="font-display text-xl">{{ title }}</h3>
+        <h3 class="font-display text-text-main text-xl tracking-normal normal-case">{{ title }}</h3>
         <p class="text-text-muted text-sm">Precio orientativo; no sustituye snapshots confirmados.</p>
       </div>
       <div class="text-right">

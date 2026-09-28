@@ -114,7 +114,7 @@ function saveEdit(): void {
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <p class="text-primary font-mono text-[0.65rem] tracking-[0.18em] uppercase">Revisión explícita</p>
-        <h3 class="font-display text-xl">Pendientes <span class="text-accent">({{ recurringStore.pendingCount }})</span></h3>
+        <h3 class="font-display text-text-main text-xl tracking-normal normal-case">Pendientes <span class="text-accent">({{ recurringStore.pendingCount }})</span></h3>
         <p class="text-text-muted text-sm">No afectan balances ni patrimonio hasta confirmarlos.</p>
       </div>
       <button v-if="recurringStore.pendingCount" type="button" class="secondary-btn" @click="recurringStore.refreshPending()">Buscar vencimientos</button>
