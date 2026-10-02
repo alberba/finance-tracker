@@ -1,3 +1,7 @@
+import { round2 } from "../lib/number";
+
+export { round2 };
+
 export function uid(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}-${Date.now().toString(36)}`;
 }
@@ -24,10 +28,6 @@ export function parseIntSafe(value: unknown, fallback: number): number {
 export function parseFloatSafe(value: unknown, fallback: number): number {
   const n = parseFloat(String(value ?? "").replace(",", "."));
   return Number.isFinite(n) ? n : fallback;
-}
-
-export function round2(value: unknown): number {
-  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 export function monthFromISO(value: unknown): number | null {

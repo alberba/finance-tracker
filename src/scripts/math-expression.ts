@@ -16,7 +16,7 @@ export function evaluateNumericExpression(expression: string): number | null {
     const result = Function(`"use strict"; return (${normalized});`)();
     const numeric = Number(result);
     return Number.isFinite(numeric) ? numeric : null;
-  } catch (_) {
+  } catch {
     return null;
   }
 }

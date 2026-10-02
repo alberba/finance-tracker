@@ -1,22 +1,12 @@
 ---
-import "../styles/global.css";
-import BudgetSection from "./sections/BudgetSection.astro";
-import DashboardSection from "./sections/DashboardSection.astro";
-import DataSection from "./sections/DataSection.astro";
-import GoalsSection from "./sections/GoalsSection.astro";
-import InvestmentSection from "./sections/InvestmentSection.astro";
-import ReportsSection from "./reports/ReportsSection.astro";
-import SettingsSection from "./sections/SettingsSection.astro";
-import TransactionsSection from "./sections/TransactionsSection.astro";
-import WealthSection from "./sections/WealthSection.astro";
+import '../styles/global.css'
+import AppSidebar from './layout/AppSidebar.astro'
+import MobileNavigation from './layout/MobileNavigation.astro'
+import FinanceWorkspace from './FinanceWorkspace.vue'
+import { getSectionFromPath } from '../scripts/app/dashboard-section-routing'
 
-export interface Props {
-  activeRoute?: "root" | "section";
-  sectionParam?: string;
-}
-
-const { activeRoute = "root", sectionParam = "" } = Astro.props;
-const canonicalUrl = new URL("/", Astro.url).toString();
+const canonicalUrl = new URL('/', Astro.url).toString()
+const activeSection = getSectionFromPath(Astro.url.pathname)
 ---
 
 <!doctype html>
@@ -25,430 +15,99 @@ const canonicalUrl = new URL("/", Astro.url).toString();
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script is:inline>
-      (function () {
+      ;(function () {
         try {
-          var stored = localStorage.getItem("theme");
-          var prefersDark =
-            window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches;
-          document.documentElement.dataset.theme =
-            stored || (prefersDark ? "dark" : "light");
-        } catch (e) {
-          document.documentElement.dataset.theme = "light";
+          const stored = localStorage.getItem('theme')
+          const prefersDark =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light')
+        } catch {
+          document.documentElement.dataset.theme = 'light'
         }
-      })();
+      })()
     </script>
-    <meta name="theme-color" content="#07080B" media="(prefers-color-scheme: dark)" />
+    <script is:inline>
+      // Modo demo: `?demo=1` activa (persistente), `?demo=0` desactiva. Debe
+      // correr antes que los scripts de la app para fijar el namespace `demo`
+      // (datos sintéticos aislados) antes de la hidratación del estado.
+      ;(function () {
+        try {
+          const params = new URLSearchParams(window.location.search)
+          const flag = params.get('demo')
+          if (flag !== null) {
+            if (['1', 'on', 'true'].includes(flag.toLowerCase())) {
+              localStorage.setItem('finance-demo-mode', '1')
+              document.cookie =
+                'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
+            } else {
+              localStorage.removeItem('finance-demo-mode')
+              document.cookie =
+                'finance-demo-mode=; Path=/; Max-Age=0; SameSite=Lax' +
+                (window.location.protocol === 'https:' ? '; Secure' : '')
+            }
+            params.delete('demo')
+            const query = params.toString()
+            history.replaceState(
+              null,
+              '',
+              window.location.pathname + (query ? '?' + query : '') + window.location.hash,
+            )
+          }
+          if (!window.__FINANCE_NAMESPACE__ && localStorage.getItem('finance-demo-mode') === '1') {
+            window.__FINANCE_NAMESPACE__ = 'demo'
+            document.documentElement.dataset.demo = '1'
+            document.cookie =
+              'finance-demo-mode=1; Path=/; Max-Age=2592000; SameSite=Lax' +
+              (window.location.protocol === 'https:' ? '; Secure' : '')
+          }
+        } catch {
+          /* storage no disponible — sin modo demo */
+        }
+      })()
+    </script>
+    <meta name="theme-color" content="#090B10" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#EEF1F6" media="(prefers-color-scheme: light)" />
     <title>Finance Tracker 2026</title>
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
+    <meta name="application-name" content="Finance Tracker" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css" />
-    <script
-      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
-    ></script>
     <script>
-      import "../scripts/app";
-      import "../scripts/issue-report";
-    </script>
-    <script is:inline>
-      (function () {
-        const STORAGE_KEY = "sidebar-collapsed";
-        const stored = localStorage.getItem(STORAGE_KEY) === "true";
-
-        function applyState(collapsed, body, toggleBtn) {
-          body.classList.toggle("is-sidebar-collapsed", collapsed);
-          if (toggleBtn) {
-            toggleBtn.setAttribute(
-              "aria-label",
-              collapsed ? "Expandir barra lateral" : "Colapsar barra lateral",
-            );
-            toggleBtn.setAttribute(
-              "aria-expanded",
-              collapsed ? "false" : "true",
-            );
-            const label = toggleBtn.querySelector(".sidebar-toggle-label");
-            if (label) label.textContent = collapsed ? "Expandir" : "Colapsar";
-          }
-        }
-
-        function initSidebarState() {
-          const body = document.body;
-          if (!body) {
-            return;
-          }
-
-          const toggleBtn = document.getElementById("sidebar-toggle");
-          applyState(stored, body, toggleBtn);
-
-          if (toggleBtn) {
-            toggleBtn.addEventListener("click", function () {
-              const willCollapse = !body.classList.contains(
-                "is-sidebar-collapsed",
-              );
-              applyState(willCollapse, body, toggleBtn);
-              localStorage.setItem(
-                STORAGE_KEY,
-                willCollapse ? "true" : "false",
-              );
-            });
-          }
-        }
-
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", initSidebarState, {
-            once: true,
-          });
-        } else {
-          initSidebarState();
-        }
-      })();
-    </script>
-    <script is:inline>
-      (function () {
-        function syncLabel(btn) {
-          var isDark = document.documentElement.dataset.theme === "dark";
-          btn.setAttribute(
-            "aria-label",
-            isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro",
-          );
-          var label = btn.querySelector(".theme-toggle-label");
-          if (label) label.textContent = isDark ? "Modo claro" : "Modo oscuro";
-        }
-
-        function initThemeToggle() {
-          var btn = document.getElementById("theme-toggle");
-          if (!btn) return;
-          syncLabel(btn);
-          btn.addEventListener("click", function () {
-            var isDark = document.documentElement.dataset.theme === "dark";
-            var next = isDark ? "light" : "dark";
-            document.documentElement.dataset.theme = next;
-            try {
-              localStorage.setItem("theme", next);
-            } catch (e) {}
-            syncLabel(btn);
-            var repaint = window.__ftRenderAll;
-            if (typeof repaint === "function") {
-              requestAnimationFrame(function () {
-                repaint();
-              });
-            }
-          });
-        }
-
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", initThemeToggle, {
-            once: true,
-          });
-        } else {
-          initThemeToggle();
-        }
-      })();
+      import '../scripts/app'
+      import '../scripts/shell'
     </script>
   </head>
-  <body data-route={activeRoute} data-section={sectionParam}>
+  <body>
     <a class="skip-link" href="#app-main">Saltar al contenido</a>
     <div class="bg-layer"></div>
     <div class="app-shell">
-      <aside class="sidebar">
-        <header class="brand-block">
-          <p class="brand-kicker">Plan financiero</p>
-          <h1>Finance Tracker</h1>
-        </header>
-        <div class="sidebar-collapsed-brand" aria-hidden="true">
-          <img src="/favicon.svg" alt="" />
-        </div>
-
-        <nav class="nav" id="nav-tabs" aria-label="Secciones del tracker">
-          <button
-            type="button"
-            class="nav-btn is-active"
-            data-section="dashboard"
-            aria-controls="dashboard"
-            aria-current="page"
-            aria-label="Dashboard">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><rect x="3" y="3" width="6" height="6" rx="1.2"></rect><rect
-                  x="11"
-                  y="3"
-                  width="6"
-                  height="6"
-                  rx="1.2"></rect><rect
-                  x="3"
-                  y="11"
-                  width="6"
-                  height="6"
-                  rx="1.2"></rect><rect
-                  x="11"
-                  y="11"
-                  width="6"
-                  height="6"
-                  rx="1.2"></rect></svg
-              >
-            </span>
-            <span class="nav-label">Dashboard</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="transactions"
-            aria-controls="transactions"
-            aria-label="Movimientos">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><path d="M7 3v14M7 17l-3-3m3 3 3-3M13 17V3M13 3l-3 3m3-3 3 3"
-                ></path></svg
-              >
-            </span>
-            <span class="nav-label">Movimientos</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="budget"
-            aria-controls="budget"
-            aria-label="Presupuesto">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><circle cx="10" cy="10" r="7"></circle><path
-                  d="M10 3v7l4.5 2.6"></path></svg
-              >
-            </span>
-            <span class="nav-label">Presupuesto</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="wealth"
-            aria-controls="wealth"
-            aria-label="Patrimonio">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><path d="M2 9.5 10 4l8 5.5"></path><rect
-                  x="4"
-                  y="9.5"
-                  width="12"
-                  height="7"
-                  rx="1"></rect><rect x="8" y="13" width="4" height="3.5"
-                ></rect></svg
-              >
-            </span>
-            <span class="nav-label">Patrimonio</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="investment"
-            aria-controls="investment"
-            aria-label="Inversión">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><polyline points="2,14 7,9 11,12 18,5"></polyline><polyline
-                  points="14,5 18,5 18,9"></polyline></svg
-              >
-            </span>
-            <span class="nav-label">Inversión</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="goals"
-            aria-controls="goals"
-            aria-label="Objetivos">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><circle cx="10" cy="10" r="7"></circle><circle
-                  cx="10"
-                  cy="10"
-                  r="3.5"></circle><circle
-                  cx="10"
-                  cy="10"
-                  r="1"
-                  fill="currentColor"
-                  stroke="none"></circle></svg
-              >
-            </span>
-            <span class="nav-label">Objetivos</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="settings"
-            aria-controls="settings"
-            aria-label="Configuración">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><circle cx="10" cy="10" r="2.5"></circle><path
-                  d="M10 3v1.5M10 15.5V17M3 10h1.5M15.5 10H17M4.93 4.93l1.06 1.06M14 14l1.07 1.07M4.93 15.07l1.06-1.06M14 6l1.07-1.07"
-                ></path></svg
-              >
-            </span>
-            <span class="nav-label">Configuración</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="data"
-            aria-controls="data"
-            aria-label="Datos">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                ><ellipse cx="10" cy="6" rx="7" ry="2.5"></ellipse><path
-                  d="M3 6v4c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5V6"></path><path
-                  d="M3 10v4c0 1.38 3.13 2.5 7 2.5s7-1.12 7-2.5v-4"></path></svg
-              >
-            </span>
-            <span class="nav-label">Datos</span>
-          </button>
-          <button
-            type="button"
-            class="nav-btn"
-            data-section="reports"
-            aria-controls="reports"
-            aria-label="Reportes">
-            <span class="nav-icon" aria-hidden="true">
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.6"
-                stroke-linejoin="round"
-                ><path
-                  d="M5 3h7l4 4v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"
-                ></path><path d="M12 3v4h4"></path><line
-                  x1="7"
-                  y1="10"
-                  x2="13"
-                  y2="10"></line><line x1="7" y1="13" x2="11" y2="13"
-                ></line></svg
-              >
-            </span>
-            <span class="nav-label">Reportes</span>
-          </button>
-        </nav>
-
-        <button
-          id="theme-toggle"
-          class="theme-toggle"
-          type="button"
-          aria-label="Cambiar tema">
-          <svg
-            class="theme-toggle-icon-moon"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            aria-hidden="true">
-            <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
-          </svg>
-          <svg
-            class="theme-toggle-icon-sun"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            aria-hidden="true">
-            <circle cx="10" cy="10" r="3.4"></circle>
-            <path
-              d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"
-            ></path>
-          </svg>
-          <span class="theme-toggle-label">Modo oscuro</span>
-        </button>
-
-        <button
-          id="sidebar-toggle"
-          class="sidebar-toggle"
-          type="button"
-          aria-label="Colapsar barra lateral"
-          aria-expanded="true">
-          <svg
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            aria-hidden="true">
-            <polyline points="13,4 7,10 13,16"></polyline>
-            <polyline points="8,4 2,10 8,16"></polyline>
-          </svg>
-          <span class="sidebar-toggle-label">Colapsar</span>
-        </button>
-
-        <footer class="sidebar-footer">
-          <span class="nav-icon sidebar-footer-icon" aria-hidden="true">
-            <svg
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-              ><path
-                d="M10 2a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V3a1 1 0 0 1 1-1zm6.07 3.93a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.71-.71a1 1 0 0 1 1.41 0zM18 10a1 1 0 0 1-1 1h-1a1 1 0 0 1 0-2h1a1 1 0 0 1 1 1zM10 17a1 1 0 0 1-1-1v-1a1 1 0 0 1 2 0v1a1 1 0 0 1-1 1zm-6.07-1.93a1 1 0 0 1 0-1.41l.71-.71a1 1 0 1 1 1.41 1.41l-.71.71a1 1 0 0 1-1.41 0zM3 10a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H4a1 1 0 0 1-1-1z"
-              ></path><circle cx="10" cy="10" r="3"></circle></svg
-            >
-          </span>
-          <p id="save-status" class="sidebar-footer-text">Sincronizado</p>
-        </footer>
-      </aside>
+      <div id="nav-tabs" class="app-navigation">
+        <AppSidebar activeSection={activeSection} />
+        <MobileNavigation activeSection={activeSection} />
+      </div>
 
       <main id="app-main" class="content">
-        <DashboardSection />
-        <TransactionsSection />
-        <BudgetSection />
-        <WealthSection />
-        <InvestmentSection />
-        <GoalsSection />
-        <SettingsSection />
-        <DataSection />
-        <ReportsSection />
+        <FinanceWorkspace activeSection={activeSection} client:only="vue" />
       </main>
     </div>
 
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <div
-      id="chart-tooltip"
-      class="chart-tooltip"
-      role="tooltip"
-      aria-hidden="true">
+    <div id="demo-banner" class="demo-banner" role="status" hidden>
+      <span class="demo-banner-dot" aria-hidden="true"></span>
+      <span>Modo demo · datos ficticios</span>
+      <button id="demo-banner-exit" class="demo-banner-exit" type="button"> Salir </button>
     </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="chart-tooltip" class="chart-tooltip" role="tooltip" aria-hidden="true"></div>
   </body>
 </html>

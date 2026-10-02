@@ -1,8 +1,10 @@
 import type { APIRoute } from "astro";
 import { ZodError } from "zod";
 import { getRuntimeEnvFromLocals } from "../../../lib/server/cloudflare-env";
+import { reportApiRouteFailure } from "../../../lib/server/error-tracking";
 import { createIssueFromWebReport } from "../../../lib/server/github-issues";
 import { parseIssueReportPayload } from "../../../lib/server/issue-report-schema";
+import { requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 
 type Bucket = {
   count: number;
@@ -15,15 +17,6 @@ const buckets = new Map<string, Bucket>();
 
 function now(): number {
   return Date.now();
-}
-
-function getClientKey(request: Request): string {
-  const ip =
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for") ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-  return ip.split(",")[0].trim().toLowerCase() || "unknown";
 }
 
 function consumeRateLimit(key: string): boolean {
@@ -53,30 +46,43 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  if (!consumeRateLimit(getClientKey(request))) {
-    return jsonResponse({ ok: false, error: "Rate limit excedido. Intenta en un minuto." }, 429);
-  }
-
-  try {
-    const body = await request.json();
-    const payload = parseIssueReportPayload(body);
-    const env = getRuntimeEnvFromLocals(locals);
-    const created = await createIssueFromWebReport(payload, env);
-    return jsonResponse(
-      {
-        ok: true,
-        issueNumber: created.number,
-        issueUrl: created.url,
-        ...(payload.mentionClaude ? { enrichmentStatus: "pending" as const } : {}),
-      },
-      201
-    );
-  } catch (error) {
-    if (error instanceof ZodError) {
-      return jsonResponse({ ok: false, error: "Payload inválido.", details: error.issues }, 400);
+export const POST: APIRoute = async ({ request, locals }) =>
+  withApiErrorHandling("/api/issues/report", async () => {
+    const principal = requirePrincipal(locals);
+    if (!consumeRateLimit(principal.userId)) {
+      return jsonResponse(
+        { ok: false, error: "Rate limit excedido. Intenta en un minuto." },
+        429,
+      );
     }
-    const message = error instanceof Error ? error.message : "No se pudo crear la issue";
-    return jsonResponse({ ok: false, error: message }, 500);
-  }
-};
+
+    try {
+      const body = await request.json();
+      const payload = parseIssueReportPayload(body);
+      const env = getRuntimeEnvFromLocals(locals);
+      const created = await createIssueFromWebReport(payload, env);
+      return jsonResponse(
+        {
+          ok: true,
+          issueNumber: created.number,
+          issueUrl: created.url,
+          ...(payload.mentionClaude
+            ? { enrichmentStatus: "pending" as const }
+            : {}),
+        },
+        201,
+      );
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return jsonResponse(
+          { ok: false, error: "Payload inválido.", details: error.issues },
+          400,
+        );
+      }
+      console.error("[issues/report] Issue creation failed", error);
+      // El catch resuelve la respuesta, así que `withApiErrorHandling` nunca ve
+      // este fallo: se reporta acá, una sola vez y con la misma forma.
+      reportApiRouteFailure(error, { route: "/api/issues/report", status: 500 });
+      return jsonResponse({ ok: false, error: "No se pudo crear la issue" }, 500);
+    }
+  });

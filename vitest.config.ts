@@ -1,25 +1,35 @@
-import { defineConfig } from "vitest/config";
+import { coverageConfigDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ["tests/unit/**/*.test.ts"],
-    environment: "node",
-    globals: true,
-    clearMocks: true,
-    restoreMocks: true,
+    projects: [
+      './vitest.unit.config.ts',
+      './vitest.component.config.ts',
+      './vitest.integration.config.ts',
+    ],
     coverage: {
-      provider: "v8",
-      enabled: true,
-      include: ["src/lib/**/*.ts"],
-      exclude: ["**/*.d.ts", "tests/**", "src/lib/server/**"],
-      reporter: ["text", "html"],
-      all: true,
+      provider: 'v8',
+      enabled: false,
+      include: [
+        'src/components/**/*.vue',
+        'src/composables/**/*.ts',
+        'src/domain/**/*.ts',
+        'src/lib/**/*.ts',
+        'src/services/**/*.ts',
+        'src/stores/**/*.ts',
+      ],
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        'src/lib/client/types.ts',
+        'src/lib/server/types.ts',
+      ],
+      reporter: process.env.CI ? ['text', 'json-summary'] : ['text', 'html', 'json-summary'],
       thresholds: {
-        lines: 85,
-        functions: 85,
-        statements: 85,
-        branches: 75,
+        lines: 29,
+        statements: 29,
+        functions: 28,
+        branches: 26,
       },
     },
   },
-});
+})

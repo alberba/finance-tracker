@@ -14,7 +14,10 @@ export function tokenize(input) {
 
 function scoreFile(filePath, tokens) {
   const lower = filePath.toLowerCase();
-  return tokens.reduce((score, token) => (lower.includes(token) ? score + 1 : score), 0);
+  return tokens.reduce(
+    (score, token) => (lower.includes(token) ? score + 1 : score),
+    0,
+  );
 }
 
 export function findCandidateFiles(repoFiles, issueText) {
@@ -31,13 +34,20 @@ export function findCandidateFiles(repoFiles, issueText) {
   }
 
   return repoFiles
-    .filter((filePath) => filePath.startsWith("src/") || filePath.startsWith("tests/"))
+    .filter(
+      (filePath) =>
+        filePath.startsWith("src/") || filePath.startsWith("tests/"),
+    )
     .slice(0, MAX_MATCHES);
 }
 
 export function buildIssueContextMarkdown(issue, candidateFiles) {
   const labels = Array.isArray(issue?.labels)
-    ? issue.labels.map((label) => (typeof label === "string" ? label : String(label?.name || ""))).filter(Boolean)
+    ? issue.labels
+        .map((label) =>
+          typeof label === "string" ? label : String(label?.name || ""),
+        )
+        .filter(Boolean)
     : [];
 
   const body = String(issue?.body || "").trim();
@@ -88,7 +98,11 @@ function collectRepoFiles(rootDir) {
   function walk(currentDir) {
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === ".git" || entry.name === "node_modules" || entry.name === "dist") {
+      if (
+        entry.name === ".git" ||
+        entry.name === "node_modules" ||
+        entry.name === "dist"
+      ) {
         continue;
       }
       const absolute = path.join(currentDir, entry.name);
@@ -119,7 +133,9 @@ function runCli() {
   const rootDir = args.get("repo") || process.cwd();
 
   if (!issueFile || !outputFile) {
-    throw new Error("Uso: node issue-context.mjs --issue-file <path> --out <path> [--repo <path>]");
+    throw new Error(
+      "Uso: node issue-context.mjs --issue-file <path> --out <path> [--repo <path>]",
+    );
   }
 
   const issueRaw = fs.readFileSync(issueFile, "utf-8");

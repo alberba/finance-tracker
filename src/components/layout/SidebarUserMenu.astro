@@ -1,0 +1,77 @@
+<div id="sidebar-user-menu-root" class="sidebar-account">
+  <button
+    id="sidebar-user-menu-toggle"
+    class="sidebar-footer"
+    type="button"
+    aria-label="Abrir menú de usuario"
+    aria-haspopup="menu"
+    aria-expanded="false"
+    aria-controls="sidebar-user-menu"
+  >
+    <span class="sidebar-user-avatar" aria-hidden="true">U</span>
+    <span class="sidebar-user-text">
+      <span id="sidebar-user-email" class="sidebar-user-name">Usuario</span>
+      <span id="save-status" class="sidebar-footer-text sidebar-user-status"> Sincronizado </span>
+    </span>
+    <svg
+      class="sidebar-user-chevron"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      aria-hidden="true"
+    >
+      <path d="M7 8l3 3 3-3"></path>
+    </svg>
+  </button>
+
+  <div
+    id="sidebar-user-menu"
+    class="sidebar-account-menu"
+    role="menu"
+    aria-label="Menú de usuario"
+    hidden
+  >
+    <span id="sidebar-sync-status" class="sidebar-account-menu-kicker" data-sync-status hidden>
+      Sincronizado
+    </span>
+    <span class="sidebar-account-menu-kicker">Privacidad</span>
+    <button
+      id="demo-mode-menu-action"
+      class="sidebar-account-menu-action"
+      data-demo-mode-action
+      type="button"
+      role="menuitem"
+    >
+      <span class="sidebar-account-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
+          <circle cx="10" cy="10" r="2.1"></circle>
+        </svg>
+      </span>
+      <span class="sidebar-account-menu-copy">
+        <span class="demo-mode-action-label">Activar modo demo</span>
+        <span class="demo-mode-action-description">Usar únicamente datos ficticios</span>
+      </span>
+    </button>
+    <button
+      id="sidebar-logout-action"
+      class="sidebar-account-menu-action"
+      data-logout-action
+      type="button"
+      role="menuitem"
+    >
+      <span class="sidebar-account-menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M7.5 2.5h-3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h3"></path>
+          <path d="M13 14l4-4-4-4"></path>
+          <path d="M17 10H7.5"></path>
+        </svg>
+      </span>
+      <span class="sidebar-account-menu-copy">
+        <span>Cerrar sesión</span>
+        <span class="demo-mode-action-description">Borra la caché local de este dispositivo</span>
+      </span>
+    </button>
+  </div>
+</div>

@@ -1,0 +1,37 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 theme token block."
+    },
+    {
+      "name": "@apply",
+      "description": "Inline Tailwind utility classes into a custom CSS rule."
+    },
+    {
+      "name": "@layer",
+      "description": "Tailwind CSS cascade layer (base, components, utilities)."
+    },
+    {
+      "name": "@source",
+      "description": "Tailwind CSS v4 source detection directive."
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4 custom utility block."
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS v4 variant application directive."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4 custom variant directive."
+    },
+    {
+      "name": "@reference",
+      "description": "Tailwind CSS v4 reference import directive."
+    }
+  ]
+}

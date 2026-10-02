@@ -1,21 +1,61 @@
 import type { D1DatabaseLike } from "./d1-state";
+import { env as cloudflareEnv } from "cloudflare:workers";
 
 export interface RuntimeEnv {
   finance_tracker_db?: D1DatabaseLike;
+  /** v2 relational database (WP1) — Drizzle client factory in `src/db/client.ts`. */
+  finance_tracker_db_v2?: D1DatabaseLike;
   GITHUB_ISSUE_TOKEN?: string;
   GITHUB_TOKEN?: string;
   GITHUB_OWNER?: string;
   GITHUB_REPO?: string;
+  MARKET_DATA_PROVIDER?: string;
+  TWELVE_DATA_API_KEY?: string;
+  COINGECKO_API_KEY?: string;
+  COINGECKO_API_PLAN?: string;
+  MARKET_QUOTE_STALE_MINUTES?: string;
+  MARKET_QUOTE_CACHE_SECONDS?: string;
+  /** Email of the reserved "legacy owner" user created by WP9's migration tool. */
+  LEGACY_OWNER_EMAIL?: string;
+  /** Cf-Access team domain (no scheme/path), e.g. `myteam.cloudflareaccess.com`. */
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  /** Expected `aud` claim of the Cf-Access Application protecting this app. */
+  CF_ACCESS_AUD?: string;
+  /**
+   * Test-only principal injection. The middleware additionally requires a
+   * loopback request origin, so a deployed flag cannot enable impersonation.
+   */
+  TEST_AUTH_ENABLED?: string;
+  /**
+   * Base64-encoded AES-256 key (WP12) used by
+   * `src/lib/server/crypto/data-encryption.ts` to encrypt/decrypt
+   * `integration_credentials.ciphertext`. Required in any environment that
+   * writes or reads credentials through that repository.
+   */
+  DATA_ENCRYPTION_KEY?: string;
+  /**
+   * Previous AES-256 key (base64), kept only long enough to decrypt rows
+   * still encrypted under `DATA_ENCRYPTION_KEY_VERSION - 1` during a key
+   * rotation window.
+   */
+  DATA_ENCRYPTION_KEY_PREVIOUS?: string;
+  /** Version number of `DATA_ENCRYPTION_KEY`. Defaults to `1` when unset. */
+  DATA_ENCRYPTION_KEY_VERSION?: string;
 }
 
-type LocalsWithRuntime = {
-  runtime?: {
-    env?: RuntimeEnv;
-  };
-};
+type LocalsWithTestRuntime = { runtimeEnv?: RuntimeEnv };
+
+/**
+ * Astro 6+ exposes Cloudflare bindings through `cloudflare:workers` rather
+ * than `locals.runtime.env`. `runtimeEnv` is an explicit Vitest-only seam;
+ * production request code never populates it.
+ */
+export function getRuntimeEnv(locals?: App.Locals): RuntimeEnv {
+  return (locals as LocalsWithTestRuntime | undefined)?.runtimeEnv ?? (cloudflareEnv as RuntimeEnv);
+}
 
 export function getD1FromLocals(locals: App.Locals): D1DatabaseLike {
-  const db = (locals as LocalsWithRuntime)?.runtime?.env?.finance_tracker_db;
+  const db = getRuntimeEnv(locals).finance_tracker_db;
   if (!db) {
     throw new Error("D1 binding 'finance_tracker_db' no está disponible en runtime.");
   }
@@ -23,9 +63,5 @@ export function getD1FromLocals(locals: App.Locals): D1DatabaseLike {
 }
 
 export function getRuntimeEnvFromLocals(locals: App.Locals): RuntimeEnv {
-  const env = (locals as LocalsWithRuntime)?.runtime?.env;
-  if (!env) {
-    throw new Error("Runtime env no disponible en locals.runtime.env.");
-  }
-  return env;
+  return getRuntimeEnv(locals);
 }

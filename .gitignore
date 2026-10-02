@@ -6,6 +6,23 @@ coverage
 playwright-report
 test-results
 .data
+.scratch
 .wrangler
 worker-configuration.d.ts
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 package-lock.json
+
+# Playwright
+/playwright-report/
+/blob-report/
+/blob-report-sync-v2/
+/playwright-report-sync-v2/
+/playwright/.cache/
+/playwright/.auth/
+# Local-only visual snapshots (CI generates the canonical -linux baselines)
+tests/e2e/**/*-darwin.png
+backup.sql
+# Local Pi runtime state
+.atl/

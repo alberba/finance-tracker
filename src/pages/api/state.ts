@@ -1,50 +1,62 @@
 import type { APIRoute } from "astro";
 import { getD1FromLocals } from "../../lib/server/cloudflare-env";
 import { loadStateFromD1, saveStateToD1 } from "../../lib/server/d1-state";
+import {
+  jsonResponse,
+  requireLegacyOwner,
+  withApiErrorHandling,
+} from "../../lib/server/api-auth";
 
-function requestNamespace(request: Request): string | undefined {
-  const header = request.headers.get("x-finance-namespace");
-  return header || undefined;
-}
-
-export const GET: APIRoute = async ({ request, locals }) => {
-  try {
+export const GET: APIRoute = async ({ locals }) =>
+  withApiErrorHandling("/api/state", async () => {
+    requireLegacyOwner(locals);
     const db = getD1FromLocals(locals);
-    const state = await loadStateFromD1(db, requestNamespace(request));
-    return new Response(JSON.stringify({ state }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo cargar el estado";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-};
+    const snapshot = await loadStateFromD1(db);
+    return jsonResponse(snapshot, 200);
+  });
 
-export const PUT: APIRoute = async ({ request, locals }) => {
-  try {
+export const PUT: APIRoute = async ({ request, locals }) =>
+  withApiErrorHandling("/api/state", async () => {
+    requireLegacyOwner(locals);
     const db = getD1FromLocals(locals);
-    const body = (await request.json()) as { state?: unknown };
+    const body = (await request.json()) as {
+      state?: unknown;
+      baseVersion?: unknown;
+    };
     const state = body?.state;
     if (!state || typeof state !== "object") {
-      return new Response(JSON.stringify({ error: "Payload inválido" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Payload inválido" }, 400);
     }
 
-    await saveStateToD1(db, requestNamespace(request), state);
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: "No se pudo guardar el estado" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-};
+    const baseVersion =
+      typeof body?.baseVersion === "number" ? body.baseVersion : undefined;
+    const outcome = await saveStateToD1(
+      db,
+      undefined,
+      state,
+      baseVersion,
+    );
+
+    if (!outcome.ok) {
+      // Another device saved since the client's baseVersion: report the current
+      // server snapshot so the client can reconcile instead of overwriting it.
+      return jsonResponse(
+        {
+          conflict: true,
+          state: outcome.current.state,
+          version: outcome.current.version,
+          updatedAt: outcome.current.updatedAt,
+        },
+        409,
+      );
+    }
+
+    return jsonResponse(
+      {
+        ok: true,
+        version: outcome.version,
+        updatedAt: outcome.updatedAt,
+      },
+      200,
+    );
+  });

@@ -3,7 +3,10 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const SQLITE_PATH = resolve(process.cwd(), ".data/finance-tracker.sqlite");
-const OUTPUT_PATH = resolve(process.cwd(), "migrations/0002_import_seeded_state.sql");
+const OUTPUT_PATH = resolve(
+  process.cwd(),
+  "migrations/0002_import_seeded_state.sql",
+);
 const KEEP_IDS = new Set(["default", "current"]);
 
 function toSqlString(value) {
