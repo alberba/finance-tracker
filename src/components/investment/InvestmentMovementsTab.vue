@@ -1,259 +1,316 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, reactive, watch } from 'vue'
+import { computed, ref } from 'vue'
 
-import InvestmentMovementForm from './InvestmentMovementForm.vue'
+import InvestmentMovementPanel from './InvestmentMovementPanel.vue'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import FigureStrip, { type FigureStripItem } from '../ui/FigureStrip.vue'
+import FilterChip from '../ui/FilterChip.vue'
+import IconButton from '../ui/IconButton.vue'
+import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTable.vue'
+import PillTag from '../ui/PillTag.vue'
+import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { computeInvestmentMovement } from '../../scripts/investment-movements'
+import type { InvestmentMovementRow } from '../../domain/investment/view-model'
 import type { Transaction } from '../../scripts/types'
+import { formatDayMonth, formatMonthYear } from '../../lib/format'
 import { useInvestmentStore } from '../../stores/investment'
 import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
 
+// The Movimientos tab: the year and the "only undeclared" filter, the year's
+// figures and its movements by month, each month with its count and net.
+// Creating and editing happen in the side panel.
 defineProps<{ isActive: boolean }>()
 
 const investmentStore = useInvestmentStore()
 const stockEventsStore = useStockEventsStore()
-const uiStore = useUiStore()
-const ui = uiStore.ui
-const { movementRows, yearOptions, investmentCategories } = storeToRefs(investmentStore)
+const ui = useUiStore().ui
+const { movementMonthGroups, yearSummary, yearOptions } = storeToRefs(investmentStore)
 const { formatMoney } = useMoneyFormatter()
 
-const editDraft = reactive({
-  date: '',
-  time: '',
-  side: 'buy',
-  symbol: '',
-  category: '',
-  unitPrice: '',
-  units: '',
-  fee: '',
-  movementCurrency: '',
-  accountId: '',
-  declared: false,
-})
-
-const editIsBitvavo = computed(() => investmentStore.isBitvavoBrokerAccount(editDraft.accountId))
-const editCategoryOptions = computed(() => {
-  if (editIsBitvavo.value) {
-    return ['Crypto']
-  }
-  return Array.from(new Set([...investmentCategories.value, editDraft.category, 'Crypto'])).filter(
-    Boolean,
-  )
-})
-const editComputedAmount = computed(() => {
-  const computed = computeInvestmentMovement({
-    side: editDraft.side === 'sell' ? 'sell' : 'buy',
-    symbol: editDraft.symbol,
-    units: Number(editDraft.units) || 0,
-    unitPrice: Number(editDraft.unitPrice) || 0,
-    fee: Number(editDraft.fee) || 0,
-  })
-  return String(computed.signedAmount)
-})
-
-watch(
-  () => editDraft.accountId,
-  () => {
-    if (editIsBitvavo.value) {
-      editDraft.category = 'Crypto'
-    }
+const panel = ref<InstanceType<typeof InvestmentMovementPanel> | null>(null)
+const pendingDelete = ref<InvestmentMovementRow | null>(null)
+const confirmOpen = computed({
+  get: () => pendingDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingDelete.value = null
   },
+})
+
+const year = computed({
+  get: () => ui.investmentYearFilter,
+  set: (value: number) => investmentStore.setYearFilter(value),
+})
+const onlyUndeclared = computed({
+  get: () => ui.investmentOnlyUndeclared,
+  set: (value: boolean) => investmentStore.setOnlyUndeclared(value),
+})
+const yearSelectOptions = computed(() =>
+  yearOptions.value.map((value) => ({ value, label: String(value) })),
 )
 
-function onStartEdit(tx: Transaction): void {
-  editDraft.date = String(tx.date)
-  editDraft.time = tx.time || '00:00'
-  editDraft.side = tx.side === 'sell' ? 'sell' : 'buy'
-  editDraft.symbol = tx.symbol || tx.category || ''
-  editDraft.category = tx.category || ''
-  editDraft.unitPrice = String(Number.isFinite(tx.unitPrice) ? Number(tx.unitPrice) : 0)
-  editDraft.units = String(Number.isFinite(tx.units) ? Number(tx.units) : 0)
-  editDraft.fee = String(Number.isFinite(tx.fee) ? Number(tx.fee) : 0)
-  editDraft.movementCurrency = (tx.movementCurrency || 'EUR').toUpperCase()
-  editDraft.accountId = tx.accountId
-  editDraft.declared = Boolean(tx.declared)
-  investmentStore.startEditMovement(tx.id)
+const figures = computed<FigureStripItem[]>(() => [
+  { label: `Comprado en ${ui.investmentYearFilter}`, value: formatMoney(yearSummary.value.bought) },
+  { label: 'Vendido', value: formatMoney(yearSummary.value.sold) },
+  { label: 'Comisiones', value: formatMoney(yearSummary.value.fees) },
+  {
+    label: 'Sin declarar',
+    value: String(yearSummary.value.pending),
+    suffix: yearSummary.value.pending === 1 ? 'movimiento' : 'movimientos',
+  },
+])
+
+const groups = computed<LedgerGroup<InvestmentMovementRow>[]>(() =>
+  movementMonthGroups.value.map((group) => ({
+    key: String(group.month),
+    title: formatMonthYear(group.month, ui.investmentYearFilter),
+    summary: `${group.count} ${group.count === 1 ? 'movimiento' : 'movimientos'} · ${
+      group.net >= 0 ? 'neto invertido' : 'neto retirado'
+    } ${formatMoney(Math.abs(group.net))}`,
+    rows: group.rows,
+  })),
+)
+
+const columns: LedgerColumn<InvestmentMovementRow>[] = [
+  { key: 'date', label: 'Fecha', hideBelow: 'sm' },
+  { key: 'asset', label: 'Activo', rowHeader: true },
+  { key: 'units', label: 'Títulos', align: 'right', hideBelow: 'lg' },
+  { key: 'currency', label: 'Moneda', hideBelow: 'lg' },
+  { key: 'fee', label: 'Comisión', align: 'right', hideBelow: 'lg' },
+  { key: 'total', label: 'Total', align: 'right' },
+  { key: 'broker', label: 'Broker', hideBelow: 'md', value: (row) => row.account },
+  { key: 'declared', label: 'Declaración' },
+  { key: 'actions', label: 'Acciones', align: 'right', hideBelow: 'sm' },
+]
+
+const emptyText = computed(() =>
+  ui.investmentOnlyUndeclared
+    ? `Todo declarado en ${ui.investmentYearFilter}. No queda ningún movimiento pendiente.`
+    : `Aún no hay movimientos de inversión en ${ui.investmentYearFilter}.`,
+)
+
+function nameOf(row: InvestmentMovementRow): string {
+  return `${row.sideLabel.toLowerCase()} de ${row.symbol} del ${formatDayMonth(row.tx.date)}`
 }
 
-function onSaveEdit(id: string): void {
-  investmentStore.saveEditedMovement(id, { ...editDraft })
+function formatUnits(value: number | undefined): string {
+  const units = Number(value) || 0
+  const digits = units > 0 && units < 1 ? 5 : 4
+  return units.toLocaleString('es-ES', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
 }
 
-function onYearChange(event: Event): void {
-  investmentStore.setYearFilter(Number((event.target as HTMLSelectElement).value))
+function requestDelete(tx: Transaction): void {
+  pendingDelete.value = investmentStore.movementRows.find((row) => row.tx.id === tx.id) ?? null
 }
 
-function fmt(value: number | undefined, digits: number): string {
-  return Number.isFinite(value) ? Number(value).toFixed(digits) : digits === 2 ? '0.00' : '-'
+function confirmDelete(): void {
+  if (pendingDelete.value) investmentStore.deleteMovement(pendingDelete.value.tx.id)
 }
 </script>
 
 <template>
   <div
     id="investment-tab-movements"
-    class="grid content-start gap-3.5"
+    class="grid content-start gap-6"
     :hidden="!isActive"
     data-investment-tab-panel="movements"
     role="tabpanel"
   >
-    <InvestmentMovementForm />
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div class="flex flex-wrap items-end gap-3">
+        <BaseSelect
+          id="investment-year-filter"
+          v-model="year"
+          label="Año"
+          name="investmentYearFilter"
+          :options="yearSelectOptions"
+          class="w-28"
+        />
+        <FilterChip
+          v-model="onlyUndeclared"
+          label="Solo no declarados"
+          data-investment-only-undeclared
+        />
+      </div>
+      <BaseButton
+        id="investment-movement-new"
+        variant="primary"
+        class="max-sm:w-full"
+        @click="panel?.openNew()"
+      >
+        <svg
+          class="size-4.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Nuevo movimiento
+      </BaseButton>
+    </div>
 
-    <article class="card">
-      <h3>Movimientos de inversión</h3>
-      <div class="inline-controls investment-table-controls">
-        <label>
-          Año
-          <select
-            id="investment-year-filter"
-            name="investmentYearFilter"
-            :value="ui.investmentYearFilter"
-            @change="onYearChange"
+    <section
+      class="border-line bg-panel rounded-lg border px-5 py-5 sm:px-7 sm:py-6"
+      :aria-label="`Resumen de ${ui.investmentYearFilter}`"
+      data-investment-year-summary
+    >
+      <FigureStrip :items="figures" />
+    </section>
+
+    <section
+      class="border-line bg-panel shadow-soft grid gap-3 rounded-lg border px-2 pt-2 pb-4 sm:px-7 sm:pt-4"
+      :aria-label="`Movimientos de inversión de ${ui.investmentYearFilter}`"
+      data-investment-ledger
+    >
+      <LedgerTable
+        :columns="columns"
+        :groups="groups"
+        :row-key="(row) => row.tx.id"
+        :label="`Movimientos de inversión de ${ui.investmentYearFilter}`"
+        :empty-text="emptyText"
+        :row-attrs="
+          (row) => ({
+            'data-investment-tx-id': row.tx.id,
+            'data-investment-operation': row.sideLabel,
+          })
+        "
+      >
+        <template #cell-date="{ row }">
+          <span class="grid gap-0.5 whitespace-nowrap">
+            <span class="font-semibold">{{ formatDayMonth(row.tx.date) }}</span>
+            <span class="font-display text-text-muted text-sm tabular-nums">
+              {{ row.tx.time || '--:--' }}
+            </span>
+          </span>
+        </template>
+        <template #cell-asset="{ row }">
+          <!-- On small screens the actions column is hidden: the asset opens
+               the movement, with its date, broker and currency below. -->
+          <button
+            type="button"
+            class="grid min-h-11 w-full min-w-0 gap-1 text-left sm:hidden"
+            :aria-label="`Editar ${nameOf(row)}`"
+            @click="panel?.openEdit(row.tx)"
           >
-            <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
-          </select>
-        </label>
-        <label class="investment-declared-field">
-          <input
-            id="investment-only-undeclared"
-            type="checkbox"
-            name="investmentOnlyUndeclared"
-            :checked="ui.investmentOnlyUndeclared"
-            @change="investmentStore.setOnlyUndeclared(($event.target as HTMLInputElement).checked)"
-          />
-          Solo no declarados
-        </label>
-      </div>
-      <div class="table-wrap compact">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Hora</th>
-              <th>Operación</th>
-              <th>Símbolo</th>
-              <th>Categoría</th>
-              <th>Precio (€)</th>
-              <th>Títulos</th>
-              <th>Comisión</th>
-              <th>Gasto total</th>
-              <th>Moneda</th>
-              <th>Broker</th>
-              <th>Declarado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="investment-tx-table-body">
-            <tr v-if="!movementRows.length">
-              <td colspan="13">Sin movimientos de inversión para este filtro.</td>
-            </tr>
+            <span class="flex items-center gap-2">
+              <span class="font-mono font-medium">{{ row.symbol }}</span>
+              <PillTag :tone="row.tx.side === 'sell' ? 'accent' : 'invest'">
+                {{ row.sideLabel }}
+              </PillTag>
+            </span>
+            <span class="text-text-muted text-sm">
+              {{ formatDayMonth(row.tx.date) }} · {{ row.account }} · {{ row.currency }}
+            </span>
+          </button>
+          <span class="hidden min-w-0 gap-0.5 sm:grid">
+            <span class="flex items-center gap-2">
+              <span class="font-mono font-medium">{{ row.symbol }}</span>
+              <PillTag :tone="row.tx.side === 'sell' ? 'accent' : 'invest'">
+                {{ row.sideLabel }}
+              </PillTag>
+            </span>
+            <span class="text-text-muted text-sm">{{ row.tx.category || 'Sin categoría' }}</span>
+          </span>
+        </template>
+        <template #cell-units="{ row }">
+          <span class="font-display tabular-nums">{{ formatUnits(row.tx.units) }}</span>
+        </template>
+        <template #cell-currency="{ row }">
+          <PillTag>{{ row.currency }}</PillTag>
+        </template>
+        <template #cell-fee="{ row }">
+          <span class="font-display text-text-muted text-sm tabular-nums">
+            {{ formatMoney(row.tx.fee) }}
+          </span>
+        </template>
+        <template #cell-total="{ row }">
+          <span class="grid justify-items-end gap-0.5 whitespace-nowrap">
+            <span
+              class="font-display tabular-nums"
+              :class="row.tx.side === 'sell' ? TONE_TEXT.gain : 'text-text-main'"
+              data-investment-total
+            >
+              {{ row.tx.side === 'sell' ? '+' : '' }}{{ formatMoney(Math.abs(row.tx.amount)) }}
+            </span>
+            <span class="font-display text-text-muted text-xs tabular-nums">
+              {{ formatUnits(row.tx.units) }} × {{ formatMoney(row.tx.unitPrice) }}
+            </span>
+          </span>
+        </template>
+        <template #cell-declared="{ row }">
+          <button
+            type="button"
+            class="focus-visible:outline-primary inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm font-bold whitespace-nowrap focus-visible:outline-2"
+            :class="
+              row.declared
+                ? 'bg-income/12 text-gain border-transparent'
+                : 'border-accent bg-panel text-text-main'
+            "
+            :aria-pressed="row.declared"
+            :aria-label="`Declaración de ${row.symbol} del ${formatDayMonth(row.tx.date)}: ${
+              row.declared ? 'declarado' : 'pendiente'
+            }`"
+            :data-investment-declared="row.declared ? 'yes' : 'no'"
+            @click="investmentStore.toggleDeclared(row.tx.id)"
+          >
+            <span
+              class="size-2 rounded-full"
+              :class="row.declared ? 'bg-income' : 'bg-accent'"
+              aria-hidden="true"
+            ></span>
+            {{ row.declared ? 'Declarado' : 'Pendiente' }}
+          </button>
+        </template>
+        <template #cell-actions="{ row }">
+          <span class="flex justify-end">
+            <IconButton
+              v-if="stockEventsStore.canSyncSymbol(row.tx.symbol || '')"
+              icon="resend"
+              :label="`Reenviar ${nameOf(row)} a Stock Events`"
+              title="Reenviar a Stock Events"
+              data-investment-resend
+              @click="investmentStore.resyncMovement(row.tx.id)"
+            />
+            <IconButton
+              icon="edit"
+              :label="`Editar ${nameOf(row)}`"
+              @click="panel?.openEdit(row.tx)"
+            />
+            <IconButton
+              icon="trash"
+              tone="danger"
+              :label="`Eliminar ${nameOf(row)}`"
+              @click="requestDelete(row.tx)"
+            />
+          </span>
+        </template>
+      </LedgerTable>
+    </section>
 
-            <template v-for="row in movementRows" v-else :key="row.tx.id">
-              <tr v-if="ui.investmentTxEditingId === row.tx.id" :data-investment-editing-id="row.tx.id">
-                <td><input v-model="editDraft.date" type="date" data-edit-field="date" /></td>
-                <td><input v-model="editDraft.time" type="time" data-edit-field="time" /></td>
-                <td>
-                  <select v-model="editDraft.side" data-edit-field="side">
-                    <option value="buy">Compra</option>
-                    <option value="sell">Venta</option>
-                  </select>
-                </td>
-                <td><input v-model="editDraft.symbol" type="text" data-edit-field="symbol" /></td>
-                <td>
-                  <select
-                    v-model="editDraft.category"
-                    data-edit-field="category"
-                    :disabled="editIsBitvavo"
-                    :aria-disabled="editIsBitvavo ? 'true' : undefined"
-                  >
-                    <option v-for="name in editCategoryOptions" :key="name" :value="name">{{ name }}</option>
-                  </select>
-                </td>
-                <td><input v-model="editDraft.unitPrice" type="number" step="0.0001" min="0" data-edit-field="unitPrice" /></td>
-                <td><input v-model="editDraft.units" type="number" step="0.00000001" min="0" data-edit-field="units" /></td>
-                <td><input v-model="editDraft.fee" type="number" step="0.01" min="0" data-edit-field="fee" /></td>
-                <td><input :value="editComputedAmount" type="number" step="0.01" data-edit-field="amount" readonly /></td>
-                <td><input v-model="editDraft.movementCurrency" type="text" maxlength="3" data-edit-field="movementCurrency" /></td>
-                <td>
-                  <select v-model="editDraft.accountId" data-edit-field="accountId">
-                    <option v-for="account in investmentStore.accounts" :key="account.id" :value="account.id">
-                      {{ account.name }}
-                    </option>
-                  </select>
-                </td>
-                <td>
-                  <input v-model="editDraft.declared" type="checkbox" data-edit-field="declared" aria-label="Movimiento declarado" />
-                </td>
-                <td>
-                  <div class="inline-actions">
-                    <button type="button" class="inline-save-btn icon-action-btn" aria-label="Guardar" @click="onSaveEdit(row.tx.id)">
-                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"></path></svg>
-                    </button>
-                    <button type="button" class="inline-cancel-btn icon-action-btn" aria-label="Cancelar" @click="investmentStore.cancelEditMovement()">
-                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"></path></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-
-              <tr v-else>
-                <td>{{ row.tx.date }}</td>
-                <td>{{ row.tx.time || '--:--' }}</td>
-                <td>{{ row.sideLabel }}</td>
-                <td>{{ row.tx.symbol || row.tx.category || '-' }}</td>
-                <td>{{ row.tx.category || 'Sin categoría' }}</td>
-                <td>{{ fmt(row.tx.unitPrice, 4) }}</td>
-                <td>{{ fmt(row.tx.units, 4) }}</td>
-                <td>{{ fmt(row.tx.fee, 2) }}</td>
-                <td>{{ formatMoney(row.tx.amount) }}</td>
-                <td>{{ row.tx.movementCurrency || 'EUR' }}</td>
-                <td>{{ row.account }}</td>
-                <td>
-                  <button
-                    type="button"
-                    class="secondary-btn"
-                    aria-label="Cambiar declarado"
-                    @click="investmentStore.toggleDeclared(row.tx.id)"
-                  >
-                    <span :class="row.declared ? 'text-(--income)' : 'text-(--expense)'">{{ row.declaredLabel }}</span>
-                  </button>
-                </td>
-                <td>
-                  <div class="inline-actions">
-                    <button
-                      v-if="stockEventsStore.canSyncSymbol(row.tx.symbol || '')"
-                      class="resend-btn icon-action-btn"
-                      type="button"
-                      :aria-label="`Reenviar movimiento del ${row.tx.date} a Stock Events`"
-                      title="Reenviar a Stock Events"
-                      @click="investmentStore.resyncMovement(row.tx.id)"
-                    >
-                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-8 8s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"></path></svg>
-                    </button>
-                    <button
-                      class="edit-btn icon-action-btn"
-                      type="button"
-                      :aria-label="`Editar movimiento del ${row.tx.date}`"
-                      @click="onStartEdit(row.tx)"
-                    >
-                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25z"></path><path d="M20.71 7.04a1 1 0 0 0 0-1.41L18.37 3.29a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
-                    </button>
-                    <button
-                      class="delete-btn icon-action-btn"
-                      type="button"
-                      :aria-label="`Eliminar movimiento del ${row.tx.date}`"
-                      @click="investmentStore.deleteMovement(row.tx.id)"
-                    >
-                      <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 7h12l-1 14H7L6 7z"></path><path d="M9 4h6l1 2H8l1-2z"></path></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </article>
+    <InvestmentMovementPanel ref="panel" @delete="requestDelete" />
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      title="¿Eliminar este movimiento?"
+      title-id="investment-movement-delete-title"
+      confirm-label="Eliminar"
+      @confirm="confirmDelete"
+    >
+      <template v-if="pendingDelete">
+        {{ pendingDelete.sideLabel }} de {{ pendingDelete.symbol }} del
+        {{ formatDayMonth(pendingDelete.tx.date) }} por
+        {{ formatMoney(Math.abs(pendingDelete.tx.amount)) }}. No se puede deshacer y cambiará tus
+        posiciones.
+      </template>
+    </ConfirmDialog>
   </div>
 </template>

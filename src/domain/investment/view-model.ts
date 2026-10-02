@@ -8,6 +8,7 @@ import { parseTransactionYear } from '../../scripts/investment-movements'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
 import { seriesColor } from '../../scripts/chart-theme'
 import { MONTHS, type State, type Transaction } from '../../scripts/types'
+import { monthFromISO } from '../../scripts/utils'
 import {
   computeInvestedCapital,
   computeInvestedCapitalByAsset,
@@ -63,7 +64,10 @@ function toGainPercent(value: number, investedCapital: number): number {
   return investedCapital <= 0 ? 0 : ((value - investedCapital) / investedCapital) * 100
 }
 
-type PositionDetail = Pick<InvestmentPosition, 'symbol' | 'units' | 'averagePrice' | 'lastMovementDate'>
+type PositionDetail = Pick<
+  InvestmentPosition,
+  'symbol' | 'units' | 'averagePrice' | 'lastMovementDate'
+>
 
 /** Symbol, units, average buy price and last movement of an asset up to a month. */
 function buildPositionDetail(state: State, asset: Entity, month: number): PositionDetail {
@@ -205,6 +209,9 @@ export function buildInvestmentDashboardViewModel(
 export interface InvestmentMovementRow {
   tx: Transaction
   account: string
+  /** The traded symbol, or the category for movements saved without one. */
+  symbol: string
+  currency: string
   sideLabel: string
   declaredLabel: string
   declared: boolean
@@ -232,10 +239,73 @@ export function buildInvestmentMovementRows(
     .map((tx) => ({
       tx,
       account: getAccountName(tx.accountId),
+      symbol: tx.symbol || tx.category || '—',
+      currency: (tx.movementCurrency || 'EUR').toUpperCase(),
       sideLabel: tx.side === 'sell' ? 'Venta' : 'Compra',
       declaredLabel: tx.declared ? 'Sí' : 'No',
       declared: Boolean(tx.declared),
     }))
+}
+
+/**
+ * Money a movement put into the portfolio: a purchase's stored amount (fee
+ * included, see computeInvestmentMovement), negative for what a sale brought in.
+ */
+function investedFlow(tx: Transaction): number {
+  const amount = Math.abs(Number(tx.amount) || 0)
+  return tx.side === 'sell' ? -amount : amount
+}
+
+export interface InvestmentYearSummary {
+  /** Spent on purchases, fees included. */
+  bought: number
+  /** Brought in by sales. */
+  sold: number
+  fees: number
+  /** Movements not declared yet. */
+  pending: number
+}
+
+/** The year's figures, regardless of the "only undeclared" filter. */
+export function summarizeInvestmentYear(state: State, year: number): InvestmentYearSummary {
+  const summary: InvestmentYearSummary = { bought: 0, sold: 0, fees: 0, pending: 0 }
+  for (const tx of state.transactions) {
+    if (tx.type !== 'investment' || parseTransactionYear(tx.date) !== year) continue
+    const flow = investedFlow(tx)
+    if (flow < 0) summary.sold -= flow
+    else summary.bought += flow
+    summary.fees += Number(tx.fee) || 0
+    if (!tx.declared) summary.pending += 1
+  }
+  return summary
+}
+
+export interface InvestmentMonthGroup {
+  /** 0-based month. */
+  month: number
+  count: number
+  /** Purchases (fees included) minus what sales brought in. */
+  net: number
+  rows: InvestmentMovementRow[]
+}
+
+/** Rows (already sorted newest first) grouped by the month of their date. */
+export function groupInvestmentMovementsByMonth(
+  rows: InvestmentMovementRow[],
+): InvestmentMonthGroup[] {
+  const groups: InvestmentMonthGroup[] = []
+  for (const row of rows) {
+    const month = monthFromISO(row.tx.date) ?? row.tx.month
+    let group = groups.find((item) => item.month === month)
+    if (!group) {
+      group = { month, count: 0, net: 0, rows: [] }
+      groups.push(group)
+    }
+    group.net += investedFlow(row.tx)
+    group.count += 1
+    group.rows.push(row)
+  }
+  return groups.sort((a, b) => b.month - a.month)
 }
 
 export function buildInvestmentYearOptions(state: State): number[] {
@@ -253,4 +323,3 @@ export function buildInvestmentYearOptions(state: State): number[] {
   }
   return years
 }
-

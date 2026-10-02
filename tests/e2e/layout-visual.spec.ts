@@ -45,6 +45,40 @@ const INVESTMENT_VIEWS: Array<{
   },
   { name: 'investment-movements', open: (_page, tracker) => tracker.openInvestmentMovementsTab() },
   {
+    name: 'investment-movement-panel',
+    open: async (_page, tracker) => {
+      await tracker.openInvestmentMovementPanel()
+    },
+  },
+  {
+    name: 'investment-movement-edit-panel',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentMovementsTab()
+      await page
+        .locator('#investment tr[data-investment-tx-id]')
+        .first()
+        .getByRole('button', { name: /^Editar / })
+        .click()
+      await expect(tracker.investmentMovementPanel()).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-movement-delete-dialog',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentMovementsTab()
+      const row = page.locator('#investment tr[data-investment-tx-id]').first()
+      const rowDelete = row.getByRole('button', { name: /^Eliminar / })
+      if (await rowDelete.isVisible()) {
+        await rowDelete.click()
+      } else {
+        // Small screens hide the row actions: delete from the edit panel.
+        await row.getByRole('button', { name: /^Editar / }).click()
+        await tracker.investmentMovementPanel().getByRole('button', { name: 'Eliminar' }).click()
+      }
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+  {
     name: 'investment-contributions',
     open: (_page, tracker) => tracker.openInvestmentContributionsTab(),
   },
@@ -115,7 +149,10 @@ type LayoutScanResult = {
   undersizedInteractiveElements: string[]
 }
 
-async function getLayoutScanResult(page: Page, sectionId: FinanceSectionId): Promise<LayoutScanResult> {
+async function getLayoutScanResult(
+  page: Page,
+  sectionId: FinanceSectionId,
+): Promise<LayoutScanResult> {
   return await page.evaluate((id) => {
     const activePanel = document.getElementById(id)
     const overlapIssues: LayoutIssue[] = []
@@ -305,7 +342,12 @@ async function expectSectionSnapshot(
   sectionId: FinanceSectionId,
   name: string,
 ): Promise<void> {
-  await expectViewSnapshot(page, tracker, () => openSectionForLayout(page, tracker, sectionId), name)
+  await expectViewSnapshot(
+    page,
+    tracker,
+    () => openSectionForLayout(page, tracker, sectionId),
+    name,
+  )
 }
 
 async function expectSoundLayout(
@@ -410,7 +452,12 @@ test.describe('Movimientos · vistas secundarias', { tag: '@visual' }, () => {
     })
 
     test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(page, tracker, () => view.open(page, tracker), `page-${view.name}.png`)
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+      )
     })
   }
 

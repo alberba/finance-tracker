@@ -21,6 +21,8 @@ import {
 import {
   buildInvestmentDashboardViewModel,
   buildInvestmentMovementRows,
+  groupInvestmentMovementsByMonth,
+  summarizeInvestmentYear,
   buildInvestmentYearOptions,
   type ReturnMode,
 } from '../domain/investment/view-model'
@@ -180,6 +182,12 @@ export const useInvestmentStore = defineStore('investment', () => {
     ),
   )
 
+  const movementMonthGroups = computed(() => groupInvestmentMovementsByMonth(movementRows.value))
+
+  const yearSummary = computed(() =>
+    summarizeInvestmentYear(financialStateStore.state, ui.investmentYearFilter),
+  )
+
   const contributionRows = computed(() => buildContributionMetricRows(financialStateStore.state))
 
   function setTab(tab: InvestmentSubTab): void {
@@ -201,14 +209,6 @@ export const useInvestmentStore = defineStore('investment', () => {
 
   function setOnlyUndeclared(value: boolean): void {
     ui.investmentOnlyUndeclared = value
-    ui.investmentTxEditingId = ''
-  }
-
-  function startEditMovement(id: string): void {
-    ui.investmentTxEditingId = id
-  }
-
-  function cancelEditMovement(): void {
     ui.investmentTxEditingId = ''
   }
 
@@ -504,6 +504,8 @@ export const useInvestmentStore = defineStore('investment', () => {
     dashboardViewModel,
     yearOptions,
     movementRows,
+    movementMonthGroups,
+    yearSummary,
     contributionRows,
     getAccountName,
     isBitvavoBrokerAccount,
@@ -513,8 +515,6 @@ export const useInvestmentStore = defineStore('investment', () => {
     setMonth,
     setYearFilter,
     setOnlyUndeclared,
-    startEditMovement,
-    cancelEditMovement,
     addMovement,
     saveEditedMovement,
     resyncMovement,
