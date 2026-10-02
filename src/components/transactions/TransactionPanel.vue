@@ -237,9 +237,9 @@ defineExpose({ openNew, openEdit })
           <span class="text-ink-muted text-sm">{{ previewLabel }}</span>
           <span class="text-ink-text/80 text-sm">{{ previewDetail }}</span>
         </div>
-        <output class="font-display text-2xl font-medium tabular-nums" data-tx-preview>
+        <p class="font-display text-2xl font-medium tabular-nums" data-tx-preview>
           {{ preview }}
-        </output>
+        </p>
       </div>
 
       <p v-if="form.type === 'investment'" class="text-text-muted text-sm">

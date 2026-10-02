@@ -6,6 +6,7 @@ import SegmentedControl from '../ui/SegmentedControl.vue'
 import { TYPE_PLURAL, seriesColor } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { formatMonthName, formatPercent } from '../../lib/format'
+import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import type { TransactionType } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
@@ -88,7 +89,9 @@ const segments = computed(() =>
               :style="{ background: row.color }"
               aria-hidden="true"
             ></span>
-            <span class="truncate">{{ row.category }}</span>
+            <span class="truncate">
+              {{ decorateCategoryLabel(type, row.category, movementsStore.categoryEmojis) }}
+            </span>
           </span>
           <span class="font-display tabular-nums" data-summary-amount>{{
             formatMoney(row.amount)

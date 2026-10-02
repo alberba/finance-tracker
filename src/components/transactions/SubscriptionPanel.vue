@@ -175,9 +175,9 @@ defineExpose({ openNew, openEdit })
             {{ formatMoney(annual) }} al año
           </span>
         </div>
-        <output class="font-display text-2xl font-medium tabular-nums" data-subscription-preview>
+        <p class="font-display text-2xl font-medium tabular-nums" data-subscription-preview>
           ≈ {{ formatMoney(annual / 12) }} / mes
-        </output>
+        </p>
       </div>
       <p class="text-text-muted text-sm">
         Mientras esté activa, cada cobro se apunta como gasto en el Registro el día que vence. Si la

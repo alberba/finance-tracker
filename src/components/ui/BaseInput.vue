@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useAttrs, type StyleValue } from 'vue'
+import { computed, useAttrs, useId, type StyleValue } from 'vue'
 
 import { FIELD_CONTROL, FIELD_LABEL } from './field'
 
@@ -8,10 +8,14 @@ import { FIELD_CONTROL, FIELD_LABEL } from './field'
 // right-aligned figure of a panel, with its currency after it.
 defineOptions({ inheritAttrs: false })
 
-// `class` and `style` place the field (on the label); the rest go to the control.
+// `class` and `style` place the field (on its wrapper); the rest go to the
+// control. The label points at the control with `for`, so the control's name
+// is the label alone, never the label plus the chosen value.
 const attrs = useAttrs()
+const generatedId = useId()
+const controlId = computed(() => String(attrs.id ?? generatedId))
 const controlAttrs = computed(() => {
-  const { class: _class, style: _style, ...rest } = attrs
+  const { class: _class, style: _style, id: _id, ...rest } = attrs
   return rest
 })
 
@@ -30,8 +34,8 @@ const value = defineModel<string>({ required: true })
 </script>
 
 <template>
-  <label :class="[FIELD_LABEL, $attrs.class]" :style="$attrs.style as StyleValue">
-    <span :class="{ 'sr-only': hideLabel }">{{ label }}</span>
+  <div :class="[FIELD_LABEL, $attrs.class]" :style="$attrs.style as StyleValue">
+    <label :for="controlId" :class="{ 'sr-only': hideLabel }">{{ label }}</label>
     <span class="relative flex items-center">
       <span
         v-if="$slots.leading"
@@ -42,6 +46,7 @@ const value = defineModel<string>({ required: true })
       </span>
       <input
         v-model="value"
+        :id="controlId"
         v-bind="controlAttrs"
         :class="[
           FIELD_CONTROL,
@@ -61,5 +66,5 @@ const value = defineModel<string>({ required: true })
         {{ suffix }}
       </span>
     </span>
-  </label>
+  </div>
 </template>

@@ -5,14 +5,15 @@ import BaseInput from '../../src/components/ui/BaseInput.vue'
 import BaseSelect from '../../src/components/ui/BaseSelect.vue'
 
 describe('BaseInput', () => {
-  it('envuelve el campo en su etiqueta y pasa los atributos al input', () => {
+  it('nombra el campo con su etiqueta y pasa los atributos al input', () => {
     const wrapper = mount(BaseInput, {
       props: { label: 'Descripción', modelValue: 'Mercadona' },
       attrs: { name: 'description', maxlength: '140' },
     })
 
-    const input = wrapper.get('label input')
-    expect(wrapper.get('label').text()).toContain('Descripción')
+    const input = wrapper.get('input')
+    expect(wrapper.get('label').text()).toBe('Descripción')
+    expect(wrapper.get('label').attributes('for')).toBe(input.attributes('id'))
     expect(input.attributes('name')).toBe('description')
     expect(input.attributes('maxlength')).toBe('140')
     expect((input.element as HTMLInputElement).value).toBe('Mercadona')
@@ -26,13 +27,23 @@ describe('BaseInput', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['Luz']])
   })
 
-  it('coloca la clase en la etiqueta para situar el campo, no en el input', () => {
+  it('usa el id que se le da para el campo', () => {
+    const wrapper = mount(BaseInput, {
+      props: { label: 'Importe', modelValue: '' },
+      attrs: { id: 'tx-amount' },
+    })
+
+    expect(wrapper.get('input').attributes('id')).toBe('tx-amount')
+    expect(wrapper.get('label').attributes('for')).toBe('tx-amount')
+  })
+
+  it('coloca la clase en el contenedor para situar el campo, no en el input', () => {
     const wrapper = mount(BaseInput, {
       props: { label: 'Descripción', modelValue: '' },
       attrs: { class: 'sm:col-span-2' },
     })
 
-    expect(wrapper.get('label').classes()).toContain('sm:col-span-2')
+    expect(wrapper.classes()).toContain('sm:col-span-2')
     expect(wrapper.get('input').classes()).not.toContain('sm:col-span-2')
   })
 
@@ -41,7 +52,7 @@ describe('BaseInput', () => {
       props: { label: 'Buscar movimientos', modelValue: '', hideLabel: true },
     })
 
-    expect(wrapper.get('label span.sr-only').text()).toBe('Buscar movimientos')
+    expect(wrapper.get('label.sr-only').text()).toBe('Buscar movimientos')
   })
 })
 

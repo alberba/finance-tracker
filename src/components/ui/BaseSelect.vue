@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends string | number">
-import { computed, useAttrs, type StyleValue } from 'vue'
+import { computed, useAttrs, useId, type StyleValue } from 'vue'
 
 import { FIELD_CONTROL, FIELD_LABEL } from './field'
 
@@ -13,10 +13,14 @@ export interface SelectOption<V extends string | number = string> {
 // select itself.
 defineOptions({ inheritAttrs: false })
 
-// `class` and `style` place the field (on the label); the rest go to the control.
+// `class` and `style` place the field (on its wrapper); the rest go to the
+// control. The label points at the control with `for`, so the control's name
+// is the label alone, never the label plus the chosen value.
 const attrs = useAttrs()
+const generatedId = useId()
+const controlId = computed(() => String(attrs.id ?? generatedId))
 const controlAttrs = computed(() => {
-  const { class: _class, style: _style, ...rest } = attrs
+  const { class: _class, style: _style, id: _id, ...rest } = attrs
   return rest
 })
 
@@ -33,11 +37,12 @@ const value = defineModel<T>({ required: true })
 </script>
 
 <template>
-  <label :class="[FIELD_LABEL, $attrs.class]" :style="$attrs.style as StyleValue">
-    <span :class="{ 'sr-only': hideLabel }">{{ label }}</span>
+  <div :class="[FIELD_LABEL, $attrs.class]" :style="$attrs.style as StyleValue">
+    <label :for="controlId" :class="{ 'sr-only': hideLabel }">{{ label }}</label>
     <span class="relative flex items-center">
       <select
         v-model="value"
+        :id="controlId"
         v-bind="controlAttrs"
         :class="[FIELD_CONTROL, 'cursor-pointer appearance-none pr-10 text-base']"
       >
@@ -60,5 +65,5 @@ const value = defineModel<T>({ required: true })
         <path d="M6 9l6 6 6-6" />
       </svg>
     </span>
-  </label>
+  </div>
 </template>

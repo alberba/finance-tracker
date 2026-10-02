@@ -9,6 +9,7 @@ import { TYPE_LABEL, TYPE_TAG, seriesColor } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { signedAmount } from '../../domain/transactions/registry'
 import { formatDayMonth, formatMonthName, formatMonthYear } from '../../lib/format'
+import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import type { Transaction, TxSortColumn } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
@@ -131,7 +132,7 @@ const emptyText = computed(() =>
       :row-key="(tx) => tx.id"
       :label="`Movimientos de ${ui.txYear}`"
       :empty-text="emptyText"
-      :row-attrs="(tx) => ({ 'data-tx-id': tx.id })"
+      :row-attrs="(tx) => ({ 'data-tx-id': tx.id, 'data-tx-month': String(tx.month) })"
       :row-class="(tx) => (isSelected(tx) ? 'bg-primary/8' : '')"
     >
       <template #head-select>
@@ -189,7 +190,7 @@ const emptyText = computed(() =>
               :style="{ background: categoryDot(row) }"
               aria-hidden="true"
             ></span>
-            {{ row.category || 'Sin categoría' }}
+            {{ decorateCategoryLabel(row.type, row.category, movementsStore.categoryEmojis) }}
           </span>
         </span>
       </template>

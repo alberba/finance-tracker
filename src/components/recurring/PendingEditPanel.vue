@@ -233,9 +233,9 @@ defineExpose({ openFor })
         <BaseInput v-model="draft.fee" label="Comisiones" type="number" min="0" step="0.01" />
         <div class="bg-subtle grid content-center gap-1 rounded-md px-4 py-2.5">
           <span class="text-text-muted text-sm">Importe total</span>
-          <output class="font-display text-lg tabular-nums">{{
+          <p class="font-display text-lg tabular-nums">{{
             formatMoney(investmentTotal)
-          }}</output>
+          }}</p>
         </div>
       </fieldset>
     </form>
