@@ -50,7 +50,7 @@ wrangler secret put COINGECKO_API_KEY
 Para probarlo en local:
 
 ```bash
-cp .dev.vars.example .dev.vars
+cp .dev.vars.example .dev.vars   # en un worktree: pnpm setup:worktree
 # Edita .dev.vars y añade TWELVE_DATA_API_KEY
 pnpm dev
 ```
@@ -72,17 +72,22 @@ wrangler secret put COINGECKO_API_KEY
 
 ### 1) Configuración D1
 
-Este repo ya incluye:
+`wrangler.toml` declara dos bases D1, cada una con su carpeta de migraciones:
 
-- `wrangler.toml` con los bindings `finance_tracker_db` y `finance_tracker_db_v2`
-- `migrations/0001_create_app_state.sql`
-- `migrations/0002_import_seeded_state.sql` (import de namespaces persistentes)
+| Binding | Base | Migraciones | Contenido |
+|---|---|---|---|
+| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (*sync v2*), el que usa la app |
+| `finance_tracker_db` | `finance-tracker-db` | `migrations/` | Blob legacy v1 |
+
+Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.
 
 Aplicar migraciones:
 
 ```bash
-pnpm d1:migrate:local
-pnpm d1:migrate:remote
+pnpm d1:migrate:local:v2    # v2, local
+pnpm d1:migrate:remote:v2   # v2, producción
+pnpm d1:migrate:local       # v1, local
+pnpm d1:migrate:remote      # v1, producción
 ```
 
 Si cambias `wrangler.toml`, regenera tipos:

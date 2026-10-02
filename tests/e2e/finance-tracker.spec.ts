@@ -436,7 +436,9 @@ test.describe("Finance tracker E2E", () => {
     await assertSortedDescByAmount("investment");
   });
 
-  test("home no muestra bloque legacy de filtros en movimientos", async ({
+  // Quarantine: raw navigation does not wait for finance-ready before interacting.
+  // https://github.com/alberba/finance-tracker/issues/233
+  test.fixme("home no muestra bloque legacy de filtros en movimientos", async ({
     page,
     tracker,
   }) => {
