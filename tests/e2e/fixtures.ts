@@ -41,7 +41,10 @@ export const test = base.extend<Fixtures>({
     // run serially; multi-user isolation is covered against the relational v2
     // APIs instead of manufacturing tenants inside v1.
     const reset = await page.request.post('/api/state/reset-legacy', { data: {} })
-    expect(reset.ok()).toBe(true)
+    expect(
+      reset.ok(),
+      `POST /api/state/reset-legacy devolvió ${reset.status()}. Si es 401/403, faltan TEST_AUTH_ENABLED o LEGACY_OWNER_EMAIL en .dev.vars: ejecuta \`pnpm setup:worktree\`.`,
+    ).toBe(true)
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
     await use(tracker)

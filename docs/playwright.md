@@ -46,8 +46,26 @@ suites visual y sync-v2 dentro de un mismo job. Los blob reports solo se combina
 `playwright-report` cuando falla alguna suite completa. Las ejecuciones anteriores de la misma rama
 se cancelan y los artifacts se conservan siete días.
 
-Los snapshots Linux se actualizan explícitamente después de revisar el resultado visual:
+Los snapshots versionados son `*-linux.png`, la plataforma de CI. En macOS se comparan y
+actualizan dentro de la imagen Linux de Playwright con Docker, después de revisar el resultado
+visual:
 
 ```bash
-pnpm test:e2e:visual --update-snapshots
+pnpm test:e2e:visual:linux                      # compara
+pnpm test:e2e:visual:linux --update-snapshots   # regenera
+pnpm test:e2e:visual:linux tests/e2e/layout-visual.spec.ts --project=mobile-chrome
 ```
+
+El script (`scripts/e2e-visual-linux.sh`) arranca un dev server propio de este worktree en
+`VISUAL_PORT` (4398 por defecto; su log queda en `.wrangler/visual-dev-server.log`) y lo para al
+terminar. `pnpm test:e2e:visual` sin `:linux` en macOS compara contra snapshots de otra
+plataforma.
+
+## Worktrees
+
+- Un worktree nuevo no tiene `.dev.vars` (está en `.gitignore`): ejecuta `pnpm setup:worktree`.
+  Sin `TEST_AUTH_ENABLED` y `LEGACY_OWNER_EMAIL`, cada spec falla en `reset-legacy` con 401/403.
+- `pnpm test:e2e` arranca su propio servidor en 4321 (`reuseExistingServer: false`) y falla si ese
+  puerto ya está ocupado. Para usar un servidor ya arrancado, pásalo con `PLAYWRIGHT_BASE_URL`.
+- Varios worktrees a la vez necesitan puertos distintos: `pnpm dev --port <n>` y
+  `PLAYWRIGHT_BASE_URL=http://127.0.0.1:<n>`.

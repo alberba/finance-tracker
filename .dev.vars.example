@@ -16,3 +16,8 @@ COINGECKO_API_PLAN=demo
 # (ver src/middleware.ts). NUNCA definir esta variable en wrangler.toml
 # [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
 TEST_AUTH_ENABLED=true
+
+# Solo para desarrollo local / Playwright: el email del propietario del estado
+# legacy. Los specs E2E resetean ese estado en cada test (`/api/state/reset-legacy`)
+# y sin esta variable responde 403. Mismo valor que usa CI.
+LEGACY_OWNER_EMAIL=legacy-owner@e2e.test
