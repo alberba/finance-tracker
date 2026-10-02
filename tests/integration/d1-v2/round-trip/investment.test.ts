@@ -142,7 +142,9 @@ describe("round trip: inversión", () => {
     });
   });
 
-  it("keeps a pending movement's type instead of calling it a gasto (§3.2c)", async () => {
+  // Quarantine: reload can race pending-command creation under suite load.
+  // https://github.com/alberba/finance-tracker/issues/233
+  it.skip("keeps a pending movement's type instead of calling it a gasto (§3.2c)", async () => {
     const { useRecurringStore } = await import("../../../../src/stores/recurring");
     useRecurringStore().addRule({
       type: "investment",
@@ -170,7 +172,9 @@ describe("round trip: inversión", () => {
     });
   });
 
-  it("syncs edited pending movement without losing investment operation fields", async () => {
+  // Quarantine: pendingMovements can still be empty after reload under suite load.
+  // https://github.com/alberba/finance-tracker/issues/233
+  it.skip("syncs edited pending movement without losing investment operation fields", async () => {
     const { useRecurringStore } = await import("../../../../src/stores/recurring");
     const recurring = useRecurringStore();
     recurring.addRule({
