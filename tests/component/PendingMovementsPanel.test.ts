@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import PendingMovementsPanel from '../../src/components/recurring/PendingMovementsPanel.vue'
+import { nextTick } from 'vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useRecurringStore } from '../../src/stores/recurring'
 
@@ -51,20 +52,24 @@ describe('PendingMovementsPanel', () => {
     return { financialStore, recurringStore: useRecurringStore() }
   }
 
+  // Editar opens the side panel; its form is where the pending movement changes.
   async function openEditForm(wrapper: ReturnType<typeof mount>) {
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Editar')
-    expect(editButton).toBeDefined()
-    await editButton!.trigger('click')
-    return wrapper.get('form')
+    await wrapper.get('button[aria-label^="Editar"]').trigger('click')
+    await nextTick()
+    expect((wrapper.get('#pending-edit-panel').element as HTMLDialogElement).open).toBe(true)
+    return wrapper.get('#pending-edit-form')
   }
 
-  it('renders type selector and category select populated with categories of current type', async () => {
+  async function pickType(form: ReturnType<ReturnType<typeof mount>['get']>, type: string) {
+    await form.get(`button[data-pending-type="${type}"]`).trigger('click')
+  }
+
+  it('renders type control and category select populated with categories of current type', async () => {
     setupState()
-    const wrapper = mount(PendingMovementsPanel)
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
-    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
-    expect(typeSelect).toBeDefined()
+    expect(form.get('button[data-pending-type="expense"]').attributes('aria-pressed')).toBe('true')
 
     const categorySelect = form.findAll('select').find((s) => s.text().includes('Vivienda'))
     expect(categorySelect).toBeDefined()
@@ -74,13 +79,12 @@ describe('PendingMovementsPanel', () => {
 
   it('shows investment fields and accounts when reclassifying type to investment', async () => {
     setupState()
-    const wrapper = mount(PendingMovementsPanel)
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
     expect(form.text()).not.toContain('Símbolo')
 
-    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
-    await typeSelect!.setValue('investment')
+    await pickType(form, 'investment')
 
     expect(form.text()).toContain('Símbolo')
     expect(form.text()).toContain('Títulos')
@@ -95,11 +99,10 @@ describe('PendingMovementsPanel', () => {
 
   it('submits updated investment fields to recurring store', async () => {
     const { recurringStore } = setupState()
-    const wrapper = mount(PendingMovementsPanel)
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
-    const typeSelect = form.findAll('select').find((s) => s.text().includes('Gasto') && s.text().includes('Inversión'))
-    await typeSelect!.setValue('investment')
+    await pickType(form, 'investment')
 
     const categorySelect = form.findAll('select').find((s) => s.text().includes('Fondos Indexados'))
     await categorySelect!.setValue('Fondos Indexados')
@@ -157,7 +160,7 @@ describe('PendingMovementsPanel', () => {
       ]
     })
 
-    const wrapper = mount(PendingMovementsPanel)
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
     const symbolInput = form.find<HTMLInputElement>('input[placeholder="VWCE"]')
@@ -171,7 +174,7 @@ describe('PendingMovementsPanel', () => {
   })
 
   it('preserves legacy category without clobbering when opening edit form', async () => {
-    const { financialStore } = setupState()
+    const { financialStore, recurringStore } = setupState()
     financialStore.commitState((draft) => {
       draft.pendingMovements = [
         {
@@ -195,11 +198,14 @@ describe('PendingMovementsPanel', () => {
       ]
     })
 
-    const wrapper = mount(PendingMovementsPanel)
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
     const categorySelect = form.findAll('select').find((s) => s.text().includes('Categoría Antigua Desconocida'))
     expect(categorySelect).toBeDefined()
-    expect(categorySelect?.element.value).toBe('Categoría Antigua Desconocida')
+
+    await form.trigger('submit')
+
+    expect(recurringStore.openPendingMovements[0].category).toBe('Categoría Antigua Desconocida')
   })
 })

@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import { computed, useAttrs, type StyleValue } from 'vue'
+
 import { FIELD_CONTROL, FIELD_LABEL } from './field'
 
 // A labelled text, number, date or search input. Other attributes (name,
 // type, maxlength, required…) go to the input itself. `amount` is the large
 // right-aligned figure of a panel, with its currency after it.
 defineOptions({ inheritAttrs: false })
+
+// `class` and `style` place the field (on the label); the rest go to the control.
+const attrs = useAttrs()
+const controlAttrs = computed(() => {
+  const { class: _class, style: _style, ...rest } = attrs
+  return rest
+})
 
 withDefaults(
   defineProps<{
@@ -21,7 +30,7 @@ const value = defineModel<string>({ required: true })
 </script>
 
 <template>
-  <label :class="FIELD_LABEL">
+  <label :class="[FIELD_LABEL, $attrs.class]" :style="$attrs.style as StyleValue">
     <span :class="{ 'sr-only': hideLabel }">{{ label }}</span>
     <span class="relative flex items-center">
       <span
@@ -33,12 +42,12 @@ const value = defineModel<string>({ required: true })
       </span>
       <input
         v-model="value"
-        v-bind="$attrs"
+        v-bind="controlAttrs"
         :class="[
           FIELD_CONTROL,
           variant === 'amount'
             ? 'font-display h-16 pr-12 text-right text-3xl font-medium tabular-nums'
-            : '',
+            : 'text-base',
           $slots.leading ? 'pl-10' : '',
           suffix && variant !== 'amount' ? 'pr-9' : '',
         ]"

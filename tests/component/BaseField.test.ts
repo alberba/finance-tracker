@@ -26,6 +26,16 @@ describe('BaseInput', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['Luz']])
   })
 
+  it('coloca la clase en la etiqueta para situar el campo, no en el input', () => {
+    const wrapper = mount(BaseInput, {
+      props: { label: 'Descripción', modelValue: '' },
+      attrs: { class: 'sm:col-span-2' },
+    })
+
+    expect(wrapper.get('label').classes()).toContain('sm:col-span-2')
+    expect(wrapper.get('input').classes()).not.toContain('sm:col-span-2')
+  })
+
   it('puede ocultar la etiqueta sin quitarle el nombre al campo', () => {
     const wrapper = mount(BaseInput, {
       props: { label: 'Buscar movimientos', modelValue: '', hideLabel: true },

@@ -108,12 +108,23 @@ const shortDate = new Intl.DateTimeFormat('es-ES', {
   year: 'numeric',
   timeZone: 'UTC',
 })
+const dayMonth = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+})
 const longDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' })
 
 /** "15 jul 2026" from an ISO date. */
 export function formatShortDate(isoDate: string): string {
   const date = parseIsoDate(isoDate)
   return date ? shortDate.format(date) : MISSING
+}
+
+/** "27 sept" from an ISO date, for rows already grouped by month or year. */
+export function formatDayMonth(isoDate: string): string {
+  const date = parseIsoDate(isoDate)
+  return date ? dayMonth.format(date) : MISSING
 }
 
 /** "31 de julio de 2026" from an ISO date. */
@@ -143,10 +154,16 @@ export function formatStamp(instant: string, timeZone?: string): string {
   return `${pad(parts.day)}/${pad(parts.month)}, ${pad(parts.hour)}:${pad(parts.minute)}`
 }
 
+/** "Julio" from a 0-based month index; empty when there is no such month. */
+export function formatMonthName(month: number): string {
+  const name = MONTH_NAMES[month]
+  return name ? `${name.charAt(0).toUpperCase()}${name.slice(1)}` : ''
+}
+
 /** "Julio 2026" from a 0-based month index. */
 export function formatMonthYear(month: number, year: number): string {
-  const name = MONTH_NAMES[month]
-  return name ? `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}` : String(year)
+  const name = formatMonthName(month)
+  return name ? `${name} ${year}` : String(year)
 }
 
 /** Short x-axis label: month names shrink to three letters, dates stay whole. */

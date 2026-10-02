@@ -31,7 +31,7 @@ const parts = computed(() => splitDecimals(props.value))
 
 <template>
   <section
-    class="bg-ink border-ink-line text-ink-text grid border gap-5 rounded-lg px-5 py-6 sm:px-9 sm:py-8 lg:flex lg:items-end lg:gap-0"
+    class="bg-ink border-ink-line text-ink-text grid gap-5 rounded-lg border px-5 py-6 sm:px-9 sm:py-8 lg:flex lg:items-end lg:gap-0"
     :aria-label="ariaLabel"
   >
     <div class="grid gap-2.5 lg:flex-[1.6] lg:pr-8">

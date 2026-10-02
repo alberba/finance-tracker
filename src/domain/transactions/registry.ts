@@ -1,7 +1,6 @@
-import { round2 } from '../../lib/number'
+import { parseDecimal, round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
 import type { Transaction, TransactionType } from '../../scripts/types'
-import { parseFloatSafe } from '../../scripts/utils'
 
 type Dated = Pick<Transaction, 'date' | 'month'>
 
@@ -72,7 +71,7 @@ export function signedAmount(tx: Transaction): number {
 }
 
 function bound(value: string): number | null {
-  const parsed = value === '' ? NaN : parseFloatSafe(value, NaN)
+  const parsed = parseDecimal(value)
   return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -89,7 +88,9 @@ function matcher(filters: RegistryFilters): (tx: Transaction) => boolean {
     if (max !== null && amount > max) return false
     if (!search) return true
     return [tx.description, tx.category].some((text) =>
-      String(text || '').toLowerCase().includes(search),
+      String(text || '')
+        .toLowerCase()
+        .includes(search),
     )
   }
 }
