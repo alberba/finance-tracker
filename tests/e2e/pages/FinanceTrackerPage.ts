@@ -8,7 +8,7 @@ const SECTION_CONFIG = {
   },
   budget: { buttonLabel: "Presupuesto", headingText: "Presupuesto" },
   wealth: { buttonLabel: "Patrimonio", headingText: "Patrimonio total" },
-  investment: { buttonLabel: "Inversión", headingText: "Inversión y aportes" },
+  investment: { buttonLabel: "Inversión", headingText: /^Inversión$/ },
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
   data: { buttonLabel: "Datos", headingText: "Datos y backups" },
@@ -120,7 +120,7 @@ export class FinanceTrackerPage {
   async openInvestmentDashboardTab() {
     await this.openInvestment();
     await this.investmentSection()
-      .getByRole("tab", { name: "Dashboard" })
+      .getByRole("tab", { name: "Resumen" })
       .click();
   }
 
@@ -1131,7 +1131,7 @@ export class FinanceTrackerPage {
   private async openSection(
     buttonLabel: string,
     sectionId: string,
-    headingText: string,
+    headingText: string | RegExp,
   ) {
     // Callers often reload or navigate right before this; the nav buttons do
     // nothing until the app has booted.

@@ -19,6 +19,8 @@ import type { InstrumentType } from '../scripts/types'
 import { slug, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 
+const CLOCK_INTERVAL_MS = 60_000
+
 export interface NewInstrumentInput {
   investmentAssetId: string
   type: InstrumentType
@@ -32,7 +34,12 @@ export const useMarketStore = defineStore('market', () => {
   const financialStateStore = useFinancialStateStore()
   const instruments = computed(() => financialStateStore.state.instruments)
   const quotes = computed(() => financialStateStore.state.quotes)
-  const valuation = computed<PortfolioValuation>(() => buildPortfolioValuation(financialStateStore.state))
+  // Quotes age with time, not only with state changes: `tickClock` moves this
+  // forward so a fresh quote turns stale without waiting for a new commit.
+  const now = shallowRef(new Date())
+  const valuation = computed<PortfolioValuation>(() =>
+    buildPortfolioValuation(financialStateStore.state, { now: now.value }),
+  )
   const isLoading = shallowRef(false)
   const errorMessage = shallowRef<string | null>(null)
   const lastRefreshAt = shallowRef<string | null>(null)
@@ -149,6 +156,27 @@ export const useMarketStore = defineStore('market', () => {
     return linkedCount
   }
 
+  function tickClock(): void {
+    now.value = new Date()
+  }
+
+  // One shared clock however many views keep quotes live: the first starts
+  // it, the last to stop clears it.
+  let clockUsers = 0
+  let clock: ReturnType<typeof setInterval> | undefined
+
+  function startClock(): () => void {
+    clockUsers += 1
+    if (clockUsers === 1) clock = setInterval(tickClock, CLOCK_INTERVAL_MS)
+    let stopped = false
+    return () => {
+      if (stopped) return
+      stopped = true
+      clockUsers -= 1
+      if (clockUsers === 0) clearInterval(clock)
+    }
+  }
+
   async function refreshQuotes(force = false): Promise<boolean> {
     if (refreshPromise) return refreshPromise
     if (!force && lastRefreshAt.value && Date.now() - Date.parse(lastRefreshAt.value) < 60_000) return true
@@ -172,6 +200,7 @@ export const useMarketStore = defineStore('market', () => {
         })
       }
       lastRefreshAt.value = new Date().toISOString()
+      tickClock()
       return true
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
@@ -197,6 +226,8 @@ export const useMarketStore = defineStore('market', () => {
     linkedMovementCount,
     linkExistingMovements,
     refreshQuotes,
+    tickClock,
+    startClock,
   }
 })
 

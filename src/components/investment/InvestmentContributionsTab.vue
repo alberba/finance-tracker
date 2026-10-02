@@ -33,8 +33,7 @@ function onFlowInput(date: string, event: Event): void {
 <template>
   <div
     id="investment-tab-contributions"
-    class="investment-subtab-panel"
-    :class="{ 'is-active': isActive }"
+    class="grid content-start gap-3.5"
     :hidden="!isActive"
     data-investment-tab-panel="contributions"
     role="tabpanel"

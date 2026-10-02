@@ -8,7 +8,7 @@ test.describe("inversión tabs y TWR", () => {
     const investmentSection = tracker.investmentSection();
 
     await expect(
-      investmentSection.getByRole("tab", { name: "Dashboard" }),
+      investmentSection.getByRole("tab", { name: "Resumen" }),
     ).toBeVisible();
     await expect(
       investmentSection.getByRole("tab", { name: "Movimientos" }),

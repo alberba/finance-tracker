@@ -85,7 +85,8 @@ test.describe('Mobile smoke', () => {
     await expect(page).toHaveURL(/\/inversion$/)
     await expect(
       tracker.section('investment').getByRole('heading', {
-        name: 'Inversión y aportes',
+        name: 'Inversión',
+        exact: true,
       }),
     ).toBeVisible()
   })

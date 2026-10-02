@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 
+import { useLiveQuotes } from '../../composables/useLiveQuotes'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
+import { QUOTE_STATUS, type StatusTone } from '../../domain/investment/quote-status'
+import { formatQuotePrice } from '../../lib/format'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMarketStore } from '../../stores/market'
 import PanelHeading from '../ui/PanelHeading.vue'
+import { TONE_TEXT } from '../ui/tone'
 
 withDefaults(
   defineProps<{ title?: string }>(),
@@ -19,23 +23,11 @@ const totalValue = computed(() => marketStore.valuation.totalValue)
 const dailyChange = computed(() => marketStore.valuation.dailyChangePercent)
 const assetNameById = computed(() => new Map(financialStateStore.investmentAssets.map((asset) => [asset.id, asset.name])))
 
-onMounted(() => {
-  void marketStore.refreshQuotes()
-})
+useLiveQuotes()
 
-watch(
-  () => marketStore.instruments.map((instrument) => `${instrument.id}:${instrument.provider}:${instrument.symbol}:${instrument.currency}`).join('|'),
-  (signature, previousSignature) => {
-    if (signature && signature !== previousSignature) void marketStore.refreshQuotes(true)
-  },
-)
-
-function formatQuote(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency, maximumFractionDigits: 6 }).format(value)
-  } catch {
-    return `${value.toFixed(2)} ${currency}`
-  }
+const STATUS_TEXT: Record<StatusTone, string> = {
+  ...TONE_TEXT,
+  warn: 'text-accent',
 }
 
 function formatTimestamp(value: string): string {
@@ -102,16 +94,19 @@ function formatTimestamp(value: string): string {
               />
             </td>
             <td class="py-3 pr-4">
-              <span v-if="row.quote">{{ formatQuote(row.quote.price, row.quote.currency) }}</span>
+              <span v-if="row.quote">{{ formatQuotePrice(row.quote.price, row.quote.currency) }}</span>
               <span v-else>—</span>
               <small class="block text-text-muted">{{ row.quote ? `Última actualización: ${formatTimestamp(row.quote.timestamp)}` : 'Sin dato' }}</small>
               <small v-if="row.dailyChangePercent !== null" :class="row.dailyChangePercent >= 0 ? 'text-income' : 'text-expense'">{{ row.dailyChangePercent >= 0 ? '+' : '' }}{{ row.dailyChangePercent.toFixed(2) }}%</small>
             </td>
             <td class="py-3 pr-4 font-semibold">{{ formatMoney(row.value) }}</td>
             <td class="py-3">
-              <span v-if="row.status === 'fresh'" class="text-income">Actualizado</span>
-              <span v-else-if="row.status === 'stale'" class="text-accent" title="La cotización supera el intervalo recomendado">Retrasado</span>
-              <span v-else class="text-expense">Sin cotización</span>
+              <span
+                :class="STATUS_TEXT[QUOTE_STATUS[row.status].tone]"
+                :title="row.status === 'stale' ? 'La cotización supera el intervalo recomendado' : undefined"
+              >
+                {{ QUOTE_STATUS[row.status].label }}
+              </span>
             </td>
           </tr>
         </tbody>

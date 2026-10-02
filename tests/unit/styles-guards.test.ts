@@ -17,7 +17,7 @@ const legacyCss = readFileSync(new URL('../../src/styles/legacy.css', import.met
  * that deletes legacy rules lowers it in the same PR. Never raise it; new
  * styles go in components (utilities, base components or scoped styles).
  */
-const LEGACY_CSS_LINE_CEILING = 3176
+const LEGACY_CSS_LINE_CEILING = 3078
 
 describe('legacy.css', () => {
   it('does not grow past its line ceiling', () => {
@@ -105,6 +105,8 @@ const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--accent', surfaces: PAGE_SURFACES },
   { text: '--ink-text', surfaces: ['--bg-sidebar'] },
   { text: '--ink-muted', surfaces: ['--bg-sidebar'] },
+  { text: '--ink-gain', surfaces: ['--bg-sidebar'] },
+  { text: '--ink-loss', surfaces: ['--bg-sidebar'] },
 ]
 
 /**
