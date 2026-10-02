@@ -295,9 +295,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.filterTransactionsMonth("FEBRERO");
     await tracker.setTransactionDescriptionFilter("Compra 2 E2EEDIT");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 2 E2EEDIT",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 2 E2EEDIT" }),
     ).toHaveCount(0);
   });
 
@@ -395,14 +393,10 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openTransactions();
     await tracker.filterTransactionsMonth("MARZO");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 1 BTC",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 1 BTC" }),
     ).toContainText("Crypto");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 1 VWCE",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 1 VWCE" }),
     ).toContainText("Fondos Indexados");
   });
 

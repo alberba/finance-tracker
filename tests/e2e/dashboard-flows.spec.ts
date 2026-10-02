@@ -62,7 +62,7 @@ test.describe("Finance tracker E2E", () => {
       {
         open: () => tracker.openTransactions(),
         path: /\/movimientos$/,
-        heading: "Movimientos mensuales",
+        heading: "Movimientos",
       },
       {
         open: () => tracker.openBudget(),

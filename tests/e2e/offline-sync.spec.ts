@@ -105,9 +105,8 @@ test.describe('Sincronización offline (sync v2)', () => {
       // the outbox replay didn't duplicate it on reconnect.
       await tracker.reload()
       await tracker.filterTransactionsMonth('FEBRERO')
-      const rows = tracker.transactionsSection.locator('#tx-table-body tr', {
-        hasText: 'Compra sin conexión',
-      })
+      await tracker.revealOlderTransactions()
+      const rows = tracker.transactionRows.filter({ hasText: 'Compra sin conexión' })
       await expect(rows).toHaveCount(1)
     } finally {
       await context.close()
@@ -189,9 +188,8 @@ test.describe('Sincronización offline (sync v2)', () => {
       // device two's own edit is what both devices see after reloading.
       await deviceTwo.reload()
       await deviceTwo.filterTransactionsMonth('FEBRERO')
-      const disputedRow = deviceTwo.transactionsSection.locator('#tx-table-body tr', {
-        hasText: 'Movimiento en disputa',
-      })
+      await deviceTwo.revealOlderTransactions()
+      const disputedRow = deviceTwo.transactionRows.filter({ hasText: 'Movimiento en disputa' })
       await expect(disputedRow).toContainText('22,00 €')
     } finally {
       await contextDeviceOne.close()

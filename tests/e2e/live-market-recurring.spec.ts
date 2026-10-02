@@ -210,21 +210,22 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     const pendingItem = await liveMarket.openFirstPendingEdit()
     const descriptionInput = pendingItem.getByLabel('Descripción')
     const accountSelect = pendingItem.getByLabel('Cuenta')
-    await expect(descriptionInput).toHaveCSS('min-height', '42px')
+    await expect(descriptionInput).toHaveCSS('min-height', '44px')
     await expect(descriptionInput).toHaveCSS('border-radius', '11px')
-    await expect(accountSelect).toHaveCSS('min-height', '42px')
+    await expect(accountSelect).toHaveCSS('min-height', '44px')
     await descriptionInput.fill('Compra VWCE editada')
     await pendingItem.getByLabel('Precio por título').fill('105')
     await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
     await expect(liveMarket.pendingPanel).toContainText('Compra VWCE editada')
     await liveMarket.confirmFirstPending()
-    await expect(liveMarket.pendingPanel).toContainText('(2)')
+    await expect(
+      liveMarket.pendingPanel.getByRole('heading', { name: /Pendientes de revisar\s*2$/ }),
+    ).toBeVisible()
     // Two clocks are in play: `__FINANCE_TODAY__` pins the recurring engine to
-    // 2026-07-10 (only `src/stores/recurring.ts` reads it), while the table's
-    // month filter defaults to the *real* month (`src/stores/ui.ts`). The
-    // confirmed movement is dated July, so select July explicitly instead of
-    // relying on the two happening to agree — which is why this passed only
-    // while the wall clock was in July.
+    // 2026-07-10 (only `src/stores/recurring.ts` reads it), while the
+    // registry's band defaults to the *real* month (`src/stores/ui.ts`). The
+    // confirmed movement is dated July, so move the band to July explicitly
+    // instead of relying on the two happening to agree.
     await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Compra VWCE editada')
 
@@ -256,7 +257,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toContainText('1 × 100 VWCE')
 
     await liveMarket.editFirstPendingInvestment({ units: 2, unitPrice: 105.5, fee: 1.5, time: '10:30' })
-    await expect(liveMarket.pendingPanel).toContainText('212.50')
+    await expect(liveMarket.pendingPanel).toContainText('212,50 €')
     await expect(liveMarket.pendingPanel).toContainText('2 × 105.5 VWCE')
 
     await liveMarket.confirmFirstPending()
@@ -304,12 +305,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(liveMarket.pendingPanel).toBeVisible()
 
     const pendingItem = await liveMarket.openFirstPendingEdit()
-    const typeSelect = pendingItem.getByLabel('Tipo')
+    const typeControl = pendingItem.getByRole('group', { name: 'Tipo de movimiento' })
     const categorySelect = pendingItem.getByLabel('Categoría')
     const accountSelect = pendingItem.getByLabel('Cuenta')
 
-    await expect(typeSelect).toHaveValue('expense')
-    await typeSelect.selectOption('investment')
+    await expect(typeControl.getByRole('button', { name: 'Gasto' })).toHaveAttribute('aria-pressed', 'true')
+    await typeControl.getByRole('button', { name: 'Inversión' }).click()
 
     await expect(categorySelect.locator('option[value="Fondos Indexados"]')).toBeAttached()
     await categorySelect.selectOption('Fondos Indexados')
@@ -325,7 +326,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
 
-    await expect(liveMarket.pendingPanel).toContainText('182.00')
+    await expect(liveMarket.pendingPanel).toContainText('182,00 €')
     await expect(liveMarket.pendingPanel).toContainText('2 × 90 IWDA')
 
     await liveMarket.confirmFirstPending()
