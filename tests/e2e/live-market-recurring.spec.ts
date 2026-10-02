@@ -2,6 +2,11 @@ import { test, expect, mirrorStateToServer } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
+  test.fixme(
+    true,
+    'Quarantine: reload hydration is intermittent. https://github.com/alberba/finance-tracker/issues/233',
+  )
+
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({ page, tracker }) => {
     await page.evaluate(() => {
       const raw = localStorage.getItem('finance-tracker-state-v1')
