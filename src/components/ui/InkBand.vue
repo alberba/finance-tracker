@@ -24,6 +24,8 @@ const props = defineProps<{
   ariaLabel: string
   valueId?: string
   chip?: { text: string; tone: Tone } | null
+  /** Colors the headline figure as a gain or a loss (it carries its sign too). */
+  valueTone?: Tone
   facts?: InkBandFact[]
 }>()
 
@@ -42,6 +44,7 @@ const parts = computed(() => splitDecimals(props.value))
       <p
         :id="valueId"
         class="font-display leading-none font-bold tracking-tight whitespace-nowrap tabular-nums"
+        :class="valueTone ? INK_TONE_TEXT[valueTone] : undefined"
       >
         <span class="text-5xl lg:text-6xl">{{ parts.whole }}</span
         ><span class="text-ink-muted text-2xl lg:text-3xl">{{ parts.rest }}</span>

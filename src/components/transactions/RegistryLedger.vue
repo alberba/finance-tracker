@@ -78,7 +78,7 @@ const olderLabel = computed(() => {
 
 const columns = computed<LedgerColumn<Transaction>[]>(() => [
   { key: 'select', label: 'Seleccionar', hideBelow: props.selecting ? undefined : 'sm' },
-  { key: 'date', label: 'Fecha' },
+  { key: 'date', label: 'Fecha', hideBelow: 'sm' },
   { key: 'description', label: 'Descripción', rowHeader: true },
   {
     key: 'account',
@@ -88,7 +88,7 @@ const columns = computed<LedgerColumn<Transaction>[]>(() => [
   },
   { key: 'type', label: 'Tipo', hideBelow: 'lg' },
   { key: 'amount', label: 'Importe', align: 'right' },
-  { key: 'actions', label: 'Acciones', align: 'right' },
+  { key: 'actions', label: 'Acciones', align: 'right', hideBelow: 'sm' },
 ])
 
 function categoryDot(tx: Transaction): string {
@@ -125,7 +125,11 @@ const emptyText = computed(() =>
 </script>
 
 <template>
-  <section class="grid gap-3" :aria-label="`Movimientos de ${ui.txYear}`" data-tx-ledger>
+  <section
+    class="border-line bg-panel shadow-soft grid gap-3 rounded-lg border px-2 pt-2 pb-4 sm:px-7 sm:pt-4"
+    :aria-label="`Movimientos de ${ui.txYear}`"
+    data-tx-ledger
+  >
     <LedgerTable
       :columns="columns"
       :groups="groups"
@@ -182,7 +186,21 @@ const emptyText = computed(() =>
         }}</span>
       </template>
       <template #cell-description="{ row }">
-        <span class="grid min-w-0 gap-0.5">
+        <!-- On small screens the actions column is hidden: the description
+             opens the movement, with its date on the second line. -->
+        <button
+          type="button"
+          class="grid min-h-11 w-full min-w-0 gap-0.5 text-left sm:hidden"
+          :aria-label="`Editar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
+          @click="emit('edit', row)"
+        >
+          <span class="font-semibold">{{ row.description || row.category || '—' }}</span>
+          <span class="text-text-muted text-sm">
+            {{ formatDayMonth(row.date) }} ·
+            {{ decorateCategoryLabel(row.type, row.category, movementsStore.categoryEmojis) }}
+          </span>
+        </button>
+        <span class="hidden min-w-0 gap-0.5 sm:grid">
           <span class="font-semibold">{{ row.description || row.category || '—' }}</span>
           <span class="text-text-muted flex items-center gap-1.5 text-sm">
             <span
@@ -195,7 +213,7 @@ const emptyText = computed(() =>
         </span>
       </template>
       <template #cell-type="{ row }">
-        <span class="rounded-full px-2.5 py-1 text-xs font-bold" :class="TYPE_TAG[row.type]">
+        <span class="rounded-sm px-2 py-1 text-xs font-bold" :class="TYPE_TAG[row.type]">
           {{ TYPE_LABEL[row.type] }}
         </span>
       </template>

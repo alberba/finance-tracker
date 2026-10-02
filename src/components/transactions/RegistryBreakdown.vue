@@ -96,7 +96,7 @@ const segments = computed(() =>
           <span class="font-display tabular-nums" data-summary-amount>{{
             formatMoney(row.amount)
           }}</span>
-          <span class="text-text-muted w-16 text-right text-sm tabular-nums">
+          <span class="font-display text-text-muted w-16 text-right text-sm tabular-nums">
             {{ formatPercent(row.share, { digits: 1 }) }}
           </span>
         </li>

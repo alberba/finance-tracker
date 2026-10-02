@@ -24,7 +24,12 @@ describe('InkBand', () => {
 
   it('muestra el chip de variación con su tono', () => {
     const wrapper = mount(InkBand, {
-      props: { label: 'Valor', value: '1,00 €', ariaLabel: 'x', chip: { text: '−0,42 % hoy', tone: 'loss' } },
+      props: {
+        label: 'Valor',
+        value: '1,00 €',
+        ariaLabel: 'x',
+        chip: { text: '−0,42 % hoy', tone: 'loss' },
+      },
     })
 
     const chip = wrapper.get('[data-ink-chip]')
@@ -40,7 +45,13 @@ describe('InkBand', () => {
         ariaLabel: 'x',
         facts: [
           { label: 'Capital invertido', value: '10,00 €', valueId: 'capital' },
-          { label: 'Rentabilidad', value: '+3,50 %', tone: 'gain', labelId: 'ret-label', valueId: 'ret' },
+          {
+            label: 'Rentabilidad',
+            value: '+3,50 %',
+            tone: 'gain',
+            labelId: 'ret-label',
+            valueId: 'ret',
+          },
         ],
       },
     })
@@ -55,5 +66,19 @@ describe('InkBand', () => {
 
     expect(wrapper.find('[data-ink-chip]').exists()).toBe(false)
     expect(wrapper.findAll('p')).toHaveLength(2)
+  })
+
+  it('colorea la cifra principal según su tono', () => {
+    const wrapper = mount(InkBand, {
+      props: {
+        label: 'Neto',
+        ariaLabel: 'Neto',
+        value: '+1.274,01 €',
+        valueId: 'net',
+        valueTone: 'gain',
+      },
+    })
+
+    expect(wrapper.get('#net').classes()).toContain('text-ink-gain')
   })
 })

@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import IconButton from '../ui/IconButton.vue'
 import InkBand from '../ui/InkBand.vue'
 import KickerLabel from '../ui/KickerLabel.vue'
+import { toneOf } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { formatMonthYear } from '../../lib/format'
 import { useMovementsStore } from '../../stores/movements'
@@ -40,6 +41,7 @@ const pendingNote = computed(() => {
     :aria-label="`Neto de ${monthTitle}`"
     :value="formatSignedMoney(totals.net)"
     value-id="tx-month-net"
+    :value-tone="totals.net === 0 ? undefined : toneOf(totals.net)"
     :facts="facts"
   >
     <template #label>
