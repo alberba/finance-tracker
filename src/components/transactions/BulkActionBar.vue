@@ -4,7 +4,7 @@ import { computed, reactive, watch } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import IconButton from '../ui/IconButton.vue'
-import { TYPE_LABEL } from './transaction-types'
+import { TYPE_OPTIONS } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { TransactionType } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
@@ -23,15 +23,10 @@ const countLabel = computed(
   () => `${count.value} ${count.value === 1 ? 'seleccionado' : 'seleccionados'}`,
 )
 
-const typeOptions = [
-  { value: '', label: 'Tipo: sin cambio' },
-  ...(['income', 'expense', 'investment'] as const).map((value) => ({
-    value,
-    label: TYPE_LABEL[value],
-  })),
-]
+// The empty first option means "leave as it is"; its short text fits on a phone.
+const typeOptions = [{ value: '', label: 'Tipo' }, ...TYPE_OPTIONS]
 const accountOptions = computed(() => [
-  { value: '', label: 'Cuenta: sin cambio' },
+  { value: '', label: 'Cuenta' },
   ...movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 ])
 
@@ -42,7 +37,7 @@ const categoryType = computed<TransactionType | null>(() => {
   return types.size === 1 ? [...types][0] : null
 })
 const categoryOptions = computed(() => [
-  { value: '', label: categoryType.value ? 'Categoría: sin cambio' : 'Categoría: elige un tipo' },
+  { value: '', label: 'Categoría' },
   ...(categoryType.value ? movementsStore.orderedCategories(categoryType.value) : []).map(
     (name) => ({
       value: name,
@@ -71,7 +66,7 @@ function close(): void {
 <template>
   <div
     v-if="visible"
-    class="bg-ink border-ink-line text-ink-text shadow-raised fixed inset-x-3 bottom-3 z-50 grid gap-3 rounded-lg border p-3 sm:inset-x-auto sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-center sm:px-4 lg:ml-32"
+    class="bg-ink border-ink-line text-ink-text shadow-raised fixed inset-x-3 bottom-3 z-60 grid gap-3 rounded-lg border p-3 sm:inset-x-auto sm:left-1/2 sm:flex sm:-translate-x-1/2 sm:items-center sm:px-4 lg:ml-32"
     role="region"
     aria-label="Acciones sobre la selección"
     data-bulk-bar

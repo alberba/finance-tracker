@@ -7,8 +7,9 @@ import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
+import { useSectionNavigation } from '../../composables/useSectionNavigation'
+import { signedAmount } from '../../domain/transactions/registry'
 import { formatDayMonth } from '../../lib/format'
-import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
 import type { PendingMovement } from '../../scripts/types'
 import { todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -34,10 +35,6 @@ const accountNames = computed(
       ]),
     ),
 )
-
-function signed(item: PendingMovement): number {
-  return item.type === 'income' ? item.amount : -item.amount
-}
 
 function dueLabel(date: string): string {
   const days = Math.round(
@@ -71,9 +68,10 @@ const columns: LedgerColumn<PendingMovement>[] = [
   { key: 'actions', label: 'Acciones', align: 'right' },
 ]
 
+const { navigateTo } = useSectionNavigation()
+
 function openTransactions(): void {
-  window.history.pushState(null, '', getPathFromSection('transactions'))
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  navigateTo('transactions')
 }
 </script>
 
@@ -151,7 +149,7 @@ function openTransactions(): void {
           class="font-display tabular-nums"
           :class="row.type === 'income' ? TONE_TEXT.gain : 'text-text-main'"
         >
-          {{ formatSignedMoney(signed(row)) }}
+          {{ formatSignedMoney(signedAmount(row)) }}
         </span>
       </template>
       <template #cell-actions="{ row }">

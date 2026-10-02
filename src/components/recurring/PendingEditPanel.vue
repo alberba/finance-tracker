@@ -6,7 +6,8 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
-import { TYPE_OPTIONS } from '../transactions/transaction-types'
+import { TYPE_OPTIONS, categorySelectOptions } from '../transactions/transaction-types'
+import { getCategoriesForType } from '../../domain/transactions/categories'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { parseDecimal, round2 } from '../../lib/number'
 import type { InvestmentSide, PendingMovement, TransactionType } from '../../scripts/types'
@@ -44,19 +45,8 @@ const investmentTotal = computed(() =>
   ),
 )
 
-const categories = computed(() => {
-  const state = financialStateStore.state
-  if (draft.type === 'income') return state.incomeCategories
-  if (draft.type === 'investment') return state.investmentCategories
-  return state.expenseCategories
-})
-const categoryOptions = computed(() => {
-  const names = categories.value
-  // A category no longer in the list stays selectable instead of being replaced.
-  const list =
-    draft.category && !names.includes(draft.category) ? [draft.category, ...names] : names
-  return list.map((name) => ({ value: name, label: name }))
-})
+const categories = computed(() => getCategoriesForType(financialStateStore.state, draft.type))
+const categoryOptions = computed(() => categorySelectOptions(categories.value, draft.category))
 const sideOptions = [
   { value: 'buy' as const, label: 'Compra' },
   { value: 'sell' as const, label: 'Venta' },
@@ -233,9 +223,7 @@ defineExpose({ openFor })
         <BaseInput v-model="draft.fee" label="Comisiones" type="number" min="0" step="0.01" />
         <div class="bg-subtle grid content-center gap-1 rounded-md px-4 py-2.5">
           <span class="text-text-muted text-sm">Importe total</span>
-          <p class="font-display text-lg tabular-nums">{{
-            formatMoney(investmentTotal)
-          }}</p>
+          <p class="font-display text-lg tabular-nums">{{ formatMoney(investmentTotal) }}</p>
         </div>
       </fieldset>
     </form>

@@ -65,7 +65,7 @@ export class FinanceTrackerPage {
 
   /** The movement side panel (create and edit). */
   get transactionPanel(): Locator {
-    return this.page.locator("#tx-panel");
+    return this.page.getByRole("dialog", { name: /^(Nuevo|Editar) movimiento$/ });
   }
 
   /** Ledger rows of the registry, every month shown. */
@@ -127,7 +127,7 @@ export class FinanceTrackerPage {
 
   /** The subscription side panel (create and edit). */
   get subscriptionPanel(): Locator {
-    return this.page.locator("#subscription-panel");
+    return this.page.getByRole("dialog", { name: /^(Nueva|Editar) suscripción$/ });
   }
 
   async openNewSubscriptionPanel() {
@@ -481,24 +481,24 @@ export class FinanceTrackerPage {
   }) {
     const bar = this.bulkActionBar;
     if (params.type) {
-      await bar.locator("#tx-bulk-type").selectOption(params.type);
+      await bar.getByLabel("Cambiar tipo").selectOption(params.type);
     }
     if (params.accountName) {
       await this.selectByLabelOrFirst(
-        bar.locator("#tx-bulk-account"),
+        bar.getByLabel("Mover a cuenta"),
         params.accountName,
       );
     }
     if (params.category !== undefined) {
       await bar
-        .locator("#tx-bulk-category")
+        .getByLabel("Cambiar categoría")
         .selectOption({ label: params.category });
     }
-    await bar.locator("#tx-bulk-apply").click();
+    await bar.getByRole("button", { name: "Aplicar" }).click();
   }
 
   async deleteSelectedTransactions() {
-    await this.bulkActionBar.locator("#tx-bulk-delete").click();
+    await this.bulkActionBar.getByRole("button", { name: "Eliminar" }).click();
   }
 
   /**
@@ -1278,10 +1278,7 @@ export class FinanceTrackerPage {
   }
 
   private async ensureTransactionModalOpen() {
-    const isOpen = await this.transactionPanel.evaluate(
-      (dialog) => (dialog as HTMLDialogElement).open,
-    );
-    if (!isOpen) {
+    if (!(await this.transactionPanel.isVisible())) {
       await this.transactionsSection
         .getByRole("tab", { name: /Registro/ })
         .click();

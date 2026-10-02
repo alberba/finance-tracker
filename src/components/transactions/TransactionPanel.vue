@@ -6,12 +6,13 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
-import { TYPE_LABEL, TYPE_OPTIONS } from './transaction-types'
+import { TYPE_LABEL, TYPE_OPTIONS, categorySelectOptions } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useToast } from '../../composables/useToast'
 import { formatDayMonth, formatMonthName } from '../../lib/format'
-import { parseDecimal } from '../../lib/number'
-import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
+import { useSectionNavigation } from '../../composables/useSectionNavigation'
+import { signedAmount } from '../../domain/transactions/registry'
+import { formatDecimalInput, parseDecimal } from '../../lib/number'
 import type { Transaction, TransactionType } from '../../scripts/types'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import { useMovementsStore } from '../../stores/movements'
@@ -22,7 +23,8 @@ import { useUiStore } from '../../stores/ui'
 const movementsStore = useMovementsStore()
 const uiStore = useUiStore()
 const { showToast } = useToast()
-const { formatMoney } = useMoneyFormatter()
+const { formatSignedMoney } = useMoneyFormatter()
+const { navigateTo } = useSectionNavigation()
 
 const open = ref(false)
 const editingId = ref<string | null>(null)
@@ -46,17 +48,13 @@ const accountOptions = computed(() =>
 )
 const categoryOptions = computed(() => {
   const names = movementsStore.orderedCategories(form.type)
-  const list = names.length ? names : ['Sin categoría']
-  // An edited movement keeps a category that is no longer in the list.
-  return (form.category && !list.includes(form.category) ? [form.category, ...list] : list).map(
-    (name) => ({ value: name, label: name }),
-  )
+  return categorySelectOptions(names.length ? names : ['Sin categoría'], form.category)
 })
 
 const amount = computed(() => parseDecimal(form.amount))
 const preview = computed(() => {
   const value = Number.isFinite(amount.value) ? Math.abs(amount.value) : 0
-  return `${form.type === 'income' ? '+' : '−'}${formatMoney(value)}`
+  return formatSignedMoney(signedAmount({ type: form.type, amount: value }))
 })
 const previewLabel = computed(
   () => `${TYPE_LABEL[form.type]} de ${formatMonthName(form.month).toLowerCase()}`,
@@ -103,7 +101,7 @@ function openNew(): void {
 function openEdit(tx: Transaction): void {
   editingId.value = tx.id
   form.type = tx.type
-  form.amount = String(Number(tx.amount || 0)).replace('.', ',')
+  form.amount = formatDecimalInput(Number(tx.amount || 0))
   form.description = tx.description || ''
   form.category = tx.category || ''
   form.accountId = tx.accountId
@@ -144,8 +142,7 @@ function save(keepOpen: boolean): void {
 function openInvestmentMovements(): void {
   open.value = false
   uiStore.ui.investmentTab = 'movements'
-  window.history.pushState(null, '', getPathFromSection('investment'))
-  window.dispatchEvent(new PopStateEvent('popstate'))
+  navigateTo('investment')
 }
 
 defineExpose({ openNew, openEdit })

@@ -6,9 +6,10 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
+import { categorySelectOptions } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { annualizeSubscription } from '../../domain/subscriptions/analysis'
-import { parseDecimal } from '../../lib/number'
+import { formatDecimalInput, parseDecimal } from '../../lib/number'
 import type { Subscription, SubscriptionFrequency } from '../../scripts/types'
 import { todayISO } from '../../scripts/utils'
 import { useMovementsStore } from '../../stores/movements'
@@ -41,11 +42,9 @@ const frequencyOptions = [
 const accountOptions = computed(() =>
   movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
-const categoryOptions = computed(() => {
-  const names = movementsStore.orderedCategories('expense')
-  const list = form.category && !names.includes(form.category) ? [form.category, ...names] : names
-  return list.map((name) => ({ value: name, label: name }))
-})
+const categoryOptions = computed(() =>
+  categorySelectOptions(movementsStore.orderedCategories('expense'), form.category),
+)
 
 const amount = computed(() => parseDecimal(form.amount))
 const annual = computed(() =>
@@ -70,7 +69,7 @@ function openNew(): void {
 function openEdit(subscription: Subscription): void {
   editingId.value = subscription.id
   form.name = subscription.name
-  form.amount = String(subscription.amount).replace('.', ',')
+  form.amount = formatDecimalInput(subscription.amount)
   form.frequency = subscription.frequency
   form.accountId = subscription.accountId
   form.category = subscription.category

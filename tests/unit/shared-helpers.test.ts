@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getInvestmentBuckets } from '../../src/domain/investment/buckets'
-import { parseDecimal, round2 } from '../../src/lib/number'
+import { formatDecimalInput, parseDecimal, round2 } from '../../src/lib/number'
 import { createJsonResponse } from '../../src/lib/server/json-response'
 import { resolveCssColor } from '../../src/scripts/css-color'
 
@@ -66,5 +66,12 @@ describe('parseDecimal', () => {
   it('is NaN for empty or non-numeric text', () => {
     expect(parseDecimal('')).toBeNaN()
     expect(parseDecimal('doce')).toBeNaN()
+  })
+})
+
+describe('formatDecimalInput', () => {
+  it('writes the amount with a decimal comma, ready to parse back', () => {
+    expect(formatDecimalInput(64.32)).toBe('64,32')
+    expect(parseDecimal(formatDecimalInput(1250.5))).toBe(1250.5)
   })
 })

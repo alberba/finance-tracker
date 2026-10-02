@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
@@ -194,6 +194,15 @@ export const useMovementsStore = defineStore('movements', () => {
     () =>
       visibleTransactions.value.length > 0 &&
       selectedVisibleCount.value === visibleTransactions.value.length,
+  )
+
+  // A selection only covers rows the user can see: changing the year or a
+  // filter drops it, so a bulk delete never reaches hidden movements.
+  watch(
+    () => [ui.txYear, JSON.stringify(ui.txFilters)],
+    () => {
+      ui.txSelectedIds = []
+    },
   )
 
   function breakdownFor(type: TransactionType) {

@@ -2,6 +2,7 @@
 import { nextTick, onMounted, useTemplateRef, watch } from 'vue'
 
 import IconButton from './IconButton.vue'
+import KickerLabel from './KickerLabel.vue'
 
 // Create and edit forms: a modal <dialog> anchored to the right (the whole
 // screen on mobile) with a kicker and title, a scrolling body and a footer for
@@ -52,7 +53,7 @@ function onCancel(event: Event): void {
         class="border-line flex items-start justify-between gap-4 border-b px-5 pt-4 pb-4 sm:px-8 sm:pt-7 sm:pb-5"
       >
         <div class="grid gap-1.5">
-          <p class="text-primary font-mono text-xs tracking-[0.16em] uppercase">{{ kicker }}</p>
+          <KickerLabel>{{ kicker }}</KickerLabel>
           <h2 :id="titleId" class="font-display text-2xl font-bold tracking-tight">{{ title }}</h2>
         </div>
         <IconButton label="Cerrar" icon="close" @click="open = false" />

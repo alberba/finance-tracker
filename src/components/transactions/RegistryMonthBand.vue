@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import IconButton from '../ui/IconButton.vue'
 import InkBand from '../ui/InkBand.vue'
+import KickerLabel from '../ui/KickerLabel.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { formatMonthYear } from '../../lib/format'
 import { useMovementsStore } from '../../stores/movements'
@@ -49,12 +50,7 @@ const pendingNote = computed(() => {
           label="Mes anterior"
           @click="movementsStore.stepMonth(-1)"
         />
-        <h3
-          id="tx-month-title"
-          class="text-ink-muted font-mono text-xs tracking-[0.14em] uppercase"
-        >
-          Neto de {{ monthTitle }}
-        </h3>
+        <KickerLabel id="tx-month-title" tone="ink" as="h3">Neto de {{ monthTitle }}</KickerLabel>
         <IconButton
           icon="chevron-right"
           tone="ink"

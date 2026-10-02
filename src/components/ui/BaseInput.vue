@@ -45,8 +45,8 @@ const value = defineModel<string>({ required: true })
         <slot name="leading" />
       </span>
       <input
-        v-model="value"
         :id="controlId"
+        v-model="value"
         v-bind="controlAttrs"
         :class="[
           FIELD_CONTROL,

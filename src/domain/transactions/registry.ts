@@ -65,7 +65,7 @@ export interface MonthGroup {
 }
 
 /** The amount as it moves the net: income adds, expenses and investment subtract. */
-export function signedAmount(tx: Transaction): number {
+export function signedAmount(tx: Pick<Transaction, 'type' | 'amount'>): number {
   const amount = Number(tx.amount || 0)
   return tx.type === 'income' ? amount : -amount
 }

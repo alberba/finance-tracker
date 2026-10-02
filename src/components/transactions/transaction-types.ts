@@ -1,17 +1,24 @@
 import type { SegmentedOption } from '../ui/SegmentedControl.vue'
 import type { TransactionType } from '../../scripts/types'
 
-/** Order and names of the three movement types, as the panel and filters show them. */
-export const TYPE_OPTIONS: SegmentedOption<TransactionType>[] = [
-  { value: 'expense', label: 'Gasto' },
-  { value: 'income', label: 'Ingreso' },
-  { value: 'investment', label: 'Inversión' },
-]
-
 export const TYPE_LABEL: Record<TransactionType, string> = {
   expense: 'Gasto',
   income: 'Ingreso',
   investment: 'Inversión',
+}
+
+/** The three movement types in the order the panels and the bulk bar offer them. */
+export const TYPE_OPTIONS: SegmentedOption<TransactionType>[] = (
+  ['expense', 'income', 'investment'] as const
+).map((value) => ({ value, label: TYPE_LABEL[value] }))
+
+/**
+ * Category names as select options, keeping the one already chosen when it is
+ * no longer in the list (a renamed or deleted category on an old movement).
+ */
+export function categorySelectOptions(names: string[], current: string) {
+  const list = current && !names.includes(current) ? [current, ...names] : names
+  return list.map((name) => ({ value: name, label: name }))
 }
 
 /** Plural, for filters and breakdowns ("Gastos"). */

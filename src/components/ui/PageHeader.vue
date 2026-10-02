@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import KickerLabel from './KickerLabel.vue'
+
 // Top of a section: kicker, title and a one-line lede, with an optional aside
 // (status, primary action) aligned to the right.
 defineProps<{
@@ -12,7 +14,7 @@ defineProps<{
 <template>
   <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
     <div class="grid gap-2">
-      <p class="text-primary font-mono text-xs tracking-[0.16em] uppercase">{{ kicker }}</p>
+      <KickerLabel>{{ kicker }}</KickerLabel>
       <h2
         :id="titleId"
         class="font-display text-text-main text-3xl leading-tight font-bold tracking-tight sm:text-4xl"

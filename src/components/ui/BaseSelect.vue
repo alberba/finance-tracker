@@ -41,8 +41,8 @@ const value = defineModel<T>({ required: true })
     <label :for="controlId" :class="{ 'sr-only': hideLabel }">{{ label }}</label>
     <span class="relative flex items-center">
       <select
-        v-model="value"
         :id="controlId"
+        v-model="value"
         v-bind="controlAttrs"
         :class="[FIELD_CONTROL, 'cursor-pointer appearance-none pr-10 text-base']"
       >

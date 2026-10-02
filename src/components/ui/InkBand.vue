@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { splitDecimals } from '../../lib/format'
+import KickerLabel from './KickerLabel.vue'
 import { INK_TONE_TEXT, type Tone } from './tone'
 
 export interface InkBandFact {
@@ -36,7 +37,7 @@ const parts = computed(() => splitDecimals(props.value))
   >
     <div class="grid gap-2.5 lg:flex-[1.6] lg:pr-8">
       <slot name="label">
-        <p class="text-ink-muted font-mono text-xs tracking-[0.14em] uppercase">{{ label }}</p>
+        <KickerLabel tone="ink">{{ label }}</KickerLabel>
       </slot>
       <p
         :id="valueId"

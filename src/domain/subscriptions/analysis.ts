@@ -15,15 +15,6 @@ export interface SubscriptionBreakdownRow {
   share: number
 }
 
-export interface SubscriptionCostRow {
-  id: string
-  name: string
-  category: string
-  monthlyAmount: number
-  annualAmount: number
-  nextChargeDate: string
-}
-
 export interface UpcomingSubscriptionCharge {
   id: string
   name: string
@@ -42,8 +33,6 @@ export interface SubscriptionAnalysis {
   /** Every charge in the next 30 days; `upcomingCharges` lists only the first ones. */
   next30DaysCount: number
   categoryBreakdown: SubscriptionBreakdownRow[]
-  accountBreakdown: SubscriptionBreakdownRow[]
-  topCosts: SubscriptionCostRow[]
   upcomingCharges: UpcomingSubscriptionCharge[]
 }
 
@@ -77,18 +66,6 @@ export function buildSubscriptionAnalysis(
     next30DaysAmount: round2(upcomingCharges.reduce((sum, charge) => sum + charge.amount, 0)),
     next30DaysCount: upcomingCharges.length,
     categoryBreakdown: buildBreakdown(active, (subscription) => subscription.category),
-    accountBreakdown: buildBreakdown(active, (subscription) => subscription.accountId),
-    topCosts: active
-      .map((subscription) => ({
-        id: subscription.id,
-        name: subscription.name,
-        category: subscription.category,
-        monthlyAmount: monthlyEquivalent(subscription),
-        annualAmount: annualizeSubscription(subscription),
-        nextChargeDate: subscription.nextChargeDate,
-      }))
-      .sort((a, b) => b.annualAmount - a.annualAmount || a.name.localeCompare(b.name))
-      .slice(0, 5),
     upcomingCharges: upcomingCharges.slice(0, 5),
   }
 }
