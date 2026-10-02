@@ -40,6 +40,10 @@
     --text-main: #0d1626;
     --text-muted: #5a6678;
     --text-faint: #95a0b1; /* placeholders and decoration; below AA, not for text to read */
+    /* Ink surface of bands and tooltips: the sidebar ink in light; in dark a
+       step lighter than the page, with a hairline, so it still reads as a band. */
+    --ink-surface: #0b1120;
+    --ink-line: transparent;
     --ink-text: #e7ecf5; /* text placed on the dark ink surface */
     --ink-muted: #8195b2;
     /* Gain / loss text on the ink surface, which stays dark in both themes. */
@@ -49,6 +53,11 @@
     /* Brand / interaction */
     --primary: #3b6bf0;
     --primary-light: #eaf0fe;
+    /* Fill of primary buttons and its text: the same blue in both themes, so
+       white text keeps AA (the dark --primary is too light under white). */
+    --primary-fill: #3b6bf0;
+    --primary-fill-hover: #2a53d4;
+    --on-primary: #ffffff;
 
     /* Semantic */
     --income: #0e9f6e;
@@ -119,6 +128,8 @@
     --text-main: #eceff5;
     --text-muted: #9aa4b4;
     --text-faint: #626b7b;
+    --ink-surface: #161c2a;
+    --ink-line: rgba(255, 255, 255, 0.08);
     --ink-text: #e7ecf5;
     --ink-muted: #8c99b2;
 
@@ -184,6 +195,9 @@
   /* Colors delegate to the theme-aware variables above, so dark mode needs no
      `dark:` variant. Exposed as `text-*` / `bg-*` / `border-*` utilities. */
   --color-primary: var(--primary);
+  --color-primary-fill: var(--primary-fill);
+  --color-primary-fill-hover: var(--primary-fill-hover);
+  --color-on-primary: var(--on-primary);
   --color-income: var(--income);
   --color-expense: var(--expense);
   --color-invest: var(--invest);
@@ -197,7 +211,8 @@
   --color-panel: var(--bg-panel);
   --color-subtle: var(--bg-subtle);
   --color-elevated: var(--bg-elevated);
-  --color-ink: var(--bg-sidebar);
+  --color-ink: var(--ink-surface);
+  --color-ink-line: var(--ink-line);
   --color-ink-text: var(--ink-text);
   --color-ink-muted: var(--ink-muted);
   --color-ink-gain: var(--ink-gain);

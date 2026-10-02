@@ -13,12 +13,24 @@ export interface LedgerColumn<R = unknown> {
   value?: (row: R) => string
 }
 
+export interface LedgerGroup<R = unknown> {
+  key: string
+  title: string
+  /** Shown beside the title, e.g. the count and the net of a month. */
+  summary?: string
+  rows: R[]
+}
+
 // The ledger table: small-caps header, hairline rules, figures to the right.
 // Rows can expand (click anywhere on the row, or its toggle button from the
-// keyboard) to show a detail slot; a `total-<key>` slot adds a total row.
+// keyboard) to show a detail slot; a `total-<key>` slot adds a total row and
+// a `head-<key>` slot replaces a column's header. With `groups`, the rows sit
+// under a group row each (a month with its count and net).
 const props = defineProps<{
   columns: LedgerColumn<Row>[]
-  rows: Row[]
+  /** Ungrouped rows; ignored when `groups` is given. */
+  rows?: Row[]
+  groups?: LedgerGroup<Row>[]
   rowKey: (row: Row) => string
   label: string
   emptyText?: string
@@ -26,6 +38,8 @@ const props = defineProps<{
   expandLabel?: (row: Row, open: boolean) => string
   /** Extra attributes per row (`data-*` hooks for tests and scripts). */
   rowAttrs?: (row: Row) => Record<string, string>
+  /** Extra classes per row, e.g. to mark the selected ones. */
+  rowClass?: (row: Row) => string
 }>()
 
 const expanded = defineModel<string | null>('expanded', { default: null })
@@ -47,6 +61,10 @@ function cellClass(column: LedgerColumn<Row>): string[] {
 const expandable = computed(() => Boolean(props.expandLabel))
 const hasTotal = computed(() => props.columns.some((column) => slots[`total-${column.key}`]))
 const span = computed(() => props.columns.length + (expandable.value ? 1 : 0))
+const sections = computed<LedgerGroup<Row>[]>(
+  () => props.groups ?? [{ key: '', title: '', rows: props.rows ?? [] }],
+)
+const isEmpty = computed(() => sections.value.every((section) => !section.rows.length))
 
 function toggle(row: Row): void {
   if (!expandable.value) return
@@ -57,7 +75,7 @@ function toggle(row: Row): void {
 
 <template>
   <p
-    v-if="!rows.length"
+    v-if="isEmpty"
     class="border-line text-text-muted rounded-md border border-dashed p-4 text-sm"
     data-ledger-empty
   >
@@ -74,20 +92,31 @@ function toggle(row: Row): void {
             class="text-text-muted px-2 pb-3 text-xs font-semibold tracking-[0.08em] whitespace-nowrap uppercase"
             :class="cellClass(column)"
           >
-            {{ column.label }}
+            <slot :name="`head-${column.key}`">{{ column.label }}</slot>
           </th>
           <th v-if="expandable" scope="col" class="w-11 pb-3">
             <span class="sr-only">Detalle</span>
           </th>
         </tr>
       </thead>
-      <tbody>
-        <template v-for="row in rows" :key="rowKey(row)">
+      <tbody v-for="section in sections" :key="section.key">
+        <tr v-if="section.title" class="border-line border-t" data-ledger-group>
+          <th :colspan="span" scope="colgroup" class="px-2 pt-6 pb-2.5 text-left font-normal">
+            <span class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <span class="font-display text-text-main text-lg font-bold">{{ section.title }}</span>
+              <span v-if="section.summary" class="text-text-muted text-sm tabular-nums">
+                {{ section.summary }}
+              </span>
+            </span>
+          </th>
+        </tr>
+        <template v-for="row in section.rows" :key="rowKey(row)">
           <tr
             class="border-line border-t transition-colors"
             :class="[
               expandable ? 'hover:bg-subtle cursor-pointer' : 'hover:bg-subtle/60',
               expanded === rowKey(row) ? 'bg-subtle' : '',
+              rowClass?.(row) ?? '',
             ]"
             v-bind="rowAttrs?.(row)"
             @click="toggle(row)"
