@@ -49,7 +49,7 @@
 
   /* Base grid for legacy data tables (transactions / investment / wealth),
      scoped to .table-wrap so migrated tables that don't use it are untouched.
-     Class-scoped tables (.tx-summary-table, .budget-*) override via specificity. */
+     Class-scoped tables (.budget-*) override via specificity. */
   .table-wrap table {
     width: 100%;
     border-collapse: collapse;
@@ -1362,214 +1362,13 @@ dialog {
 }
 
 /* ══ TRANSACTIONS LAYOUT ═════════════════════════════════════════ */
-.tx-summary-side {
-  display: grid;
-  gap: 14px;
-}
-.tx-summary-card {
-  background: var(--bg-panel);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
-}
-.tx-summary-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-.tx-summary-table--breakdown {
-  table-layout: auto;
-}
+
 /* ══ TX SUMMARY TABLE ════════════════════════════════════════════ */
-.tx-summary-table th,
-.tx-summary-table td {
-  border: 1px solid var(--line);
-  padding: 8px 11px;
-  font-size: 0.84rem;
-}
-.tx-summary-title {
-  background: var(--bg-sidebar);
-  color: #fff;
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-}
-.tx-summary-heading {
-  font-size: 0.66rem;
-  text-align: center;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.tx-summary-heading--income {
-  background: var(--income-bg);
-  color: var(--income);
-}
-.tx-summary-heading--expense {
-  background: var(--expense-bg);
-  color: var(--expense);
-}
-.tx-summary-heading--investment {
-  background: var(--invest-bg);
-  color: var(--invest);
-}
-.tx-summary-total-value {
-  background: var(--bg-subtle);
-  text-align: center;
-  font-weight: 700;
-  font-family: 'DM Mono', monospace;
-  font-variant-numeric: tabular-nums;
-}
-.tx-summary-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-.tx-summary-item > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tx-summary-item > strong {
-  font-family: 'DM Mono', monospace;
-  font-variant-numeric: tabular-nums;
-}
-.tx-summary-empty {
-  color: var(--text-faint);
-  padding: 4px 8px;
-  display: block;
-}
-.tx-summary-table--breakdown .tx-summary-title {
-  text-align: center;
-}
-.tx-summary-group-title {
-  text-align: center;
-  font-weight: 700;
-}
 
 /* ══ TX QUERY / BULK ═════════════════════════════════════════════ */
-.tx-bulk-card {
-  gap: 12px;
-}
-.tx-bulk-grid {
-  display: grid;
-  grid-template-columns: 1.2fr repeat(3, minmax(0, 1fr)) auto auto;
-  gap: 9px;
-  align-items: end;
-}
-.tx-selected-count {
-  font-weight: 700;
-  font-family: 'DM Mono', monospace;
-  color: var(--primary);
-  padding: 9px 13px;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--primary) 12%, var(--bg-panel));
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  font-size: 0.875rem;
-}
-/* ══ TX DIALOG ═══════════════════════════════════════════════════ */
-.tx-dialog {
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  border: none;
-  border-radius: 22px;
-  box-shadow:
-    var(--shadow-raised),
-    0 0 0 1px var(--line);
-  padding: 0;
-  width: min(780px, 94vw);
-  max-height: calc(100dvh - 32px);
-  background: transparent;
-  overflow: hidden;
-  animation: tx-dialog-enter 0.24s cubic-bezier(0.34, 1.4, 0.64, 1) both;
-}
-@keyframes tx-dialog-enter {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.tx-dialog::backdrop {
-  background: var(--overlay);
-  animation: tx-backdrop-enter 0.2s ease both;
-}
-@keyframes tx-backdrop-enter {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 
-.tx-form-dialog {
-  display: flex;
-  flex-direction: column;
-  max-height: inherit;
-  background: var(--bg-subtle);
-  overflow-y: auto;
-}
-.tx-dialog-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 22px 26px 20px;
-  background: var(--bg-sidebar);
-  position: relative;
-  overflow: hidden;
-}
-.tx-dialog-head::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--primary) 40%, transparent) 0%,
-    transparent 55%
-  );
-  pointer-events: none;
-}
-.tx-dialog-title {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-}
-.tx-dialog-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.25rem;
-  color: #fff;
-  flex-shrink: 0;
-  line-height: 1;
-}
-.tx-dialog-head h3 {
-  color: #fff;
-  font-family: 'Syne', sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
+/* ══ TX DIALOG ═══════════════════════════════════════════════════ */
+
 .tx-close-btn {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -1592,87 +1391,6 @@ dialog {
   color: #fff;
 }
 
-.tx-form-fields {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  padding: 22px 26px;
-  background: var(--bg-subtle);
-}
-.tx-form-fields label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.tx-form-fields input,
-.tx-form-fields select {
-  background: var(--bg-card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  color: var(--text-main);
-  font-family: inherit;
-  font-size: 0.9rem;
-  min-height: 44px;
-  padding: 10px 13px;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-  width: 100%;
-}
-.tx-form-fields input:focus,
-.tx-form-fields select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--ring);
-  outline: none;
-}
-.tx-form-fields input::placeholder {
-  color: var(--text-faint);
-}
-.tx-form-fields .span-3 {
-  grid-column: span 4;
-}
-.tx-category-field {
-  grid-column: span 2;
-}
-.tx-amount-field {
-  grid-column: span 2;
-}
-.tx-amount-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.tx-amount-currency {
-  position: absolute;
-  left: 14px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  pointer-events: none;
-  z-index: 1;
-}
-.tx-amount-wrap input {
-  padding-left: 28px;
-  font-family: 'DM Mono', monospace;
-  font-size: 1.05rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-main);
-}
-
-.tx-dialog-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding: 18px 26px;
-  background: var(--bg-panel);
-  border-top: 1px solid var(--line);
-}
 .tx-btn-primary {
   background: linear-gradient(
     180deg,
@@ -1717,104 +1435,11 @@ dialog {
 }
 
 /* ══ TABLES ══════════════════════════════════════════════════════ */
-.row-selected {
-  background: color-mix(in srgb, var(--primary) 10%, var(--bg-panel));
-}
+
 .table-wrap.compact {
   max-height: 360px;
 }
 
-.tx-col-select {
-  width: 44px;
-  text-align: center;
-}
-#tx-select-all,
-#tx-table-body input[type='checkbox'][name='txSelectedIds'] {
-  inline-size: 16px;
-  block-size: 16px;
-  min-height: 16px;
-  margin: 0;
-  padding: 0;
-}
-
-.tx-head {
-  position: relative;
-}
-.tx-head-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.tx-filter-trigger {
-  min-height: 28px;
-  padding: 3px 9px;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-main);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-.tx-filter-trigger:hover {
-  background: var(--line);
-}
-.tx-head.is-filtered .tx-filter-trigger {
-  color: var(--primary);
-}
-.tx-filter-trigger.is-filtered::after {
-  content: '•';
-  margin-left: 4px;
-  color: var(--primary);
-}
-.tx-sort-btn {
-  min-height: 24px;
-  min-width: 24px;
-  padding: 0 5px;
-  border-radius: 7px;
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  border: 1px solid var(--line);
-}
-.tx-sort-btn.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
-}
-
-.tx-filter-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 12;
-  min-width: 220px;
-  max-width: min(300px, 90vw);
-  display: grid;
-  gap: 7px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-pop);
-  padding: 13px;
-}
-.tx-filter-popover[hidden] {
-  display: none;
-}
-.tx-filter-popover label {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-.tx-filter-popover input,
-.tx-filter-popover select {
-  min-height: 36px;
-  padding: 7px 9px;
-}
-.tx-checkbox-list {
-  display: grid;
-  gap: 6px;
-  max-height: 170px;
-  overflow: auto;
-  padding: 2px 0;
-}
 .tx-checkbox-option {
   display: flex;
   align-items: center;
@@ -1829,14 +1454,6 @@ dialog {
   inline-size: 16px;
   block-size: 16px;
   margin: 0;
-}
-.tx-header-clear-btn {
-  min-height: 32px;
-  border: 1px solid var(--line);
-  background: var(--bg-subtle);
-  color: var(--text-main);
-  font-size: 0.78rem;
-  font-weight: 600;
 }
 
 td input:not([type='checkbox']),
@@ -1895,14 +1512,6 @@ td select {
 }
 
 /* ══ BADGES ══════════════════════════════════════════════════════ */
-.badge {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
 
 /* ══ DUAL / GOAL GRIDS ═══════════════════════════════════════════ */
 .dual-grid {
@@ -2778,20 +2387,6 @@ td select {
   #contribution-form > button[type='submit'] {
     justify-self: stretch;
   }
-  .tx-bulk-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .tx-form-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tx-form-fields .span-3,
-  .tx-form-fields .tx-category-field,
-  .tx-form-fields .tx-amount-field {
-    grid-column: span 2;
-  }
-  .tx-dialog-actions {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 980px) {
@@ -2960,34 +2555,10 @@ td select {
   .cards-grid.slim,
   .form-grid,
   .form-grid.compact,
-  .investment-form,
-  .tx-bulk-grid,
-  .tx-form-fields {
+  .investment-form {
     grid-template-columns: 1fr;
   }
-  .tx-form-fields .span-3,
-  .tx-form-fields .tx-category-field,
-  .tx-form-fields .tx-amount-field {
-    grid-column: 1 / -1;
-  }
-  .tx-dialog-head {
-    padding: 18px 18px 16px;
-  }
-  .tx-dialog-head h3 {
-    font-size: 1.1rem;
-  }
-  .tx-form-fields {
-    padding: 18px;
-    gap: 14px;
-  }
-  .tx-dialog-actions {
-    flex-direction: column-reverse;
-    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-  }
-  .tx-dialog-actions .tx-btn-primary,
-  .tx-dialog-actions .tx-btn-secondary {
-    width: 100%;
-  }
+
   .mini-form,
   .mini-form.compact-row {
     grid-template-columns: 1fr;

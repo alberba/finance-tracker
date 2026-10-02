@@ -17,7 +17,7 @@ const legacyCss = readFileSync(new URL('../../src/styles/legacy.css', import.met
  * that deletes legacy rules lowers it in the same PR. Never raise it; new
  * styles go in components (utilities, base components or scoped styles).
  */
-const LEGACY_CSS_LINE_CEILING = 3078
+const LEGACY_CSS_LINE_CEILING = 2649
 
 describe('legacy.css', () => {
   it('does not grow past its line ceiling', () => {
@@ -92,6 +92,7 @@ function contrastRatio(foreground: string, background: string): number {
 
 /** Every token the app paints text with, and the surfaces that text sits on. */
 const PAGE_SURFACES = ['--bg-main', '--bg-panel', '--bg-subtle', '--bg-elevated']
+const INK_SURFACES = ['--bg-sidebar', '--ink-surface']
 const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--text-main', surfaces: PAGE_SURFACES },
   { text: '--text-muted', surfaces: PAGE_SURFACES },
@@ -103,10 +104,11 @@ const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--expense', surfaces: PAGE_SURFACES },
   { text: '--invest', surfaces: PAGE_SURFACES },
   { text: '--accent', surfaces: PAGE_SURFACES },
-  { text: '--ink-text', surfaces: ['--bg-sidebar'] },
-  { text: '--ink-muted', surfaces: ['--bg-sidebar'] },
-  { text: '--ink-gain', surfaces: ['--bg-sidebar'] },
-  { text: '--ink-loss', surfaces: ['--bg-sidebar'] },
+  { text: '--on-primary', surfaces: ['--primary-fill', '--primary-fill-hover'] },
+  { text: '--ink-text', surfaces: INK_SURFACES },
+  { text: '--ink-muted', surfaces: INK_SURFACES },
+  { text: '--ink-gain', surfaces: INK_SURFACES },
+  { text: '--ink-loss', surfaces: INK_SURFACES },
 ]
 
 /**

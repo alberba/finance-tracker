@@ -63,6 +63,41 @@ const INVESTMENT_VIEWS: Array<{
   },
 ]
 
+/** Movimientos views beyond the default tab: sub-tab, side panels and the bulk bar. */
+const TRANSACTION_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+}> = [
+  {
+    name: 'transactions-subscriptions',
+    open: (_page, tracker) => tracker.openSubscriptionsTab(),
+  },
+  {
+    name: 'transactions-movement-panel',
+    open: async (page, tracker) => {
+      await tracker.openTransactions()
+      await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
+      await expect(page.getByRole('dialog', { name: 'Nuevo movimiento' })).toBeVisible()
+    },
+  },
+  {
+    name: 'transactions-subscription-panel',
+    open: (_page, tracker) => tracker.openNewSubscriptionPanel(),
+  },
+  {
+    name: 'transactions-selection',
+    open: async (page, tracker) => {
+      await tracker.openTransactions()
+      const select = page.getByRole('button', { name: 'Seleccionar', exact: true })
+      if (await select.isVisible()) await select.click()
+      const boxes = tracker.transactionsSection.locator('input[data-select-tx-id]')
+      await boxes.nth(0).check()
+      await boxes.nth(1).check()
+      await expect(tracker.bulkActionBar).toBeVisible()
+    },
+  },
+]
+
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
 
 type LayoutIssue = {
@@ -121,8 +156,6 @@ async function getLayoutScanResult(page: Page, sectionId: FinanceSectionId): Pro
             '.dual-grid',
             '.goal-edit-grid',
             '.goal-progress',
-            '.tx-query-grid',
-            '.tx-bulk-grid',
             '.form-grid',
             '.settings-head',
             '.mini-form',
@@ -364,6 +397,51 @@ test.describe('Inversión · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'investment', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Movimientos · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of TRANSACTION_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'transactions', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(page, tracker, () => view.open(page, tracker), `page-${view.name}.png`)
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of TRANSACTION_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "transactions" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openTransactions()
+      await expectSoundLayout(page, 'transactions')
+    })
+
+    for (const view of TRANSACTION_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'transactions', view.name)
       })
     }
   })

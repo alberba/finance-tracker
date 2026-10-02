@@ -62,7 +62,8 @@ test.describe('Dashboard section', () => {
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(
       tracker.transactionsSection.getByRole('heading', {
-        name: 'Movimientos mensuales',
+        name: 'Movimientos',
+        exact: true,
       }),
     ).toBeVisible()
   })

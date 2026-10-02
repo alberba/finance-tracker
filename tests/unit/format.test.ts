@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatAxisLabel,
+  formatDayMonth,
   formatLongDate,
   formatMoney,
+  formatMonthName,
   formatMonthYear,
   formatPercent,
   formatQuotePrice,
@@ -106,6 +108,26 @@ describe('fechas', () => {
     expect(formatShortDate('')).toBe('—')
     expect(formatLongDate('no-date')).toBe('—')
     expect(formatStamp('')).toBe('—')
+  })
+})
+
+describe('formatDayMonth', () => {
+  it('da el día y el mes abreviado, sin año', () => {
+    expect(formatDayMonth('2026-09-27')).toBe('27 sept')
+  })
+
+  it('marca la falta de fecha con una raya', () => {
+    expect(formatDayMonth('')).toBe('—')
+  })
+})
+
+describe('formatMonthName', () => {
+  it('da el mes con mayúscula inicial, sin año', () => {
+    expect(formatMonthName(8)).toBe('Septiembre')
+  })
+
+  it('devuelve una cadena vacía si el mes no existe', () => {
+    expect(formatMonthName(12)).toBe('')
   })
 })
 

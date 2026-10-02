@@ -77,7 +77,8 @@ test.describe('Mobile smoke', () => {
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(
       tracker.transactionsSection.getByRole('heading', {
-        name: 'Movimientos mensuales',
+        name: 'Movimientos',
+        exact: true,
       }),
     ).toBeVisible()
 
@@ -99,21 +100,21 @@ test.describe('Mobile smoke', () => {
     await tracker.openTransactions()
     await page.locator('#tx-open-modal').click()
 
-    const dialog = page.locator('#tx-dialog')
-    const addAnother = dialog.getByRole('button', { name: 'Otro' })
-
-    await addAnother.scrollIntoViewIfNeeded()
+    // The panel fills the screen; its footer stays put while the fields scroll.
+    const panel = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+    const addAnother = panel.getByRole('button', { name: 'Guardar y añadir otro' })
     await expect(addAnother).toBeVisible()
 
     const layout = await addAnother.evaluate((element) => {
       const rect = element.getBoundingClientRect()
+      const body = element.closest('dialog')!.querySelector('form')!.parentElement!
       return {
         isWithinVisualViewport: rect.top >= 0 && rect.bottom <= window.innerHeight,
-        formScrolls: element.closest('form')!.scrollHeight > element.closest('form')!.clientHeight,
+        bodyScrolls: body.scrollHeight > body.clientHeight,
       }
     })
 
-    expect(layout).toEqual({ isWithinVisualViewport: true, formScrolls: true })
+    expect(layout).toEqual({ isWithinVisualViewport: true, bodyScrolls: true })
   })
 
   test('agrupa las secciones secundarias en un menú inferior accesible', async ({

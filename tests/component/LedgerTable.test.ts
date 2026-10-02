@@ -143,4 +143,38 @@ describe('LedgerTable', () => {
       expect(wrapper.emitted('update:expanded')).toBeUndefined()
     })
   })
+
+  it('agrupa las filas bajo una fila de grupo con su título y su resumen', () => {
+    const wrapper = mountTable({
+      rows: undefined,
+      groups: [
+        { key: 'sep', title: 'Septiembre 2026', summary: '1 movimiento', rows: [rows[0]] },
+        { key: 'ago', title: 'Agosto 2026', summary: '1 movimiento', rows: [rows[1]] },
+      ],
+    })
+
+    const groups = wrapper.findAll('tbody')
+    expect(groups).toHaveLength(2)
+    const header = groups[0].get('[data-ledger-group]')
+    expect(header.get('th').attributes('scope')).toBe('colgroup')
+    expect(header.text()).toContain('Septiembre 2026')
+    expect(header.text()).toContain('1 movimiento')
+    expect(groups[1].find('[data-position="oro"]').exists()).toBe(true)
+  })
+
+  it('muestra el estado vacío cuando ningún grupo tiene filas', () => {
+    const wrapper = mountTable({ rows: undefined, groups: [], emptyText: 'Sin movimientos.' })
+
+    expect(wrapper.get('[data-ledger-empty]').text()).toBe('Sin movimientos.')
+  })
+
+  it('deja sustituir la cabecera de una columna y marcar filas', () => {
+    const wrapper = mountTable(
+      { rowClass: (row: Row) => (row.id === 'oro' ? 'is-picked' : '') },
+      { 'head-name': () => h('span', { 'data-custom-head': '' }, 'Todo') },
+    )
+
+    expect(wrapper.get('thead [data-custom-head]').text()).toBe('Todo')
+    expect(wrapper.get('[data-position="oro"]').classes()).toContain('is-picked')
+  })
 })

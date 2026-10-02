@@ -15,6 +15,11 @@ export class LiveMarketPage {
     return this.page.locator('[data-pending-panel]')
   }
 
+  /** Side panel where a pending movement is edited before it is confirmed. */
+  get pendingEditPanel(): Locator {
+    return this.page.locator('#pending-edit-panel')
+  }
+
   get pendingAlert(): Locator {
     return this.page.locator('[data-pending-alert]')
   }
@@ -92,13 +97,13 @@ export class LiveMarketPage {
 
   async openFirstPendingEdit(): Promise<Locator> {
     const item = this.pendingPanel.locator('[data-pending-item]').first()
-    await item.getByRole('button', { name: 'Editar' }).click()
-    return item
+    await item.getByRole('button', { name: /^Editar/ }).click()
+    await expect(this.pendingEditPanel).toBeVisible()
+    return this.pendingEditPanel
   }
 
   async editFirstPendingInvestment(params: { units?: number; unitPrice?: number; fee?: number; time?: string; symbol?: string }): Promise<void> {
-    const item = this.pendingPanel.locator('[data-pending-item]').first()
-    await item.getByRole('button', { name: 'Editar' }).click()
+    const item = await this.openFirstPendingEdit()
     if (params.symbol !== undefined) await item.getByLabel('Símbolo').fill(params.symbol)
     if (params.units !== undefined) await item.getByLabel('Títulos').fill(String(params.units))
     if (params.unitPrice !== undefined) await item.getByLabel('Precio por título').fill(String(params.unitPrice))
@@ -108,7 +113,7 @@ export class LiveMarketPage {
   }
 
   async confirmFirstPending(): Promise<void> {
-    await this.pendingPanel.locator('[data-pending-item]').first().getByRole('button', { name: 'Confirmar' }).click()
+    await this.pendingPanel.locator('[data-pending-item]').first().getByRole('button', { name: /^Confirmar/ }).click()
   }
 
   async expectPendingCount(count: number): Promise<void> {

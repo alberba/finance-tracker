@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import { splitDecimals } from '../../lib/format'
+import KickerLabel from './KickerLabel.vue'
 import { INK_TONE_TEXT, type Tone } from './tone'
 
 export interface InkBandFact {
@@ -14,6 +15,8 @@ export interface InkBandFact {
 
 // The dark band that carries a screen's headline figure: the figure large
 // (decimals smaller), an optional change chip and up to three facts beside it.
+// The `label` slot replaces the label (e.g. with month arrows); `note` adds a
+// line under the figure.
 const props = defineProps<{
   label: string
   /** Formatted figure; its decimals and currency render smaller. */
@@ -21,6 +24,8 @@ const props = defineProps<{
   ariaLabel: string
   valueId?: string
   chip?: { text: string; tone: Tone } | null
+  /** Colors the headline figure as a gain or a loss (it carries its sign too). */
+  valueTone?: Tone
   facts?: InkBandFact[]
 }>()
 
@@ -29,18 +34,22 @@ const parts = computed(() => splitDecimals(props.value))
 
 <template>
   <section
-    class="bg-ink text-ink-text grid gap-5 rounded-lg px-5 py-6 sm:px-9 sm:py-8 lg:flex lg:items-end lg:gap-0"
+    class="bg-ink border-ink-line text-ink-text grid gap-5 rounded-lg border px-5 py-6 sm:px-9 sm:py-8 lg:flex lg:items-end lg:gap-0"
     :aria-label="ariaLabel"
   >
     <div class="grid gap-2.5 lg:flex-[1.6] lg:pr-8">
-      <p class="text-ink-muted font-mono text-xs tracking-[0.14em] uppercase">{{ label }}</p>
+      <slot name="label">
+        <KickerLabel tone="ink">{{ label }}</KickerLabel>
+      </slot>
       <p
         :id="valueId"
         class="font-display leading-none font-bold tracking-tight whitespace-nowrap tabular-nums"
+        :class="valueTone ? INK_TONE_TEXT[valueTone] : undefined"
       >
         <span class="text-5xl lg:text-6xl">{{ parts.whole }}</span
         ><span class="text-ink-muted text-2xl lg:text-3xl">{{ parts.rest }}</span>
       </p>
+      <slot name="note" />
       <p v-if="chip" class="flex">
         <span
           class="bg-ink-text/10 font-display rounded-full px-2.5 py-0.5 text-sm font-medium tabular-nums"

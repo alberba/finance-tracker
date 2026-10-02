@@ -296,16 +296,20 @@ test.describe("Reports E2E", () => {
     page,
     tracker,
   }) => {
+    // The movement form is a side panel now, anchored to the right edge.
     await tracker.openTransactions();
     await tracker.transactionsSection
-      .getByRole("button", { name: "Nuevo" })
+      .getByRole("button", { name: "Nuevo movimiento" })
       .click();
-    await expectModalCentered(page, "#tx-dialog");
-    // Close it before navigating. Sections are rendered one at a time now, so
-    // `openWealth()` has to click the nav tab — and an open dialog's backdrop
-    // swallows that click. It only worked while every section stayed mounted
-    // and the navigation helper could skip the click altogether.
-    await page.locator("#tx-close-modal").click();
+    const panel = page.getByRole("dialog", { name: "Nuevo movimiento" });
+    await expect(panel).toBeVisible();
+    // Polled: the panel slides in from the right.
+    await expect
+      .poll(() => panel.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    // Close it before navigating: an open dialog's backdrop swallows the
+    // click on the nav tab.
+    await panel.getByRole("button", { name: "Cerrar" }).click();
 
     await tracker.openWealth();
     // Match the accessible name, not the visible label: these buttons read

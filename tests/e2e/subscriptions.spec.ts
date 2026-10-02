@@ -6,39 +6,45 @@ function addDays(isoDate: string, days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
+function shortDate(isoDate: string): string {
+  return new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${isoDate}T00:00:00Z`))
+}
+
 test.describe('suscripciones de gastos', () => {
-  test('presenta el editor de suscripciones con controles accesibles en móvil', { tag: '@smoke' }, async ({
+  test('presenta las suscripciones y su panel con controles accesibles en móvil', { tag: '@smoke' }, async ({
     page,
     tracker,
   }) => {
     await tracker.openSubscriptionsTab()
 
     const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    const editor = subscriptions.getByRole('article', {
-      name: 'Programa un gasto recurrente',
-    })
-
-    await expect(editor).toBeVisible()
     await expect(
-      subscriptions.getByLabel('Resumen de suscripciones').getByText(/activas/),
+      subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
     ).toBeVisible()
-    await expect(
-      subscriptions.getByRole('heading', { name: 'Análisis de suscripciones' }),
-    ).toBeVisible()
-    await expect(subscriptions.getByText('Activa o añade una suscripción')).toBeVisible()
     await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
-    await expect(subscriptions.getByLabel('Nombre')).toHaveAttribute('required', '')
-    await expect(subscriptions.getByLabel('Categoría')).toHaveValue('Suscripciones')
-    await expect(subscriptions.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
+    await expect(subscriptions.getByText('Aún no hay suscripciones')).toBeVisible()
+    await expect(subscriptions.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
+    await expect(subscriptions.getByRole('heading', { name: 'Próximos 30 días' })).toBeVisible()
+
+    await tracker.openNewSubscriptionPanel()
+    const panel = page.getByRole('dialog', { name: 'Nueva suscripción' })
+    await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
+    await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
+    await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
 
     await page.setViewportSize({ width: 375, height: 812 })
 
     const mobileControls = [
-      subscriptions.getByLabel('Nombre'),
-      subscriptions.getByLabel('Importe'),
-      subscriptions.getByLabel('Cuenta'),
-      subscriptions.getByRole('heading', { name: 'Análisis de suscripciones' }),
-      subscriptions.getByRole('button', { name: 'Añadir suscripción' }),
+      panel.getByLabel('Nombre'),
+      panel.getByLabel('Importe'),
+      panel.getByLabel('Cuenta'),
+      panel.getByRole('button', { name: 'Mensual' }),
+      panel.getByRole('button', { name: 'Añadir suscripción' }),
     ]
     for (const control of mobileControls) {
       await control.scrollIntoViewIfNeeded()
@@ -62,23 +68,22 @@ test.describe('suscripciones de gastos', () => {
       firstChargeDate: today,
     })
 
-    const analysis = tracker.transactionsSection.getByRole('region', {
-      name: 'Análisis de suscripciones',
-    })
-    await expect(analysis.getByText('Coste mensual equivalente')).toBeVisible()
-    await expect(analysis.getByText('14,99 €', { exact: true })).toBeVisible()
-    await expect(analysis.getByText('179,88 €', { exact: true })).toBeVisible()
     await expect(page.getByRole('status')).toContainText('gasto generado')
+    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+    const summary = subscriptions.getByLabel('Resumen de suscripciones')
+    await expect(summary).toContainText('14,99 €')
+    await expect(summary).toContainText('179,88 €')
+    await expect(subscriptions.locator('[data-subscriptions-total]')).toHaveText('14,99 € / mes')
+
     await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.locator('#tx-table-body tr', { hasText: 'E2E Streaming' }),
-    ).toHaveCount(1)
+    await tracker.transactionsSection.getByRole('tab', { name: /Registro/ }).click()
+    await tracker.revealOlderTransactions()
+    await expect(tracker.transactionRows.filter({ hasText: 'E2E Streaming' })).toHaveCount(1)
 
     await tracker.reload()
     await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.locator('#tx-table-body tr', { hasText: 'E2E Streaming' }),
-    ).toHaveCount(1)
+    await tracker.revealOlderTransactions()
+    await expect(tracker.transactionRows.filter({ hasText: 'E2E Streaming' })).toHaveCount(1)
   })
 
   test('permite pausar y eliminar una suscripción sin borrar su gasto', async ({
@@ -95,19 +100,22 @@ test.describe('suscripciones de gastos', () => {
     })
 
     const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    const row = subscriptions.getByRole('listitem').filter({ hasText: 'E2E Pausable' })
-    await row.getByRole('button', { name: 'Pausar' }).click()
+    const row = subscriptions.locator('tr[data-subscription-id]', { hasText: 'E2E Pausable' })
+    const toggle = row.getByRole('switch', { name: 'E2E Pausable activa' })
+    await expect(toggle).toBeChecked()
+    await row.locator('label:has([role="switch"])').click()
+    await expect(toggle).not.toBeChecked()
     await expect(row).toContainText('Pausada')
-    await row.getByRole('button', { name: 'Eliminar' }).click()
+    await row.getByRole('button', { name: 'Eliminar la suscripción E2E Pausable' }).click()
     await expect(page.getByRole('status')).toContainText('gastos ya creados se conservan')
+    await expect(row).toHaveCount(0)
 
-    await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.locator('#tx-table-body tr', { hasText: 'E2E Pausable' }),
-    ).toHaveCount(1)
+    await tracker.transactionsSection.getByRole('tab', { name: /Registro/ }).click()
+    await tracker.revealOlderTransactions()
+    await expect(tracker.transactionRows.filter({ hasText: 'E2E Pausable' })).toHaveCount(1)
   })
 
-  test('analiza el compromiso recurrente en una página responsive', async ({
+  test('resume el compromiso, dónde se va y los próximos cobros sin scroll lateral', async ({
     page,
     tracker,
   }) => {
@@ -155,23 +163,24 @@ test.describe('suscripciones de gastos', () => {
     await mirrorStateToServer(page)
     await tracker.reload()
     await tracker.openTransactions()
-    await tracker.transactionsSection.getByRole('tab', { name: 'Análisis' }).click()
+    await tracker.openSubscriptionsTab()
 
-    const analysis = tracker.transactionsSection.locator('#transactions-tab-analysis')
-    await expect(analysis.getByRole('heading', { name: 'Radar de suscripciones' })).toBeVisible()
-    await expect(analysis.locator('.analysis-metric', { hasText: 'Compromiso mensual' })).toContainText(
-      '20,00',
-    )
-    await expect(analysis.locator('.analysis-metric', { hasText: 'Proyección anual' })).toContainText(
-      '240,00',
-    )
-    await expect(analysis.getByText('Revolut')).toBeVisible()
+    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+    const summary = subscriptions.getByLabel('Resumen de suscripciones')
+    await expect(summary).toContainText('20,00 €')
+    await expect(summary).toContainText('240,00 €')
+    await expect(summary).toContainText('de 3')
+
+    const where = subscriptions.getByRole('region', { name: 'Dónde se va' })
+    await expect(where).toContainText('Ocio')
+    await expect(where).toContainText('Software')
+    await expect(where).not.toContainText('Salud')
     await expect(
-      analysis.locator('.analysis-ranking').getByText('Streaming análisis'),
-    ).toBeVisible()
+      subscriptions.locator('tr[data-subscription-id]', { hasText: 'Gimnasio pausado' }),
+    ).toContainText('En pausa')
 
     await page.setViewportSize({ width: 375, height: 812 })
-    await expect(analysis).toBeVisible()
+    await expect(subscriptions).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
@@ -225,15 +234,16 @@ test.describe('suscripciones de gastos', () => {
     await tracker.reload()
     await tracker.openSubscriptionsTab()
     const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    const row = subscriptions.getByRole('listitem').filter({ hasText: 'E2E Reactivada' })
-    await row.getByRole('button', { name: 'Reactivar' }).click()
+    const row = subscriptions.locator('tr[data-subscription-id]', { hasText: 'E2E Reactivada' })
+    const toggle = row.getByRole('switch', { name: 'E2E Reactivada activa' })
+    await row.locator('label:has([role="switch"])').click()
+    await expect(toggle).toBeChecked()
 
-    await expect(row).toContainText(`Próximo cobro: ${nextChargeDate}`)
+    await expect(row).toContainText(shortDate(nextChargeDate))
 
     await tracker.reload()
     await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.locator('#tx-table-body tr', { hasText: 'E2E Reactivada' }),
-    ).toHaveCount(0)
+    await tracker.revealOlderTransactions()
+    await expect(tracker.transactionRows.filter({ hasText: 'E2E Reactivada' })).toHaveCount(0)
   })
 })

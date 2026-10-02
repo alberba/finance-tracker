@@ -4,7 +4,7 @@ const SECTION_CONFIG = {
   dashboard: { buttonLabel: "Dashboard", headingText: "Resumen financiero" },
   transactions: {
     buttonLabel: "Movimientos",
-    headingText: "Movimientos mensuales",
+    headingText: /^Movimientos$/,
   },
   budget: { buttonLabel: "Presupuesto", headingText: "Presupuesto" },
   wealth: { buttonLabel: "Patrimonio", headingText: "Patrimonio total" },
@@ -16,7 +16,39 @@ const SECTION_CONFIG = {
 
 export type FinanceSectionId = keyof typeof SECTION_CONFIG;
 
+const TX_TYPE_LABEL = {
+  income: "Ingreso",
+  expense: "Gasto",
+  investment: "Inversión",
+} as const;
+
+/** "FEBRERO" → "Febrero", as the panel's month select names it. */
+function monthOptionLabel(monthLabel: string): string {
+  const lower = monthLabel.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+const MONTH_INDEX: Record<string, number> = Object.fromEntries(
+  [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ].map((name, index) => [name, index]),
+);
+
 export class FinanceTrackerPage {
+  /** Month the registry band was last moved to, for month-scoped row counts. */
+  private transactionsMonth: number | null = null;
+
   constructor(private readonly page: Page) {}
 
   get dashboardSection(): Locator {
@@ -27,8 +59,22 @@ export class FinanceTrackerPage {
     return this.page.locator("#transactions");
   }
 
-  get transactionsSummarySection(): Locator {
-    return this.transactionsSection.locator(".tx-summary-side");
+  get transactionsBreakdown(): Locator {
+    return this.transactionsSection.locator("[data-tx-breakdown]");
+  }
+
+  /** The movement side panel (create and edit). */
+  get transactionPanel(): Locator {
+    return this.page.getByRole("dialog", { name: /^(Nuevo|Editar) movimiento$/ });
+  }
+
+  /** Ledger rows of the registry, every month shown. */
+  get transactionRows(): Locator {
+    return this.transactionsSection.locator("[data-tx-ledger] tr[data-tx-id]");
+  }
+
+  transactionRow(description: string): Locator {
+    return this.transactionRows.filter({ hasText: description }).first();
   }
 
   get budgetSection(): Locator {
@@ -79,6 +125,19 @@ export class FinanceTrackerPage {
       .click();
   }
 
+  /** The subscription side panel (create and edit). */
+  get subscriptionPanel(): Locator {
+    return this.page.getByRole("dialog", { name: /^(Nueva|Editar) suscripción$/ });
+  }
+
+  async openNewSubscriptionPanel() {
+    await this.openSubscriptionsTab();
+    await this.transactionsSection
+      .getByRole("button", { name: "Nueva suscripción" })
+      .click();
+    await expect(this.subscriptionPanel).toBeVisible();
+  }
+
   async addSubscription(params: {
     name: string;
     amount: number;
@@ -86,23 +145,20 @@ export class FinanceTrackerPage {
     frequency: "weekly" | "monthly" | "quarterly" | "yearly";
     firstChargeDate: string;
   }) {
-    await this.openSubscriptionsTab();
-    const section = this.transactionsSection.locator(
-      "#transactions-tab-subscriptions",
-    );
-    await section.getByLabel("Nombre").fill(params.name);
-    await section.getByLabel("Importe").fill(String(params.amount));
+    await this.openNewSubscriptionPanel();
+    const panel = this.subscriptionPanel;
+    await panel.getByLabel("Nombre").fill(params.name);
+    await panel.getByLabel("Importe").fill(String(params.amount));
+    await this.selectByLabelOrFirst(panel.getByLabel("Cuenta"), "Revolut");
     await this.selectByLabelOrFirst(
-      section.getByLabel("Cuenta"),
-      "Revolut",
-    );
-    await this.selectByLabelOrFirst(
-      section.getByLabel("Categoría"),
+      panel.getByLabel("Categoría"),
       params.categoryLabel,
     );
-    await section.getByLabel("Frecuencia").selectOption(params.frequency);
-    await section.getByLabel("Primer cobro").fill(params.firstChargeDate);
-    await section.getByRole("button", { name: "Añadir suscripción" }).click();
+    await panel
+      .locator(`button[data-frequency="${params.frequency}"]`)
+      .click();
+    await panel.getByLabel("Primer cobro").fill(params.firstChargeDate);
+    await panel.getByRole("button", { name: "Añadir suscripción" }).click();
   }
 
   async openBudget() {
@@ -218,25 +274,7 @@ export class FinanceTrackerPage {
     amount: number;
     description: string;
   }) {
-    await this.openTransactions();
-    await this.ensureTransactionModalOpen();
-
-    const form = this.transactionsSection.locator("#tx-form");
-    await form.getByLabel("Fecha").fill(params.date);
-    await form.getByLabel("Mes").selectOption({ label: params.monthLabel });
-    await form.getByLabel("Tipo").selectOption("income");
-    await this.selectByLabelOrFirst(form.getByLabel("Cuenta"), "Revolut");
-    await this.selectByLabelOrFirst(
-      form.getByLabel("Categoría"),
-      params.categoryLabel,
-    );
-    await form.getByLabel("Descripción").fill(params.description);
-    await form.getByLabel("Importe").fill(String(params.amount));
-
-    await form.getByRole("button", { name: "Guardar" }).click();
-    await expect(this.page.locator("#toast")).toContainText(
-      "Movimiento guardado.",
-    );
+    await this.addCustomTransaction({ ...params, type: "income" });
   }
 
   async addCustomTransaction(params: {
@@ -258,20 +296,10 @@ export class FinanceTrackerPage {
      */
     accountLabel?: string;
   }) {
-    await this.openTransactions();
-    await this.ensureTransactionModalOpen();
-    const form = this.transactionsSection.locator("#tx-form");
-    await form.getByLabel("Fecha").fill(params.date);
-    await form.getByLabel("Mes").selectOption({ label: params.monthLabel });
-    await form.getByLabel("Tipo").selectOption(params.type);
-    await this.selectByLabelOrFirst(form.getByLabel("Cuenta"), params.accountLabel ?? "Revolut");
-    await this.selectByLabelOrFirst(
-      form.getByLabel("Categoría"),
-      params.categoryLabel,
-    );
-    await form.getByLabel("Descripción").fill(params.description);
-    await form.getByLabel("Importe").fill(String(params.amount));
-    await form.getByRole("button", { name: "Guardar" }).click();
+    await this.fillTransactionPanel(params);
+    await this.transactionPanel
+      .getByRole("button", { name: "Guardar movimiento" })
+      .click();
     await expect(this.page.locator("#toast")).toContainText(
       "Movimiento guardado.",
     );
@@ -285,23 +313,45 @@ export class FinanceTrackerPage {
     amount: number;
     description: string;
   }) {
-    await this.openTransactions();
-    await this.ensureTransactionModalOpen();
-    const form = this.transactionsSection.locator("#tx-form");
-    await form.getByLabel("Fecha").fill(params.date);
-    await form.getByLabel("Mes").selectOption({ label: params.monthLabel });
-    await form.getByLabel("Tipo").selectOption(params.type);
-    await this.selectByLabelOrFirst(form.getByLabel("Cuenta"), "Revolut");
-    await this.selectByLabelOrFirst(
-      form.getByLabel("Categoría"),
-      params.categoryLabel,
-    );
-    await form.getByLabel("Descripción").fill(params.description);
-    await form.getByLabel("Importe").fill(String(params.amount));
-    await form.getByRole("button", { name: "Otro" }).click();
+    await this.fillTransactionPanel(params);
+    await this.transactionPanel
+      .getByRole("button", { name: "Guardar y añadir otro" })
+      .click();
     await expect(this.page.getByRole("status")).toContainText(
       "Guardado. Puedes añadir otro.",
     );
+  }
+
+  private async fillTransactionPanel(params: {
+    date: string;
+    monthLabel: string;
+    type: "income" | "expense" | "investment";
+    categoryLabel: string;
+    amount: number;
+    description: string;
+    accountLabel?: string;
+  }) {
+    await this.openTransactions();
+    await this.ensureTransactionModalOpen();
+    const panel = this.transactionPanel;
+    await panel
+      .getByRole("group", { name: "Tipo de movimiento" })
+      .getByRole("button", { name: TX_TYPE_LABEL[params.type], exact: true })
+      .click();
+    await panel.getByLabel("Fecha").fill(params.date);
+    await panel
+      .getByLabel("Cuenta en el mes")
+      .selectOption({ label: monthOptionLabel(params.monthLabel) });
+    await this.selectByLabelOrFirst(
+      panel.getByLabel("Cuenta", { exact: true }),
+      params.accountLabel ?? "Revolut",
+    );
+    await this.selectByLabelOrFirst(
+      panel.getByLabel("Categoría"),
+      params.categoryLabel,
+    );
+    await panel.getByLabel("Descripción").fill(params.description);
+    await panel.getByLabel("Importe").fill(String(params.amount));
   }
 
   async addInvestmentMovement(params: {
@@ -402,26 +452,26 @@ export class FinanceTrackerPage {
   async transactionModalDateValue(): Promise<string> {
     await this.openTransactions();
     await this.ensureTransactionModalOpen();
-    return this.transactionsSection
-      .locator('#tx-form input[name="date"]')
-      .inputValue();
+    return this.transactionPanel.getByLabel("Fecha").inputValue();
   }
 
   async transactionModalCategoryValue(): Promise<string> {
     await this.openTransactions();
     await this.ensureTransactionModalOpen();
-    return this.transactionsSection
-      .locator('#tx-form select[name="category"]')
-      .inputValue();
+    return this.transactionPanel.getByLabel("Categoría").inputValue();
   }
 
   async selectTransactionByDescription(description: string) {
     await this.openTransactions();
-    const row = this.transactionsSection
-      .locator("#tx-table-body tr", { hasText: description })
-      .first();
+    await this.revealOlderTransactions();
+    const row = this.transactionRow(description);
     await expect(row).toBeVisible();
     await row.locator("input[data-select-tx-id]").check();
+  }
+
+  /** The contextual bar shown while rows are selected. */
+  get bulkActionBar(): Locator {
+    return this.page.getByRole("region", { name: "Acciones sobre la selección" });
   }
 
   async applyBulkTransactionChanges(params: {
@@ -429,109 +479,136 @@ export class FinanceTrackerPage {
     accountName?: string;
     category?: string;
   }) {
-    await this.openTransactions();
+    const bar = this.bulkActionBar;
     if (params.type) {
-      await this.transactionsSection
-        .locator("#tx-bulk-type")
-        .selectOption(params.type);
+      await bar.getByLabel("Cambiar tipo").selectOption(params.type);
     }
     if (params.accountName) {
       await this.selectByLabelOrFirst(
-        this.transactionsSection.locator("#tx-bulk-account"),
+        bar.getByLabel("Mover a cuenta"),
         params.accountName,
       );
     }
     if (params.category !== undefined) {
-      await this.transactionsSection
-        .locator("#tx-bulk-category")
-        .fill(params.category);
+      await bar
+        .getByLabel("Cambiar categoría")
+        .selectOption({ label: params.category });
     }
-    await this.transactionsSection.locator("#tx-bulk-apply").click();
+    await bar.getByRole("button", { name: "Aplicar" }).click();
   }
 
   async deleteSelectedTransactions() {
-    await this.openTransactions();
-    await this.transactionsSection.locator("#tx-bulk-delete").click();
+    await this.bulkActionBar.getByRole("button", { name: "Eliminar" }).click();
   }
 
-  async filterTransactionsMonth(monthLabel: string) {
+  /**
+   * Moves the registry's ink band to a month (of 2026 by default, the year of
+   * the seed) with its arrows, so the totals, breakdown and month-scoped row
+   * counts refer to it.
+   */
+  async filterTransactionsMonth(monthLabel: string, year = 2026) {
     await this.openTransactions();
-    await this.transactionsSection
-      .getByLabel("Filtrar mes")
-      .selectOption({ label: monthLabel });
+    const yearSelect = this.registryToolbar.getByLabel("Año", { exact: true });
+    if ((await yearSelect.inputValue()) !== String(year)) {
+      await yearSelect.selectOption(String(year));
+    }
+    const target = MONTH_INDEX[monthLabel.toLowerCase()];
+    const title = this.transactionsSection.locator("#tx-month-title");
+    for (let step = 0; step < 24; step += 1) {
+      const text = ((await title.textContent()) ?? "").toLowerCase();
+      const current = Object.keys(MONTH_INDEX).find((name) => text.includes(` ${name} `));
+      if (current === undefined) {
+        throw new Error(`No se pudo leer el mes de la franja: ${text}`);
+      }
+      const delta = target - MONTH_INDEX[current];
+      if (delta === 0) {
+        break;
+      }
+      await this.transactionsSection
+        .getByRole("button", { name: delta < 0 ? "Mes anterior" : "Mes siguiente" })
+        .click();
+    }
+    await expect(title).toContainText(`${monthLabel.toLowerCase()} ${year}`);
+    this.transactionsMonth = target;
+  }
+
+  /** Unfolds the months the registry keeps behind "Ver … y anteriores". */
+  async revealOlderTransactions() {
+    const more = this.transactionsSection.getByRole("button", {
+      name: /^Ver .+ y anteriores/,
+    });
+    if (await more.isVisible()) {
+      await more.click();
+    }
   }
 
   async expectTransactionDescriptionVisible(description: string) {
-    await expect(
-      this.transactionsSection.locator("#tx-table-body tr", {
-        hasText: description,
-      }),
-    ).toBeVisible();
+    await this.revealOlderTransactions();
+    await expect(this.transactionRow(description)).toBeVisible();
   }
 
+  /** Rows of the month last chosen with `filterTransactionsMonth`, or every row shown. */
   async getTransactionRowCount(): Promise<number> {
-    const emptyState = this.transactionsSection.locator("#tx-table-body tr", {
-      hasText: "Sin movimientos para este mes.",
-    });
-    if (await emptyState.isVisible()) {
-      return 0;
+    await this.revealOlderTransactions();
+    const rows =
+      this.transactionsMonth === null
+        ? this.transactionRows
+        : this.transactionsSection.locator(
+            `[data-tx-ledger] tr[data-tx-month="${this.transactionsMonth}"]`,
+          );
+    return rows.count();
+  }
+
+  get registryToolbar(): Locator {
+    return this.transactionsSection.locator("[data-registry-toolbar]");
+  }
+
+  get transactionSearch(): Locator {
+    return this.registryToolbar.getByLabel("Buscar movimientos");
+  }
+
+  /** Turns a type chip of the registry toolbar on or off. */
+  async setTransactionTypeChip(label: string, on: boolean) {
+    const chip = this.registryToolbar
+      .getByRole("group", { name: "Filtrar por tipo" })
+      .locator("label", { hasText: label });
+    if ((await chip.locator("input").isChecked()) !== on) {
+      await chip.click();
     }
-    return this.transactionsSection.locator("#tx-table-body tr").count();
   }
 
   async setTransactionCategoryFilter(value: string) {
     await this.openTransactions();
-    const trigger = this.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="category"]',
-    );
-    await trigger.click();
-    await this.transactionsSection
-      .locator("#tx-header-filter-category")
-      .fill(value);
+    await this.transactionSearch.fill(value);
   }
 
   async setTransactionDescriptionFilter(value: string) {
     await this.openTransactions();
-    const trigger = this.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="description"]',
-    );
-    await trigger.click();
-    await this.transactionsSection
-      .locator("#tx-header-filter-description")
-      .fill(value);
+    await this.transactionSearch.fill(value);
   }
 
   async clearTransactionFilters() {
     await this.openTransactions();
-    const clearColumns = [
-      "date",
-      "account",
-      "type",
-      "category",
-      "description",
-      "amount",
-    ];
-    for (const column of clearColumns) {
-      const trigger = this.transactionsSection.locator(
-        `.tx-filter-trigger[data-column="${column}"]`,
-      );
-      await trigger.click();
-      await this.transactionsSection
-        .locator(`.tx-header-clear-btn[data-column="${column}"]`)
-        .click();
+    await this.transactionSearch.fill("");
+    await this.registryToolbar
+      .getByLabel("Cuenta", { exact: true })
+      .selectOption({ label: "Todas las cuentas" });
+    for (const label of ["Ingresos", "Gastos", "Inversión"]) {
+      await this.setTransactionTypeChip(label, true);
     }
   }
 
   async clickSortByDate() {
     await this.openTransactions();
     await this.transactionsSection
-      .getByRole("button", { name: "Ordenar por fecha" })
+      .getByRole("button", { name: /^Ordenar por fecha/ })
       .click();
   }
 
-  async firstTransactionDateText(): Promise<string> {
-    const row = this.transactionsSection.locator("#tx-table-body tr").first();
-    return (await row.locator("td").nth(1).innerText()).trim();
+  /** Description of the first row the ledger shows. */
+  async firstTransactionDescription(): Promise<string> {
+    const row = this.transactionRows.first();
+    return (await row.locator("th").innerText()).split("\n")[0].trim();
   }
 
   async editTransactionByDescription(
@@ -544,38 +621,30 @@ export class FinanceTrackerPage {
     },
   ) {
     await this.openTransactions();
-    const row = this.transactionsSection
-      .locator("#tx-table-body tr", { hasText: description })
-      .first();
+    await this.revealOlderTransactions();
+    const row = this.transactionRow(description);
     await expect(row).toBeVisible();
-    await row.getByRole("button", { name: "Editar" }).click();
+    await row.getByRole("button", { name: /^Editar/ }).click();
 
-    const editRow = this.transactionsSection
-      .locator("tr[data-editing-id]")
-      .first();
-    await expect(editRow).toBeVisible();
+    const panel = this.transactionPanel;
+    await expect(
+      panel.getByRole("heading", { name: "Editar movimiento" }),
+    ).toBeVisible();
 
     if (payload.date) {
-      await editRow.locator('[data-edit-field="date"]').fill(payload.date);
+      await panel.getByLabel("Fecha").fill(payload.date);
     }
     if (typeof payload.amount === "number") {
-      await editRow
-        .locator('[data-edit-field="amount"]')
-        .fill(String(payload.amount));
+      await panel.getByLabel("Importe").fill(String(payload.amount));
     }
     if (typeof payload.category === "string") {
-      await this.selectByLabelOrFirst(
-        editRow.locator('[data-edit-field="category"]'),
-        payload.category,
-      );
+      await this.selectByLabelOrFirst(panel.getByLabel("Categoría"), payload.category);
     }
     if (typeof payload.newDescription === "string") {
-      await editRow
-        .locator('[data-edit-field="description"]')
-        .fill(payload.newDescription);
+      await panel.getByLabel("Descripción").fill(payload.newDescription);
     }
 
-    await editRow.getByRole("button", { name: "Guardar" }).click();
+    await panel.getByRole("button", { name: "Guardar cambios" }).click();
     await expect(this.page.getByRole("status")).toContainText(
       "Movimiento actualizado.",
     );
@@ -754,13 +823,21 @@ export class FinanceTrackerPage {
     return this.parseMoneyText(text);
   }
 
+  /** Shows one type in the month's breakdown by category. */
+  async showTransactionBreakdown(type: "income" | "expense" | "investment") {
+    await this.transactionsBreakdown
+      .locator(`button[data-breakdown-type="${type}"]`)
+      .click();
+  }
+
   async getTransactionSummaryCategoryAmount(
     column: "income" | "expense" | "investment",
     category: string,
   ): Promise<number> {
     await this.openTransactions();
-    const row = this.transactionsSection.locator(
-      `#tx-category-breakdown-body tr[data-summary-type="${column}"][data-summary-category="${category}"]`,
+    await this.showTransactionBreakdown(column);
+    const row = this.transactionsBreakdown.locator(
+      `li[data-summary-type="${column}"][data-summary-category="${category}"]`,
     );
     if ((await row.count()) === 0) {
       throw new Error(
@@ -768,7 +845,7 @@ export class FinanceTrackerPage {
       );
     }
     const amountText = (
-      await row.first().locator(".tx-summary-item > strong").innerText()
+      await row.first().locator("[data-summary-amount]").innerText()
     ).trim();
     return this.parseMoneyText(amountText);
   }
@@ -1201,15 +1278,14 @@ export class FinanceTrackerPage {
   }
 
   private async ensureTransactionModalOpen() {
-    const isOpen = await this.transactionsSection
-      .locator("#tx-dialog")
-      .evaluate((dialog) => {
-        return (dialog as HTMLDialogElement).open;
-      });
-    if (!isOpen) {
+    if (!(await this.transactionPanel.isVisible())) {
       await this.transactionsSection
-        .getByRole("button", { name: "Nuevo" })
+        .getByRole("tab", { name: /Registro/ })
         .click();
+      await this.transactionsSection
+        .getByRole("button", { name: "Nuevo movimiento" })
+        .click();
+      await expect(this.transactionPanel).toBeVisible();
     }
   }
 
