@@ -18,6 +18,10 @@ Single-context: `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents
 
 Sync: the files a field crosses from store to D1 and back, and the three movement builders, are in `docs/architecture/sync-v2.md`.
 
+### Design language
+
+UI or `/design` work: the v2 visual pieces, base components and the design rules the user has corrected before are in `docs/architecture/design-language.md`.
+
 ### Coding standards
 
 `CODING_STANDARDS.md` at the repo root is the canonical source for the Standards axis of
