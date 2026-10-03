@@ -49,6 +49,7 @@ import { useUiStore } from './ui'
 
 /** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
 export async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+  if (tx.remoteOperation) return { declared: Boolean(tx.declared), description: tx.description }
   // The server only knows its own account ids; sending the local one made
   // every investment movement fail the ownership check (audit §1).
   const accountId = await resolveEntityId('account', tx.accountId)
@@ -297,6 +298,7 @@ export const useInvestmentStore = defineStore('investment', () => {
   }
 
   function saveEditedMovement(id: string, input: NewInvestmentMovementInput): boolean {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return false
     const side = normalizeInvestmentSide(input.side)
     const symbol = normalizeInvestmentSymbol(input.symbol)
     const date = input.date.trim()
@@ -397,6 +399,7 @@ export const useInvestmentStore = defineStore('investment', () => {
   }
 
   function deleteMovement(id: string): void {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)

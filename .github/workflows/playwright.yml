@@ -180,6 +180,9 @@ jobs:
       - name: Apply local D1 v2 migrations
         if: ${{ always() && !cancelled() }}
         run: pnpm d1:migrate:local:v2
+      - name: Generate an ephemeral integration encryption key
+        if: ${{ always() && !cancelled() }}
+        run: node --input-type=module -e 'import { appendFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; appendFileSync(".dev.vars", "DATA_ENCRYPTION_KEY=" + randomBytes(32).toString("base64") + "\n")'
       - name: Run sync-v2 E2E tests
         if: ${{ always() && !cancelled() }}
         run: pnpm test:e2e:sync-v2

@@ -197,7 +197,7 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const response = await fetch('/api/bootstrap')
       reachedServer = response.ok
-      if (response.ok) bootstrap = await response.json() as SyncV2Bootstrap
+      if (response.ok) bootstrap = (await response.json()) as SyncV2Bootstrap
     } catch {
       // Offline reload falls back to the last complete identity-partitioned read model.
     }
@@ -217,10 +217,20 @@ export const useSyncStore = defineStore('sync', () => {
     bootstrap ??= {
       revision: 0,
       settings: null,
-      accounts: [], categories: [], transactions: [], subscriptions: [],
-      recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
-      contributions: [], userInstruments: [], wealthSnapshots: [],
-      stockeventsSymbolMappings: [], stockeventsCashMappings: [], stockeventsCashSyncEntries: [],
+      accounts: [],
+      categories: [],
+      transactions: [],
+      subscriptions: [],
+      recurringRules: [],
+      pendingMovements: [],
+      budgetEntries: [],
+      goals: [],
+      contributions: [],
+      userInstruments: [],
+      wealthSnapshots: [],
+      stockeventsSymbolMappings: [],
+      stockeventsCashMappings: [],
+      stockeventsCashSyncEntries: [],
     }
     const collections = {
       account: bootstrap.accounts,
@@ -242,9 +252,11 @@ export const useSyncStore = defineStore('sync', () => {
       // cache. Rewriting it from its own (possibly stale) copy would drop
       // rows this device has since learned about through `pullChanges`, with
       // the same duplicate-`create` consequence as §5.2's empty fallback.
-      await Promise.all(Object.entries(collections).map(([entityType, entities]) =>
-        replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
-      ))
+      await Promise.all(
+        Object.entries(collections).map(([entityType, entities]) =>
+          replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
+        ),
+      )
       await setCachedSettings(cacheDb, bootstrap.settings)
       await setCachedBootstrap(cacheDb, bootstrap)
       await setCachedRevision(cacheDb, bootstrap.revision)
@@ -253,7 +265,10 @@ export const useSyncStore = defineStore('sync', () => {
     // saved — because for the user it has been.
     const pending = outboxDb ? await listOutbox(outboxDb) : []
     const withPending = pending.length
-      ? applyPendingCommands(bootstrap, pending.map((entry) => entry.command))
+      ? applyPendingCommands(
+          bootstrap,
+          pending.map((entry) => entry.command),
+        )
       : bootstrap
     useFinancialStateStore().reloadState(projectSyncV2State(withPending))
     if (withPending.subscriptions.length) {
@@ -276,11 +291,12 @@ export const useSyncStore = defineStore('sync', () => {
    * user as nothing at all (audit's transversal guardrail, issue #138).
    */
   function surfaceEnqueueError(error: unknown): void {
-    const message = error instanceof InvalidCommandError
-      ? error.message
-      : error instanceof Error
-        ? `No se pudo encolar el cambio: ${error.message}`
-        : 'No se pudo encolar el cambio.'
+    const message =
+      error instanceof InvalidCommandError
+        ? error.message
+        : error instanceof Error
+          ? `No se pudo encolar el cambio: ${error.message}`
+          : 'No se pudo encolar el cambio.'
     lastError.value = message
     syncStatus.value = 'error'
     showToast(`⚠️ ${message}`)
@@ -412,10 +428,7 @@ export const useSyncStore = defineStore('sync', () => {
         if (result.status === 'applied' || result.status === 'noop') {
           acked.push(entry.seq)
           const command = entry.command
-          if (
-            result.entity !== undefined &&
-            cacheDb !== null
-          ) {
+          if (result.entity !== undefined && cacheDb !== null) {
             if (command.action === 'settingsUpdate') {
               // Keeps this device's `user_settings.version` current, so the next
               // settings command sends the right `baseVersion` (audit §6.4).
@@ -445,7 +458,7 @@ export const useSyncStore = defineStore('sync', () => {
                     entityType: command.entityType,
                     entityId: command.entityId,
                     baseVersion,
-                },
+                  },
             )
           } else if (command.action === 'settingsUpdate') {
             // ADR 0003 for the settings singleton: rebase over the server's
@@ -585,7 +598,12 @@ export const useSyncStore = defineStore('sync', () => {
           await applyResultToCache(change.entityType, JSON.parse(change.payload))
         }
       } catch (error) {
-        console.warn('[sync] No se pudo aplicar un cambio remoto', change.entityType, change.entityId, error)
+        console.warn(
+          '[sync] No se pudo aplicar un cambio remoto',
+          change.entityType,
+          change.entityId,
+          error,
+        )
       }
     }
     revision.value = body.revision
@@ -781,6 +799,7 @@ export const useSyncStore = defineStore('sync', () => {
     enqueueCommand,
     flush,
     pullChanges,
+    refreshFromServer: bootstrapState,
     logout,
     getEntityRef,
     getSettingsVersion,

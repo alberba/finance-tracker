@@ -80,7 +80,8 @@ const totalLabel = computed(() =>
   form.side === 'sell' ? 'Total de la venta' : 'Total de la compra',
 )
 const formula = computed(
-  () => `${form.units || '0'} × ${form.unitPrice || '0'} + ${form.fee || '0'}`,
+  () =>
+    `${form.units || '0'} × ${form.unitPrice || '0'} ${form.side === 'sell' ? '−' : '+'} ${form.fee || '0'}`,
 )
 const cashLabel = computed(() =>
   form.side === 'sell'
@@ -139,6 +140,7 @@ function openNew(): void {
 }
 
 function openEdit(tx: Transaction): void {
+  if (tx.remoteOperation) return
   editing.value = tx
   form.side = tx.side === 'sell' ? 'sell' : 'buy'
   form.symbol = tx.symbol || tx.category || ''

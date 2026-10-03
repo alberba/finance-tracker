@@ -2,6 +2,8 @@
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 
+import BitvavoImportPanel from './BitvavoImportPanel.vue'
+import BitvavoMovementDetails from './BitvavoMovementDetails.vue'
 import InvestmentMovementPanel from './InvestmentMovementPanel.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
@@ -106,6 +108,7 @@ function formatUnits(value: number | undefined): string {
 }
 
 function requestDelete(tx: Transaction): void {
+  if (tx.remoteOperation) return
   pendingDelete.value = investmentStore.movementRows.find((row) => row.tx.id === tx.id) ?? null
 }
 
@@ -138,25 +141,28 @@ function confirmDelete(): void {
           data-investment-only-undeclared
         />
       </div>
-      <BaseButton
-        id="investment-movement-new"
-        variant="primary"
-        class="max-sm:w-full"
-        @click="panel?.openNew()"
-      >
-        <svg
-          class="size-4.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          aria-hidden="true"
+      <div class="flex flex-wrap gap-2">
+        <BitvavoImportPanel />
+        <BaseButton
+          id="investment-movement-new"
+          variant="primary"
+          class="max-sm:w-full"
+          @click="panel?.openNew()"
         >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Nuevo movimiento
-      </BaseButton>
+          <svg
+            class="size-4.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nuevo movimiento
+        </BaseButton>
+      </div>
     </div>
 
     <section
@@ -194,16 +200,29 @@ function confirmDelete(): void {
           </span>
         </template>
         <template #cell-asset="{ row }">
+          <div v-if="row.tx.remoteOperation" class="grid gap-1 sm:hidden">
+            <span class="font-mono font-medium">{{ row.symbol }} <PillTag>Bitvavo</PillTag></span>
+            <span class="text-text-muted text-sm"
+              >{{ formatDayMonth(row.tx.date) }} · {{ row.account }}</span
+            >
+            <span v-if="!row.tx.instrumentId" class="text-text-muted text-sm"
+              >Pendiente de vincular</span
+            >
+            <BitvavoMovementDetails :transaction="row.tx" />
+          </div>
           <!-- On small screens the actions column is hidden: the asset opens
                the movement, with its date, broker and currency below. -->
           <button
+            v-if="!row.tx.remoteOperation"
             type="button"
             class="grid min-h-11 w-full min-w-0 gap-1 text-left sm:hidden"
+            :disabled="Boolean(row.tx.remoteOperation)"
             :aria-label="`Editar ${nameOf(row)}`"
             @click="panel?.openEdit(row.tx)"
           >
             <span class="flex items-center gap-2">
               <span class="font-mono font-medium">{{ row.symbol }}</span>
+              <PillTag v-if="row.tx.remoteOperation">Bitvavo</PillTag>
               <PillTag :tone="row.tx.side === 'sell' ? 'accent' : 'invest'">
                 {{ row.sideLabel }}
               </PillTag>
@@ -215,11 +234,16 @@ function confirmDelete(): void {
           <span class="hidden min-w-0 gap-0.5 sm:grid">
             <span class="flex items-center gap-2">
               <span class="font-mono font-medium">{{ row.symbol }}</span>
+              <PillTag v-if="row.tx.remoteOperation">Bitvavo</PillTag>
               <PillTag :tone="row.tx.side === 'sell' ? 'accent' : 'invest'">
                 {{ row.sideLabel }}
               </PillTag>
             </span>
-            <span class="text-text-muted text-sm">{{ row.tx.category || 'Sin categoría' }}</span>
+            <span class="text-text-muted text-sm">{{
+              row.tx.remoteOperation && !row.tx.instrumentId
+                ? 'Pendiente de vincular'
+                : row.tx.category || 'Sin categoría'
+            }}</span>
           </span>
         </template>
         <template #cell-units="{ row }">
@@ -273,6 +297,7 @@ function confirmDelete(): void {
         </template>
         <template #cell-actions="{ row }">
           <span class="flex justify-end">
+            <BitvavoMovementDetails v-if="row.tx.remoteOperation" :transaction="row.tx" />
             <IconButton
               v-if="stockEventsStore.canSyncSymbol(row.tx.symbol || '')"
               icon="resend"
@@ -282,11 +307,13 @@ function confirmDelete(): void {
               @click="investmentStore.resyncMovement(row.tx.id)"
             />
             <IconButton
+              v-if="!row.tx.remoteOperation"
               icon="edit"
               :label="`Editar ${nameOf(row)}`"
               @click="panel?.openEdit(row.tx)"
             />
             <IconButton
+              v-if="!row.tx.remoteOperation"
               icon="trash"
               tone="danger"
               :label="`Eliminar ${nameOf(row)}`"
