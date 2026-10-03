@@ -61,9 +61,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.openSettings()
     const liveMarket = new LiveMarketPage(page)
     await liveMarket.addInstrument({ asset: 'ETF Plata', type: 'etf', symbol: 'VWCE', currency: 'EUR' })
-    await tracker.openDashboard()
+    await tracker.openWealth()
 
-    const panel = page.locator('#dashboard [data-market-panel]')
+    const panel = page.locator('#wealth [data-market-panel]')
     await expect(panel.getByText('VWCE', { exact: true })).toBeVisible()
     await expect(panel.getByText('Actualizado')).toBeVisible()
     await expect(panel.getByText('125,5')).toBeVisible()
@@ -96,9 +96,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.addInstrument({
       asset: 'ETF AGED', type: 'etf', symbol: 'AGED.MI', currency: 'EUR', provider: 'yahoo',
     })
-    await tracker.openDashboard()
+    await tracker.openWealth()
 
-    const panel = page.locator('#dashboard [data-market-panel]')
+    const panel = page.locator('#wealth [data-market-panel]')
     await expect(panel.getByText('AGED.MI', { exact: true })).toBeVisible()
     await expect(panel.getByText('9,28')).toBeVisible()
     expect(requestedProvider).toBe('yahoo')
@@ -157,8 +157,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.linkExistingMovements('AGED.MI')
     await expect(row).toContainText('1 vinculados')
 
-    await tracker.openDashboard()
-    await expect(page.locator('#dashboard [data-market-panel]').getByLabel('Títulos de AGED.MI')).toHaveValue('5')
+    await tracker.openWealth()
+    await expect(page.locator('#wealth [data-market-panel]').getByLabel('Títulos de AGED.MI')).toHaveValue('5')
   })
 
   test('permite vincular un movimiento legacy de ETF AGED sin símbolo', async ({ page, tracker }) => {
@@ -206,8 +206,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await expect(liveMarket.pendingAlert).toContainText('3 movimientos pendientes')
-    await liveMarket.pendingAlert.getByRole('button', { name: 'Revisar pendientes' }).click()
+    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).toHaveCount(3)
+    await tracker.openTransactions()
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(3)
@@ -256,7 +256,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await liveMarket.pendingAlert.getByRole('button', { name: 'Revisar pendientes' }).click()
+    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(1)
     await expect(liveMarket.pendingPanel).toContainText('1 × 100 VWCE')
@@ -306,7 +307,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const liveMarket = new LiveMarketPage(page)
     await tracker.openDashboard()
-    await liveMarket.pendingAlert.getByRole('button', { name: 'Revisar pendientes' }).click()
+    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
 
     const pendingItem = await liveMarket.openFirstPendingEdit()
@@ -369,8 +371,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     const liveMarket = new LiveMarketPage(page)
     await tracker.openSettings()
     await liveMarket.addInstrument({ asset: 'ETF Plata', type: 'etf', symbol: 'STALE', currency: 'EUR' })
-    await tracker.openDashboard()
-    const panel = page.locator('#dashboard [data-market-panel]')
+    await tracker.openWealth()
+    const panel = page.locator('#wealth [data-market-panel]')
     await expect(panel.getByText('Retrasado')).toBeVisible()
     await expect(panel).toContainText('Última actualización')
   })
@@ -390,7 +392,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(row).toContainText('1 vinculados')
     await expect(row).toContainText('0 por vincular')
 
-    await tracker.openDashboard()
-    await expect(page.locator('#dashboard [data-market-panel]').getByLabel('Títulos de LINKED')).toHaveValue('2')
+    await tracker.openWealth()
+    await expect(page.locator('#wealth [data-market-panel]').getByLabel('Títulos de LINKED')).toHaveValue('2')
   })
 })

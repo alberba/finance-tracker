@@ -7,18 +7,15 @@ import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import { signedAmount } from '../../domain/transactions/registry'
-import { formatDayMonth } from '../../lib/format'
+import { formatDayMonth, formatDueLabel } from '../../lib/format'
 import type { PendingMovement } from '../../scripts/types'
 import { todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
-// Pending movements from recurring rules: a short alert on the dashboard
-// (compact) or the review block of the Movimientos registry, where each one
-// is confirmed, skipped, edited or cancelled.
-const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+// Pending movements from recurring rules: the review block of the Movimientos
+// registry, where each one is confirmed, skipped, edited or cancelled.
 
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
@@ -35,17 +32,6 @@ const accountNames = computed(
       ]),
     ),
 )
-
-function dueLabel(date: string): string {
-  const days = Math.round(
-    (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${todayISO()}T00:00:00Z`)) / 86_400_000,
-  )
-  if (!Number.isFinite(days)) return ''
-  if (days === 0) return 'Vence hoy'
-  if (days === 1) return 'Vence mañana'
-  if (days === -1) return 'Hace 1 día'
-  return days < 0 ? `Hace ${-days} días` : `En ${days} días`
-}
 
 function meta(item: PendingMovement): string {
   const operation =
@@ -68,40 +54,11 @@ const columns: LedgerColumn<PendingMovement>[] = [
   { key: 'actions', label: 'Acciones', align: 'right' },
 ]
 
-const { navigateTo } = useSectionNavigation()
-
-function openTransactions(): void {
-  navigateTo('transactions')
-}
 </script>
 
 <template>
-  <aside
-    v-if="props.compact && recurringStore.pendingCount > 0"
-    class="card border-l-accent border-l-4"
-    role="alert"
-    data-pending-alert
-  >
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <strong
-          >{{ recurringStore.pendingCount }} movimiento{{
-            recurringStore.pendingCount === 1 ? '' : 's'
-          }}
-          pendiente{{ recurringStore.pendingCount === 1 ? '' : 's' }}</strong
-        >
-        <p class="text-text-muted text-sm">
-          Revisa y confirma antes de incluirlos en tus balances.
-        </p>
-      </div>
-      <button type="button" class="secondary-btn" data-review-pending @click="openTransactions">
-        Revisar pendientes
-      </button>
-    </div>
-  </aside>
-
   <section
-    v-else-if="!props.compact && pending.length"
+    v-if="pending.length"
     class="border-line bg-panel shadow-soft grid gap-4 rounded-lg border px-4 py-5 sm:px-8 sm:py-6"
     aria-labelledby="pending-title"
     data-pending-panel
@@ -135,7 +92,7 @@ function openTransactions(): void {
       <template #cell-date="{ row }">
         <span class="grid gap-0.5">
           <span class="tabular-nums">{{ formatDayMonth(row.occurrenceDate) }}</span>
-          <span class="text-text-muted text-xs">{{ dueLabel(row.occurrenceDate) }}</span>
+          <span class="text-text-muted text-xs">{{ formatDueLabel(row.occurrenceDate, todayISO()) }}</span>
         </span>
       </template>
       <template #cell-movement="{ row }">

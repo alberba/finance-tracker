@@ -1,123 +1,105 @@
 <script setup lang="ts">
+import { computed, useTemplateRef } from 'vue'
+
 import { useDashboardViewModel } from '../../composables/useDashboardViewModel'
-import DashboardCashflowPanel from '../dashboard/DashboardCashflowPanel.vue'
-import DashboardHeroNetWorth from '../dashboard/DashboardHeroNetWorth.vue'
-import DashboardOverviewPanels from '../dashboard/DashboardOverviewPanels.vue'
-import DashboardPanel from '../dashboard/DashboardPanel.vue'
-import DashboardPeriodControls from '../dashboard/DashboardPeriodControls.vue'
-import DashboardRecentTransactionsPanel from '../dashboard/DashboardRecentTransactionsPanel.vue'
-import DashboardSavingsGoalPanel from '../dashboard/DashboardSavingsGoalPanel.vue'
-import DashboardStatsGrid from '../dashboard/DashboardStatsGrid.vue'
+import DashboardGoalsBlock from '../dashboard/DashboardGoalsBlock.vue'
+import DashboardMonthCard from '../dashboard/DashboardMonthCard.vue'
+import DashboardNetWorthBand from '../dashboard/DashboardNetWorthBand.vue'
+import DashboardPendingBlock from '../dashboard/DashboardPendingBlock.vue'
+import DashboardQuotesBlock from '../dashboard/DashboardQuotesBlock.vue'
+import DashboardRecentBlock from '../dashboard/DashboardRecentBlock.vue'
+import DashboardTopExpensesBlock from '../dashboard/DashboardTopExpensesBlock.vue'
+import DashboardWealthBlock from '../dashboard/DashboardWealthBlock.vue'
+import TransactionPanel from '../transactions/TransactionPanel.vue'
 import AppSection from '../ui/AppSection.vue'
-import MarketQuotesPanel from '../market/MarketQuotesPanel.vue'
-import PendingMovementsPanel from '../recurring/PendingMovementsPanel.vue'
+import BaseButton from '../ui/BaseButton.vue'
+import PageHeader from '../ui/PageHeader.vue'
+import { formatWeekdayDate } from '../../lib/format'
+import { todayISO } from '../../scripts/utils'
 
-const props = withDefaults(
-  defineProps<{
-    isActive?: boolean
-  }>(),
-  { isActive: true },
-)
+const props = withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: true })
 
-const {
-  currentCurrency,
-  currentYear,
-  yearOptions,
-  currentMonth,
-  monthOptions,
-  rangeOptions,
-  kpis,
-  netWorthChart,
-  cashflowChart,
-  topExpenses,
-  wealthSplit,
-  investmentProgress,
-  recentTransactions,
-  savingsGoal,
-  changeYear,
-  changeMonth,
-  changeRange,
-  navigate,
-} = useDashboardViewModel()
+const { viewModel, activeRange, changeYear, changeMonth, changeRange, navigate } =
+  useDashboardViewModel()
+const transactionPanel = useTemplateRef<InstanceType<typeof TransactionPanel>>('transactionPanel')
+
+const today = formatWeekdayDate(todayISO())
+const month = computed({ get: () => viewModel.value.month, set: changeMonth })
+const year = computed({ get: () => viewModel.value.year, set: changeYear })
+const range = computed({ get: () => activeRange.value, set: changeRange })
 </script>
 
 <template>
   <AppSection id="dashboard" :is-active="props.isActive">
-    <header class="flex flex-col items-start justify-between gap-5 pb-1 md:flex-row md:items-end">
-      <div class="grid max-w-2xl gap-1.5">
-        <p class="text-primary font-mono text-xs tracking-widest uppercase">
-          ¡Bienvenido de nuevo!
-        </p>
-        <h2
-          id="dashboard-title"
-          class="font-display text-text-main text-[clamp(1.8rem,3vw,2.6rem)] leading-[1.05]"
-        >
-          Resumen financiero
-        </h2>
-        <p class="text-text-muted max-w-xl text-sm leading-relaxed sm:text-base">
-          Tu situación financiera, ordenada para decidir con perspectiva.
-        </p>
-      </div>
-      <DashboardPeriodControls
-        class="w-full sm:w-auto"
-        :year="currentYear"
-        :years="yearOptions"
-        :month="currentMonth"
-        :months="monthOptions"
-        @change-year="changeYear"
-        @change-month="changeMonth"
+    <div class="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
+      <PageHeader
+        :kicker="today"
+        title="Dashboard"
+        title-id="dashboard-title"
+        lede="Cuánto tienes, cómo va el mes y qué te queda por hacer."
+      >
+        <template #aside>
+          <BaseButton variant="primary" @click="transactionPanel?.openNew()">
+            <svg
+              class="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nuevo movimiento
+          </BaseButton>
+        </template>
+      </PageHeader>
+
+      <DashboardNetWorthBand
+        v-model:range="range"
+        :band="viewModel.netWorth"
+        :chart="viewModel.netWorthChart"
+        :ranges="viewModel.ranges"
+        :currency="viewModel.currency"
       />
-    </header>
 
-    <PendingMovementsPanel compact />
-    <DashboardHeroNetWorth
-      :kpis="kpis"
-      :chart="netWorthChart"
-      :ranges="rangeOptions"
-      :currency="currentCurrency"
-      @change-range="changeRange"
-    />
+      <DashboardMonthCard
+        v-model:month="month"
+        v-model:year="year"
+        :month-name="viewModel.monthName"
+        :status="viewModel.monthStatus"
+        :kpis="viewModel.kpis"
+        :split="viewModel.incomeSplit"
+        :months="viewModel.months"
+        :years="viewModel.yearOptions"
+      />
 
-    <DashboardStatsGrid :kpis="kpis" />
-
-    <MarketQuotesPanel title="Cartera a precio de mercado" />
-
-    <DashboardOverviewPanels
-      :currency="currentCurrency"
-      :wealth-split="wealthSplit"
-      :top-expenses="topExpenses"
-      :investment-progress="investmentProgress"
-      @navigate="navigate"
-    />
-
-    <section class="grid grid-cols-1 gap-4 xl:grid-cols-5">
-      <DashboardPanel
-        title="Objetivo de ahorro"
-        action-label="Ver todos los objetivos"
-        action-target="goals"
-        class="xl:col-span-2"
-        @navigate="navigate"
+      <div
+        class="border-line bg-panel shadow-soft grid overflow-hidden rounded-lg border xl:grid-cols-3"
+        data-dashboard-grid
       >
-        <DashboardSavingsGoalPanel :goal="savingsGoal" />
-      </DashboardPanel>
-      <DashboardPanel
-        title="Ingresos, gastos e inversión"
-        action-label="Ver análisis detallado"
-        action-target="budget"
-        class="xl:col-span-3"
-        @navigate="navigate"
-      >
-        <DashboardCashflowPanel :chart="cashflowChart" :currency="currentCurrency" />
-      </DashboardPanel>
-    </section>
+        <DashboardWealthBlock :split="viewModel.wealthSplit" />
+        <DashboardTopExpensesBlock
+          class="border-t xl:border-t-0 xl:border-l"
+          :expenses="viewModel.topExpenses"
+          @navigate="navigate"
+        />
+        <DashboardPendingBlock class="border-t xl:border-t-0 xl:border-l" />
+        <DashboardRecentBlock
+          class="border-t"
+          :transactions="viewModel.recentTransactions"
+          @navigate="navigate"
+        />
+        <DashboardGoalsBlock
+          class="border-t xl:col-span-2 xl:border-l"
+          :goals="viewModel.goals"
+          @navigate="navigate"
+        />
+        <DashboardQuotesBlock class="border-t xl:col-span-3" />
+      </div>
+    </div>
 
-    <DashboardPanel
-      title="Últimos movimientos"
-      action-label="Ver todos los movimientos"
-      action-target="transactions"
-      @navigate="navigate"
-    >
-      <DashboardRecentTransactionsPanel :transactions="recentTransactions" @navigate="navigate" />
-    </DashboardPanel>
+    <TransactionPanel ref="transactionPanel" />
   </AppSection>
 </template>

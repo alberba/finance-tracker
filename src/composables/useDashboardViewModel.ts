@@ -4,38 +4,11 @@ import { useDashboardStore } from '../stores/dashboard'
 
 export function useDashboardViewModel() {
   const dashboardStore = useDashboardStore()
-  const {
-    currentCurrency,
-    currentYear,
-    yearOptions,
-    currentMonth,
-    monthOptions,
-    rangeOptions,
-    kpis,
-    netWorthChart,
-    cashflowChart,
-    topExpenses,
-    wealthSplit,
-    investmentProgress,
-    recentTransactions,
-    savingsGoal,
-  } = storeToRefs(dashboardStore)
+  const { viewModel, activeRange } = storeToRefs(dashboardStore)
 
   return {
-    currentCurrency,
-    currentYear,
-    yearOptions,
-    currentMonth,
-    monthOptions,
-    rangeOptions,
-    kpis,
-    netWorthChart,
-    cashflowChart,
-    topExpenses,
-    wealthSplit,
-    investmentProgress,
-    recentTransactions,
-    savingsGoal,
+    viewModel,
+    activeRange,
     changeYear: dashboardStore.requestYearChange,
     changeMonth: dashboardStore.requestMonthChange,
     changeRange: dashboardStore.requestRangeChange,

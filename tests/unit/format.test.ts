@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatAxisLabel,
   formatDayMonth,
+  formatDueLabel,
   formatLongDate,
   formatMoney,
   formatMonthName,
@@ -12,6 +13,7 @@ import {
   formatShortDate,
   formatSignedMoney,
   formatStamp,
+  formatWeekdayDate,
   MINUS,
   splitDecimals,
 } from '../../src/lib/format'
@@ -155,5 +157,27 @@ describe('formatAxisLabel', () => {
 
   it('devuelve cadena vacía para etiquetas ausentes', () => {
     expect(formatAxisLabel(undefined)).toBe('')
+  })
+})
+
+describe('formatWeekdayDate', () => {
+  it('names the weekday and the month, capitalized', () => {
+    expect(formatWeekdayDate('2026-09-28')).toBe('Lunes, 28 de septiembre')
+  })
+
+  it('falls back to the missing mark', () => {
+    expect(formatWeekdayDate('')).toBe('—')
+  })
+})
+
+describe('formatDueLabel', () => {
+  it.each([
+    ['2026-09-28', 'Vence hoy'],
+    ['2026-09-29', 'Vence mañana'],
+    ['2026-10-02', 'En 4 días'],
+    ['2026-09-27', 'Hace 1 día'],
+    ['2026-09-20', 'Hace 8 días'],
+  ])('reads %s from 28 September as "%s"', (date, label) => {
+    expect(formatDueLabel(date, '2026-09-28')).toBe(label)
   })
 })

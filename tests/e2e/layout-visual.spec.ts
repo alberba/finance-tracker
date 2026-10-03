@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
 import type { FinanceSectionId, FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { LiveMarketPage } from './pages/LiveMarketPage'
 
 const SECTION_IDS: FinanceSectionId[] = [
   'dashboard',
@@ -132,6 +133,24 @@ const TRANSACTION_VIEWS: Array<{
   },
 ]
 
+/** Dashboard views beyond the default one (which has no pending movements). */
+const DASHBOARD_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'dashboard-pending',
+    focus: '#dashboard [data-dashboard-pending]',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await new LiveMarketPage(page).createThreePendingMovements('2026-09-15')
+      await tracker.openDashboard()
+      await expect(page.locator('#dashboard [data-pending-item]')).toHaveCount(3)
+    },
+  },
+]
+
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
 
 type LayoutIssue = {
@@ -188,8 +207,8 @@ async function getLayoutScanResult(
         activePanel.querySelectorAll<HTMLElement>(
           [
             '.cards-grid',
-            '.dashboard-kpi-layout',
-            '[data-dashboard-chart-grid]',
+            '[data-month-card]',
+            '[data-dashboard-grid]',
             '.dual-grid',
             '.goal-edit-grid',
             '.goal-progress',
@@ -439,6 +458,58 @@ test.describe('Inversión · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'investment', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Dashboard · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of DASHBOARD_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'dashboard', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of DASHBOARD_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "dashboard" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openDashboard()
+      await expectSoundLayout(page, 'dashboard')
+    })
+
+    for (const view of DASHBOARD_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'dashboard', view.name)
       })
     }
   })

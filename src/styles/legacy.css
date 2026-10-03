@@ -1529,14 +1529,6 @@ td select {
   transition: width 0.4s ease;
 }
 
-/* investment progress mini-cards (rendered from JS) */
-[data-investment-progress-item] {
-  color: var(--text-main);
-}
-[data-investment-progress-item] small {
-  color: var(--text-muted);
-}
-
 /* ══ SETTINGS · LIBRO MAYOR ══════════════════════════════════════
    La configuración se compone como el índice de un libro contable:
    un índice lateral numerado y un único lienzo documental con las

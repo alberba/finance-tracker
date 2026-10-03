@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 const SECTION_CONFIG = {
-  dashboard: { buttonLabel: "Dashboard", headingText: "Resumen financiero" },
+  dashboard: { buttonLabel: "Dashboard", headingText: /^Dashboard$/ },
   transactions: {
     buttonLabel: "Movimientos",
     headingText: /^Movimientos$/,
@@ -100,7 +100,8 @@ export class FinanceTrackerPage {
     ).toBeVisible();
     await expect(
       this.dashboardSection.getByRole("heading", {
-        name: "Resumen financiero",
+        name: "Dashboard",
+        exact: true,
       }),
     ).toBeVisible();
   }
