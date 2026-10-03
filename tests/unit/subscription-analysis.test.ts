@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  analyzeSubscriptions,
   annualizeSubscription,
   buildSubscriptionAnalysis,
   monthlyEquivalent,
@@ -24,28 +23,6 @@ function subscription(overrides: Partial<Subscription> = {}): Subscription {
 }
 
 describe('análisis de suscripciones', () => {
-  it('conserva el resumen visible por frecuencia', () => {
-    const result = analyzeSubscriptions([
-      subscription({ id: 'weekly', amount: 10, frequency: 'weekly' }),
-      subscription({ id: 'monthly', amount: 20 }),
-      subscription({ id: 'quarterly', amount: 30, frequency: 'quarterly' }),
-      subscription({ id: 'yearly', amount: 120, frequency: 'yearly' }),
-      subscription({ id: 'paused', amount: 999, active: false }),
-    ])
-
-    expect(result).toMatchObject({
-      activeCount: 4,
-      monthlyEquivalent: 83.33,
-      annualTotal: 1000,
-    })
-    expect(result.byFrequency.map((row) => row.frequency)).toEqual([
-      'weekly',
-      'monthly',
-      'quarterly',
-      'yearly',
-    ])
-  })
-
   it('normaliza cada frecuencia a importes mensuales y anuales', () => {
     expect(annualizeSubscription(subscription({ amount: 5, frequency: 'weekly' }))).toBe(260)
     expect(monthlyEquivalent(subscription({ amount: 120, frequency: 'yearly' }))).toBe(10)
@@ -99,5 +76,28 @@ describe('análisis de suscripciones', () => {
       '2026-09-03',
       '2026-09-10',
     ])
+  })
+
+  it('cuenta todos los cobros de los próximos 30 días aunque la lista se recorte', () => {
+    const analysis = buildSubscriptionAnalysis(
+      [
+        subscription({
+          id: 'semanal',
+          frequency: 'weekly',
+          amount: 8,
+          nextChargeDate: '2026-08-13',
+        }),
+        subscription({
+          id: 'mensual',
+          frequency: 'monthly',
+          amount: 10,
+          nextChargeDate: '2026-08-20',
+        }),
+      ],
+      '2026-08-12',
+    )
+
+    expect(analysis.upcomingCharges).toHaveLength(5)
+    expect(analysis.next30DaysCount).toBe(6)
   })
 })

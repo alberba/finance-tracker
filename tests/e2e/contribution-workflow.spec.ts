@@ -20,17 +20,12 @@ test.describe("recorrido guiado de aportes", () => {
       modal.locator("#contribution-workflow-step-snapshot"),
     ).toBeVisible();
     expect(
-      await modal.locator("#contribution-workflow-investments-body tr").count(),
+      await modal.locator('[data-contribution-snapshot-row="investments"]').count(),
     ).toBeGreaterThan(0);
-    await expect(
-      modal.locator("#contribution-workflow-liquidity-body"),
-    ).toContainText("MyInvestor");
-    await expect(
-      modal.locator("#contribution-workflow-liquidity-body"),
-    ).toContainText("Trading 212");
-    await expect(
-      modal.locator("#contribution-workflow-liquidity-body"),
-    ).toContainText("Trade Republic");
+    const liquidity = modal.locator('[data-contribution-snapshot-row="accounts"]');
+    await expect(liquidity.filter({ hasText: "MyInvestor" })).toHaveCount(1);
+    await expect(liquidity.filter({ hasText: "Trading 212" })).toHaveCount(1);
+    await expect(liquidity.filter({ hasText: "Trade Republic" })).toHaveCount(1);
 
     await tracker.contributionWorkflowApplySnapshotCalculator({
       type: "investment",
@@ -129,11 +124,9 @@ test.describe("recorrido guiado de aportes", () => {
     await tracker.contributionWorkflowSave();
 
     await expect(page.getByRole("status")).toContainText("Aporte guardado");
-    const row = tracker
-      .investmentSection()
-      .locator("#contribution-body tr", { hasText: "2026-04-15" });
+    const row = tracker.contributionRow("2026-04-15");
     await expect(row).toBeVisible();
-    await expect(row.locator("td").nth(1)).toHaveText("15.850,00 €");
+    await expect(row.locator("[data-contribution-value]")).toHaveText("15.850,00 €");
 
     const accounts = await page.evaluate(() => {
       const raw = window.localStorage.getItem("finance-tracker-state-v1");
@@ -234,8 +227,10 @@ test.describe("recorrido guiado de aportes", () => {
 
     await tracker.openContributionWorkflowModal();
     await expect(
-      page.locator("#contribution-workflow-liquidity-body"),
-    ).not.toContainText("Trade Republic");
+      page.locator('[data-contribution-snapshot-row="accounts"]', {
+        hasText: "Trade Republic",
+      }),
+    ).toHaveCount(0);
 
     await tracker.contributionWorkflowSelectMonth("JUNIO");
     await tracker.contributionWorkflowSetDate("2026-06-30");
@@ -402,10 +397,6 @@ test.describe("recorrido guiado de aportes", () => {
     await expect(page.locator("#toast")).not.toContainText(
       "Aporte guardado con avisos.",
     );
-    await expect(
-      tracker
-        .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-04-30" }),
-    ).toHaveCount(0);
+    await expect(tracker.contributionRow("2026-04-30")).toHaveCount(0);
   });
 });

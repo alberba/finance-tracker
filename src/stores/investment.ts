@@ -21,8 +21,12 @@ import {
 import {
   buildInvestmentDashboardViewModel,
   buildInvestmentMovementRows,
+  groupInvestmentMovementsByMonth,
+  summarizeInvestmentYear,
   buildInvestmentYearOptions,
   type ReturnMode,
+  buildContributionLedger,
+  summarizeContributions,
 } from '../domain/investment/view-model'
 import {
   computeInvestmentMovement,
@@ -181,7 +185,23 @@ export const useInvestmentStore = defineStore('investment', () => {
     ),
   )
 
+  const movementMonthGroups = computed(() => groupInvestmentMovementsByMonth(movementRows.value))
+
+  const yearSummary = computed(() =>
+    summarizeInvestmentYear(financialStateStore.state, ui.investmentYearFilter),
+  )
+
   const contributionRows = computed(() => buildContributionMetricRows(financialStateStore.state))
+
+  const contributionLedger = computed(() =>
+    buildContributionLedger(contributionRows.value, (date) =>
+      isManualContributionDate(financialStateStore.state, date),
+    ),
+  )
+
+  const contributionSummary = computed(() =>
+    summarizeContributions(contributionRows.value, financialStateStore.state.year),
+  )
 
   function setTab(tab: InvestmentSubTab): void {
     ui.investmentTab = tab
@@ -202,14 +222,6 @@ export const useInvestmentStore = defineStore('investment', () => {
 
   function setOnlyUndeclared(value: boolean): void {
     ui.investmentOnlyUndeclared = value
-    ui.investmentTxEditingId = ''
-  }
-
-  function startEditMovement(id: string): void {
-    ui.investmentTxEditingId = id
-  }
-
-  function cancelEditMovement(): void {
     ui.investmentTxEditingId = ''
   }
 
@@ -515,7 +527,11 @@ export const useInvestmentStore = defineStore('investment', () => {
     dashboardViewModel,
     yearOptions,
     movementRows,
+    movementMonthGroups,
+    yearSummary,
     contributionRows,
+    contributionLedger,
+    contributionSummary,
     getAccountName,
     isBitvavoBrokerAccount,
     resolveInvestmentCategory,
@@ -524,8 +540,6 @@ export const useInvestmentStore = defineStore('investment', () => {
     setMonth,
     setYearFilter,
     setOnlyUndeclared,
-    startEditMovement,
-    cancelEditMovement,
     addMovement,
     saveEditedMovement,
     resyncMovement,

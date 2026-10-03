@@ -42,10 +42,10 @@ test.describe("Settings E2E", () => {
     // El alta se propaga al selector de cuentas del formulario de movimientos.
     await tracker.openTransactions();
     await tracker.transactionsSection
-      .getByRole("button", { name: "Nuevo" })
+      .getByRole("button", { name: "Nuevo movimiento" })
       .click();
     await expect(
-      page.locator("#tx-dialog select[name='accountId']"),
+      page.locator("#tx-panel select[name='accountId']"),
     ).toContainText("Cuenta Vacaciones");
   });
 
@@ -99,8 +99,7 @@ test.describe("Settings E2E", () => {
     await tracker.openSubscriptionsTab();
     await expect(
       tracker.transactionsSection
-        .locator("#transactions-tab-subscriptions")
-        .getByRole("listitem")
+        .locator("#transactions-tab-subscriptions tr[data-subscription-id]")
         .filter({ hasText: "Suscripción cuenta eliminada" }),
     ).toHaveCount(0);
     await expect(page.getByRole("status")).toContainText("Elemento eliminado");

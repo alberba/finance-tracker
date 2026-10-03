@@ -10,6 +10,7 @@ test.describe("Sidebar toggle", () => {
     });
 
     await page.goto("/");
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible();
     await expect(page.locator("#dashboard")).toBeVisible();
 
     expect(
@@ -131,7 +132,7 @@ test.describe("Sidebar toggle", () => {
       .click();
     await expect(page.locator("#transactions")).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Movimientos mensuales" }),
+      page.getByRole("heading", { name: "Movimientos", exact: true }),
     ).toBeVisible();
 
     // Navegar a Inversión

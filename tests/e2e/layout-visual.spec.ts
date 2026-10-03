@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
 import type { FinanceSectionId, FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { LiveMarketPage } from './pages/LiveMarketPage'
 
 const SECTION_IDS: FinanceSectionId[] = [
   'dashboard',
@@ -20,6 +21,209 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
   data: 'Datos',
 }
 
+/**
+ * Sections and views whose touch targets were already under 24 px when the
+ * scan started looking at the active section (it used to find none). The list
+ * only shrinks: each zone's migration fixes its targets and removes its entry.
+ */
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals', 'settings'])
+
+/** A monthly purchase, for the views that need one rule in the plan. */
+const RECURRING_RULE = {
+  account: 'Revolut',
+  category: 'Fondos Indexados',
+  description: 'Compra mensual',
+  amount: 300,
+  frequency: 'monthly',
+  startDate: '2026-12-01',
+  symbol: 'VWCE',
+  units: 1,
+  unitPrice: 300,
+}
+
+/** Investment views beyond the default tab: expanded row, sub-tabs and dialog. */
+const INVESTMENT_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  /** Scrolled into view for the snapshot instead of the top of the page. */
+  focus?: string
+}> = [
+  {
+    name: 'investment-position',
+    focus: '#investment [data-ledger-detail]',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentDashboardTab()
+      await page.locator('#investment [data-position]').first().click()
+      await expect(page.locator('#investment-asset-chart')).toBeVisible()
+    },
+  },
+  { name: 'investment-movements', open: (_page, tracker) => tracker.openInvestmentMovementsTab() },
+  {
+    name: 'investment-movement-panel',
+    open: async (_page, tracker) => {
+      await tracker.openInvestmentMovementPanel()
+    },
+  },
+  {
+    name: 'investment-movement-edit-panel',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentMovementsTab()
+      await page
+        .locator('#investment tr[data-investment-tx-id]')
+        .first()
+        .getByRole('button', { name: /^Editar / })
+        .click()
+      await expect(tracker.investmentMovementPanel()).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-movement-delete-dialog',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentMovementsTab()
+      const row = page.locator('#investment tr[data-investment-tx-id]').first()
+      const rowDelete = row.getByRole('button', { name: /^Eliminar / })
+      if (await rowDelete.isVisible()) {
+        await rowDelete.click()
+      } else {
+        // Small screens hide the row actions: delete from the edit panel.
+        await row.getByRole('button', { name: /^Editar / }).click()
+        await tracker.investmentMovementPanel().getByRole('button', { name: 'Eliminar' }).click()
+      }
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-contributions',
+    open: (_page, tracker) => tracker.openInvestmentContributionsTab(),
+  },
+  { name: 'investment-recurring', open: (_page, tracker) => tracker.openInvestmentRecurringTab() },
+  {
+    name: 'investment-contribution-dialog',
+    open: (_page, tracker) => tracker.openContributionWorkflowModal(),
+  },
+  {
+    name: 'investment-contribution-allocation',
+    open: async (_page, tracker) => {
+      await tracker.openContributionWorkflowModal()
+      await tracker.contributionWorkflowGoToAllocationStep()
+    },
+  },
+  {
+    name: 'investment-contribution-delete-dialog',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentContributionsTab()
+      const remove = page.locator('button[data-delete-contribution-date]').first()
+      await remove.scrollIntoViewIfNeeded()
+      await remove.click()
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-panel',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await page.getByRole('button', { name: 'Nueva compra recurrente' }).click()
+      await expect(new LiveMarketPage(page).recurringPanel).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-plan',
+    focus: '#investment [data-recurring-rules] table',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await new LiveMarketPage(page).createRecurringRule(RECURRING_RULE)
+    },
+  },
+  {
+    name: 'investment-recurring-edit-panel',
+    open: async (page, tracker) => {
+      const liveMarket = new LiveMarketPage(page)
+      await tracker.openInvestmentRecurringTab()
+      await liveMarket.createRecurringRule(RECURRING_RULE)
+      await page
+        .locator('#investment tr[data-recurring-rule-id]')
+        .first()
+        .getByRole('button', { name: /^Editar la regla / })
+        .first()
+        .click()
+      await expect(liveMarket.recurringPanel).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-delete-dialog',
+    open: async (page, tracker) => {
+      const liveMarket = new LiveMarketPage(page)
+      await tracker.openInvestmentRecurringTab()
+      await liveMarket.createRecurringRule(RECURRING_RULE)
+      const row = page.locator('#investment tr[data-recurring-rule-id]').first()
+      const rowDelete = row.getByRole('button', { name: /^Eliminar la regla / })
+      if (await rowDelete.isVisible()) {
+        await rowDelete.click()
+      } else {
+        // Small screens hide the row actions: delete from the edit panel.
+        await row.getByRole('button', { name: /^Editar la regla / }).click()
+        await liveMarket.recurringPanel.getByRole('button', { name: 'Eliminar' }).click()
+      }
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+]
+
+/** Movimientos views beyond the default tab: sub-tab, side panels and the bulk bar. */
+const TRANSACTION_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+}> = [
+  {
+    name: 'transactions-subscriptions',
+    open: (_page, tracker) => tracker.openSubscriptionsTab(),
+  },
+  {
+    name: 'transactions-movement-panel',
+    open: async (page, tracker) => {
+      await tracker.openTransactions()
+      await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
+      await expect(page.getByRole('dialog', { name: 'Nuevo movimiento' })).toBeVisible()
+    },
+  },
+  {
+    name: 'transactions-subscription-panel',
+    open: (_page, tracker) => tracker.openNewSubscriptionPanel(),
+  },
+  {
+    name: 'transactions-selection',
+    open: async (page, tracker) => {
+      await tracker.openTransactions()
+      const select = page.getByRole('button', { name: 'Seleccionar', exact: true })
+      if (await select.isVisible()) await select.click()
+      const boxes = tracker.transactionsSection.locator('input[data-select-tx-id]')
+      await boxes.nth(0).check()
+      await boxes.nth(1).check()
+      await expect(tracker.bulkActionBar).toBeVisible()
+    },
+  },
+]
+
+/** Dashboard views beyond the default one (which has no pending movements). */
+const DASHBOARD_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'dashboard-pending',
+    focus: '#dashboard [data-dashboard-pending]',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await new LiveMarketPage(page).createThreePendingMovements('2026-09-15')
+      await tracker.openDashboard()
+      await expect(page.locator('#dashboard [data-pending-item]')).toHaveCount(3)
+    },
+  },
+]
+
+const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
+
 type LayoutIssue = {
   container: string
   first: string
@@ -35,9 +239,12 @@ type LayoutScanResult = {
   undersizedInteractiveElements: string[]
 }
 
-async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
-  return await page.evaluate(() => {
-    const activePanel = document.querySelector<HTMLElement>('.panel.is-active')
+async function getLayoutScanResult(
+  page: Page,
+  sectionId: FinanceSectionId,
+): Promise<LayoutScanResult> {
+  return await page.evaluate((id) => {
+    const activePanel = document.getElementById(id)
     const overlapIssues: LayoutIssue[] = []
     const undersizedInteractiveElements: string[] = []
     const viewportWidth = document.documentElement.clientWidth
@@ -71,18 +278,15 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
         activePanel.querySelectorAll<HTMLElement>(
           [
             '.cards-grid',
-            '.dashboard-kpi-layout',
-            '[data-dashboard-chart-grid]',
+            '[data-month-card]',
+            '[data-dashboard-grid]',
             '.dual-grid',
             '.goal-edit-grid',
             '.goal-progress',
-            '.tx-query-grid',
-            '.tx-bulk-grid',
             '.form-grid',
             '.settings-head',
             '.mini-form',
             '.data-actions',
-            '.tag-wrap',
           ].join(','),
         ),
       ),
@@ -91,6 +295,10 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
     for (const container of containers) {
       const children = Array.from(container.children).filter((node): node is HTMLElement => {
         if (!(node instanceof HTMLElement)) {
+          return false
+        }
+        // An open modal dialog sits in the top layer, over the page on purpose.
+        if (node.matches('dialog:modal')) {
           return false
         }
         const styles = window.getComputedStyle(node)
@@ -168,7 +376,7 @@ async function getLayoutScanResult(page: Page): Promise<LayoutScanResult> {
       overlapIssues: overlapIssues.slice(0, 10),
       undersizedInteractiveElements: undersizedInteractiveElements.slice(0, 10),
     }
-  })
+  }, sectionId)
 }
 
 async function openSectionForLayout(
@@ -191,34 +399,239 @@ async function openSectionForLayout(
   await tracker.open(sectionId)
 }
 
+/** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
+const SNAPSHOT_NOW = new Date('2026-09-15T10:00:00+02:00')
+
+async function expectViewSnapshot(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  open: () => Promise<void>,
+  name: string,
+  focus?: string,
+): Promise<void> {
+  await page.clock.setFixedTime(SNAPSHOT_NOW)
+  await tracker.goto()
+  await open()
+  await page.evaluate(async (selector) => {
+    await document.fonts.ready
+    const target = selector ? document.querySelector(selector) : null
+    if (target) target.scrollIntoView({ block: 'center' })
+    else window.scrollTo(0, 0)
+  }, focus)
+  await expect(page).toHaveScreenshot(name, {
+    animations: 'disabled',
+    caret: 'hide',
+    scale: 'css',
+    stylePath: './tests/e2e/screenshot-stable.css',
+  })
+}
+
+async function expectSectionSnapshot(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  sectionId: FinanceSectionId,
+  name: string,
+): Promise<void> {
+  await expectViewSnapshot(
+    page,
+    tracker,
+    () => openSectionForLayout(page, tracker, sectionId),
+    name,
+  )
+}
+
+async function expectSoundLayout(
+  page: Page,
+  sectionId: FinanceSectionId,
+  view: string = sectionId,
+): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+  })
+  const scan = await getLayoutScanResult(page, sectionId)
+  expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
+  expect(scan.overlapIssues).toEqual([])
+  if (!KNOWN_UNDERSIZED_TARGETS.has(view)) {
+    expect(scan.undersizedInteractiveElements).toEqual([])
+  }
+}
+
 test.describe('UI layout integrity', { tag: '@visual' }, () => {
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
       await openSectionForLayout(page, tracker, sectionId)
-      await page.evaluate(async () => {
-        await document.fonts.ready
-      })
-
-      const scan = await getLayoutScanResult(page)
-      expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
-      expect(scan.overlapIssues).toEqual([])
-      expect(scan.undersizedInteractiveElements).toEqual([])
+      await expectSoundLayout(page, sectionId)
     })
 
     test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
-      await openSectionForLayout(page, tracker, sectionId)
-      await page.evaluate(async () => {
-        await document.fonts.ready
-      })
-      await page.evaluate(() => {
-        window.scrollTo(0, 0)
-      })
-      await expect(page).toHaveScreenshot(`page-${sectionId}.png`, {
-        animations: 'disabled',
-        caret: 'hide',
-        scale: 'css',
-        stylePath: './tests/e2e/screenshot-stable.css',
-      })
+      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}.png`)
     })
   }
+})
+
+test.describe('UI layout integrity · tema oscuro', { tag: '@visual' }, () => {
+  // No stored theme, so the pre-paint script follows prefers-color-scheme and
+  // the whole app (charts included) renders dark from the first frame.
+  test.use({ colorScheme: 'dark' })
+
+  for (const sectionId of SECTION_IDS) {
+    test(`snapshot visual estable en "${sectionId}" (oscuro)`, async ({ tracker, page }) => {
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}-dark.png`)
+    })
+  }
+})
+
+test.describe('Inversión · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of INVESTMENT_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'investment', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of INVESTMENT_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "investment" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openInvestment()
+      await expectSoundLayout(page, 'investment')
+    })
+
+    for (const view of INVESTMENT_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'investment', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Dashboard · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of DASHBOARD_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'dashboard', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of DASHBOARD_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "dashboard" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openDashboard()
+      await expectSoundLayout(page, 'dashboard')
+    })
+
+    for (const view of DASHBOARD_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'dashboard', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Movimientos · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of TRANSACTION_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'transactions', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of TRANSACTION_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "transactions" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openTransactions()
+      await expectSoundLayout(page, 'transactions')
+    })
+
+    for (const view of TRANSACTION_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'transactions', view.name)
+      })
+    }
+  })
 })

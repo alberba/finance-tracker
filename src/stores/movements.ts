@@ -1,14 +1,16 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
 import { resolveCategoryId, resolveEntityId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
 import {
-  buildAccountFilterOptions,
-  buildMonthBreakdown,
-  filterAndSortTransactions,
-} from '../scripts/transactions'
+  buildMonthGroups,
+  categoryBreakdown,
+  monthTotals,
+  registryYears,
+  signedAmount,
+} from '../domain/transactions/registry'
 import {
   isTransactionType,
   type BudgetType,
@@ -74,12 +76,6 @@ async function buildSubscriptionData(subscription: Subscription, currency: strin
   }
 }
 
-const TYPE_FILTER_OPTIONS = [
-  { value: 'income', label: 'Ingreso' },
-  { value: 'expense', label: 'Gasto' },
-  { value: 'investment', label: 'Inversión' },
-] as const
-
 export interface NewTransactionInput {
   date: string
   month: number
@@ -92,6 +88,8 @@ export interface NewTransactionInput {
 
 export interface EditedTransactionInput {
   date: string
+  /** The month it counts in; defaults to the month of the date. */
+  month?: number
   accountId: string
   type: string
   category: string
@@ -122,6 +120,14 @@ export interface EditedSubscriptionInput {
   frequency: SubscriptionFrequency
 }
 
+function currentYear(): number {
+  return Number(todayISO().slice(0, 4))
+}
+
+function todayMonth(): number {
+  return monthFromISO(todayISO()) ?? 0
+}
+
 export const useMovementsStore = defineStore('movements', () => {
   const financialStateStore = useFinancialStateStore()
   const uiStore = useUiStore()
@@ -142,38 +148,47 @@ export const useMovementsStore = defineStore('movements', () => {
   const subscriptions = computed(() => financialStateStore.subscriptions)
   const categoryEmojis = computed(() => financialStateStore.state.categoryEmojis)
 
-  const visibleTransactions = computed(() =>
-    filterAndSortTransactions({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      filters: ui.txFilters,
-      sort: ui.txSort,
-      getAccountName,
-    }),
+  const years = computed(() => registryYears(financialStateStore.transactions, currentYear()))
+
+  /** The selected year's movements under the toolbar filters, by month. */
+  const monthGroups = computed(() =>
+    buildMonthGroups(financialStateStore.transactions, ui.txYear, ui.txFilters, ui.txSort),
   )
 
-  const breakdown = computed(() =>
-    buildMonthBreakdown({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      incomeCategories: financialStateStore.state.incomeCategories,
-      expenseCategories: financialStateStore.state.expenseCategories,
-      investmentCategories: financialStateStore.state.investmentCategories,
-    }),
+  const visibleTransactions = computed(() => monthGroups.value.flatMap((group) => group.rows))
+
+  /** Movements of the selected year, whatever the filters (the tab's count). */
+  const yearCount = computed(
+    () =>
+      buildMonthGroups(
+        financialStateStore.transactions,
+        ui.txYear,
+        { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+        ui.txSort,
+      ).reduce((sum, group) => sum + group.count, 0),
   )
 
-  const accountFilterOptions = computed(() =>
-    buildAccountFilterOptions({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      getAccountName,
-    }),
+  /** Totals of the month the ink band shows. */
+  const bandTotals = computed(() =>
+    monthTotals(financialStateStore.transactions, ui.txYear, ui.txFilterMonth),
   )
 
-  const typeFilterOptions = TYPE_FILTER_OPTIONS
+  /** True while the band shows the current month, so it cannot move forward. */
+  const isLatestMonth = computed(
+    () =>
+      ui.txYear > currentYear() ||
+      (ui.txYear === currentYear() && ui.txFilterMonth >= todayMonth()),
+  )
 
+  const selectedTransactions = computed(() => {
+    const selected = new Set(ui.txSelectedIds)
+    return financialStateStore.transactions.filter((item) => selected.has(item.id))
+  })
   const selectedVisibleCount = computed(
     () => visibleTransactions.value.filter((item) => ui.txSelectedIds.includes(item.id)).length,
+  )
+  const selectedSum = computed(() =>
+    round2(selectedTransactions.value.reduce((sum, item) => sum + signedAmount(item), 0)),
   )
   const allVisibleSelected = computed(
     () =>
@@ -181,14 +196,50 @@ export const useMovementsStore = defineStore('movements', () => {
       selectedVisibleCount.value === visibleTransactions.value.length,
   )
 
+  // A selection only covers rows the user can see: changing the year or a
+  // filter drops it, so a bulk delete never reaches hidden movements.
+  watch(
+    () => [ui.txYear, JSON.stringify(ui.txFilters)],
+    () => {
+      ui.txSelectedIds = []
+    },
+  )
+
+  function breakdownFor(type: TransactionType) {
+    return categoryBreakdown(financialStateStore.transactions, ui.txYear, ui.txFilterMonth, type)
+  }
+
   function orderedCategories(type: BudgetType): string[] {
     return getOrderedCategoriesForType(financialStateStore.state, type)
   }
 
   function setMonth(month: number): void {
     ui.txFilterMonth = month
+  }
+
+  /** Moves the band one month back or forward, across the turn of the year. */
+  function stepMonth(delta: -1 | 1): void {
+    const index = ui.txYear * 12 + ui.txFilterMonth + delta
+    const year = Math.floor(index / 12)
+    if (year !== ui.txYear) setYear(year)
+    ui.txFilterMonth = index - year * 12
+  }
+
+  /** Shows another year, starting at its latest month with movements. */
+  function setYear(year: number): void {
+    ui.txYear = year
     ui.txSelectedIds = []
-    ui.txEditingId = ''
+    if (year === currentYear()) {
+      ui.txFilterMonth = todayMonth()
+      return
+    }
+    const months = buildMonthGroups(
+      financialStateStore.transactions,
+      year,
+      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      ui.txSort,
+    ).map((group) => group.month)
+    ui.txFilterMonth = months[0] ?? 11
   }
 
   function toggleSort(column: TxSortColumn): void {
@@ -196,36 +247,8 @@ export const useMovementsStore = defineStore('movements', () => {
       ui.txSort.direction = ui.txSort.direction === 'asc' ? 'desc' : 'asc'
     } else {
       ui.txSort.column = column
-      ui.txSort.direction = column === 'date' || column === 'amount' ? 'desc' : 'asc'
+      ui.txSort.direction = 'desc'
     }
-  }
-
-  function toggleFilterPopover(column: TxSortColumn): void {
-    ui.txOpenHeaderFilter = ui.txOpenHeaderFilter === column ? '' : column
-  }
-
-  function closeFilterPopover(): void {
-    ui.txOpenHeaderFilter = ''
-  }
-
-  function clearFilterColumn(column: TxSortColumn): void {
-    if (column === 'date') {
-      ui.txFilters.date = ''
-    } else if (column === 'account') {
-      ui.txFilters.accountIds = []
-    } else if (column === 'type') {
-      ui.txFilters.types = []
-    } else if (column === 'category') {
-      ui.txFilters.category = ''
-    } else if (column === 'description') {
-      ui.txFilters.description = ''
-    } else if (column === 'amount') {
-      ui.txFilters.amountMin = ''
-      ui.txFilters.amountMax = ''
-    }
-    ui.txOpenHeaderFilter = ''
-    ui.txEditingId = ''
-    ui.txSelectedIds = []
   }
 
   function setSelected(id: string, selected: boolean): void {
@@ -242,13 +265,8 @@ export const useMovementsStore = defineStore('movements', () => {
     ui.txSelectedIds = selected ? visibleTransactions.value.map((item) => item.id) : []
   }
 
-  function startEdit(id: string): void {
-    ui.txEditingId = id
+  function clearSelection(): void {
     ui.txSelectedIds = []
-  }
-
-  function cancelEdit(): void {
-    ui.txEditingId = ''
   }
 
   function addTransaction(input: NewTransactionInput): boolean {
@@ -299,7 +317,7 @@ export const useMovementsStore = defineStore('movements', () => {
         return
       }
       tx.date = date
-      tx.month = monthFromISO(date) ?? tx.month
+      tx.month = fields.month ?? monthFromISO(date) ?? tx.month
       tx.accountId = accountId
       tx.type = type
       tx.category = category
@@ -310,7 +328,6 @@ export const useMovementsStore = defineStore('movements', () => {
       buildTransactionData(tx, financialStateStore.currency),
     )
 
-    ui.txEditingId = ''
     ui.investmentTxEditingId = ''
     showToast('Movimiento actualizado.')
     return true
@@ -514,23 +531,26 @@ export const useMovementsStore = defineStore('movements', () => {
     accounts,
     subscriptions,
     categoryEmojis,
+    years,
+    monthGroups,
     visibleTransactions,
-    breakdown,
-    accountFilterOptions,
-    typeFilterOptions,
+    yearCount,
+    bandTotals,
+    isLatestMonth,
+    selectedTransactions,
     selectedVisibleCount,
+    selectedSum,
     allVisibleSelected,
+    breakdownFor,
     getAccountName,
     orderedCategories,
     setMonth,
+    stepMonth,
+    setYear,
     toggleSort,
-    toggleFilterPopover,
-    closeFilterPopover,
-    clearFilterColumn,
     setSelected,
     setAllSelected,
-    startEdit,
-    cancelEdit,
+    clearSelection,
     addTransaction,
     saveEdit,
     deleteTransaction,

@@ -15,14 +15,14 @@ test.describe('Mobile smoke', () => {
       value: 9_999_999_999.99,
     })
     await page.goto('/')
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(
-      tracker.dashboardSection.getByRole('heading', { name: 'Resumen financiero' }),
+      tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
 
     const hero = tracker.dashboardSection.getByRole('region', { name: 'Patrimonio neto' })
     const netWorth = hero.locator('#kpi-net-worth')
     await expect(netWorth).toContainText('€')
-    await expect(netWorth).toHaveClass(/net-worth-value--compact/)
 
     const layout = await hero.evaluate((element) => {
       const amount = element.querySelector<HTMLElement>('#kpi-net-worth')
@@ -46,9 +46,8 @@ test.describe('Mobile smoke', () => {
       amountIsSingleLine: true,
       viewportHasNoOverflow: true,
     })
-    await expect(hero.getByRole('button', { name: '7D' })).toHaveCSS('min-height', '44px')
     await expect(
-      tracker.dashboardSection.getByRole('region', { name: 'Lista de últimos movimientos' }),
+      tracker.dashboardSection.getByRole('list', { name: 'Últimos movimientos' }),
     ).toBeVisible()
   })
 
@@ -57,15 +56,13 @@ test.describe('Mobile smoke', () => {
     tracker,
   }) => {
     await expect(
-      tracker.dashboardSection.getByRole('heading', {
-        name: 'Resumen financiero',
-      }),
+      tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
     await expect(page.locator('.sidebar')).toBeHidden()
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible()
 
     const titleBox = await tracker.dashboardSection
-      .getByRole('heading', { name: 'Resumen financiero' })
+      .getByRole('heading', { name: 'Dashboard', exact: true })
       .boundingBox()
     const viewport = page.viewportSize()
     expect(titleBox).not.toBeNull()
@@ -76,7 +73,8 @@ test.describe('Mobile smoke', () => {
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(
       tracker.transactionsSection.getByRole('heading', {
-        name: 'Movimientos mensuales',
+        name: 'Movimientos',
+        exact: true,
       }),
     ).toBeVisible()
 
@@ -84,7 +82,8 @@ test.describe('Mobile smoke', () => {
     await expect(page).toHaveURL(/\/inversion$/)
     await expect(
       tracker.section('investment').getByRole('heading', {
-        name: 'Inversión y aportes',
+        name: 'Inversión',
+        exact: true,
       }),
     ).toBeVisible()
   })
@@ -97,21 +96,21 @@ test.describe('Mobile smoke', () => {
     await tracker.openTransactions()
     await page.locator('#tx-open-modal').click()
 
-    const dialog = page.locator('#tx-dialog')
-    const addAnother = dialog.getByRole('button', { name: 'Otro' })
-
-    await addAnother.scrollIntoViewIfNeeded()
+    // The panel fills the screen; its footer stays put while the fields scroll.
+    const panel = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+    const addAnother = panel.getByRole('button', { name: 'Guardar y añadir otro' })
     await expect(addAnother).toBeVisible()
 
     const layout = await addAnother.evaluate((element) => {
       const rect = element.getBoundingClientRect()
+      const body = element.closest('dialog')!.querySelector('form')!.parentElement!
       return {
         isWithinVisualViewport: rect.top >= 0 && rect.bottom <= window.innerHeight,
-        formScrolls: element.closest('form')!.scrollHeight > element.closest('form')!.clientHeight,
+        bodyScrolls: body.scrollHeight > body.clientHeight,
       }
     })
 
-    expect(layout).toEqual({ isWithinVisualViewport: true, formScrolls: true })
+    expect(layout).toEqual({ isWithinVisualViewport: true, bodyScrolls: true })
   })
 
   test('agrupa las secciones secundarias en un menú inferior accesible', async ({
@@ -178,7 +177,8 @@ test.describe('Mobile smoke', () => {
       headers: { 'x-finance-namespace': 'demo' },
     })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Resumen financiero' })).toBeVisible()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Más secciones' }).click()
     await page

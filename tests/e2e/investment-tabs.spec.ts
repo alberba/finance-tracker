@@ -8,7 +8,7 @@ test.describe("inversión tabs y TWR", () => {
     const investmentSection = tracker.investmentSection();
 
     await expect(
-      investmentSection.getByRole("tab", { name: "Dashboard" }),
+      investmentSection.getByRole("tab", { name: "Resumen" }),
     ).toBeVisible();
     await expect(
       investmentSection.getByRole("tab", { name: "Movimientos" }),
@@ -102,9 +102,7 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
-    await tracker
-      .investmentSection()
+    await (await tracker.openInvestmentMovementPanel())
       .locator("#investment-movement-symbol")
       .fill("CASHBUY");
 
@@ -155,10 +153,7 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
-
-    await tracker
-      .investmentSection()
+    await (await tracker.openInvestmentMovementPanel())
       .locator("#investment-movement-symbol")
       .fill("UNMAPPED");
 
@@ -209,10 +204,10 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentMovementsTab();
 
     // Sin mapeo el envío automático se salta con aviso visible y sin botón.
-    const section = tracker.investmentSection();
+    const section = await tracker.openInvestmentMovementPanel();
     await section.locator("#investment-movement-date").fill("2026-09-04");
     await section.locator("#investment-movement-time").fill("16:11");
-    await section.locator("#investment-movement-side").selectOption("buy");
+    await section.locator('[data-investment-side="buy"]').click();
     await section.locator("#investment-movement-symbol").fill("RESEND");
     await section.locator("#investment-movement-unit-price").fill("2110.3");
     await section.locator("#investment-movement-units").fill("0.0047");
@@ -225,7 +220,7 @@ test.describe("inversión tabs y TWR", () => {
       "no tiene sincronización activada",
     );
     await expect(
-      section.getByRole("button", { name: /Reenviar movimiento/ }),
+      tracker.investmentSection().getByRole("button", { name: /^Reenviar / }),
     ).toHaveCount(0);
 
     // El mapeo llega después: aparece el botón y el reenvío crea la transacción.
@@ -244,7 +239,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentMovementsTab();
     const resend = tracker
       .investmentSection()
-      .getByRole("button", { name: "Reenviar movimiento del 2026-09-04 a Stock Events" });
+      .getByRole("button", { name: /^Reenviar compra de RESEND .* a Stock Events$/ });
     await expect(resend).toBeVisible();
     await resend.click();
     await expect.poll(() => syncedTransaction).toMatchObject({
@@ -295,9 +290,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.filterTransactionsMonth("FEBRERO");
     await tracker.setTransactionDescriptionFilter("Compra 2 E2EEDIT");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 2 E2EEDIT",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 2 E2EEDIT" }),
     ).toHaveCount(0);
   });
 
@@ -328,12 +321,12 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2025" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2025" }),
     ).toHaveCount(1);
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2026D" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2026D" }),
     ).toHaveCount(0);
 
     await tracker.filterInvestmentYear(2026);
@@ -341,16 +334,14 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2026D" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2026D" }),
     ).toHaveCount(0);
   });
 
   test("categoría de inversión: Bitvavo fija Crypto y otros brokers permiten elegir del desplegable", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
-
-    const section = tracker.investmentSection();
+    const section = await tracker.openInvestmentMovementPanel();
     await section
       .locator("#investment-movement-broker")
       .selectOption({ label: "Bitvavo" });
@@ -395,25 +386,19 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openTransactions();
     await tracker.filterTransactionsMonth("MARZO");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 1 BTC",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 1 BTC" }),
     ).toContainText("Crypto");
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Compra 1 VWCE",
-      }),
+      tracker.transactionRows.filter({ hasText: "Compra 1 VWCE" }),
     ).toContainText("Fondos Indexados");
   });
 
   test("el símbolo en movimientos de inversión conserva espacios mientras se escribe", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
-
-    const symbolInput = tracker
-      .investmentSection()
-      .locator("#investment-movement-symbol");
+    const symbolInput = (await tracker.openInvestmentMovementPanel()).locator(
+      "#investment-movement-symbol",
+    );
     await symbolInput.click();
     await symbolInput.pressSequentially("MSCI WORLD");
     await expect(symbolInput).toHaveValue("MSCI WORLD");
@@ -430,13 +415,13 @@ test.describe("inversión tabs y TWR", () => {
     });
 
     await expect(
-      tracker.investmentSection().locator("#investment-tx-table-body tr", {
+      tracker.investmentSection().locator("tr[data-investment-tx-id]", {
         hasText: "MSCI WORLD",
       }),
     ).toHaveCount(1);
   });
 
-  test("aportes renderiza tabla TWR con base 100 y retornos iniciales vacíos", async ({
+  test("aportes muestra el registro de cierres con base 100 y retornos iniciales vacíos", async ({
     tracker,
   }) => {
     await tracker.openInvestmentContributionsTab();
@@ -446,95 +431,72 @@ test.describe("inversión tabs y TWR", () => {
       .locator("#investment-tab-contributions thead th")
       .allTextContents();
     expect(headers.map((value) => value.trim())).toEqual([
-      "Fecha",
-      "Valor cartera (cierre)",
-      "Flujo del día",
-      "VLE",
-      "Participaciones antes",
-      "Participaciones después",
-      "Retorno período",
-      "Retorno acumulado",
-      "Acciones",
+      "Cierre",
+      "Valor cartera",
+      "Aporte",
+      "VL",
+      "Participaciones",
+      "Periodo",
+      "Acumulado",
+      "Origen",
     ]);
 
-    const firstRow = section.locator("#contribution-body tr").first();
-    await expect(firstRow).toBeVisible();
-    await expect(firstRow.locator("td").nth(3)).toHaveText("100");
-    await expect(firstRow.locator("td").nth(6)).toHaveText("--");
-    await expect(firstRow.locator("td").nth(7)).toHaveText("--");
+    // Newest first: the base close is the last row.
+    const baseRow = section.locator("tr[data-contribution-date]").last();
+    await expect(baseRow.locator("[data-contribution-nav]")).toHaveText("100,0000");
+    await expect(baseRow.locator("[data-contribution-period]")).toHaveText("—");
+    await expect(baseRow.locator("[data-contribution-cumulative]")).toHaveText("—");
   });
 
-  test("editar flujo en aportes recalcula y persiste tras recarga", async ({
+  test("editar el aporte de un cierre recalcula y persiste tras recarga", async ({
     tracker,
   }) => {
     await tracker.openInvestmentContributionsTab();
-    const section = tracker.investmentSection();
 
-    // The auto month-end close rows carry no flow of their own (their input
-    // defaults to "0") — only the manual (non-month-end) contribution row
-    // has a real flow value to edit, so recalculation actually has an effect.
-    const editableRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-28",
-    });
-    await expect(editableRow).toBeVisible();
-    const editableDate = (
-      await editableRow.locator("td").nth(0).innerText()
-    ).trim();
+    // Month-end closes carry no flow of their own; only the manual
+    // contribution has a real flow to edit, so the recalculation shows.
+    await expect(tracker.contributionRow("2026-01-28")).toBeVisible();
+    const downstreamNav = tracker
+      .contributionRow("2026-02-28")
+      .locator("[data-contribution-nav]");
+    const previousNav = (await downstreamNav.innerText()).trim();
 
-    const downstreamRow = section.locator("#contribution-body tr", {
-      hasText: "2026-02-28",
-    });
-    await expect(downstreamRow).toBeVisible();
-    const previousVle = (
-      await downstreamRow.locator("td").nth(3).innerText()
-    ).trim();
+    await tracker.setContributionFlowByDate("2026-01-28", 0);
 
-    await tracker.setContributionFlowByDate(editableDate, 0);
-
-    const nextVle = (
-      await downstreamRow.locator("td").nth(3).innerText()
-    ).trim();
-    expect(nextVle).not.toBe(previousVle);
+    await expect(downstreamNav).not.toHaveText(previousNav);
+    const nextNav = (await downstreamNav.innerText()).trim();
 
     await tracker.reload();
     await tracker.openInvestmentContributionsTab();
-    const persistedVle = (
-      await tracker
-        .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-02-28" })
-        .locator("td")
-        .nth(3)
-        .innerText()
-    ).trim();
-    expect(persistedVle).toBe(nextVle);
+    await expect(
+      tracker.contributionRow("2026-02-28").locator("[data-contribution-nav]"),
+    ).toHaveText(nextNav);
   });
 
   test("aportes muestra también fechas manuales fuera de cierre mensual", async ({
     tracker,
   }) => {
     await tracker.openInvestmentContributionsTab();
-    const section = tracker.investmentSection();
 
-    const manualRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-28",
-    });
+    const manualRow = tracker.contributionRow("2026-01-28");
     await expect(manualRow).toBeVisible();
     await expect(
       manualRow.locator('input[data-contribution-flow-date="2026-01-28"]'),
     ).toHaveValue("200");
+    await expect(manualRow.locator("[data-contribution-origin]")).toContainText("Manual");
   });
 
   test("aportes automáticos de cierre mensual incluyen la liquidez del mes en valor cartera", async ({
     tracker,
   }) => {
     await tracker.openInvestmentContributionsTab();
-    const section = tracker.investmentSection();
 
-    const monthEndRow = section.locator("#contribution-body tr", {
-      hasText: "2026-01-31",
-    });
+    const monthEndRow = tracker.contributionRow("2026-01-31");
     await expect(monthEndRow).toBeVisible();
-    await expect(monthEndRow.locator("td").nth(1)).toHaveText("11.209,45 €");
+    await expect(monthEndRow.locator("[data-contribution-value]")).toHaveText("11.209,45 €");
+    await expect(monthEndRow.locator("[data-contribution-origin]")).toHaveText(
+      "Cierre de mes",
+    );
     await expect(
       monthEndRow.locator('button[data-delete-contribution-date="2026-01-31"]'),
     ).toHaveCount(0);
@@ -546,16 +508,34 @@ test.describe("inversión tabs y TWR", () => {
   }) => {
     await tracker.deleteManualContributionByDate("2026-01-28");
     await expect(page.locator("#contribution-delete-dialog")).toContainText(
-      "2026-01-28",
+      "28 ene 2026",
     );
     await tracker.confirmDeleteManualContribution();
     await expect(page.getByRole("status")).toContainText(
       "Aporte manual eliminado.",
     );
-    await expect(
-      tracker
-        .investmentSection()
-        .locator("#contribution-body tr", { hasText: "2026-01-28" }),
-    ).toHaveCount(0);
+    await expect(tracker.contributionRow("2026-01-28")).toHaveCount(0);
+  });
+
+  test("aportes resume el año y dibuja el valor liquidativo", async ({ tracker }) => {
+    await tracker.openInvestmentContributionsTab();
+    const section = tracker.investmentSection();
+
+    const summary = section.locator("[data-contribution-summary]");
+    await expect(summary).toContainText("Rentabilidad TWR");
+    await expect(summary).toContainText("Aportado en 2026");
+    await expect(section.locator("#contribution-nav-chart")).toBeVisible();
+  });
+
+  test("el registro de aportes oculta columnas secundarias en móvil", async ({
+    tracker,
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await tracker.openInvestmentContributionsTab();
+
+    const row = tracker.contributionRow("2026-01-31");
+    await expect(row.locator("[data-contribution-nav]")).toBeHidden();
+    await expect(row.locator('input[data-contribution-flow-date]')).toBeVisible();
   });
 });
