@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues on `alberba/finance-tracker`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues on `alberba/finance-tracker`, managed with the `gh` CLI. Read an issue with `gh issue view N --json title,body,comments` (`--comments` alone prints nothing). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
@@ -32,8 +32,9 @@ The docs under `docs/` stay as the narrative behind those rules (`docs/architect
 `docs/testing.md`, `docs/playwright.md`); read them for the reasoning, review against
 `CODING_STANDARDS.md`. If they disagree, `CODING_STANDARDS.md` wins and the drift is a bug.
 
-Formatting and lint are enforced by tooling (`.prettierrc`, `eslint.config.ts`), so don't review
-them by hand.
+Lint is enforced by tooling (`eslint.config.ts`), so don't review it by hand. Prettier
+(`.prettierrc`) is not gated and much of the repo is unformatted: format only the files you touch,
+by path.
 
 ## Commands
 
@@ -41,7 +42,7 @@ Run with `pnpm`. During `/implement`, typecheck and single test files run often;
 
 | Purpose                         | Command                                                                          |
 | ------------------------------- | -------------------------------------------------------------------------------- |
-| New worktree (`.dev.vars`)      | `pnpm setup:worktree`                                                            |
+| New worktree (`.dev.vars`, D1)  | `pnpm setup:worktree`                                                            |
 | Typecheck                       | `pnpm check`                                                                     |
 | Lint                            | `pnpm lint` (`pnpm lint:fix` to autofix)                                         |
 | Tests (all three Vitest layers) | `pnpm test`                                                                      |
@@ -49,6 +50,7 @@ Run with `pnpm`. During `/implement`, typecheck and single test files run often;
 | Tests, one layer                | `pnpm test:unit` / `pnpm test:component` / `pnpm test:integration`               |
 | Coverage                        | `pnpm test:coverage`                                                             |
 | E2E                             | `pnpm test:e2e` (excludes `@visual`); `pnpm test:e2e:smoke` for the smoke subset |
+| Visual E2E, Linux snapshots     | `pnpm test:e2e:visual:linux` (needs Docker; `--update-snapshots` to regenerate)  |
 | Build                           | `pnpm build`                                                                     |
 
-Visual E2E (`pnpm test:e2e:visual`) is flaky by nature; treat a snapshot diff as a question, not a failure.
+Visual E2E: open the diff image before calling it a flake. Faint text antialiasing is noise; a changed label, tab or date is a real diff. Without Docker, regenerate snapshots from CI: see `docs/playwright.md`.
