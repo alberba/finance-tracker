@@ -36,7 +36,7 @@ const confirmOpen = computed({
 
 const rules = computed(() => recurringStore.rules.filter((rule) => rule.type === 'investment'))
 const plan = computed(() => summarizeRecurringPlan(rules.value))
-const today = computed(() => recurringStore.today())
+const today = computed(() => recurringStore.resolveToday())
 
 const figures = computed<FigureStripItem[]>(() => [
   { label: 'Comprometido al mes', value: `≈ ${formatMoney(plan.value.monthly)}` },
