@@ -122,12 +122,7 @@ export const useSettingsStore = defineStore('settings', () => {
     return true
   }
 
-  function updateEntityField(
-    key: EntityKey,
-    id: string,
-    field: EntityField,
-    value: string,
-  ): void {
+  function updateEntityField(key: EntityKey, id: string, field: EntityField, value: string): void {
     const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
       const item = draft[key].find((entry) => entry.id === id)
@@ -148,6 +143,38 @@ export const useSettingsStore = defineStore('settings', () => {
     syncEntities(key, before)
   }
 
+  /** Saves the name and opening balance of an entity's card at once. */
+  function saveEntity(key: EntityKey, id: string, name: string, openingBalance: number): boolean {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      showToast('Indica un nombre.')
+      return false
+    }
+    const normalized = slug(trimmedName)
+    if (
+      financialStateStore.state[key].some(
+        (item) => item.id !== id && slug(item.name) === normalized,
+      )
+    ) {
+      showToast('Ese elemento ya existe.')
+      return false
+    }
+
+    const before = financialStateStore.state[key]
+    financialStateStore.commitState((draft) => {
+      const item = draft[key].find((entry) => entry.id === id)
+      if (!item) return
+      item.name = trimmedName
+      item.openingBalance = round2(Number.isFinite(openingBalance) ? openingBalance : 0)
+      if (key === 'investmentAssets') {
+        syncInvestmentCategoriesWithAssets(draft)
+      }
+    })
+    syncEntities(key, before)
+    showToast('Cambios guardados.')
+    return true
+  }
+
   function removeEntity(key: EntityKey, id: string): void {
     const before = financialStateStore.state[key]
     const wasTwrLiquidity =
@@ -157,7 +184,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
       if (key === 'accounts') {
         draft.transactions = draft.transactions.filter((tx) => tx.accountId !== id)
-        draft.subscriptions = draft.subscriptions.filter((subscription) => subscription.accountId !== id)
+        draft.subscriptions = draft.subscriptions.filter(
+          (subscription) => subscription.accountId !== id,
+        )
         draft.twrLiquidityAccountIds = (draft.twrLiquidityAccountIds || []).filter(
           (accountId) => accountId !== id,
         )
@@ -279,6 +308,7 @@ export const useSettingsStore = defineStore('settings', () => {
     saveGeneral,
     addEntity,
     updateEntityField,
+    saveEntity,
     removeEntity,
     addCategory,
     removeCategory,

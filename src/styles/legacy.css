@@ -10,7 +10,7 @@
 
 /* ══ BRIDGE · legacy control base ═══════════════════════════════ */
 /* Button, table and field base used only by legacy classes (.primary-btn,
-   .table-wrap, .settings-fields…). It sits in the nested `legacy.bridge`
+   .table-wrap…). It sits in the nested `legacy.bridge`
    layer: below the rest of this sheet, which overrides it where needed, and
    above preflight. Delete each part with its zone. */
 @layer bridge {
@@ -85,15 +85,7 @@
   /* Form controls: inline edit rows in those tables + the not-yet-migrated
      investment forms. Scoped to their container classes so header
      dropdowns and already-migrated sections stay untouched. */
-  .settings-fields label {
-    display: grid;
-    gap: 6px;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
-  }
-  .table-wrap td :is(input, select):not([type='checkbox']),
-  :is(.settings-fields, .mini-form) :is(input, select):not([type='checkbox']):not([type='radio']) {
+  .table-wrap td :is(input, select):not([type='checkbox']) {
     width: 100%;
     max-width: 100%;
     min-height: 42px;
@@ -107,15 +99,10 @@
       box-shadow 0.15s,
       background 0.15s;
   }
-  .settings-fields select,
   .table-wrap td select {
     cursor: pointer;
   }
-  :is(.settings-fields, .mini-form) input::placeholder {
-    color: var(--text-faint);
-  }
-  .table-wrap td :is(input, select):focus-visible,
-  :is(.settings-fields, .mini-form) :is(input, select):focus-visible {
+  .table-wrap td :is(input, select):focus-visible {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--ring);
@@ -1143,11 +1130,7 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
   display: block;
 }
 
-/* ══ LIST STACK ══════════════════════════════════════════════════ */
-.list-stack {
-  display: grid;
-  gap: 9px;
-}
+/* ══ LIST ITEM ══════════════════════════════════════════════════ */
 .list-item {
   display: flex;
   flex-wrap: wrap;
@@ -1165,13 +1148,6 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
 }
 .list-item > * {
   min-width: 0;
-}
-.list-item input[type='text'],
-.list-item input[type='number'] {
-  flex: 1 1 160px;
-}
-.list-item .delete-btn {
-  flex: 0 0 auto;
 }
 .list-item small {
   color: var(--text-muted);
@@ -1283,22 +1259,6 @@ dialog {
   max-height: 360px;
 }
 
-.tx-checkbox-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 28px;
-  font-size: 0.82rem;
-  color: var(--text-main);
-  text-transform: none;
-  font-weight: 500;
-}
-.tx-checkbox-option input[type='checkbox'] {
-  inline-size: 16px;
-  block-size: 16px;
-  margin: 0;
-}
-
 td input:not([type='checkbox']),
 td select {
   width: 100%;
@@ -1348,326 +1308,6 @@ td select {
   transition: width 0.4s ease;
 }
 
-/* ══ SETTINGS · LIBRO MAYOR ══════════════════════════════════════
-   La configuración se compone como el índice de un libro contable:
-   un índice lateral numerado y un único lienzo documental con las
-   secciones separadas por filetes. Las listas de datos maestros son
-   tablas de libro mayor: columnas alineadas, importes en mono y
-   edición inline silenciosa. */
-
-.settings-layout {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: clamp(20px, 2.6vw, 36px);
-  align-items: start;
-  max-width: 1220px;
-  margin-inline: auto;
-  width: 100%;
-}
-
-/* ── Índice lateral ── */
-.settings-index {
-  position: sticky;
-  top: 20px;
-  display: grid;
-  gap: 2px;
-  padding-top: 10px;
-}
-.settings-index a {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 8px 12px;
-  border-left: 2px solid transparent;
-  border-radius: 0 9px 9px 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    color 0.15s,
-    background 0.15s,
-    border-color 0.15s;
-}
-.settings-index a::before {
-  content: attr(data-num);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.64rem;
-  color: var(--text-faint);
-  transition: color 0.15s;
-}
-.settings-index a:hover {
-  background: color-mix(in srgb, var(--primary) 6%, transparent);
-  color: var(--text-main);
-}
-.settings-index a.is-active {
-  border-left-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  color: var(--text-main);
-}
-.settings-index a:hover::before,
-.settings-index a.is-active::before {
-  color: var(--primary);
-}
-.settings-index a:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-/* ── Lienzo documental ── */
-.settings-doc {
-  min-width: 0;
-  padding: 0 clamp(18px, 3vw, 44px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
-}
-.settings-block {
-  display: grid;
-  gap: 18px;
-  padding: clamp(24px, 2.8vw, 34px) 0;
-  border-bottom: 1px solid var(--line);
-  scroll-margin-top: 20px;
-}
-.settings-block:last-child {
-  border-bottom: 0;
-}
-.settings-block > header {
-  display: grid;
-  align-items: baseline;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 5px 14px;
-}
-.settings-block__num {
-  color: var(--primary);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-}
-.settings-block > header h3 {
-  font-family: 'Syne', sans-serif;
-  font-size: 1.3rem;
-  letter-spacing: -0.015em;
-  color: var(--text-main);
-}
-.settings-block > header p {
-  grid-column: 2;
-  max-width: 72ch;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-.settings-block__body {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-.settings-block__body small {
-  color: var(--text-muted);
-}
-
-/* Los CTA de alta vuelven a su tamaño natural, alineados al final. */
-.settings-block__body form .primary-btn {
-  justify-self: end;
-  min-width: 190px;
-}
-
-/* ── Ajustes generales ── */
-.settings-head {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-.settings-head label {
-  flex: 0 1 150px;
-}
-
-/* ── Tabla de libro mayor (cuentas / activos / pasivos) ── */
-.ledger {
-  display: grid;
-}
-.ledger-head,
-#settings .ledger-row,
-#settings .ledger .mini-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 96px;
-  gap: 10px;
-  align-items: center;
-}
-.ledger-head {
-  padding: 0 10px 8px;
-  border-bottom: 1px solid var(--line-strong);
-  color: var(--text-faint);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.ledger-head span:nth-child(2) {
-  text-align: right;
-}
-#settings .list-stack {
-  gap: 0;
-}
-#settings .list-item {
-  border: 0;
-  border-radius: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  padding: 8px 10px;
-  transition: background 0.15s;
-}
-#settings .ledger-row {
-  padding: 4px 10px;
-}
-#settings .list-item:hover {
-  background: color-mix(in srgb, var(--primary) 3%, transparent);
-}
-
-/* Edición inline silenciosa: el campo solo se dibuja al pasar el
-   ratón por la fila o al enfocar. */
-#settings .list-item :is(input[type='text'], input[type='number']) {
-  min-height: 38px;
-  padding: 6px 9px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-main);
-  font-size: 0.95rem;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s,
-    background 0.15s;
-}
-#settings .list-item input[type='number'] {
-  text-align: right;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.92rem;
-}
-#settings .list-item:hover :is(input[type='text'], input[type='number']) {
-  border-color: var(--line);
-}
-#settings .list-item :is(input[type='text'], input[type='number']):focus-visible {
-  outline: none;
-  border-color: var(--primary);
-  background: var(--bg-card);
-  box-shadow: 0 0 0 3px var(--ring);
-}
-
-/* Acciones destructivas en reposo: presentes pero silenciosas. */
-#settings .list-item :is(.delete-btn, .danger-btn) {
-  justify-self: end;
-  min-height: 32px;
-  padding: 5px 11px;
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-faint);
-  font-size: 0.78rem;
-}
-#settings .list-item:hover :is(.delete-btn, .danger-btn) {
-  color: var(--expense);
-}
-#settings .list-item :is(.delete-btn, .danger-btn):hover,
-#settings .list-item :is(.delete-btn, .danger-btn):focus-visible {
-  border-color: color-mix(in srgb, var(--expense) 35%, transparent);
-  background: var(--expense-bg);
-  color: var(--expense);
-}
-
-/* Fila de alta: última línea del libro, con subrayado editorial. */
-#settings .mini-form :is(input, select) {
-  min-height: 40px;
-  padding: 6px 10px 7px;
-  border: 0;
-  border-bottom: 1.5px solid var(--line);
-  border-radius: 0;
-  background: transparent;
-  font-size: 0.95rem;
-}
-#settings .mini-form input[type='number'] {
-  text-align: right;
-  font-family: 'DM Mono', monospace;
-  font-size: 0.92rem;
-}
-#settings .mini-form :is(input, select):focus-visible {
-  outline: none;
-  border-bottom-color: var(--primary);
-  box-shadow: 0 1px 0 0 var(--primary);
-}
-#settings .ledger .mini-form {
-  padding: 6px 10px 0;
-}
-#settings .mini-form .secondary-btn {
-  justify-self: end;
-}
-
-/* ── Liquidez para TWR: lista de verificación en columnas ── */
-#settings-twr-liquidity.list-stack {
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 7px 14px;
-}
-
-/* ── Responsive ── */
-@media (max-width: 1080px) {
-  .settings-layout {
-    grid-template-columns: 1fr;
-  }
-  .settings-index {
-    position: static;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding-top: 0;
-  }
-  .settings-index a {
-    padding: 7px 13px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: var(--bg-panel);
-  }
-  .settings-index a.is-active {
-    border-color: var(--primary);
-  }
-}
-@media (max-width: 640px) {
-  .ledger-head,
-  #settings .ledger-row {
-    grid-template-columns: minmax(0, 1fr) 96px 78px;
-    gap: 6px;
-  }
-  #settings .ledger .mini-form {
-    grid-template-columns: minmax(0, 1fr) 96px;
-  }
-  #settings .ledger .mini-form .secondary-btn {
-    grid-column: 1 / -1;
-  }
-}
-
-.mini-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  gap: 9px;
-}
-.mini-form.compact-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.category-block {
-  display: grid;
-  gap: 9px;
-}
-.category-block h4 {
-  color: var(--text-muted);
-  font-family: 'DM Mono', monospace;
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 /* ══ TAGS ════════════════════════════════════════════════════════ */
 .tag {
   display: inline-flex;
@@ -1683,33 +1323,6 @@ td select {
 }
 
 /* ══ ACTION BUTTONS ══════════════════════════════════════════════ */
-.icon-btn {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  min-width: 24px;
-  min-height: 24px;
-  border-radius: 7px;
-  padding: 2px;
-  cursor: pointer;
-}
-.icon-btn:hover {
-  color: var(--text-main);
-  background: var(--line);
-}
-.delete-btn {
-  color: var(--expense);
-  background: var(--expense-bg);
-  border: 1px solid color-mix(in srgb, var(--expense) 35%, transparent);
-  border-radius: 9px;
-  min-height: 32px;
-  padding: 5px 11px;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-.delete-btn:hover {
-  background: color-mix(in srgb, var(--expense) 16%, var(--bg-panel));
-}
 .edit-btn {
   color: var(--primary);
   background: color-mix(in srgb, var(--primary) 12%, var(--bg-panel));
@@ -2329,10 +1942,6 @@ td select {
     grid-template-columns: 1fr;
   }
 
-  .mini-form,
-  .mini-form.compact-row {
-    grid-template-columns: 1fr;
-  }
   .reports-form-row-type,
   .reports-form-row-pair {
     grid-template-columns: 1fr;

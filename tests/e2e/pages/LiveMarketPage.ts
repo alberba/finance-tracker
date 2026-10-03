@@ -3,8 +3,27 @@ import { expect, type Locator, type Page } from '@playwright/test'
 export class LiveMarketPage {
   constructor(private readonly page: Page) {}
 
-  get instrumentEditor(): Locator {
-    return this.page.locator('[data-instrument-editor]')
+  /** The side panel with the card of an investment asset. */
+  get assetPanel(): Locator {
+    return this.page.locator('#settings-asset-panel')
+  }
+
+  /** The editor of an instrument inside the asset card, by its symbol. */
+  instrument(symbol: string): Locator {
+    return this.assetPanel.locator('[data-instrument-id]').filter({
+      has: this.page.getByText(symbol, { exact: true }),
+    })
+  }
+
+  /** Opens the card of an asset from Configuración › Activos. */
+  async openAsset(asset: string): Promise<void> {
+    if (await this.assetPanel.isVisible()) await this.closeAsset()
+    await this.page.locator('#settings').getByRole('tab', { name: 'Activos' }).click()
+    await this.page
+      .locator('#settings')
+      .getByRole('button', { name: `Abrir la ficha de ${asset}`, exact: true })
+      .click()
+    await expect(this.assetPanel).toBeVisible()
   }
 
   get recurringRules(): Locator {
@@ -29,20 +48,48 @@ export class LiveMarketPage {
     return this.page.locator('#dashboard [data-dashboard-pending]')
   }
 
-  async addInstrument(params: { asset: string; type: string; symbol: string; currency: string; provider?: string }): Promise<void> {
-    const form = this.instrumentEditor.locator('form')
-    await form.getByLabel('Activo').selectOption({ label: params.asset })
+  /** Adds a quote instrument to an asset from its card, then closes it unless `keepOpen`. */
+  async addInstrument(params: {
+    asset: string
+    type: string
+    symbol: string
+    currency: string
+    provider?: string
+    keepOpen?: boolean
+  }): Promise<void> {
+    await this.openAsset(params.asset)
+    const panel = this.assetPanel
+    if (!(await panel.locator('[data-instrument-form]').isVisible())) {
+      await panel.getByRole('button', { name: 'Añadir otro instrumento' }).click()
+    }
+    const form = panel.locator('[data-instrument-form]')
     await form.getByLabel('Tipo').selectOption(params.type)
     await form.getByLabel('Símbolo').fill(params.symbol)
     await form.getByLabel('Moneda').fill(params.currency)
     if (params.provider) await form.getByLabel('Proveedor').selectOption(params.provider)
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
+    await expect(this.instrument(params.symbol.toUpperCase())).toBeVisible()
+    if (!params.keepOpen) await this.closeAsset()
+  }
+
+  async closeAsset(): Promise<void> {
+    await this.assetPanel.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(this.assetPanel).toBeHidden()
   }
 
   async createRecurringRule(params: {
-    account: string; category: string; description: string; amount: number; frequency: string; startDate: string;
-    type?: 'investment';
-    symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
+    account: string
+    category: string
+    description: string
+    amount: number
+    frequency: string
+    startDate: string
+    type?: 'investment'
+    symbol?: string
+    units?: number
+    unitPrice?: number
+    fee?: number
+    time?: string
   }): Promise<void> {
     await this.recurringRules.getByRole('button', { name: 'Nueva compra recurrente' }).click()
     const form = this.recurringPanel
@@ -55,7 +102,8 @@ export class LiveMarketPage {
     await form.getByLabel('Fecha inicial').fill(params.startDate)
     if (params.symbol !== undefined) await form.getByLabel('Símbolo').fill(params.symbol)
     if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))
-    if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.unitPrice !== undefined)
+      await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
     await form.getByRole('button', { name: 'Crear regla' }).click()
@@ -88,11 +136,17 @@ export class LiveMarketPage {
   }
 
   async linkExistingMovements(symbol: string): Promise<void> {
-    const row = this.instrumentEditor.getByRole('listitem').filter({ hasText: symbol })
-    await row.getByRole('button', { name: 'Vincular movimientos' }).click()
+    await this.instrument(symbol).getByRole('button', { name: 'Vincular movimientos' }).click()
   }
 
-  async editFirstRecurringRule(params: { description: string; amount: number; units?: number; unitPrice?: number; fee?: number; time?: string }): Promise<void> {
+  async editFirstRecurringRule(params: {
+    description: string
+    amount: number
+    units?: number
+    unitPrice?: number
+    fee?: number
+    time?: string
+  }): Promise<void> {
     const row = this.recurringRules.locator('tr[data-recurring-rule-id]').first()
     await row.getByRole('button', { name: /^Editar la regla / }).click()
     const form = this.recurringPanel
@@ -100,7 +154,8 @@ export class LiveMarketPage {
     await form.getByLabel('Descripción').fill(params.description)
     await form.getByLabel('Importe por compra').fill(String(params.amount))
     if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))
-    if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.unitPrice !== undefined)
+      await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
     await form.getByRole('button', { name: 'Guardar cambios' }).click()
@@ -108,19 +163,19 @@ export class LiveMarketPage {
   }
 
   async searchSourceSymbol(currentSymbol: string, query: string): Promise<void> {
-    const row = this.instrumentEditor.getByRole('listitem').filter({ hasText: currentSymbol })
-    await row.getByLabel(`Símbolo fuente de ${currentSymbol}`).fill(query)
-    await row.getByRole('button', { name: 'Buscar aproximados' }).click()
+    const instrument = this.instrument(currentSymbol)
+    await instrument.getByLabel(`Ticker de ${currentSymbol} en el proveedor`).fill(query)
+    await instrument.getByRole('button', { name: 'Buscar aproximados' }).click()
   }
 
   async selectSourceSearchResult(currentSymbol: string, resultSymbol: string): Promise<void> {
-    const row = this.instrumentEditor.getByRole('listitem').filter({ hasText: currentSymbol })
-    await row.getByRole('button', { name: `Usar símbolo ${resultSymbol}` }).click()
+    await this.instrument(currentSymbol)
+      .getByRole('button', { name: `Usar símbolo ${resultSymbol}` })
+      .click()
   }
 
   async saveSourceSymbol(currentSymbol: string): Promise<void> {
-    const row = this.instrumentEditor.getByRole('listitem').filter({ hasText: currentSymbol })
-    await row.getByRole('button', { name: 'Guardar' }).click()
+    await this.instrument(currentSymbol).getByRole('button', { name: 'Guardar ticker' }).click()
   }
 
   async editFirstPending(description: string, amount: number): Promise<void> {
@@ -137,18 +192,29 @@ export class LiveMarketPage {
     return this.pendingEditPanel
   }
 
-  async editFirstPendingInvestment(params: { units?: number; unitPrice?: number; fee?: number; time?: string; symbol?: string }): Promise<void> {
+  async editFirstPendingInvestment(params: {
+    units?: number
+    unitPrice?: number
+    fee?: number
+    time?: string
+    symbol?: string
+  }): Promise<void> {
     const item = await this.openFirstPendingEdit()
     if (params.symbol !== undefined) await item.getByLabel('Símbolo').fill(params.symbol)
     if (params.units !== undefined) await item.getByLabel('Títulos').fill(String(params.units))
-    if (params.unitPrice !== undefined) await item.getByLabel('Precio por título').fill(String(params.unitPrice))
+    if (params.unitPrice !== undefined)
+      await item.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await item.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await item.getByLabel('Hora').fill(params.time)
     await item.getByRole('button', { name: 'Guardar edición' }).click()
   }
 
   async confirmFirstPending(): Promise<void> {
-    await this.pendingPanel.locator('[data-pending-item]').first().getByRole('button', { name: /^Confirmar/ }).click()
+    await this.pendingPanel
+      .locator('[data-pending-item]')
+      .first()
+      .getByRole('button', { name: /^Confirmar/ })
+      .click()
   }
 
   async expectPendingCount(count: number): Promise<void> {

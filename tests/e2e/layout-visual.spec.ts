@@ -26,7 +26,7 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
  * scan started looking at the active section (it used to find none). The list
  * only shrinks: each zone's migration fixes its targets and removes its entry.
  */
-const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals', 'settings'])
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals'])
 
 /** A monthly purchase, for the views that need one rule in the plan. */
 const RECURRING_RULE = {
@@ -258,6 +258,61 @@ const WEALTH_VIEWS: Array<{
   },
 ]
 
+/** Configuración views beyond the default tab: the other tabs, cards and dialogs. */
+const SETTINGS_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  { name: 'settings-assets', open: (_page, tracker) => tracker.openSettingsTab('Activos') },
+  { name: 'settings-liabilities', open: (_page, tracker) => tracker.openSettingsTab('Pasivos') },
+  { name: 'settings-categories', open: (_page, tracker) => tracker.openSettingsTab('Categorías') },
+  { name: 'settings-recurring', open: (_page, tracker) => tracker.openSettingsTab('Recurrentes') },
+  {
+    name: 'settings-preferences',
+    open: (_page, tracker) => tracker.openSettingsTab('Preferencias'),
+  },
+  {
+    name: 'settings-account-card',
+    open: async (_page, tracker) => {
+      await tracker.openSettingsCard('Cuentas', 'Trade Republic')
+    },
+  },
+  {
+    name: 'settings-asset-card',
+    open: async (page, tracker) => {
+      await tracker.openSettings()
+      await new LiveMarketPage(page).addInstrument({
+        asset: 'ETF Plata',
+        type: 'etf',
+        symbol: 'PHAG',
+        currency: 'EUR',
+        keepOpen: true,
+      })
+    },
+  },
+  {
+    name: 'settings-delete-account',
+    open: async (page, tracker) => {
+      const panel = await tracker.openSettingsCard('Cuentas', 'Efectivo')
+      await panel.getByRole('button', { name: 'Eliminar' }).click()
+      await expect(page.getByRole('alertdialog', { name: '¿Eliminar esta cuenta?' })).toBeVisible()
+    },
+  },
+  {
+    name: 'settings-emoji',
+    focus: '#settings [data-category="Comida"]',
+    open: async (page, tracker) => {
+      await tracker.openSettingsTab('Categorías')
+      await page
+        .locator('#settings')
+        .getByRole('button', { name: 'Cambiar emoji de Comida' })
+        .click()
+      await expect(page.getByRole('dialog', { name: 'Elegir emoji de Comida' })).toBeVisible()
+    },
+  },
+]
+
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
 
 type LayoutIssue = {
@@ -319,8 +374,6 @@ async function getLayoutScanResult(
             '.goal-edit-grid',
             '.goal-progress',
             '.form-grid',
-            '.settings-head',
-            '.mini-form',
             '.data-actions',
           ].join(','),
         ),
@@ -674,6 +727,58 @@ test.describe('Patrimonio · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'wealth', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Configuración · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of SETTINGS_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'settings', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of SETTINGS_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "settings" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openSettings()
+      await expectSoundLayout(page, 'settings')
+    })
+
+    for (const view of SETTINGS_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'settings', view.name)
       })
     }
   })

@@ -4,7 +4,16 @@
 withDefaults(
   defineProps<{
     label: string
-    icon: 'edit' | 'trash' | 'close' | 'chevron-left' | 'chevron-right' | 'resend' | 'calculator'
+    icon:
+      | 'edit'
+      | 'trash'
+      | 'close'
+      | 'chevron-left'
+      | 'chevron-right'
+      | 'arrow-up'
+      | 'arrow-down'
+      | 'resend'
+      | 'calculator'
     tone?: 'default' | 'danger' | 'ink'
     disabled?: boolean
   }>(),
@@ -19,6 +28,8 @@ const PATHS = {
   close: ['M6 6l12 12M18 6L6 18'],
   'chevron-left': ['M15 6l-6 6 6 6'],
   'chevron-right': ['M9 6l6 6-6 6'],
+  'arrow-up': ['M12 19V5', 'M6 11l6-6 6 6'],
+  'arrow-down': ['M12 5v14', 'M6 13l6 6 6-6'],
   calculator: [
     'M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z',
     'M8 7h8',
