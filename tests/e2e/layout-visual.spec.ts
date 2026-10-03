@@ -292,6 +292,14 @@ const SETTINGS_VIEWS: Array<{
     },
   },
   {
+    name: 'settings-recurring-panel',
+    open: async (page, tracker) => {
+      await tracker.openSettingsTab('Recurrentes')
+      await tracker.section('settings').getByRole('button', { name: 'Nueva regla' }).click()
+      await expect(page.locator('#settings-recurring-panel')).toBeVisible()
+    },
+  },
+  {
     name: 'settings-delete-account',
     open: async (page, tracker) => {
       const panel = await tracker.openSettingsCard('Cuentas', 'Efectivo')

@@ -4,7 +4,7 @@ import { reactive } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
-import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/settings/view-model'
+import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
 import type { InstrumentType } from '../../scripts/types'
 import { useMarketStore, type NewInstrumentInput } from '../../stores/market'
 

@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import SettingsEntityPanel from './SettingsEntityPanel.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import LedgerSurface from '../ui/LedgerSurface.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { Entity } from '../../scripts/types'
@@ -55,7 +56,7 @@ function confirmDelete(): void {
       @action="panel?.openNew()"
     />
 
-    <div class="border-line bg-panel shadow-soft rounded-lg border px-2 pt-5 pb-4 sm:px-7 sm:pt-6">
+    <LedgerSurface>
       <LedgerTable
         :columns="columns"
         :rows="rows"
@@ -88,7 +89,7 @@ function confirmDelete(): void {
           </span>
         </template>
       </LedgerTable>
-    </div>
+    </LedgerSurface>
 
     <SettingsEntityPanel
       ref="panel"

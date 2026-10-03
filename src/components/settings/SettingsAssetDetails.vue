@@ -5,6 +5,7 @@ import SettingsInstrumentEditor from './SettingsInstrumentEditor.vue'
 import SettingsInstrumentForm from './SettingsInstrumentForm.vue'
 import SettingsSymbolSync from './SettingsSymbolSync.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
 import { useSettingsAssets } from '../../composables/useSettingsAssets'
 
 // The sections of an asset's card below its opening value: where its quote
@@ -20,12 +21,7 @@ const addingInstrument = ref(false)
 <template>
   <template v-if="asset">
     <section class="border-line grid gap-4 border-t pt-6" aria-labelledby="settings-asset-quotes">
-      <h3
-        id="settings-asset-quotes"
-        class="text-text-muted text-xs font-bold tracking-widest uppercase"
-      >
-        Cotización
-      </h3>
+      <PanelSectionTitle id="settings-asset-quotes" as="h3">Cotización</PanelSectionTitle>
       <SettingsInstrumentEditor
         v-for="instrument in asset.instruments"
         :key="instrument.id"
@@ -52,12 +48,7 @@ const addingInstrument = ref(false)
       class="border-line grid gap-4 border-t pt-6"
       aria-labelledby="settings-asset-stockevents"
     >
-      <h3
-        id="settings-asset-stockevents"
-        class="text-text-muted text-xs font-bold tracking-widest uppercase"
-      >
-        Stock Events
-      </h3>
+      <PanelSectionTitle id="settings-asset-stockevents" as="h3">Stock Events</PanelSectionTitle>
       <SettingsSymbolSync v-for="row in asset.syncRows" :key="row.symbol" :row="row" />
       <p v-if="!asset.syncRows.length" class="text-text-muted text-sm">
         Cuando el activo tenga un símbolo, aquí eliges si sus movimientos se envían a Stock Events.

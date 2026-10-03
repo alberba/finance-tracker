@@ -152,6 +152,19 @@ describe('buildAssetsViewModel', () => {
   })
 })
 
+describe('buildAssetsViewModel · activos que ya no existen', () => {
+  it('leaves apart the symbols of an instrument whose asset is gone', () => {
+    const vm = buildAssetsViewModel(
+      state({
+        instruments: [instrument({ id: 'old', symbol: 'OLD', investmentAssetId: 'deleted' })],
+        transactions: [buy({ symbol: 'OLD', instrumentId: 'old', category: 'Borrado' })],
+      }),
+    )
+
+    expect(vm.orphanSymbols).toEqual(['OLD'])
+  })
+})
+
 describe('summarizeStockEventsSync', () => {
   const row = (partial: object) => ({
     sync: true,

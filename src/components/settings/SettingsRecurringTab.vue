@@ -5,13 +5,14 @@ import SettingsRecurringRulePanel from './SettingsRecurringRulePanel.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
+import LedgerSurface from '../ui/LedgerSurface.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { ruleMonthlyEquivalent } from '../../domain/investment/view-model'
-import { frequencyLabel } from '../../domain/recurring/occurrences'
+import { frequencyText } from '../../domain/recurring/occurrences'
 import { formatShortDate } from '../../lib/format'
-import type { RecurringFrequency, RecurringRule } from '../../scripts/types'
+import type { RecurringRule } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
@@ -54,21 +55,6 @@ const columns: LedgerColumn<RecurringRule>[] = [
   { key: 'actions', label: 'Acciones', align: 'right', hideBelow: 'sm' },
 ]
 
-const INTERVAL_UNIT: Record<RecurringFrequency, string> = {
-  daily: 'días',
-  weekly: 'semanas',
-  monthly: 'meses',
-  monthEnd: 'fines de mes',
-  yearly: 'años',
-}
-
-function frequencyText(rule: RecurringRule): string {
-  const interval = Math.max(1, Math.floor(rule.interval || 1))
-  return interval === 1
-    ? frequencyLabel(rule.frequency)
-    : `Cada ${interval} ${INTERVAL_UNIT[rule.frequency]}`
-}
-
 function accountName(rule: RecurringRule): string {
   return financialStateStore.accounts.find((account) => account.id === rule.accountId)?.name ?? ''
 }
@@ -94,7 +80,7 @@ function confirmDelete(): void {
       @action="panel?.openNew()"
     />
 
-    <div class="border-line bg-panel shadow-soft rounded-lg border px-2 pt-5 pb-4 sm:px-7 sm:pt-6">
+    <LedgerSurface>
       <LedgerTable
         :columns="columns"
         :rows="rules"
@@ -170,7 +156,7 @@ function confirmDelete(): void {
           </span>
         </template>
       </LedgerTable>
-    </div>
+    </LedgerSurface>
 
     <SettingsRecurringRulePanel ref="panel" @delete="pendingDelete = $event" />
     <ConfirmDialog

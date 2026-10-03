@@ -7,11 +7,12 @@ import SettingsSymbolSync from './SettingsSymbolSync.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import FilterChip from '../ui/FilterChip.vue'
+import LedgerSurface from '../ui/LedgerSurface.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import StatusDot from '../ui/StatusDot.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useSettingsAssets, type SettingsAssetRow } from '../../composables/useSettingsAssets'
-import { INSTRUMENT_TYPE_LABEL, providerLabel } from '../../domain/settings/view-model'
+import { INSTRUMENT_TYPE_LABEL, providerLabel } from '../../domain/investment/instrument-labels'
 import type { Entity } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSettingsStore } from '../../stores/settings'
@@ -59,9 +60,7 @@ function kindOf(asset: SettingsAssetRow): string {
 function listsOf(asset: SettingsAssetRow): string {
   const names = asset.syncRows
     .filter((row) => row.sync && row.watchlistId)
-    .map(
-      (row) => stockEventsStore.watchlists.find((list) => list.id === row.watchlistId)?.name ?? '',
-    )
+    .map((row) => stockEventsStore.watchlistName(row.watchlistId))
   return [...new Set(names.filter(Boolean))].join(', ')
 }
 
@@ -91,7 +90,7 @@ function confirmDelete(): void {
       @action="panel?.openNew()"
     />
 
-    <div class="border-line bg-panel shadow-soft rounded-lg border px-2 pt-5 pb-4 sm:px-7 sm:pt-6">
+    <LedgerSurface>
       <LedgerTable
         :columns="columns"
         :rows="assets"
@@ -159,7 +158,7 @@ function confirmDelete(): void {
           </span>
         </template>
       </LedgerTable>
-    </div>
+    </LedgerSurface>
 
     <section
       v-if="orphanRows.length"
@@ -223,8 +222,8 @@ function confirmDelete(): void {
     >
       <template v-if="pendingDelete">
         {{ pendingDelete.name }}, con su valor inicial de
-        {{ formatMoney(pendingDelete.openingBalance) }}. Sus movimientos se conservan. No se puede
-        deshacer.
+        {{ formatMoney(pendingDelete.openingBalance) }}. Se quitan también sus instrumentos de
+        cotización; sus movimientos se conservan. No se puede deshacer.
       </template>
     </ConfirmDialog>
   </section>

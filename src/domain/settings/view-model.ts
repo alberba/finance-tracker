@@ -1,6 +1,7 @@
 import type { StatusTone } from '../investment/quote-status'
 import {
   isUnlinkedMovementForInstrument,
+  normalizeSymbol,
   symbolsMatchInstrument,
 } from '../investment/symbol-matching'
 import { categoryEmojiKey, getCategoryEmoji } from '../../scripts/category-emoji'
@@ -13,12 +14,6 @@ export interface CategoryTagViewModel {
   isCustomEmoji: boolean
 }
 
-export interface TwrLiquidityOptionViewModel {
-  id: string
-  name: string
-  selected: boolean
-}
-
 export interface SettingsViewModel {
   year: number
   currency: string
@@ -28,7 +23,6 @@ export interface SettingsViewModel {
   incomeCategories: CategoryTagViewModel[]
   expenseCategories: CategoryTagViewModel[]
   investmentCategories: CategoryTagViewModel[]
-  twrLiquidityOptions: TwrLiquidityOptionViewModel[]
 }
 
 export function categoryKeyToType(key: CategoryKey): BudgetType {
@@ -55,8 +49,6 @@ function buildCategoryTags(
 }
 
 export function buildSettingsViewModel(state: State): SettingsViewModel {
-  const selected = new Set((state.twrLiquidityAccountIds || []).map((id) => String(id)))
-
   return {
     year: state.year,
     currency: state.currency || 'EUR',
@@ -78,11 +70,6 @@ export function buildSettingsViewModel(state: State): SettingsViewModel {
       state.investmentCategories || [],
       state.categoryEmojis,
     ),
-    twrLiquidityOptions: (state.accounts || []).map((account) => ({
-      id: account.id,
-      name: account.name,
-      selected: selected.has(account.id),
-    })),
   }
 }
 
@@ -147,12 +134,6 @@ export interface AssetsViewModel {
   orphanSymbols: string[]
 }
 
-function upper(value: unknown): string {
-  return String(value || '')
-    .trim()
-    .toUpperCase()
-}
-
 /**
  * Each investment asset with all that hangs from it: its quote instruments,
  * the movements linked to them or waiting to be, and the symbols Stock Events
@@ -165,22 +146,24 @@ export function buildAssetsViewModel(state: State): AssetsViewModel {
     state.instruments.map((instrument) => [instrument.id, instrument.investmentAssetId]),
   )
   const assetIdByName = new Map(state.investmentAssets.map((asset) => [asset.name, asset.id]))
+  const assetIds = new Set(state.investmentAssets.map((asset) => asset.id))
   const symbolsByAsset = new Map<string, Set<string>>()
   const orphans = new Set<string>()
 
   function claim(assetId: string | undefined, symbol: string): boolean {
-    if (!assetId || !symbol) return false
+    if (!assetId || !assetIds.has(assetId) || !symbol) return false
     const symbols = symbolsByAsset.get(assetId) ?? new Set<string>()
     symbols.add(symbol)
     symbolsByAsset.set(assetId, symbols)
     return true
   }
 
-  state.instruments.forEach((instrument) =>
-    claim(instrument.investmentAssetId, upper(instrument.symbol)),
-  )
+  state.instruments.forEach((instrument) => {
+    const symbol = normalizeSymbol(instrument.symbol)
+    if (!claim(instrument.investmentAssetId, symbol) && symbol) orphans.add(symbol)
+  })
   investments.forEach((tx) => {
-    const symbol = upper(tx.symbol)
+    const symbol = normalizeSymbol(tx.symbol)
     if (!symbol) return
     const owner =
       (tx.instrumentId && assetByInstrument.get(tx.instrumentId)) ||
@@ -226,44 +209,37 @@ export interface StockEventsSyncSummary {
   tone: StatusTone | null
 }
 
+/** The one place a Stock Events symbol check becomes words and a tone. */
+export function describeSymbolCheck(result: {
+  status: string
+  message?: string
+}): StockEventsSyncSummary & { tone: StatusTone } {
+  if (result.status === 'in-watchlist') return { label: 'En la lista', tone: 'gain' }
+  if (result.status === 'detected') return { label: 'Detectado', tone: 'gain' }
+  if (result.status === 'not-detected') return { label: 'No detectado', tone: 'warn' }
+  return { label: result.message || 'Error', tone: 'loss' }
+}
+
 /** How an asset's symbols reach Stock Events, in one line. */
 export function summarizeStockEventsSync(
   rows: ReadonlyArray<{
     sync: boolean
     watchlistId: string
-    checkResult: { status: string } | null
+    checkResult: { status: string; message?: string } | null
   }>,
 ): StockEventsSyncSummary {
   if (!rows.length) return { label: 'Sin símbolo', tone: null }
   const synced = rows.filter((row) => row.sync)
   if (!synced.length) return { label: 'No se sincroniza', tone: null }
   if (synced.some((row) => !row.watchlistId)) return { label: 'Falta la lista', tone: 'warn' }
-  const statuses = synced.map((row) => row.checkResult?.status)
-  if (statuses.some((status) => status === 'not-detected' || status === 'error')) {
-    return { label: 'No detectado', tone: 'warn' }
-  }
-  if (statuses.every((status) => status === 'in-watchlist'))
-    return { label: 'En la lista', tone: 'gain' }
-  if (statuses.every((status) => status === 'in-watchlist' || status === 'detected')) {
-    return { label: 'Detectado', tone: 'gain' }
-  }
-  return { label: 'Sincroniza', tone: 'gain' }
-}
-
-export const INSTRUMENT_TYPE_LABEL: Record<Instrument['type'], string> = {
-  stock: 'Acción',
-  etf: 'ETF',
-  fund: 'Fondo',
-  crypto: 'Cripto',
-}
-
-/** Quote providers an instrument can use, as the selects list them. */
-export const QUOTE_PROVIDERS = [
-  { value: 'twelve-data', label: 'Twelve Data' },
-  { value: 'yahoo', label: 'Yahoo Finance' },
-  { value: 'coingecko', label: 'CoinGecko' },
-] as const
-
-export function providerLabel(provider: string): string {
-  return QUOTE_PROVIDERS.find((item) => item.value === provider)?.label ?? provider
+  const checks = synced.map((row) =>
+    row.checkResult ? describeSymbolCheck(row.checkResult) : null,
+  )
+  // The worst check speaks for the asset; unchecked symbols only "sync".
+  const problem = checks.find((check) => check && check.tone !== 'gain')
+  if (problem) return { ...problem, tone: 'warn' }
+  if (checks.some((check) => !check)) return { label: 'Sincroniza', tone: 'gain' }
+  return checks.every((check) => check!.label === 'En la lista')
+    ? { label: 'En la lista', tone: 'gain' }
+    : { label: 'Detectado', tone: 'gain' }
 }

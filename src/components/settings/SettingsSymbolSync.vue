@@ -5,7 +5,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import StatusDot from '../ui/StatusDot.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
-import type { StatusTone } from '../../domain/investment/quote-status'
+import { describeSymbolCheck } from '../../domain/settings/view-model'
 import { useStockEventsStore, type StockEventsSymbolRow } from '../../stores/stockevents'
 
 // How one symbol reaches Stock Events: whether it syncs, to which list and
@@ -44,20 +44,12 @@ function saveTarget(): void {
 
 const watchlistOptions = computed(() => [
   { value: '', label: 'Sin lista' },
-  ...stockEventsStore.watchlists.map((list) => ({ value: list.id, label: list.name })),
+  ...stockEventsStore.watchlistOptions,
 ])
 
-const CHECK: Record<string, { label: string; tone: StatusTone }> = {
-  'in-watchlist': { label: 'En la lista', tone: 'gain' },
-  detected: { label: 'Detectado', tone: 'gain' },
-  'not-detected': { label: 'No detectado', tone: 'warn' },
-}
-
-const check = computed(() => {
-  const result = props.row.checkResult
-  if (!result) return null
-  return CHECK[result.status] ?? { label: result.message || 'Error', tone: 'loss' as const }
-})
+const check = computed(() =>
+  props.row.checkResult ? describeSymbolCheck(props.row.checkResult) : null,
+)
 </script>
 
 <template>

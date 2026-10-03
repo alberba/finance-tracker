@@ -5,15 +5,17 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 
 // The emoji palette of a category, opened under its emoji: pick one, type
-// another, or go back to the default. Eight per row, as the grid shows them.
+// another, or go back to the default. Six per row, as the grid shows them.
 // prettier-ignore
 const EMOJI_PALETTE = [
-  '💼', '💰', '💳', '💸', '🏦', '📈', '📉', '📊',
-  '🪙', '💵', '🧾', '🎯', '✨', '🎉', '🎁', '🔁',
-  '🍽️', '🍔', '☕', '🛒', '🏠', '🚗', '🚌', '✈️',
-  '👕', '📺', '🎮', '🏃', '🏥', '💊', '📚', '🐾',
-  '👶', '🎓', '🛠️', '📱', '💡', '🌱', '🏢', '₿',
-  '🥇', '🥈', '🏷️', '📦', '🧳', '🍿', '🍕', '🎬',
+  '💼', '💰', '💳', '💸', '🏦', '📈',
+  '📉', '📊', '🪙', '💵', '🧾', '🎯',
+  '✨', '🎉', '🎁', '🔁', '🍽️', '🍔',
+  '☕', '🛒', '🏠', '🚗', '🚌', '✈️',
+  '👕', '📺', '🎮', '🏃', '🏥', '💊',
+  '📚', '🐾', '👶', '🎓', '🛠️', '📱',
+  '💡', '🌱', '🏢', '₿', '🥇', '🥈',
+  '🏷️', '📦', '🧳', '🍿', '🍕', '🎬',
 ]
 
 const props = defineProps<{
@@ -45,12 +47,12 @@ function applyCustom(): void {
     role="dialog"
     :aria-label="`Elegir emoji de ${category}`"
   >
-    <div class="grid grid-cols-8 gap-1">
+    <div class="grid grid-cols-6 gap-1">
       <button
         v-for="emoji in EMOJI_PALETTE"
         :key="emoji"
         type="button"
-        class="hover:bg-subtle focus-visible:outline-primary flex h-9 items-center justify-center rounded-sm border text-lg focus-visible:outline-2"
+        class="hover:bg-subtle focus-visible:outline-primary flex h-11 items-center justify-center rounded-sm border text-lg focus-visible:outline-2"
         :class="emoji === props.modelValue ? 'border-primary bg-primary/10' : 'border-transparent'"
         :aria-pressed="emoji === props.modelValue"
         @click="emit('select', emoji)"

@@ -25,7 +25,8 @@ export function isUnlinkedMovementForInstrument(
   return !transaction.symbol && Boolean(assetName && transaction.category === assetName)
 }
 
-function normalizeSymbol(value: unknown): string {
+/** A symbol as stored and compared: trimmed and upper case. */
+export function normalizeSymbol(value: unknown): string {
   return String(value || '')
     .trim()
     .toUpperCase()

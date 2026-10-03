@@ -91,23 +91,36 @@ export const useSettingsStore = defineStore('settings', () => {
     )
   }
 
-  function addEntity(key: EntityKey, name: string, openingBalance: string): boolean {
+  /**
+   * The trimmed name if it is usable for an entity of `key`, else null after
+   * telling why. The duplicate check compares normalized names, so `Revolut`
+   * and `revolut` keep colliding exactly as they did when the slug was the id.
+   */
+  function usableName(key: EntityKey, name: string, exceptId?: string): string | null {
     const trimmedName = name.trim()
     if (!trimmedName) {
       showToast('Indica un nombre.')
-      return false
+      return null
     }
+    const normalized = slug(trimmedName)
+    if (
+      financialStateStore.state[key].some(
+        (item) => item.id !== exceptId && slug(item.name) === normalized,
+      )
+    ) {
+      showToast('Ese elemento ya existe.')
+      return null
+    }
+    return trimmedName
+  }
+
+  function addEntity(key: EntityKey, name: string, openingBalance: string): boolean {
+    const trimmedName = usableName(key, name)
+    if (!trimmedName) return false
 
     // The entity's identity is minted here and never derived from its name
     // (ADR 0001): renaming it later leaves the identity — and the row — alone.
     const id = newId()
-    // The duplicate check still compares normalized names, so `Revolut` and
-    // `revolut` keep colliding exactly as they did when the slug was the id.
-    const normalized = slug(trimmedName)
-    if (financialStateStore.state[key].some((item) => slug(item.name) === normalized)) {
-      showToast('Ese elemento ya existe.')
-      return false
-    }
 
     const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
@@ -145,20 +158,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /** Saves the name and opening balance of an entity's card at once. */
   function saveEntity(key: EntityKey, id: string, name: string, openingBalance: number): boolean {
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      showToast('Indica un nombre.')
-      return false
-    }
-    const normalized = slug(trimmedName)
-    if (
-      financialStateStore.state[key].some(
-        (item) => item.id !== id && slug(item.name) === normalized,
-      )
-    ) {
-      showToast('Ese elemento ya existe.')
-      return false
-    }
+    const trimmedName = usableName(key, name, id)
+    if (!trimmedName) return false
 
     const before = financialStateStore.state[key]
     financialStateStore.commitState((draft) => {
@@ -192,6 +193,12 @@ export const useSettingsStore = defineStore('settings', () => {
         )
       }
       if (key === 'investmentAssets') {
+        // Its quote instruments only show on its card: they go with it.
+        const gone = new Set(
+          draft.instruments.filter((item) => item.investmentAssetId === id).map((item) => item.id),
+        )
+        draft.instruments = draft.instruments.filter((item) => !gone.has(item.id))
+        gone.forEach((instrumentId) => delete draft.quotes[instrumentId])
         syncInvestmentCategoriesWithAssets(draft)
       }
     })

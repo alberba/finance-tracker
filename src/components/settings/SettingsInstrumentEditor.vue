@@ -5,11 +5,8 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import PillTag from '../ui/PillTag.vue'
-import {
-  INSTRUMENT_TYPE_LABEL,
-  QUOTE_PROVIDERS,
-  type InstrumentRowViewModel,
-} from '../../domain/settings/view-model'
+import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
+import type { InstrumentRowViewModel } from '../../domain/settings/view-model'
 import { searchMarketSymbols, type MarketSearchResult } from '../../services/market-api'
 import { useMarketStore } from '../../stores/market'
 

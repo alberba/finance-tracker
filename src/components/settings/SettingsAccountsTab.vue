@@ -5,6 +5,7 @@ import SettingsAccountLiquidity from './SettingsAccountLiquidity.vue'
 import SettingsEntityPanel from './SettingsEntityPanel.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
+import LedgerSurface from '../ui/LedgerSurface.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { buildAccountRows, type AccountRowViewModel } from '../../domain/settings/view-model'
@@ -43,9 +44,9 @@ const columns: LedgerColumn<AccountRowViewModel>[] = [
   { key: 'cash', label: 'Efectivo en Stock Events', hideBelow: 'lg' },
 ]
 
-function watchlistName(id: string): string {
+function cashListName(id: string): string {
   if (!id) return 'Sin lista'
-  return stockEventsStore.watchlists.find((list) => list.id === id)?.name ?? 'Lista guardada'
+  return stockEventsStore.watchlistName(id) || 'Lista guardada'
 }
 
 function openCard(row: AccountRowViewModel): void {
@@ -74,7 +75,7 @@ function confirmDelete(): void {
       @action="panel?.openNew()"
     />
 
-    <div class="border-line bg-panel shadow-soft rounded-lg border px-2 pt-5 pb-4 sm:px-7 sm:pt-6">
+    <LedgerSurface>
       <LedgerTable
         :columns="columns"
         :rows="rows"
@@ -105,7 +106,7 @@ function confirmDelete(): void {
         </template>
         <template #cell-cash="{ row }">
           <span :class="row.cashWatchlistId ? 'text-text-main' : 'text-text-muted'">
-            {{ row.twrLiquidity ? watchlistName(row.cashWatchlistId) : '—' }}
+            {{ row.twrLiquidity ? cashListName(row.cashWatchlistId) : '—' }}
           </span>
         </template>
         <template #total-name>
@@ -122,7 +123,7 @@ function confirmDelete(): void {
           </span>
         </template>
       </LedgerTable>
-    </div>
+    </LedgerSurface>
 
     <SettingsEntityPanel
       ref="panel"

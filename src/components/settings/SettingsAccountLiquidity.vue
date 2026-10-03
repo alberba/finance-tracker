@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import BaseSelect from '../ui/BaseSelect.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
+import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
 import { buildAccountRows } from '../../domain/settings/view-model'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSettingsStore } from '../../stores/settings'
@@ -33,7 +34,7 @@ const cashWatchlist = computed({
 
 const watchlistOptions = computed(() => [
   { value: '', label: 'No sincronizar efectivo' },
-  ...stockEventsStore.watchlists.map((list) => ({ value: list.id, label: list.name })),
+  ...stockEventsStore.watchlistOptions,
 ])
 
 const hint = computed(() => {
@@ -48,11 +49,7 @@ const hint = computed(() => {
 
 <template>
   <fieldset v-if="row" class="border-line grid gap-4 border-t pt-6" data-account-liquidity>
-    <legend
-      class="text-text-muted float-left mb-3 w-full text-xs font-bold tracking-widest uppercase"
-    >
-      Cartera
-    </legend>
+    <PanelSectionTitle class="float-left w-full">Cartera</PanelSectionTitle>
     <div class="flex items-center justify-between gap-4">
       <p class="grid gap-0.5">
         <span class="font-semibold">Su efectivo es liquidez de la cartera</span>

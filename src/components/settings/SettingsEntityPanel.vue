@@ -4,6 +4,7 @@ import { computed, reactive, ref } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import SidePanel from '../ui/SidePanel.vue'
+import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
 import { formatDecimalInput, parseDecimal } from '../../lib/number'
 import type { Entity, EntityKey } from '../../scripts/types'
 import { useSettingsStore } from '../../stores/settings'
@@ -77,9 +78,7 @@ defineExpose({ openNew, openEdit })
   >
     <form :id="formId" autocomplete="off" @submit.prevent="save">
       <fieldset class="grid gap-3.5 sm:grid-cols-[1fr_12rem]">
-        <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
-          Partida
-        </legend>
+        <PanelSectionTitle>Partida</PanelSectionTitle>
         <BaseInput v-model="form.name" label="Nombre" name="name" required />
         <BaseInput
           v-model="form.openingBalance"

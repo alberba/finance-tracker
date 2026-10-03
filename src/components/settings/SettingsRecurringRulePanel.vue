@@ -6,6 +6,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
+import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { ruleMonthlyEquivalent } from '../../domain/investment/view-model'
 import { parseDecimal } from '../../lib/number'
@@ -56,10 +57,15 @@ const isEditing = computed(() => editing.value !== null)
 const accountOptions = computed(() =>
   financialStateStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
+// A type with no categories still gets one, as the rule needs a category.
+const UNCATEGORIZED = 'Sin categoría'
+function categoriesOf(type: RuleType): string[] {
+  const categories = movementsStore.orderedCategories(type)
+  return categories.length ? categories : [UNCATEGORIZED]
+}
+
 const categoryOptions = computed(() =>
-  movementsStore
-    .orderedCategories(form.type)
-    .map((category) => ({ value: category, label: category })),
+  categoriesOf(form.type).map((category) => ({ value: category, label: category })),
 )
 
 watch(
@@ -90,7 +96,7 @@ function fill(rule: RecurringRule | null): void {
   Object.assign(form, {
     type,
     description: rule?.description ?? '',
-    category: rule?.category ?? movementsStore.orderedCategories(type)[0] ?? '',
+    category: rule?.category ?? categoriesOf(type)[0],
     accountId: rule?.accountId ?? accountOptions.value[0]?.value ?? '',
     amount: rule ? String(rule.amount).replace('.', ',') : '',
     frequency: rule?.frequency ?? 'monthly',
@@ -157,9 +163,7 @@ defineExpose({ openNew, openEdit })
       />
 
       <fieldset class="grid gap-3.5 sm:grid-cols-2">
-        <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
-          Qué
-        </legend>
+        <PanelSectionTitle>Qué</PanelSectionTitle>
         <BaseInput
           v-model="form.description"
           class="sm:col-span-2"
@@ -184,10 +188,8 @@ defineExpose({ openNew, openEdit })
         />
       </fieldset>
 
-      <fieldset class="grid grid-cols-2 gap-3.5">
-        <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
-          Cada cuánto
-        </legend>
+      <fieldset class="grid gap-3.5 sm:grid-cols-2">
+        <PanelSectionTitle>Cada cuánto</PanelSectionTitle>
         <BaseSelect
           v-model="form.frequency"
           label="Frecuencia"
@@ -214,9 +216,7 @@ defineExpose({ openNew, openEdit })
       </fieldset>
 
       <fieldset class="grid gap-3.5">
-        <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
-          Importe
-        </legend>
+        <PanelSectionTitle>Importe</PanelSectionTitle>
         <BaseInput
           v-model="form.amount"
           variant="amount"
