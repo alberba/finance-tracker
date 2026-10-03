@@ -4,7 +4,7 @@
 withDefaults(
   defineProps<{
     label: string
-    icon: 'edit' | 'trash' | 'close' | 'chevron-left' | 'chevron-right'
+    icon: 'edit' | 'trash' | 'close' | 'chevron-left' | 'chevron-right' | 'resend'
     tone?: 'default' | 'danger' | 'ink'
     disabled?: boolean
   }>(),
@@ -19,6 +19,12 @@ const PATHS = {
   close: ['M6 6l12 12M18 6L6 18'],
   'chevron-left': ['M15 6l-6 6 6 6'],
   'chevron-right': ['M9 6l6 6-6 6'],
+  resend: [
+    'M20 11a8 8 0 0 0-14.3-4.9L4 8',
+    'M4 4v4h4',
+    'M4 13a8 8 0 0 0 14.3 4.9L20 16',
+    'M20 20v-4h-4',
+  ],
 } as const
 
 const TONE = {

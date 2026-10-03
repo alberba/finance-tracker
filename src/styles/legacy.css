@@ -10,7 +10,7 @@
 
 /* ══ BRIDGE · legacy control base ═══════════════════════════════ */
 /* Button, table and field base used only by legacy classes (.primary-btn,
-   .table-wrap, .investment-form…). It sits in the nested `legacy.bridge`
+   .table-wrap, .wealth-calc-form…). It sits in the nested `legacy.bridge`
    layer: below the rest of this sheet, which overrides it where needed, and
    above preflight. Delete each part with its zone. */
 @layer bridge {
@@ -86,8 +86,6 @@
      investment / wealth forms. Scoped to their container classes so header
      dropdowns and already-migrated sections stay untouched. */
   :is(
-      .investment-form,
-      .investment-table-controls,
       .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields
@@ -101,8 +99,6 @@
   }
   .table-wrap td :is(input, select):not([type='checkbox']),
   :is(
-      .investment-form,
-      .investment-table-controls,
       .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
@@ -124,8 +120,6 @@
       background 0.15s;
   }
   :is(
-      .investment-form,
-      .investment-table-controls,
       .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields
@@ -136,8 +130,6 @@
   }
   .snapshot-field-stack input::placeholder,
   :is(
-      .investment-form,
-      .investment-table-controls,
       .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
@@ -148,8 +140,6 @@
   }
   .table-wrap td :is(input, select):focus-visible,
   :is(
-      .investment-form,
-      .investment-table-controls,
       .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
@@ -1241,29 +1231,6 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
 }
 .form-grid.compact {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-.investment-form {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-.investment-form > button[type='submit'] {
-  justify-self: end;
-  align-self: end;
-}
-.investment-declared-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-main);
-  font-weight: 600;
-  text-transform: none;
-}
-.investment-declared-field input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-}
-.investment-table-controls {
-  margin-bottom: 10px;
 }
 .form-grid > * {
   min-width: 0;
@@ -2381,9 +2348,6 @@ td select {
   .form-grid.compact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .investment-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   #contribution-form > button[type='submit'] {
     justify-self: stretch;
   }
@@ -2554,8 +2518,7 @@ td select {
   .cards-grid,
   .cards-grid.slim,
   .form-grid,
-  .form-grid.compact,
-  .investment-form {
+  .form-grid.compact {
     grid-template-columns: 1fr;
   }
 
