@@ -62,7 +62,7 @@
  *   silently dropped from local state).
  * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
  *   its flow allocations nested under `data.allocations`; the snapshot
- *   balances that same workflow save touches are not re-synced from there.
+ *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
  * - `settings.ts`'s TWR liquidity toggle sends the whole selection through
  *   `syncTwrLiquidityAccounts` (a `settingsUpdate`), resolved to server
  *   `account` ids.
@@ -312,7 +312,8 @@ export async function syncSettingsUpdate(patch: {
 }
 
 /**
- * Resolves a local id to its server entity id only (no create-if-missing) —
+ * Resolves a local id to its server entity id or its queued create's own id
+ * (no create-if-missing) —
  * for referencing a *different* aggregate as a foreign key (e.g. a pending
  * movement's parent recurring rule). Returns `null` if unresolved; callers
  * decide whether that's acceptable (optional FK) or means the command must
@@ -324,7 +325,7 @@ export async function resolveEntityId(entityType: SyncEntityType, localId: strin
   }
   const syncStore = useSyncStore();
   const ref = await syncStore.getEntityRef(entityType, localId);
-  return ref?.entityId ?? null;
+  return ref?.entityId ?? await syncStore.peekPendingCreateId(entityType, identityMatch(localId));
 }
 
 /**
