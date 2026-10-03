@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Prepara un worktree recién creado para dev y E2E.
+# Prepara un worktree recién creado (o el checkout principal) para dev y E2E.
 # `.dev.vars` está en .gitignore, así que un worktree nuevo no lo tiene: sin él
-# el fixture E2E falla en `POST /api/state/reset-legacy` con 403.
+# el fixture E2E falla en `POST /api/state/reset-legacy` con 403. Sin las
+# migraciones locales, `pnpm dev` arranca contra una D1 vacía.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -25,3 +26,7 @@ ensure_var TEST_AUTH_ENABLED true
 ensure_var LEGACY_OWNER_EMAIL legacy-owner@e2e.test
 
 [[ -d node_modules ]] || pnpm install --frozen-lockfile
+
+pnpm d1:migrate:local >/dev/null
+pnpm d1:migrate:local:v2 >/dev/null
+echo "setup-worktree: migraciones D1 locales (v1 y v2) aplicadas"
