@@ -477,7 +477,7 @@ medirlo con `wrangler check startup` en el piloto.
 
 ## 6. Ruta de adopción incremental
 
-0. **Decidir la frontera** con un ADR corto en `docs/adr/0004-…`: Effect solo en
+0. **Decidir la frontera** con un ADR corto en `docs/adr/0005-effect-solo-en-integraciones-de-servidor.md`: Effect solo en
    `src/lib/server/integrations/**` (o similar). Funciones exportadas con `Promise`. Errores
    `Data.TaggedError` que no salen del módulo sin pasar por `runPromise`. Versión exacta fijada.
    Sin `@effect/vitest` mientras el repo siga en Vitest 4.

@@ -48,6 +48,8 @@ solo para mejorar el porcentaje. El HTML se escribe en `coverage/`.
 4. Mockea límites externos, no la unidad que intentas validar.
 5. Una regresión corregida incluye el test que la reproduce.
 6. No aumentes timeouts o workers para ocultar una carrera; corrige el aislamiento.
+7. En happy-dom, `select.value` deja de seguir a `v-model` cuando las opciones cambian después de
+   montar. Comprueba lo que se guarda (el evento emitido o el store), no `select.value`.
 
 ## Cuarentena de tests inestables (#233)
 

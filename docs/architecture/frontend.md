@@ -9,7 +9,7 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004 y la nota `docs/architecture/estilos-tailwind-vs-css.md`).
 - `src/styles/legacy.css` está congelada en la capa `legacy`, por debajo de Tailwind, y se vacía por zonas hasta desaparecer.
-- `src/scripts/app.ts` mantiene el runtime imperativo legacy hasta que las secciones puedan migrarse por dominio.
+- Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: hidrata y persiste el estado, registra el puente de commit y recarga del store y lleva la navegación lateral.
 
 ## Reglas de integracion
 
@@ -30,13 +30,11 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 
 ## Store compartido
 
-Pinia no es obligatorio mientras Vue solo consuma una parte del estado global legacy. Se introducira cuando el estado reactivo sea compartido por varias islas Vue o cuando una seccion completa pase a Vue y necesite acciones, getters y persistencia tipadas.
+Pinia es la fuente de verdad del estado en cliente. `useFinancialStateStore` (`src/stores/financial-state.ts`) guarda el estado completo, y cada sección sigue el mismo patrón:
 
-Hasta entonces, el patron preferido es:
-
-1. Runtime legacy publica snapshots o acciones desde adaptadores.
-2. Composables Vue encapsulan esos adaptadores.
-3. Componentes Vue consumen composables y renderizan sin conocer el bus global.
+1. Selectores puros en `src/domain/<sección>/view-model.ts`.
+2. Un store en `src/stores/<sección>.ts` que expone el view-model como `computed` sobre `useFinancialStateStore().state` y muta con `financialStateStore.commitState((draft) => …)`.
+3. El componente de la sección lee el store con `storeToRefs` y emite acciones explícitas.
 
 ## Verificacion
 
