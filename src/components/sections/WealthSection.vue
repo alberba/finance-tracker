@@ -15,6 +15,7 @@ import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import {
   formatSnapshotInput,
   parseSnapshotInput,
+  parseSnapshotKey,
   snapshotKey,
   snapshotTotals,
   type SnapshotRowViewModel,
@@ -65,10 +66,10 @@ const status = computed(() => {
 })
 
 function save(): void {
-  const edits = Object.entries(inputs).map(([key, value]) => {
-    const [kind, id] = key.split(':') as [SnapshotKind, string]
-    return { kind, id, value }
-  })
+  const edits = Object.entries(inputs).map(([key, value]) => ({
+    ...parseSnapshotKey(key),
+    value,
+  }))
   wealthStore.saveSnapshot(edits)
 }
 

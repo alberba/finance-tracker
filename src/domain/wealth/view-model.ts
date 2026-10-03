@@ -74,6 +74,11 @@ export function snapshotKey(kind: SnapshotKind, id: string): string {
   return `${kind}:${id}`
 }
 
+export function parseSnapshotKey(key: string): { kind: SnapshotKind; id: string } {
+  const at = key.indexOf(':')
+  return { kind: key.slice(0, at) as SnapshotKind, id: key.slice(at + 1) }
+}
+
 /**
  * A snapshot field as typed: empty means "use the calculated balance" (null),
  * Spanish decimals ("1.234,56") or a plain dot decimal; NaN when it is not a
