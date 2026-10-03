@@ -222,6 +222,42 @@ const DASHBOARD_VIEWS: Array<{
   },
 ]
 
+/** Patrimonio views beyond the default one: edited snapshot, history and calculator. */
+const WEALTH_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'wealth-dirty',
+    focus: '#wealth [data-snapshot-changes]',
+    open: async (_page, tracker) => {
+      await tracker.openWealth()
+      await tracker.wealthSnapshotInput('Revolut').fill('1234,5')
+      await expect(tracker.wealthSection.locator('[data-snapshot-changes]')).toBeVisible()
+    },
+  },
+  {
+    name: 'wealth-history',
+    focus: '#wealth [data-history-row="total"]',
+    open: async (_page, tracker) => {
+      await tracker.openWealth()
+    },
+  },
+  {
+    name: 'wealth-calc-panel',
+    open: async (_page, tracker) => {
+      await tracker.openWealth()
+      await tracker.wealthSection
+        .getByRole('button', { name: 'Calcular el saldo de Fondos Indexados' })
+        .click()
+      const panel = tracker.wealthCalcPanel()
+      await expect(panel).toBeVisible()
+      await panel.getByLabel('Cálculo numérico').fill('45,85*128,46')
+    },
+  },
+]
+
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
 
 type LayoutIssue = {
@@ -280,7 +316,6 @@ async function getLayoutScanResult(
             '.cards-grid',
             '[data-month-card]',
             '[data-dashboard-grid]',
-            '.dual-grid',
             '.goal-edit-grid',
             '.goal-progress',
             '.form-grid',
@@ -587,6 +622,58 @@ test.describe('Dashboard · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'dashboard', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Patrimonio · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of WEALTH_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'wealth', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of WEALTH_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "wealth" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openWealth()
+      await expectSoundLayout(page, 'wealth')
+    })
+
+    for (const view of WEALTH_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'wealth', view.name)
       })
     }
   })

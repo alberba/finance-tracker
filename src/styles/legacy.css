@@ -10,7 +10,7 @@
 
 /* ══ BRIDGE · legacy control base ═══════════════════════════════ */
 /* Button, table and field base used only by legacy classes (.primary-btn,
-   .table-wrap, .wealth-calc-form…). It sits in the nested `legacy.bridge`
+   .table-wrap, .settings-fields…). It sits in the nested `legacy.bridge`
    layer: below the rest of this sheet, which overrides it where needed, and
    above preflight. Delete each part with its zone. */
 @layer bridge {
@@ -47,7 +47,7 @@
     outline-offset: 2px;
   }
 
-  /* Base grid for legacy data tables (transactions / investment / wealth),
+  /* Base grid for legacy data tables (transactions / investment),
      scoped to .table-wrap so migrated tables that don't use it are untouched.
      Class-scoped tables (.budget-*) override via specificity. */
   .table-wrap table {
@@ -83,13 +83,9 @@
   }
 
   /* Form controls: inline edit rows in those tables + the not-yet-migrated
-     investment / wealth forms. Scoped to their container classes so header
+     investment forms. Scoped to their container classes so header
      dropdowns and already-migrated sections stay untouched. */
-  :is(
-      .wealth-calc-form,
-      .settings-fields
-    )
-    label {
+  .settings-fields label {
     display: grid;
     gap: 6px;
     color: var(--text-muted);
@@ -97,13 +93,7 @@
     font-weight: 600;
   }
   .table-wrap td :is(input, select):not([type='checkbox']),
-  :is(
-      .wealth-calc-form,
-      .settings-fields,
-      .mini-form
-    )
-    :is(input, select):not([type='checkbox']):not([type='radio']),
-  .snapshot-field-stack input {
+  :is(.settings-fields, .mini-form) :is(input, select):not([type='checkbox']):not([type='radio']) {
     width: 100%;
     max-width: 100%;
     min-height: 42px;
@@ -117,31 +107,15 @@
       box-shadow 0.15s,
       background 0.15s;
   }
-  :is(
-      .wealth-calc-form,
-      .settings-fields
-    )
-    select,
+  .settings-fields select,
   .table-wrap td select {
     cursor: pointer;
   }
-  .snapshot-field-stack input::placeholder,
-  :is(
-      .wealth-calc-form,
-      .settings-fields,
-      .mini-form
-    )
-    input::placeholder {
+  :is(.settings-fields, .mini-form) input::placeholder {
     color: var(--text-faint);
   }
   .table-wrap td :is(input, select):focus-visible,
-  :is(
-      .wealth-calc-form,
-      .settings-fields,
-      .mini-form
-    )
-    :is(input, select):focus-visible,
-  .snapshot-field-stack input:focus-visible {
+  :is(.settings-fields, .mini-form) :is(input, select):focus-visible {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--ring);
@@ -1169,20 +1143,6 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
   display: block;
 }
 
-.chart-canvas-wrap {
-  position: relative;
-  width: 100%;
-  height: 220px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 12px;
-}
-.chart-canvas-wrap canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 /* ══ LIST STACK ══════════════════════════════════════════════════ */
 .list-stack {
   display: grid;
@@ -1345,64 +1305,7 @@ td select {
   min-width: 90px;
 }
 
-/* ══ SNAPSHOT FIELD ══════════════════════════════════════════════ */
-.snapshot-field-stack {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.snapshot-calc-btn {
-  min-height: 34px;
-  padding: 7px 11px;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-/* ══ WEALTH / CONTRIBUTION CALC DIALOG ═══════════════════════════ */
-.wealth-calc-dialog {
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  border: none;
-  border-radius: 22px;
-  padding: 0;
-  width: min(460px, 92vw);
-  max-height: calc(100dvh - 32px);
-  background: var(--bg-panel);
-  box-shadow:
-    var(--shadow-raised),
-    0 0 0 1px var(--line);
-}
-.wealth-calc-dialog::backdrop {
-  background: var(--overlay);
-}
-.wealth-calc-form {
-  display: grid;
-  gap: 14px;
-  padding: 22px;
-}
-.wealth-calc-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.wealth-calc-head h3 {
-  font-size: 1.1rem;
-}
-.wealth-calc-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* ══ BADGES ══════════════════════════════════════════════════════ */
-
-/* ══ DUAL / GOAL GRIDS ═══════════════════════════════════════════ */
-.dual-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-.dual-grid > *,
+/* ══ GOAL GRIDS ══════════════════════════════════════════════════ */
 .goal-edit-grid > *,
 .goal-progress > * {
   min-width: 0;
@@ -2245,7 +2148,6 @@ td select {
   .cards-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .dual-grid,
   .goal-edit-grid,
   .goal-progress {
     grid-template-columns: 1fr;

@@ -7,7 +7,7 @@ const SECTION_CONFIG = {
     headingText: /^Movimientos$/,
   },
   budget: { buttonLabel: "Presupuesto", headingText: "Presupuesto" },
-  wealth: { buttonLabel: "Patrimonio", headingText: "Patrimonio total" },
+  wealth: { buttonLabel: "Patrimonio", headingText: /^Patrimonio$/ },
   investment: { buttonLabel: "Inversión", headingText: /^Inversión$/ },
   goals: { buttonLabel: "Objetivos", headingText: "Objetivos" },
   settings: { buttonLabel: "Configuración", headingText: "Configuración base" },
@@ -737,23 +737,37 @@ export class FinanceTrackerPage {
     return Number(value);
   }
 
+  /** Picks a month in the band's month strip ("MARZO" or "marzo"). */
+  async selectWealthMonth(monthLabel: string) {
+    const month = MONTH_INDEX[monthLabel.toLowerCase()];
+    await this.wealthSection
+      .locator(`[data-wealth-months] [data-month="${month}"]`)
+      .click();
+  }
+
+  /** The snapshot cell of an account, asset or debt in the snapshot ledger. */
+  wealthSnapshotInput(name: string): Locator {
+    return this.wealthSection.getByRole("textbox", {
+      name: `Snapshot de ${name}`,
+      exact: true,
+    });
+  }
+
+  async readWealthSnapshot(name: string): Promise<number> {
+    const value = await this.wealthSnapshotInput(name).inputValue();
+    return Number(value.replace(/\./g, "").replace(",", "."));
+  }
+
   async saveAccountSnapshot(params: {
     monthLabel: string;
     accountName: string;
     value: number;
   }) {
     await this.openWealth();
-    await this.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: params.monthLabel });
-
-    const row = this.wealthSection.locator(
-      `#snapshot-accounts tr:has(td:text-is("${params.accountName}"))`,
+    await this.selectWealthMonth(params.monthLabel);
+    await this.wealthSnapshotInput(params.accountName).fill(
+      String(params.value).replace(".", ","),
     );
-    await expect(row).toBeVisible();
-
-    const input = row.locator('input[data-snapshot-kind="accounts"]');
-    await input.fill(String(params.value));
     // The toast fires as soon as local state commits, but the app mirrors the
     // blob to the server asynchronously. Tests that reload right after saving
     // would otherwise race that PUT and read back the pre-save server copy, so
@@ -764,22 +778,16 @@ export class FinanceTrackerPage {
         response.request().method() === "PUT" &&
         (response.request().postData() ?? "").includes(String(params.value)),
     );
-    await this.wealthSection
-      .getByRole("button", { name: "Guardar snapshot" })
-      .click();
-    await expect(this.page.getByRole("status")).toContainText(
-      "Snapshot guardado.",
-    );
+    await this.saveSnapshot();
     await persisted;
   }
 
   async getAccountSnapshotValue(accountName: string): Promise<number> {
-    const row = this.wealthSection.locator(
-      `#snapshot-accounts tr:has(td:text-is("${accountName}"))`,
-    );
-    const input = row.locator('input[data-snapshot-kind="accounts"]');
-    const value = await input.inputValue();
-    return Number(value);
+    return this.readWealthSnapshot(accountName);
+  }
+
+  wealthCalcPanel(): Locator {
+    return this.page.getByRole("dialog", { name: "Calcular saldo" });
   }
 
   async applyInvestmentSnapshotCalculation(params: {
@@ -788,46 +796,30 @@ export class FinanceTrackerPage {
     expression: string;
   }): Promise<number> {
     await this.openWealth();
+    await this.selectWealthMonth(params.monthLabel);
     await this.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: params.monthLabel });
-    const row = this.wealthSection.locator(
-      `#snapshot-investments tr:has(td:text-is("${params.assetName}"))`,
-    );
-    await expect(row).toBeVisible();
-    await row
-      .getByRole("button", { name: `Abrir cálculo de ${params.assetName}` })
+      .getByRole("button", { name: `Calcular el saldo de ${params.assetName}` })
       .click();
 
-    const modal = this.page.locator("#wealth-calc-dialog");
-    await expect(modal).toBeVisible();
-    await modal.getByLabel("Cálculo numérico").fill(params.expression);
-    await modal.getByRole("button", { name: "Aplicar al snapshot" }).click();
-    await expect(modal).toBeHidden();
+    const panel = this.wealthCalcPanel();
+    await expect(panel).toBeVisible();
+    await panel.getByLabel("Cálculo numérico").fill(params.expression);
+    await panel.getByRole("button", { name: "Aplicar al snapshot" }).click();
+    await expect(panel).toBeHidden();
 
-    const snapshotValue = await row
-      .locator('input[data-snapshot-kind="investments"]')
-      .inputValue();
-    return Number(snapshotValue);
+    return this.readWealthSnapshot(params.assetName);
   }
 
   async saveSnapshot() {
     await this.openWealth();
-    await this.wealthSection
-      .getByRole("button", { name: "Guardar snapshot" })
-      .click();
-    await expect(this.page.getByRole("status")).toContainText(
-      "Snapshot guardado.",
-    );
+    await this.wealthSection.locator("[data-save-snapshot]").click();
+    await expect(
+      this.page.getByRole("status").filter({ hasText: /Snapshot de .+ guardado\./ }),
+    ).toBeVisible();
   }
 
   async getInvestmentSnapshotValue(assetName: string): Promise<number> {
-    const row = this.wealthSection.locator(
-      `#snapshot-investments tr:has(td:text-is("${assetName}"))`,
-    );
-    const input = row.locator('input[data-snapshot-kind="investments"]');
-    const value = await input.inputValue();
-    return Number(value);
+    return this.readWealthSnapshot(assetName);
   }
 
   async getTransactionSummaryTotal(

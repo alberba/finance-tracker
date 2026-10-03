@@ -14,6 +14,7 @@ import {
   formatSignedMoney,
   formatStamp,
   formatWeekdayDate,
+  formatWholeAmount,
   MINUS,
   splitDecimals,
 } from '../../src/lib/format'
@@ -179,5 +180,18 @@ describe('formatDueLabel', () => {
     ['2026-09-20', 'Hace 8 días'],
   ])('reads %s from 28 September as "%s"', (date, label) => {
     expect(formatDueLabel(date, '2026-09-28')).toBe(label)
+  })
+})
+
+describe('formatWholeAmount', () => {
+  it('rounds to euros and always groups thousands', () => {
+    expect(formatWholeAmount(1249.5)).toBe('1.250')
+    expect(formatWholeAmount(18420.4)).toBe('18.420')
+    expect(formatWholeAmount(80)).toBe('80')
+  })
+
+  it('uses the typographic minus', () => {
+    expect(formatWholeAmount(-1500.2)).toBe('−1.500')
+    expect(formatWholeAmount(-0.4)).toBe('0')
   })
 })

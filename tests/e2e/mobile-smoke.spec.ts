@@ -127,7 +127,7 @@ test.describe('Mobile smoke', () => {
 
     await expect(page).toHaveURL(/\/patrimonio$/)
     await expect(
-      tracker.section('wealth').getByRole('heading', { name: 'Patrimonio total' }),
+      tracker.section('wealth').getByRole('heading', { name: 'Patrimonio', exact: true }),
     ).toBeVisible()
     await expect(menu).toBeHidden()
     await expect(moreButton).toHaveClass(/is-active/)
