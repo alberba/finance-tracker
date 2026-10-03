@@ -36,6 +36,7 @@ import {
   syncListDiff,
   type CategoryKind,
 } from '../lib/client/command-mapping'
+import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -487,10 +488,20 @@ export const useInvestmentStore = defineStore('investment', () => {
       return false
     }
     const currency = financialStateStore.currency
-    void syncListDiff('contribution', before, financialStateStore.contributions, async (contribution) => ({
-      ...buildContributionData(contribution, currency),
-      allocations: await buildContributionAllocations(contribution),
-    }))
+    void syncListDiff(
+      'contribution',
+      before,
+      financialStateStore.contributions,
+      async (contribution) => ({
+        ...buildContributionData(contribution, currency),
+        allocations: await buildContributionAllocations(contribution),
+      }),
+    )
+    void syncSnapshotBalances(
+      financialStateStore.year,
+      financialStateStore.state.snapshots[String(month)],
+      currency,
+    )
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
     if (options.syncStockEventsCash) {
       void stockEventsStore.syncContributionCash(date, allocations)

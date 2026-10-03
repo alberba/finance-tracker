@@ -1,3 +1,4 @@
+import type { UiState } from "./ui-state";
 import { type Contribution, type ContributionMetricRow, type SnapshotKind, type SnapshotRow, type State } from "../types";
 import {
   deriveContributionFlow,
@@ -10,10 +11,31 @@ import { computeContributionMetrics as computeContributionMetricsCore } from "..
 import { evaluateNumericExpression } from "../math-expression";
 import { escapeAttr, escapeHtml, formatPercent, monthFromISO, parseFloatSafe, parseIntSafe, round2, todayISO } from "../utils";
 
+interface ContributionWorkflowModalElements {
+  contributionBody: HTMLElement;
+  contributionCalcDialog: HTMLDialogElement;
+  contributionCalcExpression: HTMLInputElement;
+  contributionCalcTitle: HTMLElement;
+  contributionWorkflowAllocationBody: HTMLElement;
+  contributionWorkflowAllocationWarning: HTMLElement;
+  contributionWorkflowDate: HTMLInputElement;
+  contributionWorkflowDialog: HTMLDialogElement;
+  contributionWorkflowInvestmentsBody: HTMLElement;
+  contributionWorkflowLiquidityBody: HTMLElement;
+  contributionWorkflowMonth: HTMLSelectElement;
+  contributionWorkflowNext: HTMLButtonElement;
+  contributionWorkflowPrev: HTMLButtonElement;
+  contributionWorkflowSave: HTMLButtonElement;
+  contributionWorkflowSnapshotWarning: HTMLElement;
+  contributionWorkflowStepAllocation: HTMLElement;
+  contributionWorkflowStepSnapshot: HTMLElement;
+  contributionWorkflowTotal: HTMLInputElement;
+}
+
 interface ContributionWorkflowSectionDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: ContributionWorkflowModalElements;
   formatMoney: (value: number) => string;
   showToast: (message: string) => void;
   saveState: () => void;
@@ -24,11 +46,11 @@ interface ContributionWorkflowSectionDeps {
 
 export function setupContributionWorkflowSection(deps: ContributionWorkflowSectionDeps) {
   const { ui, el } = deps;
-  const workflowDialog = el.contributionWorkflowDialog as HTMLDialogElement;
+  const workflowDialog = el.contributionWorkflowDialog;
 
   function getInvestmentValueFromSnapshot(snapshot: SnapshotRow | undefined): number {
     return round2(
-      Object.values(snapshot?.investments || {}).reduce((sum: number, value: any) => sum + parseFloatSafe(value, 0), 0)
+      Object.values(snapshot?.investments || {}).reduce((sum: number, value) => sum + parseFloatSafe(value, 0), 0)
     );
   }
 
@@ -64,7 +86,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     const rowsByDate = new Map<string, Contribution>();
 
     Object.entries(state.snapshots || {})
-      .map(([monthKey, snapshot]: any) => {
+      .map(([monthKey, snapshot]) => {
         const month = parseIntSafe(monthKey, -1);
         if (!Number.isInteger(month) || month < 0 || month > 11) {
           return null;
@@ -76,7 +98,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         }
 
         const date = toSnapshotDate(state.year, month);
-        const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
+        const existing = state.contributions.find((item) => String(item.portfolioDate || item.date) === date);
         const derived = deriveContributionFlow(existing || {});
         const flow = round2(derived.flow);
         return {
@@ -205,7 +227,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
     ui.contributionWorkflowMonth = monthFromISO(ui.contributionWorkflowDate) ?? ui.investmentMonth;
 
     const existing = state.contributions.find(
-      (item: any) => String(item.portfolioDate || item.date) === ui.contributionWorkflowDate
+      (item) => String(item.portfolioDate || item.date) === ui.contributionWorkflowDate
     );
     const derived = deriveContributionFlow(existing || {});
     ui.contributionWorkflowAmount = round2(derived.flow);
@@ -229,14 +251,14 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
 
     const month = ui.contributionWorkflowMonth;
     const date = ui.contributionWorkflowDate || toSnapshotDate(state.year, month);
-    const existing = state.contributions.find((item: any) => String(item.portfolioDate || item.date) === date);
+    const existing = state.contributions.find((item) => String(item.portfolioDate || item.date) === date);
     const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || []);
     const { matched: liquidityAccounts, missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds);
     const snapshot = state.snapshots[String(month)];
 
     el.contributionWorkflowInvestmentsBody.innerHTML = state.investmentAssets.length
       ? state.investmentAssets
-          .map((asset: any) => {
+          .map((asset) => {
             const snapshotValue = snapshot?.investments?.[asset.id];
             return `
               <tr>
@@ -525,7 +547,7 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
         amount: round2(parseFloatSafe(input.value, 0)),
       }))
     );
-    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const existingIndex = state.contributions.findIndex((item) => String(item.portfolioDate || item.date) === date);
     const previousAllocations =
       existingIndex >= 0 ? sanitizeFlowAllocations(state.contributions[existingIndex].flowAllocations || []) : [];
 
@@ -602,11 +624,11 @@ export function setupContributionWorkflowSection(deps: ContributionWorkflowSecti
   function upsertContributionFlowForDate(date: string, flow: number) {
     const state = deps.getState();
     const entries = getContributionEntriesFromSnapshots();
-    const current = entries.find((item: any) => item.date === date || item.portfolioDate === date);
+    const current = entries.find((item) => item.date === date || item.portfolioDate === date);
     if (!current) {
       return;
     }
-    const existingIndex = state.contributions.findIndex((item: any) => String(item.portfolioDate || item.date) === date);
+    const existingIndex = state.contributions.findIndex((item) => String(item.portfolioDate || item.date) === date);
     const payload: Contribution = {
       id: current.id,
       date,
