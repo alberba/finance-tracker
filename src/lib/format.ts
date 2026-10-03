@@ -115,6 +115,13 @@ const dayMonth = new Intl.DateTimeFormat('es-ES', {
 })
 const longDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: 'UTC' })
 
+const weekdayDate = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+})
+
 /** "15 jul 2026" from an ISO date. */
 export function formatShortDate(isoDate: string): string {
   const date = parseIsoDate(isoDate)
@@ -131,6 +138,26 @@ export function formatDayMonth(isoDate: string): string {
 export function formatLongDate(isoDate: string): string {
   const date = parseIsoDate(isoDate)
   return date ? longDate.format(date) : MISSING
+}
+
+/** "Lunes, 28 de septiembre" from an ISO date. */
+export function formatWeekdayDate(isoDate: string): string {
+  const date = parseIsoDate(isoDate)
+  if (!date) return MISSING
+  const text = weekdayDate.format(date)
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+}
+
+/** "Vence hoy", "En 4 días", "Hace 8 días": how far a due date is from `today` (both ISO). */
+export function formatDueLabel(isoDate: string, today: string): string {
+  const date = parseIsoDate(isoDate)
+  const from = parseIsoDate(today)
+  if (!date || !from) return ''
+  const days = Math.round((date.getTime() - from.getTime()) / 86_400_000)
+  if (days === 0) return 'Vence hoy'
+  if (days === 1) return 'Vence mañana'
+  if (days === -1) return 'Hace 1 día'
+  return days < 0 ? `Hace ${-days} días` : `En ${days} días`
 }
 
 /** "26/09, 10:42" from an instant (quote timestamps, last sync). */

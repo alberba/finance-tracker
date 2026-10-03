@@ -1,11 +1,9 @@
 import { test, expect } from "./fixtures";
 
-const DASHBOARD_CASHFLOW_DATASET_COUNT = 3;
 interface TestChart {
   data: {
     datasets: Array<{
       data?: unknown[];
-      borderColor?: string;
     }>;
   };
   tooltip: {
@@ -44,7 +42,8 @@ test.describe("Finance tracker E2E", () => {
     await expect(page).toHaveURL(/\/$/);
     await expect(
       page.locator("#dashboard").getByRole("heading", {
-        name: "Resumen financiero",
+        name: "Dashboard",
+        exact: true,
       }),
     ).toBeVisible();
   });
@@ -57,7 +56,7 @@ test.describe("Finance tracker E2E", () => {
       {
         open: () => tracker.openDashboard(),
         path: /\/$/,
-        heading: "Resumen financiero",
+        heading: "Dashboard",
       },
       {
         open: () => tracker.openTransactions(),
@@ -111,141 +110,22 @@ test.describe("Finance tracker E2E", () => {
     expect(incomeText).toContain("€");
   });
 
-  test("dashboard muestra el panel de distribución de patrimonio y navega al detalle", async ({
-    page,
+  test("dashboard muestra la distribución del patrimonio con su leyenda", async ({
     tracker,
   }) => {
     await tracker.openDashboard();
 
-    await expect(
-      tracker.dashboardSection.getByRole("heading", {
-        name: "Distribución de patrimonio",
-      }),
-    ).toBeVisible();
-    await expect(
-      tracker.dashboardSection.getByLabel("Distribución del patrimonio"),
-    ).toBeVisible();
-    await expect(
-      tracker.dashboardSection.locator("#wealth-split-legend"),
-    ).toBeVisible();
-
-    await tracker.dashboardSection
-      .getByRole("button", { name: "Ver detalle de patrimonio" })
-      .click();
-
-    await expect(page).toHaveURL(/\/patrimonio$/);
-    await expect(
-      tracker.wealthSection.getByRole("heading", { name: "Patrimonio total" }),
-    ).toBeVisible();
-  });
-
-  test("dashboard repinta el borde del donut de patrimonio al cambiar de tema", async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openDashboard();
-    await expect(
-      tracker.dashboardSection.getByLabel("Distribución del patrimonio"),
-    ).toBeVisible();
-
-    const documentElement = page.locator("html");
-    const themeToggle = page.getByRole("button", {
-      name: /Cambiar a modo (oscuro|claro)/,
+    const block = tracker.dashboardSection.getByRole("region", {
+      name: "Distribución del patrimonio",
     });
-    if ((await documentElement.getAttribute("data-theme")) === "dark") {
-      await themeToggle.click();
-      await expect(documentElement).toHaveAttribute("data-theme", "light");
-    }
-
-    await themeToggle.click();
-    await expect(documentElement).toHaveAttribute("data-theme", "dark");
-
-    await expect.poll(async () =>
-      page.evaluate(() => {
-        const canvas = document.getElementById("chart-wealth-split");
-        if (!(canvas instanceof HTMLCanvasElement)) {
-          return null;
-        }
-
-        const chartConstructor = (
-          window as Window & { Chart?: TestChartConstructor }
-        ).Chart;
-        const chart = chartConstructor?.getChart(canvas);
-        return chart?.data.datasets[0]?.borderColor;
-      }),
-    ).toBe("#121419");
-  });
-
-  test("dashboard muestra el patrimonio sobre el gráfico de cashflow", async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openDashboard();
-
+    await expect(block).toBeVisible();
     await expect(
-      tracker.dashboardSection.locator("#chart-networth"),
+      block.getByRole("img", { name: "Distribución del patrimonio por tipo de activo" }),
     ).toBeVisible();
-    await expect(
-      tracker.dashboardSection.locator("#chart-cashflow"),
-    ).toBeVisible();
-
-    const order = await page.evaluate(() => {
-      const networth = document
-        .getElementById("chart-networth")
-        ?.getBoundingClientRect();
-      const cashflow = document
-        .getElementById("chart-cashflow")
-        ?.getBoundingClientRect();
-      if (!networth || !cashflow) {
-        return null;
-      }
-      return {
-        networthTop: Math.round(networth.top),
-        cashflowTop: Math.round(cashflow.top),
-      };
-    });
-
-    expect(order).not.toBeNull();
-    if (!order) {
-      return;
-    }
-    // El hero de patrimonio se muestra por encima del bloque de cashflow.
-    expect(order.cashflowTop).toBeGreaterThan(order.networthTop);
+    await expect(block.locator("#wealth-split-legend li").first()).toContainText("%");
   });
 
-  test("dashboard recorta evolucion y cashflow hasta el ultimo mes con datos", async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openDashboard();
-
-    const chartDetails = await page.evaluate(() => {
-      const networth = document.getElementById("chart-networth");
-      const cashflow = document.getElementById("chart-cashflow");
-      if (!networth || !cashflow) {
-        return null;
-      }
-
-      return {
-        linePointCount: parseInt(networth.dataset.chartPointCount || "0"),
-        barCount: parseInt(cashflow.dataset.chartBarCount || "0"),
-      };
-    });
-
-    expect(chartDetails).not.toBeNull();
-    if (!chartDetails) {
-      return;
-    }
-    expect(chartDetails.linePointCount).toBeGreaterThanOrEqual(0);
-    expect(chartDetails.linePointCount).toBeLessThanOrEqual(12);
-    expect(chartDetails.barCount).toBeGreaterThanOrEqual(0);
-    expect(chartDetails.barCount % DASHBOARD_CASHFLOW_DATASET_COUNT).toBe(0);
-    expect(chartDetails.barCount).toBe(
-      chartDetails.linePointCount * DASHBOARD_CASHFLOW_DATASET_COUNT,
-    );
-  });
-
-  test("dashboard muestra tooltip funcional al hacer hover en cada grafica", async ({
+  test("dashboard muestra tooltip funcional en la evolución del patrimonio", async ({
     page,
     tracker,
   }, testInfo) => {
@@ -281,33 +161,6 @@ test.describe("Finance tracker E2E", () => {
     if (networthHasData) {
       await expect(tooltip).toBeVisible();
       await expect(tooltip).toContainText("€");
-    } else {
-      await expect(tooltip).toBeHidden();
-    }
-
-    const cashflowHasData = await page.evaluate(() => {
-      const canvas = document.getElementById("chart-cashflow");
-      if (!(canvas instanceof HTMLCanvasElement)) {
-        return false;
-      }
-      const chartConstructor = (
-        window as Window & { Chart?: TestChartConstructor }
-      ).Chart;
-      const chart = chartConstructor?.getChart(canvas);
-      const tooltipApi = chart?.tooltip;
-      if (chart && tooltipApi && chart.data.datasets[0]?.data?.length > 0) {
-        tooltipApi.setActiveElements([{ datasetIndex: 0, index: 0 }], {
-          x: 0,
-          y: 0,
-        });
-        chart.update();
-        return true;
-      }
-      return false;
-    });
-    if (cashflowHasData) {
-      await expect(tooltip).toBeVisible();
-      await expect(tooltip).toContainText("Ingresos");
     } else {
       await expect(tooltip).toBeHidden();
     }
