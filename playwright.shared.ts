@@ -10,6 +10,14 @@ type PlaywrightRuntimeOptions = {
 
 const isCI = Boolean(process.env.CI)
 
+// Each worktree gets its own port so parallel worktrees never collide on 4321.
+// The offset is even, so configs whose base ports differ by one stay apart.
+function worktreeOffset(): number {
+  let hash = 0
+  for (const char of process.cwd()) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return 2 * (hash % 250)
+}
+
 export function createPlaywrightRuntime({
   port,
   htmlOutputFolder,
@@ -17,13 +25,12 @@ export function createPlaywrightRuntime({
   tag,
   env,
 }: PlaywrightRuntimeOptions): PlaywrightTestConfig {
-  const localBaseURL = `http://127.0.0.1:${port}`
+  const serverPort = isCI ? port : port + worktreeOffset()
+  const localBaseURL = `http://127.0.0.1:${serverPort}`
   const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
-  const useProductionBuild = process.env.PLAYWRIGHT_USE_BUILD === 'true'
-  const buildSyncFlag = env?.PUBLIC_SYNC_V2 ?? 'false'
-  const serverCommand = useProductionBuild
-    ? `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && PUBLIC_SYNC_V2=${buildSyncFlag} SENTRY_AUTH_TOKEN= pnpm build && pnpm exec wrangler dev --config dist/server/wrangler.json --persist-to .wrangler/state --ip 127.0.0.1 --port ${port} --compatibility-flag nodejs_compat`
-    : `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${port}`
+  // --ignore-lock: Astro allows one dev server per project root, and the user's
+  // `pnpm dev` in this worktree must keep running alongside the test server.
+  const serverCommand = `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${serverPort} --ignore-lock`
 
   return {
     tag,
