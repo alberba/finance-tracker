@@ -18,7 +18,7 @@ import { getInvestmentBuckets } from '../investment/buckets'
 import { buildGoalsViewModel } from '../goals/view-model'
 import type { Tone } from '../../components/ui/tone'
 
-export type DashboardHeroRange = '7d' | '1m' | '6m' | '1a'
+export type DashboardHeroRange = '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'
 export type DashboardTrend = 'up' | 'down' | 'flat'
 export type DashboardKpiKind = BudgetType
@@ -329,7 +329,6 @@ export function buildMonthStatus(month: number, year: number, today: string): st
 }
 
 const RANGE_OPTIONS: DashboardRangeOption[] = [
-  { value: '7d', label: '7D' },
   { value: '1m', label: '1M' },
   { value: '6m', label: '6M' },
   { value: '1a', label: '1A' },
@@ -374,7 +373,7 @@ function buildNetWorthChart(
 ): DashboardLineChart {
   const fullMonths = MONTHS.slice(0, latestDataMonth + 1)
   const fullNets = nets.slice(0, latestDataMonth + 1)
-  const rangeCount: Record<DashboardHeroRange, number> = { '7d': 2, '1m': 2, '6m': 6, '1a': 12 }
+  const rangeCount: Record<DashboardHeroRange, number> = { '1m': 2, '6m': 6, '1a': 12 }
   const start = Math.max(0, fullNets.length - Math.max(2, rangeCount[heroRange]))
   const values = fullNets.slice(start)
   return {

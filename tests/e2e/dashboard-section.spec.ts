@@ -62,8 +62,8 @@ test.describe('Dashboard section', () => {
     await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
 
     const range = dashboard.getByRole('group', { name: 'Rango temporal del gráfico' })
-    await range.getByRole('button', { name: '7D' }).click()
-    await expect(range.getByRole('button', { name: '7D' })).toHaveAttribute('aria-pressed', 'true')
+    await range.getByRole('button', { name: '6M' }).click()
+    await expect(range.getByRole('button', { name: '6M' })).toHaveAttribute('aria-pressed', 'true')
 
     await tracker.openSettings()
     await expect(page.locator('#settings-year')).toHaveValue('2027')
