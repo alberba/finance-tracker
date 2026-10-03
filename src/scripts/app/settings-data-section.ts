@@ -9,10 +9,38 @@ import {
 import { decorateCategoryLabel } from "../category-emoji";
 import { escapeAttr, escapeHtml, parseFloatSafe, parseIntSafe, round2, slug } from "../utils";
 
+interface SettingsDataSectionElements {
+  addAccountForm: HTMLFormElement;
+  addExpenseCategory: HTMLFormElement;
+  addIncomeCategory: HTMLFormElement;
+  addInvestmentCategory: HTMLFormElement;
+  addInvestmentForm: HTMLFormElement;
+  addLiabilityForm: HTMLFormElement;
+  dataMeta: HTMLElement;
+  dataTotalContributions: HTMLElement;
+  dataTotalSnapshots: HTMLElement;
+  dataTotalTransactions: HTMLElement;
+  expenseTags: HTMLElement;
+  exportJson: HTMLButtonElement;
+  exportTransactionsCsv: HTMLButtonElement;
+  importJson: HTMLInputElement;
+  incomeTags: HTMLElement;
+  investmentTags: HTMLElement;
+  resetSeed: HTMLButtonElement;
+  saveSettingsMain: HTMLButtonElement;
+  settingsAccounts: HTMLElement;
+  settingsCurrency: HTMLInputElement;
+  settingsInvestments: HTMLElement;
+  settingsLiabilities: HTMLElement;
+  settingsTwrLiquidity: HTMLElement;
+  settingsYear: HTMLInputElement;
+  yearDisplay: HTMLInputElement;
+}
+
 interface SettingsDataSectionDeps {
   getState: () => State;
   setState: (nextState: State) => void;
-  el: any;
+  el: SettingsDataSectionElements;
   saveState: () => void;
   renderAll: () => void;
   showToast: (message: string) => void;
@@ -120,7 +148,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
     container.innerHTML = list
       .map(
-        (item: any) => `
+        (item) => `
           <div class="list-item" data-entity="${escapeAttr(key)}" data-id="${escapeAttr(item.id)}">
             <input type="text" name="${escapeAttr(key)}-${escapeAttr(item.id)}-name" autocomplete="off" data-field="name" value="${escapeAttr(item.name)}" aria-label="Nombre ${escapeAttr(item.name)}" />
             <input type="number" name="${escapeAttr(key)}-${escapeAttr(item.id)}-openingBalance" autocomplete="off" data-field="openingBalance" step="0.01" value="${Number(item.openingBalance || 0)}" aria-label="Saldo inicial de ${escapeAttr(item.name)}" />
@@ -141,7 +169,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     }
 
     el.settingsTwrLiquidity.innerHTML = accounts
-      .map((account: any) => {
+      .map((account) => {
         const checked = selected.has(account.id) ? "checked" : "";
         return `
           <label class="tx-checkbox-option">
@@ -162,7 +190,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
     return list
       .map(
-        (item: any) => `
+        (item) => `
           <span class="tag">
             ${escapeHtml(decorateCategoryLabel(categoryKeyToType(key), item))}
             <button class="icon-btn" data-action="remove-category" data-target="${escapeAttr(key)}" data-name="${escapeAttr(item)}" aria-label="Eliminar categoría ${escapeAttr(item)}">×</button>
@@ -194,7 +222,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     }
 
     const id = slug(name);
-    const exists = state[targetKey].some((item: any) => item.id === id);
+    const exists = state[targetKey].some((item) => item.id === id);
     if (exists) {
       deps.showToast("Ese elemento ya existe.");
       return;
@@ -227,7 +255,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
     const state = deps.getState();
     const list = state[entity];
-    const item = list.find((entry: any) => entry.id === id);
+    const item = list.find((entry) => entry.id === id);
     if (!item) {
       return;
     }
@@ -261,10 +289,10 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
     const state = deps.getState();
     const list = state[entity];
-    state[entity] = list.filter((item: any) => item.id !== id);
+    state[entity] = list.filter((item) => item.id !== id);
 
     if (entity === "accounts") {
-      state.transactions = state.transactions.filter((tx: any) => tx.accountId !== id);
+      state.transactions = state.transactions.filter((tx) => tx.accountId !== id);
       state.twrLiquidityAccountIds = (state.twrLiquidityAccountIds || []).filter(
         (accountId: string) => accountId !== id
       );
@@ -292,7 +320,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     }
 
     const state = deps.getState();
-    const nextSelection = new Set((state.twrLiquidityAccountIds || []).map((item: any) => String(item)));
+    const nextSelection = new Set((state.twrLiquidityAccountIds || []).map((item) => String(item)));
     if (target.checked) {
       nextSelection.add(accountId);
     } else {
@@ -339,7 +367,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     }
 
     const state = deps.getState();
-    state[key] = state[key].filter((item: any) => item !== name);
+    state[key] = state[key].filter((item) => item !== name);
     if (key === "investmentCategories") {
       // no-op
     }
@@ -351,7 +379,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
 
   function syncInvestmentCategoriesWithAssets() {
     const state = deps.getState();
-    const assetNames = state.investmentAssets.map((item: any) => item.name);
+    const assetNames = state.investmentAssets.map((item) => item.name);
     const merged = Array.from(new Set([...(state.investmentCategories || []), ...assetNames]));
     state.investmentCategories = merged;
   }
@@ -384,7 +412,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
         deps.saveState();
         deps.renderAll();
         deps.showToast("JSON importado correctamente.");
-      } catch (error) {
+      } catch {
         deps.showToast("No se pudo importar el archivo.");
       } finally {
         el.importJson.value = "";
@@ -413,7 +441,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
       "movementCurrency",
       "declared",
     ];
-    const rows = state.transactions.map((item: any) => [
+    const rows = state.transactions.map((item) => [
       item.id,
       item.date,
       item.month,
@@ -433,7 +461,7 @@ export function setupSettingsDataSection(deps: SettingsDataSectionDeps) {
     ]);
 
     const csv = [header, ...rows]
-      .map((row: any) => row.map((field: any) => `"${String(field ?? "").replace(/"/g, '""')}"`).join(","))
+      .map((row) => row.map((field) => `"${String(field ?? "").replace(/"/g, '""')}"`).join(","))
       .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });

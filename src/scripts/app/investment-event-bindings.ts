@@ -1,16 +1,62 @@
-import { type SnapshotKind, type State } from "../types";
+import type { UiState } from "./ui-state";
+import { type InvestmentSubTab, type SnapshotKind, type State } from "../types";
 import { computeInvestmentMovement, normalizeInvestmentSide, normalizeInvestmentSymbol } from "../investment-movements";
 import { monthFromISO } from "../utils";
 import { parseFloatSafe, parseIntSafe, round2, todayISO, uid } from "../utils";
 import { toSnapshotDate } from "../contribution-workflow";
 
+interface InvestmentEventBindingsElements {
+  contributionBody: HTMLElement;
+  contributionCalcClose: HTMLButtonElement;
+  contributionCalcDialog: HTMLDialogElement;
+  contributionCalcForm: HTMLFormElement;
+  contributionDeleteCancel: HTMLButtonElement;
+  contributionDeleteClose: HTMLButtonElement;
+  contributionDeleteDialog: HTMLDialogElement;
+  contributionDeleteForm: HTMLFormElement;
+  contributionDeleteMessage: HTMLElement;
+  contributionWorkflowClose: HTMLButtonElement;
+  contributionWorkflowDate: HTMLInputElement;
+  contributionWorkflowDialog: HTMLDialogElement;
+  contributionWorkflowForm: HTMLFormElement;
+  contributionWorkflowMonth: HTMLSelectElement;
+  contributionWorkflowNext: HTMLButtonElement;
+  contributionWorkflowPrev: HTMLButtonElement;
+  contributionWorkflowTotal: HTMLInputElement;
+  investmentMonth: HTMLSelectElement;
+  investmentMovementBroker: HTMLSelectElement;
+  investmentMovementCategory: HTMLSelectElement;
+  investmentMovementCurrency: HTMLInputElement;
+  investmentMovementDate: HTMLInputElement;
+  investmentMovementDeclared: HTMLInputElement;
+  investmentMovementFee: HTMLInputElement;
+  investmentMovementForm: HTMLFormElement;
+  investmentMovementSide: HTMLSelectElement;
+  investmentMovementSymbol: HTMLInputElement;
+  investmentMovementTime: HTMLInputElement;
+  investmentMovementUnitPrice: HTMLInputElement;
+  investmentMovementUnits: HTMLInputElement;
+  investmentOnlyUndeclared: HTMLInputElement;
+  investmentReturnModeButtons: HTMLButtonElement[];
+  investmentSubtabButtons: HTMLButtonElement[];
+  investmentTxBody: HTMLElement;
+  investmentYearFilter: HTMLSelectElement;
+  openContributionWorkflow: HTMLButtonElement;
+  saveSnapshot: HTMLButtonElement;
+  snapshotInvestments: HTMLElement;
+  snapshotMonth: HTMLSelectElement;
+  wealthCalcClose: HTMLButtonElement;
+  wealthCalcDialog: HTMLDialogElement;
+  wealthCalcForm: HTMLFormElement;
+}
+
 interface InvestmentEventBindingsDeps {
   getState: () => State;
-  ui: any;
-  el: any;
+  ui: UiState;
+  el: InvestmentEventBindingsElements;
   getEventElement: (target: EventTarget | null) => Element | null;
   isSnapshotKind: (value: string) => value is SnapshotKind;
-  isInvestmentSubTab: (value: string) => boolean;
+  isInvestmentSubTab: (value: string) => value is InvestmentSubTab;
   renderWealth: () => void;
   saveSnapshotFromTable: () => void;
   onOpenInvestmentSnapshotCalcModal: (event: Event) => void;
@@ -70,7 +116,7 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       return;
     }
 
-    state.contributions = state.contributions.filter((item: any) => {
+    state.contributions = state.contributions.filter((item) => {
       const itemDate = String(item.portfolioDate || item.date || "").trim();
       return itemDate !== date;
     });
@@ -224,9 +270,9 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
           return;
         }
         if (action === "toggle-investment-declared") {
-          const tx = state.transactions.find((item: any) => item.id === id && item.type === "investment");
+          const tx = state.transactions.find((item) => item.id === id && item.type === "investment");
           if (!tx) return;
-          tx.declared = !Boolean(tx.declared);
+          tx.declared = !tx.declared;
           deps.saveState();
           deps.renderInvestmentTransactionsTable();
           deps.showToast(tx.declared ? "Movimiento marcado como declarado." : "Movimiento marcado como no declarado.");
@@ -237,7 +283,7 @@ export function setupInvestmentEventBindings(deps: InvestmentEventBindingsDeps) 
       const deleteButton = target?.closest<HTMLButtonElement>("button[data-delete-id]");
       if (!deleteButton) return;
       const id = deleteButton.dataset.deleteId;
-      state.transactions = state.transactions.filter((item: any) => item.id !== id);
+      state.transactions = state.transactions.filter((item) => item.id !== id);
       ui.investmentTxEditingId = "";
       deps.saveState();
       deps.renderAll();
