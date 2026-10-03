@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # Runs the @visual specs in the Linux Playwright image, the platform the
 # committed `*-linux.png` snapshots belong to. Needs Docker.
-# Starts its own dev server for this worktree on $VISUAL_PORT (default 4398),
-# so a server from another worktree is never tested by mistake.
+# Starts its own dev server for this worktree on $VISUAL_PORT (default derived
+# from the worktree path), so a server from another worktree is never tested by
+# mistake. `--ignore-lock` lets it run next to the user's `pnpm dev`.
 # Extra args go to Playwright: pnpm test:e2e:visual:linux --update-snapshots
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-port="${VISUAL_PORT:-4398}"
+docker info >/dev/null 2>&1 || {
+  echo "e2e-visual-linux: Docker no responde; arranca Docker Desktop y repite" >&2
+  exit 1
+}
+
+port="${VISUAL_PORT:-$((5100 + $(printf %s "$PWD" | cksum | cut -d' ' -f1) % 400))}"
 image="mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
 log=".wrangler/visual-dev-server.log"
 
@@ -20,7 +26,7 @@ mkdir -p .wrangler
 pnpm d1:migrate:local >/dev/null
 pnpm d1:migrate:local:v2 >/dev/null
 set -m
-ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port "$port" >"$log" 2>&1 &
+ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port "$port" --ignore-lock >"$log" 2>&1 &
 server_pgid=$!
 set +m
 trap 'kill -- "-$server_pgid" 2>/dev/null || true' EXIT

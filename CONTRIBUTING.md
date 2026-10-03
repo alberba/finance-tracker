@@ -10,9 +10,13 @@ Node según `.node-version`, pnpm como gestor.
 
 ```bash
 pnpm install
-pnpm dev                     # Astro dev
-pnpm test:e2e:install        # Chromium para Playwright, una sola vez
+pnpm setup:worktree
+pnpm dev
 ```
+
+`pnpm setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
+sin Cloudflare Access está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
+una sola vez: `pnpm test:e2e:install`.
 
 ## Dónde viven las issues
 

@@ -2,11 +2,6 @@ import { test, expect, mirrorStateToServer } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
-  test.fixme(
-    true,
-    'Quarantine: reload hydration is intermittent. https://github.com/alberba/finance-tracker/issues/233',
-  )
-
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({ page, tracker }) => {
     await page.evaluate(() => {
       const raw = localStorage.getItem('finance-tracker-state-v1')
@@ -30,7 +25,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
     await mirrorStateToServer(page)
-    await page.reload()
+    await tracker.reload()
     await tracker.openSettings()
 
     const panel = page.locator('[data-legacy-recurring-rules]')
@@ -302,7 +297,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
     await mirrorStateToServer(page)
-    await page.reload()
+    await tracker.reload()
 
     const liveMarket = new LiveMarketPage(page)
     await tracker.openDashboard()

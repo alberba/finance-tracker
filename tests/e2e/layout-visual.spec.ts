@@ -491,7 +491,13 @@ async function expectSoundLayout(
   }
 }
 
+// The date the committed snapshots were taken; see `fixedTime` in fixtures.ts.
+test.use({ fixedTime: '2026-10-03T12:00:00' })
+
 test.describe('UI layout integrity', { tag: '@visual' }, () => {
+  // The date the committed snapshots were taken; see `fixedTime` in fixtures.ts.
+  test.use({ fixedTime: '2026-08-23T12:00:00' })
+
   for (const sectionId of SECTION_IDS) {
     test(`no rompe layout en "${sectionId}"`, async ({ tracker, page }) => {
       await openSectionForLayout(page, tracker, sectionId)
