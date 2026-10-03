@@ -164,8 +164,6 @@ export interface Goal {
   targetAmount: number;
 }
 
-export type GoalField = keyof Goal;
-
 export interface Contribution {
   id: string;
   date: string;
@@ -311,7 +309,6 @@ const GOAL_KEYS = [
   "investmentFunds",
   "investmentCrypto",
 ] as const;
-const GOAL_FIELDS = ["name", "targetYear", "targetAmount"] as const;
 const ENTITY_KEYS = ["accounts", "investmentAssets", "liabilities"] as const;
 const CATEGORY_KEYS = [
   "incomeCategories",
@@ -389,6 +386,3 @@ export function isGoalKey(value: string): value is GoalKey {
   return (GOAL_KEYS as readonly string[]).includes(value);
 }
 
-export function isGoalField(value: string): value is GoalField {
-  return (GOAL_FIELDS as readonly string[]).includes(value);
-}
