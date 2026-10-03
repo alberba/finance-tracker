@@ -25,6 +25,8 @@ import {
   summarizeInvestmentYear,
   buildInvestmentYearOptions,
   type ReturnMode,
+  buildContributionLedger,
+  summarizeContributions,
 } from '../domain/investment/view-model'
 import {
   computeInvestmentMovement,
@@ -190,6 +192,16 @@ export const useInvestmentStore = defineStore('investment', () => {
   )
 
   const contributionRows = computed(() => buildContributionMetricRows(financialStateStore.state))
+
+  const contributionLedger = computed(() =>
+    buildContributionLedger(contributionRows.value, (date) =>
+      isManualContributionDate(financialStateStore.state, date),
+    ),
+  )
+
+  const contributionSummary = computed(() =>
+    summarizeContributions(contributionRows.value, financialStateStore.state.year),
+  )
 
   function setTab(tab: InvestmentSubTab): void {
     ui.investmentTab = tab
@@ -518,6 +530,8 @@ export const useInvestmentStore = defineStore('investment', () => {
     movementMonthGroups,
     yearSummary,
     contributionRows,
+    contributionLedger,
+    contributionSummary,
     getAccountName,
     isBitvavoBrokerAccount,
     resolveInvestmentCategory,

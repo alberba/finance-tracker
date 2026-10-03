@@ -29,12 +29,20 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 ## Ejecutar en local (Astro)
 
 ```bash
-cd /ruta/al/finance-tracker
 pnpm install
+pnpm setup:worktree
 pnpm dev
 ```
 
-Luego abre `http://localhost:4321`.
+`pnpm setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
+migraciones D1 locales de v1 y v2. Sirve igual en el checkout principal que en un worktree.
+
+En local no hay Cloudflare Access: `http://localhost:4321` carga, pero sus llamadas a `/api/*`
+responden 401 («Falta la cabecera Cf-Access-Jwt-Assertion»). Para entrar:
+
+- `http://localhost:4321/?demo=1`: la demo con datos sintéticos.
+- Con la cabecera `X-Test-User-Email: legacy-owner@e2e.test`: tus datos locales, como en los E2E.
+  Por ejemplo, `agent-browser open http://localhost:4321 --headers '{"X-Test-User-Email":"legacy-owner@e2e.test"}'`.
 
 ### Mercado y reglas recurrentes
 
@@ -47,13 +55,7 @@ wrangler secret put COINGECKO_API_KEY
 
 `MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime definidas en `wrangler.toml`. La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
 
-Para probarlo en local:
-
-```bash
-cp .dev.vars.example .dev.vars   # en un worktree: pnpm setup:worktree
-# Edita .dev.vars y añade TWELVE_DATA_API_KEY
-pnpm dev
-```
+Para probarlo en local, ejecuta `pnpm setup:worktree`, añade `TWELVE_DATA_API_KEY` a `.dev.vars` y arranca `pnpm dev`.
 
 Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`, pero su endpoint de gráficos no es una API pública oficial y puede responder con HTTP 429. Las peticiones se cachean, se deduplican y, cuando Yahoo está limitado, los instrumentos Yahoo usan Twelve Data como respaldo si `TWELVE_DATA_API_KEY` está configurada. La búsqueda de símbolos aplica el mismo respaldo. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
 

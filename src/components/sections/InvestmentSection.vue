@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
-import ContributionDeleteDialog from '../investment/ContributionDeleteDialog.vue'
-import ContributionWorkflowDialog from '../investment/ContributionWorkflowDialog.vue'
 import InvestmentContributionsTab from '../investment/InvestmentContributionsTab.vue'
 import InvestmentDashboardTab from '../investment/InvestmentDashboardTab.vue'
 import InvestmentMovementsTab from '../investment/InvestmentMovementsTab.vue'
@@ -36,9 +34,6 @@ const { movementRows, contributionRows } = storeToRefs(investmentStore)
 
 useLiveQuotes()
 
-const workflowDialogRef = ref<InstanceType<typeof ContributionWorkflowDialog> | null>(null)
-const deleteDialogRef = ref<InstanceType<typeof ContributionDeleteDialog> | null>(null)
-
 const activeTab = computed({
   get: () => ui.investmentTab,
   set: (tab: string) => investmentStore.setTab(tab as InvestmentSubTab),
@@ -57,10 +52,6 @@ const tabs = computed<SectionTab[]>(() => [
 ])
 
 const quoteStatus = computed(() => summarizeQuoteStatus(marketStore.valuation.instruments))
-
-function onConfirmDelete(date: string): void {
-  investmentStore.deleteContribution(date)
-}
 </script>
 
 <template>
@@ -91,15 +82,8 @@ function onConfirmDelete(date: string): void {
 
       <InvestmentDashboardTab :is-active="activeTab === 'dashboard'" />
       <InvestmentMovementsTab :is-active="activeTab === 'movements'" />
-      <InvestmentContributionsTab
-        :is-active="activeTab === 'contributions'"
-        @open-workflow="workflowDialogRef?.open()"
-        @request-delete="deleteDialogRef?.open($event)"
-      />
+      <InvestmentContributionsTab :is-active="activeTab === 'contributions'" />
       <InvestmentRecurringTab :is-active="activeTab === 'recurring'" />
     </div>
-
-    <ContributionWorkflowDialog ref="workflowDialogRef" />
-    <ContributionDeleteDialog ref="deleteDialogRef" @confirm="onConfirmDelete" />
   </AppSection>
 </template>

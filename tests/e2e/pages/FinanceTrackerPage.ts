@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 const SECTION_CONFIG = {
-  dashboard: { buttonLabel: "Dashboard", headingText: "Resumen financiero" },
+  dashboard: { buttonLabel: "Dashboard", headingText: /^Dashboard$/ },
   transactions: {
     buttonLabel: "Movimientos",
     headingText: /^Movimientos$/,
@@ -100,7 +100,8 @@ export class FinanceTrackerPage {
     ).toBeVisible();
     await expect(
       this.dashboardSection.getByRole("heading", {
-        name: "Resumen financiero",
+        name: "Dashboard",
+        exact: true,
       }),
     ).toBeVisible();
   }
@@ -1012,6 +1013,11 @@ export class FinanceTrackerPage {
     await expect(input).toBeChecked({ checked: enabled });
   }
 
+  /** A close of the Aportes register, by its ISO date. */
+  contributionRow(date: string): Locator {
+    return this.investmentSection().locator(`tr[data-contribution-date="${date}"]`);
+  }
+
   async setContributionFlowByDate(date: string, flow: number) {
     await this.openInvestmentContributionsTab();
     const input = this.investmentSection().locator(
@@ -1019,15 +1025,8 @@ export class FinanceTrackerPage {
     );
     await expect(input).toBeVisible();
     await input.fill(String(flow));
-  }
-
-  async getContributionRowTexts(date: string): Promise<string[]> {
-    await this.openInvestmentContributionsTab();
-    const row = this.investmentSection()
-      .locator("#contribution-body tr", { hasText: date })
-      .first();
-    await expect(row).toBeVisible();
-    return row.locator("td").allInnerTexts();
+    await input.press("Enter");
+    await input.blur();
   }
 
   async getContributionFlowByDate(date: string): Promise<number> {
@@ -1036,44 +1035,52 @@ export class FinanceTrackerPage {
       `input[data-contribution-flow-date="${date}"]`,
     );
     await expect(input).toBeVisible();
-    return Number(await input.inputValue());
+    const text = await input.inputValue();
+    return Number(text.replace(/\./g, "").replace(",", "."));
+  }
+
+  contributionWorkflow(): Locator {
+    return this.page.locator("#contribution-workflow-dialog");
   }
 
   async openContributionWorkflowModal() {
     await this.openInvestmentContributionsTab();
     await this.investmentSection()
-      .getByRole("button", { name: "Añadir aporte" })
+      .getByRole("button", { name: "Nuevo aporte" })
       .click();
-    await expect(
-      this.page.locator("#contribution-workflow-dialog"),
-    ).toBeVisible();
+    await expect(this.contributionWorkflow()).toBeVisible();
   }
 
   async contributionWorkflowSelectMonth(monthLabel: string) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    await modal
+    await this.contributionWorkflow()
       .locator("#contribution-workflow-month")
       .selectOption({ label: monthLabel });
   }
 
   async contributionWorkflowSetDate(date: string) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    await modal.locator("#contribution-workflow-date").fill(date);
+    await this.contributionWorkflow().locator("#contribution-workflow-date").fill(date);
   }
 
   async contributionWorkflowDateValue(): Promise<string> {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    return modal.locator("#contribution-workflow-date").inputValue();
+    return this.contributionWorkflow().locator("#contribution-workflow-date").inputValue();
+  }
+
+  /** A step-1 row: an investment asset or a liquidity account, by name. */
+  contributionWorkflowSnapshotRow(
+    kind: "investments" | "accounts",
+    name: string,
+  ): Locator {
+    return this.contributionWorkflow().locator(
+      `[data-contribution-snapshot-row="${kind}"]`,
+      { hasText: name },
+    );
   }
 
   async contributionWorkflowSetInvestmentSnapshot(
     assetName: string,
     value: number,
   ) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    const row = modal.locator("#contribution-workflow-investments-body tr", {
-      hasText: assetName,
-    });
+    const row = this.contributionWorkflowSnapshotRow("investments", assetName);
     await expect(row).toBeVisible();
     await row
       .locator('input[data-contribution-snapshot-kind="investments"]')
@@ -1085,36 +1092,26 @@ export class FinanceTrackerPage {
     rowName: string;
     expression: string;
   }) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    const tbodySelector =
-      params.type === "investment"
-        ? "#contribution-workflow-investments-body"
-        : "#contribution-workflow-liquidity-body";
-    const row = modal.locator(`${tbodySelector} tr`, {
-      hasText: params.rowName,
-    });
+    const row = this.contributionWorkflowSnapshotRow(
+      params.type === "investment" ? "investments" : "accounts",
+      params.rowName,
+    );
     await expect(row).toBeVisible();
     await row
-      .getByRole("button", { name: `Calcular snapshot de ${params.rowName}` })
+      .getByRole("button", { name: `Calcular el valor de ${params.rowName}` })
       .click();
-    const calc = this.page.locator("#contribution-calc-dialog");
-    await expect(calc).toHaveJSProperty("open", true);
-    await calc.locator("#contribution-calc-expression").fill(params.expression);
-    await calc.getByRole("button", { name: "Aplicar al snapshot" }).click();
-    await expect(calc).toHaveJSProperty("open", false);
-    await expect(
-      this.page.locator("#contribution-workflow-dialog"),
-    ).toBeVisible();
+    const calc = row.locator("[data-contribution-calc]");
+    await expect(calc).toBeVisible();
+    await calc.getByLabel("Cálculo").fill(params.expression);
+    await calc.getByRole("button", { name: "Aplicar al valor" }).click();
+    await expect(calc).toBeHidden();
   }
 
   async contributionWorkflowSetLiquiditySnapshot(
     accountName: string,
     value: number,
   ) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    const row = modal.locator("#contribution-workflow-liquidity-body tr", {
-      hasText: accountName,
-    });
+    const row = this.contributionWorkflowSnapshotRow("accounts", accountName);
     await expect(row).toBeVisible();
     await row
       .locator('input[data-contribution-snapshot-kind="accounts"]')
@@ -1122,23 +1119,24 @@ export class FinanceTrackerPage {
   }
 
   async contributionWorkflowGoToAllocationStep() {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    await modal.getByRole("button", { name: "Siguiente" }).click();
+    const modal = this.contributionWorkflow();
+    await modal.getByRole("button", { name: "Siguiente: reparto" }).click();
     await expect(
       modal.locator("#contribution-workflow-step-allocation"),
     ).toBeVisible();
   }
 
   async contributionWorkflowSetTotal(value: number) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    await modal.locator("#contribution-workflow-total").fill(String(value));
+    await this.contributionWorkflow()
+      .locator("#contribution-workflow-total")
+      .fill(String(value));
   }
 
   async contributionWorkflowSetAllocation(accountName: string, value: number) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    const row = modal.locator("#contribution-workflow-allocation-body tr", {
-      hasText: accountName,
-    });
+    const row = this.contributionWorkflow().locator(
+      "[data-contribution-allocation-row]",
+      { hasText: accountName },
+    );
     await expect(row).toBeVisible();
     await row
       .locator("input[data-contribution-allocation-account-id]")
@@ -1154,17 +1152,13 @@ export class FinanceTrackerPage {
   }
 
   async contributionWorkflowSave() {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    await modal
-      .getByRole("button", { name: "Guardar aporte (con avisos)" })
+    await this.contributionWorkflow()
+      .getByRole("button", { name: /^Guardar (aporte|con avisos)$/ })
       .click();
   }
 
   async contributionWorkflowPressEnterInInvestmentSnapshot(assetName: string) {
-    const modal = this.page.locator("#contribution-workflow-dialog");
-    const row = modal.locator("#contribution-workflow-investments-body tr", {
-      hasText: assetName,
-    });
+    const row = this.contributionWorkflowSnapshotRow("investments", assetName);
     await expect(row).toBeVisible();
     await row
       .locator('input[data-contribution-snapshot-kind="investments"]')
@@ -1173,9 +1167,7 @@ export class FinanceTrackerPage {
 
   async deleteManualContributionByDate(date: string) {
     await this.openInvestmentContributionsTab();
-    const row = this.investmentSection().locator("#contribution-body tr", {
-      hasText: date,
-    });
+    const row = this.contributionRow(date);
     await expect(row).toBeVisible();
     await row
       .locator(`button[data-delete-contribution-date="${date}"]`)
