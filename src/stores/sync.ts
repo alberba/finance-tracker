@@ -256,6 +256,13 @@ export const useSyncStore = defineStore('sync', () => {
       ? applyPendingCommands(bootstrap, pending.map((entry) => entry.command))
       : bootstrap
     useFinancialStateStore().reloadState(projectSyncV2State(withPending))
+    if (withPending.subscriptions.length) {
+      const recoveredSubscriptionIds = withPending.subscriptions
+        .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
+        .map((subscription) => String(subscription.legacyId || subscription.id))
+      const { useMovementsStore } = await import('./movements')
+      await useMovementsStore().refreshSubscriptions(recoveredSubscriptionIds)
+    }
   }
 
   /**
