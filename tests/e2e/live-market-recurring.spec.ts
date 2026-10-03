@@ -61,7 +61,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     const panel = page.locator('#investment [data-investment-quotes]')
     await expect(panel.getByText('VWCE', { exact: true })).toBeVisible()
     await expect(panel.getByText('Actualizado')).toBeVisible()
-    await expect(panel.getByText('125,5 €')).toBeVisible()
+    await expect(panel.getByText('125,50 €')).toBeVisible()
     const holdingsInput = panel.getByLabel('Títulos de VWCE')
     await expect(holdingsInput).toHaveValue('0')
     await holdingsInput.fill('0.25')
@@ -94,7 +94,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const panel = page.locator('#investment [data-investment-quotes]')
     await expect(panel.getByText('AGED.MI', { exact: true })).toBeVisible()
-    await expect(panel.getByText('9,276 €')).toBeVisible()
+    await expect(panel.getByText('9,28 €')).toBeVisible()
     expect(requestedProvider).toBe('yahoo')
   })
 
