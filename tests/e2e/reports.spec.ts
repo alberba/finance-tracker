@@ -1,36 +1,6 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
-async function expectModalCentered(
-  page: Page,
-  selector: string,
-  tolerance = 24,
-) {
-  const dialog = page.locator(selector);
-  await expect(dialog).toBeVisible();
-  await dialog.evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
-  });
-
-  const viewport = page.viewportSize();
-  const box = await dialog.boundingBox();
-  if (!viewport || !box) {
-    throw new Error(`No se pudo medir el modal ${selector}.`);
-  }
-
-  const dialogCenterX = box.x + box.width / 2;
-  const dialogCenterY = box.y + box.height / 2;
-  const viewportCenterX = viewport.width / 2;
-  const viewportCenterY = viewport.height / 2;
-
-  expect(Math.abs(dialogCenterX - viewportCenterX)).toBeLessThanOrEqual(
-    tolerance,
-  );
-  expect(Math.abs(dialogCenterY - viewportCenterY)).toBeLessThanOrEqual(
-    tolerance,
-  );
-}
-
 async function expectModalAnchoredToLauncher(
   page: Page,
   selector: string,
@@ -292,7 +262,7 @@ test.describe("Reports E2E", () => {
     await expect(status).not.toContainText("Token de Cf-Access");
   });
 
-  test("los modales principales se abren centrados en pantalla", async ({
+  test("los paneles laterales se anclan al borde derecho", async ({
     page,
     tracker,
   }) => {
@@ -311,15 +281,18 @@ test.describe("Reports E2E", () => {
     // click on the nav tab.
     await panel.getByRole("button", { name: "Cerrar" }).click();
 
+    // The balance calculator is a side panel too.
     await tracker.openWealth();
-    // Match the accessible name, not the visible label: these buttons read
-    // "Calcular" but carry `aria-label="Abrir cálculo de <activo>"`
-    // (`WealthSnapshotTable.vue`), which is what `getByRole` resolves.
     await tracker.wealthSection
-      .getByRole("button", { name: /^Abrir cálculo de / })
+      .getByRole("button", { name: /^Calcular el saldo de / })
       .first()
       .click();
-    await expectModalCentered(page, "#wealth-calc-dialog");
-    await page.locator("#wealth-calc-close").click();
+    const calc = tracker.wealthCalcPanel();
+    await expect(calc).toBeVisible();
+    await expect
+      .poll(() => calc.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    await calc.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(calc).toBeHidden();
   });
 });

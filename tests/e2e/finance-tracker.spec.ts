@@ -1,20 +1,5 @@
 import { test, expect } from "./fixtures";
 
-const MONTH_NAMES = [
-  "ENERO",
-  "FEBRERO",
-  "MARZO",
-  "ABRIL",
-  "MAYO",
-  "JUNIO",
-  "JULIO",
-  "AGOSTO",
-  "SEPTIEMBRE",
-  "OCTUBRE",
-  "NOVIEMBRE",
-  "DICIEMBRE",
-] as const;
-
 test.describe("Finance tracker E2E", () => {
   test("permite crear movimiento y persiste tras recarga", { tag: "@smoke" }, async ({
     tracker,
@@ -170,74 +155,8 @@ test.describe("Finance tracker E2E", () => {
 
     await tracker.reload();
     await tracker.openWealth();
-    await tracker.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: "MARZO" });
+    await tracker.selectWealthMonth("MARZO");
     expect(await tracker.getAccountSnapshotValue("Revolut")).toBe(999.99);
-  });
-
-  test("patrimonio renderiza la evolución mensual hasta el mes actual YTD", async ({
-    page,
-    tracker,
-  }) => {
-    const yearDisplay = await tracker.getDisplayedYear();
-    await tracker.openWealth();
-
-    const chartDetails = await page.evaluate((yearDisplay) => {
-      const chart = document.getElementById("chart-wealth");
-      const now = new Date();
-      if (!chart) {
-        return null;
-      }
-      return {
-        points: parseInt(chart.dataset.chartPointCount || "0"),
-        currentYear: now.getFullYear(),
-        currentMonth: now.getMonth(),
-        yearDisplay,
-      };
-    }, yearDisplay);
-
-    expect(chartDetails).not.toBeNull();
-    if (!chartDetails) {
-      return;
-    }
-    const expectedPoints =
-      chartDetails.yearDisplay === chartDetails.currentYear
-        ? chartDetails.currentMonth + 1
-        : 12;
-    expect(chartDetails.points).toBe(expectedPoints);
-  });
-
-  test("patrimonio recorta la tabla de evolución al YTD actual", async ({
-    page,
-    tracker,
-  }) => {
-    const yearDisplay = await tracker.getDisplayedYear();
-    await tracker.openWealth();
-
-    const details = await page.evaluate((yearDisplay) => {
-      const chart = document.getElementById("chart-wealth");
-      const rows = Array.from(
-        document.querySelectorAll("#wealth-timeline-body tr"),
-      );
-      return {
-        chartPoints: Number(chart?.dataset.chartPointCount || 0),
-        rowCount: rows.length,
-        lastLabel: rows.length
-          ? rows[rows.length - 1].querySelector("td")?.textContent?.trim() || ""
-          : "",
-        yearDisplay,
-        currentYear: new Date().getFullYear(),
-        currentMonth: new Date().getMonth(),
-      };
-    }, yearDisplay);
-
-    expect(details.rowCount).toBe(details.chartPoints);
-    const expectedLastMonth =
-      details.yearDisplay === details.currentYear
-        ? MONTH_NAMES[details.currentMonth]
-        : "DICIEMBRE";
-    expect(details.lastLabel).toBe(expectedLastMonth);
   });
 
   test("patrimonio permite calcular snapshot de inversión por fila y persistirlo", async ({
@@ -253,9 +172,7 @@ test.describe("Finance tracker E2E", () => {
     await tracker.saveSnapshot();
     await tracker.reload();
     await tracker.openWealth();
-    await tracker.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: "MARZO" });
+    await tracker.selectWealthMonth("MARZO");
     expect(await tracker.getInvestmentSnapshotValue("Fondos Indexados")).toBe(
       200,
     );

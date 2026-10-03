@@ -53,6 +53,18 @@ export function formatMoney(value: unknown, currency = 'EUR'): string {
   return formatter ? formatter.format(numeric) : `${numeric.toFixed(2)} ${code}`
 }
 
+const wholeFormatter = new Intl.NumberFormat('es-ES', {
+  maximumFractionDigits: 0,
+  useGrouping: 'always',
+})
+
+/** "18.420": rounded to whole units, thousands always grouped, for dense tables. */
+export function formatWholeAmount(value: number): string {
+  const rounded = Math.round(value)
+  const text = wholeFormatter.format(Math.abs(rounded))
+  return rounded < 0 ? `${MINUS}${text}` : text
+}
+
 /** A quote price in its own currency, keeping up to six decimals ("58.412,00 €", "0,000123 €"). */
 export function formatQuotePrice(value: number, currency: string): string {
   try {

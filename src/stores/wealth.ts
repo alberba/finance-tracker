@@ -2,10 +2,10 @@ import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
-import { buildWealthViewModel } from '../domain/wealth/view-model'
+import { buildWealthViewModel, parseSnapshotInput } from '../domain/wealth/view-model'
+import { formatMonthName } from '../lib/format'
 import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { SnapshotKind } from '../scripts/types'
-import { parseFloatSafe, round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
 
@@ -43,11 +43,11 @@ export const useWealthStore = defineStore('wealth', () => {
       }
       const snapshot = draft.snapshots[String(month)]
       edits.forEach(({ kind, id, value }) => {
-        const numeric = parseFloatSafe(value, NaN)
-        if (Number.isNaN(numeric)) {
+        const numeric = parseSnapshotInput(value)
+        if (numeric === null || Number.isNaN(numeric)) {
           delete snapshot[kind][id]
         } else {
-          snapshot[kind][id] = round2(numeric)
+          snapshot[kind][id] = numeric
         }
       })
     })
@@ -55,7 +55,7 @@ export const useWealthStore = defineStore('wealth', () => {
     const year = financialStateStore.year
     const currency = financialStateStore.state.currency
     void syncSnapshotBalances(year, snapshot, currency)
-    showToast('Snapshot guardado.')
+    showToast(`Snapshot de ${formatMonthName(month).toLowerCase()} guardado.`)
   }
 
   return {

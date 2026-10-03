@@ -71,7 +71,7 @@ test.describe("Finance tracker E2E", () => {
       {
         open: () => tracker.openWealth(),
         path: /\/patrimonio$/,
-        heading: "Patrimonio total",
+        heading: "Patrimonio",
       },
       {
         open: () => tracker.openInvestment(),
