@@ -7,8 +7,15 @@ import {
 import { parseTransactionYear } from '../../scripts/investment-movements'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
 import { seriesColor } from '../../scripts/chart-theme'
-import { MONTHS, type State, type Transaction } from '../../scripts/types'
-import { monthFromISO } from '../../scripts/utils'
+import {
+  MONTHS,
+  type ContributionMetricRow,
+  type RecurringFrequency,
+  type RecurringRule,
+  type State,
+  type Transaction,
+} from '../../scripts/types'
+import { monthFromISO, round2 } from '../../scripts/utils'
 import {
   computeInvestedCapital,
   computeInvestedCapitalByAsset,
@@ -322,4 +329,92 @@ export function buildInvestmentYearOptions(state: State): number[] {
     years.push(state.year)
   }
   return years
+}
+
+/** Purchases a frequency makes in a year, before its interval. */
+const YEARLY_OCCURRENCES: Record<RecurringFrequency, number> = {
+  daily: 365,
+  weekly: 52,
+  monthly: 12,
+  monthEnd: 12,
+  yearly: 1,
+}
+
+/** What a recurring purchase costs a month on average (weekly: × 52 ÷ 12). */
+export function ruleMonthlyEquivalent(
+  rule: Pick<RecurringRule, 'amount' | 'frequency' | 'interval'>,
+): number {
+  const interval = Math.max(1, Math.floor(rule.interval || 1))
+  return round2((rule.amount * YEARLY_OCCURRENCES[rule.frequency]) / interval / 12)
+}
+
+export interface RecurringPlanSummary {
+  /** Monthly equivalent of the active rules. */
+  monthly: number
+  active: number
+  total: number
+  /** The active rule due first, with its date. */
+  next: { rule: RecurringRule; date: string } | null
+}
+
+export function summarizeRecurringPlan(rules: RecurringRule[]): RecurringPlanSummary {
+  const active = rules.filter((rule) => rule.active)
+  const next = active
+    .filter((rule) => rule.nextOccurrenceDate)
+    .sort((a, b) => String(a.nextOccurrenceDate).localeCompare(String(b.nextOccurrenceDate)))[0]
+  return {
+    monthly: round2(active.reduce((sum, rule) => sum + ruleMonthlyEquivalent(rule), 0)),
+    active: active.length,
+    total: rules.length,
+    next: next ? { rule: next, date: String(next.nextOccurrenceDate) } : null,
+  }
+}
+
+/** Where a close comes from: the first one, a month end or a manual contribution. */
+export type ContributionOrigin = 'base' | 'monthEnd' | 'manual'
+
+export interface ContributionLedgerRow extends ContributionMetricRow {
+  origin: ContributionOrigin
+}
+
+function originOf(index: number, manual: boolean): ContributionOrigin {
+  // A manual close stays manual even when it is the first: it can be deleted.
+  if (manual) return 'manual'
+  return index === 0 ? 'base' : 'monthEnd'
+}
+
+/** The closes (oldest first, as computed) newest first, each with its origin. */
+export function buildContributionLedger(
+  rows: ContributionMetricRow[],
+  isManual: (date: string) => boolean,
+): ContributionLedgerRow[] {
+  return rows
+    .map((row, index) => ({ ...row, origin: originOf(index, isManual(row.date)) }))
+    .reverse()
+}
+
+export interface ContributionSummary {
+  /** Contributed in the year. */
+  contributed: number
+  /** Net asset value, units and cumulative return of the latest close. */
+  nav: number | null
+  units: number | null
+  cumulativeReturn: number | null
+}
+
+export function summarizeContributions(
+  rows: ContributionMetricRow[],
+  year: number,
+): ContributionSummary {
+  const latest = rows.at(-1)
+  return {
+    contributed: round2(
+      rows
+        .filter((row) => parseTransactionYear(row.date) === year)
+        .reduce((sum, row) => sum + (Number(row.flow) || 0), 0),
+    ),
+    nav: latest?.nav ?? null,
+    units: latest?.unitsAfter ?? null,
+    cumulativeReturn: latest?.cumulativeReturn ?? null,
+  }
 }

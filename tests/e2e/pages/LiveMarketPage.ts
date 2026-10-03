@@ -11,6 +11,11 @@ export class LiveMarketPage {
     return this.page.locator('[data-recurring-rules]')
   }
 
+  /** The side panel that creates and edits a recurring purchase. */
+  get recurringPanel(): Locator {
+    return this.page.locator('#investment-recurring-panel')
+  }
+
   get pendingPanel(): Locator {
     return this.page.locator('[data-pending-panel]')
   }
@@ -39,11 +44,13 @@ export class LiveMarketPage {
     type?: 'investment';
     symbol?: string; units?: number; unitPrice?: number; fee?: number; time?: string;
   }): Promise<void> {
-    const form = this.recurringRules.locator('form')
+    await this.recurringRules.getByRole('button', { name: 'Nueva compra recurrente' }).click()
+    const form = this.recurringPanel
+    await expect(form).toBeVisible()
     await form.getByLabel('Cuenta').selectOption({ label: params.account })
     await form.getByLabel('Categoría').selectOption({ label: params.category })
     await form.getByLabel('Descripción').fill(params.description)
-    await form.getByLabel('Importe').fill(String(params.amount))
+    await form.getByLabel('Importe por compra').fill(String(params.amount))
     await form.getByLabel('Frecuencia').selectOption(params.frequency)
     await form.getByLabel('Fecha inicial').fill(params.startDate)
     if (params.symbol !== undefined) await form.getByLabel('Símbolo').fill(params.symbol)
@@ -51,7 +58,8 @@ export class LiveMarketPage {
     if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
-    await form.getByRole('button', { name: 'Crear compra recurrente' }).click()
+    await form.getByRole('button', { name: 'Crear regla' }).click()
+    await expect(form).toBeHidden()
   }
 
   /**
@@ -85,16 +93,18 @@ export class LiveMarketPage {
   }
 
   async editFirstRecurringRule(params: { description: string; amount: number; units?: number; unitPrice?: number; fee?: number; time?: string }): Promise<void> {
-    const row = this.recurringRules.locator('.list-item').first()
-    await row.getByRole('button', { name: 'Editar' }).click()
-    const form = this.recurringRules.locator('form')
+    const row = this.recurringRules.locator('tr[data-recurring-rule-id]').first()
+    await row.getByRole('button', { name: /^Editar la regla / }).click()
+    const form = this.recurringPanel
+    await expect(form).toBeVisible()
     await form.getByLabel('Descripción').fill(params.description)
-    await form.getByLabel('Importe').fill(String(params.amount))
+    await form.getByLabel('Importe por compra').fill(String(params.amount))
     if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))
     if (params.unitPrice !== undefined) await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
-    await form.getByRole('button', { name: 'Guardar regla' }).click()
+    await form.getByRole('button', { name: 'Guardar cambios' }).click()
+    await expect(form).toBeHidden()
   }
 
   async searchSourceSymbol(currentSymbol: string, query: string): Promise<void> {

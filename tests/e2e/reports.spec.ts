@@ -321,15 +321,5 @@ test.describe("Reports E2E", () => {
       .click();
     await expectModalCentered(page, "#wealth-calc-dialog");
     await page.locator("#wealth-calc-close").click();
-
-    await tracker.openContributionWorkflowModal();
-    await expectModalCentered(page, "#contribution-workflow-dialog");
-
-    const workflowModal = page.locator("#contribution-workflow-dialog");
-    const investmentSnapshotButton = workflowModal
-      .getByRole("button", { name: /^Calcular snapshot de / })
-      .first();
-    await investmentSnapshotButton.click();
-    await expectModalCentered(page, "#contribution-calc-dialog");
   });
 });
