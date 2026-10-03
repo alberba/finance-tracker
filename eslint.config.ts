@@ -94,6 +94,19 @@ export default defineConfig([
     },
   },
   {
+    files: ['tests/e2e/**/*.spec.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='page'][callee.property.name='reload']",
+          message:
+            'Usa `tracker.reload()`: espera a `html[data-finance-ready]` antes de navegar. Un `page.reload()` a pelo da fallos que parecen lentitud de compilación.',
+        },
+      ],
+    },
+  },
+  {
     files: ['tests/e2e/screenshot-stable.css'],
     rules: {
       'css/no-important': 'off',
