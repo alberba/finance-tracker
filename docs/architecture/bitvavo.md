@@ -53,14 +53,14 @@ reversible. La persistencia sigue explícita en los repositorios: Effect no sust
 de D1. Las pruebas Vitest 4 ejecutan la frontera Promise con HTTP falso y su capa, sin
 `@effect/vitest`.
 
-Medición local inicial de `wrangler check startup` en esta máquina (2026-10-03), comparando la
-base v2 con la integración:
+Medición local de `wrangler check startup` en esta máquina (2026-10-04), comparando
+`v2` (`056f29a`) con la integración y las mismas versiones de dependencias:
 
 | Medida                |        Base | Con Bitvavo |
 | --------------------- | ----------: | ----------: |
-| Bundle Worker         | 1864,78 KiB | 2197,82 KiB |
-| Gzip                  |  432,12 KiB |  522,41 KiB |
-| CPU activa muestreada |     69,0 ms |     58,0 ms |
+| Bundle Worker         | 1980,52 KiB | 2305,67 KiB |
+| Gzip                  |  452,89 KiB |  543,72 KiB |
+| CPU activa muestreada |     31,3 ms |     28,8 ms |
 
 Es una muestra local, no una predicción del arranque en producción ni evidencia de una mejora
 de velocidad; no mostró regresión de arranque. Para reproducir con el build Astro:
