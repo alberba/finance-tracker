@@ -102,9 +102,7 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
-    await tracker
-      .investmentSection()
+    await (await tracker.openInvestmentMovementPanel())
       .locator("#investment-movement-symbol")
       .fill("CASHBUY");
 
@@ -155,10 +153,7 @@ test.describe("inversión tabs y TWR", () => {
     });
     await mirrorStateToServer(page);
     await page.reload();
-    await tracker.openInvestmentMovementsTab();
-
-    await tracker
-      .investmentSection()
+    await (await tracker.openInvestmentMovementPanel())
       .locator("#investment-movement-symbol")
       .fill("UNMAPPED");
 
@@ -209,10 +204,10 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentMovementsTab();
 
     // Sin mapeo el envío automático se salta con aviso visible y sin botón.
-    const section = tracker.investmentSection();
+    const section = await tracker.openInvestmentMovementPanel();
     await section.locator("#investment-movement-date").fill("2026-09-04");
     await section.locator("#investment-movement-time").fill("16:11");
-    await section.locator("#investment-movement-side").selectOption("buy");
+    await section.locator('[data-investment-side="buy"]').click();
     await section.locator("#investment-movement-symbol").fill("RESEND");
     await section.locator("#investment-movement-unit-price").fill("2110.3");
     await section.locator("#investment-movement-units").fill("0.0047");
@@ -225,7 +220,7 @@ test.describe("inversión tabs y TWR", () => {
       "no tiene sincronización activada",
     );
     await expect(
-      section.getByRole("button", { name: /Reenviar movimiento/ }),
+      tracker.investmentSection().getByRole("button", { name: /^Reenviar / }),
     ).toHaveCount(0);
 
     // El mapeo llega después: aparece el botón y el reenvío crea la transacción.
@@ -244,7 +239,7 @@ test.describe("inversión tabs y TWR", () => {
     await tracker.openInvestmentMovementsTab();
     const resend = tracker
       .investmentSection()
-      .getByRole("button", { name: "Reenviar movimiento del 2026-09-04 a Stock Events" });
+      .getByRole("button", { name: /^Reenviar compra de RESEND .* a Stock Events$/ });
     await expect(resend).toBeVisible();
     await resend.click();
     await expect.poll(() => syncedTransaction).toMatchObject({
@@ -326,12 +321,12 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2025" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2025" }),
     ).toHaveCount(1);
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2026D" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2026D" }),
     ).toHaveCount(0);
 
     await tracker.filterInvestmentYear(2026);
@@ -339,16 +334,14 @@ test.describe("inversión tabs y TWR", () => {
     await expect(
       tracker
         .investmentSection()
-        .locator("#investment-tx-table-body tr", { hasText: "YEAR2026D" }),
+        .locator("tr[data-investment-tx-id]", { hasText: "YEAR2026D" }),
     ).toHaveCount(0);
   });
 
   test("categoría de inversión: Bitvavo fija Crypto y otros brokers permiten elegir del desplegable", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
-
-    const section = tracker.investmentSection();
+    const section = await tracker.openInvestmentMovementPanel();
     await section
       .locator("#investment-movement-broker")
       .selectOption({ label: "Bitvavo" });
@@ -403,11 +396,9 @@ test.describe("inversión tabs y TWR", () => {
   test("el símbolo en movimientos de inversión conserva espacios mientras se escribe", async ({
     tracker,
   }) => {
-    await tracker.openInvestmentMovementsTab();
-
-    const symbolInput = tracker
-      .investmentSection()
-      .locator("#investment-movement-symbol");
+    const symbolInput = (await tracker.openInvestmentMovementPanel()).locator(
+      "#investment-movement-symbol",
+    );
     await symbolInput.click();
     await symbolInput.pressSequentially("MSCI WORLD");
     await expect(symbolInput).toHaveValue("MSCI WORLD");
@@ -424,7 +415,7 @@ test.describe("inversión tabs y TWR", () => {
     });
 
     await expect(
-      tracker.investmentSection().locator("#investment-tx-table-body tr", {
+      tracker.investmentSection().locator("tr[data-investment-tx-id]", {
         hasText: "MSCI WORLD",
       }),
     ).toHaveCount(1);
