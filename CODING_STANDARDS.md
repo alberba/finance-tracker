@@ -13,6 +13,8 @@ deriva que hay que corregir, no una excepción: manda este fichero y se actualiz
 No revises a mano nada de esto; falla solo en CI.
 
 - Formato: `.prettierrc` (sin punto y coma, comillas simples, ancho 100, `trailingComma: all`).
+  Ningún gate lo comprueba y parte del repo está sin formatear: el diff formatea solo los ficheros
+  que toca (`pnpm exec prettier --write <rutas>`), nunca un directorio entero.
 - Lint: `eslint.config.ts` (TypeScript, Vue, Astro, CSS con tokens Tailwind 4).
 - Tipos: `pnpm check` (`astro check`).
 

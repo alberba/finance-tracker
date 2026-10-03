@@ -101,7 +101,7 @@ test.describe("inversión tabs y TWR", () => {
       localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
     });
     await mirrorStateToServer(page);
-    await page.reload();
+    await tracker.reload();
     await tracker.openInvestmentMovementsTab();
     await tracker
       .investmentSection()
@@ -154,7 +154,7 @@ test.describe("inversión tabs y TWR", () => {
       localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
     });
     await mirrorStateToServer(page);
-    await page.reload();
+    await tracker.reload();
     await tracker.openInvestmentMovementsTab();
 
     await tracker
@@ -204,8 +204,7 @@ test.describe("inversión tabs y TWR", () => {
       localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
     });
     await mirrorStateToServer(page);
-    await page.reload();
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
+    await tracker.reload();
     await tracker.openInvestmentMovementsTab();
 
     // Sin mapeo el envío automático se salta con aviso visible y sin botón.
@@ -239,8 +238,7 @@ test.describe("inversión tabs y TWR", () => {
       localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
     });
     await mirrorStateToServer(page);
-    await page.reload();
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible({ timeout: 15000 });
+    await tracker.reload();
     await tracker.openInvestmentMovementsTab();
     const resend = tracker
       .investmentSection()
