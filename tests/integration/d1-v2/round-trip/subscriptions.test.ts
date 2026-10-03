@@ -151,6 +151,53 @@ describe("round trip: subscriptions", () => {
     expect(reloaded.subscriptions[0].nextChargeDate).toBe("2026-10-13");
   });
 
+  it.each([null, '2026-09-12'])(
+    'persists a migrated subscription charge generated during startup (next date: %s)',
+    async (nextChargeDate) => {
+      trip.cleanup()
+      vi.setSystemTime('2026-09-11T10:00:00Z')
+      trip = await startRoundTrip(async (db, userId) => {
+        const accounts = await import('../../../../src/db/repositories/accounts')
+        const subscriptions = await import('../../../../src/db/repositories/subscriptions')
+        const account = await accounts.create(db, userId, {
+          legacyId: 'legacy-account',
+          name: 'Cuenta',
+          kind: 'cash',
+          currency: 'EUR',
+          openingBalance: 0,
+        })
+        await subscriptions.create(db, userId, {
+          legacyId: 'legacy-todoist',
+          name: 'Todoist',
+          accountId: account.id,
+          amount: 48,
+          currency: 'EUR',
+          frequency: 'yearly',
+          startDate: '2025-09-12',
+          nextChargeDate,
+        })
+      })
+
+      await trip.reload()
+      const subscriptionsRepository = await import('../../../../src/db/repositories/subscriptions')
+      expect(
+        (await subscriptionsRepository.listByUser(trip.testDb.db, trip.userId))[0].nextChargeDate,
+      ).toBe('2026-09-12')
+      vi.setSystemTime('2026-09-13T10:00:00Z')
+      const reloaded = await trip.reload()
+      expect(reloaded.subscriptions[0].nextChargeDate).toBe('2027-09-12')
+      expect(reloaded.transactions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ description: 'Todoist', date: '2026-09-12', amount: 48 }),
+        ]),
+      )
+      const secondReload = await trip.reload()
+      expect(secondReload.transactions).toHaveLength(1)
+      const transactionsRepository = await import('../../../../src/db/repositories/transactions')
+      expect(await transactionsRepository.listByUser(trip.testDb.db, trip.userId)).toHaveLength(1)
+    },
+  )
+
   it("recovers a subscription created before start dates were stored", async () => {
     const subscriptionsRepository = await import(
       "../../../../src/db/repositories/subscriptions"

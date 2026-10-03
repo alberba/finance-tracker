@@ -1,5 +1,7 @@
 import {
+  computeAccountBalance,
   computeContributionMetrics as computeContributionMetricsCore,
+  computeInvestmentValue,
   type ContributionEntry,
 } from '../../lib/finance-core'
 import {
@@ -116,7 +118,10 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
     const existing = rowsByDate.get(date)
     const keepsSnapshotPortfolioValue = Boolean(existing)
     const normalizedPortfolioValue = round2(
-      parseFloatSafe(item.portfolioValue, keepsSnapshotPortfolioValue ? (existing?.portfolioValue ?? 0) : 0),
+      parseFloatSafe(
+        item.portfolioValue,
+        keepsSnapshotPortfolioValue ? (existing?.portfolioValue ?? 0) : 0,
+      ),
     )
     const portfolioValue =
       keepsSnapshotPortfolioValue && existing
@@ -174,23 +179,38 @@ export function buildWorkflowSnapshotState(
     (item) => String(item.portfolioDate || item.date) === date,
   )
   const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || [])
-  const allocationsByAccountId = new Map(existingAllocations.map((item) => [item.accountId, item.amount]))
-
-  const snapshotValue = (kind: SnapshotKind, id: string): string => {
-    const raw = snapshot?.[kind]?.[id]
-    return raw === undefined || raw === null ? '' : String(raw)
-  }
+  const allocationsByAccountId = new Map(
+    existingAllocations.map((item) => [item.accountId, item.amount]),
+  )
 
   return {
     investments: state.investmentAssets.map((asset: Entity) => ({
       id: asset.id,
       name: asset.name,
-      value: snapshotValue('investments', asset.id),
+      value: String(
+        snapshot?.investments[asset.id] ??
+          computeInvestmentValue(
+            asset.id,
+            month,
+            state.investmentAssets,
+            state.transactions,
+            state.snapshots,
+          ),
+      ),
     })),
     liquidity: liquidityAccounts.map((account) => ({
       id: account.id,
       name: account.name,
-      value: snapshotValue('accounts', account.id),
+      value: String(
+        snapshot?.accounts[account.id] ??
+          computeAccountBalance(
+            account.id,
+            month,
+            state.accounts,
+            state.transactions,
+            state.snapshots,
+          ),
+      ),
     })),
     missingLiquidity: missing,
     allocations: liquidityAccounts.map((account) => ({
@@ -211,7 +231,8 @@ export function computeWorkflowWarnings(
   const warnings: string[] = []
 
   const missingInvestment = snapshotInputs.filter(
-    (input) => input.kind === 'investments' && Number.isNaN(parseFloatSafe(input.value, Number.NaN)),
+    (input) =>
+      input.kind === 'investments' && Number.isNaN(parseFloatSafe(input.value, Number.NaN)),
   ).length
   if (missingInvestment > 0) {
     warnings.push(`Faltan snapshots de inversión: ${missingInvestment}`)

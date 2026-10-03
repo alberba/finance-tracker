@@ -20,3 +20,12 @@ overrides:
   baseline-browser-mapping: ^2.11.0
   js-yaml: 4.3.2
   svgo: 4.1.0
+
+patchedDependencies:
+  http-cache-semantics@4.2.0: patches/http-cache-semantics@4.2.0.patch
+
+auditConfig:
+  # Fixed by patchedDependencies above; npm audit cannot inspect local patches.
+  # Remove this exception and the patch when upstream publishes a fixed release.
+  ignoreGhsas:
+    - GHSA-ch52-4w7c-c8xp

@@ -13,7 +13,11 @@ export default defineConfig(
   {
     fullyParallel: false,
     workers: 1,
-    testMatch: ['multi-user-isolation.spec.ts', 'offline-sync.spec.ts'],
+    testMatch: [
+      'multi-user-isolation.spec.ts',
+      'offline-sync.spec.ts',
+      'subscription-charges.spec.ts',
+    ],
     projects: [
       {
         name: 'chromium',

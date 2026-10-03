@@ -319,6 +319,25 @@ describe("command-mapping (WP7b)", () => {
       expect(await resolveEntityId("recurringRule", "rule-1")).toBe("server-rule-1");
     });
 
+    it("resolves a queued account's own id without changing its create command", async () => {
+      await initSyncStore();
+      await syncCreate("account", "pending-account", {
+        name: "Offline account",
+        kind: "checking",
+        currency: "EUR",
+        openingBalance: 400,
+      });
+      const outboxDb = await openOutbox(USER_ID);
+      try {
+        const before = await listAll(outboxDb);
+
+        expect(await resolveEntityId("account", "pending-account")).toBe("pending-account");
+        expect(await listAll(outboxDb)).toEqual(before);
+      } finally {
+        outboxDb.close();
+      }
+    });
+
     describe("syncListDiff", () => {
       it("emits create for new rows, update for changed rows, and remove for dropped rows", async () => {
         await initSyncStore();
