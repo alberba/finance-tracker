@@ -26,7 +26,20 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
  * scan started looking at the active section (it used to find none). The list
  * only shrinks: each zone's migration fixes its targets and removes its entry.
  */
-const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals', 'settings', 'investment-recurring'])
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals', 'settings'])
+
+/** A monthly purchase, for the views that need one rule in the plan. */
+const RECURRING_RULE = {
+  account: 'Revolut',
+  category: 'Fondos Indexados',
+  description: 'Compra mensual',
+  amount: 300,
+  frequency: 'monthly',
+  startDate: '2026-12-01',
+  symbol: 'VWCE',
+  units: 1,
+  unitPrice: 300,
+}
 
 /** Investment views beyond the default tab: expanded row, sub-tabs and dialog. */
 const INVESTMENT_VIEWS: Array<{
@@ -89,11 +102,69 @@ const INVESTMENT_VIEWS: Array<{
     open: (_page, tracker) => tracker.openContributionWorkflowModal(),
   },
   {
+    name: 'investment-contribution-allocation',
+    open: async (_page, tracker) => {
+      await tracker.openContributionWorkflowModal()
+      await tracker.contributionWorkflowGoToAllocationStep()
+    },
+  },
+  {
     name: 'investment-contribution-delete-dialog',
     open: async (page, tracker) => {
       await tracker.openInvestmentContributionsTab()
-      await page.locator('button[data-delete-contribution-date]').first().click()
-      await expect(page.getByRole('dialog')).toBeVisible()
+      const remove = page.locator('button[data-delete-contribution-date]').first()
+      await remove.scrollIntoViewIfNeeded()
+      await remove.click()
+      await expect(page.getByRole('alertdialog')).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-panel',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await page.getByRole('button', { name: 'Nueva compra recurrente' }).click()
+      await expect(new LiveMarketPage(page).recurringPanel).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-plan',
+    focus: '#investment [data-recurring-rules] table',
+    open: async (page, tracker) => {
+      await tracker.openInvestmentRecurringTab()
+      await new LiveMarketPage(page).createRecurringRule(RECURRING_RULE)
+    },
+  },
+  {
+    name: 'investment-recurring-edit-panel',
+    open: async (page, tracker) => {
+      const liveMarket = new LiveMarketPage(page)
+      await tracker.openInvestmentRecurringTab()
+      await liveMarket.createRecurringRule(RECURRING_RULE)
+      await page
+        .locator('#investment tr[data-recurring-rule-id]')
+        .first()
+        .getByRole('button', { name: /^Editar la regla / })
+        .first()
+        .click()
+      await expect(liveMarket.recurringPanel).toBeVisible()
+    },
+  },
+  {
+    name: 'investment-recurring-delete-dialog',
+    open: async (page, tracker) => {
+      const liveMarket = new LiveMarketPage(page)
+      await tracker.openInvestmentRecurringTab()
+      await liveMarket.createRecurringRule(RECURRING_RULE)
+      const row = page.locator('#investment tr[data-recurring-rule-id]').first()
+      const rowDelete = row.getByRole('button', { name: /^Eliminar la regla / })
+      if (await rowDelete.isVisible()) {
+        await rowDelete.click()
+      } else {
+        // Small screens hide the row actions: delete from the edit panel.
+        await row.getByRole('button', { name: /^Editar la regla / }).click()
+        await liveMarket.recurringPanel.getByRole('button', { name: 'Eliminar' }).click()
+      }
+      await expect(page.getByRole('alertdialog')).toBeVisible()
     },
   },
 ]

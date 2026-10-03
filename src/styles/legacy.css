@@ -86,7 +86,6 @@
      investment / wealth forms. Scoped to their container classes so header
      dropdowns and already-migrated sections stay untouched. */
   :is(
-      .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields
     )
@@ -99,7 +98,6 @@
   }
   .table-wrap td :is(input, select):not([type='checkbox']),
   :is(
-      .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
       .mini-form
@@ -120,7 +118,6 @@
       background 0.15s;
   }
   :is(
-      .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields
     )
@@ -130,7 +127,6 @@
   }
   .snapshot-field-stack input::placeholder,
   :is(
-      .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
       .mini-form
@@ -140,7 +136,6 @@
   }
   .table-wrap td :is(input, select):focus-visible,
   :is(
-      .contribution-workflow-form,
       .wealth-calc-form,
       .settings-fields,
       .mini-form
@@ -1236,88 +1231,9 @@ body.is-sidebar-collapsed .sidebar-toggle-label {
   min-width: 0;
 }
 
-#contribution-form {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-#contribution-form > button[type='submit'] {
-  grid-column: 1 / -1;
-  justify-self: end;
-}
-.contribution-flow-input {
-  width: 120px;
-  max-width: 100%;
-}
-.contribution-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
 /* ══ DIALOG (shared chrome) ══════════════════════════════════════ */
 dialog {
   color: var(--text-main);
-}
-
-.contribution-workflow-dialog {
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  border: none;
-  border-radius: 22px;
-  padding: 0;
-  width: min(840px, 94vw);
-  max-height: calc(100dvh - 32px);
-  background: var(--bg-panel);
-  box-shadow:
-    var(--shadow-raised),
-    0 0 0 1px var(--line);
-}
-.contribution-workflow-dialog::backdrop {
-  background: var(--overlay);
-}
-.contribution-workflow-form {
-  display: grid;
-  gap: 14px;
-  padding: 22px;
-}
-.contribution-workflow-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.contribution-workflow-intro {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-.contribution-workflow-date {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.contribution-workflow-table {
-  margin-top: 8px;
-}
-
-.workflow-warning {
-  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-panel));
-  color: color-mix(in srgb, var(--accent) 60%, var(--text-main));
-  min-height: 24px;
-  padding: 9px 13px;
-  font-size: 0.84rem;
-  white-space: pre-line;
-}
-.workflow-warning:empty {
-  display: none;
-}
-.contribution-workflow-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 /* ══ TABLE WRAP ══════════════════════════════════════════════════ */
@@ -2340,9 +2256,6 @@ td select {
   .form-grid.compact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  #contribution-form > button[type='submit'] {
-    justify-self: stretch;
-  }
 }
 
 @media (max-width: 980px) {
@@ -2536,16 +2449,6 @@ td select {
   }
   .global-report-dialog .reports-form-card {
     padding: 18px;
-  }
-  .contribution-head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .contribution-workflow-date {
-    grid-template-columns: 1fr;
-  }
-  .contribution-workflow-actions {
-    flex-direction: column;
   }
 }
 

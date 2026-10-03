@@ -529,6 +529,8 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   return {
     rules,
+    /** The engine's today: due dates and labels are measured from it. */
+    today: resolveToday,
     pendingMovements,
     openPendingMovements,
     pendingCount,
