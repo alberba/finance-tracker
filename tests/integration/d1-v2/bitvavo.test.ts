@@ -25,42 +25,43 @@ beforeEach(() => {
 })
 afterEach(() => testDb.close())
 
-it('imports a closed preview idempotently with exact operations and tenant isolation', async () => {
-  const user = await users.create(testDb.db, { email: 'import@example.com' })
-  const stranger = await users.create(testDb.db, { email: 'stranger@example.com' })
-  const account = await accounts.create(testDb.db, user.id, {
-    name: 'Bitvavo',
-    kind: 'investment',
-    currency: 'EUR',
-    openingBalance: 0,
-  })
-  await configureBitvavo(
-    testDb.db,
-    user.id,
-    env,
-    {
-      apiKey: 'key',
-      apiSecret: 'secret',
-      accountId: account.id,
-      startDate: '2019-01-01',
-      timeZone: 'Europe/Madrid',
-    },
-    http,
-  )
+async function importedUser() {
+  const { user, account } = await configuredUser()
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
-  await expect(confirmBitvavo(testDb.db, stranger.id, preview.id, [])).rejects.toThrow()
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
+  return { user, account, preview, bootstrap: await buildBootstrapPayload(testDb.db, user.id) }
+}
+
+it('imports a closed preview idempotently', async () => {
+  const { user, preview } = await importedUser()
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
-  const bootstrap = await buildBootstrapPayload(testDb.db, user.id)
-  expect(bootstrap.transactions).toHaveLength(2)
+  expect((await buildBootstrapPayload(testDb.db, user.id)).transactions).toHaveLength(2)
+})
+
+it('retains exact remote operations through bootstrap and projection', async () => {
+  const { bootstrap } = await importedUser()
   expect(bootstrap.transactions[0]).toMatchObject({
     declared: false,
     remoteOperation: { provider: 'bitvavo', unitPrice: '76953', fee: '0.01789334395' },
   })
   expect(bootstrap.transactions[1].amount).toBe(-58.33)
   expect(projectSyncV2State(bootstrap).transactions[0].remoteOperation?.fee).toBe('0.01789334395')
+})
+
+it('does not expose credentials in the synchronized bootstrap', async () => {
+  const { bootstrap } = await importedUser()
   expect(JSON.stringify(bootstrap)).not.toContain('secret')
+})
+
+it('isolates an import preview from another user', async () => {
+  const { preview } = await importedUser()
+  const stranger = await users.create(testDb.db, { email: 'stranger@example.com' })
+  await expect(confirmBitvavo(testDb.db, stranger.id, preview.id, [])).rejects.toThrow()
   expect((await buildBootstrapPayload(testDb.db, stranger.id)).transactions).toEqual([])
+})
+
+it('rejects deletion of a remote financial operation', async () => {
+  const { user, bootstrap } = await importedUser()
   await expect(
     transactions.remove(testDb.db, user.id, bootstrap.transactions[0].id),
   ).rejects.toThrow('Bitvavo')
@@ -134,7 +135,7 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
   expect(JSON.parse(changes[1].payload!).remoteOperation.fee).toBe('0.14748650471')
 })
 
-it('links a unique symbol, keeps declaration changes editable and rejects remote financial edits', async () => {
+it('automatically links a unique symbol belonging to the user', async () => {
   const { user } = await configuredUser()
   const instrument = await market.createInstrument(testDb.db, {
     symbol: 'BTC',
@@ -145,9 +146,14 @@ it('links a unique symbol, keeps declaration changes editable and rejects remote
   await market.createUserInstrument(testDb.db, user.id, { instrumentId: instrument.id })
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
-  const bootstrap = await buildBootstrapPayload(testDb.db, user.id)
+  expect(
+    (await buildBootstrapPayload(testDb.db, user.id)).transactions[0].tradeDetail?.instrumentId,
+  ).toBe(instrument.id)
+})
+
+it('synchronizes declaration changes without losing the remote operation', async () => {
+  const { user, bootstrap } = await importedUser()
   const purchase = bootstrap.transactions[0]
-  expect(purchase.tradeDetail?.instrumentId).toBe(instrument.id)
   const updated = await applySyncBatch(testDb.db, user.id, [
     {
       commandId: 'declare',
@@ -162,16 +168,62 @@ it('links a unique symbol, keeps declaration changes editable and rejects remote
     status: 'applied',
     entity: { declared: true, tradeDetail: { quantity: '0.00008878285' } },
   })
-  const current = await transactions.get(testDb.db, user.id, purchase.id)
+})
+
+it('rejects synchronized changes to remote financial fields', async () => {
+  const { user, bootstrap } = await importedUser()
+  const purchase = bootstrap.transactions[0]
   const rejected = await applySyncBatch(testDb.db, user.id, [
     {
       commandId: 'change-financial',
       action: 'update',
       entityType: 'transaction',
       entityId: purchase.id,
-      baseVersion: current!.version,
+      baseVersion: purchase.version,
       patch: { amount: 100 },
     },
   ])
   expect(rejected.results[0].status).toBe('rejected')
+})
+
+it('offers historical sales calculated with gross plus fee as explicit duplicate candidates', async () => {
+  const { user, account } = await configuredUser()
+  const manual = await transactions.create(testDb.db, user.id, {
+    accountId: account.id,
+    type: 'investment',
+    date: '2020-01-01',
+    amount: -58.63,
+    currency: 'EUR',
+    operation: {
+      symbol: 'BTC',
+      side: 'sell',
+      units: 0.0005,
+      unitPrice: 116958.69300942,
+      fee: 0.15,
+    },
+  })
+  const preview = await previewBitvavo(testDb.db, user.id, env, http)
+  expect(preview.operations.find((op) => op.side === 'sell')?.candidates.map((c) => c.id)).toEqual([
+    manual.id,
+  ])
+})
+
+it('preserves a local description when linking an explicit manual duplicate', async () => {
+  const { user, account } = await configuredUser()
+  const manual = await transactions.create(testDb.db, user.id, {
+    accountId: account.id,
+    type: 'investment',
+    date: '2020-01-01',
+    amount: 6.85,
+    currency: 'EUR',
+    description: 'My purchase notes',
+    operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
+  })
+  const preview = await previewBitvavo(testDb.db, user.id, env, http)
+  await confirmBitvavo(testDb.db, user.id, preview.id, [
+    { externalId: 'example-1', transactionId: manual.id },
+  ])
+  expect((await transactions.get(testDb.db, user.id, manual.id))?.description).toBe(
+    'My purchase notes',
+  )
 })

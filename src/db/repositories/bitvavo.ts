@@ -208,7 +208,9 @@ export async function importOperation(
     type: 'investment',
     date: operation.date,
     time: operation.time,
-    description: `${operation.side === 'buy' ? 'Compra' : 'Venta'} ${operation.quantity} ${operation.symbol}`,
+    description:
+      existing?.description ??
+      `${operation.side === 'buy' ? 'Compra' : 'Venta'} ${operation.quantity} ${operation.symbol}`,
     amountMinor,
     currency: 'EUR',
     externalId: operation.externalId,
@@ -248,22 +250,7 @@ export async function importOperation(
       .insert(investmentTradeDetails)
       .values(detail)
       .onConflictDoUpdate({ target: investmentTradeDetails.transactionId, set: detail }),
-    db
-      .insert(userRevisions)
-      .values({ userId, revision: 1, updatedAt: now })
-      .onConflictDoUpdate({
-        target: userRevisions.userId,
-        set: { revision: sql`${userRevisions.revision} + 1`, updatedAt: now },
-      }),
-    db.insert(syncChanges).values({
-      userId,
-      revision: sql`(select revision from user_revisions where user_id = ${userId})`,
-      entityType: 'transaction',
-      entityId: id,
-      changeType: 'upsert',
-      payload: JSON.stringify(updated),
-      createdAt: now,
-    }),
+    ...transactionSyncStatements(db, userId, id, updated, now),
   ])
   return true
 }
@@ -297,6 +284,28 @@ export async function linkInstrument(
       .update(transactions)
       .set({ version: sql`${transactions.version} + 1`, updatedAt: now })
       .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId))),
+    ...transactionSyncStatements(
+      db,
+      userId,
+      transactionId,
+      {
+        ...movement,
+        version: movement.version + 1,
+        tradeDetail: { ...detail, instrumentId },
+      },
+      now,
+    ),
+  ])
+}
+
+function transactionSyncStatements(
+  db: Db,
+  userId: string,
+  transactionId: string,
+  payload: Record<string, unknown>,
+  now: string,
+) {
+  return [
     db
       .insert(userRevisions)
       .values({ userId, revision: 1, updatedAt: now })
@@ -310,12 +319,8 @@ export async function linkInstrument(
       entityType: 'transaction',
       entityId: transactionId,
       changeType: 'upsert',
-      payload: JSON.stringify({
-        ...movement,
-        version: movement.version + 1,
-        tradeDetail: { ...detail, instrumentId },
-      }),
+      payload: JSON.stringify(payload),
       createdAt: now,
     }),
-  ])
+  ]
 }

@@ -58,23 +58,30 @@ describe('Bitvavo account history', () => {
     expect(http).toHaveBeenCalledTimes(2)
   })
 
-  it('lists non-EUR fees and inconsistent gross flows as incompatible', async () => {
+  it.each([
+    {
+      name: 'non-EUR fees',
+      index: 0,
+      patch: { feesCurrency: 'BTC' },
+      reason: 'Precio y comisión deben estar en EUR.',
+    },
+    {
+      name: 'inconsistent gross flows',
+      index: 1,
+      patch: { receivedAmount: '100' },
+      reason: 'La operación no cumple el contrato contable validado.',
+    },
+  ])('lists $name as incompatible', async ({ index, patch, reason }) => {
+    const operation = { ...fixture.transactions[index], ...patch }
     const http = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({
-        items: [
-          { ...fixture.transactions[0], feesCurrency: 'BTC' },
-          { ...fixture.transactions[1], receivedAmount: '100' },
-        ],
+        items: [operation],
         currentPage: 1,
         totalPages: 1,
       }),
     )
     const result = await fetchBitvavoHistory(credentials, range, http)
-    expect(result.operations).toEqual([])
-    expect(result.incompatible).toEqual([
-      { externalId: 'example-1', reason: 'Precio y comisión deben estar en EUR.' },
-      { externalId: 'example-2', reason: 'La operación no cumple el contrato contable validado.' },
-    ])
+    expect(result.incompatible).toEqual([{ externalId: operation.transactionId, reason }])
   })
 
   it('rejects repeated external identities rather than silently closing an incomplete preview', async () => {
@@ -86,5 +93,17 @@ describe('Bitvavo account history', () => {
       }),
     )
     await expect(fetchBitvavoHistory(credentials, range, http)).rejects.toThrow('repetidas')
+  })
+
+  it('excludes incompatible operations before the configured local start date', async () => {
+    const http = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        items: [{ ...fixture.transactions[0], feesCurrency: 'BTC' }],
+        currentPage: 1,
+        totalPages: 1,
+      }),
+    )
+    const localRange = { ...range, startDate: '2020-01-02' }
+    expect((await fetchBitvavoHistory(credentials, localRange, http)).incompatible).toEqual([])
   })
 })

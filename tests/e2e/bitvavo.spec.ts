@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import fixture from '../unit/fixtures/bitvavo-real-sanitized.json' with { type: 'json' }
 import { BitvavoPage } from './pages/BitvavoPage'
+import { seedMarketInstrument } from './seed-market-instrument'
 
 // Real D1 and server routes, with only the external Bitvavo HTTP boundary replaced.
 test('imports a closed preview, retains exact data after reload and synchronizes another client @smoke', async ({
@@ -44,7 +45,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.confirm()
     await bitvavo.close()
     await page.getByLabel('Año', { exact: true }).selectOption('2020')
-    const rows = page.locator('[data-investment-tx-id]')
+    const rows = bitvavo.rows
     await expect(rows).toHaveCount(2)
     await expect(rows.getByRole('button', { name: /^Editar/ })).toHaveCount(0)
     await expect(rows.getByRole('button', { name: /^Eliminar/ })).toHaveCount(0)
@@ -55,13 +56,21 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.close()
     await page.getByLabel('Año', { exact: true }).selectOption('2020')
     await expect(rows).toHaveCount(2)
-    await rows
-      .filter({ hasText: 'Compra' })
-      .getByRole('button', { name: 'Ver operación Bitvavo' })
-      .click()
-    const detail = page.getByRole('dialog', { name: 'Detalle Bitvavo' })
+    await bitvavo.openDetails('Compra')
+    const detail = bitvavo.details
     await expect(detail.getByText('0.01789334395', { exact: true })).toBeVisible()
     await expect(detail.getByText('2020-01-01T00:00:00.000Z', { exact: true })).toBeVisible()
+    await expect(detail.getByText('Pendiente de vincular', { exact: true })).toBeVisible()
+    const instrumentId = await seedMarketInstrument(context.request)
+    await detail.getByRole('button', { name: 'Cerrar', exact: true }).click()
+    await bitvavo.openDetails('Compra')
+    await bitvavo.linkInstrument(instrumentId)
+    await bitvavo.tracker.reload()
+    await bitvavo.tracker.openInvestmentMovementsTab()
+    await bitvavo.tracker.filterInvestmentYear(2020)
+    await bitvavo.openDetails('Compra')
+    await expect(detail.getByText('Pendiente de vincular', { exact: true })).toHaveCount(0)
+    await expect(detail.getByText('0.01789334395', { exact: true })).toBeVisible()
     const other = await browser.newContext({ extraHTTPHeaders: headers })
     try {
       const otherPage = await other.newPage()
@@ -69,7 +78,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
       await otherBitvavo.tracker.goto()
       await otherBitvavo.tracker.openInvestmentMovementsTab()
       await otherPage.getByLabel('Año', { exact: true }).selectOption('2020')
-      await expect(otherPage.locator('[data-investment-tx-id]')).toHaveCount(2)
+      await expect(otherBitvavo.rows).toHaveCount(2)
       const exported = await other.request.get('/api/data/export')
       expect(await exported.text()).not.toContain('test-secret')
     } finally {

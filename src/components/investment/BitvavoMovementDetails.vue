@@ -1,65 +1,17 @@
 <script setup lang="ts">
-import { computed, shallowRef, useId } from 'vue'
+import { computed, useId } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
-import { useSyncStore } from '../../stores/sync'
-import { resolveEntityId } from '../../lib/client/command-mapping'
+import { useBitvavoMovementDetails } from '../../composables/useBitvavoMovementDetails'
 import type { Transaction } from '../../scripts/types'
 
 const props = defineProps<{ transaction: Transaction }>()
 const titleId = useId()
-const open = shallowRef(false)
-const instrumentId = shallowRef('')
-const busy = shallowRef(false)
-const error = shallowRef('')
-const instruments = shallowRef<Array<{ id: string; symbol: string; name: string | null }>>([])
-const sync = useSyncStore()
 const operation = computed(() => props.transaction.remoteOperation)
-const options = computed(() => [
-  { value: '', label: 'Selecciona un instrumento' },
-  ...instruments.value.map((instrument) => ({
-    value: instrument.id,
-    label: `${instrument.symbol} · ${instrument.name}`,
-  })),
-])
-async function show() {
-  open.value = true
-  try {
-    const response = await fetch('/api/integrations/bitvavo')
-    if (!response.ok) throw new Error('No se pudieron cargar los instrumentos.')
-    instruments.value = (await response.json()).instruments
-  } catch (failure) {
-    error.value =
-      failure instanceof Error ? failure.message : 'No se pudieron cargar los instrumentos.'
-  }
-}
-async function link() {
-  busy.value = true
-  error.value = ''
-  try {
-    const transactionId = await resolveEntityId('transaction', props.transaction.id)
-    // Instruments use their own catalog identity in the server bootstrap.
-    const instrument = instruments.value.find((item) => item.id === instrumentId.value)
-    if (!transactionId || !instrument) throw new Error('Selecciona un instrumento disponible.')
-    const response = await fetch('/api/integrations/bitvavo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'linkInstrument',
-        transactionId,
-        instrumentId: instrument.id,
-      }),
-    })
-    if (!response.ok) throw new Error((await response.json()).error || 'No se pudo vincular.')
-    await sync.refreshFromServer()
-    open.value = false
-  } catch (failure) {
-    error.value = failure instanceof Error ? failure.message : 'No se pudo vincular.'
-  } finally {
-    busy.value = false
-  }
-}
+const { open, instrumentId, busy, error, options, show, link } = useBitvavoMovementDetails(
+  () => props.transaction,
+)
 </script>
 
 <template>

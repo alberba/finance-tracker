@@ -9,6 +9,24 @@ export class BitvavoPage {
   get panel() {
     return this.page.getByRole('dialog', { name: 'Importar desde Bitvavo' })
   }
+  get rows() {
+    return this.page.locator('[data-investment-tx-id]')
+  }
+  get details() {
+    return this.page.getByRole('dialog', { name: 'Detalle Bitvavo' })
+  }
+  async openDetails(side: 'Compra' | 'Venta') {
+    await this.rows
+      .filter({ hasText: side })
+      .getByRole('button', { name: 'Ver operación Bitvavo' })
+      .click()
+    await expect(this.details).toBeVisible()
+  }
+  async linkInstrument(id: string) {
+    await this.details.getByLabel('Instrumento', { exact: true }).selectOption(id)
+    await this.details.getByRole('button', { name: 'Vincular instrumento' }).click()
+    await expect(this.details).toBeHidden()
+  }
   async open() {
     await this.tracker.openInvestmentMovementsTab()
     await this.page.getByRole('button', { name: 'Importar Bitvavo', exact: true }).click()

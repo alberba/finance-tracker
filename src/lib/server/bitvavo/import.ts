@@ -1,5 +1,6 @@
 import { Effect, Data } from 'effect'
 import { z } from 'zod'
+import Decimal from 'decimal.js'
 import type { Db } from '../../../db/repositories/shared'
 import { RejectedCommandError } from '../../../db/repositories/shared'
 import * as repository from '../../../db/repositories/bitvavo'
@@ -93,7 +94,11 @@ export async function previewBitvavo(
   // Start at UTC midnight and filter by the configured local date to include all zones.
   const from = Math.max(0, Date.parse(`${config.startDate}T00:00:00Z`) - 86400000)
   const to = Date.now()
-  const history = await fetchBitvavoHistory(secret, { from, to, timeZone: config.timeZone }, http)
+  const history = await fetchBitvavoHistory(
+    secret,
+    { from, to, timeZone: config.timeZone, startDate: config.startDate },
+    http,
+  )
   const movements = await transactions.listByUser(db, userId)
   const details = await transactions.listTradeDetailsByTransactions(
     db,
@@ -123,7 +128,13 @@ export async function previewBitvavo(
               m.date === op.date &&
               detail?.side === op.side &&
               detail.symbol?.toUpperCase() === op.symbol &&
-              Math.abs(Math.abs(m.amount) - Number(op.cashAmount)) <= 0.02
+              [
+                Number(op.cashAmount),
+                ...(op.side === 'sell'
+                  ? // Historical manual sales used gross + fee instead of gross - fee.
+                    [new Decimal(op.cashAmount).plus(new Decimal(op.fee).times(2)).toNumber()]
+                  : []),
+              ].some((amount) => Math.abs(Math.abs(m.amount) - amount) <= 0.02)
             )
           })
           .map((m) => ({ id: m.id, description: m.description || '', date: m.date })),

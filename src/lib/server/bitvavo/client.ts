@@ -44,6 +44,7 @@ export interface HistoryRange {
   from: number
   to: number
   timeZone: string
+  startDate?: string
 }
 
 async function sign(secret: string, timestamp: string, path: string): Promise<string> {
@@ -251,6 +252,18 @@ export async function fetchBitvavoHistory(
             retryable: false,
           })
         seen.add(identity.value.transactionId)
+        if (range.startDate) {
+          const timestamp = Schema.decodeUnknownOption(
+            Schema.Struct({ executedAt: Schema.String }),
+          )(item)
+          const instant = timestamp._tag === 'Some' ? Date.parse(timestamp.value.executedAt) : NaN
+          if (
+            Number.isFinite(instant) &&
+            new Intl.DateTimeFormat('sv-SE', { timeZone: range.timeZone }).format(instant) <
+              range.startDate
+          )
+            continue
+        }
         try {
           operations.push(readOperation(item, range))
         } catch (error) {
