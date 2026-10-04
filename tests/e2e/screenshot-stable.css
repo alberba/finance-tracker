@@ -3,7 +3,8 @@
 }
 
 #save-status,
-#data-meta {
+#data-meta,
+#toast {
   visibility: hidden !important;
 }
 
