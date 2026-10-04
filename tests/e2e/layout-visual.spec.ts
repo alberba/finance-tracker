@@ -26,7 +26,7 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
  * scan started looking at the active section (it used to find none). The list
  * only shrinks: each zone's migration fixes its targets and removes its entry.
  */
-const KNOWN_UNDERSIZED_TARGETS = new Set<string>(['goals'])
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>([])
 
 /** A monthly purchase, for the views that need one rule in the plan. */
 const RECURRING_RULE = {
@@ -222,6 +222,35 @@ const DASHBOARD_VIEWS: Array<{
   },
 ]
 
+/** Objetivos views beyond the top of the page: both ledgers and the edit side panel. */
+const GOALS_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'goals-net',
+    focus: '#goals [data-goal-row="medium"]',
+    open: async (_page, tracker) => {
+      await tracker.openGoals()
+    },
+  },
+  {
+    name: 'goals-portfolio',
+    focus: '#goals [data-goals-allocation]',
+    open: async (_page, tracker) => {
+      await tracker.openGoals()
+    },
+  },
+  {
+    name: 'goals-panel',
+    focus: '#goal-panel [data-goal-impact]',
+    open: async (_page, tracker) => {
+      await tracker.openGoalPanel('medium')
+    },
+  },
+]
+
 /** Patrimonio views beyond the default one: edited snapshot, history and calculator. */
 const WEALTH_VIEWS: Array<{
   name: string
@@ -379,8 +408,6 @@ async function getLayoutScanResult(
             '.cards-grid',
             '[data-month-card]',
             '[data-dashboard-grid]',
-            '.goal-edit-grid',
-            '.goal-progress',
             '.form-grid',
             '.data-actions',
           ].join(','),
@@ -735,6 +762,58 @@ test.describe('Patrimonio · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'wealth', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Objetivos · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of GOALS_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'goals', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of GOALS_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "goals" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openGoals()
+      await expectSoundLayout(page, 'goals')
+    })
+
+    for (const view of GOALS_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'goals', view.name)
       })
     }
   })

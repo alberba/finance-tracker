@@ -85,6 +85,10 @@ export class FinanceTrackerPage {
     return this.page.locator('#wealth')
   }
 
+  get goalsSection(): Locator {
+    return this.page.locator("#goals");
+  }
+
   get dataSection(): Locator {
     return this.page.locator('#data')
   }
@@ -185,6 +189,25 @@ export class FinanceTrackerPage {
 
   async openGoals() {
     await this.open('goals')
+  }
+
+  /** A goal's row in its ledger, by its slot key ("short", "investmentFunds"…). */
+  goalRow(key: string): Locator {
+    return this.goalsSection.locator(`[data-goal-row="${key}"]`);
+  }
+
+  goalPanel(): Locator {
+    return this.page.locator("#goal-panel");
+  }
+
+  /** Opens the side panel of a goal from its row's edit button. */
+  async openGoalPanel(key: string) {
+    await this.openGoals();
+    const button = this.goalRow(key).getByRole("button", { name: /^(Editar|Definir) / });
+    // On a phone the fixed bottom nav covers a row scrolled just into view.
+    await button.evaluate((element) => element.scrollIntoView({ block: "center" }));
+    await button.click();
+    await expect(this.goalPanel()).toBeVisible();
   }
 
   async openSettings() {
