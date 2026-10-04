@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { shallowRef } from 'vue'
+import { onScopeDispose, shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
@@ -11,13 +11,12 @@ import {
   getRevision as getCachedRevision,
   openIdbCache,
   putEntities,
-  replaceEntities,
-  removeEntity as removeCachedEntity,
-  setRevision as setCachedRevision,
+  saveReadModel,
   setCachedSettings,
-  setCachedBootstrap,
   type CachedEntity,
 } from '../lib/client/idb-cache'
+import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
+import { watchSyncConnection } from '../lib/client/sync-connection'
 import { applyPendingCommands } from '../lib/client/pending-overlay'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
 import { useFinancialStateStore } from './financial-state'
@@ -39,7 +38,6 @@ import {
 } from '../lib/client/outbox'
 import { wipeAllClientData } from '../lib/client/wipe'
 import {
-  SYNC_ENTITY_TYPES,
   type CommandStatus,
   type SyncEntityType,
 } from '../lib/server/sync/command-schemas'
@@ -75,13 +73,6 @@ interface SyncCommandResult {
 
 const RETRY_BASE_DELAY_MS = 1000
 const RETRY_MAX_DELAY_MS = 30_000
-/**
- * The outbox is FIFO, so a head entry the server keeps failing on (5xx)
- * would block every later command forever (audit §2.1). After this many
- * failed sends it is discarded and surfaced via `lastError`.
- */
-const MAX_SEND_ATTEMPTS = 5
-
 export const useSyncStore = defineStore('sync', () => {
   const enabled = isSyncV2Enabled()
   const { showToast } = useToast()
@@ -93,6 +84,8 @@ export const useSyncStore = defineStore('sync', () => {
     typeof navigator === 'undefined' || navigator.onLine ? 'online' : 'offline',
   )
   const syncStatus = shallowRef<SyncStatus>('idle')
+  /** When the server last confirmed this device holds its latest revision. */
+  const lastCheckedAt = shallowRef<number | null>(null)
   const revision = shallowRef(0)
   const pendingCount = shallowRef(0)
   const lastError = shallowRef<string | null>(null)
@@ -105,161 +98,119 @@ export const useSyncStore = defineStore('sync', () => {
   let retryAttempt = 0
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let initialized = false
+  let initializing: Promise<void> | null = null
+  let synchronizing: Promise<void> | null = null
+  let syncAgainRequested = false
+  let readModel: SyncV2Bootstrap | null = null
+  /** A fresh client re-reads the full model once; the cache only covers failures. */
+  let readModelStale = false
+  let stopConnection: (() => void) | null = null
+
+  function stop(): void {
+    stopConnection?.()
+    stopConnection = null
+    if (retryTimer) clearTimeout(retryTimer)
+    retryTimer = null
+  }
+  onScopeDispose(stop)
+
+  async function renderReadModel(): Promise<void> {
+    if (!readModel) return
+    const pending = outboxDb ? await listOutbox(outboxDb) : []
+    const projected = pending.length
+      ? applyPendingCommands(readModel, pending.map((entry) => entry.command))
+      : readModel
+    useFinancialStateStore().reloadState(projectSyncV2State(projected))
+  }
 
   function isReady(): boolean {
     return enabled && cacheDb !== null && outboxDb !== null && userId.value !== null
   }
 
-  /**
-   * Pulls, then flushes, tracking `syncStatus` across both — the single
-   * "go online" entry point (`handleConnectionChange`, `init`).
-   *
-   * WP10 fix: `syncStatus` previously only ever reflected `flush()`'s own
-   * push phase, and `flush()` returns immediately (without touching
-   * `syncStatus` at all) when the outbox is empty — so a device with
-   * nothing of its own queued (the common "second device" case) never
-   * transitioned through `'syncing'`, and the UI's "Sincronizado" label
-   * (`#sidebar-sync-status`) was already showing before the pull that
-   * populates `cacheDb` with entities *this* device didn't itself create
-   * had actually finished. Wrapping both here means "Sincronizado" is an
-   * honest readiness signal for `getEntityRef`, not just "nothing queued".
-   */
-  async function syncNow(): Promise<void> {
-    syncStatus.value = 'syncing'
-    try {
-      await pullChanges()
-      await flush()
-      if (pendingCount.value === 0) await bootstrapState()
-    } finally {
-      if (syncStatus.value === 'syncing') {
-        syncStatus.value = 'idle'
-      }
+  /** Coalesces reconnects, remote notices and local writes into one cycle. */
+  async function syncNow(options: { full?: boolean } = {}): Promise<void> {
+    if (!isReady() || connection.value === 'offline') return
+    if (options.full) readModelStale = true
+    if (synchronizing) {
+      syncAgainRequested = true
+      return synchronizing
     }
+    synchronizing = (async () => {
+      do {
+        syncAgainRequested = false
+        syncStatus.value = 'syncing'
+        try {
+          if (!readModel || readModelStale) await bootstrapState()
+          await pullChanges()
+          await flush()
+          if ((syncStatus.value as SyncStatus) === 'error') break
+          await pullChanges()
+          lastCheckedAt.value = Date.now()
+          if (pendingCount.value === 0) {
+            syncStatus.value = 'idle'
+            lastError.value = null
+          }
+        } catch (error) {
+          lastError.value = error instanceof Error ? error.message : 'No se pudieron descargar tus cambios.'
+          syncStatus.value = 'error'
+          if (!readModel) useFinancialStateStore().failLoad(lastError.value)
+          scheduleRetry()
+          break
+        }
+      } while (syncAgainRequested && connection.value === 'online')
+    })()
+    try { await synchronizing } finally { synchronizing = null }
   }
 
   function handleConnectionChange(next: ConnectionState): void {
     connection.value = next
-    if (next === 'online') {
-      retryAttempt = 0
-      // Pull first: this device's local cache may be missing (or stale on)
-      // entities another device created/edited while this one was offline —
-      // `getEntityRef` (used by `syncUpdate`/`syncRemove` to resolve a local
-      // id to `{entityId, version}`) only ever sees what's in `cacheDb`, so
-      // without this an edit to an entity this device never itself wrote
-      // silently no-ops (console warning, no conflict) instead of sending a
-      // stale `baseVersion` the server can reject as a genuine conflict.
-      void syncNow()
-    }
+    if (next === 'online') void syncNow()
   }
 
-  /** Bootstraps the local databases for the authenticated identity. Idempotent. */
+  /** Shares initialization so the shell cannot race the workspace. */
   async function init(nextUserId: string, options: { email?: string | null } = {}): Promise<void> {
-    if (!enabled || isReadOnlyDemoActive()) {
-      // Read-only demo never opens a per-user cache/outbox or talks to the
-      // server — `getGlobalDemoState()` is the only data source in that mode.
-      return
-    }
+    if (!enabled || isReadOnlyDemoActive()) return
+    if (userId.value === nextUserId && initializing) return initializing
     if (initialized && userId.value === nextUserId) return
-    if (initialized) {
-      cacheDb?.close()
-      outboxDb?.close()
-      cacheDb = null
-      outboxDb = null
-      initialized = false
-    }
-    initialized = true
+    stop()
+    cacheDb?.close()
+    outboxDb?.close()
+    readModel = null
+    initialized = false
     userId.value = nextUserId
     email.value = options.email ?? null
-
-    cacheDb = await openIdbCache(nextUserId)
-    outboxDb = await openOutbox(nextUserId)
-    await bootstrapState()
-    revision.value = await getCachedRevision(cacheDb)
-    pendingCount.value = await countOutbox(outboxDb)
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', () => handleConnectionChange('online'))
-      window.addEventListener('offline', () => handleConnectionChange('offline'))
-    }
-
-    if (connection.value === 'online') {
-      // See the identical comment in `handleConnectionChange`: pull before
-      // flushing so `getEntityRef` can resolve entities this device didn't
-      // itself create (e.g. a fresh "second device" for an existing user).
-      await syncNow()
-    }
+    initializing = (async () => {
+      cacheDb = await openIdbCache(nextUserId)
+      outboxDb = await openOutbox(nextUserId)
+      readModel = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+      revision.value = readModel?.revision ?? await getCachedRevision(cacheDb)
+      pendingCount.value = await countOutbox(outboxDb)
+      await renderReadModel()
+      await syncNow({ full: true })
+      initialized = true
+      stopConnection = watchSyncConnection({
+        changed: () => { void syncNow() },
+        online: () => handleConnectionChange('online'),
+        offline: () => handleConnectionChange('offline'),
+      })
+    })()
+    try { await initializing } finally { initializing = null }
   }
 
   async function bootstrapState(): Promise<void> {
     if (!cacheDb) return
-    let bootstrap: SyncV2Bootstrap | null = null
-    let reachedServer = false
-    try {
-      const response = await fetch('/api/bootstrap')
-      reachedServer = response.ok
-      if (response.ok) bootstrap = await response.json() as SyncV2Bootstrap
-    } catch {
-      // Offline reload falls back to the last complete identity-partitioned read model.
-    }
-    bootstrap ??= await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-    if (!bootstrap && !reachedServer) {
-      // Audit §5.2: only the server can tell us this identity has no data yet.
-      // When the request itself failed we know nothing, so we must not write
-      // an empty read model over the cache or reset the cursor to 0 — doing so
-      // makes every later edit look like a brand-new entity and duplicates it.
-      lastError.value = 'No se pudo cargar tus datos. Reintentando…'
-      syncStatus.value = 'error'
-      return
-    }
-    // A brand-new identity has no read model yet. Start from an empty
-    // projection; the first command will create its server-side entities.
-    // Existing identities still hydrate from the network/cache above.
-    bootstrap ??= {
-      revision: 0,
-      settings: null,
-      accounts: [], categories: [], transactions: [], subscriptions: [],
-      recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
-      contributions: [], userInstruments: [], wealthSnapshots: [],
-      stockeventsSymbolMappings: [], stockeventsCashMappings: [], stockeventsCashSyncEntries: [],
-    }
-    const collections = {
-      account: bootstrap.accounts,
-      category: bootstrap.categories,
-      transaction: bootstrap.transactions,
-      subscription: bootstrap.subscriptions,
-      recurringRule: bootstrap.recurringRules,
-      pendingMovement: bootstrap.pendingMovements,
-      budgetEntry: bootstrap.budgetEntries,
-      goal: bootstrap.goals,
-      contribution: bootstrap.contributions,
-      userInstrument: bootstrap.userInstruments,
-      wealthSnapshot: bootstrap.wealthSnapshots,
-      stockeventsMapping: bootstrap.stockeventsSymbolMappings ?? [],
-      stockeventsCashEntry: bootstrap.stockeventsCashSyncEntries ?? [],
-    } satisfies Record<SyncEntityType, CachedEntity[]>
-    if (reachedServer) {
-      // Only a payload that actually came from the server may replace the
-      // cache. Rewriting it from its own (possibly stale) copy would drop
-      // rows this device has since learned about through `pullChanges`, with
-      // the same duplicate-`create` consequence as §5.2's empty fallback.
-      await Promise.all(Object.entries(collections).map(([entityType, entities]) =>
-        replaceEntities(cacheDb!, entityType as SyncEntityType, entities),
-      ))
-      await setCachedSettings(cacheDb, bootstrap.settings)
-      await setCachedBootstrap(cacheDb, bootstrap)
-      await setCachedRevision(cacheDb, bootstrap.revision)
-    }
-    // Audit §5.4: what is still queued is shown as if it had already been
-    // saved — because for the user it has been.
-    const pending = outboxDb ? await listOutbox(outboxDb) : []
-    const withPending = pending.length
-      ? applyPendingCommands(bootstrap, pending.map((entry) => entry.command))
-      : bootstrap
-    useFinancialStateStore().reloadState(projectSyncV2State(withPending))
-    if (withPending.subscriptions.length) {
-      const recoveredSubscriptionIds = withPending.subscriptions
-        .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
-        .map((subscription) => String(subscription.legacyId || subscription.id))
+    const response = await fetch('/api/bootstrap')
+    if (!response.ok) throw new Error(`No se pudieron cargar tus datos (${response.status}). Reintentando…`)
+    const bootstrap = await response.json() as SyncV2Bootstrap
+    await saveReadModel(cacheDb, bootstrap)
+    readModel = bootstrap
+    readModelStale = false
+    revision.value = bootstrap.revision
+    await renderReadModel()
+    const recoveredSubscriptionIds = bootstrap.subscriptions
+      .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
+      .map((subscription) => String(subscription.legacyId || subscription.id))
+    if (bootstrap.subscriptions.length) {
       const { useMovementsStore } = await import('./movements')
       await useMovementsStore().refreshSubscriptions(recoveredSubscriptionIds)
     }
@@ -304,7 +255,7 @@ export const useSyncStore = defineStore('sync', () => {
       return null
     }
     pendingCount.value = await countOutbox(outboxDb)
-    void flush()
+    void syncNow()
     return entry
   }
 
@@ -316,7 +267,7 @@ export const useSyncStore = defineStore('sync', () => {
     retryAttempt += 1
     retryTimer = setTimeout(() => {
       retryTimer = null
-      void flush()
+      void syncNow()
     }, delay)
   }
 
@@ -505,17 +456,8 @@ export const useSyncStore = defineStore('sync', () => {
       syncStatus.value = 'error'
       const message = error instanceof Error ? error.message : 'Error de sincronización'
       lastError.value = message
-      // Network failures never count: a flaky connection must not discard
-      // edits the server has never seen.
-      const failed = batch[0]
-      if (reachedServer && failed.attempts + 1 >= MAX_SEND_ATTEMPTS) {
-        await discardOutboxEntry(outboxDb, failed.seq)
-        pendingCount.value = await countOutbox(outboxDb)
-        lastError.value = `Se descartó un cambio que el servidor no pudo aplicar tras ${MAX_SEND_ATTEMPTS} intentos: ${message}`
-        showToast(`⚠️ ${lastError.value}`)
-      } else if (reachedServer) {
-        await recordFailure(outboxDb, failed.seq, message)
-      }
+      // A transient Worker failure cannot invalidate an accepted local edit.
+      if (reachedServer) await recordFailure(outboxDb, batch[0].seq, message)
       scheduleRetry()
     } finally {
       flushing = false
@@ -526,70 +468,33 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /** Pulls incremental changes since the last known revision (`GET /api/changes`). */
-  /**
-   * Shape of one `GET /api/changes` row — `SyncChangeRow`
-   * (`src/db/repositories/sync.ts`), returned as-is by the route.
-   *
-   * WP10 fix: previously typed (and read) as `{ entityType, entityId,
-   * data, removed }`, none of which exist on the real row: the entity
-   * snapshot is `payload`, a JSON *string* (D1 has no native JSON column),
-   * not a `data` object; "this row is a delete" is `changeType ===
-   * 'remove'`, not a `removed` boolean. Both mismatches meant every pulled
-   * change was silently a no-op — `applyResultToCache` bailed on
-   * `change.data` always being `undefined` (`typeof undefined !==
-   * 'object'`), so `cacheDb` never actually gained any entity a device
-   * didn't create itself, and `removeEntity` was never called either. The
-   * pull's `revision` bookkeeping still advanced, so this failed silently
-   * with no retry: a device could poll forever and never notice its cache
-   * was empty of everyone else's writes.
-   */
-  interface SyncChangeRow {
-    entityType: SyncEntityType
-    entityId: string
-    changeType: 'create' | 'update' | 'remove'
-    payload: string
-  }
-
+  /** Persists rows, projection and cursor in one IndexedDB transaction. */
   async function pullChanges(): Promise<void> {
-    if (!isReady() || !cacheDb) {
-      return
-    }
-    let response: Response
-    try {
-      response = await fetch(`/api/changes?since=${revision.value}`)
-    } catch {
-      // Same principle as `bootstrapState`'s §5.2 fix: a network failure here
-      // must leave the cursor and cache untouched, not be treated as "nothing
-      // changed" and definitely not thrown — a reload while offline still
-      // needs `init()` to finish so the pending-overlay in `bootstrapState`
-      // can render what the user queued (audit §5.4).
-      return
-    }
-    if (!response.ok) {
-      return
-    }
-    const body = (await response.json()) as {
-      revision: number
-      changes: SyncChangeRow[]
-    }
-    for (const change of body.changes) {
-      // The change log also carries non-entity rows (`userSettings`) that
-      // have no object store; applying them used to throw and pin the
-      // cursor forever (audit §2.5). Bootstrap rehydrates settings.
-      if (!(SYNC_ENTITY_TYPES as readonly string[]).includes(change.entityType)) continue
-      try {
-        if (change.changeType === 'remove') {
-          await removeCachedEntity(cacheDb, change.entityType, change.entityId)
-        } else {
-          await applyResultToCache(change.entityType, JSON.parse(change.payload))
-        }
-      } catch (error) {
-        console.warn('[sync] No se pudo aplicar un cambio remoto', change.entityType, change.entityId, error)
+    if (!isReady() || !cacheDb || !readModel) return
+    let hasMore: boolean
+    do {
+      const response = await fetch(`/api/changes?since=${revision.value}`)
+      if (!response.ok) throw new Error(`No se pudieron descargar tus cambios (${response.status}).`)
+      const body = await response.json() as {
+        revision: number; changes: RemoteChange[]; hasMore?: boolean; requiresBootstrap?: boolean
       }
-    }
-    revision.value = body.revision
-    await setCachedRevision(cacheDb, body.revision)
+      if (body.requiresBootstrap || body.changes.some((change) =>
+        change.entityType === 'userInstrument' || change.entityType === 'reset')) {
+        await bootstrapState()
+        return
+      }
+      if (!Number.isSafeInteger(body.revision) || body.revision < revision.value) {
+        throw new Error('La revisión remota no es válida.')
+      }
+      if (body.changes.length || body.revision !== revision.value) {
+        const next = applyRemoteChanges(readModel, body.changes, body.revision)
+        await saveReadModel(cacheDb, next)
+        readModel = next
+        revision.value = next.revision
+        await renderReadModel()
+      }
+      hasMore = body.hasMore === true
+    } while (hasMore)
   }
 
   /**
@@ -752,6 +657,8 @@ export const useSyncStore = defineStore('sync', () => {
 
   /** Full local wipe (Cf-Access logout doesn't clear client storage on its own). */
   async function logout(): Promise<void> {
+    stop()
+    readModel = null
     cacheDb?.close()
     outboxDb?.close()
     cacheDb = null
@@ -777,10 +684,12 @@ export const useSyncStore = defineStore('sync', () => {
     revision,
     pendingCount,
     lastError,
+    lastCheckedAt,
     init,
     enqueueCommand,
     flush,
     pullChanges,
+    syncNow,
     logout,
     getEntityRef,
     getSettingsVersion,
