@@ -280,6 +280,21 @@ const GOALS_VIEWS: Array<{
   },
 ]
 
+/** Datos views beyond the top of the page: the import confirmation dialog. */
+const DATA_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'data-import-confirm',
+    open: async (page, tracker) => {
+      await openSectionForLayout(page, tracker, 'data')
+      await tracker.chooseImportFile()
+    },
+  },
+]
+
 /** Patrimonio views beyond the default one: edited snapshot, history and calculator. */
 const WEALTH_VIEWS: Array<{
   name: string
@@ -438,7 +453,6 @@ async function getLayoutScanResult(
             '[data-month-card]',
             '[data-dashboard-grid]',
             '.form-grid',
-            '.data-actions',
           ].join(','),
         ),
       ),
@@ -1001,6 +1015,58 @@ test.describe('Movimientos · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'transactions', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Datos · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of DATA_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'data', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of DATA_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "data" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openData()
+      await expectSoundLayout(page, 'data', 'data')
+    })
+
+    for (const view of DATA_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'data', view.name)
       })
     }
   })

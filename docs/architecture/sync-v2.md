@@ -35,8 +35,10 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
     `src/scripts/types.ts` (tipo `State`). Si la proyección emite un campo que `normalizeState`
     no conserva, se pierde.
 
-**Fuera de la cadena**: `src/pages/api/data/import.ts` mapea los ajustes por su cuenta al
-importar.
+**Fuera de la cadena**: la copia JSON de Datos. `src/pages/api/data/export.ts` vuelca las filas
+y `src/pages/api/data/import.ts` las recrea campo a campo, así que un campo nuevo también se
+añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFullDataset`) comprueba
+que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
 
 ## Test
 

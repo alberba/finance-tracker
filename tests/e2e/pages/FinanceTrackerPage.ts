@@ -252,6 +252,16 @@ export class FinanceTrackerPage {
     await this.open('data')
   }
 
+  /** Picks a backup file in Datos, which opens the import confirmation. */
+  async chooseImportFile() {
+    await this.page.locator('#import-json').setInputFiles({
+      name: 'finance-tracker-copia.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from('{}'),
+    })
+    await expect(this.page.getByRole('alertdialog', { name: '¿Importar esta copia?' })).toBeVisible()
+  }
+
   async openGlobalReportDialog() {
     await this.page.locator('#global-report-trigger').click()
     await expect(this.issueReportDialog).toBeVisible()
