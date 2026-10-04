@@ -12,12 +12,21 @@ interface WorkerBindings {
 export default Sentry.withSentry<WorkerBindings>(
   (env) => ({
     dsn: env.SENTRY_DSN,
+    // Línea base de v10 (`sendDefaultPii: false`): en v11 cada categoría que
+    // no se fija aquí se recoge por defecto.
     dataCollection: {
       userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+        response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      },
       httpBodies: [],
+      urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      graphQL: { document: false, variables: false },
     },
-    sendDefaultPii: false,
-    enableLogs: true,
     tracesSampleRate: 0.1,
     // Los eventos llevan nuestros tags y la pila; el breadcrumb automático de la
     // integración `Console` guarda los argumentos crudos de cada `console.*`,

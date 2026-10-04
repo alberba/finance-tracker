@@ -125,8 +125,8 @@ son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
 `PUBLIC_SYNC_V2=true` viene de `.env.production` (versionado), así que no hay
 que declararlo como variable de build.
 
-Toolchain del build: `.node-version` (24) y el campo `packageManager` de
-`package.json` fijan Node y pnpm para que Workers Builds coincida con el CI.
+Toolchain del build: `.node-version` (24.16.0) y el campo `packageManager` de
+`package.json` fijan Node y pnpm para Workers Builds. El CI usa la rama Node 24.
 
 El deploy ocurre en el push a `main`, **en paralelo al CI y sin esperarlo**: si
 los E2E fallan, el deploy sale igual. Compensación aceptada a cambio de

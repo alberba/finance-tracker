@@ -184,7 +184,7 @@ function initUserMenu(): void {
   if (!root || !trigger || !menu || !demoAction) return
 
   trigger.addEventListener('click', () => {
-    const nextOpen = menu.hidden
+    const nextOpen = Boolean(menu.hidden)
     setUserMenuOpen(menu, trigger, nextOpen)
     if (nextOpen) demoAction.focus()
   })
