@@ -636,16 +636,30 @@ async function expectViewSnapshot(
 ): Promise<void> {
   await page.clock.setFixedTime(SNAPSHOT_NOW)
   await tracker.goto()
-  // Tab scrolling must use the same font metrics as the captured screenshot.
-  if (/^page-settings-(recurring|preferences)/.test(name)) {
-    await page.addStyleTag({ path: './tests/e2e/screenshot-stable.css' })
-  }
+  // Scrolling (tabs, `focus`) must use the font metrics of the captured
+  // screenshot: with the remote fonts, the offset depends on whether they had
+  // loaded yet, and the capture lands a few pixels off from run to run.
+  await page.addStyleTag({ path: './tests/e2e/screenshot-stable.css' })
   await open()
   await page.evaluate(async (selector) => {
     await document.fonts.ready
     const target = selector ? document.querySelector(selector) : null
-    if (target) target.scrollIntoView({ block: 'center' })
-    else window.scrollTo(0, 0)
+    if (!target) {
+      window.scrollTo(0, 0)
+      return
+    }
+    // Late renders (sync status, pending rows) can still move the target after
+    // the first scroll: scroll again until it holds still for a frame.
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve))
+    let lastTop = Number.NaN
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      target.scrollIntoView({ block: 'center' })
+      await frame()
+      await frame()
+      const top = target.getBoundingClientRect().top
+      if (top === lastTop) break
+      lastTop = top
+    }
   }, focus)
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
