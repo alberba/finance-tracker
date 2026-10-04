@@ -221,6 +221,7 @@
   /* Rules and borders. */
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-track: var(--track-bg);
 
   /* Gain / loss text tones (AA on every surface, both themes). Pair them
      with a sign so meaning never depends on color alone. */
