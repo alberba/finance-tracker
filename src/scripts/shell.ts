@@ -220,7 +220,7 @@ function initUserMenu(): void {
   if (!root || !trigger || !menu || !demoAction) return
 
   trigger.addEventListener('click', () => {
-    const nextOpen = menu.hidden
+    const nextOpen = Boolean(menu.hidden)
     setUserMenuOpen(menu, trigger, nextOpen)
     if (nextOpen) demoAction.focus()
   })
@@ -301,19 +301,21 @@ function initSyncMenu(): void {
 
   logoutAction?.addEventListener('click', () => {
     logoutAction.setAttribute('aria-disabled', 'true')
-    void sessionRequest.then(async (session) => {
-      if (syncStore?.userId) {
-        await syncStore.logout()
-      } else if (session?.user?.id) {
-        await wipeAllClientData(session.user.id)
-      } else {
-        wipeLegacyClientData()
-      }
-      window.location.href = '/cdn-cgi/access/logout'
-    }).catch((error: unknown) => {
-      logoutAction.removeAttribute('aria-disabled')
-      console.error('No se pudo borrar el almacenamiento privado antes de cerrar sesión.', error)
-    })
+    void sessionRequest
+      .then(async (session) => {
+        if (syncStore?.userId) {
+          await syncStore.logout()
+        } else if (session?.user?.id) {
+          await wipeAllClientData(session.user.id)
+        } else {
+          wipeLegacyClientData()
+        }
+        window.location.href = '/cdn-cgi/access/logout'
+      })
+      .catch((error: unknown) => {
+        logoutAction.removeAttribute('aria-disabled')
+        console.error('No se pudo borrar el almacenamiento privado antes de cerrar sesión.', error)
+      })
   })
 }
 
