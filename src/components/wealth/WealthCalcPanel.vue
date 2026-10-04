@@ -155,7 +155,7 @@ function apply(): void {
       >
         <div class="grid gap-1">
           <span class="text-ink-muted text-sm">Resultado</span>
-          <span class="text-sm" :class="isInvalid ? 'text-accent' : 'text-ink-muted'">{{
+          <span class="text-sm" :class="isInvalid ? 'text-ink-loss' : 'text-ink-muted'">{{
             note
           }}</span>
         </div>
@@ -171,7 +171,12 @@ function apply(): void {
 
     <template #footer>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton variant="primary" type="submit" form="wealth-calc-form" :disabled="result === null">
+      <BaseButton
+        variant="primary"
+        type="submit"
+        form="wealth-calc-form"
+        :disabled="result === null"
+      >
         Aplicar al snapshot
       </BaseButton>
     </template>

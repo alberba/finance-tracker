@@ -71,6 +71,7 @@ const columns: LedgerColumn<InstrumentValuation>[] = [
       :row-key="(row) => row.instrument.id"
       :row-attrs="(row) => ({ 'data-quote': row.instrument.id })"
       label="Cotizaciones de cartera"
+      empty-text="Aún no hay instrumentos. Añádelos a un activo en Configuración para seguir su cotización."
     >
       <template #cell-instrument="{ row }">
         <span class="grid gap-0.5">

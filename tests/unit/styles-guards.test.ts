@@ -134,14 +134,14 @@ const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
  * Pairs that were already below AA when the guard landed. The list only
  * shrinks: fix the token (or move its text to --gain / --loss) and delete the
  * entry — the test fails while a listed pair passes. Never add to it.
- * `--text-faint` is meant for placeholders and decoration; `--income` /
- * `--expense` are fills whose text counterparts are `--gain` / `--loss`.
+ * What is left is never painted as readable text (the next describe enforces
+ * it): `--text-faint` is for placeholders and decoration; `--income` /
+ * `--expense` are fills whose text counterparts are `--gain` / `--loss`;
+ * `--accent` is a warning fill (dots, tinted pills with `text-text-main`).
  */
 const KNOWN_BELOW_AA = new Set([
   ...PAGE_SURFACES.map((surface) => `light --text-faint on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `dark --text-faint on ${surface}`),
-  'light --primary on --bg-main',
-  'light --primary on --bg-subtle',
   ...PAGE_SURFACES.map((surface) => `light --income on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `light --expense on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `light --accent on ${surface}`),
@@ -192,5 +192,23 @@ describe('CSS variables', () => {
     )
 
     expect(undefinedReads).toEqual([])
+  })
+})
+
+describe('tokens below AA', () => {
+  it('are never painted as readable text', () => {
+    // The pairs left in KNOWN_BELOW_AA stay there only because no text uses
+    // them; `placeholder:text-text-faint` is the one allowed use.
+    const textUses = sourceFiles.flatMap(({ path, text }) =>
+      [
+        ...text.matchAll(
+          /(?<![\w-])((?:[\w-]+:)*)text-(income|expense|accent|text-faint|\(--(?:income|expense|accent|text-faint)\))(?![\w-])/g,
+        ),
+      ]
+        .filter(([, variants]) => variants !== 'placeholder:')
+        .map(([match]) => `${path}: ${match}`),
+    )
+
+    expect(textUses).toEqual([])
   })
 })

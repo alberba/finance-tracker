@@ -31,7 +31,7 @@ const TYPE_OPTIONS: SegmentedOption<RuleType>[] = [
   { value: 'income', label: 'Ingreso' },
   { value: 'expense', label: 'Gasto' },
 ]
-const FREQUENCY_OPTIONS: Array<{ value: RecurringFrequency; label: string }> = [
+const FREQUENCY_OPTIONS: SegmentedOption<RecurringFrequency>[] = [
   { value: 'daily', label: 'Diaria' },
   { value: 'weekly', label: 'Semanal' },
   { value: 'monthly', label: 'Mensual' },
@@ -190,11 +190,13 @@ defineExpose({ openNew, openEdit })
 
       <fieldset class="grid gap-3.5 sm:grid-cols-2">
         <PanelSectionTitle>Cada cuánto</PanelSectionTitle>
-        <BaseSelect
+        <SegmentedControl
           v-model="form.frequency"
-          label="Frecuencia"
-          name="frequency"
           :options="FREQUENCY_OPTIONS"
+          label="Frecuencia"
+          variant="soft"
+          data-key="frequency"
+          class="flex-wrap sm:col-span-2 [&>button]:h-11 [&>button]:flex-auto [&>button]:whitespace-nowrap"
         />
         <BaseInput
           v-model="form.interval"

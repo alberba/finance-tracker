@@ -28,7 +28,7 @@ const SIDE_OPTIONS: SegmentedOption<InvestmentSide>[] = [
   { value: 'buy', label: 'Compra' },
   { value: 'sell', label: 'Venta' },
 ]
-const FREQUENCY_OPTIONS: Array<{ value: RecurringFrequency; label: string }> = [
+const FREQUENCY_OPTIONS: SegmentedOption<RecurringFrequency>[] = [
   { value: 'daily', label: 'Diaria' },
   { value: 'weekly', label: 'Semanal' },
   { value: 'monthly', label: 'Mensual' },
@@ -200,11 +200,13 @@ defineExpose({ openNew, openEdit })
         <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
           Cada cuánto
         </legend>
-        <BaseSelect
+        <SegmentedControl
           v-model="form.frequency"
-          label="Frecuencia"
-          name="frequency"
           :options="FREQUENCY_OPTIONS"
+          label="Frecuencia"
+          variant="soft"
+          data-key="frequency"
+          class="col-span-2 flex-wrap [&>button]:h-11 [&>button]:flex-auto [&>button]:whitespace-nowrap"
         />
         <BaseInput
           v-model="form.interval"

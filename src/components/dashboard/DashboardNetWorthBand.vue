@@ -45,7 +45,7 @@ const drawChart = computed(() => {
       fillOpacity: 0.22,
       borderWidth: 2.5,
       axisColor: resolveCssColor('--ink-muted', '#8195b2', canvas),
-      gridColor: 'rgba(255, 255, 255, 0.07)',
+      gridColor: resolveCssColor('--ink-grid', 'rgba(255, 255, 255, 0.07)', canvas),
       pointBorderColor: resolveCssColor('--ink-surface', '#0b1120', canvas),
       labels,
       formatValue: (value) => formatMoney(value, currency),
