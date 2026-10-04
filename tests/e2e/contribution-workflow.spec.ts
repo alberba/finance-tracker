@@ -282,10 +282,10 @@ test.describe('recorrido guiado de aportes', () => {
 
     const modal = page.locator('#contribution-workflow-dialog')
     await modal
-      .getByRole('checkbox', {
-        name: /Añadir las asignaciones al efectivo de Stock Events/,
+      .getByRole('switch', {
+        name: 'Añadir las asignaciones al efectivo de Stock Events',
       })
-      .check()
+      .check({ force: true })
     await tracker.contributionWorkflowSave()
 
     await expect
@@ -309,10 +309,10 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 150.5)
     await page
       .locator('#contribution-workflow-dialog')
-      .getByRole('checkbox', {
-        name: /Añadir las asignaciones al efectivo de Stock Events/,
+      .getByRole('switch', {
+        name: 'Añadir las asignaciones al efectivo de Stock Events',
       })
-      .check()
+      .check({ force: true })
     await tracker.contributionWorkflowSave()
 
     await expect.poll(() => syncedTransactions).toHaveLength(2)

@@ -63,10 +63,18 @@ export class LiveMarketPage {
       await panel.getByRole('button', { name: 'Añadir otro instrumento' }).click()
     }
     const form = panel.locator('[data-instrument-form]')
-    await form.getByLabel('Tipo').selectOption(params.type)
+    await form
+      .getByRole('group', { name: 'Tipo', exact: true })
+      .locator(`[data-instrument-type="${params.type}"]`)
+      .click()
     await form.getByLabel('Símbolo').fill(params.symbol)
     await form.getByLabel('Moneda').fill(params.currency)
-    if (params.provider) await form.getByLabel('Proveedor').selectOption(params.provider)
+    if (params.provider) {
+      await form
+        .getByRole('group', { name: 'Proveedor', exact: true })
+        .locator(`[data-provider="${params.provider}"]`)
+        .click()
+    }
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
     await expect(this.instrument(params.symbol.toUpperCase())).toBeVisible()
     if (!params.keepOpen) await this.closeAsset()
@@ -98,7 +106,10 @@ export class LiveMarketPage {
     await form.getByLabel('Categoría').selectOption({ label: params.category })
     await form.getByLabel('Descripción').fill(params.description)
     await form.getByLabel('Importe por compra').fill(String(params.amount))
-    await form.getByLabel('Frecuencia').selectOption(params.frequency)
+    await form
+      .getByRole('group', { name: 'Frecuencia' })
+      .locator(`[data-frequency="${params.frequency}"]`)
+      .click()
     await form.getByLabel('Fecha inicial').fill(params.startDate)
     if (params.symbol !== undefined) await form.getByLabel('Símbolo').fill(params.symbol)
     if (params.units !== undefined) await form.getByLabel('Títulos').fill(String(params.units))

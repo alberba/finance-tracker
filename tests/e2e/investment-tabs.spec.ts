@@ -45,7 +45,9 @@ test.describe('inversión tabs y TWR', () => {
 
   test('permite descontar una compra del efectivo de Stock Events', async ({ tracker, page }) => {
     await tracker.openInvestmentMovementsTab()
-    await expect(tracker.investmentSection().locator('#investment-movement-to-cash')).toHaveCount(0)
+    await expect(
+      tracker.investmentSection().getByRole('switch', { name: /efectivo en Stock Events/ }),
+    ).toHaveCount(0)
 
     let syncedTransaction: Record<string, unknown> | undefined
     await page.route('**/api/integrations/stockevents', (route) =>
@@ -100,7 +102,7 @@ test.describe('inversión tabs y TWR', () => {
       .fill('CASHBUY')
 
     await expect(
-      tracker.investmentSection().getByRole('checkbox', {
+      tracker.investmentSection().getByRole('switch', {
         name: 'Descontar del efectivo en Stock Events',
       }),
     ).toBeVisible()
@@ -151,7 +153,9 @@ test.describe('inversión tabs y TWR', () => {
       .locator('#investment-movement-symbol')
       .fill('UNMAPPED')
 
-    await expect(tracker.investmentSection().locator('#investment-movement-to-cash')).toHaveCount(0)
+    await expect(
+      tracker.investmentSection().getByRole('switch', { name: /efectivo en Stock Events/ }),
+    ).toHaveCount(0)
   })
 
   test('avisa y permite reenviar un movimiento salteado por Stock Events', async ({
