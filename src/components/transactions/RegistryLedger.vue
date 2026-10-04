@@ -153,14 +153,17 @@ const emptyText = computed(() =>
       :row-class="(tx) => (isSelected(tx) ? 'bg-primary/8' : '')"
     >
       <template #head-select>
-        <input
-          id="tx-select-all"
-          type="checkbox"
-          class="accent-primary size-4.5"
-          aria-label="Seleccionar todos los movimientos visibles"
-          :checked="movementsStore.allVisibleSelected"
-          @change="movementsStore.setAllSelected(($event.target as HTMLInputElement).checked)"
-        />
+        <!-- The label is the touch target: 44 px on mobile around the 18 px box. -->
+        <label class="desk:size-6 grid size-11 cursor-pointer place-items-center">
+          <input
+            id="tx-select-all"
+            type="checkbox"
+            class="accent-primary size-4.5"
+            aria-label="Seleccionar todos los movimientos visibles"
+            :checked="movementsStore.allVisibleSelected"
+            @change="movementsStore.setAllSelected(($event.target as HTMLInputElement).checked)"
+          />
+        </label>
       </template>
       <template #head-date>
         <button
@@ -184,15 +187,19 @@ const emptyText = computed(() =>
       </template>
 
       <template #cell-select="{ row }">
-        <input
-          type="checkbox"
-          class="accent-primary size-4.5"
-          :data-select-tx-id="row.id"
-          :disabled="Boolean(row.remoteOperation)"
-          :checked="isSelected(row)"
-          :aria-label="`Seleccionar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
-          @change="movementsStore.setSelected(row.id, ($event.target as HTMLInputElement).checked)"
-        />
+        <label class="desk:size-6 grid size-11 cursor-pointer place-items-center">
+          <input
+            type="checkbox"
+            class="accent-primary size-4.5"
+            :data-select-tx-id="row.id"
+            :disabled="Boolean(row.remoteOperation)"
+            :checked="isSelected(row)"
+            :aria-label="`Seleccionar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
+            @change="
+              movementsStore.setSelected(row.id, ($event.target as HTMLInputElement).checked)
+            "
+          />
+        </label>
       </template>
       <template #cell-date="{ row }">
         <span class="text-text-muted whitespace-nowrap tabular-nums">{{

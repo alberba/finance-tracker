@@ -269,7 +269,7 @@ function confirmDelete(): void {
         <template #cell-declared="{ row }">
           <button
             type="button"
-            class="focus-visible:outline-primary inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm font-bold whitespace-nowrap focus-visible:outline-2"
+            class="focus-visible:outline-primary desk:min-h-9 inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm font-bold whitespace-nowrap focus-visible:outline-2"
             :class="
               row.declared
                 ? 'bg-income/12 text-gain border-transparent'

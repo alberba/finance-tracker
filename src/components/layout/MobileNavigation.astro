@@ -92,7 +92,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     </div>
     <button
       type="button"
-      class="bg-subtle text-text-muted hover:text-text-main grid size-11 shrink-0 place-items-center rounded-md"
+      class="bg-subtle text-text-muted hover:text-text-main grid size-11 shrink-0 place-items-center rounded-md focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
       data-mobile-more-close
       aria-label="Cerrar menú"
     >
@@ -118,7 +118,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
         return (
           <button
             type="button"
-            class="border-line text-text-main aria-[current=page]:text-primary flex min-h-14 items-center gap-3 border-b px-1 text-left text-[0.9375rem] font-semibold even:border-l even:pl-4 aria-[current=page]:font-bold"
+            class="border-line text-text-main aria-[current=page]:text-primary flex min-h-14 items-center gap-3 border-b px-1 text-left text-[0.9375rem] font-semibold even:border-l even:pl-4 aria-[current=page]:font-bold focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
             data-nav-item
             data-section={section.id}
             aria-controls={section.id}
@@ -150,7 +150,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
   <div class="border-line mt-4.5 grid border-t">
     <button
       type="button"
-      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
       data-report-dialog-open
     >
       <svg
@@ -175,7 +175,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     </button>
     <button
       type="button"
-      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
       data-demo-mode-action
     >
       <svg
@@ -201,7 +201,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     <button
       id="pwa-install-button"
       type="button"
-      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left text-[0.9375rem] font-semibold"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left text-[0.9375rem] font-semibold focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
       hidden
     >
       <svg

@@ -49,7 +49,7 @@ const IDLE = {
       v-for="option in options"
       :key="option.value"
       type="button"
-      class="focus-visible:outline-primary h-9 min-w-11 rounded-sm px-3.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      class="focus-visible:outline-primary desk:h-9 h-11 min-w-11 rounded-sm px-3.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
       :class="selected === option.value ? ACTIVE[variant] : IDLE[variant]"
       :aria-pressed="selected === option.value"
       :aria-label="option.ariaLabel"

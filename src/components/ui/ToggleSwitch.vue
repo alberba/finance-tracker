@@ -13,7 +13,7 @@ const checked = defineModel<boolean>({ required: true })
 
 <template>
   <label
-    class="relative inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm font-semibold"
+    class="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center gap-2.5 text-sm font-semibold"
   >
     <input
       v-model="checked"
