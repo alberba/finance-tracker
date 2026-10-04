@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, shallowRef, watch } from 'vue'
+import SidePanel from '../ui/SidePanel.vue'
 
 import StockEventsSymbolTable from './StockEventsSymbolTable.vue'
 import { useStockEventsStore } from '../../stores/stockevents'
 
 const stockEventsStore = useStockEventsStore()
+const open = defineModel<boolean>('open', { required: true })
 
 const apiKeyInput = shallowRef('')
+watch(open, (value) => {
+  if (!value) apiKeyInput.value = ''
+})
 const showHiddenSymbols = shallowRef(false)
 
 onMounted(async () => {
@@ -53,16 +58,18 @@ function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
 </script>
 
 <template>
-  <section id="cfg-stockevents" class="settings-block">
-    <header>
-      <span class="settings-block__num">09</span>
-      <h3>Stock Events</h3>
-      <p>
-        Sincroniza los nuevos movimientos de inversión con Stock Events. La API key se crea en la
-        web de Stock Events, en Settings &gt; Data &gt; API Keys (requiere suscripción Pro).
-      </p>
-    </header>
-    <div class="settings-block__body">
+  <SidePanel
+    id="stockevents-connection-panel"
+    v-model:open="open"
+    kicker="Conexión · Sincronización"
+    title="Stock Events"
+    title-id="stockevents-connection-title"
+  >
+    <p class="text-text-muted text-sm">
+      Sincroniza los nuevos movimientos de inversión con Stock Events. La API key se crea en la web
+      de Stock Events, en Settings &gt; Data &gt; API Keys (requiere suscripción Pro).
+    </p>
+    <div class="grid gap-4">
       <label class="tx-checkbox-option">
         <input
           type="checkbox"
@@ -213,7 +220,7 @@ function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
         </small>
       </div>
     </div>
-  </section>
+  </SidePanel>
 </template>
 
 <style scoped>

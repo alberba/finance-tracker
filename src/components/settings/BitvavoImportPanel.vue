@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
+import { computed, watch } from 'vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
 import PillTag from '../ui/PillTag.vue'
 import { useBitvavoImport } from '../../composables/useBitvavoImport'
-import { isSyncV2Enabled } from '../../lib/client/feature-flags'
-
-const enabled = isSyncV2Enabled()
-const open = shallowRef(false)
+const open = defineModel<boolean>('open', { required: true })
 const {
   form,
   destinations,
@@ -35,16 +32,18 @@ const purchases = computed(
 const sales = computed(
   () => preview.value?.operations.filter((op) => op.side === 'sell').length ?? 0,
 )
-async function show() {
-  open.value = true
-  await load()
-}
-watch(open, (value) => {
-  if (!value) {
-    form.apiKey = ''
-    form.apiSecret = ''
-  }
-})
+watch(
+  open,
+  (value) => {
+    if (value) {
+      void load()
+    } else {
+      form.apiKey = ''
+      form.apiSecret = ''
+    }
+  },
+  { immediate: true },
+)
 function close() {
   open.value = false
   form.apiKey = ''
@@ -53,11 +52,11 @@ function close() {
 </script>
 
 <template>
-  <BaseButton v-if="enabled" @click="show">Importar Bitvavo</BaseButton>
   <SidePanel
+    id="bitvavo-connection-panel"
     v-model:open="open"
-    kicker="Historial de cuenta"
-    title="Importar desde Bitvavo"
+    kicker="Conexión · Historial de cuenta"
+    title="Bitvavo"
     title-id="bitvavo-import-title"
   >
     <p class="text-text-muted text-sm">

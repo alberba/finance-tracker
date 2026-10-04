@@ -2,7 +2,6 @@
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 
-import BitvavoImportPanel from './BitvavoImportPanel.vue'
 import BitvavoMovementDetails from './BitvavoMovementDetails.vue'
 import InvestmentMovementPanel from './InvestmentMovementPanel.vue'
 import BaseButton from '../ui/BaseButton.vue'
@@ -142,7 +141,6 @@ function confirmDelete(): void {
         />
       </div>
       <div class="flex flex-wrap gap-2">
-        <BitvavoImportPanel />
         <BaseButton
           id="investment-movement-new"
           variant="primary"

@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import BitvavoImportPanel from '../../src/components/investment/BitvavoImportPanel.vue'
+import BitvavoImportPanel from '../../src/components/settings/BitvavoImportPanel.vue'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 it('requests read-only credentials, destination and local history settings', async () => {
-  const wrapper = mount(BitvavoImportPanel)
+  const wrapper = mount(BitvavoImportPanel, { props: { open: true } })
   await flushPromises()
   expect(wrapper.text()).toContain('exclusivamente permiso de lectura')
   expect(wrapper.find('input[name="bitvavoApiSecret"]').attributes('type')).toBe('password')
@@ -58,8 +58,7 @@ it('blocks confirmation until every possible duplicate has an explicit resolutio
       }),
     )
   vi.stubGlobal('fetch', http)
-  const wrapper = mount(BitvavoImportPanel)
-  await wrapper.find('button').trigger('click')
+  const wrapper = mount(BitvavoImportPanel, { props: { open: true } })
   await flushPromises()
   const prepare = wrapper
     .findAll('button')

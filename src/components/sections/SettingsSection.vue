@@ -4,7 +4,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
-import StockEventsPanel from '../settings/StockEventsPanel.vue'
+import ConnectionsPanel from '../settings/ConnectionsPanel.vue'
 import LegacyRecurringRulesPanel from '../recurring/LegacyRecurringRulesPanel.vue'
 import AppSection from '../ui/AppSection.vue'
 import { useSettingsStore } from '../../stores/settings'
@@ -51,7 +51,7 @@ const indexEntries = [
   { id: 'cfg-pasivos', num: '06', label: 'Pasivos' },
   { id: 'cfg-categorias', num: '07', label: 'Categorías' },
   { id: 'cfg-twr', num: '08', label: 'Liquidez TWR' },
-  { id: 'cfg-stockevents', num: '09', label: 'Stock Events' },
+  { id: 'cfg-connections', num: '09', label: 'Conexiones' },
 ]
 
 const activeBlockId = ref(indexEntries[0].id)
@@ -230,8 +230,7 @@ onBeforeUnmount(() => {
             <span class="settings-block__num">08</span>
             <h3>Liquidez para TWR</h3>
             <p>
-              Cuentas de brokers que se incluyen como liquidez en el cálculo de
-              cartera para TWR.
+              Cuentas de brokers que se incluyen como liquidez en el cálculo de cartera para TWR.
             </p>
           </header>
           <div class="settings-block__body">
@@ -258,7 +257,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <StockEventsPanel />
+        <ConnectionsPanel />
       </div>
     </div>
   </AppSection>

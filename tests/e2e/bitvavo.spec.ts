@@ -7,7 +7,7 @@ import { seedMarketInstrument } from './seed-market-instrument'
 // Real D1 and server routes, with only the external Bitvavo HTTP boundary replaced.
 test('imports a closed preview, retains exact data after reload and synchronizes another client @smoke', async ({
   browser,
-}) => {
+}, testInfo) => {
   const email = `bitvavo-${randomUUID()}@e2e.test`
   const headers = {
     'X-Test-User-Email': email,
@@ -38,12 +38,18 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     const page = await context.newPage()
     const bitvavo = new BitvavoPage(page)
     await bitvavo.tracker.goto()
+    await bitvavo.tracker.openSettings()
+    await page.getByRole('region', { name: 'Conexiones', exact: true }).screenshot({
+      path: testInfo.outputPath('connections-grid.png'),
+    })
     await bitvavo.open()
     await bitvavo.connect(accountId)
     await bitvavo.preview()
     await expect(bitvavo.panel.getByText('0.01789334395', { exact: true })).toBeVisible()
     await bitvavo.confirm()
     await bitvavo.close()
+    await bitvavo.tracker.openInvestmentMovementsTab()
+    await expect(page.getByRole('button', { name: 'Importar Bitvavo', exact: true })).toHaveCount(0)
     await page.getByLabel('Año', { exact: true }).selectOption('2020')
     const rows = bitvavo.rows
     await expect(rows).toHaveCount(2)
@@ -54,6 +60,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.preview()
     await bitvavo.confirm()
     await bitvavo.close()
+    await bitvavo.tracker.openInvestmentMovementsTab()
     await page.getByLabel('Año', { exact: true }).selectOption('2020')
     await expect(rows).toHaveCount(2)
     await bitvavo.openDetails('Compra')

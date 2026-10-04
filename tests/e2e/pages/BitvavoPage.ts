@@ -7,7 +7,7 @@ export class BitvavoPage {
     this.tracker = new FinanceTrackerPage(page)
   }
   get panel() {
-    return this.page.getByRole('dialog', { name: 'Importar desde Bitvavo' })
+    return this.page.getByRole('dialog', { name: 'Bitvavo', exact: true })
   }
   get rows() {
     return this.page.locator('[data-investment-tx-id]')
@@ -28,8 +28,13 @@ export class BitvavoPage {
     await expect(this.details).toBeHidden()
   }
   async open() {
-    await this.tracker.openInvestmentMovementsTab()
-    await this.page.getByRole('button', { name: 'Importar Bitvavo', exact: true }).click()
+    await this.tracker.openSettings()
+    await expect(
+      this.page
+        .getByRole('region', { name: 'Conexiones', exact: true })
+        .getByRole('button', { name: 'Stock Events', exact: true }),
+    ).toBeVisible()
+    await this.page.getByRole('button', { name: 'Bitvavo', exact: true }).click()
     await expect(this.panel).toBeVisible()
   }
   async connect(accountId: string) {
