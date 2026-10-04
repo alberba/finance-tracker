@@ -69,7 +69,7 @@
     "globals": "^17.12.0",
     "happy-dom": "^20.14.5",
     "prettier": "3.9.9",
-    "prettier-plugin-astro": "0.14.1",
+    "prettier-plugin-astro": "1.1.0",
     "tailwind-csstree": "^0.4.1",
     "tsx": "^4.23.15",
     "typescript": "^5.0.0",
