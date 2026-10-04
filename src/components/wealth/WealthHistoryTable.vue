@@ -51,7 +51,7 @@ const ROW_CLASS: Record<WealthHistoryRow['kind'], string> = {
     <template v-for="entry in visible" :key="entry.month" #[`head-m${entry.month}`]>
       <button
         type="button"
-        class="hover:text-text-main focus-visible:outline-primary -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 tracking-[0.08em] uppercase focus-visible:outline-2"
+        class="hover:text-text-main focus-visible:outline-primary -my-2 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-1 tracking-[0.08em] uppercase focus-visible:outline-2"
         :class="entry.month === month ? 'text-text-main' : ''"
         :aria-pressed="entry.month === month"
         :aria-label="`Abrir el snapshot de ${entry.name}`"
