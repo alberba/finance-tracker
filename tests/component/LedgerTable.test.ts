@@ -55,7 +55,10 @@ describe('LedgerTable', () => {
   })
 
   it('un slot de celda sustituye al valor plano', () => {
-    const wrapper = mountTable({}, { 'cell-value': ({ row }: { row: Row }) => h('strong', `${row.value}!`) })
+    const wrapper = mountTable(
+      {},
+      { 'cell-value': ({ row }: { row: Row }) => h('strong', `${row.value}!`) },
+    )
 
     expect(wrapper.get('[data-position="oro"] strong').text()).toBe('300!')
   })
@@ -72,20 +75,25 @@ describe('LedgerTable', () => {
     const withTotal = mountTable({}, { 'total-name': 'Total', 'total-value': '900 €' })
 
     expect(plain.find('tfoot').exists()).toBe(false)
-    expect(withTotal.get('[data-ledger-total]').findAll('td').map((td) => td.text())).toEqual([
-      'Total',
-      '',
-      '900 €',
-    ])
+    expect(
+      withTotal
+        .get('[data-ledger-total]')
+        .findAll('td')
+        .map((td) => td.text()),
+    ).toEqual(['Total', '', '900 €'])
   })
 
   describe('filas desplegables', () => {
-    const expandLabel = (row: Row, open: boolean) => `${open ? 'Ocultar' : 'Ver'} detalle de ${row.name}`
+    const expandLabel = (row: Row, open: boolean) =>
+      `${open ? 'Ocultar' : 'Ver'} detalle de ${row.name}`
 
     function mountExpandable(expanded: string | null = null) {
       return mountTable(
         { expandLabel, expanded, 'onUpdate:expanded': () => {} },
-        { detail: ({ row }: { row: Row }) => h('p', { 'data-detail': row.id }, `Detalle ${row.name}`) },
+        {
+          detail: ({ row }: { row: Row }) =>
+            h('p', { 'data-detail': row.id }, `Detalle ${row.name}`),
+        },
       )
     }
 
@@ -176,5 +184,24 @@ describe('LedgerTable', () => {
 
     expect(wrapper.get('thead [data-custom-head]').text()).toBe('Todo')
     expect(wrapper.get('[data-position="oro"]').classes()).toContain('is-picked')
+  })
+
+  it('aplica las clases de una columna a su cabecera, a sus celdas y al total', () => {
+    const highlighted = columns.map((column) =>
+      column.key === 'value' ? { ...column, class: 'is-current' } : column,
+    )
+    const wrapper = mountTable(
+      { columns: highlighted },
+      { 'total-value': () => h('span', '900 €') },
+    )
+
+    const cells = [
+      wrapper.findAll('thead th')[2],
+      ...wrapper.findAll('[data-position] td').filter((_, index) => index % 2 === 1),
+      wrapper.findAll('[data-ledger-total] td')[2],
+    ]
+    expect(cells).toHaveLength(4)
+    for (const cell of cells) expect(cell.classes()).toContain('is-current')
+    expect(wrapper.findAll('thead th')[0].classes()).not.toContain('is-current')
   })
 })
