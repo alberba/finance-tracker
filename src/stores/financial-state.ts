@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
-import { BASE_SEED, normalizeState } from '../scripts/state'
+import { BASE_SEED, EMPTY_STATE_SEED, normalizeState } from '../scripts/state'
 import type { State } from '../scripts/types'
+import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { isDemoMode } from '../scripts/demo-mode'
 import { clone } from '../scripts/utils'
 
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
@@ -10,7 +12,7 @@ type StateCommitHandler = (state: State) => void
 type StateReloadHandler = (state: State) => void
 
 export const useFinancialStateStore = defineStore('financial-state', () => {
-  const state = shallowRef<State>(normalizeState(clone(BASE_SEED)))
+  const state = shallowRef<State>(normalizeState(clone(isSyncV2Enabled() && !isDemoMode() ? EMPTY_STATE_SEED : BASE_SEED)))
   const status = shallowRef<FinanceStoreStatus>('idle')
   const errorMessage = shallowRef<string | null>(null)
   let stateCommitHandler: StateCommitHandler | undefined
@@ -39,6 +41,11 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     errorMessage.value = null
     status.value = 'idle'
     return state.value
+  }
+
+  function failLoad(message: string): void {
+    status.value = 'error'
+    errorMessage.value = message
   }
 
   function patchState(mutator: (draft: State) => void): State {
@@ -90,6 +97,7 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     recurringRules,
     pendingMovements,
     replaceState,
+    failLoad,
     patchState,
     commitState,
     registerStateCommitHandler,

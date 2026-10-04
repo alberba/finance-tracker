@@ -13,6 +13,9 @@
  * goes in/out of here.
  */
 
+import { SYNC_COLLECTIONS } from './sync-read-model'
+import type { SyncV2Bootstrap } from './v2-state-projection'
+
 import { SYNC_ENTITY_TYPES, type SyncEntityType } from "../server/sync/command-schemas";
 
 const DB_VERSION = 2;
@@ -207,3 +210,34 @@ export function wipeIdbCache(userId: string): Promise<void> {
 
 export { SYNC_ENTITY_TYPES };
 export type { SyncEntityType };
+
+
+/**
+ * The rows, complete projection and cursor commit together, including after a crash.
+ * Another tab may already have stored a newer revision: that one wins and is returned,
+ * so a stale tab can never roll the shared cache back.
+ */
+export async function saveReadModel(db: IDBDatabase, model: SyncV2Bootstrap): Promise<SyncV2Bootstrap> {
+  const tx = db.transaction([...SYNC_ENTITY_TYPES, META_STORE], 'readwrite')
+  const done = txDone(tx)
+  const meta = tx.objectStore(META_STORE)
+  let stored = model
+  const current = meta.get(BOOTSTRAP_KEY) as IDBRequest<{ key: string; value: SyncV2Bootstrap } | undefined>
+  current.onsuccess = () => {
+    const cached = current.result?.value
+    if (cached && cached.revision > model.revision) {
+      stored = cached
+      return
+    }
+    for (const type of SYNC_ENTITY_TYPES) {
+      const store = tx.objectStore(type)
+      store.clear()
+      for (const entity of model[SYNC_COLLECTIONS[type]] ?? []) store.put(entity)
+    }
+    meta.put({ key: BOOTSTRAP_KEY, value: model })
+    meta.put({ key: SETTINGS_KEY, value: model.settings })
+    meta.put({ key: REVISION_KEY, value: model.revision })
+  }
+  await done
+  return stored
+}
