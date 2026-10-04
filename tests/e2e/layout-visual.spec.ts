@@ -21,14 +21,6 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
   data: 'Datos',
 }
 
-/**
- * Views whose touch targets were already under the minimum when the scan
- * raised it to 44 px on mobile. The list only shrinks: each zone's rework
- * fixes its targets and removes its entry. Budget: the "Planificar los doce
- * meses" category buttons of the budget table (being rewritten).
- */
-const KNOWN_UNDERSIZED_TARGETS = new Set<string>([])
-
 /** A monthly purchase, for the views that need one rule in the plan. */
 const RECURRING_RULE = {
   account: 'Revolut',
@@ -688,9 +680,7 @@ async function expectSoundLayout(
   const scan = await getLayoutScanResult(page, scopeId)
   expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
   expect(scan.overlapIssues).toEqual([])
-  if (!KNOWN_UNDERSIZED_TARGETS.has(view)) {
-    expect(scan.undersizedInteractiveElements).toEqual([])
-  }
+  expect(scan.undersizedInteractiveElements, view).toEqual([])
 }
 
 // The date the committed snapshots were taken; see `fixedTime` in fixtures.ts.
