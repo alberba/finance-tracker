@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    ".astro/types.d.ts",
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/unit/**/*.ts",
+    "tests/integration/**/*.ts",
+    "tests/e2e/**/*.ts",
+    "*.ts"
+  ]
+}
