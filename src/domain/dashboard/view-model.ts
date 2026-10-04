@@ -482,8 +482,8 @@ function buildRecentTransactions(state: State, formatMoney: Money): DashboardRec
 }
 
 function buildGoals(state: State, month: number, formatMoney: Money): DashboardGoals {
-  const goals = buildGoalsViewModel(state, month).progressItems.filter(
-    (item) => SAVINGS_GOALS.includes(item.key) && item.target > 0,
+  const goals = buildGoalsViewModel(state, month).net.rows.filter(
+    (item) => SAVINGS_GOALS.includes(item.key) && item.defined,
   )
   const saved = goals.reduce((sum, item) => sum + Math.max(Math.min(item.current, item.target), 0), 0)
   const target = goals.reduce((sum, item) => sum + item.target, 0)
@@ -492,7 +492,7 @@ function buildGoals(state: State, month: number, formatMoney: Money): DashboardG
     summary: goals.length ? `${formatMoney(saved)} de ${formatMoney(target)}` : '',
     items: goals.map((item) => ({
       key: item.key,
-      name: item.goal.name || item.title,
+      name: item.name,
       progress: Math.max(item.progress, 0),
       progressLabel: formatPercent(Math.max(item.progress, 0), { digits: 0 }),
       saved: formatMoney(Math.max(item.current, 0)),

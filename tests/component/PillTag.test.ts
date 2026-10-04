@@ -16,5 +16,8 @@ describe('PillTag', () => {
 
     expect(neutral.attributes('data-tone')).toBe('neutral')
     expect(accent.attributes('data-tone')).toBe('accent')
+
+    const gain = mount(PillTag, { props: { tone: 'gain' }, slots: { default: 'Cumplida' } })
+    expect(gain.attributes('data-tone')).toBe('gain')
   })
 })
