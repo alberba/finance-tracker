@@ -1,19 +1,29 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import DocumentSurface from '../ui/DocumentSurface.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
+import SegmentedControl from '../ui/SegmentedControl.vue'
+import { THEME_OPTIONS, useThemePreference } from '../../composables/useThemePreference'
 import { useSettingsStore } from '../../stores/settings'
 
-// Preferencias: año de trabajo y moneda. Las conexiones tienen su propia pestaña.
+// Preferencias: año de trabajo, moneda y tema. Las conexiones tienen su propia pestaña.
 defineProps<{ isActive: boolean }>()
 
 const settingsStore = useSettingsStore()
 const { viewModel } = storeToRefs(settingsStore)
+
+const { preference: themePreference, theme } = useThemePreference()
+const themeSummary = computed(() => {
+  if (themePreference.value === 'system') {
+    return `Sigue al sistema: ahora ${theme.value === 'dark' ? 'oscuro' : 'claro'}.`
+  }
+  return themePreference.value === 'dark' ? 'Siempre oscuro.' : 'Siempre claro.'
+})
 
 const year = ref(String(viewModel.value.year))
 const currency = ref(viewModel.value.currency)
@@ -43,7 +53,10 @@ watch(
     aria-labelledby="settings-tab-preferences-button"
     data-settings-preferences
   >
-    <SettingsTabIntro title="Preferencias" description="Año de trabajo y moneda del tracker." />
+    <SettingsTabIntro
+      title="Preferencias"
+      description="Año de trabajo, moneda y tema del tracker."
+    />
 
     <DocumentSurface>
       <NumberedBlock
@@ -84,6 +97,23 @@ watch(
             Guardar ajustes
           </BaseButton>
         </form>
+      </NumberedBlock>
+
+      <NumberedBlock
+        number="02"
+        title="Apariencia"
+        title-id="settings-appearance-title"
+        description="Claro, oscuro o el del sistema. Se aplica al momento y se recuerda en este dispositivo."
+      >
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <SegmentedControl
+            v-model="themePreference"
+            :options="THEME_OPTIONS"
+            label="Tema"
+            data-key="theme-pref"
+          />
+          <p class="text-text-muted text-sm" data-theme-summary>{{ themeSummary }}</p>
+        </div>
       </NumberedBlock>
     </DocumentSurface>
   </section>

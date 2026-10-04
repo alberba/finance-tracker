@@ -202,7 +202,7 @@ function makeExternalTooltip<TType extends ChartType>(
     if (!tooltipEl) return
 
     if (tooltip.opacity === 0) {
-      tooltipEl.classList.remove('is-visible')
+      delete tooltipEl.dataset.visible
       tooltipEl.setAttribute('aria-hidden', 'true')
       return
     }
@@ -214,7 +214,7 @@ function makeExternalTooltip<TType extends ChartType>(
     const canvasRect = chart.canvas.getBoundingClientRect()
     tooltipEl.style.left = canvasRect.left + tooltip.caretX + 'px'
     tooltipEl.style.top = canvasRect.top + tooltip.caretY + 'px'
-    tooltipEl.classList.add('is-visible')
+    tooltipEl.dataset.visible = ''
     tooltipEl.setAttribute('aria-hidden', 'false')
   }
 }

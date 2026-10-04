@@ -58,7 +58,7 @@ test.describe('Mobile smoke', () => {
     await expect(
       tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
     ).toBeVisible()
-    await expect(page.locator('.sidebar')).toBeHidden()
+    await expect(page.getByRole('navigation', { name: 'Secciones del tracker' })).toBeHidden()
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible()
 
     const titleBox = await tracker.dashboardSection
@@ -130,7 +130,7 @@ test.describe('Mobile smoke', () => {
       tracker.section('wealth').getByRole('heading', { name: 'Patrimonio', exact: true }),
     ).toBeVisible()
     await expect(menu).toBeHidden()
-    await expect(moreButton).toHaveClass(/is-active/)
+    await expect(moreButton).toHaveAttribute('data-active', 'true')
   })
 
   test('ofrece el reporte al final del menú Más sin ocupar la barra inferior', async ({
@@ -192,7 +192,7 @@ test.describe('Mobile smoke', () => {
     const banner = page.getByRole('status').filter({ hasText: 'Modo demo · datos ficticios' })
     await expect(banner).toBeVisible()
 
-    const appBarBox = await page.locator('.mobile-app-bar').boundingBox()
+    const appBarBox = await page.locator('[data-mobile-app-bar]').boundingBox()
     const bannerBox = await banner.boundingBox()
     expect(appBarBox).not.toBeNull()
     expect(bannerBox).not.toBeNull()

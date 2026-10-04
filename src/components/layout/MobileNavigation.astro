@@ -2,6 +2,7 @@
 import { APP_SECTIONS } from '../../config/app-sections'
 import type { SectionId } from '../../scripts/types'
 import NavIcon from './NavIcon.astro'
+import ThemeSwitcher from './ThemeSwitcher.vue'
 
 export interface Props {
   activeSection: SectionId
@@ -14,43 +15,29 @@ const secondarySections = APP_SECTIONS.filter((section) => !primarySectionIds.in
 const isSecondarySectionActive = secondarySections.some((section) => section.id === activeSection)
 ---
 
-<header class="mobile-app-bar">
-  <button type="button" class="mobile-brand" data-section="dashboard" aria-label="Ir al Dashboard">
-    <img src="/favicon.svg" alt="" width="34" height="34" />
-    <span>
-      <strong>Finance</strong>
-      <small>Tracker</small>
-    </span>
+<header
+  class="bg-page/92 border-line desk:hidden sticky top-0 z-40 flex min-h-[calc(64px+env(safe-area-inset-top))] items-center justify-between gap-3 border-b px-4 pt-[env(safe-area-inset-top)] backdrop-blur-sm"
+  data-mobile-app-bar
+>
+  <button
+    type="button"
+    class="text-text-main flex min-h-11 items-center gap-2.5"
+    data-section="dashboard"
+    aria-label="Ir al Dashboard"
+  >
+    <img src="/favicon.svg" alt="" width="34" height="34" class="size-8.5 rounded-sm" />
+    <span class="font-display text-[1.0625rem] font-bold">Finance Tracker</span>
   </button>
 
-  <button type="button" class="mobile-theme-button" data-theme-toggle aria-label="Cambiar tema">
-    <svg
-      class="theme-toggle-icon-moon"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.7"
-      aria-hidden="true"
-    >
-      <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
-    </svg>
-    <svg
-      class="theme-toggle-icon-sun"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.7"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="10" r="3.4"></circle>
-      <path
-        d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"
-      ></path>
-    </svg>
-  </button>
+  <div class="min-h-12.5">
+    <ThemeSwitcher client:only="vue" variant="bar" />
+  </div>
 </header>
 
-<nav class="mobile-bottom-nav" aria-label="Navegación principal">
+<nav
+  class="bg-panel/96 border-line shadow-pop desk:hidden fixed inset-x-2.5 bottom-3.5 z-50 grid grid-cols-5 rounded-lg border p-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
+  aria-label="Navegación principal"
+>
   {
     primarySections.map((section) => {
       const isActive = section.id === activeSection
@@ -58,56 +45,64 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
       return (
         <button
           type="button"
-          class:list={['nav-btn', 'mobile-nav-item', { 'is-active': isActive }]}
+          class="text-text-muted hover:text-text-main aria-[current=page]:bg-primary-fill aria-[current=page]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 aria-[current=page]:font-bold"
+          data-nav-item
           data-section={section.id}
           aria-controls={section.id}
           aria-current={isActive ? 'page' : undefined}
           aria-label={section.label}
         >
-          <span class="mobile-nav-icon" aria-hidden="true">
+          <span class="size-5 [&>svg]:size-full" aria-hidden="true">
             <NavIcon sectionId={section.id} />
           </span>
-          <span>{section.id === 'transactions' ? 'Movimientos' : section.label}</span>
+          <span class="max-w-full truncate">{section.label}</span>
         </button>
       )
     })
   }
   <button
     type="button"
-    class:list={[
-      'mobile-nav-item',
-      'mobile-more-trigger',
-      { 'is-active': isSecondarySectionActive },
-    ]}
+    class="text-text-muted hover:text-text-main data-[active=true]:bg-primary-fill data-[active=true]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 data-[active=true]:font-bold"
     data-mobile-more-trigger
+    data-active={isSecondarySectionActive ? 'true' : 'false'}
     aria-label="Más secciones"
     aria-haspopup="dialog"
     aria-controls="mobile-more-menu"
     aria-expanded="false"
   >
-    <span class="mobile-more-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+    <svg class="size-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8"></circle>
+      <circle cx="12" cy="12" r="1.8"></circle>
+      <circle cx="19" cy="12" r="1.8"></circle>
+    </svg>
     <span>Más</span>
   </button>
 </nav>
 
-<dialog id="mobile-more-menu" class="mobile-more-sheet" aria-labelledby="mobile-more-title">
-  <div class="mobile-sheet-handle" aria-hidden="true"></div>
-  <header>
-    <div>
-      <p>Tu espacio</p>
-      <h2 id="mobile-more-title">Más secciones</h2>
+<dialog
+  id="mobile-more-menu"
+  class="bg-panel text-text-main border-line shadow-pop open:animate-panel-in backdrop:bg-overlay mx-auto mt-auto mb-0 max-h-[min(82dvh,720px)] w-full max-w-140 overflow-y-auto rounded-t-lg border border-b-0 px-4 pt-2.5 pb-[calc(24px+env(safe-area-inset-bottom))]"
+  aria-labelledby="mobile-more-title"
+>
+  <div class="bg-line-strong mx-auto mb-3.5 h-1 w-10 rounded-full" aria-hidden="true"></div>
+  <header class="mb-4.5 flex items-start justify-between gap-3">
+    <div class="grid gap-1">
+      <p class="text-primary font-mono text-xs tracking-[0.16em] uppercase">Tu espacio</p>
+      <h2 id="mobile-more-title" class="font-display text-[1.375rem] font-bold">Más secciones</h2>
     </div>
     <button
       type="button"
-      class="mobile-sheet-close"
+      class="bg-subtle text-text-muted hover:text-text-main grid size-11 shrink-0 place-items-center rounded-md"
       data-mobile-more-close
       aria-label="Cerrar menú"
     >
       <svg
+        class="size-4.5"
         viewBox="0 0 20 20"
         fill="none"
         stroke="currentColor"
         stroke-width="1.8"
+        stroke-linecap="round"
         aria-hidden="true"
       >
         <path d="M5 5l10 10M15 5 5 15"></path>
@@ -115,7 +110,7 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     </button>
   </header>
 
-  <div class="mobile-more-grid">
+  <div class="border-line grid grid-cols-2 border-t">
     {
       secondarySections.map((section) => {
         const isActive = section.id === activeSection
@@ -123,13 +118,14 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
         return (
           <button
             type="button"
-            class:list={['nav-btn', 'mobile-more-item', { 'is-active': isActive }]}
+            class="border-line text-text-main aria-[current=page]:text-primary flex min-h-14 items-center gap-3 border-b px-1 text-left text-[0.9375rem] font-semibold even:border-l even:pl-4 aria-[current=page]:font-bold"
+            data-nav-item
             data-section={section.id}
             aria-controls={section.id}
             aria-current={isActive ? 'page' : undefined}
             aria-label={section.label}
           >
-            <span class="mobile-more-item-icon" aria-hidden="true">
+            <span class="text-text-muted size-5 shrink-0 [&>svg]:size-full" aria-hidden="true">
               <NavIcon sectionId={section.id} />
             </span>
             <span>{section.label}</span>
@@ -139,65 +135,87 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     }
   </div>
 
-  <div class="mobile-sheet-actions">
-    <button type="button" class="mobile-sheet-action" data-report-dialog-open>
-      <span class="mobile-sheet-action-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
-          <path
-            d="M3.5 4.75A2.25 2.25 0 0 1 5.75 2.5h8.5a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H9.5l-3.75 2.75V13.2a2.25 2.25 0 0 1-2.25-2.2z"
-          ></path>
-          <path d="M6.75 7h6.5M6.75 9.75h3.75"></path>
-        </svg>
-      </span>
-      <span class="mobile-sheet-action-copy">
-        <span>Crear reporte</span>
-        <small>Enviar una mejora o un error</small>
+  <section class="mt-4.5 grid gap-2.5" aria-labelledby="mobile-theme-title">
+    <h3
+      id="mobile-theme-title"
+      class="text-text-muted font-mono text-xs tracking-[0.16em] uppercase"
+    >
+      Tema
+    </h3>
+    <div class="min-h-13">
+      <ThemeSwitcher client:only="vue" variant="sheet" />
+    </div>
+  </section>
+
+  <div class="border-line mt-4.5 grid border-t">
+    <button
+      type="button"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left"
+      data-report-dialog-open
+    >
+      <svg
+        class="text-text-muted size-5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path
+          d="M3.5 4.75A2.25 2.25 0 0 1 5.75 2.5h8.5a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H9.5l-3.75 2.75V13.2a2.25 2.25 0 0 1-2.25-2.2z"
+        ></path>
+        <path d="M6.75 7h6.5M6.75 9.75h3.75"></path>
+      </svg>
+      <span class="grid gap-0.5">
+        <span class="text-[0.9375rem] font-semibold">Crear reporte</span>
+        <small class="text-text-muted text-sm">Enviar una mejora o un error</small>
       </span>
     </button>
-    <button type="button" class="mobile-sheet-action" data-demo-mode-action>
-      <span class="mobile-sheet-action-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
-          <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
-          <circle cx="10" cy="10" r="2.1"></circle>
-        </svg>
-      </span>
-      <span class="mobile-sheet-action-copy">
-        <span class="demo-mode-action-label">Activar modo demo</span>
-        <small class="demo-mode-action-description">Usar únicamente datos ficticios</small>
-      </span>
-    </button>
-    <button type="button" class="mobile-sheet-action" data-theme-toggle aria-label="Cambiar tema">
-      <span class="mobile-sheet-action-icon" aria-hidden="true">
-        <svg
-          class="theme-toggle-icon-moon"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.7"
+    <button
+      type="button"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left"
+      data-demo-mode-action
+    >
+      <svg
+        class="text-text-muted size-5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
+        <circle cx="10" cy="10" r="2.1"></circle>
+      </svg>
+      <span class="grid gap-0.5">
+        <span class="text-[0.9375rem] font-semibold" data-demo-mode-label>Activar modo demo</span>
+        <small class="text-text-muted text-sm" data-demo-mode-description
+          >Usar únicamente datos ficticios</small
         >
-          <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
-        </svg>
-        <svg
-          class="theme-toggle-icon-sun"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.7"
-        >
-          <circle cx="10" cy="10" r="3.4"></circle>
-          <path
-            d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14 6l1.07-1.07"
-          ></path>
-        </svg>
       </span>
-      <span class="theme-toggle-label">Modo oscuro</span>
     </button>
-    <button id="pwa-install-button" type="button" class="mobile-sheet-action" hidden>
-      <span class="mobile-sheet-action-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
-          <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M4 15.5h12"></path>
-        </svg>
-      </span>
+    <button
+      id="pwa-install-button"
+      type="button"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left text-[0.9375rem] font-semibold"
+      hidden
+    >
+      <svg
+        class="text-text-muted size-5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M4 15.5h12"></path>
+      </svg>
       <span>Instalar aplicación</span>
     </button>
   </div>
