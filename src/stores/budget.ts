@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
+import { useToast } from '../composables/useToast'
 import { buildBudgetViewModel } from '../domain/budget/view-model'
 import {
   resolveOrCreateCategoryId,
@@ -13,6 +14,7 @@ import { useFinancialStateStore } from './financial-state'
 
 export const useBudgetStore = defineStore('budget', () => {
   const financialStateStore = useFinancialStateStore()
+  const { showToast } = useToast()
 
   const viewModel = computed(() => buildBudgetViewModel(financialStateStore.state))
   const budget = computed(() => financialStateStore.budget)
@@ -84,6 +86,7 @@ export const useBudgetStore = defineStore('budget', () => {
       })
     })
     syncMonths(type, category, changed)
+    showToast(`Plan de ${category} guardado.`)
   }
 
   return {

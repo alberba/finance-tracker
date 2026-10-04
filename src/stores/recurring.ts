@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
+import { useToast } from '../composables/useToast'
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
@@ -247,6 +248,7 @@ export interface PendingMovementEdit {
 export const useRecurringStore = defineStore('recurring', () => {
   const financialStateStore = useFinancialStateStore()
   const stockEventsStore = useStockEventsStore()
+  const { showToast } = useToast()
   const rules = computed(() => financialStateStore.state.recurringRules)
   const pendingMovements = computed(() => financialStateStore.state.pendingMovements)
   const openPendingMovements = computed(() => pendingMovements.value.filter((item) => item.status === 'pending'))
@@ -300,6 +302,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       buildRecurringRuleData(item, financialStateStore.currency),
     )
     refreshPending()
+    showToast('Regla recurrente guardada.')
     return true
   }
 
@@ -355,6 +358,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       buildRecurringRuleData(item, financialStateStore.currency),
     )
     refreshPending()
+    showToast('Regla recurrente actualizada.')
     return true
   }
 
@@ -460,7 +464,10 @@ export const useRecurringStore = defineStore('recurring', () => {
     void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),
     )
-    if (confirmed) void stockEventsStore.syncMovement(transaction)
+    if (confirmed) {
+      showToast('Pendiente confirmado: ya cuenta en el Registro.')
+      void stockEventsStore.syncMovement(transaction)
+    }
     return true
   }
 
@@ -510,6 +517,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),
     )
+    showToast('Pendiente actualizado.')
     return true
   }
 
@@ -525,6 +533,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),
     )
+    showToast(status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.')
   }
 
   return {
