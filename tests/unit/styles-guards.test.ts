@@ -17,7 +17,7 @@ const legacyCss = readFileSync(new URL('../../src/styles/legacy.css', import.met
  * that deletes legacy rules lowers it in the same PR. Never raise it; new
  * styles go in components (utilities, base components or scoped styles).
  */
-const LEGACY_CSS_LINE_CEILING = 1971
+const LEGACY_CSS_LINE_CEILING = 1937
 
 describe('legacy.css', () => {
   it('does not grow past its line ceiling', () => {

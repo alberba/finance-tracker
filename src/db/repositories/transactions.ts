@@ -9,6 +9,7 @@
 
 import { and, eq, inArray } from 'drizzle-orm'
 import { fromMinorUnits, toMinorUnits } from '../../lib/money'
+import type { RemoteOperation } from '../../lib/bitvavo-types'
 import { investmentTradeDetails, transactions } from '../schema'
 import {
   type Db,
@@ -60,6 +61,9 @@ export interface CreateTransactionInput {
   time?: string | null
   declared?: boolean
   operation?: MovementOperationInput | null
+  /** Provider identity of an imported movement (Bitvavo); only a backup restore sets it here. */
+  externalId?: string | null
+  remoteOperation?: RemoteOperation | null
 }
 
 export interface UpdateTransactionInput {
@@ -117,6 +121,8 @@ export async function create(
       currency: input.currency,
       time: input.time ?? null,
       declared: input.declared ?? false,
+      externalId: input.externalId ?? null,
+      remoteOperation: input.remoteOperation ?? null,
       createdAt: now,
       updatedAt: now,
     })

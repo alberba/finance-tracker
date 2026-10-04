@@ -82,11 +82,9 @@
  *   Only `integration_credentials` stays excluded (WP12 owns encryption).
  * - `settings.ts`'s three `EntityKey` values all map to the single v2
  *   `account` entity; the list shown in the UI determines its `kind`.
- * - `data.ts`'s import/reset/start-fresh flows use `reloadState` (whole
- *   blob), not `commitState`, and already have dedicated v2 endpoints
- *   (`/api/data/import`, `/api/state/reset`, `/api/state/initialize` via
- *   `state-initialize.ts`) — intentionally not routed through the sync
- *   command outbox.
+ * - `data.ts`'s JSON restore and "empezar de cero" call their own v2
+ *   endpoints (`/api/data/import`, `/api/state/initialize`) and reload —
+ *   intentionally not routed through the sync command outbox.
  */
 
 import { useSyncStore } from "../../stores/sync";
