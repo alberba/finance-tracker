@@ -68,7 +68,7 @@ const providers = [
               >{{ provider.description }}</span
             >
             <span
-              class="text-primary flex w-full items-center justify-between gap-2 text-sm font-bold"
+              class="text-text-main flex w-full items-center justify-between gap-2 text-sm font-bold"
             >
               {{ provider.action }}
               <span aria-hidden="true">→</span>
