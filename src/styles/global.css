@@ -1,17 +1,9 @@
-/* Global CSS: cascade order, theme tokens and the Tailwind theme. Styles for a
-   screen live with its component (ADR 0004); legacy.css only shrinks.
+/* Global CSS: theme tokens, the Tailwind theme, reset, base typography and
+   the shell variants. Styles for a screen live with its component (ADR 0004);
+   no other stylesheet exists (tests/unit/styles-guards.test.ts).
    See docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md. */
 
-/* Cascade order. legacy.css sits below components and utilities, so a
-   Tailwind utility always beats a legacy rule whatever its specificity. */
-@layer theme, base, legacy, components, utilities;
-
 @import 'tailwindcss';
-@import './legacy.css' layer(legacy);
-
-/* legacy.css owns `.list-item` (a flex row); Tailwind's `list-item` utility
-   would override it now that utilities win. Remove with the legacy class. */
-@source not inline('list-item');
 
 /* `dark:` follows the app theme attribute, not prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
@@ -193,8 +185,8 @@
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
-  /* Shell breakpoint: sidebar from here up, app bar and bottom nav below
-     (legacy.css still hides the report launcher at max-width 980px). */
+  /* Shell breakpoint: sidebar and the floating report launcher from here up;
+     app bar and bottom nav below. */
   --breakpoint-desk: 61.3125rem;
 
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
@@ -255,6 +247,57 @@
   --shadow-card: var(--elevation-card);
   --shadow-raised: var(--elevation-raised);
   --shadow-pop: var(--elevation-pop);
+}
+
+/* Reset and base typography on top of Tailwind's preflight. Everything here
+   is element-level: no classes, so a utility always wins. */
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    color: var(--text-main);
+    line-height: 1.55;
+    background: var(--bg-main);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.032em;
+  }
+
+  h3,
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  dialog {
+    color: var(--text-main);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+      transition-duration: 0.01ms;
+      scroll-behavior: auto;
+    }
+  }
 }
 
 @keyframes panelIn {

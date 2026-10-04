@@ -1,5 +1,9 @@
 # Estilos: Tailwind vs CSS vs híbrido
 
+> **Histórico.** La decisión está en el ADR 0004 y las normas, en `CODING_STANDARDS.md`. Las fases
+> de este plan ya están completas: `legacy.css` desapareció en la 2.0.0, y lo que la nota dice de
+> ella describe el estado de la investigación.
+
 Nota de arquitectura para decidir cómo se estiliza la app a partir de ahora. Fecha de la
 investigación: 2026-09-26, rama `mejorar-pagina-inversi-n` (HEAD `4bbe883`). Cada afirmación va
 marcada como **[medido]** (comando reproducible en este repo), **[fuente]** (documentación primaria,

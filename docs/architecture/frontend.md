@@ -8,7 +8,7 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - `FinanceTrackerShell.astro` solo compone layout, sidebar y secciones; la navegacion vive en componentes de `src/components/layout`.
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004 y la nota `docs/architecture/estilos-tailwind-vs-css.md`).
-- `src/styles/legacy.css` está congelada en la capa `legacy`, por debajo de Tailwind, y se vacía por zonas hasta desaparecer.
+- `src/styles/global.css` es la única hoja de estilos: tokens, reset, tipografía base y las variantes del shell. La hoja heredada desapareció en la 2.0.0 y `tests/unit/styles-guards.test.ts` impide recrearla.
 - Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: hidrata y persiste el estado, registra el puente de commit y recarga del store y lleva la navegación lateral.
 
 ## Reglas de integracion
