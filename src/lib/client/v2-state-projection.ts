@@ -166,6 +166,7 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       createdAt: String(transaction.createdAt || ''),
       ...(transaction.time ? { time: String(transaction.time) } : {}),
       declared: Boolean(transaction.declared),
+      movementCurrency: String(transaction.currency || trade?.currency || projected.currency),
       ...(remote.success ? { remoteOperation: remote.data } : {}),
       ...(trade
         ? {
@@ -173,7 +174,6 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
             units: Number(trade.quantity || 0),
             unitPrice: Number(trade.price || 0),
             fee: Number(trade.fee || 0),
-            movementCurrency: String(trade.currency || projected.currency),
             // The stored ticker is what the user typed; the instrument is only a
             // fallback for rows migrated from v1, which have no `symbol` column.
             ...(trade.symbol || instrument

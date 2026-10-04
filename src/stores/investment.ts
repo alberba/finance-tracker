@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+
 import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
@@ -34,57 +35,14 @@ import {
   normalizeInvestmentSymbol,
 } from '../scripts/investment-movements'
 import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
-import {
-  resolveCategoryId,
-  resolveEntityId,
-  syncListDiff,
-  type CategoryKind,
-} from '../lib/client/command-mapping'
+import { resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
+import { syncMovements } from '../lib/client/movement-commands'
 import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
-
-/** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
-export async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
-  if (tx.remoteOperation) return { declared: Boolean(tx.declared), description: tx.description }
-  // The server only knows its own account ids; sending the local one made
-  // every investment movement fail the ownership check (audit §1).
-  const accountId = await resolveEntityId('account', tx.accountId)
-  if (!accountId) return null
-  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
-  return {
-    accountId,
-    categoryId,
-    type: tx.type,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    currency: tx.movementCurrency || currency,
-    time: tx.time ?? null,
-    declared: Boolean(tx.declared),
-    // The operation travels nested, so importe and operación reach D1 in the
-    // same write and cannot end up disagreeing (ADR 0002).
-    operation: buildOperationData(tx),
-  }
-}
-
-/**
- * The operation of an investment movement, or `null` when the movement has
- * none — which is also how the server is told to drop the one it had stored.
- */
-function buildOperationData(tx: Transaction) {
-  if (tx.type !== 'investment' || !tx.side) return null
-  return {
-    symbol: tx.symbol ?? null,
-    side: tx.side,
-    units: Number(tx.units) || 0,
-    unitPrice: Number(tx.unitPrice) || 0,
-    fee: Number(tx.fee) || 0,
-  }
-}
 
 /** WP7b — maps a legacy `Contribution` row to a `contribution` sync command payload. */
 function buildContributionData(contribution: Contribution, currency: string) {
@@ -289,9 +247,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     financialStateStore.commitState((draft) => {
       draft.transactions.push(transaction)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildInvestmentTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     showToast('Movimiento de inversión guardado.')
     void stockEventsStore.syncMovement(transaction, { toCash: input.toCash })
     return true
@@ -362,9 +318,7 @@ export const useInvestmentStore = defineStore('investment', () => {
       tx.amount = computed.signedAmount
       tx.declared = input.declared
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildInvestmentTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.investmentTxEditingId = ''
     showToast('Movimiento de inversión actualizado.')
     // Editing a movement that already exists in Stock Events cannot update the
@@ -404,9 +358,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildInvestmentTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.investmentTxEditingId = ''
     showToast('Movimiento eliminado.')
   }
@@ -422,9 +374,7 @@ export const useInvestmentStore = defineStore('investment', () => {
       tx.declared = !tx.declared
       nowDeclared = Boolean(tx.declared)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildInvestmentTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     showToast(
       nowDeclared ? 'Movimiento marcado como declarado.' : 'Movimiento marcado como no declarado.',
     )

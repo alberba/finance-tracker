@@ -1,14 +1,11 @@
 import { defineStore } from 'pinia'
+
 import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
-import {
-  resolveCategoryId,
-  resolveEntityId,
-  syncListDiff,
-  type CategoryKind,
-} from '../lib/client/command-mapping'
+import { resolveCategoryId, resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
+import { syncMovements } from '../lib/client/movement-commands'
 import {
   buildMonthGroups,
   categoryBreakdown,
@@ -30,37 +27,7 @@ import { monthFromISO, parseFloatSafe, round2, todayISO, uid } from '../scripts/
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
 
-/**
- * WP7b — maps a legacy `Transaction` row to a `transaction` sync command
- * payload.
- *
- * WP10 fix: `accountId` is a *required* field in `entityCreateSchemas`
- * for `transaction`/`subscription` — the original builder passed the
- * legacy row's `accountId` straight through unresolved (the client-local
- * id, not the server-assigned account UUID `resolveEntityId('account', …)`
- * returns), so every real create command was rejected server-side. Same
- * "required FK, skip until resolved" pattern as `pendingMovement`'s
- * `recurringRuleId` in `stores/recurring.ts`. See that file's identical
- * fix note for the full story of how this went undetected.
- */
-async function buildTransactionData(tx: Transaction, currency: string) {
-  const accountId = await resolveEntityId('account', tx.accountId)
-  if (!accountId) {
-    return null
-  }
-  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
-  return {
-    accountId,
-    categoryId,
-    type: tx.type,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    currency,
-  }
-}
-
-/** WP7b — maps a legacy `Subscription` row to a `subscription` sync command payload. See the WP10 fix note on `buildTransactionData` above for `accountId`. */
+/** Maps a subscription, skipping commands whose required account is unresolved. */
 async function buildSubscriptionData(subscription: Subscription, currency: string) {
   const accountId = await resolveEntityId('account', subscription.accountId)
   if (!accountId) {
@@ -292,9 +259,7 @@ export const useMovementsStore = defineStore('movements', () => {
         amount: round2(input.amount),
       })
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     return true
   }
 
@@ -329,9 +294,7 @@ export const useMovementsStore = defineStore('movements', () => {
       tx.description = description
       tx.amount = round2(amount)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
 
     ui.investmentTxEditingId = ''
     showToast('Movimiento actualizado.')
@@ -344,9 +307,7 @@ export const useMovementsStore = defineStore('movements', () => {
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = ui.txSelectedIds.filter((itemId) => itemId !== id)
     showToast('Movimiento eliminado.')
   }
@@ -390,9 +351,7 @@ export const useMovementsStore = defineStore('movements', () => {
         }
       })
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     showToast(`Actualizadas ${updated} filas.`)
   }
 
@@ -410,9 +369,7 @@ export const useMovementsStore = defineStore('movements', () => {
         (item) => item.remoteOperation || !selectedIds.has(item.id),
       )
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = []
     showToast(`Eliminadas ${removed} filas.`)
   }
@@ -428,8 +385,10 @@ export const useMovementsStore = defineStore('movements', () => {
     financialStateStore.commitState((draft) => {
       materializeDueSubscriptions(draft, todayISO())
     })
-    await syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+    await syncMovements(
+      beforeTransactions,
+      financialStateStore.transactions,
+      financialStateStore.currency,
     )
     await syncListDiff(
       'subscription',
@@ -479,8 +438,10 @@ export const useMovementsStore = defineStore('movements', () => {
     )
     // `materializeDueSubscriptions` may also push already-due charges as
     // ordinary transactions in the same commit — diff those too.
-    void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+    void syncMovements(
+      beforeTransactions,
+      financialStateStore.transactions,
+      financialStateStore.currency,
     )
     showToast(
       generatedCount > 0
