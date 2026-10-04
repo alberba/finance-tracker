@@ -9,6 +9,7 @@ import DocumentSurface from '../ui/DocumentSurface.vue'
 import FigureStrip from '../ui/FigureStrip.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
 import PageHeader from '../ui/PageHeader.vue'
+import { formatNumber } from '../../lib/format'
 import { useDataStore } from '../../stores/data'
 
 withDefaults(
@@ -21,11 +22,10 @@ withDefaults(
 const dataStore = useDataStore()
 const { summary, canStartFresh, backsUpServerData } = storeToRefs(dataStore)
 
-const countFormat = new Intl.NumberFormat('es-ES')
 const figures = computed(() => [
-  { label: 'Movimientos', value: countFormat.format(summary.value.totalTransactions) },
-  { label: 'Snapshots', value: countFormat.format(summary.value.totalSnapshots) },
-  { label: 'Aportes', value: countFormat.format(summary.value.totalContributions) },
+  { label: 'Movimientos', value: formatNumber(summary.value.totalTransactions) },
+  { label: 'Snapshots', value: formatNumber(summary.value.totalSnapshots) },
+  { label: 'Aportes', value: formatNumber(summary.value.totalContributions) },
 ])
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')

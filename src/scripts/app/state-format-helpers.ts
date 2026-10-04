@@ -103,40 +103,10 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
     showShellToast(String(message));
   }
 
-  function formatMoney(value: unknown) {
-    const currency = (deps.getState().currency || "EUR").toUpperCase();
-    const amount = Number(value || 0);
-    try {
-      return new Intl.NumberFormat("es-ES", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    } catch {
-      return `${amount.toFixed(2)} ${currency}`;
-    }
-  }
-
-  function formatMoneyCompact(value: unknown) {
-    const currency = (deps.getState().currency || "EUR").toUpperCase();
-    try {
-      return new Intl.NumberFormat("es-ES", {
-        style: "currency",
-        currency,
-        notation: "compact",
-        maximumFractionDigits: 1,
-      }).format(Number(value || 0));
-    } catch {
-      return formatMoney(value);
-    }
-  }
-
   return {
     saveState,
     sortTransactions,
     sortContributions,
     showToast,
-    formatMoney,
-    formatMoneyCompact,
   };
 }

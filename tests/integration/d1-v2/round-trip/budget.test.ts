@@ -95,10 +95,10 @@ describe("round trip: presupuesto y categorías", () => {
       budget.updateBudgetValue("expense", "Ocio", 0, 100);
       await trip.reload();
 
-      financialState.commitState((draft) => {
+      useFinancialStateStore().commitState((draft) => {
         draft.year = 2026;
       });
-      budget.updateBudgetValue("expense", "Ocio", 0, 250);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 0, 250);
       await trip.reload();
 
       const budgetEntriesRepository = await import("../../../../src/db/repositories/budget-entries");

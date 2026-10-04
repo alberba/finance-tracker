@@ -16,7 +16,7 @@ import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { InvestmentMovementRow } from '../../domain/investment/view-model'
 import type { Transaction } from '../../scripts/types'
-import { formatDayMonth, formatMonthYear } from '../../lib/format'
+import { formatDayMonth, formatMonthYear, formatNumber } from '../../lib/format'
 import { useInvestmentStore } from '../../stores/investment'
 import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
@@ -100,10 +100,7 @@ function nameOf(row: InvestmentMovementRow): string {
 function formatUnits(value: number | undefined): string {
   const units = Number(value) || 0
   const digits = units > 0 && units < 1 ? 5 : 4
-  return units.toLocaleString('es-ES', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  })
+  return formatNumber(units, digits)
 }
 
 function requestDelete(tx: Transaction): void {
@@ -272,7 +269,7 @@ function confirmDelete(): void {
         <template #cell-declared="{ row }">
           <button
             type="button"
-            class="focus-visible:outline-primary inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-sm font-bold whitespace-nowrap focus-visible:outline-2"
+            class="focus-visible:outline-primary desk:min-h-9 inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-sm font-bold whitespace-nowrap focus-visible:outline-2"
             :class="
               row.declared
                 ? 'bg-income/12 text-gain border-transparent'

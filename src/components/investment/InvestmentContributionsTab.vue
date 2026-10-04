@@ -15,7 +15,7 @@ import PillTag from '../ui/PillTag.vue'
 import { TONE_TEXT, toneOf } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { ContributionLedgerRow } from '../../domain/investment/view-model'
-import { formatDayMonth, formatPercent, formatShortDate } from '../../lib/format'
+import { formatDayMonth, formatNumber, formatPercent, formatShortDate } from '../../lib/format'
 import { formatDecimalInput, parseDecimal } from '../../lib/number'
 import { renderMultiLineChart } from '../../scripts/charts'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -43,9 +43,7 @@ const confirmOpen = computed({
 const ORIGIN_LABEL = { base: 'Inicio', monthEnd: 'Cierre de mes', manual: 'Manual' } as const
 
 function formatNav(value: number | null): string {
-  return value === null
-    ? '—'
-    : value.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+  return value === null ? '—' : formatNumber(value, 4)
 }
 
 function formatReturn(value: number | null): string {
@@ -206,7 +204,7 @@ function confirmDelete(): void {
             <input
               type="text"
               inputmode="decimal"
-              class="font-display text-text-main hover:border-line-strong hover:bg-panel focus:border-primary focus:bg-panel h-10 w-28 rounded-sm border border-transparent bg-transparent px-2.5 text-right tabular-nums outline-none focus:shadow-[0_0_0_3px_var(--ring)]"
+              class="font-display text-text-main hover:border-line-strong hover:bg-panel focus:border-primary focus:bg-panel desk:h-10 h-11 w-28 rounded-sm border border-transparent bg-transparent px-2.5 text-right tabular-nums outline-none focus:shadow-[0_0_0_3px_var(--ring)]"
               :value="formatDecimalInput(row.flow)"
               :data-contribution-flow-date="row.date"
               :aria-label="`Aporte del cierre del ${formatShortDate(row.date)}`"

@@ -123,7 +123,7 @@ describe("round trip: inversión", () => {
     const first = await trip.reload();
     const ruleId = first.recurringRules[0].id;
 
-    recurring.updateRule(ruleId, {
+    useRecurringStore().updateRule(ruleId, {
       type: "expense",
       accountId,
       category: "Ocio",
@@ -239,7 +239,7 @@ describe("round trip: inversión", () => {
     });
     let reloaded = await trip.reload();
     const pmId = reloaded.pendingMovements[0].id;
-    recurring.editPending(pmId, {
+    useRecurringStore().editPending(pmId, {
       type: "investment",
       date: "2026-09-02",
       accountId,
@@ -254,7 +254,8 @@ describe("round trip: inversión", () => {
       time: "15:00",
     });
     await trip.reload();
-    expect(recurring.confirmPending(pmId)).toBe(true);
+    // A reloaded page has new stores; the pre-reload instance is gone.
+    expect(useRecurringStore().confirmPending(pmId)).toBe(true);
 
     reloaded = await trip.reload();
     expect(reloaded.transactions.find((tx) => tx.type === "investment")).toMatchObject({
@@ -286,7 +287,7 @@ describe("round trip: inversión", () => {
     const first = await trip.reload();
     const movementId = first.transactions.find((tx) => tx.type === "investment")!.id;
 
-    investment.toggleDeclared(movementId);
+    useInvestmentStore().toggleDeclared(movementId);
 
     const reloaded = await trip.reload();
 

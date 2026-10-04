@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import { test, expect, devices, type BrowserContext, type Page } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
@@ -194,6 +194,39 @@ test.describe('Sincronización offline (sync v2)', () => {
     } finally {
       await contextDeviceOne.close()
       await contextDeviceTwo.close()
+    }
+  })
+  test('un movimiento guardado en el móvil aparece en el ordenador abierto sin recargar', async ({ browser }) => {
+    const email = uniqueEmail('live')
+    const desktopContext = await browser.newContext()
+    const mobileContext = await browser.newContext({ ...devices['Pixel 5'] })
+
+    try {
+      const { tracker: desktop, page: desktopPage } = await provisionUser(desktopContext, email)
+      await desktop.addAccount({ name: 'Cuenta Viva', openingBalance: 0 })
+      await waitForSynced(desktopPage)
+      await desktop.filterTransactionsMonth('FEBRERO')
+
+      const { tracker: mobile, page: mobilePage } = await provisionUser(mobileContext, email)
+      await waitForSynced(mobilePage)
+      await mobile.addCustomTransaction({
+        date: '2026-02-07',
+        monthLabel: 'FEBRERO',
+        type: 'expense',
+        categoryLabel: 'Alimentación',
+        amount: 9,
+        description: 'Café desde el móvil',
+        accountLabel: 'Cuenta Viva',
+      })
+      await waitForSynced(mobilePage)
+
+      // No reload and no focus change: the open desktop tab must pick it up by itself.
+      await expect(
+        desktop.transactionsSection.locator('#tx-table-body tr', { hasText: 'Café desde el móvil' }),
+      ).toBeVisible({ timeout: 10000 })
+    } finally {
+      await desktopContext.close()
+      await mobileContext.close()
     }
   })
 })

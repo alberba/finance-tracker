@@ -65,6 +65,9 @@ it('blocks confirmation until every possible duplicate has an explicit resolutio
     .find((button) => button.text() === 'Preparar vista previa')!
   await prepare.trigger('click')
   await flushPromises()
+  const figures = wrapper.findAll('dd').map((dd) => dd.text())
+  expect(figures).toEqual(['0,1', '100,00', '0,00', '10,00'])
+  expect(wrapper.text()).toContain('1 ene 2020, 01:00:00')
   const confirm = wrapper
     .findAll('button')
     .find((button) => button.text() === 'Confirmar importación completa')!

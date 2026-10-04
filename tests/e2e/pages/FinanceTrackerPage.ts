@@ -460,16 +460,14 @@ export class FinanceTrackerPage {
       }
     }
 
-    const declaredInput = section.locator('#investment-movement-declared')
-    if (params.declared) {
-      await declaredInput.check()
-    } else {
-      await declaredInput.uncheck()
-    }
+    // The switches are visually hidden under their drawn tracks.
+    await section
+      .getByRole('switch', { name: 'Ya está declarado' })
+      .setChecked(Boolean(params.declared), { force: true })
 
-    const stockEventsCashInput = section.locator('#investment-movement-to-cash')
+    const stockEventsCashInput = section.getByRole('switch', { name: /efectivo en Stock Events/ })
     if (params.stockEventsCash && (await stockEventsCashInput.count()) > 0) {
-      await stockEventsCashInput.check()
+      await stockEventsCashInput.check({ force: true })
     }
 
     await section.getByRole('button', { name: 'Guardar movimiento' }).click()
@@ -547,8 +545,14 @@ export class FinanceTrackerPage {
     await bar.getByRole('button', { name: 'Aplicar' }).click()
   }
 
-  async deleteSelectedTransactions() {
+  /** Deletes the selection, confirming the dialog that names how many go. */
+  async deleteSelectedTransactions(count: number) {
     await this.bulkActionBar.getByRole('button', { name: 'Eliminar' }).click()
+    const label = `${count} ${count === 1 ? 'movimiento' : 'movimientos'}`
+    const dialog = this.page.getByRole('alertdialog', { name: `¿Eliminar ${label}?` })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: `Eliminar ${label}` }).click()
+    await expect(dialog).toBeHidden()
   }
 
   /**
@@ -934,12 +938,9 @@ export class FinanceTrackerPage {
       await panel.locator('#investment-movement-currency').fill(payload.movementCurrency)
     }
     if (typeof payload.declared === 'boolean') {
-      const checkbox = panel.locator('#investment-movement-declared')
-      if (payload.declared) {
-        await checkbox.check()
-      } else {
-        await checkbox.uncheck()
-      }
+      await panel
+        .getByRole('switch', { name: 'Ya está declarado' })
+        .setChecked(payload.declared, { force: true })
     }
 
     await panel.getByRole('button', { name: 'Guardar cambios' }).click()
@@ -1206,6 +1207,7 @@ export class FinanceTrackerPage {
   private parseMoneyText(value: string): number {
     const cleaned = value
       .replace(/\u00a0/g, '')
+      .replace(/\u2212/g, '-')
       .replace(/[€$£]/g, '')
       .replace(/\./g, '')
       .replace(',', '.')

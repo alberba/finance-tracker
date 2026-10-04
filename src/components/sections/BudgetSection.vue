@@ -6,6 +6,7 @@ import BudgetPlanPanel from '../budget/BudgetPlanPanel.vue'
 import BudgetTable from '../budget/BudgetTable.vue'
 import { deviationSpan, REMAINING_LABEL, TYPE_LABEL } from '../budget/budget-text'
 import AppSection from '../ui/AppSection.vue'
+import DocumentSurface from '../ui/DocumentSurface.vue'
 import FigureStrip, { type FigureStripItem } from '../ui/FigureStrip.vue'
 import PageHeader from '../ui/PageHeader.vue'
 import SectionTabs from '../ui/SectionTabs.vue'
@@ -99,18 +100,13 @@ function openPlan(category: string): void {
         data-key="budget-tab"
       />
 
-      <div
+      <DocumentSurface
         :id="`budget-panel-${active}`"
         role="tabpanel"
         :aria-label="TYPE_LABEL[active]"
-        class="grid min-w-0 gap-6"
+        class="min-w-0"
       >
-        <div
-          class="border-line bg-panel shadow-soft rounded-lg border px-5 py-5 sm:px-7"
-          aria-label="Resumen del año"
-          role="group"
-          data-budget-summary
-        >
+        <div class="py-5 sm:py-6" aria-label="Resumen del año" role="group" data-budget-summary>
           <FigureStrip :items="strip" />
         </div>
 
@@ -122,7 +118,7 @@ function openPlan(category: string): void {
           @plan="openPlan"
           @update="updateCell"
         />
-      </div>
+      </DocumentSurface>
     </div>
 
     <BudgetPlanPanel ref="panel" :year="viewModel.year" :current-month="viewModel.currentMonth" />

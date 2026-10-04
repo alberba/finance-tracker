@@ -6,6 +6,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
+import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { parseDecimal } from '../../lib/number'
 import { computeInvestmentMovement } from '../../scripts/investment-movements'
@@ -322,35 +323,23 @@ defineExpose({ openNew, openEdit })
         />
       </fieldset>
 
-      <div class="border-line grid gap-1 border-t pt-3.5">
-        <label class="flex min-h-11 items-center gap-3 text-[0.9375rem] font-medium">
-          <input
-            id="investment-movement-declared"
-            v-model="form.declared"
-            type="checkbox"
-            name="declared"
-            class="accent-primary size-4.5"
-          />
-          Ya está declarado
-        </label>
-        <label
+      <div class="border-line divide-line grid divide-y border-t">
+        <div class="flex items-center justify-between gap-4 py-2">
+          <span class="text-[0.9375rem] font-medium">Ya está declarado</span>
+          <ToggleSwitch v-model="form.declared" label="Ya está declarado" />
+        </div>
+        <div
           v-if="canSyncMovement && !isEditing"
-          class="flex min-h-11 items-start gap-3 pt-2.5 text-[0.9375rem] font-medium"
+          class="flex items-center justify-between gap-4 py-2"
         >
-          <input
-            id="investment-movement-to-cash"
-            v-model="form.toCash"
-            type="checkbox"
-            name="toCash"
-            class="accent-primary mt-0.5 size-4.5"
-          />
-          <span class="grid gap-0.5">
+          <span class="grid gap-0.5 text-[0.9375rem] font-medium">
             {{ cashLabel }}
             <span class="text-text-muted text-sm font-normal">
               Se sincroniza con Stock Events al guardar.
             </span>
           </span>
-        </label>
+          <ToggleSwitch v-model="form.toCash" :label="cashLabel" />
+        </div>
       </div>
     </form>
 

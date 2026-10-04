@@ -17,6 +17,15 @@ export function showToast(message: string): void {
   }
 
   toast.textContent = message
+  // `#toast` is a manual popover: showing it again puts it last in the top
+  // layer, above any side panel or confirmation opened since. The reflow
+  // between showing it and `data-visible` keeps the fade-in.
+  delete toast.dataset.visible
+  if (toast.hasAttribute('popover') && typeof toast.showPopover === 'function') {
+    if (toast.matches(':popover-open')) toast.hidePopover()
+    toast.showPopover()
+    void toast.offsetWidth
+  }
   toast.dataset.visible = ''
 
   clearTimeout(toastTimer)

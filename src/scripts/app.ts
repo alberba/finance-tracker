@@ -1,3 +1,4 @@
+import { isDemoMode } from './demo-mode';
 import { type State } from "./types";
 import { setupAppStateFormatHelpers } from "./app/state-format-helpers";
 import { setupDashboardBudgetGoalsSection } from "./app/dashboard-budget-goals-section";
@@ -32,7 +33,7 @@ import { useSyncStore } from "../stores/sync";
   const financialStateStore = useFinancialStateStore(pinia);
   const uiStore = useUiStore(pinia);
   const recurringStore = useRecurringStore(pinia);
-  let state: State = financialStateStore.replaceState(clone(BASE_SEED));
+  let state: State = financialStateStore.state;
   const ui = uiStore.ui as UiState;
 
   const el = getAppElements();
@@ -66,7 +67,9 @@ import { useSyncStore } from "../stores/sync";
     if (!isSyncV2Enabled()) saveState();
   });
 
-  void init();
+  void init().catch(() => {
+    financialStateStore.failLoad('No se pudo cargar tu sesión. Recarga para volver a conectar.');
+  });
 
   async function init() {
     await hydrateState();
@@ -87,7 +90,7 @@ import { useSyncStore } from "../stores/sync";
    * On conflict the server wins to avoid clobbering another device's change.
    */
   async function hydrateState() {
-    if (isSyncV2Enabled()) {
+    if (isSyncV2Enabled() && !isDemoMode()) {
       const response = await fetch('/api/session');
       if (!response.ok) throw new Error('No se pudo resolver la sesión para sync v2.');
       const session = await response.json() as { user?: { id?: string; email?: string } };

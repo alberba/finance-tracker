@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import PillTag from '../ui/PillTag.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTable.vue'
 import { TONE_TEXT } from '../ui/tone'
@@ -28,6 +29,17 @@ const movementsStore = useMovementsStore()
 const ui = useUiStore().ui
 const { formatSignedMoney } = useMoneyFormatter()
 const showOlder = ref(false)
+const pendingDelete = ref<Transaction | null>(null)
+const confirmOpen = computed({
+  get: () => pendingDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingDelete.value = null
+  },
+})
+
+function confirmDelete(): void {
+  if (pendingDelete.value) movementsStore.deleteTransaction(pendingDelete.value.id)
+}
 
 watch(
   () => [ui.txYear, ui.txFilterMonth],
@@ -141,14 +153,17 @@ const emptyText = computed(() =>
       :row-class="(tx) => (isSelected(tx) ? 'bg-primary/8' : '')"
     >
       <template #head-select>
-        <input
-          id="tx-select-all"
-          type="checkbox"
-          class="accent-primary size-4.5"
-          aria-label="Seleccionar todos los movimientos visibles"
-          :checked="movementsStore.allVisibleSelected"
-          @change="movementsStore.setAllSelected(($event.target as HTMLInputElement).checked)"
-        />
+        <!-- The label is the touch target: 44 px on mobile around the 18 px box. -->
+        <label class="desk:size-6 grid size-11 cursor-pointer place-items-center">
+          <input
+            id="tx-select-all"
+            type="checkbox"
+            class="accent-primary size-4.5"
+            aria-label="Seleccionar todos los movimientos visibles"
+            :checked="movementsStore.allVisibleSelected"
+            @change="movementsStore.setAllSelected(($event.target as HTMLInputElement).checked)"
+          />
+        </label>
       </template>
       <template #head-date>
         <button
@@ -172,15 +187,19 @@ const emptyText = computed(() =>
       </template>
 
       <template #cell-select="{ row }">
-        <input
-          type="checkbox"
-          class="accent-primary size-4.5"
-          :data-select-tx-id="row.id"
-          :disabled="Boolean(row.remoteOperation)"
-          :checked="isSelected(row)"
-          :aria-label="`Seleccionar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
-          @change="movementsStore.setSelected(row.id, ($event.target as HTMLInputElement).checked)"
-        />
+        <label class="desk:size-6 grid size-11 cursor-pointer place-items-center">
+          <input
+            type="checkbox"
+            class="accent-primary size-4.5"
+            :data-select-tx-id="row.id"
+            :disabled="Boolean(row.remoteOperation)"
+            :checked="isSelected(row)"
+            :aria-label="`Seleccionar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
+            @change="
+              movementsStore.setSelected(row.id, ($event.target as HTMLInputElement).checked)
+            "
+          />
+        </label>
       </template>
       <template #cell-date="{ row }">
         <span class="text-text-muted whitespace-nowrap tabular-nums">{{
@@ -249,7 +268,7 @@ const emptyText = computed(() =>
             tone="danger"
             :label="`Eliminar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
             :data-delete-id="row.id"
-            @click="movementsStore.deleteTransaction(row.id)"
+            @click="pendingDelete = row"
           />
         </span>
       </template>
@@ -262,5 +281,18 @@ const emptyText = computed(() =>
     >
       {{ olderLabel }}
     </BaseButton>
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      title="¿Eliminar este movimiento?"
+      title-id="tx-delete-title"
+      confirm-label="Eliminar movimiento"
+      @confirm="confirmDelete"
+    >
+      <template v-if="pendingDelete">
+        {{ pendingDelete.description || pendingDelete.category }} del
+        {{ formatDayMonth(pendingDelete.date) }} por
+        {{ formatSignedMoney(signedAmount(pendingDelete)) }}. No se puede deshacer.
+      </template>
+    </ConfirmDialog>
   </section>
 </template>

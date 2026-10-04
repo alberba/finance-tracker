@@ -45,13 +45,15 @@
     /* Gain / loss text on the ink surface, which stays dark in both themes. */
     --ink-gain: #34d399;
     --ink-loss: #f87171;
+    /* Chart gridlines on the ink surface. */
+    --ink-grid: rgba(255, 255, 255, 0.07);
 
     /* Brand / interaction */
-    --primary: #3b6bf0;
+    --primary: #3462e0; /* text tone too: AA (4.67:1) on --bg-main */
     --primary-light: #eaf0fe;
     /* Fill of primary buttons and its text: the same blue in both themes, so
        white text keeps AA (the dark --primary is too light under white). */
-    --primary-fill: #3b6bf0;
+    --primary-fill: #3462e0;
     --primary-fill-hover: #2a53d4;
     --on-primary: #ffffff;
 
@@ -94,7 +96,6 @@
     --chart-grid: #e9edf4;
     --chart-legend: #5a6678;
     --chart-point-border: #ffffff;
-    --chart-empty: #e4e8f1;
 
     /* Chart series palette (positions, allocation bar, per-asset charts).
        Read through chart-theme.ts; neighbours differ in lightness too. */
@@ -163,7 +164,6 @@
     --chart-grid: #21252e;
     --chart-legend: #9aa4b4;
     --chart-point-border: #121419;
-    --chart-empty: #23262f;
 
     --chart-series-1: #2bb3a0;
     --chart-series-2: #e6b04a;
@@ -179,8 +179,8 @@
 }
 
 @theme {
-  /* Typography: display = Syne (400–800), body = DM Sans, numbers and
-     symbols = DM Mono. */
+  /* Typography: display = Syne (400–800) for titles and every figure, body =
+     DM Sans, asset symbols and kickers = DM Mono. */
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;

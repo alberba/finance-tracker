@@ -106,7 +106,7 @@ export function setPendingChanges(pending: boolean): void {
   }
 }
 
-const FALLBACK_BASE_SEED = {
+export const EMPTY_STATE_SEED = {
   meta: {
     source: 'manual',
     generatedAt: new Date().toISOString(),
@@ -145,7 +145,7 @@ const FALLBACK_BASE_SEED = {
 
 export const BASE_SEED: unknown = isDemoMode()
   ? FINANCE_TRACKER_DEMO_SEED
-  : FINANCE_TRACKER_SEED || FALLBACK_BASE_SEED
+  : FINANCE_TRACKER_SEED || EMPTY_STATE_SEED
 
 /**
  * En modo demo cada clave de localStorage lleva un sufijo propio: así ni se
