@@ -226,6 +226,7 @@
   --color-ink-gain: var(--ink-gain);
   --color-ink-loss: var(--ink-loss);
   --color-sidebar: var(--bg-sidebar);
+  --color-overlay: var(--overlay);
 
   /* Notice band: demo mode. */
   --color-notice: var(--notice-bg);

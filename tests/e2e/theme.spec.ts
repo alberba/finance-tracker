@@ -95,6 +95,9 @@ test.describe('Tema: claro, oscuro o sistema', () => {
       await page.getByRole('button', { name: 'Cerrar menú' }).click()
       await appBarTheme.getByRole('button', { name: 'Tema claro' }).click()
       await expect(html(page)).toHaveAttribute('data-theme', 'light')
+
+      await page.getByRole('button', { name: 'Más secciones' }).click()
+      await expectPressed(sheetTheme, 'Claro')
     })
   })
 })

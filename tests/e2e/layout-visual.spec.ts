@@ -1164,5 +1164,35 @@ test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
         await expectSoundLayout(page, view.scope, view.name)
       })
     }
+
+    for (const view of SHELL_DESKTOP_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-desktop.png`,
+        )
+      })
+    }
+
+    test.describe('tema oscuro', () => {
+      test.use({ colorScheme: 'dark' })
+
+      for (const view of SHELL_DESKTOP_VIEWS) {
+        test(`snapshot visual estable en "${view.name}" (escritorio, oscuro)`, async ({
+          tracker,
+          page,
+        }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            tracker,
+            () => view.open(page, tracker),
+            `page-${view.name}-desktop-dark.png`,
+          )
+        })
+      }
+    })
   })
 })
