@@ -56,12 +56,9 @@ Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md` y la not
 - `<style scoped>` solo para animaciones, selectores estructurales o pseudo-elementos,
   `::backdrop`, internos de gráficos o librerías y `v-bind()`. Siempre con variables de tema
   (`var(--…)`) y sin `@apply`.
-- El CSS global (`src/styles/global.css`) solo lleva orden de capas, tokens claro y oscuro, reset,
-  tipografía base y shell.
-- `src/styles/legacy.css` está congelada: no admite reglas nuevas, solo borrados. Su subcapa
-  `legacy.bridge` (la base de botones, tablas y campos heredados, que vivía en `global.css`) sigue
-  la misma norma. Una zona que se migra borra su bloque (y su parte responsive) y baja el techo de
-  líneas de `tests/unit/styles-guards.test.ts` en la misma PR. El techo nunca sube.
+- El CSS global (`src/styles/global.css`) solo lleva tokens claro y oscuro, reset, tipografía base
+  y shell, sin clases. Es la única hoja de estilos: ni hojas nuevas ni capas propias, solo las de
+  Tailwind. `tests/unit/styles-guards.test.ts` lo comprueba.
 - El tema oscuro va por tokens: los colores de `@theme` apuntan a variables que cambian con
   `[data-theme=dark]`. Cuando haga falta una variante, `dark:` está ligada a ese atributo, no a
   `prefers-color-scheme`.

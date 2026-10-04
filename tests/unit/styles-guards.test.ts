@@ -3,50 +3,68 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Guards for the style architecture of ADR 0004
- * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): the legacy
- * sheet can only shrink, it stays below Tailwind in the cascade, the
- * text/surface token pairs keep AA contrast in both themes, and every CSS
- * variable the code reads is defined somewhere.
+ * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): global.css
+ * is the only stylesheet and imports nothing but Tailwind (the legacy sheet is
+ * gone and can't come back under any name), the text/surface token pairs keep
+ * AA contrast in both themes, and every CSS variable the code reads is defined
+ * somewhere.
  */
 
 const globalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8')
-const legacyCss = readFileSync(new URL('../../src/styles/legacy.css', import.meta.url), 'utf8')
 
-/**
- * Line ceiling for src/styles/legacy.css. It only goes down: a zone migration
- * that deletes legacy rules lowers it in the same PR. Never raise it; new
- * styles go in components (utilities, base components or scoped styles).
- */
-const LEGACY_CSS_LINE_CEILING = 891
+const srcDir = new URL('../../src/', import.meta.url)
+const sourcePaths = readdirSync(srcDir, { recursive: true }) as string[]
 
-describe('legacy.css', () => {
-  it('does not grow past its line ceiling', () => {
-    const lines = legacyCss.split('\n').length - (legacyCss.endsWith('\n') ? 1 : 0)
+describe('global stylesheet', () => {
+  it('is the only stylesheet in src/', () => {
+    // New styles go in components: utilities, base components or scoped styles.
+    const stylesheets = sourcePaths.filter((path) => /\.(css|scss|sass|less)$/.test(path))
 
-    expect(lines).toBeLessThanOrEqual(LEGACY_CSS_LINE_CEILING)
-  })
-})
-
-describe('cascade layers', () => {
-  it('declares legacy below components and utilities, above base', () => {
-    const statement = globalCss.match(/^@layer\s+([^;{]+);/m)
-    expect(statement, 'global.css declares the layer order in one statement').not.toBeNull()
-    const order = statement![1].split(',').map((layer) => layer.trim())
-
-    expect(order).toEqual(['theme', 'base', 'legacy', 'components', 'utilities'])
+    expect(stylesheets).toEqual(['styles/global.css'])
   })
 
-  it('declares the order before importing Tailwind', () => {
-    expect(globalCss.indexOf('@layer theme, base, legacy')).toBeLessThan(
-      globalCss.indexOf("@import 'tailwindcss'"),
+  it('has no global <style> blocks beside it', () => {
+    // Components style themselves with scoped blocks; an unscoped or
+    // `is:global` block would be a global sheet under another name.
+    const globalBlocks = sourcePaths
+      .filter((path) => /\.(vue|astro)$/.test(path))
+      .flatMap((path) =>
+        [...readFileSync(new URL(path, srcDir), 'utf8').matchAll(/<style\b[^>]*>/g)]
+          .filter(([tag]) => !/\bscoped\b/.test(tag))
+          .map(([tag]) => `${path}: ${tag}`),
+      )
+
+    expect(globalBlocks).toEqual([])
+  })
+
+  it('has no stylesheets in public/', () => {
+    const publicDir = new URL('../../public/', import.meta.url)
+    const stylesheets = (readdirSync(publicDir, { recursive: true }) as string[]).filter((path) =>
+      path.endsWith('.css'),
     )
+
+    expect(stylesheets).toEqual([])
   })
 
-  it('imports legacy.css only inside the legacy layer', () => {
-    const imports = [...globalCss.matchAll(/^@import\s+['"]\.\/legacy\.css['"]([^;]*);/gm)]
+  it('imports only Tailwind', () => {
+    const imports = [...globalCss.matchAll(/^@import\s+([^;]+);/gm)].map(([, target]) =>
+      target.trim(),
+    )
 
-    expect(imports).toHaveLength(1)
-    expect(imports[0][1].trim()).toBe('layer(legacy)')
+    expect(imports).toEqual(["'tailwindcss'"])
+  })
+
+  it('declares no cascade layer of its own', () => {
+    // Tailwind's theme, base, components and utilities are the whole order;
+    // a layer for old rules is how the legacy sheet lived.
+    // Block (`@layer base {`) and statement (`@layer theme, legacy;`) forms.
+    const layers = [...globalCss.matchAll(/@layer\s+([^{;]+)/g)].flatMap(([, names]) =>
+      names.split(',').map((name) => name.trim()),
+    )
+
+    expect(
+      layers.filter((name) => !['theme', 'base', 'components', 'utilities'].includes(name)),
+    ).toEqual([])
   })
 })
 
@@ -152,8 +170,7 @@ describe('token contrast (WCAG AA, normal text)', () => {
   }
 })
 
-const srcDir = new URL('../../src/', import.meta.url)
-const sourceFiles = (readdirSync(srcDir, { recursive: true }) as string[])
+const sourceFiles = sourcePaths
   .filter((path) => /\.(vue|astro|ts|js|css)$/.test(path))
   .map((path) => ({ path, text: readFileSync(new URL(path, srcDir), 'utf8') }))
 

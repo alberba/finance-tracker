@@ -1,55 +1,56 @@
 import { test, expect } from './fixtures'
 
 test.describe('Mobile smoke', () => {
-  test('mantiene legible el patrimonio y los movimientos en formato PWA', { tag: '@smoke' }, async ({
-    page,
-    tracker,
-  }) => {
-    const currentMonth = new Intl.DateTimeFormat('es-ES', { month: 'long' })
-      .format(new Date())
-      .toLocaleUpperCase('es-ES')
-    await page.goto('/patrimonio')
-    await tracker.saveAccountSnapshot({
-      monthLabel: currentMonth,
-      accountName: 'Revolut',
-      value: 9_999_999_999.99,
-    })
-    await page.goto('/')
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await expect(
-      tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
-    ).toBeVisible()
+  test(
+    'mantiene legible el patrimonio y los movimientos en formato PWA',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      const currentMonth = new Intl.DateTimeFormat('es-ES', { month: 'long' })
+        .format(new Date())
+        .toLocaleUpperCase('es-ES')
+      await page.goto('/patrimonio')
+      await tracker.saveAccountSnapshot({
+        monthLabel: currentMonth,
+        accountName: 'Revolut',
+        value: 9_999_999_999.99,
+      })
+      await page.goto('/')
+      await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+      await expect(
+        tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
+      ).toBeVisible()
 
-    const hero = tracker.dashboardSection.getByRole('region', { name: 'Patrimonio neto' })
-    const netWorth = hero.locator('#kpi-net-worth')
-    await expect(netWorth).toContainText('€')
+      const hero = tracker.dashboardSection.getByRole('region', { name: 'Patrimonio neto' })
+      const netWorth = hero.locator('#kpi-net-worth')
+      await expect(netWorth).toContainText('€')
 
-    const layout = await hero.evaluate((element) => {
-      const amount = element.querySelector<HTMLElement>('#kpi-net-worth')
-      if (!amount) return null
+      const layout = await hero.evaluate((element) => {
+        const amount = element.querySelector<HTMLElement>('#kpi-net-worth')
+        if (!amount) return null
 
-      const heroRect = element.getBoundingClientRect()
-      const amountRect = amount.getBoundingClientRect()
-      const lineHeight = Number.parseFloat(getComputedStyle(amount).lineHeight)
-      return {
-        amountFitsHero:
-          amountRect.left >= heroRect.left - 1 && amountRect.right <= heroRect.right + 1,
-        amountHasNoOverflow: amount.scrollWidth <= amount.clientWidth + 1,
-        amountIsSingleLine: amountRect.height <= lineHeight * 1.1,
-        viewportHasNoOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
-      }
-    })
+        const heroRect = element.getBoundingClientRect()
+        const amountRect = amount.getBoundingClientRect()
+        const lineHeight = Number.parseFloat(getComputedStyle(amount).lineHeight)
+        return {
+          amountFitsHero:
+            amountRect.left >= heroRect.left - 1 && amountRect.right <= heroRect.right + 1,
+          amountHasNoOverflow: amount.scrollWidth <= amount.clientWidth + 1,
+          amountIsSingleLine: amountRect.height <= lineHeight * 1.1,
+          viewportHasNoOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        }
+      })
 
-    expect(layout).toEqual({
-      amountFitsHero: true,
-      amountHasNoOverflow: true,
-      amountIsSingleLine: true,
-      viewportHasNoOverflow: true,
-    })
-    await expect(
-      tracker.dashboardSection.getByRole('list', { name: 'Últimos movimientos' }),
-    ).toBeVisible()
-  })
+      expect(layout).toEqual({
+        amountFitsHero: true,
+        amountHasNoOverflow: true,
+        amountIsSingleLine: true,
+        viewportHasNoOverflow: true,
+      })
+      await expect(
+        tracker.dashboardSection.getByRole('list', { name: 'Últimos movimientos' }),
+      ).toBeVisible()
+    },
+  )
 
   test('prioriza el contenido y permite navegar con la barra inferior', async ({
     page,
@@ -144,8 +145,8 @@ test.describe('Mobile smoke', () => {
     await menu.getByRole('button', { name: 'Crear reporte' }).click()
 
     await expect(menu).toBeHidden()
-    await expect(page.locator('#global-report-dialog')).toBeVisible()
-    await expect(page.locator('#global-report-dialog').getByLabel('Resumen')).toBeFocused()
+    await expect(tracker.issueReportDialog).toBeVisible()
+    await expect(tracker.issueReportDialog.getByLabel('Resumen')).toBeFocused()
     await expect(page.locator('#global-report-trigger')).toBeHidden()
   })
 
@@ -191,12 +192,21 @@ test.describe('Mobile smoke', () => {
     await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     const banner = page.getByRole('status').filter({ hasText: 'Modo demo · datos ficticios' })
     await expect(banner).toBeVisible()
-
-    const appBarBox = await page.locator('[data-mobile-app-bar]').boundingBox()
-    const bannerBox = await banner.boundingBox()
-    expect(appBarBox).not.toBeNull()
-    expect(bannerBox).not.toBeNull()
-    expect(bannerBox!.y).toBeGreaterThanOrEqual(appBarBox!.y + appBarBox!.height)
+    // Activating demo mode reloads the page, and the browser may restore a
+    // scroll offset that tucks the banner under the sticky app bar: measure
+    // the layout from the top, polled until the reload settles.
+    const appBar = page.locator('[data-mobile-app-bar]')
+    await expect
+      .poll(async () => {
+        await page.evaluate(() => window.scrollTo(0, 0))
+        const [appBarBox, bannerBox] = await Promise.all([
+          appBar.boundingBox(),
+          banner.boundingBox(),
+        ])
+        if (!appBarBox || !bannerBox) return -1
+        return bannerBox.y - (appBarBox.y + appBarBox.height)
+      })
+      .toBeGreaterThanOrEqual(0)
 
     await banner.getByRole('button', { name: 'Salir' }).click()
     await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')

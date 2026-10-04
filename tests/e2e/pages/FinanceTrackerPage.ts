@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 
+/** `--breakpoint-desk` in src/styles/global.css (61.3125rem): sidebar and floating launcher from here up. */
+const DESK_BREAKPOINT_PX = 981
+
 const SECTION_CONFIG = {
   dashboard: { buttonLabel: 'Dashboard', headingText: /^Dashboard$/ },
   transactions: {
@@ -94,7 +97,7 @@ export class FinanceTrackerPage {
   }
 
   get issueReportDialog(): Locator {
-    return this.page.locator('#global-report-dialog')
+    return this.page.getByRole('dialog', { name: 'Crear reporte' })
   }
 
   async goto() {
@@ -259,19 +262,29 @@ export class FinanceTrackerPage {
       mimeType: 'application/json',
       buffer: Buffer.from('{}'),
     })
-    await expect(this.page.getByRole('alertdialog', { name: '¿Importar esta copia?' })).toBeVisible()
+    await expect(
+      this.page.getByRole('alertdialog', { name: '¿Importar esta copia?' }),
+    ).toBeVisible()
   }
 
+  /** The floating launcher from the `desk` breakpoint up; the «Más» sheet below it. */
   async openGlobalReportDialog() {
-    await this.page.locator('#global-report-trigger').click()
+    if ((this.page.viewportSize()?.width ?? 0) >= DESK_BREAKPOINT_PX) {
+      await this.page.locator('#global-report-trigger').click()
+    } else {
+      await this.page.getByRole('button', { name: 'Más secciones' }).click()
+      await this.page
+        .getByRole('dialog', { name: 'Más secciones' })
+        .getByRole('button', { name: 'Crear reporte' })
+        .click()
+    }
     await expect(this.issueReportDialog).toBeVisible()
   }
 
   async submitIssueReport(params: {
-    // Only the two options `#issue-report-type` actually renders. The wider
-    // `ReportType` in `src/services/issue-report-api.ts` still allows
-    // "enhancement", but the UI dropped it, so asking for it here just made
-    // `selectOption` hang until the test timed out.
+    // Only the two options the «Tipo» control renders. The wider `ReportType`
+    // in `src/services/issue-report-api.ts` still allows "enhancement", but
+    // the UI dropped it.
     type: 'bug' | 'feature'
     summary: string
     description: string
@@ -279,21 +292,24 @@ export class FinanceTrackerPage {
     actualResult?: string
   }) {
     await this.openGlobalReportDialog()
-    const form = this.issueReportDialog.locator('#issue-report-form')
-    await form.locator('#issue-report-type').selectOption(params.type)
-    await form.locator('#issue-report-summary').fill(params.summary)
-    await form.locator('#issue-report-description').fill(params.description)
+    const panel = this.issueReportDialog
+    await panel
+      .getByRole('group', { name: 'Tipo' })
+      .getByRole('button', { name: params.type === 'bug' ? 'Error' : 'Mejora' })
+      .click()
+    await panel.getByLabel('Resumen').fill(params.summary)
+    await panel.getByLabel('Descripción').fill(params.description)
     if (params.expectedResult !== undefined) {
-      await form.locator('#issue-report-expected').fill(params.expectedResult)
+      await panel.getByLabel('Resultado esperado').fill(params.expectedResult)
     }
     if (params.actualResult !== undefined) {
-      await form.locator('#issue-report-actual').fill(params.actualResult)
+      await panel.getByLabel('Resultado actual').fill(params.actualResult)
     }
-    await form.getByRole('button', { name: 'Crear reporte' }).click()
+    await panel.getByRole('button', { name: 'Crear reporte' }).click()
   }
 
   issueReportStatus(): Locator {
-    return this.issueReportDialog.locator('#issue-report-status')
+    return this.issueReportDialog.getByRole('status')
   }
 
   async open(sectionId: FinanceSectionId) {

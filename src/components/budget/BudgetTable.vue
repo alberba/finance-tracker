@@ -372,7 +372,7 @@ const STICKY = 'bg-panel sticky left-0 z-[1]'
                         type="text"
                         inputmode="decimal"
                         autocomplete="off"
-                        :class="[FIELD, range === 3 ? 'w-24' : 'w-16']"
+                        :class="[FIELD, range === 3 ? 'w-24' : 'w-22.5']"
                         :value="formatDecimalInput(row.cells[month].planned)"
                         :aria-invalid="invalid.has(`${row.category}|${month}`)"
                         data-budget-cell

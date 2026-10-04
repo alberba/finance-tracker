@@ -1,34 +1,7 @@
-import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
-async function expectModalAnchoredToLauncher(
-  page: Page,
-  selector: string,
-  inset = 22,
-  tolerance = 4,
-) {
-  const dialog = page.locator(selector);
-  await expect(dialog).toBeVisible();
-  await dialog.evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
-  });
-
-  const viewport = page.viewportSize();
-  const box = await dialog.boundingBox();
-  if (!viewport || !box) {
-    throw new Error(`No se pudo medir el panel ${selector}.`);
-  }
-
-  expect(
-    Math.abs(viewport.width - (box.x + box.width) - inset),
-  ).toBeLessThanOrEqual(tolerance);
-  expect(
-    Math.abs(viewport.height - (box.y + box.height) - inset),
-  ).toBeLessThanOrEqual(tolerance);
-}
-
 test.describe("Reports E2E", () => {
-  test("expande el formulario desde el acceso global anclado", async ({
+  test("abre el panel lateral de reporte desde el acceso global", async ({
     page,
     tracker,
   }) => {
@@ -52,30 +25,26 @@ test.describe("Reports E2E", () => {
       .toBeGreaterThan(compactWidth);
 
     await tracker.openGlobalReportDialog();
-    await expect(tracker.issueReportDialog).toHaveAttribute("open", "");
-    await expectModalAnchoredToLauncher(page, "#global-report-dialog");
-    await expect(tracker.issueReportDialog).not.toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toHaveCSS(
-      "animation-name",
-      "report-dialog-in",
-    );
-    await expect(tracker.issueReportDialog.getByLabel("Resumen")).toBeFocused();
-    await expect(
-      tracker.issueReportDialog.locator("#issue-report-steps"),
-    ).toHaveCount(0);
-    await expect(
-      tracker.issueReportDialog.locator("#issue-report-mention-claude"),
-    ).toHaveCount(0);
+    const panel = tracker.issueReportDialog;
+    // Polled: the side panel slides in from the right edge.
+    await expect
+      .poll(() => panel.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    await expect(panel.getByLabel("Resumen")).toBeFocused();
+    await expect(trigger).toBeHidden();
 
     await page.keyboard.press("Escape");
-    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toBeHidden();
+    await expect(panel).toBeHidden();
     await expect(trigger).toBeFocused();
 
     await trigger.click();
-    await page.locator("#global-report-dialog-close").click();
-    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toBeHidden();
+    await panel.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(panel).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await panel.getByRole("button", { name: "Cancelar" }).click();
+    await expect(panel).toBeHidden();
     await expect(trigger).toBeFocused();
   });
 
@@ -157,10 +126,10 @@ test.describe("Reports E2E", () => {
     tracker,
   }) => {
     await tracker.openGlobalReportDialog();
-    const form = tracker.issueReportDialog.locator("#issue-report-form");
-    await form.locator("#issue-report-summary").fill("abc");
-    await form.locator("#issue-report-description").fill("corta");
-    await form.getByRole("button", { name: "Crear reporte" }).click();
+    const panel = tracker.issueReportDialog;
+    await panel.getByLabel("Resumen").fill("abc");
+    await panel.getByLabel("Descripción").fill("corta");
+    await panel.getByRole("button", { name: "Crear reporte" }).click();
     await expect(tracker.issueReportStatus()).toContainText(
       "el resumen debe tener al menos 5 caracteres",
     );

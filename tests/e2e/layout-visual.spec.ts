@@ -280,7 +280,7 @@ const GOALS_VIEWS: Array<{
   },
 ]
 
-/** Datos views beyond the top of the page: the import confirmation dialog. */
+/** Datos views beyond the top of the page: the import confirmation dialog and the report panel. */
 const DATA_VIEWS: Array<{
   name: string
   open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
@@ -291,6 +291,13 @@ const DATA_VIEWS: Array<{
     open: async (page, tracker) => {
       await openSectionForLayout(page, tracker, 'data')
       await tracker.chooseImportFile()
+    },
+  },
+  {
+    name: 'data-report-panel',
+    open: async (page, tracker) => {
+      await openSectionForLayout(page, tracker, 'data')
+      await tracker.openGlobalReportDialog()
     },
   },
 ]
