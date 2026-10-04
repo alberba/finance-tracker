@@ -6,6 +6,8 @@ export interface FigureStripItem {
   value: string
   tone?: Tone
   suffix?: string
+  /** A short line under the figure (what it is out of, until when). */
+  note?: string
 }
 
 // Summary figures side by side, separated by rules; two columns on mobile.
@@ -27,6 +29,7 @@ defineProps<{ items: FigureStripItem[] }>()
         {{ item.value }}
         <span v-if="item.suffix" class="text-text-muted font-sans text-sm">{{ item.suffix }}</span>
       </dd>
+      <dd v-if="item.note" class="text-text-muted text-sm">{{ item.note }}</dd>
     </div>
   </dl>
 </template>
