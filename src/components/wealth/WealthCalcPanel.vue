@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 
 import { formatSignedMoney } from '../../lib/format'
 import { evaluateNumericExpression } from '../../scripts/math-expression'
@@ -61,15 +61,16 @@ const note = computed(() => {
   return `${formatSignedMoney(diff, props.currency)} frente al snapshot actual`
 })
 
-function insert(text: string): void {
+// Places the caret right after the DOM update, not a frame later: a key typed
+// in between would land wherever the caret was (#227).
+async function insert(text: string): Promise<void> {
   const input = field.value
   const start = input?.selectionStart ?? expression.value.length
   const end = input?.selectionEnd ?? expression.value.length
   expression.value = expression.value.slice(0, start) + text + expression.value.slice(end)
-  requestAnimationFrame(() => {
-    input?.focus()
-    input?.setSelectionRange(start + text.length, start + text.length)
-  })
+  await nextTick()
+  input?.focus()
+  input?.setSelectionRange(start + text.length, start + text.length)
 }
 
 function apply(): void {
@@ -136,6 +137,7 @@ function apply(): void {
             type="button"
             class="border-line-strong bg-panel text-text-main hover:border-primary focus-visible:outline-primary h-11 rounded-md border font-mono text-lg focus-visible:outline-2"
             :aria-label="key.name"
+            @mousedown.prevent
             @click="insert(key.insert)"
           >
             {{ key.label }}
