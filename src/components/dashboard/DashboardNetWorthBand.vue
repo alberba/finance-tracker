@@ -10,10 +10,9 @@ import type {
   DashboardNetWorthBand,
   DashboardRangeOption,
 } from '../../domain/dashboard/view-model'
-import { splitDecimals } from '../../lib/format'
+import { formatCompactMoney, formatMoney, splitDecimals } from '../../lib/format'
 import { renderLineChart } from '../../scripts/charts'
 import { resolveCssColor } from '../../scripts/css-color'
-import { formatCompactMoneyForCurrency, formatMoneyForCurrency } from '../../scripts/money-format'
 
 // The ink band in two halves: the net worth with its changes on the left and
 // its evolution as an area chart, with a range control, on the right.
@@ -49,8 +48,8 @@ const drawChart = computed(() => {
       gridColor: 'rgba(255, 255, 255, 0.07)',
       pointBorderColor: resolveCssColor('--ink-surface', '#0b1120', canvas),
       labels,
-      formatValue: (value) => formatMoneyForCurrency(value, currency),
-      formatAxisValue: (value) => formatCompactMoneyForCurrency(value, currency),
+      formatValue: (value) => formatMoney(value, currency),
+      formatAxisValue: (value) => formatCompactMoney(value, currency),
       includeZeroBaseline: false,
       yPaddingRatio: 0.12,
     })
@@ -108,7 +107,9 @@ const drawChart = computed(() => {
       class="border-ink-text/10 m-0 flex min-w-0 flex-col gap-3 border-t px-5 pt-5 pb-6 sm:px-9 lg:border-t-0 lg:pt-8 lg:pr-9 lg:pl-3"
     >
       <figcaption class="text-ink-muted flex flex-wrap items-center justify-between gap-3 text-sm">
-        <span>Evolución · <span class="font-display tabular-nums">máx. {{ chart.max }}</span></span>
+        <span
+          >Evolución · <span class="font-display tabular-nums">máx. {{ chart.max }}</span></span
+        >
         <SegmentedControl
           v-model="range"
           :options="ranges"

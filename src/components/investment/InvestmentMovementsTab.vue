@@ -16,7 +16,7 @@ import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { InvestmentMovementRow } from '../../domain/investment/view-model'
 import type { Transaction } from '../../scripts/types'
-import { formatDayMonth, formatMonthYear } from '../../lib/format'
+import { formatDayMonth, formatMonthYear, formatNumber } from '../../lib/format'
 import { useInvestmentStore } from '../../stores/investment'
 import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
@@ -100,10 +100,7 @@ function nameOf(row: InvestmentMovementRow): string {
 function formatUnits(value: number | undefined): string {
   const units = Number(value) || 0
   const digits = units > 0 && units < 1 ? 5 : 4
-  return units.toLocaleString('es-ES', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  })
+  return formatNumber(units, digits)
 }
 
 function requestDelete(tx: Transaction): void {

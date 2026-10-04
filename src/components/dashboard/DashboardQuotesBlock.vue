@@ -7,7 +7,7 @@ import StatusDot from '../ui/StatusDot.vue'
 import { TONE_TEXT, toneOf } from '../ui/tone'
 import { useLiveQuotes } from '../../composables/useLiveQuotes'
 import { QUOTE_STATUS, summarizeQuoteStatus } from '../../domain/investment/quote-status'
-import { formatPercent, formatQuotePrice } from '../../lib/format'
+import { formatPercent, formatQuotePrice, formatTime } from '../../lib/format'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMarketStore } from '../../stores/market'
 
@@ -27,10 +27,7 @@ const assetNames = computed(
 const updatedAt = computed(() => {
   const summary = summarizeQuoteStatus(marketStore.valuation.instruments)
   if (!summary) return ''
-  const time = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(
-    new Date(summary.latest),
-  )
-  return `Actualizado a las ${time}`
+  return `Actualizado a las ${formatTime(summary.latest)}`
 })
 </script>
 
@@ -94,7 +91,9 @@ const updatedAt = computed(() => {
         </span>
         <div class="flex items-center justify-between gap-2 text-sm">
           <span class="text-text-muted hidden truncate sm:inline">
-            {{ assetNames.get(row.instrument.investmentAssetId) || row.instrument.type.toUpperCase() }}
+            {{
+              assetNames.get(row.instrument.investmentAssetId) || row.instrument.type.toUpperCase()
+            }}
           </span>
           <StatusDot
             v-if="row.status === 'stale'"
