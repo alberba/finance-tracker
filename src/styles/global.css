@@ -96,7 +96,6 @@
     --chart-grid: #e9edf4;
     --chart-legend: #5a6678;
     --chart-point-border: #ffffff;
-    --chart-empty: #e4e8f1;
 
     /* Chart series palette (positions, allocation bar, per-asset charts).
        Read through chart-theme.ts; neighbours differ in lightness too. */
@@ -165,7 +164,6 @@
     --chart-grid: #21252e;
     --chart-legend: #9aa4b4;
     --chart-point-border: #121419;
-    --chart-empty: #23262f;
 
     --chart-series-1: #2bb3a0;
     --chart-series-2: #e6b04a;

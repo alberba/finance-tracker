@@ -12,7 +12,6 @@ const tokens: Record<string, string> = {
   '--chart-grid': '#e9edf4',
   '--chart-legend': '#5a6678',
   '--chart-point-border': '#ffffff',
-  '--chart-empty': '#e4e8f1',
   '--font-display': "'Syne', sans-serif",
   '--chart-series-1': '#0d8476',
   '--chart-series-2': '#d49a1f',
@@ -26,7 +25,6 @@ describe('readChartTheme', () => {
       grid: '#e9edf4',
       legend: '#5a6678',
       pointBorder: '#ffffff',
-      empty: '#e4e8f1',
       fontFamily: "'Syne', sans-serif",
     })
   })

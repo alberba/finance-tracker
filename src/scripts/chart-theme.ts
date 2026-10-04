@@ -16,7 +16,6 @@ export interface ChartTheme {
   grid: string
   legend: string
   pointBorder: string
-  empty: string
   fontFamily: string
 }
 
@@ -32,7 +31,6 @@ export function readChartTheme(read: TokenReader = cssVar): ChartTheme {
     grid: token('--chart-grid', '#e9edf4'),
     legend: token('--chart-legend', '#5a6678'),
     pointBorder: token('--chart-point-border', '#ffffff'),
-    empty: token('--chart-empty', '#e4e8f1'),
     fontFamily: token('--font-display', "'Syne', sans-serif"),
   }
 }
