@@ -457,10 +457,69 @@ test.describe("Finance tracker E2E", () => {
       tracker.transactionRows.filter({ hasText: "📈 Fondos Indexados" }),
     ).toHaveCount(2);
 
-    await tracker.deleteSelectedTransactions();
+    await tracker.deleteSelectedTransactions(2);
     await expect(tracker.transactionRows).toHaveCount(0);
     await expect(tracker.bulkActionBar).toHaveCount(0);
     await tracker.clearTransactionFilters();
+  });
+
+  test("eliminar un movimiento pide confirmación y Cancelar lo conserva", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.addCustomTransaction({
+      date: "2026-03-13",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 13,
+      description: "e2e-borrar",
+    });
+    await tracker.filterTransactionsMonth("MARZO");
+    await tracker.setTransactionDescriptionFilter("e2e-borrar");
+    const row = tracker.transactionRow("e2e-borrar");
+    const remove = row.getByRole("button", { name: "Eliminar e2e-borrar del 13 mar" });
+    const dialog = page.getByRole("alertdialog", { name: "¿Eliminar este movimiento?" });
+
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("e2e-borrar del 13 mar");
+    await dialog.getByRole("button", { name: "Cancelar" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(row).toBeVisible();
+
+    await remove.click();
+    await dialog.getByRole("button", { name: "Eliminar movimiento" }).click();
+    await expect(page.getByRole("status")).toContainText("Movimiento eliminado.");
+    await expect(tracker.transactionRows).toHaveCount(0);
+    await tracker.clearTransactionFilters();
+  });
+
+  test("el aviso se ve por encima del panel lateral abierto", async ({ page, tracker }) => {
+    await tracker.addCustomTransactionKeepOpen({
+      date: "2026-03-14",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 14,
+      description: "e2e-aviso",
+    });
+
+    // The panel is a modal dialog in the top layer: the toast, a manual
+    // popover shown after it, renders above it.
+    await expect(tracker.transactionPanel).toBeVisible();
+    const toast = page.locator("#toast");
+    await expect(toast).toBeVisible();
+    expect(await toast.evaluate((element) => element.matches(":popover-open"))).toBe(true);
+    // Still in its corner, not centred like a bare popover.
+    const box = await toast.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport).toBeTruthy();
+    expect(box!.x).toBeGreaterThan(viewport!.width / 2);
+    expect(box!.y).toBeGreaterThan(viewport!.height / 2);
+    await expect(
+      tracker.transactionPanel.getByRole("button", { name: "Guardar y añadir otro" }),
+    ).toBeFocused();
   });
 
   test("movimientos cierra el panel lateral con Escape y con Cancelar", async ({

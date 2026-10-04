@@ -93,7 +93,9 @@ describe('PendingMovementsPanel', () => {
     const categorySelect = form.findAll('select').find((s) => s.text().includes('Fondos Indexados'))
     expect(categorySelect).toBeDefined()
 
-    const accountSelect = form.findAll('select').find((s) => s.text().includes('Broker Interactive'))
+    const accountSelect = form
+      .findAll('select')
+      .find((s) => s.text().includes('Broker Interactive'))
     expect(accountSelect).toBeDefined()
   })
 
@@ -107,16 +109,22 @@ describe('PendingMovementsPanel', () => {
     const categorySelect = form.findAll('select').find((s) => s.text().includes('Fondos Indexados'))
     await categorySelect!.setValue('Fondos Indexados')
 
-    const accountSelect = form.findAll('select').find((s) => s.text().includes('Broker Interactive'))
+    const accountSelect = form
+      .findAll('select')
+      .find((s) => s.text().includes('Broker Interactive'))
     await accountSelect!.setValue('asset-broker')
 
     const symbolInput = form.find('input[placeholder="VWCE"]')
     await symbolInput.setValue('VWCE')
 
-    const unitsInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Títulos'))
+    const unitsInput = form
+      .findAll<HTMLInputElement>('input[type="number"]')
+      .find((i) => i.element.labels?.[0]?.textContent?.includes('Títulos'))
     await unitsInput!.setValue(10)
 
-    const priceInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
+    const priceInput = form
+      .findAll<HTMLInputElement>('input[type="number"]')
+      .find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
     await priceInput!.setValue(100)
 
     await form.trigger('submit')
@@ -166,10 +174,14 @@ describe('PendingMovementsPanel', () => {
     const symbolInput = form.find<HTMLInputElement>('input[placeholder="VWCE"]')
     expect(symbolInput.element.value).toBe('ETH')
 
-    const unitsInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Títulos'))
+    const unitsInput = form
+      .findAll<HTMLInputElement>('input[type="number"]')
+      .find((i) => i.element.labels?.[0]?.textContent?.includes('Títulos'))
     expect(unitsInput?.element.value).toBe('0.1')
 
-    const priceInput = form.findAll<HTMLInputElement>('input[type="number"]').find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
+    const priceInput = form
+      .findAll<HTMLInputElement>('input[type="number"]')
+      .find((i) => i.element.labels?.[0]?.textContent?.includes('Precio por título'))
     expect(priceInput?.element.value).toBe('3000')
   })
 
@@ -201,11 +213,32 @@ describe('PendingMovementsPanel', () => {
     const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
-    const categorySelect = form.findAll('select').find((s) => s.text().includes('Categoría Antigua Desconocida'))
+    const categorySelect = form
+      .findAll('select')
+      .find((s) => s.text().includes('Categoría Antigua Desconocida'))
     expect(categorySelect).toBeDefined()
 
     await form.trigger('submit')
 
     expect(recurringStore.openPendingMovements[0].category).toBe('Categoría Antigua Desconocida')
+  })
+
+  it('asks before discarding a pending movement', async () => {
+    const { recurringStore } = setupState()
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
+
+    await wrapper.get('button[aria-label="Descartar el pendiente Gasto mensual"]').trigger('click')
+    await nextTick()
+
+    const dialog = wrapper.get('dialog[role="alertdialog"]')
+    expect((dialog.element as HTMLDialogElement).open).toBe(true)
+    expect(dialog.text()).toContain('Gasto mensual')
+    expect(recurringStore.pendingCount).toBe(1)
+
+    await dialog.get('button[data-confirm]').trigger('click')
+
+    expect(recurringStore.pendingCount).toBe(0)
+    expect(recurringStore.pendingMovements[0].status).toBe('cancelled')
+    wrapper.unmount()
   })
 })

@@ -144,9 +144,13 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
       </div>
     </div>
 
+    <!-- A manual popover, so it renders in the top layer above an open side
+         panel or confirmation (both modal dialogs). top/margin/size undo the
+         popover's centring from the browser stylesheet. -->
     <div
       id="toast"
-      class="bg-ink text-ink-text border-ink-line shadow-pop desk:right-24 desk:bottom-6 desk:left-auto desk:max-w-90 pointer-events-none fixed inset-x-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-60 translate-y-2.5 rounded-md border px-4.5 py-3 text-[0.9375rem] leading-snug opacity-0 transition duration-200 data-visible:translate-y-0 data-visible:opacity-100"
+      popover="manual"
+      class="bg-ink text-ink-text border-ink-line shadow-pop desk:right-24 desk:bottom-6 desk:left-auto desk:max-w-90 pointer-events-none fixed inset-x-4 top-auto bottom-[calc(96px+env(safe-area-inset-bottom))] z-60 m-0 h-auto w-auto translate-y-2.5 overflow-visible rounded-md border px-4.5 py-3 text-[0.9375rem] leading-snug opacity-0 transition duration-200 data-visible:translate-y-0 data-visible:opacity-100"
       role="status"
       aria-live="polite"
     >

@@ -547,8 +547,14 @@ export class FinanceTrackerPage {
     await bar.getByRole('button', { name: 'Aplicar' }).click()
   }
 
-  async deleteSelectedTransactions() {
+  /** Deletes the selection, confirming the dialog that names how many go. */
+  async deleteSelectedTransactions(count: number) {
     await this.bulkActionBar.getByRole('button', { name: 'Eliminar' }).click()
+    const label = `${count} ${count === 1 ? 'movimiento' : 'movimientos'}`
+    const dialog = this.page.getByRole('alertdialog', { name: `¿Eliminar ${label}?` })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: `Eliminar ${label}` }).click()
+    await expect(dialog).toBeHidden()
   }
 
   /**
