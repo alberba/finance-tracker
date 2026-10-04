@@ -5,6 +5,7 @@ import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
+import { describeCheckAge } from '../lib/client/sync-connection'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
@@ -255,12 +256,14 @@ function initSyncMenu(): void {
       const pending = syncStore.pendingCount
       const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
       const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
+      const checked = syncStore.lastCheckedAt === null ? '' : ` · ${describeCheckAge(Date.now() - syncStore.lastCheckedAt)}`
       statusEl.hidden = false
-      statusEl.replaceChildren(`${label}${suffix}`)
+      statusEl.replaceChildren(`${label}${suffix}${checked}`)
     }
 
     syncStore.$subscribe(renderStatus)
     renderStatus()
+    setInterval(renderStatus, 1000)
   }
 
   logoutAction?.addEventListener('click', () => {

@@ -90,7 +90,7 @@ describe("round trip: cuentas, activos y pasivos", () => {
     settings.addCategory("expenseCategories", "Transporte");
     await trip.reload();
 
-    settings.reorderCategory("expenseCategories", "Transporte", "up");
+    useSettingsStore().reorderCategory("expenseCategories", "Transporte", "up");
     const reloaded = await trip.reload();
 
     expect(reloaded.expenseCategories).toEqual(["Transporte", "Ocio"]);

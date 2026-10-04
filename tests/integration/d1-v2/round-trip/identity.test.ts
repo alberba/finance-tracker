@@ -178,7 +178,7 @@ describe("round trip: identidad propia para entidades nuevas", () => {
     const accountId = useFinancialStateStore().accounts[0].id;
     await trip.reload();
 
-    settings.updateEntityField("accounts", accountId, "name", "Revolut Nómina");
+    useSettingsStore().updateEntityField("accounts", accountId, "name", "Revolut Nómina");
     const reloaded = await trip.reload();
 
     const rows = await trip.testDb.db
