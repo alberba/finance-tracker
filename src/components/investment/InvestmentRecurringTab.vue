@@ -10,9 +10,9 @@ import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { ruleMonthlyEquivalent, summarizeRecurringPlan } from '../../domain/investment/view-model'
-import { frequencyLabel } from '../../domain/recurring/occurrences'
+import { frequencyText } from '../../domain/recurring/occurrences'
 import { formatDueLabel, formatShortDate } from '../../lib/format'
-import type { RecurringFrequency, RecurringRule } from '../../scripts/types'
+import type { RecurringRule } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
@@ -60,22 +60,6 @@ const columns: LedgerColumn<RecurringRule>[] = [
   { key: 'state', label: 'Estado' },
   { key: 'actions', label: 'Acciones', align: 'right', hideBelow: 'sm' },
 ]
-
-/** "Cada 3 meses": the unit of a frequency with an interval above one. */
-const INTERVAL_UNIT: Record<RecurringFrequency, string> = {
-  daily: 'días',
-  weekly: 'semanas',
-  monthly: 'meses',
-  monthEnd: 'fines de mes',
-  yearly: 'años',
-}
-
-function frequencyText(rule: RecurringRule): string {
-  const interval = Math.max(1, Math.floor(rule.interval || 1))
-  return interval === 1
-    ? frequencyLabel(rule.frequency)
-    : `Cada ${interval} ${INTERVAL_UNIT[rule.frequency]}`
-}
 
 function perMonthText(rule: RecurringRule): string {
   const monthly = ruleMonthlyEquivalent(rule)

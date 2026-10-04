@@ -17,7 +17,11 @@ import {
   type StockEventsWatchlist,
   type SymbolCheckResult,
 } from '../services/stockevents-api'
-import type { StockEventsCashMapping, StockEventsSymbolMapping, Transaction } from '../scripts/types'
+import type {
+  StockEventsCashMapping,
+  StockEventsSymbolMapping,
+  Transaction,
+} from '../scripts/types'
 import {
   resolveEntityId,
   syncSettingsUpdate,
@@ -70,6 +74,16 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   let credentialStatusLoaded = false
 
   const settings = computed(() => financialStateStore.state.stockEvents)
+
+  /** The loaded watchlists as select options. */
+  const watchlistOptions = computed(() =>
+    watchlists.value.map((list) => ({ value: list.id, label: list.name })),
+  )
+
+  /** Name of a loaded watchlist; empty when it is not loaded (or none). */
+  function watchlistName(id: string): string {
+    return watchlists.value.find((list) => list.id === id)?.name ?? ''
+  }
   const isConnected = computed(() => settings.value.enabled && credentialConfigured.value)
 
   function canSyncSymbol(symbol: string): boolean {
@@ -78,7 +92,10 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   const cashMappingRows = computed<StockEventsCashMappingRow[]>(() => {
     const mappingsByAccount = new Map(
-      (settings.value.cashMappings || []).map((mapping) => [mapping.accountId, mapping.watchlistId]),
+      (settings.value.cashMappings || []).map((mapping) => [
+        mapping.accountId,
+        mapping.watchlistId,
+      ]),
     )
     const liquidityAccountIds = new Set(financialStateStore.state.twrLiquidityAccountIds)
     return financialStateStore.accounts
@@ -355,9 +372,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const mapping = findSyncedMapping(settings.value, tx.symbol)
     if (!mapping) {
       if (isConnected.value) {
-        showToast(
-          `Stock Events: ${symbolLabel} no tiene sincronización activada o lista asignada.`,
-        )
+        showToast(`Stock Events: ${symbolLabel} no tiene sincronización activada o lista asignada.`)
         console.warn(
           `[stockevents] Movimiento de ${symbolLabel} no sincronizado: no tiene sincronización activada o lista asignada.`,
         )
@@ -400,7 +415,10 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
   ): Promise<void> {
     if (!canSyncContributionCash.value) return
     const mappingsByAccount = new Map(
-      (settings.value.cashMappings || []).map((mapping) => [mapping.accountId, mapping.watchlistId]),
+      (settings.value.cashMappings || []).map((mapping) => [
+        mapping.accountId,
+        mapping.watchlistId,
+      ]),
     )
     const accountNames = new Map(
       financialStateStore.accounts.map((account) => [account.id, account.name]),
@@ -408,12 +426,13 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const requests = allocations.flatMap((allocation) => {
       const watchlistId = mappingsByAccount.get(allocation.accountId)
       if (!watchlistId || allocation.amount < 0) return []
-      const syncedAmount = (settings.value.cashSyncEntries || []).find(
-        (entry) =>
-          entry.contributionDate === date &&
-          entry.accountId === allocation.accountId &&
-          entry.watchlistId === watchlistId,
-      )?.syncedAmount ?? 0
+      const syncedAmount =
+        (settings.value.cashSyncEntries || []).find(
+          (entry) =>
+            entry.contributionDate === date &&
+            entry.accountId === allocation.accountId &&
+            entry.watchlistId === watchlistId,
+        )?.syncedAmount ?? 0
       const delta = Math.round((allocation.amount - syncedAmount) * 100) / 100
       if (delta === 0) return []
       const payload = buildStockEventsCashTransactionPayload({
@@ -506,6 +525,8 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     cashMappingRows,
     canSyncContributionCash,
     watchlists,
+    watchlistOptions,
+    watchlistName,
     isLoadingWatchlists,
     isChecking,
     connectionError,

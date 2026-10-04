@@ -10,7 +10,7 @@ const SECTION_CONFIG = {
   wealth: { buttonLabel: 'Patrimonio', headingText: /^Patrimonio$/ },
   investment: { buttonLabel: 'Inversión', headingText: /^Inversión$/ },
   goals: { buttonLabel: 'Objetivos', headingText: 'Objetivos' },
-  settings: { buttonLabel: 'Configuración', headingText: 'Configuración base' },
+  settings: { buttonLabel: 'Configuración', headingText: /^Configuración$/ },
   data: { buttonLabel: 'Datos', headingText: 'Datos y backups' },
 } as const
 
@@ -83,6 +83,10 @@ export class FinanceTrackerPage {
 
   get wealthSection(): Locator {
     return this.page.locator('#wealth')
+  }
+
+  get goalsSection(): Locator {
+    return this.page.locator('#goals')
   }
 
   get dataSection(): Locator {
@@ -187,12 +191,51 @@ export class FinanceTrackerPage {
     await this.open('goals')
   }
 
+  /** A goal's row in its ledger, by its slot key ("short", "investmentFunds"…). */
+  goalRow(key: string): Locator {
+    return this.goalsSection.locator(`[data-goal-row="${key}"]`)
+  }
+
+  goalPanel(): Locator {
+    return this.page.locator('#goal-panel')
+  }
+
+  /** Opens the side panel of a goal from its row's edit button. */
+  async openGoalPanel(key: string) {
+    await this.openGoals()
+    const button = this.goalRow(key).getByRole('button', { name: /^(Editar|Definir) / })
+    // On a phone the fixed bottom nav covers a row scrolled just into view.
+    await button.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+    await button.click()
+    await expect(this.goalPanel()).toBeVisible()
+  }
+
   async openSettings() {
     await this.open('settings')
   }
 
-  async openStockEventsConnection() {
+  /** Opens a tab of Configuración: "Cuentas", "Activos", "Preferencias"… */
+  async openSettingsTab(label: string) {
     await this.openSettings()
+    await this.section('settings').getByRole('tab', { name: label }).click()
+  }
+
+  /**
+   * Opens the card of an account or asset in its side panel, from its tab.
+   * Returns the panel.
+   */
+  async openSettingsCard(tab: 'Cuentas' | 'Activos' | 'Pasivos', name: string): Promise<Locator> {
+    await this.openSettingsTab(tab)
+    await this.section('settings')
+      .getByRole('button', { name: `Abrir la ficha de ${name}`, exact: true })
+      .click()
+    const panel = this.page.getByRole('dialog', { name })
+    await expect(panel).toBeVisible()
+    return panel
+  }
+
+  async openStockEventsConnection() {
+    await this.openSettingsTab('Conexiones')
     await this.page.getByRole('button', { name: 'Stock Events', exact: true }).click()
     await expect(this.page.getByRole('dialog', { name: 'Stock Events', exact: true })).toBeVisible()
   }
@@ -409,25 +452,30 @@ export class FinanceTrackerPage {
   }
 
   async addAccount(params: { name: string; openingBalance?: number }) {
-    await this.openSettings()
-    const form = this.page.locator('#add-account-form')
-    await form.locator('input[name="name"]').fill(params.name)
-    await form.locator('input[name="openingBalance"]').fill(String(params.openingBalance ?? 0))
-    await form.getByRole('button', { name: 'Agregar' }).click()
+    await this.openSettingsTab('Cuentas')
+    await this.section('settings').getByRole('button', { name: 'Nueva cuenta' }).click()
+    const panel = this.page.locator('#settings-account-panel')
+    await expect(panel).toBeVisible()
+    await panel.getByLabel('Nombre').fill(params.name)
+    await panel.getByLabel('Saldo inicial (€)').fill(String(params.openingBalance ?? 0))
+    await panel.getByRole('button', { name: 'Crear cuenta' }).click()
     await expect(this.page.getByRole('status')).toContainText('Elemento agregado.')
+    await expect(panel).toBeHidden()
   }
 
   async setTwrLiquidityAccountEnabled(accountName: string, enabled: boolean) {
-    await this.openSettings()
-    const row = this.page.locator('#settings-twr-liquidity label', { hasText: accountName }).first()
-    await expect(row).toBeVisible()
-    const checkbox = row.locator('input[type="checkbox"]')
-    if (enabled) {
-      await checkbox.check()
-    } else {
-      await checkbox.uncheck()
+    const panel = await this.openSettingsCard('Cuentas', accountName)
+    const toggle = panel.getByRole('switch', {
+      name: `${accountName} es liquidez de la cartera`,
+    })
+    if ((await toggle.isChecked()) !== enabled) {
+      // The checkbox is visually hidden under its drawn track.
+      await toggle.setChecked(enabled, { force: true })
+      await expect(this.page.getByRole('status')).toContainText('Configuración TWR actualizada.')
     }
-    await expect(this.page.getByRole('status')).toContainText('Configuración TWR actualizada.')
+    await expect(toggle).toBeChecked({ checked: enabled })
+    await panel.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(panel).toBeHidden()
   }
 
   async transactionModalDateValue(): Promise<string> {

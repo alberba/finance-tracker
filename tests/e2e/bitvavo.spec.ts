@@ -38,7 +38,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     const page = await context.newPage()
     const bitvavo = new BitvavoPage(page)
     await bitvavo.tracker.goto()
-    await bitvavo.tracker.openSettings()
+    await bitvavo.tracker.openSettingsTab('Conexiones')
     await page.getByRole('region', { name: 'Conexiones', exact: true }).screenshot({
       path: testInfo.outputPath('connections-grid.png'),
     })

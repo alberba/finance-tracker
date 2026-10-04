@@ -250,10 +250,10 @@ test.describe('recorrido guiado de aportes', () => {
     })
     await mirrorStateToServer(page)
     await tracker.reload()
-    await tracker.openStockEventsConnection()
+    const accountPanel = await tracker.openSettingsCard('Cuentas', 'MyInvestor')
 
-    const mappingSelect = page.getByRole('combobox', {
-      name: 'Lista de efectivo de MyInvestor',
+    const mappingSelect = accountPanel.getByRole('combobox', {
+      name: 'Lista de efectivo en Stock Events',
     })
     await expect(mappingSelect).toBeEnabled()
     await mappingSelect.selectOption('wl-etf')
@@ -266,8 +266,9 @@ test.describe('recorrido guiado de aportes', () => {
         }),
       )
       .toContainEqual({ accountId: 'myinvestor', watchlistId: 'wl-etf' })
+    await accountPanel.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(accountPanel).toBeHidden()
 
-    await tracker.closeStockEventsConnection()
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('JULIO')
     await tracker.contributionWorkflowSetDate('2026-07-19')

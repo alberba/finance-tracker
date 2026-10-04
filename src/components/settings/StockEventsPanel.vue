@@ -1,342 +1,150 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseInput from '../ui/BaseInput.vue'
+import NumberedBlock from '../ui/NumberedBlock.vue'
 import SidePanel from '../ui/SidePanel.vue'
-
-import StockEventsSymbolTable from './StockEventsSymbolTable.vue'
+import StatusDot from '../ui/StatusDot.vue'
+import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import { useStockEventsStore } from '../../stores/stockevents'
 
-const stockEventsStore = useStockEventsStore()
 const open = defineModel<boolean>('open', { required: true })
-
-const apiKeyInput = shallowRef('')
-watch(open, (value) => {
-  if (!value) apiKeyInput.value = ''
-})
-const showHiddenSymbols = shallowRef(false)
-
-onMounted(async () => {
-  await stockEventsStore.initializeCredential()
-  if (stockEventsStore.credentialConfigured) {
-    await stockEventsStore.loadWatchlists()
-  }
-})
-
+const stockEventsStore = useStockEventsStore()
+const apiKey = shallowRef('')
 const hasApiKey = computed(() => stockEventsStore.credentialConfigured)
+const enabled = computed({
+  get: () => stockEventsStore.settings.enabled,
+  set: (value: boolean) => stockEventsStore.setEnabled(value),
+})
+const tradesToCash = computed({
+  get: () => stockEventsStore.settings.tradesToCash === true,
+  set: (value: boolean) => stockEventsStore.setTradesToCash(value),
+})
 const syncedCount = computed(
   () => stockEventsStore.symbolRows.filter((row) => row.sync && row.watchlistId).length,
 )
-const visibleRows = computed(() => stockEventsStore.symbolRows.filter((row) => !row.hidden))
-const hiddenRows = computed(() => stockEventsStore.symbolRows.filter((row) => row.hidden))
 
-async function onSaveApiKey(): Promise<void> {
-  await stockEventsStore.saveApiKey(apiKeyInput.value)
-  apiKeyInput.value = ''
-  if (stockEventsStore.credentialConfigured) {
-    await stockEventsStore.loadWatchlists()
+const connection = computed(() => {
+  if (stockEventsStore.connectionError) {
+    return { tone: 'loss' as const, label: stockEventsStore.connectionError }
   }
+  if (!hasApiKey.value) return { tone: 'warn' as const, label: 'Sin API key' }
+  const lists = stockEventsStore.watchlists.length
+  return {
+    tone: 'gain' as const,
+    label: lists
+      ? `Conectado · ${lists === 1 ? '1 lista' : `${lists} listas`}`
+      : 'API key guardada',
+  }
+})
+
+async function saveApiKey(): Promise<void> {
+  await stockEventsStore.saveApiKey(apiKey.value)
+  apiKey.value = ''
+  if (stockEventsStore.credentialConfigured) await stockEventsStore.loadWatchlists()
 }
 
-function onToggleSync(symbol: string, checked: boolean): void {
-  stockEventsStore.updateMapping(symbol, { sync: checked })
-}
-
-function onSelectWatchlist(symbol: string, watchlistId: string): void {
-  stockEventsStore.updateMapping(symbol, { watchlistId })
-}
-
-function onChangeTargetSymbol(symbol: string, targetSymbol: string): void {
-  stockEventsStore.updateMapping(symbol, { targetSymbol })
-}
-
-function onSetHidden(symbol: string, hidden: boolean): void {
-  stockEventsStore.updateMapping(symbol, { hidden })
-}
-
-function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
-  stockEventsStore.updateCashMapping(accountId, watchlistId)
-}
+watch(open, (value) => {
+  if (!value) apiKey.value = ''
+})
 </script>
 
 <template>
   <SidePanel
     id="stockevents-connection-panel"
     v-model:open="open"
-    kicker="Conexión · Sincronización"
     title="Stock Events"
     title-id="stockevents-connection-title"
+    kicker="Conexión · Sincronización"
   >
-    <p class="text-text-muted text-sm">
-      Sincroniza los nuevos movimientos de inversión con Stock Events. La API key se crea en la web
-      de Stock Events, en Settings &gt; Data &gt; API Keys (requiere suscripción Pro).
-    </p>
-    <div class="grid gap-4">
-      <label class="tx-checkbox-option">
-        <input
-          type="checkbox"
-          :checked="stockEventsStore.settings.enabled"
-          @change="stockEventsStore.setEnabled(($event.target as HTMLInputElement).checked)"
-        />
-        <span>Sincronizar nuevos movimientos con Stock Events</span>
-      </label>
-      <label class="tx-checkbox-option">
-        <input
-          type="checkbox"
-          :checked="stockEventsStore.settings.tradesToCash === true"
-          @change="stockEventsStore.setTradesToCash(($event.target as HTMLInputElement).checked)"
-        />
-        <span>Las compras y ventas mueven el efectivo en Stock Events</span>
-      </label>
-
-      <div class="stockevents-key">
-        <label class="stockevents-key__field">
-          API key
-          <input
-            v-model="apiKeyInput"
+    <NumberedBlock
+      number="01"
+      title="Stock Events"
+      title-id="settings-stockevents-title"
+      description="Envía los movimientos de inversión nuevos a tu cartera de Stock Events."
+    >
+      <template #actions>
+        <p class="text-sm font-semibold" data-stockevents-connection>
+          <StatusDot :tone="connection.tone" :label="connection.label" />
+        </p>
+      </template>
+      <div class="grid gap-5">
+        <form
+          class="grid gap-2.5 sm:grid-cols-[1fr_auto_auto] sm:items-end"
+          @submit.prevent="saveApiKey"
+        >
+          <BaseInput
+            v-model="apiKey"
+            label="API key"
             type="password"
             :placeholder="hasApiKey ? 'Configurada · escribe para sustituirla' : 'se_live_…'"
             autocomplete="off"
             spellcheck="false"
+            class="[&_input]:font-mono"
           />
-        </label>
-        <button
-          type="button"
-          class="primary-btn"
-          :disabled="stockEventsStore.isSavingCredential"
-          @click="onSaveApiKey"
-        >
-          {{ stockEventsStore.isSavingCredential ? 'Guardando…' : 'Guardar API key' }}
-        </button>
-        <button
-          type="button"
-          class="secondary-btn"
-          :disabled="!hasApiKey || stockEventsStore.isLoadingWatchlists"
-          @click="stockEventsStore.loadWatchlists()"
-        >
-          {{ stockEventsStore.isLoadingWatchlists ? 'Cargando…' : 'Cargar listas' }}
-        </button>
-      </div>
+          <BaseButton
+            type="submit"
+            variant="primary"
+            :disabled="stockEventsStore.isSavingCredential"
+          >
+            {{ stockEventsStore.isSavingCredential ? 'Guardando…' : 'Guardar API key' }}
+          </BaseButton>
+          <BaseButton
+            :disabled="!hasApiKey || stockEventsStore.isLoadingWatchlists"
+            @click="stockEventsStore.loadWatchlists()"
+          >
+            {{ stockEventsStore.isLoadingWatchlists ? 'Cargando…' : 'Cargar listas' }}
+          </BaseButton>
+        </form>
+        <p class="text-text-muted -mt-2 text-sm">
+          Se crea en la web de Stock Events, en Settings › Data › API Keys (requiere suscripción
+          Pro).
+        </p>
 
-      <p v-if="stockEventsStore.connectionError" class="stockevents-error">
-        {{ stockEventsStore.connectionError }}
-      </p>
-      <p v-else-if="hasApiKey && stockEventsStore.watchlists.length" class="stockevents-hint">
-        Conectado: {{ stockEventsStore.watchlists.length }} lista(s) de seguimiento disponibles.
-      </p>
+        <div class="border-line divide-line grid divide-y border-y">
+          <div class="flex items-center justify-between gap-4 py-2">
+            <span class="grid gap-0.5">
+              <span class="font-semibold">Sincronizar los movimientos nuevos</span>
+              <span class="text-text-muted text-sm">
+                Cada compra o venta se envía a Stock Events al guardarla.
+              </span>
+            </span>
+            <ToggleSwitch
+              v-model="enabled"
+              label="Sincronizar nuevos movimientos con Stock Events"
+            />
+          </div>
+          <div class="flex items-center justify-between gap-4 py-2">
+            <span class="grid gap-0.5">
+              <span class="font-semibold">Las compras y ventas mueven el efectivo</span>
+              <span class="text-text-muted text-sm">
+                Stock Events descuenta o suma su importe del efectivo de la lista.
+              </span>
+            </span>
+            <ToggleSwitch
+              v-model="tradesToCash"
+              label="Las compras y ventas mueven el efectivo en Stock Events"
+            />
+          </div>
+        </div>
 
-      <section class="stockevents-cash-mappings" aria-labelledby="stockevents-cash-title">
-        <div>
-          <h4 id="stockevents-cash-title">Efectivo de aportes</h4>
-          <p>
-            Relaciona cada cuenta con la lista donde Stock Events debe registrar el efectivo de sus
-            aportes.
+        <div class="flex flex-wrap items-center gap-4">
+          <BaseButton
+            :disabled="!hasApiKey || !syncedCount || stockEventsStore.isChecking"
+            @click="stockEventsStore.checkSymbols()"
+          >
+            {{ stockEventsStore.isChecking ? 'Comprobando…' : 'Comprobar símbolos' }}
+          </BaseButton>
+          <p class="text-text-muted max-w-[60ch] flex-1 text-sm">
+            {{
+              syncedCount === 1
+                ? '1 símbolo sincronizado'
+                : `${syncedCount} símbolos sincronizados`
+            }}. Qué lista y ticker usa cada símbolo se decide en la ficha de su activo; la lista de
+            efectivo, en la de cada cuenta.
           </p>
         </div>
-        <div class="stockevents-cash-grid">
-          <label v-for="row in stockEventsStore.cashMappingRows" :key="row.accountId">
-            <span>{{ row.accountName }}</span>
-            <select
-              :value="row.watchlistId"
-              :disabled="!hasApiKey || !stockEventsStore.watchlists.length"
-              :aria-label="`Lista de efectivo de ${row.accountName}`"
-              @change="
-                onSelectCashWatchlist(row.accountId, ($event.target as HTMLSelectElement).value)
-              "
-            >
-              <option value="">No sincronizar efectivo</option>
-              <option
-                v-for="watchlist in stockEventsStore.watchlists"
-                :key="watchlist.id"
-                :value="watchlist.id"
-              >
-                {{ watchlist.name }}
-              </option>
-            </select>
-          </label>
-        </div>
-        <p v-if="!stockEventsStore.cashMappingRows.length" class="stockevents-hint">
-          Añade una cuenta para poder relacionarla con Stock Events.
-        </p>
-        <p v-else-if="!stockEventsStore.watchlists.length" class="stockevents-hint">
-          Guarda la API key y carga las listas para configurar las relaciones.
-        </p>
-      </section>
-
-      <p v-if="!stockEventsStore.symbolRows.length" class="stockevents-hint">
-        No hay símbolos en finance-tracker todavía. Añade instrumentos o movimientos de inversión.
-      </p>
-      <template v-else>
-        <StockEventsSymbolTable
-          v-if="visibleRows.length"
-          :rows="visibleRows"
-          :watchlists="stockEventsStore.watchlists"
-          label="Símbolos visibles de Stock Events"
-          :hidden="false"
-          @toggle-sync="onToggleSync"
-          @select-watchlist="onSelectWatchlist"
-          @change-target-symbol="onChangeTargetSymbol"
-          @set-hidden="onSetHidden"
-        />
-        <p v-else class="stockevents-hint">No hay símbolos visibles.</p>
-
-        <div v-if="hiddenRows.length" class="stockevents-hidden-toggle">
-          <button
-            type="button"
-            class="secondary-btn"
-            :aria-expanded="showHiddenSymbols"
-            @click="showHiddenSymbols = !showHiddenSymbols"
-          >
-            {{ showHiddenSymbols ? 'Ocultar ocultos' : `Mostrar ocultos (${hiddenRows.length})` }}
-          </button>
-        </div>
-
-        <section v-if="showHiddenSymbols && hiddenRows.length" class="stockevents-hidden">
-          <h4>Símbolos ocultos</h4>
-          <StockEventsSymbolTable
-            :rows="hiddenRows"
-            :watchlists="stockEventsStore.watchlists"
-            label="Símbolos ocultos de Stock Events"
-            hidden
-            @toggle-sync="onToggleSync"
-            @select-watchlist="onSelectWatchlist"
-            @change-target-symbol="onChangeTargetSymbol"
-            @set-hidden="onSetHidden"
-          />
-        </section>
-      </template>
-
-      <div class="stockevents-actions">
-        <button
-          type="button"
-          class="secondary-btn"
-          :disabled="!hasApiKey || !syncedCount || stockEventsStore.isChecking"
-          @click="stockEventsStore.checkSymbols()"
-        >
-          {{ stockEventsStore.isChecking ? 'Comprobando…' : 'Comprobar símbolos' }}
-        </button>
-        <small>
-          {{ syncedCount }} símbolo(s) con sincronización activada. La comprobación valida que Stock
-          Events reconoce cada símbolo en su lista. Si un símbolo no se detecta, indica el ticker
-          que usa Stock Events (p. ej. AGED.MI) en «Símbolo en Stock Events».
-        </small>
       </div>
-    </div>
+    </NumberedBlock>
   </SidePanel>
 </template>
-
-<style scoped>
-.stockevents-key {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.55rem;
-  margin-top: 0.85rem;
-}
-
-.stockevents-key__field {
-  display: grid;
-  flex: 1;
-  gap: 0.35rem;
-  min-width: 14rem;
-}
-
-.stockevents-key__field input {
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: var(--bg-card);
-  padding: 0.65rem 0.75rem;
-  color: var(--text-main);
-  font-family: var(--font-mono, monospace);
-  font-size: 0.9rem;
-}
-
-.stockevents-error {
-  margin-top: 0.6rem;
-  color: var(--expense);
-  font-size: 0.85rem;
-}
-
-.stockevents-cash-mappings {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  background: var(--bg-subtle);
-  padding: 1rem;
-}
-
-.stockevents-cash-mappings h4,
-.stockevents-cash-mappings p {
-  margin: 0;
-}
-
-.stockevents-cash-mappings h4 {
-  color: var(--text-main);
-  font-size: 0.95rem;
-}
-
-.stockevents-cash-mappings p {
-  margin-top: 0.25rem;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.stockevents-cash-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.65rem;
-}
-
-.stockevents-cash-grid label {
-  display: grid;
-  gap: 0.35rem;
-  color: var(--text-main);
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.stockevents-cash-grid select {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 0.55rem;
-  background: var(--bg-card);
-  padding: 0.65rem 0.75rem;
-  color: var(--text-main);
-}
-
-.stockevents-hint {
-  margin-top: 0.6rem;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.stockevents-hidden-toggle {
-  margin-top: 0.85rem;
-}
-
-.stockevents-hidden {
-  margin-top: 0.85rem;
-  border-top: 1px solid var(--line);
-  padding-top: 0.85rem;
-}
-
-.stockevents-hidden h4 {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.stockevents-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.85rem;
-}
-
-.stockevents-actions small {
-  color: var(--text-muted);
-}
-</style>

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { shallowRef } from 'vue'
+import SettingsTabIntro from './SettingsTabIntro.vue'
 import BitvavoImportPanel from './BitvavoImportPanel.vue'
 import StockEventsPanel from './StockEventsPanel.vue'
 import { isSyncV2Enabled } from '../../lib/client/feature-flags'
+
+defineProps<{ isActive: boolean }>()
 
 const stockEventsOpen = shallowRef(false)
 const bitvavoOpen = shallowRef(false)
@@ -36,13 +39,18 @@ const providers = [
 </script>
 
 <template>
-  <section id="cfg-connections" class="settings-block" aria-labelledby="connections-title">
-    <header>
-      <span class="settings-block__num">09</span>
-      <h3 id="connections-title">Conexiones</h3>
-      <p>Gestiona los servicios conectados a tu tracker.</p>
-    </header>
-    <div class="settings-block__body">
+  <section
+    id="settings-tab-connections"
+    class="grid content-start gap-6"
+    :hidden="!isActive"
+    role="tabpanel"
+    aria-labelledby="settings-tab-connections-button"
+  >
+    <SettingsTabIntro
+      title="Conexiones"
+      description="Gestiona los servicios conectados a tu tracker."
+    />
+    <section aria-label="Conexiones">
       <ul class="grid gap-4 sm:grid-cols-2" aria-label="Proveedores disponibles">
         <li v-for="provider in providers" :key="provider.id">
           <button
@@ -76,7 +84,7 @@ const providers = [
           </button>
         </li>
       </ul>
-    </div>
+    </section>
     <StockEventsPanel v-model:open="stockEventsOpen" />
     <BitvavoImportPanel v-if="bitvavoEnabled" v-model:open="bitvavoOpen" />
   </section>

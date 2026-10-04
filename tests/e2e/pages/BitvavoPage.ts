@@ -28,7 +28,7 @@ export class BitvavoPage {
     await expect(this.details).toBeHidden()
   }
   async open() {
-    await this.tracker.openSettings()
+    await this.tracker.openSettingsTab('Conexiones')
     await expect(
       this.page
         .getByRole('region', { name: 'Conexiones', exact: true })

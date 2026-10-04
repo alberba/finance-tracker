@@ -3,6 +3,8 @@
 El recorrido vive en Configuración → Conexiones → Bitvavo, con sync v2 activo.
 El grid de Conexiones reúne Stock Events y Bitvavo; cada tarjeta abre los ajustes de su proveedor
 en un panel lateral. Los movimientos importados se consultan en Inversión → Movimientos.
+Conexiones es una pestaña de Configuración. Las listas de efectivo de Stock Events se asignan
+en la ficha de cada cuenta; las listas y los tickers de inversión, en la ficha de cada activo.
 La persona selecciona una cuenta EUR propia, fecha inicial y zona IANA, y entrega una clave de
 una cuenta normal con **solo lectura**. Se consulta únicamente `GET /v2/account/history`.
 El servidor valida la clave antes de guardar API key y secreto juntos con AES-256-GCM en
