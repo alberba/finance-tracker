@@ -495,6 +495,33 @@ test.describe("Finance tracker E2E", () => {
     await tracker.clearTransactionFilters();
   });
 
+  test("el aviso se ve por encima del panel lateral abierto", async ({ page, tracker }) => {
+    await tracker.addCustomTransactionKeepOpen({
+      date: "2026-03-14",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 14,
+      description: "e2e-aviso",
+    });
+
+    // The panel is a modal dialog in the top layer: the toast, a manual
+    // popover shown after it, renders above it.
+    await expect(tracker.transactionPanel).toBeVisible();
+    const toast = page.locator("#toast");
+    await expect(toast).toBeVisible();
+    expect(await toast.evaluate((element) => element.matches(":popover-open"))).toBe(true);
+    // Still in its corner, not centred like a bare popover.
+    const box = await toast.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport).toBeTruthy();
+    expect(box!.x).toBeGreaterThan(viewport!.width / 2);
+    expect(box!.y).toBeGreaterThan(viewport!.height / 2);
+    await expect(
+      tracker.transactionPanel.getByRole("button", { name: "Guardar y añadir otro" }),
+    ).toBeFocused();
+  });
+
   test("movimientos cierra el panel lateral con Escape y con Cancelar", async ({
     page,
     tracker,
