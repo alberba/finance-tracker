@@ -1,0 +1,70 @@
+<article class="card reports-form-card">
+  <header class="reports-form-head">
+    <p class="reports-kicker">Reporte</p>
+    <h3>Crear reporte</h3>
+    <p>Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.</p>
+  </header>
+
+  <form id="issue-report-form" autocomplete="off" novalidate>
+    <label>
+      Tipo
+      <select id="issue-report-type" name="type" required>
+        <option value="bug">Error</option>
+        <option value="enhancement">Mejora</option>
+      </select>
+    </label>
+    <label class="span-3">
+      Resumen
+      <input
+        id="issue-report-summary"
+        name="summary"
+        type="text"
+        minlength="5"
+        maxlength="140"
+        required
+        placeholder="Ej. El filtro de movimientos no guarda el valor"
+        autocomplete="off"
+      />
+    </label>
+    <label class="span-3">
+      Descripción
+      <textarea
+        id="issue-report-description"
+        name="description"
+        minlength="12"
+        maxlength="8000"
+        required
+        rows="4"
+        placeholder="Describe el error o mejora con el mayor detalle posible."
+      ></textarea>
+    </label>
+    <label>
+      Resultado esperado (opcional)
+      <textarea id="issue-report-expected" name="expectedResult" maxlength="4000" rows="3"></textarea>
+    </label>
+    <label>
+      Resultado actual (opcional)
+      <textarea id="issue-report-actual" name="actualResult" maxlength="4000" rows="3"></textarea>
+    </label>
+    <label class="span-3">
+      Pasos para reproducir (opcional)
+      <textarea
+        id="issue-report-steps"
+        name="stepsToReproduce"
+        maxlength="5000"
+        rows="3"
+        placeholder="1. Ir a ... 2. Pulsar ... 3. Ocurre ..."
+      ></textarea>
+    </label>
+    <fieldset class="span-3 reports-automation-fieldset">
+      <legend>Automatización opcional</legend>
+      <label class="reports-automation-toggle">
+        <input id="issue-report-mention-claude" name="mentionClaude" type="checkbox" />
+        Activar automatización con Claude
+      </label>
+      <p class="reports-automation-help">Opcional. Añade <code>@claude</code> a la issue para disparar el flujo automático configurado en GitHub.</p>
+    </fieldset>
+    <button id="issue-report-submit" class="primary-btn" type="submit">Crear reporte</button>
+  </form>
+  <p id="issue-report-status" role="status" aria-live="polite"></p>
+</article>

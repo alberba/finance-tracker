@@ -91,7 +91,7 @@ test.describe("recorrido guiado de aportes", () => {
 
     await tracker.contributionWorkflowSave();
     await expect(page.getByRole("status")).toContainText(
-      "Aporte guardado con avisos.",
+      "Aporte guardado.",
     );
 
     expect(await tracker.getContributionFlowByDate("2026-04-30")).toBe(300);
@@ -104,6 +104,12 @@ test.describe("recorrido guiado de aportes", () => {
     await tracker.openContributionWorkflowModal();
     await tracker.contributionWorkflowSelectMonth("ABRIL");
     await tracker.contributionWorkflowSetDate("2026-04-15");
+    const investmentInputs = await page
+      .getByRole("spinbutton", { name: /^Snapshot inversión / })
+      .all();
+    for (const input of investmentInputs) {
+      await input.fill("0");
+    }
     await tracker.contributionWorkflowSetInvestmentSnapshot(
       "Fondos Indexados",
       13000,
@@ -245,7 +251,7 @@ test.describe("recorrido guiado de aportes", () => {
     await tracker.contributionWorkflowSave();
 
     await expect(page.getByRole("status")).toContainText(
-      "Aporte guardado con avisos.",
+      "Aporte guardado.",
     );
   });
 

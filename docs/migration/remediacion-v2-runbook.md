@@ -65,11 +65,9 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    wrangler d1 export finance-tracker-db-v2 --remote --output=.data/v2-prod.sql -y
    sqlite3 .data/v2-work.sqlite < .data/v2-prod.sql
    ```
-   **Este export va después del paso 1, no antes.** El SQL que emite el paso 2
-   reemplaza tablas enteras del usuario con las columnas que existan en la copia
-   local; sobre una copia hecha al nivel del `0001`, los `INSERT` omitirían las
-   columnas aditivas y el cargue en D1 las dejaría a `NULL` —incluido el
-   `start_date` de las suscripciones que rellena `0002_subscription_dates`.
+   **Este export va después del paso 1, no antes.** El plan se calcula sobre
+   esta copia; si está por detrás de D1, planifica contra datos que ya no son
+   los de producción.
    Ensayo en seco y revisión del plan:
    ```bash
    pnpm db:repair --v2-sqlite=.data/v2-work.sqlite \
@@ -87,8 +85,13 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
 
    wrangler d1 execute finance-tracker-db-v2 --remote --file=.data/reparacion-remote.sql
    ```
-   El SQL reemplaza por usuario solo las tablas que el plan toca (hoy:
-   `categories`, `contributions`, `transactions`) y deja intactos
+   El SQL contiene solo las sentencias que el plan cambia (hoy: los `UPDATE`
+   que repuntan referencias, los `DELETE` de las categorías duplicadas y el
+   `UPDATE` del `legacy_id`), en el mismo orden que el paso local. Volcar tablas
+   enteras hacía caer a D1 con `D1_RESET_DO` (#187). Los repuntes, borrados y
+   renombrados se pueden repetir sin daño; los `INSERT` de celdas o snapshots
+   no, porque llevan ids generados en local y la segunda vez chocan. Si una
+   celda planificada ya no existe en D1, el fichero aborta en ese punto. Deja intactos
    `sync_changes`, `sync_commands`, `audit_events` y `user_revisions`:
    borrarlos haría que cualquier otro dispositivo se perdiera la reparación.
 3. **Aplicar el cierre.**
@@ -104,6 +107,17 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
 
 ## Trampas verificadas
 
+- **El SQL que emite hoy `--remote-sql-out` no cabe por la puerta de D1.** El
+  reparador vuelca las tablas enteras del usuario en vez de solo lo que cambia:
+  sobre estos datos fueron 210 KB y 421 sentencias, y
+  `wrangler d1 execute --remote --file=` falló dos veces seguidas con
+  `D1_RESET_DO` al procesar la carga. Reintentar no sirve: el fichero se sube
+  bien y lo que falla es el procesado («File already uploaded. Processing.»).
+  Lo que sí entró fue un fichero con **solo las sentencias del plan** —los
+  repuntes de referencia, los borrados de categoría y el renombrado—, que son
+  idempotentes y se pueden repetir sin miedo si la ejecución falla a medias.
+  Hasta que se corrija el emisor (issue #187), reduce el fichero a lo que el
+  plan cambia antes de lanzarlo.
 - **El orden meses → cierre no es negociable.** `0003_months_canonical` corre
   `month = month + 1`; con los índices únicos de `0004` ya creados, el
   desplazamiento falla porque cada mes destino lo ocupa la fila del mes

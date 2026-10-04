@@ -25,6 +25,7 @@ import * as wealthRepository from "../../../db/repositories/wealth";
 import * as contributionsRepository from "../../../db/repositories/contributions";
 import * as marketRepository from "../../../db/repositories/market";
 import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
 import * as syncRepository from "../../../db/repositories/sync";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
@@ -36,6 +37,7 @@ async function wipeUserData(db: Db, userId: string): Promise<void> {
     wealthSnapshots,
     userInstruments,
     stockeventsSymbolMappings,
+    stockeventsCashMappings,
     pendingMovements,
     recurringRules,
     subscriptions,
@@ -50,6 +52,7 @@ async function wipeUserData(db: Db, userId: string): Promise<void> {
     wealthRepository.listByUser(db, userId),
     marketRepository.listUserInstrumentsByUser(db, userId),
     stockeventsSymbolMappingsRepository.listByUser(db, userId),
+    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
     pendingMovementsRepository.listByUser(db, userId),
     recurringRulesRepository.listByUser(db, userId),
     subscriptionsRepository.listByUser(db, userId),
@@ -84,6 +87,9 @@ async function wipeUserData(db: Db, userId: string): Promise<void> {
   }
   for (const mapping of stockeventsSymbolMappings) {
     await stockeventsSymbolMappingsRepository.remove(db, userId, mapping.id);
+  }
+  for (const mapping of stockeventsCashMappings) {
+    await stockeventsCashMappingsRepository.removeMapping(db, userId, mapping.id);
   }
   for (const pendingMovement of pendingMovements) {
     await pendingMovementsRepository.remove(db, userId, pendingMovement.id);
@@ -123,7 +129,7 @@ const DEFAULT_CATEGORIES: Array<{ name: string; kind: string; sortOrder: number 
 ];
 
 export const POST: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/state/reset", async () => {
     const principal = requirePrincipal(locals);
     const db = getDb(locals);
     const userId = principal.userId;

@@ -71,6 +71,14 @@ function onSelectCashWatchlist(accountId: string, watchlistId: string): void {
         />
         <span>Sincronizar nuevos movimientos con Stock Events</span>
       </label>
+      <label class="tx-checkbox-option">
+        <input
+          type="checkbox"
+          :checked="stockEventsStore.settings.tradesToCash === true"
+          @change="stockEventsStore.setTradesToCash(($event.target as HTMLInputElement).checked)"
+        />
+        <span>Las compras y ventas mueven el efectivo en Stock Events</span>
+      </label>
 
       <div class="stockevents-key">
         <label class="stockevents-key__field">

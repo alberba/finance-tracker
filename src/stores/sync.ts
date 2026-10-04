@@ -40,6 +40,7 @@ import {
 import { wipeAllClientData } from '../lib/client/wipe'
 import {
   SYNC_ENTITY_TYPES,
+  type CommandStatus,
   type SyncEntityType,
 } from '../lib/server/sync/command-schemas'
 
@@ -66,7 +67,7 @@ export type SyncStatus = 'idle' | 'syncing' | 'error'
  */
 interface SyncCommandResult {
   commandId: string
-  status: 'applied' | 'conflict' | 'not_found' | 'noop' | 'rejected'
+  status: CommandStatus
   entity?: unknown
   currentVersion?: number
   message?: string
@@ -219,6 +220,7 @@ export const useSyncStore = defineStore('sync', () => {
       accounts: [], categories: [], transactions: [], subscriptions: [],
       recurringRules: [], pendingMovements: [], budgetEntries: [], goals: [],
       contributions: [], userInstruments: [], wealthSnapshots: [],
+      stockeventsSymbolMappings: [], stockeventsCashMappings: [], stockeventsCashSyncEntries: [],
     }
     const collections = {
       account: bootstrap.accounts,
@@ -232,6 +234,8 @@ export const useSyncStore = defineStore('sync', () => {
       contribution: bootstrap.contributions,
       userInstrument: bootstrap.userInstruments,
       wealthSnapshot: bootstrap.wealthSnapshots,
+      stockeventsMapping: bootstrap.stockeventsSymbolMappings ?? [],
+      stockeventsCashEntry: bootstrap.stockeventsCashSyncEntries ?? [],
     } satisfies Record<SyncEntityType, CachedEntity[]>
     if (reachedServer) {
       // Only a payload that actually came from the server may replace the
@@ -252,6 +256,13 @@ export const useSyncStore = defineStore('sync', () => {
       ? applyPendingCommands(bootstrap, pending.map((entry) => entry.command))
       : bootstrap
     useFinancialStateStore().reloadState(projectSyncV2State(withPending))
+    if (withPending.subscriptions.length) {
+      const recoveredSubscriptionIds = withPending.subscriptions
+        .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
+        .map((subscription) => String(subscription.legacyId || subscription.id))
+      const { useMovementsStore } = await import('./movements')
+      await useMovementsStore().refreshSubscriptions(recoveredSubscriptionIds)
+    }
   }
 
   /**
@@ -385,10 +396,18 @@ export const useSyncStore = defineStore('sync', () => {
       // behind it (audit §2.4).
       const retries: OutboxCommandInput[] = []
       let lastDropMessage: string | null = null
+      // Another request still holds this command's reservation; the server
+      // halted the batch there, so the entry stays queued and is resent
+      // after a backoff instead of immediately.
+      let resendAfterBackoff = false
       for (const [index, result] of body.results.entries()) {
         const entry = batch[index]
         if (!entry) {
           continue
+        }
+        if (result.status === 'in_progress') {
+          resendAfterBackoff = true
+          break
         }
         if (result.status === 'applied' || result.status === 'noop') {
           acked.push(entry.seq)
@@ -459,7 +478,6 @@ export const useSyncStore = defineStore('sync', () => {
 
       lastError.value = lastDropMessage
       syncStatus.value = lastDropMessage ? 'error' : 'idle'
-      retryAttempt = 0
 
       for (const retry of retries) {
         await enqueueCommand(retry)
@@ -475,8 +493,13 @@ export const useSyncStore = defineStore('sync', () => {
         showToast(`⚠️ No se pudo guardar este cambio: ${lastDropMessage}`)
       }
 
-      if (body.halted || (await countOutbox(outboxDb)) > 0) {
-        flushAgainRequested = true
+      if (resendAfterBackoff) {
+        scheduleRetry()
+      } else {
+        retryAttempt = 0
+        if (body.halted || (await countOutbox(outboxDb)) > 0) {
+          flushAgainRequested = true
+        }
       }
     } catch (error) {
       syncStatus.value = 'error'

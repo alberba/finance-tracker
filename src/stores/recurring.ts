@@ -5,6 +5,7 @@ import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
   resolveCategoryId,
+  resolveOrCreateCategoryId,
   resolveEntityId,
   syncListDiff,
   type CategoryKind,
@@ -19,6 +20,7 @@ import type {
   TransactionType,
 } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
+import { buildInvestmentTransactionData } from './investment'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useSyncStore } from './sync'
@@ -48,7 +50,7 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(rule.type as CategoryKind, rule.category)
+  const categoryId = await resolveOrCreateCategoryId(rule.type as CategoryKind, rule.category)
   return {
     name: rule.description,
     type: rule.type,
@@ -91,6 +93,22 @@ function operationData(template: {
   }
 }
 
+function clearInvestmentFields(target: {
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
+}): void {
+  delete target.symbol
+  delete target.side
+  delete target.units
+  delete target.unitPrice
+  delete target.fee
+  delete target.time
+}
+
 /**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
  * command payload. Returns `null` (skip, see `syncListDiff`) when the
@@ -108,7 +126,7 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(pending.type as CategoryKind, pending.category)
+  const categoryId = await resolveOrCreateCategoryId(pending.type as CategoryKind, pending.category)
   return {
     recurringRuleId,
     accountId,
@@ -217,6 +235,7 @@ export interface PendingMovementEdit {
   category: string
   description: string
   amount: number
+  type?: TransactionType
   symbol?: string
   side?: InvestmentSide
   units?: number
@@ -375,6 +394,13 @@ export const useRecurringStore = defineStore('recurring', () => {
     const category = edit?.category || pending.category
     const description = edit?.description || pending.description
     const amount = edit?.amount ?? pending.amount
+    const type = edit?.type || pending.type
+    const symbol = edit?.symbol ?? pending.symbol
+    const side = edit?.side ?? pending.side
+    const units = edit?.units ?? pending.units
+    const unitPrice = edit?.unitPrice ?? pending.unitPrice
+    const fee = edit?.fee ?? pending.fee
+    const time = edit?.time ?? pending.time
     const transactionId = uid('tx')
     const beforeTransactions = financialStateStore.transactions
     const beforePending = financialStateStore.state.pendingMovements
@@ -382,17 +408,17 @@ export const useRecurringStore = defineStore('recurring', () => {
       id: transactionId,
       date: occurrenceDate,
       month: monthFromISO(occurrenceDate) ?? 0,
-      type: pending.type,
+      type,
       accountId,
       category,
       description: description.trim(),
-      amount: pending.type === 'investment' && pending.side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
-      ...(pending.symbol ? { symbol: pending.symbol } : {}),
-      ...(pending.side ? { side: pending.side } : {}),
-      ...(pending.units !== undefined ? { units: pending.units } : {}),
-      ...(pending.unitPrice !== undefined ? { unitPrice: pending.unitPrice } : {}),
-      ...(pending.fee !== undefined ? { fee: pending.fee } : {}),
-      ...(pending.time ? { time: pending.time } : {}),
+      amount: type === 'investment' && side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
+      ...(symbol ? { symbol } : {}),
+      ...(side ? { side } : {}),
+      ...(units !== undefined ? { units } : {}),
+      ...(unitPrice !== undefined ? { unitPrice } : {}),
+      ...(fee !== undefined ? { fee } : {}),
+      ...(time ? { time } : {}),
       declared: false,
       createdAt: new Date().toISOString(),
     }
@@ -406,15 +432,30 @@ export const useRecurringStore = defineStore('recurring', () => {
       current.transactionId = transactionId
       current.updatedAt = new Date().toISOString()
       if (edit) {
+        current.type = type
         current.occurrenceDate = occurrenceDate
         current.accountId = accountId
         current.category = category
         current.description = description
         current.amount = amount
+        if (type === 'investment') {
+          if (symbol !== undefined) current.symbol = symbol
+          if (side !== undefined) current.side = side
+          if (units !== undefined) current.units = units
+          if (unitPrice !== undefined) current.unitPrice = unitPrice
+          if (fee !== undefined) current.fee = fee
+          if (time !== undefined) current.time = time
+        } else {
+          clearInvestmentFields(current)
+        }
       }
     })
+    // An investment carries its operación and hora, which the bare payload
+    // drops — the server copy would then come back without them (#205).
     void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+      tx.type === 'investment'
+        ? buildInvestmentTransactionData(tx, financialStateStore.currency)
+        : buildTransactionData(tx, financialStateStore.currency),
     )
     void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),
@@ -426,7 +467,8 @@ export const useRecurringStore = defineStore('recurring', () => {
   function editPending(id: string, edit: PendingMovementEdit): boolean {
     const pending = openPendingMovements.value.find((item) => item.id === id)
     if (!pending) return false
-    const isInvestment = pending.type === 'investment'
+    const targetType = edit.type || pending.type
+    const isInvestment = targetType === 'investment'
     const investment = isInvestment
       ? computeInvestmentMovement({
           side: edit.side || pending.side || 'buy',
@@ -444,6 +486,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     financialStateStore.commitState((draft) => {
       const current = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
       if (!current) return
+      current.type = targetType
       current.occurrenceDate = edit.date
       current.accountId = edit.accountId
       current.category = edit.category
@@ -459,6 +502,8 @@ export const useRecurringStore = defineStore('recurring', () => {
           if (edit.time) current.time = edit.time
           else delete current.time
         }
+      } else {
+        clearInvestmentFields(current)
       }
       current.updatedAt = new Date().toISOString()
     })

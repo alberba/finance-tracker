@@ -151,6 +151,52 @@ describe("POST /api/sync", () => {
     expect((await syncRepository.getCommand(testDb.db, principal.userId, commandId))?.result).not.toBeNull();
   });
 
+  it("answers a command still inside its processing lease with in_progress and halts the batch, not a 500 (issue #202)", async () => {
+    const { POST } = await import("../../../../src/pages/api/sync");
+    const commandId = "still-processing";
+    await syncRepository.createCommand(testDb.db, principal.userId, {
+      id: commandId, commandType: "create", status: "processing", result: null,
+      payload: JSON.stringify({ commandId }),
+    });
+
+    const response = await POST({
+      request: postJson("https://example.test/api/sync", {
+        commands: [
+          { commandId, action: "create", entityType: "account", data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 0 } },
+          { commandId: "after-in-progress", action: "noop" },
+        ],
+      }),
+      locals: { principal },
+    } as never);
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.halted).toBe(true);
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0]).toMatchObject({ commandId, status: "in_progress" });
+    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(0);
+    expect((await syncRepository.getCommand(testDb.db, principal.userId, commandId))?.result).toBeNull();
+  });
+
+  it("answers in_progress when a racing request reserves the command first (unique-violation branch, issue #202)", async () => {
+    const commandId = "raced-reservation";
+    await syncRepository.createCommand(testDb.db, principal.userId, {
+      id: commandId, commandType: "noop", status: "processing", result: null,
+      payload: JSON.stringify({ commandId }),
+    });
+    // The first lookup misses, as if the other request inserted the row
+    // right after it: the insert then hits the unique constraint.
+    const spy = vi.spyOn(syncRepository, "getCommand").mockResolvedValueOnce(undefined);
+
+    try {
+      const outcome = await applyOneCommand(testDb.db, principal.userId, { commandId, action: "noop" });
+      expect(outcome).toMatchObject({ commandId, status: "in_progress", replayed: false });
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("applies a concurrently repeated commandId at most once", async () => {
     const command = {
       commandId: "create-account-concurrent",

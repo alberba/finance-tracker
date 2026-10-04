@@ -28,4 +28,47 @@ describe('projectSyncV2State', () => {
       id: 'local-transaction', accountId: 'local-account', category: 'Nómina', month: 0,
     })])
   })
+
+  it('projects pending movements including investment operation fields and investment accounts', () => {
+    const b = bootstrap()
+    b.accounts.push({ id: 'server-asset', legacyId: 'local-asset', name: 'Broker', kind: 'investment', openingBalance: 0 })
+    b.categories.push({ id: 'server-inv-cat', legacyId: 'investment:Acciones', name: 'Acciones', kind: 'investment', sortOrder: 0 })
+    b.recurringRules.push({ id: 'server-rule', legacyId: 'local-rule', name: 'Regla', type: 'investment', frequency: 'monthly' })
+    b.pendingMovements = [
+      {
+        id: 'server-pm-inv',
+        legacyId: 'local-pm-inv',
+        recurringRuleId: 'server-rule',
+        accountId: 'server-asset',
+        categoryId: 'server-inv-cat',
+        type: 'investment',
+        dueDate: '2026-02-15',
+        amount: 500,
+        symbol: 'AAPL',
+        side: 'buy',
+        units: 3,
+        unitPrice: 166.66,
+        fee: 0.02,
+        time: '14:30',
+        status: 'pending',
+      },
+    ]
+
+    const state = projectSyncV2State(b)
+    expect(state.pendingMovements).toHaveLength(1)
+    expect(state.pendingMovements[0]).toEqual(expect.objectContaining({
+      id: 'local-pm-inv',
+      ruleId: 'local-rule',
+      type: 'investment',
+      accountId: 'local-asset',
+      category: 'Acciones',
+      symbol: 'AAPL',
+      side: 'buy',
+      units: 3,
+      unitPrice: 166.66,
+      fee: 0.02,
+      time: '14:30',
+      status: 'pending',
+    }))
+  })
 })

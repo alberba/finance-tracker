@@ -22,6 +22,8 @@ export interface SyncV2Bootstrap {
   instruments?: Array<CachedEntity & { userInstrument: CachedEntity; quotes: CachedEntity[] }>
   twrLiquidityAccounts?: CachedEntity[]
   stockeventsSymbolMappings?: CachedEntity[]
+  stockeventsCashMappings?: CachedEntity[]
+  stockeventsCashSyncEntries?: CachedEntity[]
 }
 
 const CATEGORY_STATE_KEYS = {
@@ -275,9 +277,40 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       isStale: false, previousClose: null, changePercent: null,
     }]]
   }))
+  const stockeventsEnabledRaw =
+    bootstrap.settings?.stockeventsEnabled ?? bootstrap.settings?.stockevents_enabled
+  projected.stockEvents.enabled = stockeventsEnabledRaw === true || stockeventsEnabledRaw === 1
+  const tradesToCashRaw =
+    bootstrap.settings?.stockeventsTradesToCash ?? bootstrap.settings?.stockevents_trades_to_cash
+  projected.stockEvents.tradesToCash = tradesToCashRaw === true || tradesToCashRaw === 1
   projected.stockEvents.symbolMappings = (bootstrap.stockeventsSymbolMappings || []).map((mapping) => ({
-    symbol: String(mapping.legacyId || mapping.stockeventsSymbol), sync: false, watchlistId: '',
-    targetSymbol: String(mapping.stockeventsSymbol), hidden: false,
+    symbol: String(mapping.legacyId || mapping.stockeventsSymbol).toUpperCase(),
+    sync: mapping.sync === true || mapping.sync === 1,
+    watchlistId: String(mapping.watchlistId || ''),
+    targetSymbol: String(mapping.stockeventsSymbol || '').toUpperCase(),
+    hidden: mapping.hidden === true || mapping.hidden === 1,
+  }))
+  // Server rows (and queued `settingsUpdate` overlays) address accounts by
+  // their server id; the UI model addresses them by legacy id.
+  const toLocalAccountId = (serverId: unknown): string => {
+    const key = String(serverId || '')
+    return accountIds.get(key) || key
+  }
+  const queuedCashMappings = (bootstrap.settings as Record<string, unknown> | null)?.stockeventsCashMappings
+  const cashSource = Array.isArray(queuedCashMappings)
+    ? (queuedCashMappings as CachedEntity[])
+    : bootstrap.stockeventsCashMappings || []
+  projected.stockEvents.cashMappings = cashSource
+    .filter((mapping) => String(mapping.watchlistId || ''))
+    .map((mapping) => ({
+      accountId: toLocalAccountId(mapping.accountId),
+      watchlistId: String(mapping.watchlistId),
+    }))
+  projected.stockEvents.cashSyncEntries = (bootstrap.stockeventsCashSyncEntries || []).map((entry) => ({
+    contributionDate: String(entry.contributionDate || '').slice(0, 10),
+    accountId: toLocalAccountId(entry.accountId),
+    watchlistId: String(entry.watchlistId || ''),
+    syncedAmount: Number(entry.syncedAmount ?? 0),
   }))
 
   return normalizeState(projected)

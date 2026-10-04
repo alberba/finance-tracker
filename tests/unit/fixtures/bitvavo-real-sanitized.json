@@ -1,0 +1,43 @@
+{
+  "provenance": "real Bitvavo account history; sanitized identities, dates and proportional amounts",
+  "capturedOn": "2026-10-03",
+  "requestedInterval": {
+    "from": "2025-10-03",
+    "toExclusive": "2026-10-04"
+  },
+  "permissionEvidence": "read-only key requested from account owner; GET /v2/account/history succeeded; granted permissions not independently inspected",
+  "verification": "exact decimal relationships from API response; UI/CSV cross-check not performed",
+  "contract": {
+    "priceKind": "unit",
+    "cashFlow": "gross",
+    "feesCurrency": "EUR"
+  },
+  "transactions": [
+    {
+      "transactionId": "example-1",
+      "executedAt": "2020-01-01T00:00:00.000Z",
+      "type": "buy",
+      "priceCurrency": "EUR",
+      "priceAmount": "76953",
+      "sentCurrency": "EUR",
+      "sentAmount": "6.83210665605",
+      "receivedCurrency": "BTC",
+      "receivedAmount": "0.00008878285",
+      "feesCurrency": "EUR",
+      "feesAmount": "0.01789334395"
+    },
+    {
+      "transactionId": "example-2",
+      "executedAt": "2020-01-01T00:01:00.000Z",
+      "type": "sell",
+      "priceCurrency": "EUR",
+      "priceAmount": "78957",
+      "sentCurrency": "BTC",
+      "sentAmount": "0.00074064803",
+      "receivedCurrency": "EUR",
+      "receivedAmount": "58.47934650471",
+      "feesCurrency": "EUR",
+      "feesAmount": "0.14748650471"
+    }
+  ]
+}

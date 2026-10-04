@@ -28,9 +28,11 @@ import {
   marketRepository,
   pendingMovementsRepository,
   recurringRulesRepository,
+  stockeventsCashMappingsRepository,
   stockeventsSymbolMappingsRepository,
   subscriptionsRepository,
   transactionsRepository,
+  userSettingsRepository,
   usersRepository,
   wealthRepository,
 } from "../src/db/repositories";
@@ -72,6 +74,9 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       contributions,
       userInstruments,
       stockeventsSymbolMappings,
+      stockeventsCashMappings,
+      stockeventsCashSyncEntries,
+      userSettings,
     ] = await Promise.all([
       accountsRepository.listByUser(db, userId),
       accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
@@ -86,6 +91,9 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
       stockeventsSymbolMappingsRepository.listByUser(db, userId),
+      stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
+      stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+      userSettingsRepository.get(db, userId),
     ]);
 
     const accountLegacyId = (v2Id: string | null): string => {
@@ -196,12 +204,18 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       description: r.name,
       amount: r.amount,
       frequency: r.frequency as RecurringRule["frequency"],
-      interval: 1,
-      startDate: r.nextRunDate ?? "",
-      endDate: null,
+      interval: r.interval ?? 1,
+      startDate: r.startDate ?? r.nextRunDate ?? "",
+      endDate: r.endDate ?? null,
       active: r.status === "active",
-      lastExecutionDate: null,
+      lastExecutionDate: r.lastExecutionDate ?? null,
       nextOccurrenceDate: r.nextRunDate,
+      ...(r.symbol ? { symbol: r.symbol } : {}),
+      ...(r.side ? { side: r.side as RecurringRule["side"] } : {}),
+      ...(r.units !== null && r.units !== undefined ? { units: r.units } : {}),
+      ...(r.unitPrice !== null && r.unitPrice !== undefined ? { unitPrice: r.unitPrice } : {}),
+      ...(r.fee !== null && r.fee !== undefined ? { fee: r.fee } : {}),
+      ...(r.time ? { time: r.time } : {}),
     }));
     const recurringRuleLegacyById = new Map(recurringRules.map((r) => [r.id, r.legacyId ?? r.id]));
 
@@ -210,15 +224,21 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       occurrenceKey: `${recurringRuleLegacyById.get(p.recurringRuleId) ?? p.recurringRuleId}:${p.dueDate}`,
       ruleId: recurringRuleLegacyById.get(p.recurringRuleId) ?? p.recurringRuleId,
       occurrenceDate: p.dueDate,
-      type: "expense",
+      type: (p.type || "expense") as PendingMovement["type"],
       accountId: accountLegacyId(p.accountId),
       category: categoryName(p.categoryId),
-      description: "",
+      description: p.description ?? "",
       amount: p.amount,
+      ...(p.symbol ? { symbol: p.symbol } : {}),
+      ...(p.side ? { side: p.side as PendingMovement["side"] } : {}),
+      ...(p.units !== null && p.units !== undefined ? { units: p.units } : {}),
+      ...(p.unitPrice !== null && p.unitPrice !== undefined ? { unitPrice: p.unitPrice } : {}),
+      ...(p.fee !== null && p.fee !== undefined ? { fee: p.fee } : {}),
+      ...(p.time ? { time: p.time } : {}),
       status: p.status as PendingMovement["status"],
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
-      transactionId: null,
+      transactionId: p.transactionId ?? null,
     }));
 
     const budget: State["budget"] = { income: {}, expense: {}, investment: {} };
@@ -313,14 +333,24 @@ async function exportState(v2Path: string, userId: string, year: number | undefi
       recurringRules: v1RecurringRules,
       pendingMovements: v1PendingMovements,
       stockEvents: {
-        enabled: Boolean(apiKey),
+        enabled: (userSettings?.stockeventsEnabled ?? 0) === 1,
         apiKey,
         symbolMappings: stockeventsSymbolMappings.map((m) => ({
           symbol: m.legacyId ?? m.stockeventsSymbol,
-          sync: false,
-          watchlistId: "",
+          sync: m.sync === 1,
+          watchlistId: m.watchlistId ?? "",
           targetSymbol: m.stockeventsSymbol,
-          hidden: false,
+          hidden: m.hidden === 1,
+        })),
+        cashMappings: stockeventsCashMappings.map((m) => ({
+          accountId: m.accountId ? accountLegacyId(m.accountId) : "",
+          watchlistId: m.watchlistId,
+        })),
+        cashSyncEntries: stockeventsCashSyncEntries.map((e) => ({
+          contributionDate: e.contributionDate,
+          accountId: e.accountId ? accountLegacyId(e.accountId) : "",
+          watchlistId: e.watchlistId,
+          syncedAmount: e.syncedAmount,
         })),
       },
     };

@@ -88,6 +88,30 @@ describe("useSyncStore — queue never stays poisoned (audit §2)", () => {
     expect(store.lastError).toBeTruthy();
   });
 
+  it("keeps an in_progress command queued, without counting a failure, and resends it after a backoff (issue #202)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    let calls = 0;
+    onSync = (commands) => {
+      calls += 1;
+      return json({
+        results: [{ commandId: commands[0].commandId, status: calls === 1 ? "in_progress" : "applied" }],
+        revision: 0, halted: calls === 1,
+      });
+    };
+    const store = useSyncStore();
+    await store.init(userId);
+
+    await store.enqueueCommand({ action: "noop", commandId: "racing" });
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.waitFor(async () => expect((await queued())[0]).toMatchObject({ attempts: 0 }));
+    expect(store.lastError).toBeNull();
+    expect(store.syncStatus).toBe("idle");
+
+    await vi.runOnlyPendingTimersAsync();
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0));
+    expect(calls).toBe(2);
+  });
+
   it("ignores pulled changes for stores the local cache does not have (userSettings)", async () => {
     changes = [{ entityType: "userSettings", entityId: userId, changeType: "update", payload: JSON.stringify({ currency: "USD" }) }];
     const store = useSyncStore();

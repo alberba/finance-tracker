@@ -29,12 +29,20 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 ## Ejecutar en local (Astro)
 
 ```bash
-cd /ruta/al/finance-tracker
 pnpm install
+pnpm setup:worktree
 pnpm dev
 ```
 
-Luego abre `http://localhost:4321`.
+`pnpm setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
+migraciones D1 locales de v1 y v2. Sirve igual en el checkout principal que en un worktree.
+
+En local no hay Cloudflare Access: `http://localhost:4321` carga, pero sus llamadas a `/api/*`
+responden 401 («Falta la cabecera Cf-Access-Jwt-Assertion»). Para entrar:
+
+- `http://localhost:4321/?demo=1`: la demo con datos sintéticos.
+- Con la cabecera `X-Test-User-Email: legacy-owner@e2e.test`: tus datos locales, como en los E2E.
+  Por ejemplo, `agent-browser open http://localhost:4321 --headers '{"X-Test-User-Email":"legacy-owner@e2e.test"}'`.
 
 ### Mercado y reglas recurrentes
 
@@ -47,13 +55,7 @@ wrangler secret put COINGECKO_API_KEY
 
 `MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime definidas en `wrangler.toml`. La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
 
-Para probarlo en local:
-
-```bash
-cp .dev.vars.example .dev.vars
-# Edita .dev.vars y añade TWELVE_DATA_API_KEY
-pnpm dev
-```
+Para probarlo en local, ejecuta `pnpm setup:worktree`, añade `TWELVE_DATA_API_KEY` a `.dev.vars` y arranca `pnpm dev`.
 
 Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`, pero su endpoint de gráficos no es una API pública oficial y puede responder con HTTP 429. Las peticiones se cachean, se deduplican y, cuando Yahoo está limitado, los instrumentos Yahoo usan Twelve Data como respaldo si `TWELVE_DATA_API_KEY` está configurada. La búsqueda de símbolos aplica el mismo respaldo. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
 
@@ -72,17 +74,22 @@ wrangler secret put COINGECKO_API_KEY
 
 ### 1) Configuración D1
 
-Este repo ya incluye:
+`wrangler.toml` declara dos bases D1, cada una con su carpeta de migraciones:
 
-- `wrangler.toml` con los bindings `finance_tracker_db` y `finance_tracker_db_v2`
-- `migrations/0001_create_app_state.sql`
-- `migrations/0002_import_seeded_state.sql` (import de namespaces persistentes)
+| Binding | Base | Migraciones | Contenido |
+|---|---|---|---|
+| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (*sync v2*), el que usa la app |
+| `finance_tracker_db` | `finance-tracker-db` | `migrations/` | Blob legacy v1 |
+
+Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.
 
 Aplicar migraciones:
 
 ```bash
-pnpm d1:migrate:local
-pnpm d1:migrate:remote
+pnpm d1:migrate:local:v2    # v2, local
+pnpm d1:migrate:remote:v2   # v2, producción
+pnpm d1:migrate:local       # v1, local
+pnpm d1:migrate:remote      # v1, producción
 ```
 
 Si cambias `wrangler.toml`, regenera tipos:
@@ -105,8 +112,10 @@ Settings → Build):
 
 `pnpm deploy:cf` usa `--config dist/server/wrangler.json`: el adapter de Astro
 genera ese fichero en el build a partir de `wrangler.toml`, y es el que lleva
-`main`, `assets` y los bindings. El `wrangler.toml` de raíz por sí solo no
-sirve para desplegar (no declara `main` ni `assets`).
+`main`, `assets` y los bindings. El `wrangler.toml` de raíz ahora sí declara
+`main` (la entrada de Sentry, que el build compila a `dist/server/entry.mjs`) y
+las `[vars]`; `assets` y los bindings se materializan en ese fichero generado,
+que sigue siendo el que se despliega.
 
 A diferencia de Pages, aquí **los bindings y las `[vars]` de `wrangler.toml`
 son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
@@ -135,6 +144,39 @@ latencia de deploy.
 pnpm build
 pnpm astro check
 ```
+
+## Sentry
+
+Los errores llegan a Sentry por dos caminos independientes:
+
+- Cliente: `@sentry/astro` inyecta `sentry.client.config.js`. La pieza
+  compartida de cliente (`src/lib/client/error-reporting.ts`) marca cada fallo
+  de API que no provocó quien usa la app con `api.endpoint` (sin query string),
+  `api.category` y `api.status`.
+- Servidor: `wrangler.toml` apunta `main` a `sentry.server.config.ts`, que
+  envuelve el handler de `@astrojs/cloudflare` con `Sentry.withSentry()` de
+  `@sentry/cloudflare`. `withApiErrorHandling`
+  (`src/lib/server/api-auth.ts`) marca los fallos de ruta no controlados con
+  `api.route` y `http.response.status_code`.
+
+La entrada del Worker se cablea a mano en lugar de apoyarse en la integración de
+`@sentry/astro` (que en `astro.config.ts` queda con `server: false`): con
+`@astrojs/cloudflare` v14 esa integración ya no aplica su envoltorio automático
+a la entrada emitida
+([getsentry/sentry-javascript#21901](https://github.com/getsentry/sentry-javascript/issues/21901)),
+así que el Worker se desplegaría con Sentry del lado servidor desactivado en
+silencio.
+
+El DSN vive en `[vars] SENTRY_DSN` de `wrangler.toml` y no es un secreto: el
+mismo valor ya viaja en el bundle de cliente.
+
+Contrato de privacidad: con `dataCollection.userInfo` desactivado y sin cuerpos
+HTTP en ninguno de los dos SDK —y con la integración `Console` fuera del SDK
+del servidor, así sus eventos tampoco llevan los argumentos de `console.*`—,
+ningún evento lleva credenciales, cuerpos de petición ni datos financieros; los
+eventos de servidor llevan solo nuestros tags (`api.route` y
+`http.response.status_code`) y la excepción, cuyo mensaje nunca repite el cuerpo
+de una respuesta de proveedor aunque su stack sí viaje.
 
 ## Testing (Vitest + Playwright)
 

@@ -35,6 +35,39 @@ export function nowIso(): string {
 }
 
 /**
+ * Maximum number of bound parameters a single D1 statement accepts.
+ *
+ * FINANCE-TRACKER-7: `GET /api/bootstrap` returned a 500 with
+ * `D1_ERROR: too many SQL variables` because its batch loaders handed every
+ * id of the user's dataset to one `inArray(...)`, and SQLite/D1 rejects a
+ * statement that binds more parameters than this ceiling. The batch loaders
+ * are the ones that build those lists, so the fix belongs to this layer:
+ * every unbounded `inArray` here must go through {@link chunkIds} instead of
+ * passing the whole id list to a single query.
+ */
+export const MAX_SQL_VARIABLES_PER_STATEMENT = 50;
+
+/**
+ * Splits `ids` into order-preserving chunks of at most `size` entries, so
+ * each chunk can be passed to its own `inArray(...)`.
+ *
+ * Never returns an empty chunk array for non-empty input (that guarantee is
+ * what lets callers accumulate rows in a loop without an extra
+ * empty-input branch), and returns `[]` for empty input so the caller's own
+ * early return stays the only empty-input path.
+ */
+export function chunkIds(
+  ids: readonly string[],
+  size: number = MAX_SQL_VARIABLES_PER_STATEMENT,
+): string[][] {
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += size) {
+    chunks.push(ids.slice(start, start + size));
+  }
+  return chunks;
+}
+
+/**
  * `WHERE` condition for the optimistic-concurrency guard, or `undefined` when
  * the caller has no version to pin.
  *

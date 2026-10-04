@@ -11,7 +11,7 @@ import * as syncRepository from "../../db/repositories/sync";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../lib/server/api-auth";
 
 export const GET: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/session", async () => {
     const principal = requirePrincipal(locals);
     const db = getDb(locals);
     const revisionRow = await syncRepository.getRevision(db, principal.userId);

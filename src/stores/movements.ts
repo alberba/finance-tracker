@@ -392,6 +392,28 @@ export const useMovementsStore = defineStore('movements', () => {
     showToast(`Eliminadas ${removed} filas.`)
   }
 
+  async function refreshSubscriptions(recoveredIds: readonly string[] = []): Promise<void> {
+    const beforeTransactions = financialStateStore.transactions
+    // Recovered dates must be saved even when their first charge is still in the future.
+    const beforeSubscriptions = financialStateStore.subscriptions.map((subscription) =>
+      recoveredIds.includes(subscription.id)
+        ? { ...subscription, startDate: '', nextChargeDate: '' }
+        : subscription,
+    )
+    financialStateStore.commitState((draft) => {
+      materializeDueSubscriptions(draft, todayISO())
+    })
+    await syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
+      buildTransactionData(tx, financialStateStore.currency),
+    )
+    await syncListDiff(
+      'subscription',
+      beforeSubscriptions,
+      financialStateStore.subscriptions,
+      (subscription) => buildSubscriptionData(subscription, financialStateStore.currency),
+    )
+  }
+
   function addSubscription(input: NewSubscriptionInput): boolean {
     const name = input.name.trim()
     if (!name || input.amount <= 0 || !input.accountId || !input.category || !input.firstChargeDate) {
@@ -514,6 +536,7 @@ export const useMovementsStore = defineStore('movements', () => {
     deleteTransaction,
     applyBulkChanges,
     deleteSelected,
+    refreshSubscriptions,
     addSubscription,
     updateSubscription,
     setSubscriptionActive,

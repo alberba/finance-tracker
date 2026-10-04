@@ -2,9 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, v2]
   pull_request:
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: Regenerate the Linux visual snapshots and commit them to this branch
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,6 +22,27 @@ env:
   CI: true
 
 jobs:
+  # Advisories land on unrelated PRs, so the audit reports without blocking.
+  # `audit.yml` runs it weekly and opens an issue.
+  audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        run: pnpm audit:prod
+
   quality:
     name: Quality and coverage
     runs-on: ubuntu-latest
@@ -32,8 +58,6 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Audit production dependencies
-        run: pnpm audit:prod
       - name: Lint
         run: pnpm lint
       - name: Astro check
@@ -120,6 +144,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -136,7 +162,21 @@ jobs:
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Run visual regression tests
+        if: ${{ !inputs.update_snapshots }}
         run: pnpm test:e2e:visual
+      - name: Regenerate and commit Linux snapshots
+        if: ${{ inputs.update_snapshots }}
+        run: |
+          pnpm test:e2e:visual --update-snapshots
+          git add 'tests/e2e/**/*-linux.png'
+          if git diff --cached --quiet; then
+            echo "Snapshots unchanged"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'test(e2e): regenerate the Linux visual snapshots'
+            git push
+          fi
       - name: Apply local D1 v2 migrations
         if: ${{ always() && !cancelled() }}
         run: pnpm d1:migrate:local:v2

@@ -36,6 +36,7 @@ import {
   syncListDiff,
   type CategoryKind,
 } from '../lib/client/command-mapping'
+import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -43,7 +44,7 @@ import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
 
 /** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
-async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+export async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
   // The server only knows its own account ids; sending the local one made
   // every investment movement fail the ownership check (audit §1).
   const accountId = await resolveEntityId('account', tx.accountId)
@@ -352,7 +353,35 @@ export const useInvestmentStore = defineStore('investment', () => {
     )
     ui.investmentTxEditingId = ''
     showToast('Movimiento de inversión actualizado.')
+    // Editing a movement that already exists in Stock Events cannot update the
+    // remote row (the API only creates), so the edit is re-sent to keep the
+    // remote side consistent with what the user just saved.
+    const updated = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === id && item.type === 'investment',
+    )
+    if (updated) {
+      void stockEventsStore.syncMovement(updated)
+    }
     return true
+  }
+
+  /**
+   * Manual resend of one movement to Stock Events, for the case the automatic
+   * fire-and-forget sync skipped it (no mapping then, mapping now).
+   */
+  async function resyncMovement(transactionId: string): Promise<boolean> {
+    const tx = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === transactionId && item.type === 'investment',
+    )
+    if (!tx) {
+      showToast('Movimiento no encontrado.')
+      return false
+    }
+    const result = await stockEventsStore.syncMovement(tx)
+    if (result === 'skipped' && !stockEventsStore.isConnected) {
+      showToast('Activa la conexión con Stock Events para reenviar.')
+    }
+    return result === 'synced'
   }
 
   function deleteMovement(id: string): void {
@@ -459,10 +488,20 @@ export const useInvestmentStore = defineStore('investment', () => {
       return false
     }
     const currency = financialStateStore.currency
-    void syncListDiff('contribution', before, financialStateStore.contributions, async (contribution) => ({
-      ...buildContributionData(contribution, currency),
-      allocations: await buildContributionAllocations(contribution),
-    }))
+    void syncListDiff(
+      'contribution',
+      before,
+      financialStateStore.contributions,
+      async (contribution) => ({
+        ...buildContributionData(contribution, currency),
+        allocations: await buildContributionAllocations(contribution),
+      }),
+    )
+    void syncSnapshotBalances(
+      financialStateStore.year,
+      financialStateStore.state.snapshots[String(month)],
+      currency,
+    )
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
     if (options.syncStockEventsCash) {
       void stockEventsStore.syncContributionCash(date, allocations)
@@ -489,6 +528,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     cancelEditMovement,
     addMovement,
     saveEditedMovement,
+    resyncMovement,
     deleteMovement,
     toggleDeclared,
     setContributionFlow,

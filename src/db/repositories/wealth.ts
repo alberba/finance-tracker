@@ -9,7 +9,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { snapshotBalances, wealthSnapshots } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, assertOwnedReferences, chunkIds, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type WealthSnapshotRow = typeof wealthSnapshots.$inferSelect;
 export type SnapshotBalanceRow = Omit<typeof snapshotBalances.$inferSelect, "balanceMinor"> & {
@@ -168,10 +168,17 @@ export async function listBalancesBySnapshots(
   if (snapshotIds.length === 0) {
     return bySnapshot;
   }
-  const rows = await db
-    .select()
-    .from(snapshotBalances)
-    .where(and(eq(snapshotBalances.userId, userId), inArray(snapshotBalances.snapshotId, snapshotIds)));
+  const rows: (typeof snapshotBalances.$inferSelect)[] = [];
+  for (const chunk of chunkIds(snapshotIds)) {
+    rows.push(
+      ...(await db
+        .select()
+        .from(snapshotBalances)
+        .where(
+          and(eq(snapshotBalances.userId, userId), inArray(snapshotBalances.snapshotId, chunk)),
+        )),
+    );
+  }
   for (const row of rows) {
     const balance = toBalanceRow(row);
     const existing = bySnapshot.get(balance.snapshotId);

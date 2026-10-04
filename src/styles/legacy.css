@@ -2409,6 +2409,17 @@ td select {
 .edit-btn:hover {
   background: color-mix(in srgb, var(--primary) 18%, var(--bg-panel));
 }
+.resend-btn {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-panel));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.resend-btn:hover {
+  background: color-mix(in srgb, var(--primary) 18%, var(--bg-panel));
+}
 .inline-actions {
   display: inline-flex;
   gap: 6px;

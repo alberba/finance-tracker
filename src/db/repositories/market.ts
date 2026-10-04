@@ -13,7 +13,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { marketInstruments, marketQuotes, userInstruments } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, assertOwnedReferences, chunkIds, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type MarketInstrumentRow = typeof marketInstruments.$inferSelect;
 export type MarketQuoteRow = Omit<typeof marketQuotes.$inferSelect, "priceMinor"> & {
@@ -75,7 +75,11 @@ export async function listInstrumentsByIds(db: Db, ids: string[]): Promise<Marke
   if (ids.length === 0) {
     return [];
   }
-  return db.select().from(marketInstruments).where(inArray(marketInstruments.id, ids));
+  const rows: MarketInstrumentRow[] = [];
+  for (const chunk of chunkIds(ids)) {
+    rows.push(...(await db.select().from(marketInstruments).where(inArray(marketInstruments.id, chunk))));
+  }
+  return rows;
 }
 
 export async function getInstrumentBySymbol(
@@ -172,10 +176,12 @@ export async function listQuotesByInstruments(
   if (instrumentIds.length === 0) {
     return byInstrument;
   }
-  const rows = await db
-    .select()
-    .from(marketQuotes)
-    .where(inArray(marketQuotes.instrumentId, instrumentIds));
+  const rows: (typeof marketQuotes.$inferSelect)[] = [];
+  for (const chunk of chunkIds(instrumentIds)) {
+    rows.push(
+      ...(await db.select().from(marketQuotes).where(inArray(marketQuotes.instrumentId, chunk))),
+    );
+  }
   for (const row of rows) {
     const quote = toQuoteRow(row);
     const existing = byInstrument.get(quote.instrumentId);
