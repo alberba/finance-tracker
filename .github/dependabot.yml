@@ -4,15 +4,83 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # Five affinity groups plus individual major PRs; at 5 the groups alone fill the queue.
+    open-pull-requests-limit: 10
     groups:
-      production-security-updates:
-        dependency-type: production
+      # Vulnerability fixes, separate from maintenance and outside the PR limit. A fix that
+      # needs a major arrives as its own PR.
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
         update-types:
           - patch
           - minor
-      development-security-updates:
-        dependency-type: development
+      # The rest are version-update groups (applies-to defaults to version-updates): patch and
+      # minor, grouped by what breaks together rather than by dependencies/devDependencies.
+      # Astro, the Cloudflare adapter and Vite are devDependencies but build the Worker that
+      # runs in production. Majors match no group and arrive as individual PRs. A dependency
+      # joins the first group it matches, so the catch-all goes last.
+      astro-vite-cloudflare:
+        patterns:
+          - astro
+          - '@astrojs/*'
+          - vite
+          - '@vitejs/*'
+          - vite-svg-loader
+          - vue
+          - pinia
+          - tailwindcss
+          - '@tailwindcss/*'
+          - wrangler
+          - '@sentry/*'
+        update-types:
+          - patch
+          - minor
+      testing:
+        patterns:
+          - vitest
+          - '@vitest/*'
+          - '@playwright/test'
+          - '@vue/test-utils'
+          - happy-dom
+          - fake-indexeddb
+          - better-sqlite3
+          - '@types/better-sqlite3'
+        update-types:
+          - patch
+          - minor
+      # typescript-eslint and @typescript-eslint/parser share a group so they stay aligned.
+      lint-format-types:
+        patterns:
+          - eslint
+          - '@eslint/*'
+          - 'eslint-*'
+          - typescript-eslint
+          - '@typescript-eslint/*'
+          - vue-eslint-parser
+          - globals
+          - prettier
+          - 'prettier-plugin-*'
+          - tailwind-csstree
+          - typescript
+          - '@types/node'
+        update-types:
+          - patch
+          - minor
+      data-auth-validation:
+        patterns:
+          - drizzle-orm
+          - drizzle-kit
+          - zod
+          - jose
+          - decimal.js
+        update-types:
+          - patch
+          - minor
+      other-maintenance:
+        patterns:
+          - '*'
         update-types:
           - patch
           - minor
