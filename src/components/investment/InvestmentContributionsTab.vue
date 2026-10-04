@@ -15,7 +15,7 @@ import PillTag from '../ui/PillTag.vue'
 import { TONE_TEXT, toneOf } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { ContributionLedgerRow } from '../../domain/investment/view-model'
-import { formatDayMonth, formatPercent, formatShortDate } from '../../lib/format'
+import { formatDayMonth, formatNumber, formatPercent, formatShortDate } from '../../lib/format'
 import { formatDecimalInput, parseDecimal } from '../../lib/number'
 import { renderMultiLineChart } from '../../scripts/charts'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -43,9 +43,7 @@ const confirmOpen = computed({
 const ORIGIN_LABEL = { base: 'Inicio', monthEnd: 'Cierre de mes', manual: 'Manual' } as const
 
 function formatNav(value: number | null): string {
-  return value === null
-    ? '—'
-    : value.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+  return value === null ? '—' : formatNumber(value, 4)
 }
 
 function formatReturn(value: number | null): string {

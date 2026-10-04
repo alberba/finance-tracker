@@ -1,6 +1,8 @@
-import { computed } from 'vue'
-
-import { formatMoney as formatMoneyIn, formatSignedMoney as formatSignedMoneyIn } from '../lib/format'
+import {
+  formatCompactMoney,
+  formatMoney as formatMoneyIn,
+  formatSignedMoney as formatSignedMoneyIn,
+} from '../lib/format'
 import { useFinancialStateStore } from '../stores/financial-state'
 
 /**
@@ -8,20 +10,6 @@ import { useFinancialStateStore } from '../stores/financial-state'
  */
 export function useMoneyFormatter() {
   const financialStateStore = useFinancialStateStore()
-
-  const compactFormatter = computed(() => {
-    const currency = (financialStateStore.currency || 'EUR').toUpperCase()
-    try {
-      return new Intl.NumberFormat('es-ES', {
-        style: 'currency',
-        currency,
-        notation: 'compact',
-        maximumFractionDigits: 1,
-      })
-    } catch {
-      return null
-    }
-  })
 
   function formatMoney(value: unknown): string {
     return formatMoneyIn(value, financialStateStore.currency || 'EUR')
@@ -32,11 +20,7 @@ export function useMoneyFormatter() {
   }
 
   function formatMoneyCompact(value: unknown): string {
-    const instance = compactFormatter.value
-    if (!instance) {
-      return formatMoney(value)
-    }
-    return instance.format(Number(value || 0))
+    return formatCompactMoney(value, financialStateStore.currency || 'EUR')
   }
 
   return { formatMoney, formatSignedMoney, formatMoneyCompact }

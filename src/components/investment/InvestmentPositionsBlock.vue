@@ -11,7 +11,7 @@ import type {
   InvestmentDashboardViewModel,
   InvestmentPosition,
 } from '../../domain/investment/view-model'
-import { formatPercent, formatShortDate } from '../../lib/format'
+import { formatDecimal, formatPercent, formatShortDate } from '../../lib/format'
 import { renderMultiLineChart } from '../../scripts/charts'
 
 // "02 Posiciones": allocation bar and the positions ledger, whose rows expand
@@ -60,7 +60,7 @@ const columns: LedgerColumn<InvestmentPosition>[] = [
 ]
 
 function formatUnits(units: number | null): string {
-  return units === null ? '—' : units.toLocaleString('es-ES', { maximumFractionDigits: 8 })
+  return units === null ? '—' : formatDecimal(units)
 }
 </script>
 

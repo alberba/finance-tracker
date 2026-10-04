@@ -45,7 +45,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.open()
     await bitvavo.connect(accountId)
     await bitvavo.preview()
-    await expect(bitvavo.panel.getByText('0.01789334395', { exact: true })).toBeVisible()
+    await expect(bitvavo.panel.getByText('0,01789334395', { exact: true })).toBeVisible()
     await bitvavo.confirm()
     await bitvavo.close()
     await bitvavo.tracker.openInvestmentMovementsTab()
@@ -65,7 +65,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await expect(rows).toHaveCount(2)
     await bitvavo.openDetails('Compra')
     const detail = bitvavo.details
-    await expect(detail.getByText('0.01789334395', { exact: true })).toBeVisible()
+    await expect(detail.getByText('0,01789334395', { exact: true })).toBeVisible()
     await expect(detail.getByText('2020-01-01T00:00:00.000Z', { exact: true })).toBeVisible()
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toBeVisible()
     const instrumentId = await seedMarketInstrument(context.request)
@@ -77,7 +77,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.tracker.filterInvestmentYear(2020)
     await bitvavo.openDetails('Compra')
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toHaveCount(0)
-    await expect(detail.getByText('0.01789334395', { exact: true })).toBeVisible()
+    await expect(detail.getByText('0,01789334395', { exact: true })).toBeVisible()
     const other = await browser.newContext({ extraHTTPHeaders: headers })
     try {
       const otherPage = await other.newPage()

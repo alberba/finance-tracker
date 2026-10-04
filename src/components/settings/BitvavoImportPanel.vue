@@ -6,6 +6,7 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
 import PillTag from '../ui/PillTag.vue'
 import { useBitvavoImport } from '../../composables/useBitvavoImport'
+import { formatDecimal, formatShortDate } from '../../lib/format'
 const open = defineModel<boolean>('open', { required: true })
 const {
   form,
@@ -135,23 +136,31 @@ function close() {
           ><PillTag>{{ operation.side === 'buy' ? 'Compra' : 'Venta' }}</PillTag>
         </div>
         <p class="text-text-muted text-sm">
-          {{ operation.date }} {{ operation.time }} · {{ operation.timeZone }}
+          {{ formatShortDate(operation.date) }}, {{ operation.time }} · {{ operation.timeZone }}
         </p>
         <dl class="grid grid-cols-2 gap-2 text-sm">
           <dt>Cantidad</dt>
-          <dd class="text-right font-mono break-all">{{ operation.quantity }}</dd>
+          <dd class="font-display text-right tabular-nums">
+            {{ formatDecimal(operation.quantity) }}
+          </dd>
           <dt>Precio unitario EUR</dt>
-          <dd class="text-right font-mono break-all">{{ operation.unitPrice }}</dd>
+          <dd class="font-display text-right tabular-nums">
+            {{ formatDecimal(operation.unitPrice, { minDigits: 2 }) }}
+          </dd>
           <dt>Comisión EUR</dt>
-          <dd class="text-right font-mono break-all">{{ operation.fee }}</dd>
+          <dd class="font-display text-right tabular-nums">
+            {{ formatDecimal(operation.fee, { minDigits: 2 }) }}
+          </dd>
           <dt>Total EUR</dt>
-          <dd class="text-right font-mono break-all">{{ operation.cashAmount }}</dd>
+          <dd class="font-display text-right tabular-nums">
+            {{ formatDecimal(operation.cashAmount, { minDigits: 2 }) }}
+          </dd>
         </dl>
         <p v-if="operation.alreadyImported" class="text-text-muted text-sm">Ya importado</p>
         <BaseSelect
           v-else-if="operation.candidates.length"
           v-model="resolutions[operation.externalId]"
-          :label="`Resolver ${operation.symbol} del ${operation.date}`"
+          :label="`Resolver ${operation.symbol} del ${formatShortDate(operation.date)}`"
           required
         >
           <option :value="undefined" disabled>Elige una resolución</option>
@@ -161,7 +170,7 @@ function close() {
             :key="candidate.id"
             :value="candidate.id"
           >
-            Vincular: {{ candidate.description }} ({{ candidate.date }})
+            Vincular: {{ candidate.description }} ({{ formatShortDate(candidate.date) }})
           </option>
         </BaseSelect>
         <p v-else class="text-text-muted text-sm">Nuevo movimiento · No declarado</p>

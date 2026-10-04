@@ -1212,6 +1212,7 @@ export class FinanceTrackerPage {
   private parseMoneyText(value: string): number {
     const cleaned = value
       .replace(/\u00a0/g, '')
+      .replace(/\u2212/g, '-')
       .replace(/[€$£]/g, '')
       .replace(/\./g, '')
       .replace(',', '.')

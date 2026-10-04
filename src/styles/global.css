@@ -179,8 +179,8 @@
 }
 
 @theme {
-  /* Typography: display = Syne (400–800), body = DM Sans, numbers and
-     symbols = DM Mono. */
+  /* Typography: display = Syne (400–800) for titles and every figure, body =
+     DM Sans, asset symbols and kickers = DM Mono. */
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;

@@ -8,8 +8,10 @@ cada una y las reglas que el usuario ha corregido en lienzos anteriores.
 
 - **Tokens:** `src/styles/global.css`, claro y oscuro. Se usan como utilidades de `@theme`
   (`bg-panel`, `bg-ink`, `text-gain`, `border-line`, `rounded-md`, `shadow-soft`…), no con hex.
-- **Tipografía:** Syne (`font-display`) para títulos y la cifra principal, DM Sans (`font-sans`)
-  para el texto, DM Mono (`font-mono`) para importes, kickers y numeración.
+- **Tipografía:** Syne (`font-display`) para títulos y todas las cifras (importes, porcentajes,
+  cantidades), siempre con `tabular-nums`; DM Sans (`font-sans`) para el texto; DM Mono
+  (`font-mono`) solo para símbolos de activos, kickers y numeración. Las cifras salen de
+  `src/lib/format.ts`: miles siempre agrupados y signo menos tipográfico (−).
 - **Componentes base:** `src/components/ui/`. Cada fichero abre con un comentario que dice cuándo
   usarlo. Un patrón que ya existe ahí no se redibuja con otra forma.
 - **Reglas de estilo del código:** ADR 0004 y la sección «Estilos» de `CODING_STANDARDS.md`.
