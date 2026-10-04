@@ -394,6 +394,56 @@ const SETTINGS_VIEWS: Array<{
   },
 ]
 
+/** Shell regions the layout scan covers: navigation (sidebar, bars, sheet) and the demo band. */
+type ShellScope = 'nav-tabs' | 'demo-banner'
+
+/** Shell views: the "Más" sheet and demo mode, on mobile; the user menu and collapsed sidebar, on desktop. */
+const SHELL_VIEWS: Array<{
+  name: string
+  scope: ShellScope
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+}> = [
+  {
+    name: 'shell-more-sheet',
+    scope: 'nav-tabs',
+    open: async (page) => {
+      await page.getByRole('button', { name: 'Más secciones' }).click()
+      await expect(page.getByRole('dialog', { name: 'Más secciones' })).toBeVisible()
+    },
+  },
+  {
+    name: 'shell-demo',
+    scope: 'demo-banner',
+    open: async (page) => {
+      await page.goto('/?demo=1')
+      await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+      await expect(page.getByRole('status').filter({ hasText: 'Modo demo' })).toBeVisible()
+    },
+  },
+]
+
+const SHELL_DESKTOP_VIEWS: typeof SHELL_VIEWS = [
+  {
+    name: 'shell-user-menu',
+    scope: 'nav-tabs',
+    open: async (page) => {
+      await page.getByRole('button', { name: 'Abrir menú de usuario' }).click()
+      await expect(page.getByRole('menu', { name: 'Menú de usuario' })).toBeVisible()
+    },
+  },
+  {
+    name: 'shell-collapsed-user-menu',
+    scope: 'nav-tabs',
+    open: async (page) => {
+      await page.getByRole('button', { name: 'Colapsar barra lateral' }).click()
+      await expect(page.locator('html')).toHaveAttribute('data-sidebar', 'collapsed')
+      await page.getByRole('button', { name: 'Abrir menú de usuario' }).click()
+      await expect(page.getByRole('menu', { name: 'Menú de usuario' })).toBeVisible()
+    },
+  },
+  SHELL_VIEWS[1],
+]
+
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false }
 
 type LayoutIssue = {
@@ -411,10 +461,8 @@ type LayoutScanResult = {
   undersizedInteractiveElements: string[]
 }
 
-async function getLayoutScanResult(
-  page: Page,
-  sectionId: FinanceSectionId,
-): Promise<LayoutScanResult> {
+/** Scans the element with id `scopeId`: a section, or a shell region such as `nav-tabs`. */
+async function getLayoutScanResult(page: Page, scopeId: string): Promise<LayoutScanResult> {
   return await page.evaluate((id) => {
     const activePanel = document.getElementById(id)
     const overlapIssues: LayoutIssue[] = []
@@ -448,12 +496,7 @@ async function getLayoutScanResult(
       activePanel,
       ...Array.from(
         activePanel.querySelectorAll<HTMLElement>(
-          [
-            '.cards-grid',
-            '[data-month-card]',
-            '[data-dashboard-grid]',
-            '.form-grid',
-          ].join(','),
+          ['.cards-grid', '[data-month-card]', '[data-dashboard-grid]', '.form-grid'].join(','),
         ),
       ),
     ]
@@ -542,7 +585,7 @@ async function getLayoutScanResult(
       overlapIssues: overlapIssues.slice(0, 10),
       undersizedInteractiveElements: undersizedInteractiveElements.slice(0, 10),
     }
-  }, sectionId)
+  }, scopeId)
 }
 
 async function openSectionForLayout(
@@ -612,13 +655,13 @@ async function expectSectionSnapshot(
 
 async function expectSoundLayout(
   page: Page,
-  sectionId: FinanceSectionId,
-  view: string = sectionId,
+  scopeId: FinanceSectionId | ShellScope,
+  view: string = scopeId,
 ): Promise<void> {
   await page.evaluate(async () => {
     await document.fonts.ready
   })
-  const scan = await getLayoutScanResult(page, sectionId)
+  const scan = await getLayoutScanResult(page, scopeId)
   expect(scan.hasViewportHorizontalOverflow, JSON.stringify(scan)).toBe(false)
   expect(scan.overlapIssues).toEqual([])
   if (!KNOWN_UNDERSIZED_TARGETS.has(view)) {
@@ -1067,6 +1110,58 @@ test.describe('Datos · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'data', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of SHELL_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await tracker.goto()
+      await view.open(page, tracker)
+      await expectSoundLayout(page, view.scope, view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of SHELL_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en la navegación (escritorio)', async ({ tracker, page }) => {
+      await tracker.goto()
+      await expectSoundLayout(page, 'nav-tabs', 'shell')
+    })
+
+    for (const view of SHELL_DESKTOP_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await tracker.goto()
+        await view.open(page, tracker)
+        await expectSoundLayout(page, view.scope, view.name)
       })
     }
   })

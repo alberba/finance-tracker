@@ -16,6 +16,10 @@
 /* `dark:` follows the app theme attribute, not prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
+/* `sidebar-collapsed:` applies while the desktop sidebar is collapsed
+   (`data-sidebar` on <html>: the pre-paint script, then scripts/shell.ts). */
+@custom-variant sidebar-collapsed (&:where([data-sidebar=collapsed] *));
+
 /*
   Theme tokens — "Aurora Ledger". Light is the default; dark applies under
   :root[data-theme='dark'] (set before paint). The @theme blocks below expose
@@ -88,10 +92,10 @@
     --overlay: rgba(11, 17, 32, 0.5);
     --ring: color-mix(in srgb, var(--primary) 26%, transparent);
 
-    /* Aurora backdrop accents */
-    --aurora-1: rgba(59, 107, 240, 0.16);
-    --aurora-2: rgba(106, 82, 232, 0.13);
-    --aurora-3: rgba(14, 159, 110, 0.1);
+    /* Notice band (demo mode): a warm strip for the one thing out of the ordinary. */
+    --notice-bg: #fdf1dc;
+    --notice-line: #f3c98b;
+    --notice-text: #8a4b06;
 
     /* Charts */
     --chart-axis: #7c8798;
@@ -159,9 +163,9 @@
     --overlay: rgba(0, 0, 0, 0.62);
     --ring: color-mix(in srgb, var(--primary) 40%, transparent);
 
-    --aurora-1: rgba(94, 139, 255, 0.16);
-    --aurora-2: rgba(167, 139, 250, 0.14);
-    --aurora-3: rgba(52, 211, 153, 0.1);
+    --notice-bg: #3a2a12;
+    --notice-line: #6b4a1c;
+    --notice-text: #f4c27a;
 
     --chart-axis: #8a93a3;
     --chart-grid: #21252e;
@@ -188,6 +192,10 @@
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
+
+  /* Shell breakpoint: sidebar from here up, app bar and bottom nav below
+     (legacy.css still hides the report launcher at max-width 980px). */
+  --breakpoint-desk: 61.3125rem;
 
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
   --animate-panel-in: panelIn 0.26s ease;
@@ -217,6 +225,12 @@
   --color-ink-muted: var(--ink-muted);
   --color-ink-gain: var(--ink-gain);
   --color-ink-loss: var(--ink-loss);
+  --color-sidebar: var(--bg-sidebar);
+
+  /* Notice band: demo mode. */
+  --color-notice: var(--notice-bg);
+  --color-notice-line: var(--notice-line);
+  --color-notice-text: var(--notice-text);
 
   /* Rules and borders. */
   --color-line: var(--line);

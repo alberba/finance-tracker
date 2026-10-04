@@ -1,10 +1,10 @@
 import { type State } from "../types";
 import { setPendingChanges, type ServerSaveResult } from "../state";
+import { showToast as showShellToast } from "../toast";
 
 interface AppStateFormatHelpersDeps {
   getState: () => State;
   saveStatusEl: HTMLElement;
-  toastEl: HTMLElement;
   persistState: (state: State) => void;
   persistServerState: (state: State) => Promise<ServerSaveResult>;
   sortTransactionsInState: (state: State) => void;
@@ -16,8 +16,6 @@ const RETRY_BASE_MS = 2000;
 const RETRY_MAX_MS = 30000;
 
 export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
-  let toastTimer: number | undefined;
-
   // Server sync is coalesced: a full-state PUT is idempotent, so while one is in
   // flight we only remember that another is due and fire a single follow-up.
   let syncing = false;
@@ -102,12 +100,7 @@ export function setupAppStateFormatHelpers(deps: AppStateFormatHelpersDeps) {
   }
 
   function showToast(message: unknown) {
-    deps.toastEl.textContent = String(message);
-    deps.toastEl.classList.add("show");
-    window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => {
-      deps.toastEl.classList.remove("show");
-    }, 2200);
+    showShellToast(String(message));
   }
 
   function formatMoney(value: unknown) {

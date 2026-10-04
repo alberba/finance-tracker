@@ -1,76 +1,107 @@
-<div id="sidebar-user-menu-root" class="sidebar-account">
+<div id="sidebar-user-menu-root" class="relative w-full">
   <button
     id="sidebar-user-menu-toggle"
-    class="sidebar-footer"
+    class="group text-ink-muted hover:bg-ink-text/6 aria-expanded:bg-ink-text/6 focus-visible:outline-primary sidebar-collapsed:min-h-11 sidebar-collapsed:justify-center sidebar-collapsed:px-0 flex min-h-13 w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
     type="button"
     aria-label="Abrir menú de usuario"
     aria-haspopup="menu"
     aria-expanded="false"
     aria-controls="sidebar-user-menu"
   >
-    <span class="sidebar-user-avatar" aria-hidden="true">U</span>
-    <span class="sidebar-user-text">
-      <span id="sidebar-user-email" class="sidebar-user-name">Usuario</span>
-      <span id="save-status" class="sidebar-footer-text sidebar-user-status"> Sincronizado </span>
+    <span
+      class="bg-ink-text/10 text-ink-text font-display grid size-8.5 shrink-0 place-items-center rounded-full text-sm font-bold"
+      aria-hidden="true">U</span
+    >
+    <span class="sidebar-collapsed:hidden grid min-w-0 flex-1 gap-0.5">
+      <span id="sidebar-user-email" class="text-ink-text truncate text-sm font-semibold"
+        >Usuario</span
+      >
+      <span id="save-status" class="truncate text-xs"> Sincronizado </span>
     </span>
     <svg
-      class="sidebar-user-chevron"
+      class="sidebar-collapsed:hidden size-4 shrink-0 transition-transform group-aria-expanded:rotate-180"
       viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      stroke-width="1.7"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
       aria-hidden="true"
     >
-      <path d="M7 8l3 3 3-3"></path>
+      <path d="M7 12l3-3 3 3"></path>
     </svg>
   </button>
 
   <div
     id="sidebar-user-menu"
-    class="sidebar-account-menu"
+    class="bg-panel text-text-main border-line shadow-pop animate-panel-in sidebar-collapsed:bottom-0 sidebar-collapsed:left-[calc(100%+0.75rem)] sidebar-collapsed:mb-0 absolute bottom-full left-0 z-30 mb-2 w-67 overflow-hidden rounded-lg border"
     role="menu"
     aria-label="Menú de usuario"
     hidden
   >
-    <span id="sidebar-sync-status" class="sidebar-account-menu-kicker" data-sync-status hidden>
+    <span
+      id="sidebar-sync-status"
+      class="text-text-muted border-line block border-b px-3.5 py-3 text-sm"
+      data-sync-status
+      hidden
+    >
       Sincronizado
     </span>
-    <span class="sidebar-account-menu-kicker">Privacidad</span>
+    <span
+      class="text-text-muted block px-3.5 pt-3 pb-1 font-mono text-[0.6875rem] tracking-[0.16em] uppercase"
+      >Privacidad</span
+    >
     <button
       id="demo-mode-menu-action"
-      class="sidebar-account-menu-action"
+      class="hover:bg-subtle focus-visible:bg-subtle flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition-colors focus-visible:outline-none"
       data-demo-mode-action
       type="button"
       role="menuitem"
     >
-      <span class="sidebar-account-menu-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-          <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
-          <circle cx="10" cy="10" r="2.1"></circle>
-        </svg>
-      </span>
-      <span class="sidebar-account-menu-copy">
-        <span class="demo-mode-action-label">Activar modo demo</span>
-        <span class="demo-mode-action-description">Usar únicamente datos ficticios</span>
+      <svg
+        class="text-text-muted mt-0.5 size-4.5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M2.5 10s2.7-4.5 7.5-4.5 7.5 4.5 7.5 4.5-2.7 4.5-7.5 4.5S2.5 10 2.5 10z"></path>
+        <circle cx="10" cy="10" r="2.1"></circle>
+      </svg>
+      <span class="grid gap-0.5">
+        <span class="text-[0.9375rem] font-semibold" data-demo-mode-label>Activar modo demo</span>
+        <span class="text-text-muted text-sm" data-demo-mode-description
+          >Usar únicamente datos ficticios</span
+        >
       </span>
     </button>
     <button
       id="sidebar-logout-action"
-      class="sidebar-account-menu-action"
+      class="hover:bg-subtle focus-visible:bg-subtle border-line flex w-full items-start gap-3 border-t px-3.5 pt-2.5 pb-3 text-left transition-colors focus-visible:outline-none"
       data-logout-action
       type="button"
       role="menuitem"
     >
-      <span class="sidebar-account-menu-icon" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
-          <path d="M7.5 2.5h-3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h3"></path>
-          <path d="M13 14l4-4-4-4"></path>
-          <path d="M17 10H7.5"></path>
-        </svg>
-      </span>
-      <span class="sidebar-account-menu-copy">
-        <span>Cerrar sesión</span>
-        <span class="demo-mode-action-description">Borra la caché local de este dispositivo</span>
+      <svg
+        class="text-text-muted mt-0.5 size-4.5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M7.5 2.5h-3a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h3"></path>
+        <path d="M13 14l4-4-4-4"></path>
+        <path d="M17 10H7.5"></path>
+      </svg>
+      <span class="grid gap-0.5">
+        <span class="text-[0.9375rem] font-semibold">Cerrar sesión</span>
+        <span class="text-text-muted text-sm">Borra la caché local de este dispositivo</span>
       </span>
     </button>
   </div>
