@@ -107,6 +107,13 @@ test.describe('suscripciones de gastos', () => {
     await expect(toggle).not.toBeChecked()
     await expect(row).toContainText('Pausada')
     await row.getByRole('button', { name: 'Eliminar la suscripción E2E Pausable' }).click()
+    const dialog = page.getByRole('alertdialog', { name: '¿Eliminar esta suscripción?' })
+    await expect(dialog).toContainText('E2E Pausable')
+    await dialog.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(dialog).toBeHidden()
+    await expect(row).toHaveCount(1)
+    await row.getByRole('button', { name: 'Eliminar la suscripción E2E Pausable' }).click()
+    await dialog.getByRole('button', { name: 'Eliminar suscripción' }).click()
     await expect(page.getByRole('status')).toContainText('gastos ya creados se conservan')
     await expect(row).toHaveCount(0)
 

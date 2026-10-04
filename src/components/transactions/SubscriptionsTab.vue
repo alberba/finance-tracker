@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import AllocationBar from '../ui/AllocationBar.vue'
-import BaseButton from '../ui/BaseButton.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import DocumentSurface from '../ui/DocumentSurface.vue'
 import FigureStrip from '../ui/FigureStrip.vue'
 import IconButton from '../ui/IconButton.vue'
@@ -32,6 +32,17 @@ const FREQUENCY_LABEL: Record<SubscriptionFrequency, string> = {
 }
 
 const subscriptions = computed(() => movementsStore.subscriptions)
+const pendingDelete = ref<Subscription | null>(null)
+const confirmOpen = computed({
+  get: () => pendingDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingDelete.value = null
+  },
+})
+
+function confirmDelete(): void {
+  if (pendingDelete.value) movementsStore.deleteSubscription(pendingDelete.value.id)
+}
 const analysis = computed(() => buildSubscriptionAnalysis(subscriptions.value, todayISO()))
 
 function inDays(days: number): string {
@@ -147,19 +158,13 @@ const upcomingSummary = computed(() => {
             />
           </template>
           <template #cell-actions="{ row }">
-            <span class="flex items-center justify-end gap-1">
-              <BaseButton
-                variant="ghost"
-                :aria-label="`Editar ${row.name}`"
-                @click="emit('edit', row)"
-              >
-                Editar
-              </BaseButton>
+            <span class="flex justify-end">
+              <IconButton icon="edit" :label="`Editar ${row.name}`" @click="emit('edit', row)" />
               <IconButton
                 icon="trash"
                 tone="danger"
                 :label="`Eliminar la suscripción ${row.name}`"
-                @click="movementsStore.deleteSubscription(row.id)"
+                @click="pendingDelete = row"
               />
             </span>
           </template>
@@ -240,5 +245,18 @@ const upcomingSummary = computed(() => {
         </NumberedBlock>
       </div>
     </DocumentSurface>
+
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      title="¿Eliminar esta suscripción?"
+      title-id="subscription-delete-title"
+      confirm-label="Eliminar suscripción"
+      @confirm="confirmDelete"
+    >
+      <template v-if="pendingDelete">
+        {{ pendingDelete.name }} de {{ formatMoney(pendingDelete.amount) }}. Deja de apuntar cobros;
+        los gastos ya creados se conservan. Si solo quieres detenerla, páusala.
+      </template>
+    </ConfirmDialog>
   </div>
 </template>

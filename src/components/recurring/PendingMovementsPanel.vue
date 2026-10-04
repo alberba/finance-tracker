@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 
 import PendingEditPanel from './PendingEditPanel.vue'
 import BaseButton from '../ui/BaseButton.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { TONE_TEXT } from '../ui/tone'
@@ -15,13 +16,25 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
 // Pending movements from recurring rules: the review block of the Movimientos
-// registry, where each one is confirmed, skipped, edited or cancelled.
+// registry, where each one is confirmed, skipped, edited or discarded (the
+// store's cancelled status; "Cancelar" would clash with the dialog's button).
 
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
 const { formatSignedMoney } = useMoneyFormatter()
 const editPanel = useTemplateRef<InstanceType<typeof PendingEditPanel>>('editPanel')
 const pending = computed(() => recurringStore.openPendingMovements)
+const pendingCancel = ref<PendingMovement | null>(null)
+const confirmOpen = computed({
+  get: () => pendingCancel.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingCancel.value = null
+  },
+})
+
+function confirmCancel(): void {
+  if (pendingCancel.value) recurringStore.cancelPending(pendingCancel.value.id)
+}
 
 const accountNames = computed(
   () =>
@@ -53,7 +66,6 @@ const columns: LedgerColumn<PendingMovement>[] = [
   { key: 'amount', label: 'Importe', align: 'right' },
   { key: 'actions', label: 'Acciones', align: 'right' },
 ]
-
 </script>
 
 <template>
@@ -92,7 +104,9 @@ const columns: LedgerColumn<PendingMovement>[] = [
       <template #cell-date="{ row }">
         <span class="grid gap-0.5">
           <span class="tabular-nums">{{ formatDayMonth(row.occurrenceDate) }}</span>
-          <span class="text-text-muted text-xs">{{ formatDueLabel(row.occurrenceDate, todayISO()) }}</span>
+          <span class="text-text-muted text-xs">{{
+            formatDueLabel(row.occurrenceDate, todayISO())
+          }}</span>
         </span>
       </template>
       <template #cell-movement="{ row }">
@@ -133,12 +147,25 @@ const columns: LedgerColumn<PendingMovement>[] = [
           <IconButton
             icon="trash"
             tone="danger"
-            :label="`Cancelar el pendiente ${row.description}`"
-            @click="recurringStore.cancelPending(row.id)"
+            :label="`Descartar el pendiente ${row.description}`"
+            @click="pendingCancel = row"
           />
         </span>
       </template>
     </LedgerTable>
     <PendingEditPanel ref="editPanel" />
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      title="¿Descartar este pendiente?"
+      title-id="pending-cancel-title"
+      confirm-label="Descartar pendiente"
+      @confirm="confirmCancel"
+    >
+      <template v-if="pendingCancel">
+        {{ pendingCancel.description }} del {{ formatDayMonth(pendingCancel.occurrenceDate) }} por
+        {{ formatSignedMoney(signedAmount(pendingCancel)) }}. No se apunta en el Registro ni vuelve
+        a aparecer; la regla sigue con los próximos vencimientos.
+      </template>
+    </ConfirmDialog>
   </section>
 </template>

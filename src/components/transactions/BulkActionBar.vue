@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
 import { TYPE_OPTIONS } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
@@ -22,6 +23,24 @@ const count = computed(() => movementsStore.selectedTransactions.length)
 const countLabel = computed(
   () => `${count.value} ${count.value === 1 ? 'seleccionado' : 'seleccionados'}`,
 )
+
+// The confirmation keeps the figures it opened with: deleting empties the
+// selection while the dialog is still closing.
+const pendingDelete = ref<{ count: number; sum: number } | null>(null)
+const confirmOpen = computed({
+  get: () => pendingDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingDelete.value = null
+  },
+})
+const deleteLabel = computed(() => {
+  const total = pendingDelete.value?.count ?? 0
+  return `${total} ${total === 1 ? 'movimiento' : 'movimientos'}`
+})
+
+function requestDelete(): void {
+  pendingDelete.value = { count: count.value, sum: movementsStore.selectedSum }
+}
 
 // The empty first option means "leave as it is"; its short text fits on a phone.
 const typeOptions = [{ value: '', label: 'Tipo' }, ...TYPE_OPTIONS]
@@ -121,10 +140,23 @@ function close(): void {
         id="tx-bulk-delete"
         variant="ink-danger"
         :disabled="!count"
-        @click="movementsStore.deleteSelected()"
+        @click="requestDelete"
       >
         Eliminar
       </BaseButton>
     </div>
   </div>
+  <!-- Outside the bar: deleting empties the selection and hides it. -->
+  <ConfirmDialog
+    v-model:open="confirmOpen"
+    :title="`¿Eliminar ${deleteLabel}?`"
+    title-id="tx-bulk-delete-title"
+    :confirm-label="`Eliminar ${deleteLabel}`"
+    @confirm="movementsStore.deleteSelected()"
+  >
+    <template v-if="pendingDelete">
+      {{ pendingDelete.count === 1 ? 'El seleccionado suma' : 'Los seleccionados suman' }}
+      {{ formatSignedMoney(pendingDelete.sum) }}. No se puede deshacer.
+    </template>
+  </ConfirmDialog>
 </template>

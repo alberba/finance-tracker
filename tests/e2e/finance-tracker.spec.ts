@@ -457,9 +457,41 @@ test.describe("Finance tracker E2E", () => {
       tracker.transactionRows.filter({ hasText: "📈 Fondos Indexados" }),
     ).toHaveCount(2);
 
-    await tracker.deleteSelectedTransactions();
+    await tracker.deleteSelectedTransactions(2);
     await expect(tracker.transactionRows).toHaveCount(0);
     await expect(tracker.bulkActionBar).toHaveCount(0);
+    await tracker.clearTransactionFilters();
+  });
+
+  test("eliminar un movimiento pide confirmación y Cancelar lo conserva", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.addCustomTransaction({
+      date: "2026-03-13",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 13,
+      description: "e2e-borrar",
+    });
+    await tracker.filterTransactionsMonth("MARZO");
+    await tracker.setTransactionDescriptionFilter("e2e-borrar");
+    const row = tracker.transactionRow("e2e-borrar");
+    const remove = row.getByRole("button", { name: "Eliminar e2e-borrar del 13 mar" });
+    const dialog = page.getByRole("alertdialog", { name: "¿Eliminar este movimiento?" });
+
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("e2e-borrar del 13 mar");
+    await dialog.getByRole("button", { name: "Cancelar" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(row).toBeVisible();
+
+    await remove.click();
+    await dialog.getByRole("button", { name: "Eliminar movimiento" }).click();
+    await expect(page.getByRole("status")).toContainText("Movimiento eliminado.");
+    await expect(tracker.transactionRows).toHaveCount(0);
     await tracker.clearTransactionFilters();
   });
 

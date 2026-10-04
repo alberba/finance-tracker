@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 
 import EmojiPickerPanel from './EmojiPickerPanel.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
+import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
 import type { CategoryTagViewModel } from '../../domain/settings/view-model'
 import type { CategoryKey } from '../../scripts/types'
@@ -22,6 +23,17 @@ const settingsStore = useSettingsStore()
 const name = ref('')
 const openPickerFor = ref<string | null>(null)
 const root = useTemplateRef<HTMLElement>('root')
+const pendingDelete = ref<string | null>(null)
+const confirmOpen = computed({
+  get: () => pendingDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) pendingDelete.value = null
+  },
+})
+
+function confirmDelete(): void {
+  if (pendingDelete.value) settingsStore.removeCategory(props.categoryKey, pendingDelete.value)
+}
 
 function add(): void {
   if (settingsStore.addCategory(props.categoryKey, name.value)) name.value = ''
@@ -105,7 +117,7 @@ onBeforeUnmount(() => {
             icon="trash"
             tone="danger"
             :label="`Eliminar categoría ${tag.name}`"
-            @click="settingsStore.removeCategory(categoryKey, tag.name)"
+            @click="pendingDelete = tag.name"
           />
         </span>
         <EmojiPickerPanel
@@ -136,5 +148,16 @@ onBeforeUnmount(() => {
       />
       <BaseButton type="submit">Añadir</BaseButton>
     </form>
+    <ConfirmDialog
+      v-model:open="confirmOpen"
+      title="¿Eliminar esta categoría?"
+      :title-id="`settings-category-delete-title-${categoryKey}`"
+      confirm-label="Eliminar categoría"
+      @confirm="confirmDelete"
+    >
+      <template v-if="pendingDelete">
+        {{ pendingDelete }} deja de aparecer al elegir categoría y pierde su emoji.
+      </template>
+    </ConfirmDialog>
   </section>
 </template>
