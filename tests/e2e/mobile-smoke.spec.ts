@@ -211,4 +211,33 @@ test.describe('Mobile smoke', () => {
     await banner.getByRole('button', { name: 'Salir' }).click()
     await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')
   })
+
+  test.describe('Presupuesto', () => {
+    // 3 October 2026: October is the month in progress.
+    test.use({ fixedTime: '2026-10-03T12:00:00' })
+
+    test('deja el mes en curso y oculta los demás en lugar de desplazarse de lado', async ({
+      tracker,
+    }) => {
+      await tracker.openBudget()
+      const table = tracker.budgetSection.getByRole('table', { name: 'Gastos por categoría y mes' })
+      await expect(table.getByRole('columnheader')).toHaveText(['Categoría', /Octubre\s*en curso/])
+
+      await tracker.selectBudgetRange('12')
+      await expect(table.getByRole('columnheader')).toHaveText([
+        'Categoría',
+        /Oct\s*en curso/,
+        /Desvío/,
+      ])
+      const fits = await table.evaluate((element) => {
+        const scroller = element.parentElement!
+        return scroller.scrollWidth <= scroller.clientWidth + 1
+      })
+      expect(fits).toBe(true)
+      await expect(tracker.budgetSection.getByRole('textbox')).toHaveCount(0)
+
+      const panel = await tracker.openBudgetPlan('Ocio')
+      await expect(panel.getByRole('textbox', { name: 'Octubre' })).toBeVisible()
+    })
+  })
 })
