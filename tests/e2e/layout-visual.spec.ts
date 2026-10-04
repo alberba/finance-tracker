@@ -534,6 +534,10 @@ async function expectViewSnapshot(
 ): Promise<void> {
   await page.clock.setFixedTime(SNAPSHOT_NOW)
   await tracker.goto()
+  // Tab scrolling must use the same font metrics as the captured screenshot.
+  if (/^page-settings-(recurring|preferences)/.test(name)) {
+    await page.addStyleTag({ path: './tests/e2e/screenshot-stable.css' })
+  }
   await open()
   await page.evaluate(async (selector) => {
     await document.fonts.ready

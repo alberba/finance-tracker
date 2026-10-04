@@ -24,6 +24,26 @@ async function editState(page: Page, edit: (state: StoredState) => void) {
 
 test.describe('Settings E2E', () => {
   test(
+    'abre los ajustes del proveedor desde Conexiones y devuelve el foco al cerrar',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      await tracker.openSettingsTab('Conexiones')
+      const connections = tracker
+        .section('settings')
+        .getByRole('region', { name: 'Conexiones', exact: true })
+      const stockEvents = connections.getByRole('button', { name: 'Stock Events', exact: true })
+      await expect(stockEvents).toBeVisible()
+      await stockEvents.click()
+      const panel = page.getByRole('dialog', { name: 'Stock Events', exact: true })
+      await expect(panel).toBeVisible()
+      await expect(panel.getByLabel('API key', { exact: true })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(panel).toBeHidden()
+      await expect(stockEvents).toBeFocused()
+    },
+  )
+
+  test(
     'muestra Configuración por entidades, con pestañas y contadores',
     { tag: '@smoke' },
     async ({ page, tracker }) => {

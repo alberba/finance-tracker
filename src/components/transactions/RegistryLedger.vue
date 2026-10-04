@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+import PillTag from '../ui/PillTag.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTable.vue'
@@ -175,6 +176,7 @@ const emptyText = computed(() =>
           type="checkbox"
           class="accent-primary size-4.5"
           :data-select-tx-id="row.id"
+          :disabled="Boolean(row.remoteOperation)"
           :checked="isSelected(row)"
           :aria-label="`Seleccionar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
           @change="movementsStore.setSelected(row.id, ($event.target as HTMLInputElement).checked)"
@@ -191,17 +193,24 @@ const emptyText = computed(() =>
         <button
           type="button"
           class="grid min-h-11 w-full min-w-0 gap-0.5 text-left sm:hidden"
+          :disabled="Boolean(row.remoteOperation)"
           :aria-label="`Editar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
           @click="emit('edit', row)"
         >
-          <span class="font-semibold">{{ row.description || row.category || '—' }}</span>
+          <span class="font-semibold"
+            >{{ row.description || row.category || '—' }}
+            <PillTag v-if="row.remoteOperation">Bitvavo</PillTag></span
+          >
           <span class="text-text-muted text-sm">
             {{ formatDayMonth(row.date) }} ·
             {{ decorateCategoryLabel(row.type, row.category, movementsStore.categoryEmojis) }}
           </span>
         </button>
         <span class="hidden min-w-0 gap-0.5 sm:grid">
-          <span class="font-semibold">{{ row.description || row.category || '—' }}</span>
+          <span class="font-semibold"
+            >{{ row.description || row.category || '—' }}
+            <PillTag v-if="row.remoteOperation">Bitvavo</PillTag></span
+          >
           <span class="text-text-muted flex items-center gap-1.5 text-sm">
             <span
               class="size-2 shrink-0 rounded-full"
@@ -229,11 +238,13 @@ const emptyText = computed(() =>
       <template #cell-actions="{ row }">
         <span class="flex justify-end">
           <IconButton
+            v-if="!row.remoteOperation"
             icon="edit"
             :label="`Editar ${row.description || row.category} del ${formatDayMonth(row.date)}`"
             @click="emit('edit', row)"
           />
           <IconButton
+            v-if="!row.remoteOperation"
             icon="trash"
             tone="danger"
             :label="`Eliminar ${row.description || row.category} del ${formatDayMonth(row.date)}`"

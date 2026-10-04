@@ -14,6 +14,7 @@ export default defineConfig(
     fullyParallel: false,
     workers: 1,
     testMatch: [
+      'bitvavo.spec.ts',
       'multi-user-isolation.spec.ts',
       'offline-sync.spec.ts',
       'subscription-charges.spec.ts',

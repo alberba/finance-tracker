@@ -3,7 +3,12 @@ import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
-import { resolveCategoryId, resolveEntityId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
+import {
+  resolveCategoryId,
+  resolveEntityId,
+  syncListDiff,
+  type CategoryKind,
+} from '../lib/client/command-mapping'
 import {
   buildMonthGroups,
   categoryBreakdown,
@@ -158,14 +163,13 @@ export const useMovementsStore = defineStore('movements', () => {
   const visibleTransactions = computed(() => monthGroups.value.flatMap((group) => group.rows))
 
   /** Movements of the selected year, whatever the filters (the tab's count). */
-  const yearCount = computed(
-    () =>
-      buildMonthGroups(
-        financialStateStore.transactions,
-        ui.txYear,
-        { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
-        ui.txSort,
-      ).reduce((sum, group) => sum + group.count, 0),
+  const yearCount = computed(() =>
+    buildMonthGroups(
+      financialStateStore.transactions,
+      ui.txYear,
+      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      ui.txSort,
+    ).reduce((sum, group) => sum + group.count, 0),
   )
 
   /** Totals of the month the ink band shows. */
@@ -295,6 +299,7 @@ export const useMovementsStore = defineStore('movements', () => {
   }
 
   function saveEdit(id: string, fields: EditedTransactionInput): boolean {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return false
     const date = fields.date.trim()
     const accountId = fields.accountId.trim()
     const type = fields.type.trim()
@@ -334,6 +339,7 @@ export const useMovementsStore = defineStore('movements', () => {
   }
 
   function deleteTransaction(id: string): void {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
@@ -369,7 +375,7 @@ export const useMovementsStore = defineStore('movements', () => {
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions.forEach((item) => {
-        if (!selectedIds.has(item.id)) {
+        if (item.remoteOperation || !selectedIds.has(item.id)) {
           return
         }
         updated += 1
@@ -400,7 +406,9 @@ export const useMovementsStore = defineStore('movements', () => {
     const removed = selectedIds.size
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
-      draft.transactions = draft.transactions.filter((item) => !selectedIds.has(item.id))
+      draft.transactions = draft.transactions.filter(
+        (item) => item.remoteOperation || !selectedIds.has(item.id),
+      )
     })
     void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
       buildTransactionData(tx, financialStateStore.currency),
@@ -433,7 +441,13 @@ export const useMovementsStore = defineStore('movements', () => {
 
   function addSubscription(input: NewSubscriptionInput): boolean {
     const name = input.name.trim()
-    if (!name || input.amount <= 0 || !input.accountId || !input.category || !input.firstChargeDate) {
+    if (
+      !name ||
+      input.amount <= 0 ||
+      !input.accountId ||
+      !input.category ||
+      !input.firstChargeDate
+    ) {
       showToast('Completa nombre, cuenta, categoría, fecha e importe válido.')
       return false
     }
@@ -457,8 +471,11 @@ export const useMovementsStore = defineStore('movements', () => {
       draft.subscriptions.push(subscription)
       generatedCount = materializeDueSubscriptions(draft, todayISO()).generatedCount
     })
-    void syncListDiff('subscription', beforeSubscriptions, financialStateStore.subscriptions, (subscription) =>
-      buildSubscriptionData(subscription, financialStateStore.currency),
+    void syncListDiff(
+      'subscription',
+      beforeSubscriptions,
+      financialStateStore.subscriptions,
+      (subscription) => buildSubscriptionData(subscription, financialStateStore.currency),
     )
     // `materializeDueSubscriptions` may also push already-due charges as
     // ordinary transactions in the same commit — diff those too.

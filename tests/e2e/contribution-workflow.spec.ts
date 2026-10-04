@@ -78,10 +78,9 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ABRIL')
     await tracker.contributionWorkflowSetDate('2026-04-15')
-    const investmentInputs = await page
-      .getByRole('spinbutton', { name: /^Snapshot inversión / })
-      .all()
-    for (const input of investmentInputs) {
+    const investmentInputs = page.getByRole('spinbutton', { name: /^Valor de / })
+    await expect(investmentInputs).not.toHaveCount(0)
+    for (const input of await investmentInputs.all()) {
       await input.fill('0')
     }
     await tracker.contributionWorkflowSetInvestmentSnapshot('Fondos Indexados', 13000)

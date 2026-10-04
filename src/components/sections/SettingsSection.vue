@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 
+import ConnectionsPanel from '../settings/ConnectionsPanel.vue'
 import SettingsAccountsTab from '../settings/SettingsAccountsTab.vue'
 import SettingsAssetsTab from '../settings/SettingsAssetsTab.vue'
 import SettingsCategoriesTab from '../settings/SettingsCategoriesTab.vue'
@@ -21,7 +22,7 @@ import { useStockEventsStore } from '../../stores/stockevents'
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 type SettingsTab =
-  'accounts' | 'assets' | 'liabilities' | 'categories' | 'recurring' | 'preferences'
+  'accounts' | 'assets' | 'liabilities' | 'categories' | 'recurring' | 'preferences' | 'connections'
 
 const financialStateStore = useFinancialStateStore()
 const recurringStore = useRecurringStore()
@@ -47,6 +48,7 @@ const tabs = computed<SectionTab[]>(() => {
       recurringStore.rules.filter((rule) => rule.type !== 'investment').length,
     ],
     ['preferences', 'Preferencias', null],
+    ['connections', 'Conexiones', null],
   ]
   return entries.map(([id, label, count]) => ({
     id,
@@ -101,6 +103,7 @@ onMounted(async () => {
       <SettingsCategoriesTab :is-active="activeTab === 'categories'" />
       <SettingsRecurringTab :is-active="activeTab === 'recurring'" />
       <SettingsPreferencesTab :is-active="activeTab === 'preferences'" />
+      <ConnectionsPanel :is-active="activeTab === 'connections'" />
     </div>
   </AppSection>
 </template>

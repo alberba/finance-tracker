@@ -99,6 +99,7 @@ function openNew(): void {
 }
 
 function openEdit(tx: Transaction): void {
+  if (tx.remoteOperation) return
   editingId.value = tx.id
   form.type = tx.type
   form.amount = formatDecimalInput(Number(tx.amount || 0))
