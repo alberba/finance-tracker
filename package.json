@@ -26,7 +26,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "lint": "eslint .",
-    "gate": "pnpm lint && pnpm check && pnpm test",
+    "gate": "pnpm check:deps && pnpm lint && pnpm check && pnpm test",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -44,7 +44,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:sync-v2": "playwright test --config playwright.sync-v2.config.ts",
     "test:e2e:bitvavo": "playwright test --config playwright.bitvavo.config.ts",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "test:e2e:shard": "tsx scripts/e2e-functional-shard.ts",
+    "check:deps": "node scripts/check-installed-dependencies.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

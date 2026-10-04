@@ -625,21 +625,14 @@ async function openSectionForLayout(
 }
 
 /** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
-const SNAPSHOT_NOW = new Date('2026-09-15T10:00:00+02:00')
+test.use({ snapshotTime: '2026-09-15T10:00:00+02:00' })
 
 async function expectViewSnapshot(
   page: Page,
-  tracker: FinanceTrackerPage,
   open: () => Promise<void>,
   name: string,
   focus?: string,
 ): Promise<void> {
-  await page.clock.setFixedTime(SNAPSHOT_NOW)
-  await tracker.goto()
-  // Scrolling (tabs, `focus`) must use the font metrics of the captured
-  // screenshot: with the remote fonts, the offset depends on whether they had
-  // loaded yet, and the capture lands a few pixels off from run to run.
-  await page.addStyleTag({ path: './tests/e2e/screenshot-stable.css' })
   await open()
   await page.evaluate(async (selector) => {
     await document.fonts.ready
@@ -675,12 +668,7 @@ async function expectSectionSnapshot(
   sectionId: FinanceSectionId,
   name: string,
 ): Promise<void> {
-  await expectViewSnapshot(
-    page,
-    tracker,
-    () => openSectionForLayout(page, tracker, sectionId),
-    name,
-  )
+  await expectViewSnapshot(page, () => openSectionForLayout(page, tracker, sectionId), name)
 }
 
 async function expectSoundLayout(
@@ -710,9 +698,13 @@ test.describe('UI layout integrity', { tag: '@visual' }, () => {
       await expectSoundLayout(page, sectionId)
     })
 
-    test(`snapshot visual estable en "${sectionId}"`, async ({ tracker, page }) => {
-      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}.png`)
-    })
+    test(
+      `snapshot visual estable en "${sectionId}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}.png`)
+      },
+    )
   }
 })
 
@@ -722,10 +714,14 @@ test.describe('UI layout integrity · tema oscuro', { tag: '@visual' }, () => {
   test.use({ colorScheme: 'dark' })
 
   for (const sectionId of SECTION_IDS) {
-    test(`snapshot visual estable en "${sectionId}" (oscuro)`, async ({ tracker, page }) => {
-      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-      await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}-dark.png`)
-    })
+    test(
+      `snapshot visual estable en "${sectionId}" (oscuro)`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectSectionSnapshot(page, tracker, sectionId, `page-${sectionId}-dark.png`)
+      },
+    )
   }
 })
 
@@ -736,31 +732,37 @@ test.describe('Inversión · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'investment', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of INVESTMENT_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -788,31 +790,37 @@ test.describe('Dashboard · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'dashboard', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of DASHBOARD_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -840,31 +848,37 @@ test.describe('Patrimonio · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'wealth', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of WEALTH_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -892,31 +906,37 @@ test.describe('Presupuesto · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'budget', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of BUDGET_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -944,31 +964,37 @@ test.describe('Objetivos · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'goals', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of GOALS_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -996,31 +1022,37 @@ test.describe('Configuración · vistas secundarias', { tag: '@visual' }, () => 
       await expectSoundLayout(page, 'settings', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of SETTINGS_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -1048,29 +1080,31 @@ test.describe('Movimientos · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'transactions', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(page, () => view.open(page, tracker), `page-${view.name}.png`)
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of TRANSACTION_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+          )
+        },
+      )
     }
   })
 
@@ -1098,31 +1132,37 @@ test.describe('Datos · vistas secundarias', { tag: '@visual' }, () => {
       await expectSoundLayout(page, 'data', view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-        view.focus,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(
+          page,
+          () => view.open(page, tracker),
+          `page-${view.name}.png`,
+          view.focus,
+        )
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of DATA_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-          view.focus,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+            view.focus,
+          )
+        },
+      )
     }
   })
 
@@ -1146,34 +1186,35 @@ test.describe('Datos · vistas secundarias', { tag: '@visual' }, () => {
 test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
   for (const view of SHELL_VIEWS) {
     test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
-      await tracker.goto()
       await view.open(page, tracker)
       await expectSoundLayout(page, view.scope, view.name)
     })
 
-    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
-      await expectViewSnapshot(
-        page,
-        tracker,
-        () => view.open(page, tracker),
-        `page-${view.name}.png`,
-      )
-    })
+    test(
+      `snapshot visual estable en "${view.name}"`,
+      { tag: '@snapshot' },
+      async ({ tracker, page }) => {
+        await expectViewSnapshot(page, () => view.open(page, tracker), `page-${view.name}.png`)
+      },
+    )
   }
 
   test.describe('tema oscuro', () => {
     test.use({ colorScheme: 'dark' })
 
     for (const view of SHELL_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
-        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-dark.png`,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (oscuro)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-dark.png`,
+          )
+        },
+      )
     }
   })
 
@@ -1181,45 +1222,47 @@ test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
     test.use(DESKTOP)
 
     test('no rompe layout en la navegación (escritorio)', async ({ tracker, page }) => {
-      await tracker.goto()
+      await tracker.open('dashboard')
       await expectSoundLayout(page, 'nav-tabs', 'shell')
     })
 
     for (const view of SHELL_DESKTOP_VIEWS) {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
-        await tracker.goto()
         await view.open(page, tracker)
         await expectSoundLayout(page, view.scope, view.name)
       })
     }
 
     for (const view of SHELL_DESKTOP_VIEWS) {
-      test(`snapshot visual estable en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
-        await expectViewSnapshot(
-          page,
-          tracker,
-          () => view.open(page, tracker),
-          `page-${view.name}-desktop.png`,
-        )
-      })
+      test(
+        `snapshot visual estable en "${view.name}" (escritorio)`,
+        { tag: '@snapshot' },
+        async ({ tracker, page }) => {
+          await expectViewSnapshot(
+            page,
+            () => view.open(page, tracker),
+            `page-${view.name}-desktop.png`,
+          )
+        },
+      )
     }
 
     test.describe('tema oscuro', () => {
       test.use({ colorScheme: 'dark' })
 
       for (const view of SHELL_DESKTOP_VIEWS) {
-        test(`snapshot visual estable en "${view.name}" (escritorio, oscuro)`, async ({
-          tracker,
-          page,
-        }) => {
-          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-          await expectViewSnapshot(
-            page,
-            tracker,
-            () => view.open(page, tracker),
-            `page-${view.name}-desktop-dark.png`,
-          )
-        })
+        test(
+          `snapshot visual estable en "${view.name}" (escritorio, oscuro)`,
+          { tag: '@snapshot' },
+          async ({ tracker, page }) => {
+            await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+            await expectViewSnapshot(
+              page,
+              () => view.open(page, tracker),
+              `page-${view.name}-desktop-dark.png`,
+            )
+          },
+        )
       }
     })
   })
