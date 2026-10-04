@@ -22,11 +22,18 @@ const MOBILE_SECONDARY_SECTION_LABELS: Partial<Record<FinanceSectionId, string>>
 }
 
 /**
- * Sections and views whose touch targets were already under 24 px when the
- * scan started looking at the active section (it used to find none). The list
- * only shrinks: each zone's migration fixes its targets and removes its entry.
+ * Views whose touch targets were already under the minimum when the scan
+ * raised it to 44 px on mobile. The list only shrinks: each zone's rework
+ * fixes its targets and removes its entry. Budget: the "Planificar los doce
+ * meses" category buttons of the budget table (being rewritten).
  */
-const KNOWN_UNDERSIZED_TARGETS = new Set<string>([])
+const KNOWN_UNDERSIZED_TARGETS = new Set<string>([
+  'budget',
+  'budget-six-months',
+  'budget-year',
+  'budget-income',
+  'budget-plan-panel',
+])
 
 /** A monthly purchase, for the views that need one rule in the plan. */
 const RECURRING_RULE = {
@@ -561,26 +568,42 @@ async function getLayoutScanResult(page: Page, scopeId: string): Promise<LayoutS
       }
     }
 
-    const interactiveElements = Array.from(
-      activePanel.querySelectorAll<HTMLElement>(
-        "button, a[href], [role='button'], input:not([type='checkbox']):not([type='radio']), select",
-      ),
-    ).filter((element) => {
-      const styles = window.getComputedStyle(element)
-      if (styles.display === 'none' || styles.visibility === 'hidden') {
-        return false
-      }
-      const rect = element.getBoundingClientRect()
-      return rect.width > 0 && rect.height > 0
-    })
+    // Touch targets: 44 px below the `desk` breakpoint (story 59: the shell's
+    // mobile layout), WCAG 2.5.8's 24 px from there up, where the pointer is a
+    // mouse. A checkbox or radio is measured by its <label> when it has one:
+    // that is what the finger hits (FilterChip, ToggleSwitch hide the input).
+    // Exempt: hidden elements and links inside running text (WCAG's inline
+    // exception: their size follows the line, not the control).
+    const isDesktop = window.matchMedia('(min-width: 61.3125rem)').matches
+    const minTarget = isDesktop ? 24 : 44
+    const isInlineTextLink = (element: HTMLElement): boolean =>
+      element.matches('a') &&
+      element.parentElement?.closest('p, li') !== null &&
+      window.getComputedStyle(element).display === 'inline'
+    const targets = new Set<HTMLElement>()
+    for (const element of activePanel.querySelectorAll<HTMLElement>(
+      "button, a[href], [role='button'], input:not([type='hidden']), select, summary",
+    )) {
+      const target = element.matches("input[type='checkbox'], input[type='radio']")
+        ? (element.closest('label') ?? element)
+        : element
+      if (!isInlineTextLink(target)) targets.add(target)
+    }
 
-    for (const element of interactiveElements) {
-      const rect = element.getBoundingClientRect()
-      if (rect.width < 24 || rect.height < 24) {
+    for (const target of targets) {
+      const styles = window.getComputedStyle(target)
+      if (styles.display === 'none' || styles.visibility === 'hidden') continue
+      const rect = target.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) continue
+      if (rect.width < minTarget - 0.5 || rect.height < minTarget - 0.5) {
+        const name = target.id
+          ? `#${target.id}`
+          : target.getAttribute('aria-label') ||
+            target.querySelector('[aria-label]')?.getAttribute('aria-label') ||
+            target.textContent?.trim().slice(0, 30) ||
+            target.tagName.toLowerCase()
         undersizedInteractiveElements.push(
-          element.id
-            ? `#${element.id}`
-            : element.getAttribute('aria-label') || element.tagName.toLowerCase(),
+          `${name} (${Math.round(rect.width)}×${Math.round(rect.height)})`,
         )
       }
     }
