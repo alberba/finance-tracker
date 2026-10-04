@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { syncBatchSchema, syncCommandSchema } from "../../src/lib/server/sync/command-schemas";
+import {
+  entityCreateSchemas,
+  entityUpdateSchemas,
+  syncBatchSchema,
+  syncCommandSchema,
+} from "../../src/lib/server/sync/command-schemas";
 
 describe("syncCommandSchema", () => {
   it("accepts a valid create command", () => {
@@ -86,5 +91,45 @@ describe("syncBatchSchema", () => {
 
   it("rejects an empty batch", () => {
     expect(syncBatchSchema.safeParse({ commands: [] }).success).toBe(false);
+  });
+});
+
+describe("entityCreateSchemas / entityUpdateSchemas are strict (issue #138)", () => {
+  it("rejects a create payload carrying a field the entity doesn't declare", () => {
+    const result = entityCreateSchemas.account.safeParse({
+      name: "Cuenta",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+      bogusField: "no destino",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an update payload carrying a field the entity doesn't declare", () => {
+    const result = entityUpdateSchemas.account.safeParse({
+      name: "Nueva",
+      bogusField: "no destino",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("still accepts a payload using only declared fields", () => {
+    const result = entityCreateSchemas.transaction.safeParse({
+      accountId: "acc-1",
+      type: "expense",
+      date: "2026-01-01",
+      amount: 10,
+      currency: "EUR",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("keeps the narrower budgetEntry update schema strict too", () => {
+    const result = entityUpdateSchemas.budgetEntry.safeParse({
+      amount: 100,
+      categoryId: "not-allowed-here",
+    });
+    expect(result.success).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildPortfolioValuation } from '../../src/domain/investment/valuation'
 import { generatePendingMovements } from '../../src/domain/recurring/pending'
@@ -23,6 +23,10 @@ function stateWithRecurring(rule: RecurringRule): Pick<State, 'recurringRules' |
 }
 
 describe('reglas recurrentes y pendientes', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('calcula frecuencias, intervalos y fin de mes', () => {
     expect(getDueOccurrences(recurringRule({ frequency: 'daily', interval: 2, startDate: '2024-01-01', nextOccurrenceDate: '2024-01-01' }), '2024-01-06')).toEqual([
       '2024-01-01', '2024-01-03', '2024-01-05',
@@ -139,6 +143,88 @@ describe('reglas recurrentes y pendientes', () => {
     expect(financialStore.transactions[0].description).toBe('Alquiler editado')
     expect(financialStore.transactions[0].amount).toBe(925)
     expect(store.pendingCount).toBe(1)
+    vi.unstubAllGlobals()
+  })
+
+  it('edita un movimiento pendiente de inversión y permite reclasificar su tipo', () => {
+    setActivePinia(createPinia())
+    vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
+    const financialStore = useFinancialStateStore()
+    financialStore.replaceState({
+      year: 2024, currency: 'EUR',
+      accounts: [{ id: 'checking', name: 'Cuenta', openingBalance: 0 }],
+      investmentAssets: [{ id: 'broker-crypto', name: 'Binance', openingBalance: 0 }],
+      liabilities: [],
+      incomeCategories: [],
+      expenseCategories: ['Vivienda'],
+      investmentCategories: ['Cripto'],
+      transactions: [], snapshots: {}, budget: { income: {}, expense: {}, investment: {} }, goals: {}, contributions: [],
+      recurringRules: [],
+      pendingMovements: [
+        {
+          id: 'pm-exp',
+          occurrenceKey: 'rule-exp:2024-02-15',
+          ruleId: 'rule-exp',
+          occurrenceDate: '2024-02-15',
+          type: 'expense',
+          accountId: 'checking',
+          category: 'Vivienda',
+          description: 'Migrado sin tipo',
+          amount: 100,
+          status: 'pending',
+          createdAt: '2024-02-15T00:00:00.000Z',
+          updatedAt: '2024-02-15T00:00:00.000Z',
+          transactionId: null,
+        },
+      ],
+      instruments: [], quotes: {},
+    })
+    const store = useRecurringStore()
+    expect(store.pendingCount).toBe(1)
+
+    // Reclassify from expense to investment with investment account and operation fields
+    const ok = store.editPending('pm-exp', {
+      type: 'investment',
+      date: '2024-02-16',
+      accountId: 'broker-crypto',
+      category: 'Cripto',
+      description: 'Compra BTC',
+      amount: 500,
+      symbol: 'BTC',
+      side: 'buy',
+      units: 0.01,
+      unitPrice: 50000,
+      fee: 2.5,
+      time: '11:00',
+    })
+    expect(ok).toBe(true)
+
+    const edited = store.openPendingMovements[0]
+    expect(edited.type).toBe('investment')
+    expect(edited.accountId).toBe('broker-crypto')
+    expect(edited.category).toBe('Cripto')
+    expect(edited.symbol).toBe('BTC')
+    expect(edited.side).toBe('buy')
+    expect(edited.units).toBe(0.01)
+    expect(edited.unitPrice).toBe(50000)
+    expect(edited.fee).toBe(2.5)
+    expect(edited.time).toBe('11:00')
+    expect(edited.amount).toBe(502.5)
+
+    // Confirm the edited investment pending movement and verify transaction
+    expect(store.confirmPending('pm-exp')).toBe(true)
+    expect(financialStore.transactions).toHaveLength(1)
+    expect(financialStore.transactions[0]).toMatchObject({
+      type: 'investment',
+      accountId: 'broker-crypto',
+      category: 'Cripto',
+      symbol: 'BTC',
+      units: 0.01,
+      unitPrice: 50000,
+      fee: 2.5,
+      amount: 502.5,
+    })
+
     vi.unstubAllGlobals()
   })
   it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {

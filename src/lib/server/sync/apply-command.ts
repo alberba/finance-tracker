@@ -21,7 +21,8 @@
  * "repositories are the sole caller of Drizzle" design decision.
  */
 
-import { runInTransaction, type Db } from "../../../db/repositories/shared";
+import { assertOwnedReferences, RejectedCommandError, runInTransaction, type Db } from "../../../db/repositories/shared";
+import { fromMinorUnits } from "../../../lib/money";
 import * as accountsRepository from "../../../db/repositories/accounts";
 import * as transactionsRepository from "../../../db/repositories/transactions";
 import * as subscriptionsRepository from "../../../db/repositories/subscriptions";
@@ -33,16 +34,19 @@ import * as contributionsRepository from "../../../db/repositories/contributions
 import * as marketRepository from "../../../db/repositories/market";
 import * as wealthRepository from "../../../db/repositories/wealth";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
+import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as syncRepository from "../../../db/repositories/sync";
 import * as auditEventsRepository from "../../../db/repositories/audit-events";
 import {
-  entityCreateSchemas,
+  entityCreatePayloadSchemas,
   entityUpdateSchemas,
+  haltsBatch,
+  type CommandStatus,
   type SyncCommandInput,
   type SyncEntityType,
 } from "./command-schemas";
 
-export type CommandStatus = "applied" | "conflict" | "not_found" | "noop";
 const PROCESSING_LEASE_MS = 30_000;
 
 export interface CommandOutcome {
@@ -63,6 +67,25 @@ interface VersionedRow {
   [key: string]: unknown;
 }
 
+/** The `balances` nested inside a `wealthSnapshot` create/update payload — see `command-schemas.ts`. */
+interface WealthSnapshotBalancesField {
+  balances?: Omit<wealthRepository.CreateSnapshotBalanceInput, "snapshotId">[];
+}
+
+/** The `allocations` nested inside a `contribution` create/update payload — see `command-schemas.ts`. */
+interface ContributionAllocationsField {
+  allocations?: Omit<contributionsRepository.CreateContributionAllocationInput, "contributionId" | "currency">[];
+}
+
+/**
+ * Looks a row up by the identifier derived from its v1 data.
+ *
+ * The only remaining use of that identifier (ADR 0001): a `create` that
+ * carries no client-minted `id` — a row coming from the v1 migration, or a
+ * client that has not migrated that section yet — must reconcile against the
+ * row already there instead of duplicating it. Everything created from now on
+ * is found by its own `id` instead (`findByClientId`).
+ */
 async function findByLegacyId(
   db: Db,
   userId: string,
@@ -83,6 +106,11 @@ async function findByLegacyId(
     case "contribution": rows = await contributionsRepository.listByUser(db, userId) as VersionedRow[]; break;
     case "wealthSnapshot": rows = await wealthRepository.listByUser(db, userId) as VersionedRow[]; break;
     case "userInstrument": return undefined;
+    case "stockeventsMapping":
+      rows = await stockeventsSymbolMappingsRepository.listByUser(db, userId) as VersionedRow[];
+      break;
+    case "stockeventsCashEntry":
+      return undefined;
   }
   return rows.find((row) => row.legacyId === value);
 }
@@ -123,10 +151,35 @@ async function loadForMutation(
         | undefined;
     case "wealthSnapshot":
       return (await wealthRepository.get(db, userId, entityId)) as VersionedRow | undefined;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.get(db, userId, entityId)) as
+        | VersionedRow
+        | undefined;
+    case "stockeventsCashEntry": {
+      const entries = await stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId);
+      return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined;
+    }
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreateSchemas` before this is called.
+/**
+ * Looks up the row the client's own identity addresses (ADR 0001).
+ *
+ * Same lookup `loadForMutation` does — an entity carrying client identity is
+ * addressable by that id from its very first `create`, with no table of
+ * equivalences and no waiting for an ack.
+ */
+async function findByClientId(
+  db: Db,
+  userId: string,
+  entityType: SyncEntityType,
+  id: unknown,
+): Promise<VersionedRow | undefined> {
+  if (typeof id !== "string" || !id) return undefined;
+  return loadForMutation(db, userId, entityType, id);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreatePayloadSchemas` before this is called.
 async function createEntity(db: Db, userId: string, entityType: SyncEntityType, data: any): Promise<VersionedRow> {
   switch (entityType) {
     case "account":
@@ -145,12 +198,62 @@ async function createEntity(db: Db, userId: string, entityType: SyncEntityType, 
       return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow;
     case "goal":
       return (await goalsRepository.create(db, userId, data)) as VersionedRow;
-    case "contribution":
-      return (await contributionsRepository.create(db, userId, data)) as VersionedRow;
+    case "contribution": {
+      const { allocations, ...contributionInput } = data as contributionsRepository.CreateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.create(db, userId, contributionInput);
+      const allocationRows = allocations?.length
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : [];
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow;
-    case "wealthSnapshot":
-      return (await wealthRepository.create(db, userId, data)) as VersionedRow;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.create(db, userId, {
+        id: typeof data.id === "string" ? data.id : undefined,
+        legacyId: data.legacyId ?? null,
+        categoryId: data.categoryId ?? null,
+        stockeventsSymbol: String(data.stockeventsSymbol),
+        sync: data.sync === true,
+        watchlistId: typeof data.watchlistId === "string" && data.watchlistId ? data.watchlistId : null,
+        hidden: data.hidden === true,
+      })) as VersionedRow;
+    case "stockeventsCashEntry": {
+      const accountId = typeof data.accountId === "string" && data.accountId ? data.accountId : null;
+      if (accountId) {
+        await assertOwnedReferences(db, userId, { accountId });
+      }
+      const duplicate = await stockeventsCashMappingsRepository.findEntry(
+        db, userId, String(data.contributionDate), accountId, String(data.watchlistId),
+      );
+      if (duplicate) {
+        return {
+          ...duplicate,
+          syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
+        } as VersionedRow;
+      }
+      const entry = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+        id: typeof data.id === "string" ? data.id : undefined,
+        contributionDate: String(data.contributionDate),
+        accountId,
+        watchlistId: String(data.watchlistId),
+        syncedAmount: Number(data.syncedAmount),
+        currency: String(data.currency),
+      });
+      return { ...entry, syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency) } as VersionedRow;
+    }
+    case "wealthSnapshot": {
+      const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.create(db, userId, snapshotInput);
+      const balanceRows = balances?.length
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : [];
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 
@@ -192,16 +295,60 @@ async function updateEntity(
         | undefined;
     case "goal":
       return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
-    case "contribution":
-      return (await contributionsRepository.update(db, userId, entityId, patch, expectedVersion)) as
-        | VersionedRow
-        | undefined;
+    case "contribution": {
+      const { allocations, ...contributionPatch } = patch as contributionsRepository.UpdateContributionInput &
+        ContributionAllocationsField;
+      const row = await contributionsRepository.update(db, userId, entityId, contributionPatch, expectedVersion);
+      if (!row) return undefined;
+      const allocationRows = allocations
+        ? await contributionsRepository.replaceAllocations(
+            db, userId, row.id, allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+          )
+        : await contributionsRepository.listAllocationsByContribution(db, userId, row.id);
+      return { ...row, allocations: allocationRows } as VersionedRow;
+    }
     case "userInstrument":
       return (await marketRepository.updateUserInstrument(db, userId, entityId, patch, expectedVersion)) as
         | VersionedRow
         | undefined;
-    case "wealthSnapshot":
-      return (await wealthRepository.update(db, userId, entityId, patch, expectedVersion)) as VersionedRow | undefined;
+    case "stockeventsMapping":
+      return (await stockeventsSymbolMappingsRepository.update(
+        db,
+        userId,
+        entityId,
+        {
+          categoryId: patch.categoryId,
+          stockeventsSymbol: patch.stockeventsSymbol,
+          sync: patch.sync,
+          watchlistId: patch.watchlistId,
+          hidden: patch.hidden,
+        },
+        expectedVersion,
+      )) as VersionedRow | undefined;
+    case "stockeventsCashEntry": {
+      const updated = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+        contributionDate: String(patch.contributionDate),
+        accountId:
+          typeof patch.accountId === "string" && patch.accountId ? patch.accountId : null,
+        watchlistId: String(patch.watchlistId),
+        syncedAmount: Number(patch.syncedAmount),
+        currency: String(patch.currency),
+      });
+      return {
+        ...updated,
+        syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
+      } as VersionedRow | undefined;
+    }
+    case "wealthSnapshot": {
+      const { balances, ...snapshotPatch } = patch as Partial<wealthRepository.CreateWealthSnapshotInput> &
+        WealthSnapshotBalancesField;
+      const row = await wealthRepository.update(db, userId, entityId, snapshotPatch, expectedVersion);
+      if (!row) return undefined;
+      const balanceRows = balances
+        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        : await wealthRepository.listBalancesBySnapshot(db, userId, row.id);
+      return { ...row, balances: balanceRows } as VersionedRow;
+    }
   }
 }
 
@@ -233,6 +380,10 @@ async function removeEntity(
       return contributionsRepository.remove(db, userId, entityId, expectedVersion);
     case "userInstrument":
       return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion);
+    case "stockeventsMapping":
+      return stockeventsSymbolMappingsRepository.remove(db, userId, entityId, expectedVersion);
+    case "stockeventsCashEntry":
+      return stockeventsCashMappingsRepository.removeSyncEntry(db, userId, entityId, expectedVersion);
     case "wealthSnapshot":
       return wealthRepository.remove(db, userId, entityId, expectedVersion);
   }
@@ -264,6 +415,14 @@ async function recordChange(
   return revisionRow.revision;
 }
 
+function rejectInvalidPayload(
+  entityType: SyncEntityType,
+  error: { issues: Array<{ path: PropertyKey[]; message: string }> },
+): Omit<CommandOutcome, "commandId" | "replayed"> {
+  const detail = error.issues.map((issue) => `${issue.path.map(String).join(".") || "(raíz)"}: ${issue.message}`).join("; ");
+  return { status: "rejected", entityType, message: `Datos inválidos para ${entityType}: ${detail}` };
+}
+
 /** Runs the actual mutation for one command inside an already-open transaction. */
 async function performMutation(
   db: Db,
@@ -275,20 +434,91 @@ async function performMutation(
       return { status: "noop" };
 
     case "settingsUpdate": {
+      const { twrLiquidityAccountIds, stockeventsCashMappings, ...settingsPatch } = command.patch;
+      // The row stores the flag as `0`/`1`; the patch carries a boolean, so
+      // replay detection must compare like with like.
+      const settingsPatchForCompare = {
+        ...settingsPatch,
+        ...(typeof settingsPatch.stockeventsEnabled === "boolean"
+          ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
+          : {}),
+        ...(typeof settingsPatch.stockeventsTradesToCash === "boolean"
+          ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
+          : {}),
+      };
       const existing = await userSettingsRepository.get(db, userId);
+      // Same contract as `update`: a stale `baseVersion` is a replay when the
+      // server already holds the patch, and a conflict otherwise (ADR 0003 —
+      // the client rebases over `currentVersion` instead of freezing the
+      // queue). `settingsPatch` is empty when the command only replaces the
+      // TWR liquidity selection, and an empty patch is trivially "already
+      // held", so that case must not be read as a replay: replacing the
+      // selection is a write of its own.
+      if (existing && command.baseVersion !== undefined && existing.version !== command.baseVersion) {
+        if (
+          Object.keys(settingsPatch).length > 0 &&
+          includesPatch(existing as unknown as VersionedRow, settingsPatchForCompare)
+        ) {
+          return { status: "noop", entityType: "userSettings", entityId: userId, entity: existing };
+        }
+        return {
+          status: "conflict",
+          entityType: "userSettings",
+          entityId: userId,
+          currentVersion: existing.version,
+          message: "La versión base no coincide con la versión actual del servidor.",
+        };
+      }
       const row = existing
-        ? await userSettingsRepository.update(db, userId, command.patch)
-        : await userSettingsRepository.create(db, userId, command.patch);
+        ? await userSettingsRepository.update(db, userId, settingsPatch, command.baseVersion)
+        : await userSettingsRepository.create(db, userId, settingsPatch);
+      if (existing && !row) {
+        const current = await userSettingsRepository.get(db, userId);
+        return current
+          ? {
+              status: "conflict",
+              entityType: "userSettings",
+              entityId: userId,
+              currentVersion: current.version,
+              message: "Los ajustes cambiaron mientras se aplicaba el comando.",
+            }
+          : {
+              status: "not_found",
+              entityType: "userSettings",
+              entityId: userId,
+              message: "Ajustes no encontrados.",
+            };
+      }
+      const twrLiquidityAccounts = twrLiquidityAccountIds
+        ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
+        : undefined;
+      const cashMappings = stockeventsCashMappings
+        ? await stockeventsCashMappingsRepository.replaceMappings(db, userId, stockeventsCashMappings)
+        : undefined;
       const revision = await recordChange(db, userId, "userSettings", userId, "update", command.patch);
-      return { status: "applied", entityType: "userSettings", entityId: userId, entity: row, revision };
+      return {
+        status: "applied",
+        entityType: "userSettings",
+        entityId: userId,
+        entity: { ...row, ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}), ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}) },
+        revision,
+      };
     }
 
     case "create": {
-      const schema = entityCreateSchemas[command.entityType];
-      const parsed = schema.parse(command.data);
-      const existing = await findByLegacyId(
-        db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
-      );
+      const schema = entityCreatePayloadSchemas[command.entityType];
+      const validation = schema.safeParse(command.data);
+      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
+      const parsed = validation.data;
+      // The client's own identity wins when it sent one: re-sending a `create`
+      // is then a no-op instead of a duplicate, even under a fresh commandId
+      // that `sync_commands`'s replay guard no longer recognises. Falling back
+      // to the derived identifier keeps the rows migrated from v1 reconcilable.
+      const existing =
+        (await findByClientId(db, userId, command.entityType, (parsed as { id?: unknown }).id))
+        ?? (await findByLegacyId(
+          db, userId, command.entityType, (parsed as { legacyId?: unknown }).legacyId,
+        ));
       if (existing) return { status: "noop", entityType: command.entityType, entityId: existing.id, entity: existing };
       const row = await createEntity(db, userId, command.entityType, parsed);
       const revision = await recordChange(db, userId, command.entityType, row.id, "create", row);
@@ -324,7 +554,9 @@ async function performMutation(
         };
       }
       const schema = entityUpdateSchemas[command.entityType];
-      const parsed = schema.parse(command.patch);
+      const validation = schema.safeParse(command.patch);
+      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error);
+      const parsed = validation.data;
       const row = await updateEntity(
         db,
         userId,
@@ -428,16 +660,26 @@ async function performMutation(
   }
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /unique constraint|constraint failed|UNIQUE/i.test(message);
-}
-
-export class CommandInProgressError extends Error {
-  constructor(commandId: string) {
-    super(`El comando ${commandId} ya se está procesando.`);
-    this.name = "CommandInProgressError";
+/**
+ * Detects a primary-key/unique violation through any wrapping layer.
+ *
+ * D1 surfaces it as `D1_ERROR: UNIQUE constraint failed: ...`, but Drizzle
+ * rethrows as `DrizzleQueryError: Failed query: ...` with the D1 error as
+ * `cause` — matching only the outer message misses it (FINANCE-TRACKER-6:
+ * a retried command then 500s instead of replaying its stored result), so
+ * the whole `cause` chain is inspected.
+ */
+export function isUniqueConstraintError(error: unknown): boolean {
+  const pattern = /unique constraint|constraint failed/i;
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current !== null && current !== undefined && !seen.has(current)) {
+    seen.add(current);
+    const message = current instanceof Error ? current.message : String(current);
+    if (pattern.test(message)) return true;
+    current = current instanceof Error ? current.cause : undefined;
   }
+  return false;
 }
 
 function replayStoredCommand(
@@ -445,7 +687,12 @@ function replayStoredCommand(
   command: syncRepository.SyncCommandRow,
 ): CommandOutcome {
   if (!command.result) {
-    throw new CommandInProgressError(commandId);
+    return {
+      commandId,
+      replayed: false,
+      status: "in_progress",
+      message: `El comando ${commandId} ya se está procesando.`,
+    };
   }
   const stored = JSON.parse(command.result) as Partial<CommandOutcome>;
   return {
@@ -508,17 +755,31 @@ export async function applyOneCommand(
     return replay;
   }
 
-  return runInTransaction(db, async (tx) => {
-    const outcome = await performMutation(tx, userId, command);
-    await syncRepository.finalizeCommand(
-      tx,
-      userId,
-      command.commandId,
-      outcome.status,
-      JSON.stringify(outcome),
-    );
+  try {
+    return await runInTransaction(db, async (tx) => {
+      const outcome = await performMutation(tx, userId, command);
+      await syncRepository.finalizeCommand(
+        tx,
+        userId,
+        command.commandId,
+        outcome.status,
+        JSON.stringify(outcome),
+      );
+      return { commandId: command.commandId, replayed: false, ...outcome };
+    });
+  } catch (error) {
+    if (!(error instanceof RejectedCommandError)) throw error;
+    // Finalize with the outer handle (the SQLite transaction was rolled
+    // back; D1 has none) so the reservation never stays `processing` and a
+    // replay returns the rejection. Guards throw before any write.
+    const outcome: Omit<CommandOutcome, "commandId" | "replayed"> = {
+      status: "rejected",
+      ...("entityType" in command ? { entityType: command.entityType } : {}),
+      message: error.message,
+    };
+    await syncRepository.finalizeCommand(db, userId, command.commandId, outcome.status, JSON.stringify(outcome));
     return { commandId: command.commandId, replayed: false, ...outcome };
-  });
+  }
 }
 
 export interface SyncBatchResult {
@@ -528,8 +789,8 @@ export interface SyncBatchResult {
 }
 
 /**
- * Applies a batch of ≤5 commands, halting on the first `conflict` outcome
- * (fail-fast semantics —
+ * Applies a batch of ≤5 commands, halting on the first `conflict` or
+ * `in_progress` outcome (fail-fast semantics —
  * the client must resolve the conflict before any later command in the
  * batch is considered).
  */
@@ -543,7 +804,7 @@ export async function applySyncBatch(
   for (const command of commands) {
     const outcome = await applyOneCommand(db, userId, command);
     results.push(outcome);
-    if (outcome.status === "conflict") {
+    if (haltsBatch(outcome.status)) {
       halted = true;
       break;
     }

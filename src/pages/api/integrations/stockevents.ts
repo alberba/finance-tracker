@@ -26,13 +26,13 @@ async function getCredential(locals: App.Locals) {
 }
 
 export const GET: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const { credential } = await getCredential(locals);
     return jsonResponse({ configured: Boolean(credential) }, 200);
   });
 
 export const PUT: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const body = (await request.json()) as { apiKey?: unknown };
     const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
     if (!apiKey || apiKey.length > MAX_API_KEY_LENGTH) {
@@ -41,7 +41,32 @@ export const PUT: APIRoute = async ({ request, locals }) =>
 
     const { credential, db, env, userId } = await getCredential(locals);
     if (credential) {
-      await integrationCredentialsRepository.update(db, userId, credential.id, { secret: apiKey }, env);
+      // The version read a moment ago guards the write, so a credential another
+      // writer rotated in between is not clobbered with a stale intent
+      // (audit §6.1). When that happens the intent is still "this key is now
+      // the key", so it is re-read and retried once rather than surfaced as an
+      // error the user can do nothing about.
+      const updated = await integrationCredentialsRepository.update(
+        db,
+        userId,
+        credential.id,
+        { secret: apiKey },
+        env,
+        credential.version,
+      );
+      if (!updated) {
+        const current = await integrationCredentialsRepository.get(db, userId, credential.id, env);
+        if (current) {
+          await integrationCredentialsRepository.update(
+            db,
+            userId,
+            current.id,
+            { secret: apiKey },
+            env,
+            current.version,
+          );
+        }
+      }
     } else {
       await integrationCredentialsRepository.create(db, userId, { provider: PROVIDER, secret: apiKey }, env);
     }
@@ -49,7 +74,7 @@ export const PUT: APIRoute = async ({ request, locals }) =>
   });
 
 export const DELETE: APIRoute = async ({ locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/integrations/stockevents", async () => {
     const { credential, db, userId } = await getCredential(locals);
     if (credential) {
       await integrationCredentialsRepository.remove(db, userId, credential.id);

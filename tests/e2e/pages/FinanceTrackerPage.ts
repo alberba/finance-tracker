@@ -662,12 +662,23 @@ export class FinanceTrackerPage {
 
     const input = row.locator('input[data-snapshot-kind="accounts"]');
     await input.fill(String(params.value));
+    // The toast fires as soon as local state commits, but the app mirrors the
+    // blob to the server asynchronously. Tests that reload right after saving
+    // would otherwise race that PUT and read back the pre-save server copy, so
+    // wait for the request that actually carries this value.
+    const persisted = this.page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/state") &&
+        response.request().method() === "PUT" &&
+        (response.request().postData() ?? "").includes(String(params.value)),
+    );
     await this.wealthSection
       .getByRole("button", { name: "Guardar snapshot" })
       .click();
     await expect(this.page.getByRole("status")).toContainText(
       "Snapshot guardado.",
     );
+    await persisted;
   }
 
   async getAccountSnapshotValue(accountName: string): Promise<number> {

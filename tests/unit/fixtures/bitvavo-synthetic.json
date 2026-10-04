@@ -1,0 +1,31 @@
+{
+  "provenance": "synthetic — does not establish the Bitvavo contract",
+  "transactions": [
+    {
+      "transactionId": "synthetic-buy",
+      "executedAt": "2020-01-01T00:00:00.000Z",
+      "type": "buy",
+      "priceCurrency": "EUR",
+      "priceAmount": "100",
+      "sentCurrency": "EUR",
+      "sentAmount": "20.05",
+      "receivedCurrency": "BTC",
+      "receivedAmount": "0.2",
+      "feesCurrency": "EUR",
+      "feesAmount": "0.05"
+    },
+    {
+      "transactionId": "synthetic-sell",
+      "executedAt": "2020-01-02T00:00:00.000Z",
+      "type": "sell",
+      "priceCurrency": "EUR",
+      "priceAmount": "20",
+      "sentCurrency": "BTC",
+      "sentAmount": "0.2",
+      "receivedCurrency": "EUR",
+      "receivedAmount": "19.95",
+      "feesCurrency": "EUR",
+      "feesAmount": "0.05"
+    }
+  ]
+}

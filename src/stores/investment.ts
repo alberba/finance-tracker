@@ -30,7 +30,13 @@ import {
   normalizeInvestmentSymbol,
 } from '../scripts/investment-movements'
 import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
-import { resolveCategoryId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
+import {
+  resolveCategoryId,
+  resolveEntityId,
+  syncListDiff,
+  type CategoryKind,
+} from '../lib/client/command-mapping'
+import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
 import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -38,16 +44,40 @@ import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
 
 /** WP7b — maps a legacy investment `Transaction` row to a `transaction` sync command payload. */
-async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+export async function buildInvestmentTransactionData(tx: Transaction, currency: string) {
+  // The server only knows its own account ids; sending the local one made
+  // every investment movement fail the ownership check (audit §1).
+  const accountId = await resolveEntityId('account', tx.accountId)
+  if (!accountId) return null
   const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
   return {
-    accountId: tx.accountId,
+    accountId,
     categoryId,
     type: tx.type,
     date: tx.date,
     description: tx.description,
     amount: tx.amount,
     currency: tx.movementCurrency || currency,
+    time: tx.time ?? null,
+    declared: Boolean(tx.declared),
+    // The operation travels nested, so importe and operación reach D1 in the
+    // same write and cannot end up disagreeing (ADR 0002).
+    operation: buildOperationData(tx),
+  }
+}
+
+/**
+ * The operation of an investment movement, or `null` when the movement has
+ * none — which is also how the server is told to drop the one it had stored.
+ */
+function buildOperationData(tx: Transaction) {
+  if (tx.type !== 'investment' || !tx.side) return null
+  return {
+    symbol: tx.symbol ?? null,
+    side: tx.side,
+    units: Number(tx.units) || 0,
+    unitPrice: Number(tx.unitPrice) || 0,
+    fee: Number(tx.fee) || 0,
   }
 }
 
@@ -61,6 +91,22 @@ function buildContributionData(contribution: Contribution, currency: string) {
     portfolioValue: contribution.portfolioValue,
     flow: contribution.flow,
   }
+}
+
+/** Resolves a contribution's flow allocations to server `account` ids for its sync command. */
+async function buildContributionAllocations(contribution: Contribution) {
+  const allocations: Array<{ accountId: string; amount: number }> = []
+  for (const allocation of contribution.flowAllocations || []) {
+    const accountId = await resolveEntityId('account', allocation.accountId)
+    if (!accountId) {
+      console.warn(
+        `[sync-v2] No se pudo incluir el reparto a la cuenta local "${allocation.accountId}" en el aporte: todavía no se ha sincronizado con el servidor.`,
+      )
+      continue
+    }
+    allocations.push({ accountId, amount: allocation.amount })
+  }
+  return allocations
 }
 
 export interface NewInvestmentMovementInput {
@@ -307,7 +353,35 @@ export const useInvestmentStore = defineStore('investment', () => {
     )
     ui.investmentTxEditingId = ''
     showToast('Movimiento de inversión actualizado.')
+    // Editing a movement that already exists in Stock Events cannot update the
+    // remote row (the API only creates), so the edit is re-sent to keep the
+    // remote side consistent with what the user just saved.
+    const updated = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === id && item.type === 'investment',
+    )
+    if (updated) {
+      void stockEventsStore.syncMovement(updated)
+    }
     return true
+  }
+
+  /**
+   * Manual resend of one movement to Stock Events, for the case the automatic
+   * fire-and-forget sync skipped it (no mapping then, mapping now).
+   */
+  async function resyncMovement(transactionId: string): Promise<boolean> {
+    const tx = financialStateStore.transactions.find(
+      (item): item is Transaction => item.id === transactionId && item.type === 'investment',
+    )
+    if (!tx) {
+      showToast('Movimiento no encontrado.')
+      return false
+    }
+    const result = await stockEventsStore.syncMovement(tx)
+    if (result === 'skipped' && !stockEventsStore.isConnected) {
+      showToast('Activa la conexión con Stock Events para reenviar.')
+    }
+    return result === 'synced'
   }
 
   function deleteMovement(id: string): void {
@@ -396,13 +470,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     warnings: string[],
     options: SaveContributionOptions = {},
   ): boolean {
-    // WP7b leftover (documented, not wired): `applyContributionSave` folds a
-    // contribution + wealth-snapshot + snapshot-balances update into one
-    // draft mutation. `contribution_allocations`/`snapshot_balances` are
-    // explicitly out of `SYNC_ENTITY_TYPES` (see `command-schemas.ts`'s doc
-    // comment), so this workflow save cannot be expressed as today's
-    // discrete sync commands without either a command-contract extension
-    // or decomposing this domain function's output — left unsynced.
+    const before = financialStateStore.contributions
     let result: ContributionSaveResult = { ok: false, hadWarnings: false }
     financialStateStore.commitState((draft) => {
       result = applyContributionSave(draft, { date, month, snapshotInputs, allocations, warnings })
@@ -419,6 +487,21 @@ export const useInvestmentStore = defineStore('investment', () => {
       }
       return false
     }
+    const currency = financialStateStore.currency
+    void syncListDiff(
+      'contribution',
+      before,
+      financialStateStore.contributions,
+      async (contribution) => ({
+        ...buildContributionData(contribution, currency),
+        allocations: await buildContributionAllocations(contribution),
+      }),
+    )
+    void syncSnapshotBalances(
+      financialStateStore.year,
+      financialStateStore.state.snapshots[String(month)],
+      currency,
+    )
     showToast(result.hadWarnings ? 'Aporte guardado con avisos.' : 'Aporte guardado.')
     if (options.syncStockEventsCash) {
       void stockEventsStore.syncContributionCash(date, allocations)
@@ -445,6 +528,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     cancelEditMovement,
     addMovement,
     saveEditedMovement,
+    resyncMovement,
     deleteMovement,
     toggleDeclared,
     setContributionFlow,

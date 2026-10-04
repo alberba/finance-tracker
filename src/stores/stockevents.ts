@@ -6,6 +6,7 @@ import {
   buildStockEventsCashTransactionPayload,
   buildStockEventsTransactionPayload,
   findSyncedMapping,
+  resolveStockEventsSymbol,
 } from '../domain/stockevents/transaction-payload'
 import {
   checkStockEventsSymbols,
@@ -17,6 +18,12 @@ import {
   type SymbolCheckResult,
 } from '../services/stockevents-api'
 import type { StockEventsCashMapping, StockEventsSymbolMapping, Transaction } from '../scripts/types'
+import {
+  resolveEntityId,
+  syncSettingsUpdate,
+  syncStockeventsCashEntryUpsert,
+  syncStockeventsMappingUpsert,
+} from '../lib/client/command-mapping'
 import { useFinancialStateStore } from './financial-state'
 
 export interface StockEventsSymbolRow {
@@ -26,12 +33,21 @@ export interface StockEventsSymbolRow {
   targetSymbol: string
   hidden: boolean
   hasInstrument: boolean
+  isCrypto: boolean
   checkResult: SymbolCheckResult | null
 }
 
 export interface StockEventsSyncOptions {
+  /** Overrides `settings.tradesToCash` for this one movement. */
   toCash?: boolean
 }
+
+/**
+ * Outcome of a single movement sync attempt: `skipped` means nothing was
+ * sent (no mapping, or the movement has no valid payload) and `failed` means
+ * Stock Events rejected the request.
+ */
+export type StockEventsSyncResult = 'synced' | 'skipped' | 'failed'
 
 export interface StockEventsCashMappingRow {
   accountId: string
@@ -99,6 +115,14 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const instrumentSymbols = new Set(
       financialStateStore.state.instruments.map((instrument) => instrument.symbol.toUpperCase()),
     )
+    const cryptoSymbols = new Set([
+      ...financialStateStore.state.instruments
+        .filter((instrument) => instrument.type === 'crypto')
+        .map((instrument) => instrument.symbol.toUpperCase()),
+      ...financialStateStore.state.transactions
+        .filter((tx) => tx.type === 'investment' && tx.category.trim().toLowerCase() === 'crypto')
+        .map((tx) => (tx.symbol || '').toUpperCase()),
+    ])
     return trackedSymbols.value.map((symbol) => {
       const mapping = mappingsBySymbol.get(symbol)
       return {
@@ -108,6 +132,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         targetSymbol: mapping?.targetSymbol || '',
         hidden: mapping?.hidden === true,
         hasInstrument: instrumentSymbols.has(symbol),
+        isCrypto: cryptoSymbols.has(symbol),
         checkResult: checkResults.value[symbol] || null,
       }
     })
@@ -165,11 +190,19 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     financialStateStore.commitState((draft) => {
       draft.stockEvents.enabled = enabled
     })
+    void syncSettingsUpdate({ stockeventsEnabled: enabled })
     showToast(
       enabled
         ? 'Sincronización con Stock Events activada.'
         : 'Sincronización con Stock Events desactivada.',
     )
+  }
+
+  function setTradesToCash(tradesToCash: boolean): void {
+    financialStateStore.commitState((draft) => {
+      draft.stockEvents.tradesToCash = tradesToCash
+    })
+    void syncSettingsUpdate({ stockeventsTradesToCash: tradesToCash })
   }
 
   function updateMapping(
@@ -199,6 +232,17 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         })
       }
     })
+    const mapping = financialStateStore.state.stockEvents.symbolMappings.find(
+      (item) => item.symbol === normalized,
+    )
+    if (mapping) {
+      void syncStockeventsMappingUpsert(normalized, {
+        stockeventsSymbol: mapping.targetSymbol || normalized,
+        sync: mapping.sync === true,
+        watchlistId: mapping.watchlistId || null,
+        hidden: mapping.hidden === true,
+      })
+    }
   }
 
   function updateCashMapping(accountId: string, watchlistId: string): void {
@@ -218,6 +262,28 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
         draft.stockEvents.cashMappings.push(mapping)
       }
     })
+    void syncCashMappings()
+  }
+
+  /**
+   * Sends the whole cash-mapping selection, resolved to server `account`
+   * ids — the same whole-selection shape `syncTwrLiquidityAccounts` uses.
+   * An account that hasn't synced yet is left out with a warning; the next
+   * change sends it once it has.
+   */
+  async function syncCashMappings(): Promise<void> {
+    const entries: Array<{ accountId: string | null; watchlistId: string }> = []
+    for (const mapping of financialStateStore.state.stockEvents.cashMappings || []) {
+      const serverAccountId = await resolveEntityId('account', mapping.accountId)
+      if (serverAccountId) {
+        entries.push({ accountId: serverAccountId, watchlistId: mapping.watchlistId })
+      } else if (typeof console !== 'undefined') {
+        console.warn(
+          `[sync-v2] No se pudo sincronizar el efectivo de Stock Events (cuenta local "${mapping.accountId}"): todavía no se ha sincronizado con el servidor.`,
+        )
+      }
+    }
+    await syncSettingsUpdate({ stockeventsCashMappings: entries })
   }
 
   async function loadWatchlists(): Promise<void> {
@@ -239,7 +305,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     if (!credentialConfigured.value || isChecking.value) return
     const rows = symbolRows.value.filter((row) => row.sync && row.watchlistId)
     const checks = rows.map((row) => ({
-      symbol: row.targetSymbol || row.symbol,
+      symbol: resolveStockEventsSymbol(row.symbol, row.targetSymbol, row.isCrypto),
       watchlistId: row.watchlistId,
     }))
     if (!checks.length) {
@@ -273,28 +339,58 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
 
   /**
    * Fire-and-forget sync of a freshly created investment movement. Never
-   * blocks the local save: failures only surface as a toast.
+   * blocks the local save: the result is returned to the caller (so a manual
+   * resend can react to it) and failures only surface as a toast.
+   *
+   * A movement that resolves no synced mapping used to return silently, which
+   * is how a buy could be saved locally and never reach Stock Events without
+   * anyone noticing. When there is a live connection it now warns instead.
    */
   async function syncMovement(
     tx: Transaction,
     options: StockEventsSyncOptions = {},
-  ): Promise<void> {
+  ): Promise<StockEventsSyncResult> {
+    const symbol = (tx.symbol || '').trim().toUpperCase()
+    const symbolLabel = symbol || 'ese símbolo'
     const mapping = findSyncedMapping(settings.value, tx.symbol)
-    if (!mapping) return
+    if (!mapping) {
+      if (isConnected.value) {
+        showToast(
+          `Stock Events: ${symbolLabel} no tiene sincronización activada o lista asignada.`,
+        )
+        console.warn(
+          `[stockevents] Movimiento de ${symbolLabel} no sincronizado: no tiene sincronización activada o lista asignada.`,
+        )
+      }
+      return 'skipped'
+    }
     const payload = buildStockEventsTransactionPayload(
       tx,
       mapping.watchlistId,
       mapping.targetSymbol,
-      options.toCash,
+      options.toCash ?? settings.value.tradesToCash === true,
+      symbolRows.value.some((row) => row.symbol === symbol && row.isCrypto),
     )
-    if (!payload) return
+    if (!payload) {
+      if (isConnected.value) {
+        showToast(
+          `Stock Events: el movimiento de ${symbolLabel} no tiene datos válidos para sincronizar.`,
+        )
+        console.warn(
+          `[stockevents] Movimiento de ${symbolLabel} no sincronizado: no tiene datos válidos (títulos o precio).`,
+        )
+      }
+      return 'skipped'
+    }
     try {
       await createStockEventsTransaction(payload)
       showToast(`Movimiento de ${payload.symbol} sincronizado con Stock Events.`)
+      return 'synced'
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'No se pudo sincronizar con Stock Events'
       showToast(`Stock Events: ${message}`)
+      return 'failed'
     }
   }
 
@@ -334,38 +430,72 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     const results = await Promise.allSettled(
       requests.map((request) => createStockEventsTransaction(request.payload)),
     )
-    results.forEach((result, index) => {
-      if (result.status !== 'fulfilled') return
+    const fulfilled = results.flatMap((result, index) => {
+      if (result.status !== 'fulfilled') return []
       const request = requests[index]
-      if (!request) return
+      return request ? [request] : []
+    })
+    if (fulfilled.length) {
       financialStateStore.commitState((draft) => {
         const entries = draft.stockEvents.cashSyncEntries || []
         draft.stockEvents.cashSyncEntries = entries
-        const existing = entries.find(
-          (entry) =>
-            entry.contributionDate === date &&
-            entry.accountId === request.allocation.accountId &&
-            entry.watchlistId === request.watchlistId,
-        )
-        const syncedAmount = Math.round(request.allocation.amount * 100) / 100
-        if (existing) {
-          existing.syncedAmount = syncedAmount
-        } else {
-          entries.push({
-            contributionDate: date,
-            accountId: request.allocation.accountId,
-            watchlistId: request.watchlistId,
-            syncedAmount,
-          })
+        for (const request of fulfilled) {
+          const existing = entries.find(
+            (entry) =>
+              entry.contributionDate === date &&
+              entry.accountId === request.allocation.accountId &&
+              entry.watchlistId === request.watchlistId,
+          )
+          const syncedAmount = Math.round(request.allocation.amount * 100) / 100
+          if (existing) {
+            existing.syncedAmount = syncedAmount
+          } else {
+            entries.push({
+              contributionDate: date,
+              accountId: request.allocation.accountId,
+              watchlistId: request.watchlistId,
+              syncedAmount,
+            })
+          }
         }
       })
-    })
+      void syncCashSyncEntries(
+        date,
+        fulfilled.map((request) => ({
+          accountId: request.allocation.accountId,
+          watchlistId: request.watchlistId,
+          syncedAmount: Math.round(request.allocation.amount * 100) / 100,
+        })),
+      )
+    }
     const failedCount = results.filter((result) => result.status === 'rejected').length
     if (failedCount > 0) {
       showToast(`Stock Events: ${failedCount} aporte(s) de efectivo no se pudieron sincronizar.`)
       return
     }
     showToast(`Efectivo actualizado en ${requests.length} lista(s) de Stock Events.`)
+  }
+
+  /**
+   * Persists the already-synced contribution-cash amounts so a reload
+   * computes deltas instead of re-sending the full allocation. Entries for
+   * accounts that haven't synced yet stay memory-only until the next run.
+   */
+  async function syncCashSyncEntries(
+    contributionDate: string,
+    entries: Array<{ accountId: string; watchlistId: string; syncedAmount: number }>,
+  ): Promise<void> {
+    for (const entry of entries) {
+      const serverAccountId = await resolveEntityId('account', entry.accountId)
+      if (!serverAccountId) continue
+      await syncStockeventsCashEntryUpsert(
+        contributionDate,
+        serverAccountId,
+        entry.watchlistId,
+        entry.syncedAmount,
+        financialStateStore.currency,
+      )
+    }
   }
 
   return {
@@ -384,6 +514,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     initializeCredential,
     saveApiKey,
     setEnabled,
+    setTradesToCash,
     updateMapping,
     updateCashMapping,
     loadWatchlists,

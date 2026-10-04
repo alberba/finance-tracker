@@ -1,20 +1,35 @@
-/** `stockevents_symbol_mappings` repository (WP6). */
+/** `stockevents_symbol_mappings` repository (WP6, extended: sync flags + optimistic concurrency). */
 
 import { and, eq } from "drizzle-orm";
 import { stockeventsSymbolMappings } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import {
+  assertOwnedReferences,
+  clientIdentity,
+  fromFlag,
+  nowIso,
+  toFlag,
+  versionGuard,
+  type Db,
+} from "./shared";
 
 export type StockeventsSymbolMappingRow = typeof stockeventsSymbolMappings.$inferSelect;
 
 export interface CreateStockeventsSymbolMappingInput {
+  id?: string;
   legacyId?: string | null;
   categoryId?: string | null;
   stockeventsSymbol: string;
+  sync?: boolean;
+  watchlistId?: string | null;
+  hidden?: boolean;
 }
 
 export interface UpdateStockeventsSymbolMappingInput {
   categoryId?: string | null;
   stockeventsSymbol?: string;
+  sync?: boolean;
+  watchlistId?: string | null;
+  hidden?: boolean;
 }
 
 export async function listByUser(db: Db, userId: string): Promise<StockeventsSymbolMappingRow[]> {
@@ -33,6 +48,35 @@ export async function get(
   return row;
 }
 
+export async function findBySymbol(
+  db: Db,
+  userId: string,
+  symbol: string,
+): Promise<StockeventsSymbolMappingRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(stockeventsSymbolMappings)
+    .where(
+      and(
+        eq(stockeventsSymbolMappings.userId, userId),
+        eq(stockeventsSymbolMappings.stockeventsSymbol, symbol),
+      ),
+    );
+  return row;
+}
+
+export function toDomainShape(row: StockeventsSymbolMappingRow): {
+  sync: boolean;
+  watchlistId: string;
+  hidden: boolean;
+} {
+  return {
+    sync: fromFlag(row.sync),
+    watchlistId: row.watchlistId ?? "",
+    hidden: fromFlag(row.hidden),
+  };
+}
+
 export async function create(
   db: Db,
   userId: string,
@@ -43,10 +87,14 @@ export async function create(
   const [row] = await db
     .insert(stockeventsSymbolMappings)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       categoryId: input.categoryId ?? null,
       stockeventsSymbol: input.stockeventsSymbol,
+      sync: toFlag(input.sync),
+      watchlistId: input.watchlistId ?? null,
+      hidden: toFlag(input.hidden),
       createdAt: now,
       updatedAt: now,
     })
@@ -59,6 +107,7 @@ export async function update(
   userId: string,
   id: string,
   input: UpdateStockeventsSymbolMappingInput,
+  expectedVersion?: number,
 ): Promise<StockeventsSymbolMappingRow | undefined> {
   const existing = await get(db, userId, id);
   if (!existing) {
@@ -70,22 +119,40 @@ export async function update(
     .set({
       categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
       stockeventsSymbol: input.stockeventsSymbol ?? existing.stockeventsSymbol,
+      sync: input.sync === undefined ? existing.sync : toFlag(input.sync),
+      watchlistId: input.watchlistId === undefined ? existing.watchlistId : input.watchlistId,
+      hidden: input.hidden === undefined ? existing.hidden : toFlag(input.hidden),
       updatedAt: nowIso(),
+      version: existing.version + 1,
     })
-    .where(and(eq(stockeventsSymbolMappings.id, id), eq(stockeventsSymbolMappings.userId, userId)))
+    .where(and(
+      eq(stockeventsSymbolMappings.id, id),
+      eq(stockeventsSymbolMappings.userId, userId),
+      versionGuard(stockeventsSymbolMappings.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
+export async function remove(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
   const existing = await get(db, userId, id);
   if (!existing) {
     return false;
   }
-  await db
+  const deleted = await db
     .delete(stockeventsSymbolMappings)
-    .where(and(eq(stockeventsSymbolMappings.id, id), eq(stockeventsSymbolMappings.userId, userId)));
-  return true;
+    .where(and(
+      eq(stockeventsSymbolMappings.id, id),
+      eq(stockeventsSymbolMappings.userId, userId),
+      versionGuard(stockeventsSymbolMappings.version, expectedVersion),
+    ))
+    .returning({ id: stockeventsSymbolMappings.id });
+  return deleted.length > 0;
 }
 
 export async function bulkInsert(
@@ -101,10 +168,14 @@ export async function bulkInsert(
     .insert(stockeventsSymbolMappings)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         categoryId: input.categoryId ?? null,
         stockeventsSymbol: input.stockeventsSymbol,
+        sync: toFlag(input.sync),
+        watchlistId: input.watchlistId ?? null,
+        hidden: toFlag(input.hidden),
         createdAt: now,
         updatedAt: now,
       })),

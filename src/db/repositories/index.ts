@@ -19,5 +19,6 @@ export * as contributionsRepository from "./contributions";
 export * as marketRepository from "./market";
 export * as integrationCredentialsRepository from "./integration-credentials";
 export * as stockeventsSymbolMappingsRepository from "./stockevents-symbol-mappings";
+export * as stockeventsCashMappingsRepository from "./stockevents-cash-mappings";
 export * as syncRepository from "./sync";
 export * as auditEventsRepository from "./audit-events";

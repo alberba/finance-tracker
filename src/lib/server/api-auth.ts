@@ -1,6 +1,7 @@
 /** Shared API authentication, authorization and private JSON responses. */
 
 import type { AuthPrincipal } from "./auth/principal";
+import { reportApiRouteFailure } from "./error-tracking";
 
 export function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -34,8 +35,15 @@ export function requireLegacyOwner(locals: App.Locals): AuthPrincipal {
   return principal;
 }
 
-/** Wraps a route handler body, turning `UnauthorizedError`/generic errors into JSON responses. */
-export async function withApiErrorHandling(handler: () => Promise<Response>): Promise<Response> {
+/**
+ * Wraps a route handler body, turning `UnauthorizedError`/generic errors into
+ * JSON responses. `UnauthorizedError`/`ForbiddenError` are handled outcomes and
+ * stay out of Sentry; anything else is reported as an unhandled route failure.
+ */
+export async function withApiErrorHandling(
+  route: string,
+  handler: () => Promise<Response>,
+): Promise<Response> {
   try {
     return await handler();
   } catch (error) {
@@ -45,7 +53,8 @@ export async function withApiErrorHandling(handler: () => Promise<Response>): Pr
     if (error instanceof ForbiddenError) {
       return jsonResponse({ error: error.message }, 403);
     }
-    console.error("[api] Unhandled route error", error);
+    console.error(`[api] Unhandled route error in ${route}`, error);
+    reportApiRouteFailure(error, { route, status: 500 });
     return jsonResponse({ error: "Error interno del servidor." }, 500);
   }
 }

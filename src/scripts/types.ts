@@ -205,6 +205,8 @@ export interface StockEventsCashSyncEntry {
 export interface StockEventsSettings {
   enabled: boolean;
   apiKey: string;
+  /** Buys/sells synced to Stock Events move the watchlist cash (`toCash`). */
+  tradesToCash?: boolean;
   symbolMappings: StockEventsSymbolMapping[];
   cashMappings?: StockEventsCashMapping[];
   cashSyncEntries?: StockEventsCashSyncEntry[];

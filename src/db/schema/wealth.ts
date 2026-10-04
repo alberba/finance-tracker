@@ -1,6 +1,6 @@
 /** Point-in-time wealth snapshots and portfolio contributions. */
 
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import {
   idColumn,
   createdAtColumn,
@@ -31,6 +31,12 @@ export const wealthSnapshots = sqliteTable(
   (table) => [
     index("wealth_snapshots_user_id_idx").on(table.userId),
     index("wealth_snapshots_user_id_snapshot_date_idx").on(table.userId, table.snapshotDate),
+    uniqueIndex("wealth_snapshots_user_id_legacy_id_idx").on(table.userId, table.legacyId),
+    uniqueIndex("wealth_snapshots_user_id_year_month_idx").on(
+      table.userId,
+      table.year,
+      table.month,
+    ),
   ],
 );
 
@@ -44,7 +50,7 @@ export const snapshotBalances = sqliteTable(
       .references(() => users.id),
     snapshotId: text("snapshot_id")
       .notNull()
-      .references(() => wealthSnapshots.id),
+      .references(() => wealthSnapshots.id, { onDelete: "cascade" }),
     accountId: text("account_id").references(() => accounts.id),
     balanceMinor: moneyMinorColumn("balance_minor"),
     currency: currencyColumn(),
@@ -78,6 +84,7 @@ export const contributions = sqliteTable(
   (table) => [
     index("contributions_user_id_idx").on(table.userId),
     index("contributions_user_id_date_idx").on(table.userId, table.date),
+    uniqueIndex("contributions_user_id_legacy_id_idx").on(table.userId, table.legacyId),
   ],
 );
 
@@ -91,7 +98,7 @@ export const contributionAllocations = sqliteTable(
       .references(() => users.id),
     contributionId: text("contribution_id")
       .notNull()
-      .references(() => contributions.id),
+      .references(() => contributions.id, { onDelete: "cascade" }),
     accountId: text("account_id").references(() => accounts.id),
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),

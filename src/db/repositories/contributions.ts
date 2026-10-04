@@ -7,10 +7,10 @@
  * `amountMinor`, just without their own separate currency column.
  */
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { contributionAllocations, contributions } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, chunkIds, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
@@ -26,6 +26,8 @@ export type ContributionAllocationRow = Omit<
 > & { amount: number };
 
 export interface CreateContributionInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   date: string;
   amount: number;
@@ -89,6 +91,7 @@ export async function create(
   const [row] = await db
     .insert(contributions)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       date: input.date,
@@ -137,7 +140,7 @@ export async function update(
     .where(and(
       eq(contributions.id, id),
       eq(contributions.userId, userId),
-      expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+      versionGuard(contributions.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -151,7 +154,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(contributions).where(and(
     eq(contributions.id, id),
     eq(contributions.userId, userId),
-    expectedVersion === undefined ? undefined : eq(contributions.version, expectedVersion),
+    versionGuard(contributions.version, expectedVersion),
   )).returning({ id: contributions.id });
   return deleted.length > 0;
 }
@@ -169,6 +172,7 @@ export async function bulkInsert(
     .insert(contributions)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         date: input.date,
@@ -203,6 +207,46 @@ export async function listAllocationsByContribution(
       ),
     );
   return rows.map(toAllocationRow);
+}
+
+/**
+ * Batched form of {@link listAllocationsByContribution} for bootstrap
+ * assembly (audit §5.1): one query for every contribution's allocations
+ * instead of one query per contribution.
+ */
+export async function listAllocationsByContributions(
+  db: Db,
+  userId: string,
+  contributionIds: string[],
+): Promise<Map<string, ContributionAllocationRow[]>> {
+  const byContribution = new Map<string, ContributionAllocationRow[]>();
+  if (contributionIds.length === 0) {
+    return byContribution;
+  }
+  const rows: (typeof contributionAllocations.$inferSelect)[] = [];
+  for (const chunk of chunkIds(contributionIds)) {
+    rows.push(
+      ...(await db
+        .select()
+        .from(contributionAllocations)
+        .where(
+          and(
+            eq(contributionAllocations.userId, userId),
+            inArray(contributionAllocations.contributionId, chunk),
+          ),
+        )),
+    );
+  }
+  for (const row of rows) {
+    const allocation = toAllocationRow(row);
+    const existing = byContribution.get(allocation.contributionId);
+    if (existing) {
+      existing.push(allocation);
+    } else {
+      byContribution.set(allocation.contributionId, [allocation]);
+    }
+  }
+  return byContribution;
 }
 
 export async function getAllocation(
@@ -280,4 +324,22 @@ export async function bulkInsertAllocations(
     )
     .returning();
   return rows.map(toAllocationRow);
+}
+
+/** Replaces how a contribution's flow splits across accounts, atomically with the contribution. */
+export async function replaceAllocations(
+  db: Db,
+  userId: string,
+  contributionId: string,
+  inputs: Omit<CreateContributionAllocationInput, "contributionId">[],
+): Promise<ContributionAllocationRow[]> {
+  await db
+    .delete(contributionAllocations)
+    .where(
+      and(
+        eq(contributionAllocations.userId, userId),
+        eq(contributionAllocations.contributionId, contributionId),
+      ),
+    );
+  return bulkInsertAllocations(db, userId, inputs.map((input) => ({ ...input, contributionId })));
 }

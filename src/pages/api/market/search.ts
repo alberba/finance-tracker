@@ -7,7 +7,7 @@ import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 const json = createJsonResponse('private, max-age=60')
 
 export const GET: APIRoute = async ({ url, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling('/api/market/search', async () => {
     requirePrincipal(locals)
     const query = url.searchParams.get('q')?.trim() || ''
     const provider = url.searchParams.get('provider')?.trim().toLowerCase() || 'yahoo'

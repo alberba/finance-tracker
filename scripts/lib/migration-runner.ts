@@ -32,10 +32,12 @@ import {
   marketRepository,
   pendingMovementsRepository,
   recurringRulesRepository,
+  stockeventsCashMappingsRepository,
   stockeventsSymbolMappingsRepository,
   subscriptionsRepository,
   transactionsRepository,
   usersRepository,
+  userSettingsRepository,
   wealthRepository,
 } from "../../src/db/repositories";
 import { runInTransaction, type Db } from "../../src/db/repositories/shared";
@@ -426,7 +428,6 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
       if (!v2CategoryId) {
         anomaly("subscriptions", sub.id, `Category '${sub.category}' not found; categoryId left null.`);
       }
-      const dayMatch = /^\d{4}-\d{2}-(\d{2})$/.exec(sub.startDate);
       toInsert.push({
         legacyId: sub.id,
         name: sub.name,
@@ -434,7 +435,8 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         accountId: v2AccountId,
         amount: sub.amount,
         currency: state.currency,
-        billingDay: dayMatch ? Number(dayMatch[1]) : null,
+        startDate: sub.startDate,
+        nextChargeDate: sub.nextChargeDate,
         frequency: sub.frequency,
         isActive: sub.active,
       });
@@ -462,7 +464,11 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         bump("recurringRules", "skippedExisting");
         continue;
       }
-      const v2AccountId = accountIdByKey.get(`cash:${rule.accountId}`) ?? null;
+      const v2AccountId =
+        accountIdByKey.get(`cash:${rule.accountId}`) ??
+        accountIdByKey.get(`investment:${rule.accountId}`) ??
+        accountIdByKey.get(`liability:${rule.accountId}`) ??
+        null;
       if (!v2AccountId) {
         anomaly("recurringRules", rule.id, `Account '${rule.accountId}' not found; accountId left null.`);
       }
@@ -481,7 +487,17 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
           amount: rule.amount,
           currency: state.currency,
           frequency: rule.frequency,
+          interval: rule.interval,
+          startDate: rule.startDate,
+          endDate: rule.endDate,
+          lastExecutionDate: rule.lastExecutionDate,
           nextRunDate: rule.nextOccurrenceDate,
+          symbol: rule.symbol ?? null,
+          side: rule.side ?? null,
+          units: rule.units ?? null,
+          unitPrice: rule.unitPrice ?? null,
+          fee: rule.fee ?? null,
+          time: rule.time ?? null,
           status: rule.active ? "active" : "paused",
         },
       });
@@ -516,7 +532,14 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         bump("pendingMovements", "skippedAnomaly");
         continue;
       }
-      const v2AccountId = accountIdByKey.get(`cash:${pm.accountId}`) ?? null;
+      const v2AccountId =
+        accountIdByKey.get(`cash:${pm.accountId}`) ??
+        accountIdByKey.get(`investment:${pm.accountId}`) ??
+        accountIdByKey.get(`liability:${pm.accountId}`) ??
+        null;
+      if (!v2AccountId) {
+        anomaly("pendingMovements", pm.id, `Account '${pm.accountId}' not found; accountId left null.`);
+      }
       const v2CategoryId = categoryIdByKey.get(`${pm.type}:${pm.category}`) ?? null;
       toInsert.push({
         legacyId: pm.id,
@@ -527,6 +550,15 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         currency: state.currency,
         dueDate: pm.occurrenceDate,
         status: pm.status,
+        type: pm.type,
+        description: pm.description ?? null,
+        symbol: pm.symbol ?? null,
+        side: pm.side ?? null,
+        units: pm.units ?? null,
+        unitPrice: pm.unitPrice ?? null,
+        fee: pm.fee ?? null,
+        time: pm.time ?? null,
+        transactionId: pm.transactionId ?? null,
       });
     }
     if (toInsert.length) {
@@ -813,11 +845,45 @@ async function applyMigration(db: Db, state: State, options: RunMigrationOptions
         legacyId: mapping.symbol,
         categoryId: null,
         stockeventsSymbol: mapping.targetSymbol || mapping.symbol,
+        sync: mapping.sync === true,
+        watchlistId: mapping.watchlistId || null,
+        hidden: mapping.hidden === true,
       });
     }
     if (toInsert.length) {
       await stockeventsSymbolMappingsRepository.bulkInsert(db, userId, toInsert);
       bump("stockeventsSymbolMappings", "inserted", toInsert.length);
+    }
+  }
+
+  // -- 15b. Stock Events settings (enabled flag + cash mappings) --------------
+  {
+    if (state.stockEvents.enabled) {
+      const existingSettings = await userSettingsRepository.get(db, userId);
+      if (existingSettings) {
+        await userSettingsRepository.update(db, userId, { stockeventsEnabled: true });
+      } else {
+        await userSettingsRepository.create(db, userId, { stockeventsEnabled: true });
+      }
+    }
+    const cashMappings = state.stockEvents.cashMappings || [];
+    for (const cashMapping of cashMappings) {
+      if (!cashMapping.watchlistId) continue;
+      const serverAccountId = accountIdByKey.get(`cash:${cashMapping.accountId}`)
+        ?? accountIdByKey.get(`investment:${cashMapping.accountId}`)
+        ?? accountIdByKey.get(`liability:${cashMapping.accountId}`);
+      if (!serverAccountId) {
+        anomaly(
+          "stockeventsCashMappings",
+          cashMapping.accountId,
+          "Referenced account not found; Stock Events cash mapping dropped.",
+        );
+        continue;
+      }
+      await stockeventsCashMappingsRepository.upsertMapping(db, userId, {
+        accountId: serverAccountId,
+        watchlistId: cashMapping.watchlistId,
+      });
     }
   }
 

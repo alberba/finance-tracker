@@ -34,6 +34,68 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Maximum number of bound parameters a single D1 statement accepts.
+ *
+ * FINANCE-TRACKER-7: `GET /api/bootstrap` returned a 500 with
+ * `D1_ERROR: too many SQL variables` because its batch loaders handed every
+ * id of the user's dataset to one `inArray(...)`, and SQLite/D1 rejects a
+ * statement that binds more parameters than this ceiling. The batch loaders
+ * are the ones that build those lists, so the fix belongs to this layer:
+ * every unbounded `inArray` here must go through {@link chunkIds} instead of
+ * passing the whole id list to a single query.
+ */
+export const MAX_SQL_VARIABLES_PER_STATEMENT = 50;
+
+/**
+ * Splits `ids` into order-preserving chunks of at most `size` entries, so
+ * each chunk can be passed to its own `inArray(...)`.
+ *
+ * Never returns an empty chunk array for non-empty input (that guarantee is
+ * what lets callers accumulate rows in a loop without an extra
+ * empty-input branch), and returns `[]` for empty input so the caller's own
+ * early return stays the only empty-input path.
+ */
+export function chunkIds(
+  ids: readonly string[],
+  size: number = MAX_SQL_VARIABLES_PER_STATEMENT,
+): string[][] {
+  const chunks: string[][] = [];
+  for (let start = 0; start < ids.length; start += size) {
+    chunks.push(ids.slice(start, start + size));
+  }
+  return chunks;
+}
+
+/**
+ * `WHERE` condition for the optimistic-concurrency guard, or `undefined` when
+ * the caller has no version to pin.
+ *
+ * Every `update`/`remove` in this layer repeats the same ternary; keeping it
+ * here means the guard has one definition instead of twenty-six copies.
+ */
+export function versionGuard(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each table's version column is a different integer column type
+  column: any,
+  expectedVersion?: number,
+) {
+  return expectedVersion === undefined ? undefined : eq(column, expectedVersion);
+}
+
+/**
+ * Identity the client minted for a new entity (ADR 0001), ready to spread into
+ * an insert's values.
+ *
+ * Optional because the two writers differ: the client always sends one for an
+ * entity it creates (the identity is its primary key from the first instant),
+ * while the v1 migration (`scripts/lib/migration-runner.ts`) writes no `id` at
+ * all — the column's server-side UUIDv7 default applies and the row stays
+ * reconcilable by its derived `legacyId`.
+ */
+export function clientIdentity(id: string | undefined): { id?: string } {
+  return id ? { id } : {};
+}
+
 /** Converts a boolean domain flag to the `0`/`1` integer flag columns use. */
 export function toFlag(value: boolean | undefined, fallback = 0): number {
   if (value === undefined) {
@@ -131,6 +193,18 @@ export async function runInTransaction<T>(db: Db, fn: (db: Db) => Promise<T>): P
 }
 
 /**
+ * A write that can never succeed as submitted (dangling/foreign reference,
+ * entity still in use). `applyOneCommand` turns it into a terminal
+ * `rejected` outcome instead of a 500 the client would retry forever.
+ */
+export class RejectedCommandError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RejectedCommandError";
+  }
+}
+
+/**
  * Cross-tenant FK-ownership guard (WP10 security fix).
  *
  * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,
@@ -162,7 +236,7 @@ export async function assertOwnedReferences(
       .from(schema.accounts)
       .where(and(eq(schema.accounts.id, refs.accountId), eq(schema.accounts.userId, userId)));
     if (!account) {
-      throw new Error("La cuenta indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La cuenta indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.categoryId) {
@@ -171,7 +245,7 @@ export async function assertOwnedReferences(
       .from(schema.categories)
       .where(and(eq(schema.categories.id, refs.categoryId), eq(schema.categories.userId, userId)));
     if (!category) {
-      throw new Error("La categoría indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La categoría indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.recurringRuleId) {
@@ -182,7 +256,7 @@ export async function assertOwnedReferences(
         and(eq(schema.recurringRules.id, refs.recurringRuleId), eq(schema.recurringRules.userId, userId)),
       );
     if (!rule) {
-      throw new Error("La regla recurrente indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La regla recurrente indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.snapshotId) {
@@ -193,7 +267,7 @@ export async function assertOwnedReferences(
         and(eq(schema.wealthSnapshots.id, refs.snapshotId), eq(schema.wealthSnapshots.userId, userId)),
       );
     if (!snapshot) {
-      throw new Error("La instantánea indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La instantánea indicada no existe o no pertenece al usuario.");
     }
   }
   if (refs.contributionId) {
@@ -204,7 +278,7 @@ export async function assertOwnedReferences(
         and(eq(schema.contributions.id, refs.contributionId), eq(schema.contributions.userId, userId)),
       );
     if (!contribution) {
-      throw new Error("La aportación indicada no existe o no pertenece al usuario.");
+      throw new RejectedCommandError("La aportación indicada no existe o no pertenece al usuario.");
     }
   }
 }

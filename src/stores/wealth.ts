@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { buildWealthViewModel } from '../domain/wealth/view-model'
-import { syncUpsert } from '../lib/client/command-mapping'
+import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
 import type { SnapshotKind } from '../scripts/types'
 import { parseFloatSafe, round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -22,7 +22,9 @@ export const useWealthStore = defineStore('wealth', () => {
   const ui = uiStore.ui
 
   const snapshotMonth = computed(() => ui.snapshotMonth)
-  const viewModel = computed(() => buildWealthViewModel(financialStateStore.state, ui.snapshotMonth))
+  const viewModel = computed(() =>
+    buildWealthViewModel(financialStateStore.state, ui.snapshotMonth),
+  )
 
   function setMonth(month: number): void {
     ui.snapshotMonth = month
@@ -30,7 +32,6 @@ export const useWealthStore = defineStore('wealth', () => {
 
   function saveSnapshot(edits: SnapshotEdit[]): void {
     const month = ui.snapshotMonth
-    const isNewSnapshot = !financialStateStore.state.snapshots[String(month)]
     financialStateStore.commitState((draft) => {
       if (!draft.snapshots[String(month)]) {
         draft.snapshots[String(month)] = {
@@ -50,18 +51,10 @@ export const useWealthStore = defineStore('wealth', () => {
         }
       })
     })
-    if (isNewSnapshot) {
-      // WP7b — only the snapshot's *existence* (date/year/month) is synced.
-      // The actual balance edits (`snapshot.accounts/investments/liabilities`)
-      // map to `snapshot_balances`, explicitly out of `SYNC_ENTITY_TYPES`
-      // (see `command-schemas.ts`'s doc comment) — left unsynced.
-      const year = financialStateStore.year
-      void syncUpsert('wealthSnapshot', String(month), {
-        snapshotDate: `${year}-${String(month + 1).padStart(2, '0')}-01`,
-        year,
-        month: month + 1,
-      })
-    }
+    const snapshot = financialStateStore.state.snapshots[String(month)]
+    const year = financialStateStore.year
+    const currency = financialStateStore.state.currency
+    void syncSnapshotBalances(year, snapshot, currency)
     showToast('Snapshot guardado.')
   }
 

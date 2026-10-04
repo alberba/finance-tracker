@@ -135,6 +135,7 @@ const FALLBACK_BASE_SEED = {
   stockEvents: {
     enabled: false,
     apiKey: "",
+    tradesToCash: false,
     symbolMappings: [],
     cashMappings: [],
     cashSyncEntries: [],
@@ -602,6 +603,7 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
   return {
     enabled: raw.enabled === true,
     apiKey: String(raw.apiKey || "").trim(),
+    tradesToCash: raw.tradesToCash === true,
     symbolMappings,
     cashMappings,
     cashSyncEntries,

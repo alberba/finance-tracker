@@ -30,6 +30,7 @@ import * as wealthRepository from "../../../db/repositories/wealth";
 import * as contributionsRepository from "../../../db/repositories/contributions";
 import * as marketRepository from "../../../db/repositories/market";
 import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
+import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 import { runInTransaction } from "../../../db/repositories/shared";
@@ -61,7 +62,7 @@ interface ImportSummary {
 }
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/data/import", async () => {
     const principal = requirePrincipal(locals);
 
     let body: Row;
@@ -161,7 +162,8 @@ export const POST: APIRoute = async ({ request, locals }) =>
           categoryId: categoryId ?? null,
           amount: typeof row.amount === "number" ? row.amount : 0,
           currency: String(row.currency ?? "EUR"),
-          billingDay: typeof row.billingDay === "number" ? row.billingDay : null,
+          startDate: typeof row.startDate === "string" ? row.startDate : null,
+          nextChargeDate: typeof row.nextChargeDate === "string" ? row.nextChargeDate : null,
           frequency: String(row.frequency ?? "monthly"),
           isActive: row.isActive === undefined ? true : Boolean(row.isActive),
         });
@@ -347,8 +349,29 @@ export const POST: APIRoute = async ({ request, locals }) =>
           legacyId: typeof row.legacyId === "string" ? row.legacyId : null,
           categoryId: categoryId ?? null,
           stockeventsSymbol: String(row.stockeventsSymbol ?? ""),
+          sync: row.sync === 1 || row.sync === true,
+          watchlistId: typeof row.watchlistId === "string" ? row.watchlistId : null,
+          hidden: row.hidden === 1 || row.hidden === true,
         });
         bump(imported, "stockeventsSymbolMappings");
+      }
+
+      // -- stockeventsCashMappings ---------------------------------------------
+      for (const row of asRows((body as Row).stockeventsCashMappings)) {
+        const accountId = remapOptionalId(accountIdMap, row.accountId);
+        if (accountId === "__skip__") {
+          bump(skipped, "stockeventsCashMappings");
+          continue;
+        }
+        if (typeof row.watchlistId !== "string" || !row.watchlistId) {
+          bump(skipped, "stockeventsCashMappings");
+          continue;
+        }
+        await stockeventsCashMappingsRepository.upsertMapping(tx, userId, {
+          accountId: accountId ?? (typeof row.accountId === "string" ? row.accountId : null),
+          watchlistId: row.watchlistId,
+        });
+        bump(imported, "stockeventsCashMappings");
       }
 
       // -- settings (singleton) ----------------------------------------------
@@ -359,6 +382,14 @@ export const POST: APIRoute = async ({ request, locals }) =>
           currency: typeof settingsRow.currency === "string" ? settingsRow.currency : undefined,
           locale: typeof settingsRow.locale === "string" ? settingsRow.locale : undefined,
           theme: typeof settingsRow.theme === "string" ? settingsRow.theme : undefined,
+          stockeventsEnabled:
+            settingsRow.stockeventsEnabled === 1 || settingsRow.stockeventsEnabled === true
+              ? true
+              : undefined,
+          stockeventsTradesToCash:
+            settingsRow.stockeventsTradesToCash === 1 || settingsRow.stockeventsTradesToCash === true
+              ? true
+              : undefined,
         };
         if (existing) {
           await userSettingsRepository.update(tx, userId, patch);

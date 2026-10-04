@@ -1,0 +1,35 @@
+{
+  "provenance": "synthetic zero-fee variants derived from sanitized examples; user-authorized assumption, not observed remotely",
+  "assumption": {
+    "feesAmount": "0",
+    "feesCurrency": "EUR"
+  },
+  "transactions": [
+    {
+      "transactionId": "synthetic-zero-1",
+      "executedAt": "2020-01-01T00:00:00.000Z",
+      "type": "buy",
+      "priceCurrency": "EUR",
+      "priceAmount": "76953",
+      "sentCurrency": "EUR",
+      "sentAmount": "6.83210665605",
+      "receivedCurrency": "BTC",
+      "receivedAmount": "0.00008878285",
+      "feesCurrency": "EUR",
+      "feesAmount": "0"
+    },
+    {
+      "transactionId": "synthetic-zero-2",
+      "executedAt": "2020-01-01T00:01:00.000Z",
+      "type": "sell",
+      "priceCurrency": "EUR",
+      "priceAmount": "78957",
+      "sentCurrency": "BTC",
+      "sentAmount": "0.00074064803",
+      "receivedCurrency": "EUR",
+      "receivedAmount": "58.47934650471",
+      "feesCurrency": "EUR",
+      "feesAmount": "0"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 import { and, eq } from "drizzle-orm";
 import { userSettings } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { type Db, nowIso, versionGuard } from "./shared";
 
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 
@@ -10,12 +10,16 @@ export interface CreateUserSettingsInput {
   currency?: string;
   locale?: string | null;
   theme?: string | null;
+  stockeventsEnabled?: boolean;
+  stockeventsTradesToCash?: boolean;
 }
 
 export interface UpdateUserSettingsInput {
   currency?: string;
   locale?: string | null;
   theme?: string | null;
+  stockeventsEnabled?: boolean;
+  stockeventsTradesToCash?: boolean;
 }
 
 export async function get(db: Db, userId: string): Promise<UserSettingsRow | undefined> {
@@ -36,6 +40,8 @@ export async function create(
       currency: input.currency ?? "EUR",
       locale: input.locale ?? null,
       theme: input.theme ?? null,
+      stockeventsEnabled: input.stockeventsEnabled ? 1 : 0,
+      stockeventsTradesToCash: input.stockeventsTradesToCash ? 1 : 0,
       createdAt: now,
       updatedAt: now,
     })
@@ -47,6 +53,7 @@ export async function update(
   db: Db,
   userId: string,
   input: UpdateUserSettingsInput,
+  expectedVersion?: number,
 ): Promise<UserSettingsRow | undefined> {
   const existing = await get(db, userId);
   if (!existing) {
@@ -58,19 +65,39 @@ export async function update(
       currency: input.currency ?? existing.currency,
       locale: input.locale === undefined ? existing.locale : input.locale,
       theme: input.theme === undefined ? existing.theme : input.theme,
+      stockeventsEnabled:
+        input.stockeventsEnabled === undefined
+          ? existing.stockeventsEnabled
+          : input.stockeventsEnabled
+            ? 1
+            : 0,
+      stockeventsTradesToCash:
+        input.stockeventsTradesToCash === undefined
+          ? existing.stockeventsTradesToCash
+          : input.stockeventsTradesToCash
+            ? 1
+            : 0,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(eq(userSettings.id, existing.id), eq(userSettings.userId, userId)))
+    .where(and(
+      eq(userSettings.id, existing.id),
+      eq(userSettings.userId, userId),
+      versionGuard(userSettings.version, expectedVersion),
+    ))
     .returning();
   return row;
 }
 
-export async function remove(db: Db, userId: string): Promise<boolean> {
+export async function remove(db: Db, userId: string, expectedVersion?: number): Promise<boolean> {
   const existing = await get(db, userId);
   if (!existing) {
     return false;
   }
-  await db.delete(userSettings).where(and(eq(userSettings.id, existing.id), eq(userSettings.userId, userId)));
-  return true;
+  const deleted = await db.delete(userSettings).where(and(
+    eq(userSettings.id, existing.id),
+    eq(userSettings.userId, userId),
+    versionGuard(userSettings.version, expectedVersion),
+  )).returning({ id: userSettings.id });
+  return deleted.length > 0;
 }

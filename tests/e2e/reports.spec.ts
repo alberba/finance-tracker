@@ -219,6 +219,79 @@ test.describe("Reports E2E", () => {
     );
   });
 
+  test("explica el fallo de conexión cuando el navegador no obtiene respuesta", async ({
+    page,
+    tracker,
+  }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.abort("failed");
+    });
+
+    await tracker.submitIssueReport({
+      type: "bug",
+      summary: "Sin respuesta del servidor",
+      description: "El navegador no obtiene respuesta del endpoint de reportes.",
+    });
+
+    const status = tracker.issueReportStatus();
+    await expect(status).toContainText(
+      "No se pudo crear la issue: No hay conexión con el servidor",
+    );
+    await expect(status).not.toContainText("Failed to fetch");
+  });
+
+  test("no muestra el error del parser cuando la respuesta no es JSON", async ({
+    page,
+    tracker,
+  }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<!doctype html><html><body>Acceso</body></html>",
+      });
+    });
+
+    await tracker.submitIssueReport({
+      type: "bug",
+      summary: "Respuesta que no es JSON",
+      description: "El borde devuelve HTML donde el cliente espera JSON.",
+    });
+
+    const status = tracker.issueReportStatus();
+    await expect(status).toContainText(
+      "No se pudo crear la issue: El servidor devolvió una respuesta que no se pudo interpretar.",
+    );
+    await expect(status).not.toContainText("Unexpected token");
+  });
+
+  test("pide volver a entrar cuando la sesión del borde venció", async ({
+    page,
+    tracker,
+  }) => {
+    await page.route("**/api/issues/report", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "Token de Cf-Access inválido o caducado.",
+        }),
+      });
+    });
+
+    await tracker.submitIssueReport({
+      type: "feature",
+      summary: "Sesión del borde vencida",
+      description: "El borde responde 401 al intentar crear la issue.",
+    });
+
+    const status = tracker.issueReportStatus();
+    await expect(status).toContainText(
+      "No se pudo crear la issue: Tu sesión venció. Vuelve a entrar o recarga la página.",
+    );
+    await expect(status).not.toContainText("Token de Cf-Access");
+  });
+
   test("los modales principales se abren centrados en pantalla", async ({
     page,
     tracker,

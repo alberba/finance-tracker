@@ -3,13 +3,15 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { budgetEntries } from "../schema";
-import { assertOwnedReferences, nowIso, type Db } from "./shared";
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type BudgetEntryRow = Omit<typeof budgetEntries.$inferSelect, "amountMinor"> & {
   amount: number;
 };
 
 export interface CreateBudgetEntryInput {
+  /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
+  id?: string;
   legacyId?: string | null;
   categoryId: string;
   year: number;
@@ -50,6 +52,7 @@ export async function create(
   const [row] = await db
     .insert(budgetEntries)
     .values({
+      ...clientIdentity(input.id),
       userId,
       legacyId: input.legacyId ?? null,
       categoryId: input.categoryId,
@@ -88,7 +91,7 @@ export async function update(
     .where(and(
       eq(budgetEntries.id, id),
       eq(budgetEntries.userId, userId),
-      expectedVersion === undefined ? undefined : eq(budgetEntries.version, expectedVersion),
+      versionGuard(budgetEntries.version, expectedVersion),
     ))
     .returning();
   return row ? toRow(row) : undefined;
@@ -102,7 +105,7 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   const deleted = await db.delete(budgetEntries).where(and(
     eq(budgetEntries.id, id),
     eq(budgetEntries.userId, userId),
-    expectedVersion === undefined ? undefined : eq(budgetEntries.version, expectedVersion),
+    versionGuard(budgetEntries.version, expectedVersion),
   )).returning({ id: budgetEntries.id });
   return deleted.length > 0;
 }
@@ -120,6 +123,7 @@ export async function bulkInsert(
     .insert(budgetEntries)
     .values(
       inputs.map((input) => ({
+        ...clientIdentity(input.id),
         userId,
         legacyId: input.legacyId ?? null,
         categoryId: input.categoryId,

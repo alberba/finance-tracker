@@ -13,7 +13,7 @@ interface QuotesBody {
 }
 
 export const POST: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling('/api/market/quotes', async () => {
     requirePrincipal(locals)
     try {
     const body = (await request.json()) as QuotesBody

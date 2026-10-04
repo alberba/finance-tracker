@@ -21,7 +21,7 @@ function parseSince(url: URL): number | "invalid" {
 }
 
 export const GET: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling(async () => {
+  withApiErrorHandling("/api/changes", async () => {
     const principal = requirePrincipal(locals);
     const url = new URL(request.url);
     const since = parseSince(url);

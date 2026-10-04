@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as accountsRepo from "../../../../src/db/repositories/accounts";
+import * as transactionsRepo from "../../../../src/db/repositories/transactions";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
 
@@ -67,6 +68,29 @@ describe("accounts repository", () => {
     expect(await accountsRepo.remove(db, userB.id, accountA.id)).toBe(false);
   });
 
+  it("rejects deleting an account still in use instead of a raw FK violation (audit §2.6)", async () => {
+    const { db } = testDb;
+    const user = await seedUser(db);
+    const account = await accountsRepo.create(db, user.id, {
+      name: "Cuenta con movimientos",
+      kind: "cash",
+      currency: "EUR",
+      openingBalance: 0,
+    });
+    await transactionsRepo.create(db, user.id, {
+      accountId: account.id,
+      type: "expense",
+      date: "2026-01-15",
+      amount: 10,
+      currency: "EUR",
+    });
+
+    await expect(accountsRepo.remove(db, user.id, account.id)).rejects.toThrow(
+      /tiene movimientos u otros datos asociados/i,
+    );
+    expect(await accountsRepo.get(db, user.id, account.id)).not.toBeUndefined();
+  });
+
   it("bulk inserts accounts for the migration tool", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
@@ -102,6 +126,31 @@ describe("accounts repository", () => {
       await expect(
         accountsRepo.createCategory(db, "does-not-exist", { name: "x", kind: "expense" }),
       ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
+    });
+
+    it("rejects deleting a category still in use instead of a raw FK violation (audit §2.6)", async () => {
+      const { db } = testDb;
+      const user = await seedUser(db);
+      const account = await accountsRepo.create(db, user.id, {
+        name: "Cuenta",
+        kind: "cash",
+        currency: "EUR",
+        openingBalance: 0,
+      });
+      const category = await accountsRepo.createCategory(db, user.id, { name: "Ocio", kind: "expense" });
+      await transactionsRepo.create(db, user.id, {
+        accountId: account.id,
+        categoryId: category.id,
+        type: "expense",
+        date: "2026-01-15",
+        amount: 10,
+        currency: "EUR",
+      });
+
+      await expect(accountsRepo.removeCategory(db, user.id, category.id)).rejects.toThrow(
+        /está en uso/i,
+      );
+      expect(await accountsRepo.getCategory(db, user.id, category.id)).not.toBeUndefined();
     });
   });
 

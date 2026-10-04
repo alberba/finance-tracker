@@ -5,6 +5,7 @@ import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
   resolveCategoryId,
+  resolveOrCreateCategoryId,
   resolveEntityId,
   syncListDiff,
   type CategoryKind,
@@ -19,8 +20,10 @@ import type {
   TransactionType,
 } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
+import { buildInvestmentTransactionData } from './investment'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
+import { useSyncStore } from './sync'
 
 /**
  * WP7b — maps a legacy `RecurringRule` row to a `recurringRule` sync
@@ -47,7 +50,7 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(rule.type as CategoryKind, rule.category)
+  const categoryId = await resolveOrCreateCategoryId(rule.type as CategoryKind, rule.category)
   return {
     name: rule.description,
     type: rule.type,
@@ -56,21 +59,66 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
     amount: rule.amount,
     currency,
     frequency: rule.frequency,
+    interval: rule.interval,
+    startDate: rule.startDate,
+    endDate: rule.endDate,
+    lastExecutionDate: rule.lastExecutionDate,
     nextRunDate: rule.nextOccurrenceDate,
+    ...operationData(rule),
     status: rule.active ? 'active' : 'paused',
   }
 }
 
 /**
+ * The operation of an investment template, flattened into the command
+ * payload. Sent as explicit `null`s rather than omitted so turning an
+ * investment rule into an expense clears the columns instead of leaving
+ * yesterday's symbol behind.
+ */
+function operationData(template: {
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
+}) {
+  return {
+    symbol: template.symbol ?? null,
+    side: template.side ?? null,
+    units: template.units ?? null,
+    unitPrice: template.unitPrice ?? null,
+    fee: template.fee ?? null,
+    time: template.time ?? null,
+  }
+}
+
+function clearInvestmentFields(target: {
+  symbol?: string
+  side?: InvestmentSide
+  units?: number
+  unitPrice?: number
+  fee?: number
+  time?: string
+}): void {
+  delete target.symbol
+  delete target.side
+  delete target.units
+  delete target.unitPrice
+  delete target.fee
+  delete target.time
+}
+
+/**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
  * command payload. Returns `null` (skip, see `syncListDiff`) when the
- * parent recurring rule *or* account hasn't synced yet — both
- * `recurringRuleId` and `accountId` are required fields in
- * `entityCreateSchemas.pendingMovement` (see the WP10 fix note on
- * `buildRecurringRuleData` above for `accountId`).
+ * account hasn't synced yet; the parent rule is waited for rather than
+ * skipped (see `resolveRecurringRuleId`). Both `recurringRuleId` and
+ * `accountId` are required fields in `entityCreateSchemas.pendingMovement`
+ * (see the WP10 fix note on `buildRecurringRuleData` above for `accountId`).
  */
 async function buildPendingMovementData(pending: PendingMovement, currency: string) {
-  const recurringRuleId = await resolveEntityId('recurringRule', pending.ruleId)
+  const recurringRuleId = await resolveRecurringRuleId(pending.ruleId)
   if (!recurringRuleId) {
     return null
   }
@@ -78,7 +126,7 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
   if (!accountId) {
     return null
   }
-  const categoryId = await resolveCategoryId(pending.type as CategoryKind, pending.category)
+  const categoryId = await resolveOrCreateCategoryId(pending.type as CategoryKind, pending.category)
   return {
     recurringRuleId,
     accountId,
@@ -86,7 +134,62 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
     amount: pending.amount,
     currency,
     dueDate: pending.occurrenceDate,
+    type: pending.type,
+    description: pending.description,
+    ...operationData(pending),
+    transactionId: pending.transactionId,
     status: pending.status,
+  }
+}
+
+/**
+ * How many times `resolveRecurringRuleId` re-asks for a rule's server id
+ * before giving up. Each attempt costs one flush plus one macrotask.
+ */
+const RULE_RESOLUTION_ATTEMPTS = 10
+
+/**
+ * A pending movement cannot exist server-side before the rule that
+ * generated it: `recurringRuleId` is a required reference
+ * (`entityCreateSchemas.pendingMovement`). But `addRule` enqueues the
+ * rule's `create` and generates its first occurrences in the same tick, so
+ * at that instant the rule has no server id yet — and a skipped occurrence
+ * is never mutated again, so it used to be skipped forever and the pending
+ * movement simply never reached D1 (audit §3.2c).
+ *
+ * So wait for the rule to cross instead of giving up: each attempt asks
+ * the outbox to flush and re-reads the local cache, which is where the
+ * server's answer lands.
+ */
+async function resolveRecurringRuleId(localRuleId: string): Promise<string | null> {
+  for (let attempt = 0; attempt < RULE_RESOLUTION_ATTEMPTS; attempt += 1) {
+    const resolved = await resolveEntityId('recurringRule', localRuleId)
+    if (resolved) {
+      return resolved
+    }
+    const syncStore = useSyncStore()
+    if (!syncStore.enabled) {
+      return null
+    }
+    // `flush()` returns at once when another flush is already in flight —
+    // and `addRule` starts one. Asking again in the next tick would burn
+    // every attempt without the rule ever crossing, and the occurrence is
+    // dropped for good. So wait for the flush that *is* running to land.
+    await syncStore.flush()
+    await waitWhileSyncing(syncStore)
+  }
+  return null
+}
+
+/** How many macrotasks to give an in-flight flush before asking again. */
+const FLUSH_SETTLE_TICKS = 20
+
+async function waitWhileSyncing(syncStore: ReturnType<typeof useSyncStore>): Promise<void> {
+  for (let tick = 0; tick < FLUSH_SETTLE_TICKS; tick += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    if (syncStore.syncStatus !== 'syncing') {
+      return
+    }
   }
 }
 
@@ -132,6 +235,7 @@ export interface PendingMovementEdit {
   category: string
   description: string
   amount: number
+  type?: TransactionType
   symbol?: string
   side?: InvestmentSide
   units?: number
@@ -207,6 +311,13 @@ export const useRecurringStore = defineStore('recurring', () => {
     const hasExistingExecution = currentRule.lastExecutionDate !== null
       || pendingMovements.value.some((pending) => pending.ruleId === id)
 
+    // Snapshot *before* the mutation: `refreshPending`'s own diff is taken
+    // after it, and compares against a copy `generatePendingMovements`
+    // rebuilt from the edited rule — identical but for the dates. So an
+    // edit that does not move the calendar produced no command at all, and
+    // was lost on the next reload (audit §3.2a).
+    const before = financialStateStore.state.recurringRules
+
     financialStateStore.commitState((draft) => {
       const rule = draft.recurringRules.find((item) => item.id === id)
       if (!rule) return
@@ -240,6 +351,9 @@ export const useRecurringStore = defineStore('recurring', () => {
         if (input.time) rule.time = input.time
       }
     })
+    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
+      buildRecurringRuleData(item, financialStateStore.currency),
+    )
     refreshPending()
     return true
   }
@@ -280,6 +394,13 @@ export const useRecurringStore = defineStore('recurring', () => {
     const category = edit?.category || pending.category
     const description = edit?.description || pending.description
     const amount = edit?.amount ?? pending.amount
+    const type = edit?.type || pending.type
+    const symbol = edit?.symbol ?? pending.symbol
+    const side = edit?.side ?? pending.side
+    const units = edit?.units ?? pending.units
+    const unitPrice = edit?.unitPrice ?? pending.unitPrice
+    const fee = edit?.fee ?? pending.fee
+    const time = edit?.time ?? pending.time
     const transactionId = uid('tx')
     const beforeTransactions = financialStateStore.transactions
     const beforePending = financialStateStore.state.pendingMovements
@@ -287,17 +408,17 @@ export const useRecurringStore = defineStore('recurring', () => {
       id: transactionId,
       date: occurrenceDate,
       month: monthFromISO(occurrenceDate) ?? 0,
-      type: pending.type,
+      type,
       accountId,
       category,
       description: description.trim(),
-      amount: pending.type === 'investment' && pending.side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
-      ...(pending.symbol ? { symbol: pending.symbol } : {}),
-      ...(pending.side ? { side: pending.side } : {}),
-      ...(pending.units !== undefined ? { units: pending.units } : {}),
-      ...(pending.unitPrice !== undefined ? { unitPrice: pending.unitPrice } : {}),
-      ...(pending.fee !== undefined ? { fee: pending.fee } : {}),
-      ...(pending.time ? { time: pending.time } : {}),
+      amount: type === 'investment' && side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
+      ...(symbol ? { symbol } : {}),
+      ...(side ? { side } : {}),
+      ...(units !== undefined ? { units } : {}),
+      ...(unitPrice !== undefined ? { unitPrice } : {}),
+      ...(fee !== undefined ? { fee } : {}),
+      ...(time ? { time } : {}),
       declared: false,
       createdAt: new Date().toISOString(),
     }
@@ -311,15 +432,30 @@ export const useRecurringStore = defineStore('recurring', () => {
       current.transactionId = transactionId
       current.updatedAt = new Date().toISOString()
       if (edit) {
+        current.type = type
         current.occurrenceDate = occurrenceDate
         current.accountId = accountId
         current.category = category
         current.description = description
         current.amount = amount
+        if (type === 'investment') {
+          if (symbol !== undefined) current.symbol = symbol
+          if (side !== undefined) current.side = side
+          if (units !== undefined) current.units = units
+          if (unitPrice !== undefined) current.unitPrice = unitPrice
+          if (fee !== undefined) current.fee = fee
+          if (time !== undefined) current.time = time
+        } else {
+          clearInvestmentFields(current)
+        }
       }
     })
+    // An investment carries its operación and hora, which the bare payload
+    // drops — the server copy would then come back without them (#205).
     void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+      tx.type === 'investment'
+        ? buildInvestmentTransactionData(tx, financialStateStore.currency)
+        : buildTransactionData(tx, financialStateStore.currency),
     )
     void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
       buildPendingMovementData(pending, financialStateStore.currency),
@@ -331,7 +467,8 @@ export const useRecurringStore = defineStore('recurring', () => {
   function editPending(id: string, edit: PendingMovementEdit): boolean {
     const pending = openPendingMovements.value.find((item) => item.id === id)
     if (!pending) return false
-    const isInvestment = pending.type === 'investment'
+    const targetType = edit.type || pending.type
+    const isInvestment = targetType === 'investment'
     const investment = isInvestment
       ? computeInvestmentMovement({
           side: edit.side || pending.side || 'buy',
@@ -349,6 +486,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     financialStateStore.commitState((draft) => {
       const current = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
       if (!current) return
+      current.type = targetType
       current.occurrenceDate = edit.date
       current.accountId = edit.accountId
       current.category = edit.category
@@ -364,6 +502,8 @@ export const useRecurringStore = defineStore('recurring', () => {
           if (edit.time) current.time = edit.time
           else delete current.time
         }
+      } else {
+        clearInvestmentFields(current)
       }
       current.updatedAt = new Date().toISOString()
     })

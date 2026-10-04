@@ -1,0 +1,48 @@
+name: Dependency audit
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        id: audit
+        continue-on-error: true
+        shell: bash
+        run: pnpm audit:prod 2>&1 | tee audit.txt
+      - name: Open an issue when the audit fails
+        if: steps.audit.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title='Auditoría de dependencias de producción en rojo'
+          if gh issue list --state open --search "in:title \"$title\"" --json number --jq 'length' | grep -qx 0; then
+            {
+              echo "La auditoría semanal (\`pnpm audit:prod\`) ha fallado en \`${GITHUB_REF_NAME}\`: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              echo
+              echo '```'
+              tail -n 60 audit.txt
+              echo '```'
+            } > body.md
+            gh issue create --title "$title" --body-file body.md --label needs-triage
+          fi
