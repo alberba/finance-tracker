@@ -123,10 +123,11 @@ describe('budget window', () => {
     expect(defaultWindowStart(6, -1)).toBe(0)
   })
 
-  it('moves a whole window at a time and stops at the edges', () => {
-    expect(moveWindow(8, 3, -1)).toBe(5)
+  it('moves one month at a time and stops at the edges', () => {
+    expect(moveWindow(8, 3, -1)).toBe(7)
     expect(moveWindow(8, 3, 1)).toBe(9)
-    expect(moveWindow(1, 3, -1)).toBe(0)
+    expect(moveWindow(0, 3, -1)).toBe(0)
+    expect(moveWindow(9, 3, 1)).toBe(9)
   })
 })
 

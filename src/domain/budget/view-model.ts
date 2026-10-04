@@ -159,9 +159,9 @@ export function defaultWindowStart(range: BudgetRange, currentMonth: number): nu
   return clampStart(currentMonth + 2 - range, range)
 }
 
-/** Slides the window a whole range back (-1) or forward (1), inside the year. */
+/** Slides the window one month back (-1) or forward (1), inside the year. */
 export function moveWindow(start: number, range: BudgetRange, direction: -1 | 1): number {
-  return clampStart(start + direction * range, range)
+  return clampStart(start + direction, range)
 }
 
 function clampStart(start: number, range: BudgetRange): number {
