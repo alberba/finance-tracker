@@ -206,7 +206,7 @@ function confirmDelete(): void {
             <input
               type="text"
               inputmode="decimal"
-              class="font-display text-text-main hover:border-line-strong hover:bg-panel focus:border-primary focus:bg-panel h-10 w-28 rounded-sm border border-transparent bg-transparent px-2.5 text-right tabular-nums outline-none focus:shadow-[0_0_0_3px_var(--ring)]"
+              class="font-display text-text-main hover:border-line-strong hover:bg-panel focus:border-primary focus:bg-panel desk:h-10 h-11 w-28 rounded-sm border border-transparent bg-transparent px-2.5 text-right tabular-nums outline-none focus:shadow-[0_0_0_3px_var(--ring)]"
               :value="formatDecimalInput(row.flow)"
               :data-contribution-flow-date="row.date"
               :aria-label="`Aporte del cierre del ${formatShortDate(row.date)}`"

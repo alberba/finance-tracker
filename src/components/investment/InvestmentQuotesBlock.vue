@@ -93,7 +93,7 @@ const columns: LedgerColumn<InstrumentValuation>[] = [
           type="number"
           min="0"
           step="0.00000001"
-          class="font-display text-text-main hover:border-line-strong focus:border-primary focus:ring-primary/20 h-10 w-24 rounded-sm border border-transparent bg-transparent px-2.5 text-right text-sm tabular-nums focus:ring-3 focus:outline-none sm:w-32"
+          class="font-display text-text-main hover:border-line-strong focus:border-primary focus:ring-primary/20 desk:h-10 h-11 w-24 rounded-sm border border-transparent bg-transparent px-2.5 text-right text-sm tabular-nums focus:ring-3 focus:outline-none sm:w-32"
           @change="
             marketStore.updateCurrentUnits(
               row.instrument.id,
