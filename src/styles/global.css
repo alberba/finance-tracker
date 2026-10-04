@@ -47,11 +47,11 @@
     --ink-loss: #f87171;
 
     /* Brand / interaction */
-    --primary: #3b6bf0;
+    --primary: #3462e0; /* text tone too: AA (4.67:1) on --bg-main */
     --primary-light: #eaf0fe;
     /* Fill of primary buttons and its text: the same blue in both themes, so
        white text keeps AA (the dark --primary is too light under white). */
-    --primary-fill: #3b6bf0;
+    --primary-fill: #3462e0;
     --primary-fill-hover: #2a53d4;
     --on-primary: #ffffff;
 
