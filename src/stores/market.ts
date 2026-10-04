@@ -13,7 +13,7 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import { buildPortfolioValuation, type PortfolioValuation } from '../domain/investment/valuation'
-import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
+import { isUnlinkedMovementForInstrument } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
 import type { InstrumentType } from '../scripts/types'
 import { slug, todayISO, uid } from '../scripts/utils'
@@ -49,7 +49,12 @@ export const useMarketStore = defineStore('market', () => {
     const symbol = input.symbol.trim().toUpperCase()
     const assetId = input.investmentAssetId.trim()
     if (!symbol || !assetId) return false
-    if (instruments.value.some((instrument) => instrument.symbol === symbol && instrument.market === input.market.trim().toUpperCase())) {
+    if (
+      instruments.value.some(
+        (instrument) =>
+          instrument.symbol === symbol && instrument.market === input.market.trim().toUpperCase(),
+      )
+    ) {
       return false
     }
     financialStateStore.commitState((draft) => {
@@ -117,14 +122,15 @@ export const useMarketStore = defineStore('market', () => {
     const assetName = financialStateStore.investmentAssets.find(
       (asset) => asset.id === instrument.investmentAssetId,
     )?.name
-    return financialStateStore.transactions.filter(
-      (transaction) => isUnlinkedMovementForInstrument(transaction, instrument, assetName),
+    return financialStateStore.transactions.filter((transaction) =>
+      isUnlinkedMovementForInstrument(transaction, instrument, assetName),
     ).length
   }
 
   function linkedMovementCount(instrumentId: string): number {
     return financialStateStore.transactions.filter(
-      (transaction) => transaction.type === 'investment' && transaction.instrumentId === instrumentId,
+      (transaction) =>
+        transaction.type === 'investment' && transaction.instrumentId === instrumentId,
     ).length
   }
 
@@ -179,7 +185,8 @@ export const useMarketStore = defineStore('market', () => {
 
   async function refreshQuotes(force = false): Promise<boolean> {
     if (refreshPromise) return refreshPromise
-    if (!force && lastRefreshAt.value && Date.now() - Date.parse(lastRefreshAt.value) < 60_000) return true
+    if (!force && lastRefreshAt.value && Date.now() - Date.parse(lastRefreshAt.value) < 60_000)
+      return true
     refreshPromise = executeRefresh()
     try {
       return await refreshPromise
@@ -203,7 +210,8 @@ export const useMarketStore = defineStore('market', () => {
       tickClock()
       return true
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
+      errorMessage.value =
+        error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
       return false
     } finally {
       isLoading.value = false
@@ -233,17 +241,5 @@ export const useMarketStore = defineStore('market', () => {
 
 function normalizeUnits(value: string | number): number {
   const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed >= 0
-    ? Math.round(parsed * 100_000_000) / 100_000_000
-    : 0
-}
-
-function isUnlinkedMovementForInstrument(
-  transaction: { type: string; symbol?: string; category: string; instrumentId?: string },
-  instrument: Parameters<typeof symbolsMatchInstrument>[1],
-  assetName?: string,
-): boolean {
-  if (transaction.type !== 'investment' || transaction.instrumentId) return false
-  if (symbolsMatchInstrument(transaction.symbol, instrument)) return true
-  return !transaction.symbol && Boolean(assetName && transaction.category === assetName)
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100_000_000) / 100_000_000 : 0
 }

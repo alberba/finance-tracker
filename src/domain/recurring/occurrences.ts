@@ -110,6 +110,23 @@ function normalizeFirstOccurrenceDate(rule: RecurringRule, date: string): string
   return formatDate(lastDayOfMonth(parseDate(date)))
 }
 
+/** "Cada 3 meses": the unit of a frequency with an interval above one. */
+const INTERVAL_UNIT: Record<RecurringFrequency, string> = {
+  daily: 'días',
+  weekly: 'semanas',
+  monthly: 'meses',
+  monthEnd: 'fines de mes',
+  yearly: 'años',
+}
+
+/** A rule's frequency with its interval: "Mensual", "Cada 2 meses". */
+export function frequencyText(rule: { frequency: RecurringFrequency; interval?: number }): string {
+  const interval = Math.max(1, Math.floor(rule.interval || 1))
+  return interval === 1
+    ? frequencyLabel(rule.frequency)
+    : `Cada ${interval} ${INTERVAL_UNIT[rule.frequency]}`
+}
+
 export function frequencyLabel(frequency: RecurringFrequency): string {
   return {
     daily: 'Diaria',

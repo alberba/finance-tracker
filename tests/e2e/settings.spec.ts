@@ -1,245 +1,252 @@
-import { test, expect, mirrorStateToServer } from "./fixtures";
+import { test, expect, mirrorStateToServer } from './fixtures'
+import type { Page } from '@playwright/test'
 
-test.describe("Settings E2E", () => {
-  test("renderiza configuración base dentro del workspace Vue", { tag: "@smoke" }, async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openSettings();
+/**
+ * Edits the stored state in the page and mirrors it to the server. `edit`
+ * runs in the browser, so it can only use its argument.
+ */
+interface StoredState {
+  instruments: unknown[]
+  transactions: unknown[]
+  stockEvents?: unknown
+}
 
-    const settingsSection = tracker.section("settings");
+async function editState(page: Page, edit: (state: StoredState) => void) {
+  await page.evaluate(`(() => {
+    const raw = localStorage.getItem("finance-tracker-state-v1");
+    if (!raw) throw new Error("No se encontró el estado financiero inicial");
+    const state = JSON.parse(raw);
+    (${edit.toString()})(state);
+    localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
+  })()`)
+  await mirrorStateToServer(page)
+}
 
-    await expect(
-      page.locator("[data-finance-workspace] #settings"),
-    ).toBeVisible();
-    await expect(
-      settingsSection.getByRole("heading", { name: "Configuración base" }),
-    ).toBeVisible();
-    await expect(
-      settingsSection.locator("#settings-accounts .list-item").first(),
-    ).toBeVisible();
-  });
+test.describe('Settings E2E', () => {
+  test(
+    'muestra Configuración por entidades, con pestañas y contadores',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      await tracker.openSettings()
+      const settings = tracker.section('settings')
 
-  test("permite agregar una cuenta y refleja el cambio en el formulario de movimientos", async ({
-    tracker,
-    page,
-  }) => {
-    await tracker.openSettings();
+      await expect(page.locator('[data-finance-workspace] #settings')).toBeVisible()
+      await expect(
+        settings.getByRole('heading', { name: 'Configuración', exact: true }),
+      ).toBeVisible()
+      await expect(settings.getByRole('tab', { name: /Cuentas/ })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      await expect(settings.locator('tr[data-account-id]').first()).toBeVisible()
 
-    const settingsSection = tracker.section("settings");
-    const accountsForm = settingsSection.locator("#add-account-form");
-    await accountsForm.locator('input[name="name"]').fill("Cuenta Vacaciones");
-    await accountsForm.locator('input[name="openingBalance"]').fill("500");
-    await accountsForm.getByRole("button", { name: "Agregar" }).click();
+      await settings.getByRole('tab', { name: /Activos/ }).click()
+      await expect(settings.locator('tr[data-asset-id]')).toHaveCount(9)
+      await expect(settings.locator('#settings-tab-accounts')).toBeHidden()
+    },
+  )
 
-    // El nombre vive en un <input>, así que comprobamos por la acción de borrado.
-    await expect(
-      settingsSection.getByRole("button", {
-        name: "Eliminar Cuenta Vacaciones",
-      }),
-    ).toBeVisible();
-
-    // El alta se propaga al selector de cuentas del formulario de movimientos.
-    await tracker.openTransactions();
-    await tracker.transactionsSection
-      .getByRole("button", { name: "Nuevo movimiento" })
-      .click();
-    await expect(
-      page.locator("#tx-panel select[name='accountId']"),
-    ).toContainText("Cuenta Vacaciones");
-  });
-
-  test("permite agregar y eliminar una categoría de gasto", async ({
-    tracker,
-  }) => {
-    await tracker.openSettings();
-
-    const settingsSection = tracker.section("settings");
-    const expenseForm = settingsSection.locator("#add-expense-category");
-    await expenseForm.locator('input[name="name"]').fill("Suscripciones");
-    await expenseForm.getByRole("button", { name: "Agregar" }).click();
-
-    const tag = settingsSection.locator(
-      "#settings-expense-categories .category-tag",
-      {
-        hasText: "Suscripciones",
-      },
-    );
-    await expect(tag).toBeVisible();
-
-    await tag.getByRole("button", { name: /Eliminar categoría/ }).click();
-    await expect(tag).toHaveCount(0);
-  });
-
-  test("eliminar una cuenta elimina sus suscripciones pendientes", async ({
+  test('crea una cuenta desde su ficha y la ofrece al registrar movimientos', async ({
     tracker,
     page,
   }) => {
-    const today = new Date().toISOString().slice(0, 10);
+    await tracker.addAccount({ name: 'Cuenta Vacaciones', openingBalance: 500 })
+
+    const settings = tracker.section('settings')
+    await expect(
+      settings.locator('tr[data-account-id]').filter({ hasText: 'Cuenta Vacaciones' }),
+    ).toContainText('500,00')
+
+    await tracker.openTransactions()
+    await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
+    await expect(page.locator("#tx-panel select[name='accountId']")).toContainText(
+      'Cuenta Vacaciones',
+    )
+  })
+
+  test('edita el nombre y el saldo inicial de una cuenta en su ficha', async ({ tracker }) => {
+    const panel = await tracker.openSettingsCard('Cuentas', 'Openbank')
+    await panel.getByLabel('Nombre').fill('Openbank Ahorro')
+    await panel.getByLabel('Saldo inicial (€)').fill('1.234,5')
+    await panel.getByRole('button', { name: 'Guardar cambios' }).click()
+    await expect(panel).toBeHidden()
+
+    await expect(
+      tracker
+        .section('settings')
+        .locator('tr[data-account-id]')
+        .filter({ hasText: 'Openbank Ahorro' }),
+    ).toContainText('1234,50')
+  })
+
+  test('añade, reordena y elimina una categoría de gasto', async ({ tracker }) => {
+    await tracker.openSettingsTab('Categorías')
+    const expenses = tracker.section('settings').locator('[data-category-list="expenseCategories"]')
+
+    await expenses.getByLabel('Nueva categoría de gastos').fill('Mascotas')
+    await expenses.getByRole('button', { name: 'Añadir' }).click()
+    const item = expenses.locator('[data-category="Mascotas"]')
+    await expect(item).toBeVisible()
+    await expect(expenses.locator('[data-category]').last()).toHaveAttribute(
+      'data-category',
+      'Mascotas',
+    )
+
+    await item.getByRole('button', { name: 'Subir Mascotas' }).click()
+    await expect(expenses.locator('[data-category]').last()).not.toHaveAttribute(
+      'data-category',
+      'Mascotas',
+    )
+
+    await item.getByRole('button', { name: 'Eliminar categoría Mascotas' }).click()
+    await expect(item).toHaveCount(0)
+  })
+
+  test('eliminar una cuenta pide confirmación y borra sus suscripciones pendientes', async ({
+    tracker,
+    page,
+  }) => {
+    const today = new Date().toISOString().slice(0, 10)
     await tracker.addSubscription({
-      name: "Suscripción cuenta eliminada",
+      name: 'Suscripción cuenta eliminada',
       amount: 12,
-      categoryLabel: "Comida",
-      frequency: "monthly",
+      categoryLabel: 'Comida',
+      frequency: 'monthly',
       firstChargeDate: today,
-    });
+    })
 
-    await tracker.openSettings();
-    const settingsSection = tracker.section("settings");
-    await settingsSection
-      .getByRole("button", { name: "Eliminar Revolut", exact: true })
-      .click();
+    const panel = await tracker.openSettingsCard('Cuentas', 'Revolut')
+    await panel.getByRole('button', { name: 'Eliminar' }).click()
+    const confirm = page.getByRole('alertdialog', { name: '¿Eliminar esta cuenta?' })
+    await expect(confirm).toContainText('También se borran sus movimientos y suscripciones')
+    await confirm.getByRole('button', { name: 'Eliminar cuenta' }).click()
+
     await expect(
-      settingsSection.getByRole("button", {
-        name: "Eliminar Revolut",
-        exact: true,
-      }),
-    ).toHaveCount(0);
+      tracker
+        .section('settings')
+        .getByRole('button', { name: 'Abrir la ficha de Revolut', exact: true }),
+    ).toHaveCount(0)
+    await expect(page.getByRole('status')).toContainText('Elemento eliminado')
 
-    await tracker.openSubscriptionsTab();
+    await tracker.openSubscriptionsTab()
     await expect(
       tracker.transactionsSection
-        .locator("#transactions-tab-subscriptions tr[data-subscription-id]")
-        .filter({ hasText: "Suscripción cuenta eliminada" }),
-    ).toHaveCount(0);
-    await expect(page.getByRole("status")).toContainText("Elemento eliminado");
-  });
+        .locator('#transactions-tab-subscriptions tr[data-subscription-id]')
+        .filter({ hasText: 'Suscripción cuenta eliminada' }),
+    ).toHaveCount(0)
+  })
 
-  test("permite editar y conservar la lista y el símbolo de Stock Events", async ({
+  test('configura la lista y el ticker de Stock Events en la ficha del activo', async ({
     tracker,
     page,
   }) => {
-    await page.route("**/api/integrations/stockevents", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: '{"configured":true}' }),
-    );
-    let releaseFirstWatchlistLoad: (() => void) | undefined;
-    let markFirstWatchlistLoadRequested: (() => void) | undefined;
-    const firstWatchlistLoadRequested = new Promise<void>((resolve) => {
-      markFirstWatchlistLoadRequested = resolve;
-    });
-    let watchlistRequestCount = 0;
-    await page.route("**/api/stockevents/watchlists", async (route) => {
-      watchlistRequestCount += 1;
-      if (watchlistRequestCount === 1) {
-        markFirstWatchlistLoadRequested?.();
-        await new Promise<void>((resolve) => {
-          releaseFirstWatchlistLoad = resolve;
-        });
-      }
-      await route.fulfill({
+    await page.route('**/api/integrations/stockevents', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"configured":true}' }),
+    )
+    await page.route('**/api/stockevents/watchlists', (route) =>
+      route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: 'application/json',
         body: JSON.stringify({
           watchlists: [
-            { id: "wl-acciones", name: "Acciones" },
-            { id: "wl-etf", name: "ETF" },
+            { id: 'wl-acciones', name: 'Acciones' },
+            { id: 'wl-etf', name: 'ETF' },
           ],
         }),
-      });
-    });
+      }),
+    )
 
-    await page.evaluate(() => {
-      const raw = localStorage.getItem("finance-tracker-state-v1");
-      if (!raw) {
-        throw new Error("No se encontró el estado financiero inicial");
-      }
-      const state = JSON.parse(raw);
+    await editState(page, (state) => {
       state.instruments.push({
-        id: "instrument-aged",
-        investmentAssetId: state.investmentAssets[0]?.id ?? "",
-        type: "etf",
-        symbol: "AGED",
-        market: "MI",
-        currency: "EUR",
-        provider: "manual",
+        id: 'instrument-aged',
+        investmentAssetId: 'etf-aged',
+        type: 'etf',
+        symbol: 'AGED',
+        market: 'MI',
+        currency: 'EUR',
+        provider: 'manual',
         active: true,
-      });
+      })
       state.stockEvents = {
         enabled: true,
-        apiKey: "",
+        apiKey: '',
         symbolMappings: [
           {
-            symbol: "AGED",
+            symbol: 'AGED',
             sync: true,
-            watchlistId: "wl-acciones",
-            targetSymbol: "AGED.MI",
+            watchlistId: 'wl-acciones',
+            targetSymbol: 'AGED.MI',
             hidden: false,
           },
         ],
-      };
-      localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
-    });
-    await mirrorStateToServer(page);
-    await tracker.reload();
+      }
+    })
+    await tracker.reload()
+
+    await tracker.openSettingsTab('Activos')
+    const row = tracker.section('settings').locator('tr[data-asset-id="etf-aged"]')
+    await expect(row).toContainText('AGED')
+    await expect(row).toContainText('Acciones')
+
+    const panel = await tracker.openSettingsCard('Activos', 'ETF AGED')
+    const watchlist = panel.getByRole('combobox', { name: 'Lista de seguimiento de AGED' })
+    const target = panel.getByRole('textbox', { name: 'Símbolo en Stock Events de AGED' })
+    await expect(watchlist).toBeEnabled()
+    await target.fill('aged.xetra')
+    await target.press('Tab')
+    await watchlist.selectOption('wl-etf')
+    await expect(watchlist).toHaveValue('wl-etf')
+    await expect(target).toHaveValue('AGED.XETRA')
+    await expect(page.locator('#save-status')).toContainText('Sincronizado')
+
+    await tracker.reload()
     await page.waitForFunction(() => {
-      const raw = localStorage.getItem("finance-tracker-state-v1");
-      return raw
-        ? JSON.parse(raw).instruments.some(
-            (item: { symbol?: string }) => item.symbol === "AGED",
-          )
-        : false;
-    });
-    await tracker.openSettings();
-
-    const watchlist = page.getByRole("combobox", {
-      name: "Lista de seguimiento de AGED",
-    });
-    const targetSymbol = page.getByRole("textbox", {
-      name: "Símbolo en Stock Events de AGED",
-    });
-
-    await firstWatchlistLoadRequested;
-    await targetSymbol.fill("aged.xetra");
-    releaseFirstWatchlistLoad?.();
-
-    await expect(watchlist).toBeEnabled();
-    await watchlist.selectOption("wl-etf");
-
-    await expect(watchlist).toHaveValue("wl-etf");
-    await expect(targetSymbol).toHaveValue("AGED.XETRA");
-    await expect(page.locator("#save-status")).toContainText("Sincronizado");
-
-    await tracker.reload();
-    await page.waitForFunction(() => {
-      const raw = localStorage.getItem("finance-tracker-state-v1");
+      const raw = localStorage.getItem('finance-tracker-state-v1')
       return raw
         ? JSON.parse(raw).stockEvents?.symbolMappings?.some(
             (item: { symbol?: string; watchlistId?: string }) =>
-              item.symbol === "AGED" && item.watchlistId === "wl-etf",
+              item.symbol === 'AGED' && item.watchlistId === 'wl-etf',
           )
-        : false;
-    });
-    await tracker.openSettings();
+        : false
+    })
+    const reopened = await tracker.openSettingsCard('Activos', 'ETF AGED')
+    await expect(
+      reopened.getByRole('combobox', { name: 'Lista de seguimiento de AGED' }),
+    ).toHaveValue('wl-etf')
+    await expect(
+      reopened.getByRole('textbox', { name: 'Símbolo en Stock Events de AGED' }),
+    ).toHaveValue('AGED.XETRA')
+  })
 
-    await expect(
-      page.getByRole("combobox", { name: "Lista de seguimiento de AGED" }),
-    ).toHaveValue("wl-etf");
-    await expect(
-      page.getByRole("textbox", { name: "Símbolo en Stock Events de AGED" }),
-    ).toHaveValue("AGED.XETRA");
+  test('oculta y vuelve a mostrar un símbolo que no es de ningún activo', async ({
+    tracker,
+    page,
+  }) => {
+    await editState(page, (state) => {
+      state.transactions.push({
+        id: 'tx-orphan',
+        type: 'investment',
+        date: '2026-07-01',
+        amount: 50,
+        category: 'Sin activo',
+        description: 'Compra suelta',
+        accountId: 'revolut',
+        symbol: 'ORPH',
+      })
+    })
+    await tracker.reload()
+    await tracker.openSettingsTab('Activos')
 
-    await page.getByRole("button", { name: "Ocultar AGED" }).click();
-    await expect(page.getByText("No hay símbolos visibles.")).toBeVisible();
-    await page.getByRole("button", { name: "Mostrar ocultos (1)" }).click();
-    await expect(
-      page
-        .getByRole("table", { name: "Símbolos ocultos de Stock Events" })
-        .getByRole("row")
-        .filter({ hasText: "AGED" }),
-    ).toBeVisible();
-    await expect(page.locator("#save-status")).toContainText("Sincronizado");
+    const orphans = tracker.section('settings').locator('[data-orphan-symbols]')
+    await expect(orphans.locator('[data-symbol-sync="ORPH"]')).toBeVisible()
 
-    await tracker.reload();
-    await tracker.openSettings();
-    await expect(page.getByRole("button", { name: "Mostrar ocultos (1)" })).toBeVisible();
-    await page.getByRole("button", { name: "Mostrar ocultos (1)" }).click();
-    await page.getByRole("button", { name: "Mostrar AGED" }).click();
-    await expect(
-      page
-        .getByRole("table", { name: "Símbolos visibles de Stock Events" })
-        .getByRole("row")
-        .filter({ hasText: "AGED" }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: /Mostrar ocultos/ })).toHaveCount(0);
-  });
-});
+    await orphans.getByRole('button', { name: 'Ocultar ORPH' }).click()
+    await expect(orphans.locator('[data-symbol-sync="ORPH"]')).toHaveCount(0)
+    await expect(orphans).toContainText('Todos están ocultos.')
+
+    await orphans.getByText('Mostrar ocultos (1)').click()
+    await orphans.getByRole('button', { name: 'Mostrar ORPH' }).click()
+    await expect(orphans.getByText(/Mostrar ocultos/)).toHaveCount(0)
+    await expect(orphans.locator('[data-symbol-sync="ORPH"]')).toBeVisible()
+  })
+})
