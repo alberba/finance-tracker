@@ -222,6 +222,35 @@ const DASHBOARD_VIEWS: Array<{
   },
 ]
 
+/** Presupuesto views beyond the default one: the other ranges, a tab and the plan panel. */
+const BUDGET_VIEWS: Array<{
+  name: string
+  open: (page: Page, tracker: FinanceTrackerPage) => Promise<void>
+  focus?: string
+}> = [
+  {
+    name: 'budget-six-months',
+    open: async (_page, tracker) => {
+      await tracker.openBudget()
+      await tracker.selectBudgetRange('6')
+    },
+  },
+  {
+    name: 'budget-year',
+    open: async (_page, tracker) => {
+      await tracker.openBudget()
+      await tracker.selectBudgetRange('12')
+    },
+  },
+  { name: 'budget-income', open: (_page, tracker) => tracker.openBudgetTab('income') },
+  {
+    name: 'budget-plan-panel',
+    open: async (_page, tracker) => {
+      await tracker.openBudgetPlan('Ocio')
+    },
+  },
+]
+
 /** Objetivos views beyond the top of the page: both ledgers and the edit side panel. */
 const GOALS_VIEWS: Array<{
   name: string
@@ -780,6 +809,58 @@ test.describe('Patrimonio · vistas secundarias', { tag: '@visual' }, () => {
       test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
         await view.open(page, tracker)
         await expectSoundLayout(page, 'wealth', view.name)
+      })
+    }
+  })
+})
+
+test.describe('Presupuesto · vistas secundarias', { tag: '@visual' }, () => {
+  for (const view of BUDGET_VIEWS) {
+    test(`no rompe layout en "${view.name}"`, async ({ tracker, page }) => {
+      await view.open(page, tracker)
+      await expectSoundLayout(page, 'budget', view.name)
+    })
+
+    test(`snapshot visual estable en "${view.name}"`, async ({ tracker, page }) => {
+      await expectViewSnapshot(
+        page,
+        tracker,
+        () => view.open(page, tracker),
+        `page-${view.name}.png`,
+        view.focus,
+      )
+    })
+  }
+
+  test.describe('tema oscuro', () => {
+    test.use({ colorScheme: 'dark' })
+
+    for (const view of BUDGET_VIEWS) {
+      test(`snapshot visual estable en "${view.name}" (oscuro)`, async ({ tracker, page }) => {
+        await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+        await expectViewSnapshot(
+          page,
+          tracker,
+          () => view.open(page, tracker),
+          `page-${view.name}-dark.png`,
+          view.focus,
+        )
+      })
+    }
+  })
+
+  test.describe('escritorio', () => {
+    test.use(DESKTOP)
+
+    test('no rompe layout en "budget" (escritorio)', async ({ tracker, page }) => {
+      await tracker.openBudget()
+      await expectSoundLayout(page, 'budget')
+    })
+
+    for (const view of BUDGET_VIEWS) {
+      test(`no rompe layout en "${view.name}" (escritorio)`, async ({ tracker, page }) => {
+        await view.open(page, tracker)
+        await expectSoundLayout(page, 'budget', view.name)
       })
     }
   })

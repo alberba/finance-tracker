@@ -48,8 +48,7 @@
   }
 
   /* Base grid for legacy data tables (transactions / investment),
-     scoped to .table-wrap so migrated tables that don't use it are untouched.
-     Class-scoped tables (.budget-*) override via specificity. */
+     scoped to .table-wrap so migrated tables that don't use it are untouched. */
   .table-wrap table {
     width: 100%;
     border-collapse: collapse;

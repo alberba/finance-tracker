@@ -678,64 +678,57 @@ export class FinanceTrackerPage {
     await expect(this.page.getByRole('status')).toContainText('Movimiento actualizado.')
   }
 
+  /** Picks the budget tab (Gastos, Ingresos, Inversión). */
+  async openBudgetTab(type: 'income' | 'expense' | 'investment') {
+    await this.openBudget()
+    await this.budgetSection.locator(`[data-budget-tab="${type}"]`).click()
+  }
+
+  /** Picks how many months the budget table shows. */
+  async selectBudgetRange(range: '3' | '6' | '12') {
+    await this.budgetSection.locator(`[data-budget-range="${range}"]`).click()
+    await expect(this.budgetSection.locator(`section[data-budget-months="${range}"]`)).toBeVisible()
+  }
+
+  /** The budget field of a category and month; the year view shows every month. */
+  budgetInput(category: string, monthLabel: string): Locator {
+    return this.budgetSection.getByRole('textbox', {
+      name: `Presupuesto de ${category} en ${monthLabel.toLowerCase()}`,
+    })
+  }
+
   async setBudgetValue(params: {
     typeValue: 'income' | 'expense' | 'investment'
     monthLabel: string
     categoryLabel: string
-    plannedValue: number
+    plannedValue: string
   }) {
-    await this.openBudget()
-    const monthIndex = [
-      'ENERO',
-      'FEBRERO',
-      'MARZO',
-      'ABRIL',
-      'MAYO',
-      'JUNIO',
-      'JULIO',
-      'AGOSTO',
-      'SEPTIEMBRE',
-      'OCTUBRE',
-      'NOVIEMBRE',
-      'DICIEMBRE',
-    ].indexOf(params.monthLabel)
-    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`)
-    const row = block.locator('tbody tr', {
-      hasText: params.categoryLabel,
-    })
-    await expect(row).toBeVisible()
-    const input = row.locator(
-      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`,
-    )
-    await input.fill(String(params.plannedValue))
+    await this.openBudgetTab(params.typeValue)
+    await this.selectBudgetRange('12')
+    const input = this.budgetInput(params.categoryLabel, params.monthLabel)
+    await input.fill(params.plannedValue)
+    await input.press('Tab')
   }
 
   async getBudgetValue(params: {
     typeValue: 'income' | 'expense' | 'investment'
     monthLabel: string
     categoryLabel: string
-  }): Promise<number> {
-    const monthIndex = [
-      'ENERO',
-      'FEBRERO',
-      'MARZO',
-      'ABRIL',
-      'MAYO',
-      'JUNIO',
-      'JULIO',
-      'AGOSTO',
-      'SEPTIEMBRE',
-      'OCTUBRE',
-      'NOVIEMBRE',
-      'DICIEMBRE',
-    ].indexOf(params.monthLabel)
-    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`)
-    const row = block.locator('tbody tr', { hasText: params.categoryLabel })
-    const input = row.locator(
-      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`,
-    )
-    const value = await input.inputValue()
-    return Number(value)
+  }): Promise<string> {
+    await this.openBudgetTab(params.typeValue)
+    await this.selectBudgetRange('12')
+    return this.budgetInput(params.categoryLabel, params.monthLabel).inputValue()
+  }
+
+  /** Opens the year plan of a category from its name in the budget table. */
+  async openBudgetPlan(category: string): Promise<Locator> {
+    await this.openBudget()
+    await this.budgetSection
+      .getByRole('button', { name: `Planificar los doce meses de ${category}` })
+      .click()
+    const panel = this.page.getByRole('dialog', { name: category })
+    await expect(panel).toBeVisible()
+    return panel
   }
 
   /** Picks a month in the band's month strip ("MARZO" or "marzo"). */

@@ -14,8 +14,6 @@ function createDefaultUiState(): UiState {
   return {
     activeSection: 'dashboard',
     month,
-    budgetType: 'income',
-    budgetMonth: month,
     txYear: new Date().getFullYear(),
     txFilterMonth: month,
     txSort: { column: 'date', direction: 'desc' },
