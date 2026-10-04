@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore, getActivePinia } from 'pinia'
 import { onScopeDispose, shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
@@ -16,7 +16,7 @@ import {
   type CachedEntity,
 } from '../lib/client/idb-cache'
 import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
-import { watchSyncConnection } from '../lib/client/sync-connection'
+import { watchSyncConnection, withSyncLock } from '../lib/client/sync-connection'
 import { applyPendingCommands } from '../lib/client/pending-overlay'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
 import { useFinancialStateStore } from './financial-state'
@@ -75,6 +75,8 @@ const RETRY_BASE_DELAY_MS = 1000
 const RETRY_MAX_DELAY_MS = 30_000
 export const useSyncStore = defineStore('sync', () => {
   const enabled = isSyncV2Enabled()
+  // Late async renders must reach this store's own Pinia, not whichever is active by then.
+  const ownPinia = getActivePinia()
   const { showToast } = useToast()
 
   const userId = shallowRef<string | null>(null)
@@ -105,6 +107,7 @@ export const useSyncStore = defineStore('sync', () => {
   /** A fresh client re-reads the full model once; the cache only covers failures. */
   let readModelStale = false
   let stopConnection: (() => void) | null = null
+  let detached = false
 
   function stop(): void {
     stopConnection?.()
@@ -115,16 +118,22 @@ export const useSyncStore = defineStore('sync', () => {
   onScopeDispose(stop)
 
   async function renderReadModel(): Promise<void> {
-    if (!readModel) return
+    if (!readModel || detached) return
     const pending = outboxDb ? await listOutbox(outboxDb) : []
     const projected = pending.length
       ? applyPendingCommands(readModel, pending.map((entry) => entry.command))
       : readModel
-    useFinancialStateStore().reloadState(projectSyncV2State(projected))
+    useFinancialStateStore(ownPinia).reloadState(projectSyncV2State(projected))
+  }
+
+  /** An unloaded page: stops every background read, send and render of this client. */
+  function detach(): void {
+    detached = true
+    stop()
   }
 
   function isReady(): boolean {
-    return enabled && cacheDb !== null && outboxDb !== null && userId.value !== null
+    return enabled && !detached && cacheDb !== null && outboxDb !== null && userId.value !== null
   }
 
   /** Coalesces reconnects, remote notices and local writes into one cycle. */
@@ -153,7 +162,7 @@ export const useSyncStore = defineStore('sync', () => {
         } catch (error) {
           lastError.value = error instanceof Error ? error.message : 'No se pudieron descargar tus cambios.'
           syncStatus.value = 'error'
-          if (!readModel) useFinancialStateStore().failLoad(lastError.value)
+          if (!readModel) useFinancialStateStore(ownPinia).failLoad(lastError.value)
           scheduleRetry()
           break
         }
@@ -197,22 +206,25 @@ export const useSyncStore = defineStore('sync', () => {
     try { await initializing } finally { initializing = null }
   }
 
-  async function bootstrapState(): Promise<void> {
+  function bootstrapState(): Promise<void> {
+    return userId.value ? withSyncLock(userId.value, bootstrapUnlocked) : Promise.resolve()
+  }
+
+  async function bootstrapUnlocked(): Promise<void> {
     if (!cacheDb) return
     const response = await fetch('/api/bootstrap')
     if (!response.ok) throw new Error(`No se pudieron cargar tus datos (${response.status}). Reintentando…`)
     const bootstrap = await response.json() as SyncV2Bootstrap
-    await saveReadModel(cacheDb, bootstrap)
-    readModel = bootstrap
+    readModel = await saveReadModel(cacheDb, bootstrap)
     readModelStale = false
-    revision.value = bootstrap.revision
+    revision.value = readModel.revision
     await renderReadModel()
     const recoveredSubscriptionIds = bootstrap.subscriptions
       .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
       .map((subscription) => String(subscription.legacyId || subscription.id))
     if (bootstrap.subscriptions.length) {
       const { useMovementsStore } = await import('./movements')
-      await useMovementsStore().refreshSubscriptions(recoveredSubscriptionIds)
+      await useMovementsStore(ownPinia).refreshSubscriptions(recoveredSubscriptionIds)
     }
   }
 
@@ -272,6 +284,34 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /** Applies one command's returned entity back into the local cache. */
+  function confirmedChange(command: OutboxEntry['command'], entity: unknown): RemoteChange | null {
+    if (command.action === 'settingsUpdate') {
+      return entity && typeof entity === 'object'
+        ? { entityType: 'userSettings', entityId: '', changeType: 'update', payload: JSON.stringify(entity) }
+        : null
+    }
+    if (command.action === 'remove') {
+      return { entityType: command.entityType, entityId: command.entityId, changeType: 'remove', payload: null }
+    }
+    if ((command.action === 'create' || command.action === 'update') && entity && typeof entity === 'object') {
+      const id = (entity as { id?: unknown }).id
+      if (typeof id !== 'string') return null
+      return { entityType: command.entityType, entityId: id, changeType: 'update', payload: JSON.stringify(entity) }
+    }
+    return null
+  }
+
+  async function absorbConfirmed(changes: RemoteChange[]): Promise<void> {
+    if (!readModel || !cacheDb || changes.length === 0) return
+    try {
+      readModel = await saveReadModel(cacheDb, applyRemoteChanges(readModel, changes, readModel.revision))
+    } catch (error) {
+      // The next pull brings the same rows; until then a full read is the safe fallback.
+      console.warn('[sync] No se pudo incorporar un cambio confirmado', error)
+      readModelStale = true
+    }
+  }
+
   async function applyResultToCache(entityType: SyncEntityType, entity: unknown): Promise<void> {
     if (!cacheDb || entity === null || typeof entity !== 'object') {
       return
@@ -312,6 +352,21 @@ export const useSyncStore = defineStore('sync', () => {
     if (connection.value === 'offline') {
       return
     }
+    flushing = true
+    try {
+      await withSyncLock(userId.value!, sendBatch)
+    } finally {
+      flushing = false
+      if (flushAgainRequested) {
+        flushAgainRequested = false
+        void flush()
+      }
+    }
+  }
+
+  /** Sends the outbox head; runs under the sync lock so no other client resends it. */
+  async function sendBatch(): Promise<void> {
+    if (!outboxDb) return
     // Once the head has failed, send it alone so a failure is charged to
     // the entry that caused it, not to whichever command led the batch.
     const [head] = await peekBatch(outboxDb, 1)
@@ -320,7 +375,6 @@ export const useSyncStore = defineStore('sync', () => {
       return
     }
 
-    flushing = true
     syncStatus.value = 'syncing'
     let reachedServer = false
     try {
@@ -351,6 +405,7 @@ export const useSyncStore = defineStore('sync', () => {
       // halted the batch there, so the entry stays queued and is resent
       // after a backoff instead of immediately.
       let resendAfterBackoff = false
+      const confirmed: Array<RemoteChange | null> = []
       for (const [index, result] of body.results.entries()) {
         const entry = batch[index]
         if (!entry) {
@@ -363,6 +418,7 @@ export const useSyncStore = defineStore('sync', () => {
         if (result.status === 'applied' || result.status === 'noop') {
           acked.push(entry.seq)
           const command = entry.command
+          if (result.status === 'applied') confirmed.push(confirmedChange(command, result.entity))
           if (
             result.entity !== undefined &&
             cacheDb !== null
@@ -419,6 +475,9 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
+      // The read model takes the confirmed results before the outbox lets
+      // them go, so no reload (even offline) can see neither of the two.
+      await absorbConfirmed(confirmed.filter((change) => change !== null))
       await acknowledge(outboxDb, acked)
       pendingCount.value = await countOutbox(outboxDb)
       // The cursor deliberately does NOT move here (audit §5.3). `body.revision`
@@ -459,17 +518,15 @@ export const useSyncStore = defineStore('sync', () => {
       // A transient Worker failure cannot invalidate an accepted local edit.
       if (reachedServer) await recordFailure(outboxDb, batch[0].seq, message)
       scheduleRetry()
-    } finally {
-      flushing = false
-      if (flushAgainRequested) {
-        flushAgainRequested = false
-        void flush()
-      }
     }
   }
 
   /** Persists rows, projection and cursor in one IndexedDB transaction. */
-  async function pullChanges(): Promise<void> {
+  function pullChanges(): Promise<void> {
+    return userId.value ? withSyncLock(userId.value, pullUnlocked) : Promise.resolve()
+  }
+
+  async function pullUnlocked(): Promise<void> {
     if (!isReady() || !cacheDb || !readModel) return
     let hasMore: boolean
     do {
@@ -480,7 +537,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
       if (body.requiresBootstrap || body.changes.some((change) =>
         change.entityType === 'userInstrument' || change.entityType === 'reset')) {
-        await bootstrapState()
+        await bootstrapUnlocked()
         return
       }
       if (!Number.isSafeInteger(body.revision) || body.revision < revision.value) {
@@ -488,9 +545,8 @@ export const useSyncStore = defineStore('sync', () => {
       }
       if (body.changes.length || body.revision !== revision.value) {
         const next = applyRemoteChanges(readModel, body.changes, body.revision)
-        await saveReadModel(cacheDb, next)
-        readModel = next
-        revision.value = next.revision
+        readModel = await saveReadModel(cacheDb, next)
+        revision.value = readModel.revision
         await renderReadModel()
       }
       hasMore = body.hasMore === true
@@ -690,6 +746,7 @@ export const useSyncStore = defineStore('sync', () => {
     flush,
     pullChanges,
     syncNow,
+    detach,
     logout,
     getEntityRef,
     getSettingsVersion,

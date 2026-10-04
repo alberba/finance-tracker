@@ -88,11 +88,12 @@ describe("round trip: sincronización", () => {
     // first bumps the version out from under the other — a same-device
     // conflict, no second device needed (audit §2.4's exact repro).
     trip.setOffline(true);
-    settingsStore.updateEntityField("accounts", accountId, "openingBalance", "10");
-    settingsStore.updateEntityField("accounts", accountId, "openingBalance", "20");
+    const reloadedSettings = useSettingsStore();
+    reloadedSettings.updateEntityField("accounts", accountId, "openingBalance", "10");
+    reloadedSettings.updateEntityField("accounts", accountId, "openingBalance", "20");
     // An unrelated change, queued alongside — the conflict on the row above
     // must not freeze it behind the conflicted commands.
-    settingsStore.addEntity("accounts", "Cuenta ajena", "5");
+    reloadedSettings.addEntity("accounts", "Cuenta ajena", "5");
     trip.setOffline(false);
 
     const state = await trip.reload();

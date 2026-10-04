@@ -33,3 +33,24 @@ export function describeCheckAge(ms: number): string {
   const minutes = Math.floor(seconds / 60)
   return minutes < 60 ? `hace ${minutes} min` : `hace ${Math.floor(minutes / 60)} h`
 }
+
+const localLocks = new Map<string, Promise<unknown>>()
+
+/**
+ * Runs `task` while no other tab (or client in this page) touches the same
+ * user's outbox and read model: concurrent flushes would resend a command and
+ * a bootstrap taken mid-flush would render without it.
+ */
+export function withSyncLock<T>(userId: string, task: () => Promise<T>): Promise<T> {
+  const name = `finance-tracker-sync:${userId}`
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+  if (locks) return locks.request(name, task) as Promise<T>
+  const previous = localLocks.get(name) ?? Promise.resolve()
+  const run = previous.then(task, task)
+  const settled = run.catch(() => {})
+  localLocks.set(name, settled)
+  void settled.then(() => {
+    if (localLocks.get(name) === settled) localLocks.delete(name)
+  })
+  return run
+}

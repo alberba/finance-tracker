@@ -45,8 +45,9 @@ describe("round trip: patrimonio", () => {
     wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "1000" }]);
     await trip.reload();
 
-    wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
+    const reloadedWealth = useWealthStore();
+    reloadedWealth.setMonth(2);
+    reloadedWealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
 
     const reloaded = await trip.reload();
 
@@ -118,11 +119,12 @@ describe("round trip: patrimonio", () => {
     wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "1000" }]);
     await trip.reload();
 
-    financialState.commitState((draft) => {
+    useFinancialStateStore().commitState((draft) => {
       draft.year = 2026;
     });
-    wealth.setMonth(2);
-    wealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
+    const reloadedWealth = useWealthStore();
+    reloadedWealth.setMonth(2);
+    reloadedWealth.saveSnapshot([{ kind: "accounts", id: accountId, value: "2000" }]);
     await trip.reload();
 
     const wealthRepository = await import("../../../../src/db/repositories/wealth");
