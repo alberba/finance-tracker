@@ -83,7 +83,7 @@
   "dependencies": {
     "@astrojs/vue": "^7.0.3",
     "@sentry/astro": "^10.70.0",
-    "@sentry/browser": "10.70.0",
+    "@sentry/browser": "11.1.0",
     "@sentry/cloudflare": "^10.70.0",
     "@tailwindcss/vite": "^4.3.3",
     "chart.js": "4.5.1",
