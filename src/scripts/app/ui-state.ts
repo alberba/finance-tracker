@@ -1,5 +1,4 @@
 import type {
-  BudgetType,
   InvestmentSubTab,
   TransactionsSubTab,
   SectionId,
@@ -12,8 +11,6 @@ import type { RegistryFilters } from '../../domain/transactions/registry'
 export interface UiState {
   activeSection: SectionId
   month: number
-  budgetType: BudgetType
-  budgetMonth: number
   /** Year the Movimientos registry shows. */
   txYear: number
   /** Month of that year the ink band shows. */

@@ -5,9 +5,7 @@
  * goals. Wraps `POST /api/state/initialize` (WP4), which is itself
  * idempotent — calling this twice never re-seeds or duplicates data.
  *
- * Gated behind `isSyncV2Enabled()` by the caller (`src/stores/data.ts`); the
- * legacy `resetSeed()` action (loads `BASE_SEED` into memory) is untouched
- * and keeps working while `PUBLIC_SYNC_V2` is off.
+ * Gated behind `isSyncV2Enabled()` by the caller (`src/stores/data.ts`).
  */
 
 import { isDemoMode } from "../../scripts/demo-mode";

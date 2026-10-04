@@ -15,14 +15,22 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script is:inline>
+      // Theme and sidebar before the first paint. Same rule as
+      // src/lib/client/theme.ts: a stored light/dark wins, anything else
+      // ("system" or nothing) follows prefers-color-scheme.
       ;(function () {
+        const root = document.documentElement
         try {
           const stored = localStorage.getItem('theme')
           const prefersDark =
             window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-          document.documentElement.dataset.theme = stored || (prefersDark ? 'dark' : 'light')
+          root.dataset.theme =
+            stored === 'light' || stored === 'dark' ? stored : prefersDark ? 'dark' : 'light'
+          root.dataset.sidebar =
+            localStorage.getItem('sidebar-collapsed') === 'true' ? 'collapsed' : 'expanded'
         } catch {
-          document.documentElement.dataset.theme = 'light'
+          root.dataset.theme = 'light'
+          root.dataset.sidebar = 'expanded'
         }
       })()
     </script>
@@ -89,25 +97,70 @@ const activeSection = getSectionFromPath(Astro.url.pathname)
     </script>
   </head>
   <body>
-    <a class="skip-link" href="#app-main">Saltar al contenido</a>
-    <div class="bg-layer"></div>
-    <div class="app-shell">
-      <div id="nav-tabs" class="app-navigation">
+    <a
+      class="bg-primary-fill text-on-primary fixed top-3 left-3 z-1000 -translate-y-20 rounded-md px-3.5 py-2 text-sm font-bold focus:translate-y-0"
+      href="#app-main">Saltar al contenido</a
+    >
+    <div
+      class="sidebar-collapsed:desk:grid-cols-[72px_minmax(0,1fr)] desk:grid-cols-[256px_minmax(0,1fr)] grid min-h-screen grid-cols-1 overflow-x-clip"
+    >
+      <div id="nav-tabs" class="contents">
         <AppSidebar activeSection={activeSection} />
         <MobileNavigation activeSection={activeSection} />
       </div>
 
-      <main id="app-main" class="content">
-        <FinanceWorkspace activeSection={activeSection} client:only="vue" />
-      </main>
+      <div class="flex min-w-0 flex-col">
+        <div
+          id="demo-banner"
+          class="bg-notice text-notice-text border-notice-line border-b"
+          role="status"
+          hidden
+        >
+          <div
+            class="mx-auto flex max-w-7xl items-center gap-3 py-1.5 pr-2 pl-4 md:px-[clamp(16px,3vw,40px)]"
+          >
+            <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true"></span>
+            <p class="min-w-0 flex-1 text-sm">
+              <span class="font-mono text-xs font-medium tracking-[0.14em] uppercase"
+                >Modo demo</span
+              >{' · '}datos ficticios
+            </p>
+            <button
+              id="demo-banner-exit"
+              class="border-notice-line hover:bg-notice-line min-h-11 shrink-0 rounded-sm px-3 text-sm font-bold md:min-h-9 md:border"
+              type="button"
+            >
+              Salir<span class="max-md:hidden"> del modo demo</span>
+            </button>
+          </div>
+        </div>
+
+        <main
+          id="app-main"
+          class="desk:pb-14 grid min-w-0 content-start gap-5 px-3.25 pt-4.5 pb-[calc(104px+env(safe-area-inset-bottom))] md:px-[clamp(16px,3vw,40px)] md:pt-7.5"
+        >
+          <FinanceWorkspace activeSection={activeSection} client:only="vue" />
+        </main>
+      </div>
     </div>
 
-    <div id="demo-banner" class="demo-banner" role="status" hidden>
-      <span class="demo-banner-dot" aria-hidden="true"></span>
-      <span>Modo demo · datos ficticios</span>
-      <button id="demo-banner-exit" class="demo-banner-exit" type="button"> Salir </button>
+    <!-- A manual popover, so it renders in the top layer above an open side
+         panel or confirmation (both modal dialogs). top/margin/size undo the
+         popover's centring from the browser stylesheet. -->
+    <div
+      id="toast"
+      popover="manual"
+      class="bg-ink text-ink-text border-ink-line shadow-pop desk:right-24 desk:bottom-6 desk:left-auto desk:max-w-90 pointer-events-none fixed inset-x-4 top-auto bottom-[calc(96px+env(safe-area-inset-bottom))] z-60 m-0 h-auto w-auto translate-y-2.5 overflow-visible rounded-md border px-4.5 py-3 text-[0.9375rem] leading-snug opacity-0 transition duration-200 data-visible:translate-y-0 data-visible:opacity-100"
+      role="status"
+      aria-live="polite"
+    >
     </div>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <div id="chart-tooltip" class="chart-tooltip" role="tooltip" aria-hidden="true"></div>
+    <div
+      id="chart-tooltip"
+      class="bg-ink text-ink-text border-ink-line shadow-pop pointer-events-none invisible fixed z-1200 max-w-[min(280px,78vw)] translate-y-1 rounded-md border px-3.5 py-2.5 text-[0.8125rem] leading-snug opacity-0 transition duration-150 data-visible:visible data-visible:translate-y-0 data-visible:opacity-100"
+      role="tooltip"
+      aria-hidden="true"
+    >
+    </div>
   </body>
 </html>

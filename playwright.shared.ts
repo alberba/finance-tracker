@@ -35,10 +35,11 @@ export function createPlaywrightRuntime({
   return {
     tag,
     testDir: './tests/e2e',
-    fullyParallel: true,
+    fullyParallel: false,
+    globalSetup: './scripts/check-installed-dependencies.mjs',
     forbidOnly: isCI,
     retries: isCI ? 2 : 0,
-    workers: isCI ? 4 : 2,
+    workers: 1,
     maxFailures: isCI ? 10 : 1,
     reporter: isCI
       ? [['dot'], ['blob', { outputDir: blobOutputDir }]]

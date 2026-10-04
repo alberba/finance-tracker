@@ -24,20 +24,28 @@ const MONTH_NAMES = [
   'diciembre',
 ]
 
-const moneyFormatters = new Map<string, Intl.NumberFormat | null>()
+/**
+ * es-ES on its own leaves four-digit figures ungrouped ("1234,50") and signs losses with a
+ * hyphen; every formatter here groups thousands and uses the typographic minus instead.
+ */
+const BASE_OPTIONS: Intl.NumberFormatOptions = { useGrouping: 'always', signDisplay: 'negative' }
 
-function moneyFormatter(currency: string): Intl.NumberFormat | null {
-  if (!moneyFormatters.has(currency)) {
+const formatters = new Map<string, Intl.NumberFormat | null>()
+
+function cachedFormatter(options: Intl.NumberFormatOptions): Intl.NumberFormat | null {
+  const key = JSON.stringify(options)
+  if (!formatters.has(key)) {
     try {
-      moneyFormatters.set(
-        currency,
-        new Intl.NumberFormat('es-ES', { style: 'currency', currency, maximumFractionDigits: 2 }),
-      )
+      formatters.set(key, new Intl.NumberFormat('es-ES', { ...BASE_OPTIONS, ...options }))
     } catch {
-      moneyFormatters.set(currency, null)
+      formatters.set(key, null)
     }
   }
-  return moneyFormatters.get(currency) ?? null
+  return formatters.get(key) ?? null
+}
+
+function withMinus(text: string): string {
+  return text.replace('-', MINUS)
 }
 
 function toNumber(value: unknown): number {
@@ -45,37 +53,69 @@ function toNumber(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-/** "15.850,00 €". Falls back to "12.00 XX" when the currency code is not valid. */
+/** "1.234,5" with exactly `digits` decimals; losses carry "−". For counts, NAVs and units. */
+export function formatNumber(value: unknown, digits = 0): string {
+  const formatter = cachedFormatter({
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
+  const numeric = toNumber(value)
+  return formatter ? withMinus(formatter.format(numeric)) : String(numeric)
+}
+
+const DECIMAL_STRING = /^-?\d+(?:\.(\d+))?$/
+
+/**
+ * A quantity without trailing zeros: "0,00012345", "1.250". A number keeps up to eight
+ * decimals; a decimal string (as Bitvavo sends them) keeps every digit it carries, so crypto
+ * quantities lose no precision. `minDigits` pads prices and fees to cents ("0,10").
+ */
+export function formatDecimal(
+  value: unknown,
+  { minDigits = 0 }: { minDigits?: number } = {},
+): string {
+  const text = typeof value === 'string' ? value.trim() : ''
+  const match = text.match(DECIMAL_STRING)
+  const maxDigits = Math.min(Math.max(match ? (match[1]?.length ?? 0) : 8, minDigits), 100)
+  const formatter = cachedFormatter({
+    minimumFractionDigits: minDigits,
+    maximumFractionDigits: maxDigits,
+  })
+  // Intl formats a numeric string exactly, without going through a float.
+  const input = match ? (text as Intl.StringNumericLiteral) : toNumber(value)
+  return formatter ? withMinus(formatter.format(input)) : text
+}
+
+/** "15.850,00 €", "−1.234,50 €". Falls back to "12,00 XX" when the currency code is not valid. */
 export function formatMoney(value: unknown, currency = 'EUR'): string {
   const code = currency.toUpperCase()
   const numeric = toNumber(value)
-  const formatter = moneyFormatter(code)
-  return formatter ? formatter.format(numeric) : `${numeric.toFixed(2)} ${code}`
+  const formatter = cachedFormatter({ style: 'currency', currency: code, maximumFractionDigits: 2 })
+  return formatter ? withMinus(formatter.format(numeric)) : `${formatNumber(numeric, 2)} ${code}`
 }
 
-const wholeFormatter = new Intl.NumberFormat('es-ES', {
-  maximumFractionDigits: 0,
-  useGrouping: 'always',
-})
+/** "1,2 mil €", "2,5 M €": chart axes, where the full amount would not fit. */
+export function formatCompactMoney(value: unknown, currency = 'EUR'): string {
+  const code = currency.toUpperCase()
+  const formatter = cachedFormatter({
+    style: 'currency',
+    currency: code,
+    notation: 'compact',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  })
+  return formatter ? withMinus(formatter.format(toNumber(value))) : formatMoney(value, code)
+}
 
 /** "18.420": rounded to whole units, thousands always grouped, for dense tables. */
 export function formatWholeAmount(value: number): string {
-  const rounded = Math.round(value)
-  const text = wholeFormatter.format(Math.abs(rounded))
-  return rounded < 0 ? `${MINUS}${text}` : text
+  return formatNumber(Math.round(value))
 }
 
 /** A quote price in its own currency, keeping up to six decimals ("58.412,00 €", "0,000123 €"). */
 export function formatQuotePrice(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 6,
-    }).format(value)
-  } catch {
-    return `${value.toFixed(2)} ${currency}`
-  }
+  const formatter = cachedFormatter({ style: 'currency', currency, maximumFractionDigits: 6 })
+  return formatter ? withMinus(formatter.format(value)) : `${formatNumber(value, 2)} ${currency}`
 }
 
 function sign(value: number): string {
@@ -98,7 +138,7 @@ export function formatPercent(
   const factor = 10 ** digits
   const rounded = Math.round(toNumber(value) * factor) / factor
   const prefix = rounded < 0 || signed ? sign(rounded) : ''
-  return `${prefix}${Math.abs(rounded).toFixed(digits).replace('.', ',')}${NBSP}%`
+  return `${prefix}${formatNumber(Math.abs(rounded), digits)}${NBSP}%`
 }
 
 /** Splits a formatted amount into its whole part and the rest ("11.062" + ",68 €"). */
@@ -172,10 +212,11 @@ export function formatDueLabel(isoDate: string, today: string): string {
   return days < 0 ? `Hace ${-days} días` : `En ${days} días`
 }
 
-/** "26/09, 10:42" from an instant (quote timestamps, last sync). */
-export function formatStamp(instant: string, timeZone?: string): string {
+type StampParts = Record<'day' | 'month' | 'hour' | 'minute', string>
+
+function stampParts(instant: string, timeZone?: string): StampParts | null {
   const date = new Date(instant)
-  if (!instant || Number.isNaN(date.getTime())) return MISSING
+  if (!instant || Number.isNaN(date.getTime())) return null
   // Assembled from parts: ICU drops the month's leading zero in this pattern.
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('es-ES', {
@@ -190,7 +231,24 @@ export function formatStamp(instant: string, timeZone?: string): string {
       .map((part) => [part.type, part.value]),
   )
   const pad = (value: string | undefined) => String(value ?? '').padStart(2, '0')
-  return `${pad(parts.day)}/${pad(parts.month)}, ${pad(parts.hour)}:${pad(parts.minute)}`
+  return {
+    day: pad(parts.day),
+    month: pad(parts.month),
+    hour: pad(parts.hour),
+    minute: pad(parts.minute),
+  }
+}
+
+/** "26/09, 10:42" from an instant (quote timestamps, last sync). */
+export function formatStamp(instant: string, timeZone?: string): string {
+  const parts = stampParts(instant, timeZone)
+  return parts ? `${parts.day}/${parts.month}, ${parts.hour}:${parts.minute}` : MISSING
+}
+
+/** "10:42" from an instant, when the day goes without saying. */
+export function formatTime(instant: string, timeZone?: string): string {
+  const parts = stampParts(instant, timeZone)
+  return parts ? `${parts.hour}:${parts.minute}` : MISSING
 }
 
 /** "Julio" from a 0-based month index; empty when there is no such month. */

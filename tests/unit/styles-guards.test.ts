@@ -3,50 +3,68 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Guards for the style architecture of ADR 0004
- * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): the legacy
- * sheet can only shrink, it stays below Tailwind in the cascade, the
- * text/surface token pairs keep AA contrast in both themes, and every CSS
- * variable the code reads is defined somewhere.
+ * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): global.css
+ * is the only stylesheet and imports nothing but Tailwind (the legacy sheet is
+ * gone and can't come back under any name), the text/surface token pairs keep
+ * AA contrast in both themes, and every CSS variable the code reads is defined
+ * somewhere.
  */
 
 const globalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8')
-const legacyCss = readFileSync(new URL('../../src/styles/legacy.css', import.meta.url), 'utf8')
 
-/**
- * Line ceiling for src/styles/legacy.css. It only goes down: a zone migration
- * that deletes legacy rules lowers it in the same PR. Never raise it; new
- * styles go in components (utilities, base components or scoped styles).
- */
-const LEGACY_CSS_LINE_CEILING = 1971
+const srcDir = new URL('../../src/', import.meta.url)
+const sourcePaths = readdirSync(srcDir, { recursive: true }) as string[]
 
-describe('legacy.css', () => {
-  it('does not grow past its line ceiling', () => {
-    const lines = legacyCss.split('\n').length - (legacyCss.endsWith('\n') ? 1 : 0)
+describe('global stylesheet', () => {
+  it('is the only stylesheet in src/', () => {
+    // New styles go in components: utilities, base components or scoped styles.
+    const stylesheets = sourcePaths.filter((path) => /\.(css|scss|sass|less)$/.test(path))
 
-    expect(lines).toBeLessThanOrEqual(LEGACY_CSS_LINE_CEILING)
-  })
-})
-
-describe('cascade layers', () => {
-  it('declares legacy below components and utilities, above base', () => {
-    const statement = globalCss.match(/^@layer\s+([^;{]+);/m)
-    expect(statement, 'global.css declares the layer order in one statement').not.toBeNull()
-    const order = statement![1].split(',').map((layer) => layer.trim())
-
-    expect(order).toEqual(['theme', 'base', 'legacy', 'components', 'utilities'])
+    expect(stylesheets).toEqual(['styles/global.css'])
   })
 
-  it('declares the order before importing Tailwind', () => {
-    expect(globalCss.indexOf('@layer theme, base, legacy')).toBeLessThan(
-      globalCss.indexOf("@import 'tailwindcss'"),
+  it('has no global <style> blocks beside it', () => {
+    // Components style themselves with scoped blocks; an unscoped or
+    // `is:global` block would be a global sheet under another name.
+    const globalBlocks = sourcePaths
+      .filter((path) => /\.(vue|astro)$/.test(path))
+      .flatMap((path) =>
+        [...readFileSync(new URL(path, srcDir), 'utf8').matchAll(/<style\b[^>]*>/g)]
+          .filter(([tag]) => !/\bscoped\b/.test(tag))
+          .map(([tag]) => `${path}: ${tag}`),
+      )
+
+    expect(globalBlocks).toEqual([])
+  })
+
+  it('has no stylesheets in public/', () => {
+    const publicDir = new URL('../../public/', import.meta.url)
+    const stylesheets = (readdirSync(publicDir, { recursive: true }) as string[]).filter((path) =>
+      path.endsWith('.css'),
     )
+
+    expect(stylesheets).toEqual([])
   })
 
-  it('imports legacy.css only inside the legacy layer', () => {
-    const imports = [...globalCss.matchAll(/^@import\s+['"]\.\/legacy\.css['"]([^;]*);/gm)]
+  it('imports only Tailwind', () => {
+    const imports = [...globalCss.matchAll(/^@import\s+([^;]+);/gm)].map(([, target]) =>
+      target.trim(),
+    )
 
-    expect(imports).toHaveLength(1)
-    expect(imports[0][1].trim()).toBe('layer(legacy)')
+    expect(imports).toEqual(["'tailwindcss'"])
+  })
+
+  it('declares no cascade layer of its own', () => {
+    // Tailwind's theme, base, components and utilities are the whole order;
+    // a layer for old rules is how the legacy sheet lived.
+    // Block (`@layer base {`) and statement (`@layer theme, legacy;`) forms.
+    const layers = [...globalCss.matchAll(/@layer\s+([^{;]+)/g)].flatMap(([, names]) =>
+      names.split(',').map((name) => name.trim()),
+    )
+
+    expect(
+      layers.filter((name) => !['theme', 'base', 'components', 'utilities'].includes(name)),
+    ).toEqual([])
   })
 })
 
@@ -109,20 +127,21 @@ const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--ink-muted', surfaces: INK_SURFACES },
   { text: '--ink-gain', surfaces: INK_SURFACES },
   { text: '--ink-loss', surfaces: INK_SURFACES },
+  { text: '--notice-text', surfaces: ['--notice-bg'] },
 ]
 
 /**
  * Pairs that were already below AA when the guard landed. The list only
  * shrinks: fix the token (or move its text to --gain / --loss) and delete the
  * entry — the test fails while a listed pair passes. Never add to it.
- * `--text-faint` is meant for placeholders and decoration; `--income` /
- * `--expense` are fills whose text counterparts are `--gain` / `--loss`.
+ * What is left is never painted as readable text (the next describe enforces
+ * it): `--text-faint` is for placeholders and decoration; `--income` /
+ * `--expense` are fills whose text counterparts are `--gain` / `--loss`;
+ * `--accent` is a warning fill (dots, tinted pills with `text-text-main`).
  */
 const KNOWN_BELOW_AA = new Set([
   ...PAGE_SURFACES.map((surface) => `light --text-faint on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `dark --text-faint on ${surface}`),
-  'light --primary on --bg-main',
-  'light --primary on --bg-subtle',
   ...PAGE_SURFACES.map((surface) => `light --income on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `light --expense on ${surface}`),
   ...PAGE_SURFACES.map((surface) => `light --accent on ${surface}`),
@@ -151,8 +170,7 @@ describe('token contrast (WCAG AA, normal text)', () => {
   }
 })
 
-const srcDir = new URL('../../src/', import.meta.url)
-const sourceFiles = (readdirSync(srcDir, { recursive: true }) as string[])
+const sourceFiles = sourcePaths
   .filter((path) => /\.(vue|astro|ts|js|css)$/.test(path))
   .map((path) => ({ path, text: readFileSync(new URL(path, srcDir), 'utf8') }))
 
@@ -174,5 +192,23 @@ describe('CSS variables', () => {
     )
 
     expect(undefinedReads).toEqual([])
+  })
+})
+
+describe('tokens below AA', () => {
+  it('are never painted as readable text', () => {
+    // The pairs left in KNOWN_BELOW_AA stay there only because no text uses
+    // them; `placeholder:text-text-faint` is the one allowed use.
+    const textUses = sourceFiles.flatMap(({ path, text }) =>
+      [
+        ...text.matchAll(
+          /(?<![\w-])((?:[\w-]+:)*)text-(income|expense|accent|text-faint|\(--(?:income|expense|accent|text-faint)\))(?![\w-])/g,
+        ),
+      ]
+        .filter(([, variants]) => variants !== 'placeholder:')
+        .map(([match]) => `${path}: ${match}`),
+    )
+
+    expect(textUses).toEqual([])
   })
 })

@@ -96,10 +96,10 @@ test.describe('Settings E2E', () => {
         .section('settings')
         .locator('tr[data-account-id]')
         .filter({ hasText: 'Openbank Ahorro' }),
-    ).toContainText('1234,50')
+    ).toContainText('1.234,50')
   })
 
-  test('añade, reordena y elimina una categoría de gasto', async ({ tracker }) => {
+  test('añade, reordena y elimina una categoría de gasto', async ({ tracker, page }) => {
     await tracker.openSettingsTab('Categorías')
     const expenses = tracker.section('settings').locator('[data-category-list="expenseCategories"]')
 
@@ -119,6 +119,9 @@ test.describe('Settings E2E', () => {
     )
 
     await item.getByRole('button', { name: 'Eliminar categoría Mascotas' }).click()
+    const confirm = page.getByRole('alertdialog', { name: '¿Eliminar esta categoría?' })
+    await expect(confirm).toContainText('Mascotas')
+    await confirm.getByRole('button', { name: 'Eliminar categoría' }).click()
     await expect(item).toHaveCount(0)
   })
 

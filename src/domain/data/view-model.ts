@@ -28,16 +28,24 @@ const CSV_HEADER = [
 
 type CsvField = string | number | undefined
 
+const SAVED_AT_FORMAT = new Intl.DateTimeFormat('es-ES', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+
+function formatSavedAt(savedAt: string | null | undefined): string {
+  const date = savedAt ? new Date(savedAt) : null
+  return date && !Number.isNaN(date.getTime()) ? SAVED_AT_FORMAT.format(date) : 'nunca'
+}
+
 export function buildDataSummaryViewModel(state: State): DataSummaryViewModel {
   const source = state.meta?.source || 'desconocido'
-  const generated = state.meta?.generatedAt || ''
-  const savedAt = state.meta?.savedAt || ''
 
   return {
     totalTransactions: state.transactions.length,
     totalSnapshots: Object.keys(state.snapshots || {}).length,
     totalContributions: state.contributions.length,
-    meta: `Origen: ${source} | Seed: ${generated} | Último guardado local: ${savedAt || '-'}`,
+    meta: `Origen: ${source} · Último guardado local: ${formatSavedAt(state.meta?.savedAt)}`,
   }
 }
 
@@ -62,8 +70,6 @@ export function buildTransactionsCsv(state: State): string {
   ])
 
   return [CSV_HEADER as readonly CsvField[], ...rows]
-    .map((row) =>
-      row.map((field) => `"${String(field ?? '').replace(/"/g, '""')}"`).join(','),
-    )
+    .map((row) => row.map((field) => `"${String(field ?? '').replace(/"/g, '""')}"`).join(','))
     .join('\n')
 }

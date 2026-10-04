@@ -72,7 +72,7 @@ describe("useSyncStore — queue never stays poisoned (audit §2)", () => {
     expect(store.lastError).toContain("La cuenta indicada no existe");
   });
 
-  it("discards the head entry after repeated server failures so later commands can sync", async () => {
+  it("keeps the head entry through repeated server failures so a Worker outage never loses an edit", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout"] });
     onSync = () => json({ error: "Error interno del servidor." }, 500);
     const store = useSyncStore();
@@ -84,7 +84,7 @@ describe("useSyncStore — queue never stays poisoned (audit §2)", () => {
       await vi.waitFor(async () => expect(store.syncStatus).not.toBe("syncing"));
     }
 
-    expect((await queued()).some((e) => e.command.commandId === "poison")).toBe(false);
+    expect((await queued()).some((e) => e.command.commandId === "poison")).toBe(true);
     expect(store.lastError).toBeTruthy();
   });
 

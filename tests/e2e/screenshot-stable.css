@@ -3,12 +3,17 @@
 }
 
 #save-status,
-#data-meta {
+#data-meta,
+#toast {
   visibility: hidden !important;
 }
 
 /* Las fuentes remotas no son deterministas en CI. El snapshot comprueba el
    layout con una fuente local estable; la carga de fuentes se valida en la app. */
+:root {
+  --font-display: Arial, sans-serif !important;
+}
+
 *,
 *::before,
 *::after {

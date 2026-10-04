@@ -5,6 +5,7 @@ import { computed, shallowRef } from 'vue'
 import InvestmentPositionsBlock from './InvestmentPositionsBlock.vue'
 import InvestmentQuotesBlock from './InvestmentQuotesBlock.vue'
 import ChartCanvas from '../charts/ChartCanvas.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
 import DocumentSurface from '../ui/DocumentSurface.vue'
 import InkBand, { type InkBandFact } from '../ui/InkBand.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
@@ -66,7 +67,11 @@ const dailyChip = computed(() =>
 )
 
 const heroFacts = computed<InkBandFact[]>(() => [
-  { label: 'Capital invertido', value: formatMoney(vm.value.investedCapital), valueId: 'inv-capital' },
+  {
+    label: 'Capital invertido',
+    value: formatMoney(vm.value.investedCapital),
+    valueId: 'inv-capital',
+  },
   { label: 'Resultado', value: formatSignedMoney(vm.value.gain), tone: toneOf(vm.value.gain) },
   {
     label: vm.value.returnLabel,
@@ -96,7 +101,6 @@ const drawPortfolioChart = computed(() => {
       forceZeroTick: true,
     })
 })
-
 </script>
 
 <template>
@@ -109,33 +113,14 @@ const drawPortfolioChart = computed(() => {
     aria-label="Resumen"
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <label class="text-text-muted flex grow items-center gap-3 text-sm font-semibold sm:grow-0">
-        <span class="sr-only sm:not-sr-only">Mes de análisis</span>
-        <span class="relative flex grow items-center">
-          <select
-            id="investment-month"
-            v-model="month"
-            name="investmentMonth"
-            class="border-line-strong bg-panel text-text-main focus-visible:outline-primary h-11 w-full appearance-none rounded-md border pr-10 pl-3.5 text-base font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
-          >
-            <option v-for="option in monthOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-          <svg
-            class="text-text-muted pointer-events-none absolute right-3.5 size-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </span>
-      </label>
+      <BaseSelect
+        id="investment-month"
+        v-model="month"
+        name="investmentMonth"
+        label="Mes de análisis"
+        :options="monthOptions"
+        class="grow sm:flex sm:grow-0 sm:items-center sm:gap-3 [&_select]:font-semibold max-sm:[&>label]:sr-only"
+      />
       <div class="flex items-center gap-3">
         <span class="text-text-muted hidden text-sm font-semibold sm:inline" aria-hidden="true">
           Rentabilidad
@@ -183,7 +168,9 @@ const drawPortfolioChart = computed(() => {
             class="block size-full"
             :draw="drawPortfolioChart"
             :aria-label="
-              unit === 'eur' ? 'Valor de cartera frente a capital aportado' : 'Evolución cartera total'
+              unit === 'eur'
+                ? 'Valor de cartera frente a capital aportado'
+                : 'Evolución cartera total'
             "
           />
         </div>

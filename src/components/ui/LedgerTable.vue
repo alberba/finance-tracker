@@ -11,6 +11,8 @@ export interface LedgerColumn<R = unknown> {
   rowHeader?: boolean
   /** Plain cell text; a `cell-<key>` slot overrides it. */
   value?: (row: R) => string
+  /** Classes for every cell of the column (header, rows, total), e.g. a width or a highlight. */
+  class?: string
 }
 
 export interface LedgerGroup<R = unknown> {
@@ -55,6 +57,7 @@ function cellClass(column: LedgerColumn<Row>): string[] {
   return [
     column.align === 'right' ? 'text-right' : 'text-left',
     column.hideBelow ? HIDE[column.hideBelow] : '',
+    column.class ?? '',
   ]
 }
 

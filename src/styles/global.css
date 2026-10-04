@@ -1,20 +1,16 @@
-/* Global CSS: cascade order, theme tokens and the Tailwind theme. Styles for a
-   screen live with its component (ADR 0004); legacy.css only shrinks.
+/* Global CSS: theme tokens, the Tailwind theme, reset, base typography and
+   the shell variants. Styles for a screen live with its component (ADR 0004);
+   no other stylesheet exists (tests/unit/styles-guards.test.ts).
    See docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md. */
 
-/* Cascade order. legacy.css sits below components and utilities, so a
-   Tailwind utility always beats a legacy rule whatever its specificity. */
-@layer theme, base, legacy, components, utilities;
-
 @import 'tailwindcss';
-@import './legacy.css' layer(legacy);
-
-/* legacy.css owns `.list-item` (a flex row); Tailwind's `list-item` utility
-   would override it now that utilities win. Remove with the legacy class. */
-@source not inline('list-item');
 
 /* `dark:` follows the app theme attribute, not prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* `sidebar-collapsed:` applies while the desktop sidebar is collapsed
+   (`data-sidebar` on <html>: the pre-paint script, then scripts/shell.ts). */
+@custom-variant sidebar-collapsed (&:where([data-sidebar=collapsed] *));
 
 /*
   Theme tokens — "Aurora Ledger". Light is the default; dark applies under
@@ -49,13 +45,15 @@
     /* Gain / loss text on the ink surface, which stays dark in both themes. */
     --ink-gain: #34d399;
     --ink-loss: #f87171;
+    /* Chart gridlines on the ink surface. */
+    --ink-grid: rgba(255, 255, 255, 0.07);
 
     /* Brand / interaction */
-    --primary: #3b6bf0;
+    --primary: #3462e0; /* text tone too: AA (4.67:1) on --bg-main */
     --primary-light: #eaf0fe;
     /* Fill of primary buttons and its text: the same blue in both themes, so
        white text keeps AA (the dark --primary is too light under white). */
-    --primary-fill: #3b6bf0;
+    --primary-fill: #3462e0;
     --primary-fill-hover: #2a53d4;
     --on-primary: #ffffff;
 
@@ -88,17 +86,16 @@
     --overlay: rgba(11, 17, 32, 0.5);
     --ring: color-mix(in srgb, var(--primary) 26%, transparent);
 
-    /* Aurora backdrop accents */
-    --aurora-1: rgba(59, 107, 240, 0.16);
-    --aurora-2: rgba(106, 82, 232, 0.13);
-    --aurora-3: rgba(14, 159, 110, 0.1);
+    /* Notice band (demo mode): a warm strip for the one thing out of the ordinary. */
+    --notice-bg: #fdf1dc;
+    --notice-line: #f3c98b;
+    --notice-text: #8a4b06;
 
     /* Charts */
     --chart-axis: #7c8798;
     --chart-grid: #e9edf4;
     --chart-legend: #5a6678;
     --chart-point-border: #ffffff;
-    --chart-empty: #e4e8f1;
 
     /* Chart series palette (positions, allocation bar, per-asset charts).
        Read through chart-theme.ts; neighbours differ in lightness too. */
@@ -159,15 +156,14 @@
     --overlay: rgba(0, 0, 0, 0.62);
     --ring: color-mix(in srgb, var(--primary) 40%, transparent);
 
-    --aurora-1: rgba(94, 139, 255, 0.16);
-    --aurora-2: rgba(167, 139, 250, 0.14);
-    --aurora-3: rgba(52, 211, 153, 0.1);
+    --notice-bg: #3a2a12;
+    --notice-line: #6b4a1c;
+    --notice-text: #f4c27a;
 
     --chart-axis: #8a93a3;
     --chart-grid: #21252e;
     --chart-legend: #9aa4b4;
     --chart-point-border: #121419;
-    --chart-empty: #23262f;
 
     --chart-series-1: #2bb3a0;
     --chart-series-2: #e6b04a;
@@ -183,11 +179,15 @@
 }
 
 @theme {
-  /* Typography: display = Syne (400–800), body = DM Sans, numbers and
-     symbols = DM Mono. */
+  /* Typography: display = Syne (400–800) for titles and every figure, body =
+     DM Sans, asset symbols and kickers = DM Mono. */
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
+
+  /* Shell breakpoint: sidebar and the floating report launcher from here up;
+     app bar and bottom nav below. */
+  --breakpoint-desk: 61.3125rem;
 
   /* Panel entrance animation, exposed as the `animate-panel-in` utility. */
   --animate-panel-in: panelIn 0.26s ease;
@@ -217,10 +217,18 @@
   --color-ink-muted: var(--ink-muted);
   --color-ink-gain: var(--ink-gain);
   --color-ink-loss: var(--ink-loss);
+  --color-sidebar: var(--bg-sidebar);
+  --color-overlay: var(--overlay);
+
+  /* Notice band: demo mode. */
+  --color-notice: var(--notice-bg);
+  --color-notice-line: var(--notice-line);
+  --color-notice-text: var(--notice-text);
 
   /* Rules and borders. */
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  --color-track: var(--track-bg);
 
   /* Gain / loss text tones (AA on every surface, both themes). Pair them
      with a sign so meaning never depends on color alone. */
@@ -239,6 +247,57 @@
   --shadow-card: var(--elevation-card);
   --shadow-raised: var(--elevation-raised);
   --shadow-pop: var(--elevation-pop);
+}
+
+/* Reset and base typography on top of Tailwind's preflight. Everything here
+   is element-level: no classes, so a utility always wins. */
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    color: var(--text-main);
+    line-height: 1.55;
+    background: var(--bg-main);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    letter-spacing: -0.032em;
+  }
+
+  h3,
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  dialog {
+    color: var(--text-main);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+      transition-duration: 0.01ms;
+      scroll-behavior: auto;
+    }
+  }
 }
 
 @keyframes panelIn {

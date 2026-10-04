@@ -1,22 +1,20 @@
 /**
- * WP7b note: `importJson`/`resetSeed` use `reloadState` (whole-blob
- * replace), not `commitState` — they were never in scope for the
- * per-entity sync-command mapping layer (`src/lib/client/command-mapping.ts`).
- * The v2 sync path already has dedicated endpoints for these flows
- * (`/api/data/import`, `/api/state/reset`, `/api/state/initialize` via
- * `startFresh`/`initializeFreshState` below), so nothing here needs wiring.
+ * On the v2 sync path the JSON backup is the server's relational export
+ * (`src/lib/client/data-backup.ts`): exporting reads D1 and importing
+ * replaces the user's rows there, then reloads so the bootstrap rebuilds the
+ * state. Off v2 (and in demo mode) both keep working on the in-memory blob.
  */
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
+import { fetchBackup, restoreBackup } from '../lib/client/data-backup'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { initializeFreshState } from '../lib/client/state-initialize'
 import { isDemoMode } from '../scripts/demo-mode'
-import { BASE_SEED } from '../scripts/state'
-import { clone } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+import { useSyncStore } from './sync'
 
 function downloadBlob(content: string, mimeType: string, filename: string): void {
   const blob = new Blob([content], { type: mimeType })
@@ -34,7 +32,21 @@ export const useDataStore = defineStore('data', () => {
 
   const summary = computed(() => buildDataSummaryViewModel(financialStateStore.state))
 
-  function exportJson(): void {
+  /** The JSON backup lives in D1 and a restore replaces what is there. */
+  const backsUpServerData = isSyncV2Enabled() && !isDemoMode()
+
+  async function exportJson(): Promise<void> {
+    if (backsUpServerData) {
+      const result = await fetchBackup()
+      if (!result.ok) {
+        showToast(`No se pudo exportar: ${result.error}`)
+        return
+      }
+      const day = new Date().toISOString().slice(0, 10)
+      downloadBlob(result.value, 'application/json', `finance-tracker-${day}.json`)
+      showToast('JSON exportado.')
+      return
+    }
     const state = financialStateStore.state
     downloadBlob(
       JSON.stringify(state, null, 2),
@@ -54,7 +66,11 @@ export const useDataStore = defineStore('data', () => {
     showToast('CSV exportado.')
   }
 
-  function importJson(file: File): void {
+  async function importJson(file: File): Promise<void> {
+    if (backsUpServerData) {
+      await restoreJson(file)
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       try {
@@ -68,9 +84,26 @@ export const useDataStore = defineStore('data', () => {
     reader.readAsText(file, 'utf-8')
   }
 
-  function resetSeed(): void {
-    financialStateStore.reloadState(clone(BASE_SEED))
-    showToast('Tracker reiniciado con datos semilla.')
+  async function restoreJson(file: File): Promise<void> {
+    // Commands still queued point at rows the restore is about to delete:
+    // send them first, and refuse while any remain (offline).
+    const syncStore = useSyncStore()
+    await syncStore.flush()
+    if (syncStore.pendingCount > 0) {
+      showToast('Hay cambios sin sincronizar. Conéctate y vuelve a intentarlo.')
+      return
+    }
+    const result = await restoreBackup(await file.text())
+    if (!result.ok) {
+      showToast(`No se pudo importar: ${result.error}`)
+      return
+    }
+    showToast(
+      result.value.skipped > 0
+        ? `JSON importado; ${result.value.skipped} elementos sin cuenta o categoría se omitieron. Recargando…`
+        : 'JSON importado correctamente. Recargando…',
+    )
+    window.location.reload()
   }
 
   /** "Empezar de cero" (WP8) — only meaningful on the v2 sync path. */
@@ -98,7 +131,7 @@ export const useDataStore = defineStore('data', () => {
     exportJson,
     exportTransactionsCsv,
     importJson,
-    resetSeed,
+    backsUpServerData,
     canStartFresh,
     startFresh,
   }

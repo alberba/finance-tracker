@@ -136,8 +136,30 @@ export async function startRoundTrip(
   let syncStore = useSyncStore();
   await syncStore.init(user.id);
 
+  /** Waits until the outbox stops changing and, when online, has drained. */
+  async function quiesce(): Promise<void> {
+    const { count: countOutbox, openOutbox } = await import("../../../../src/lib/client/outbox");
+    const db = await openOutbox(user.id);
+    try {
+      let last = -1;
+      let stable = 0;
+      for (let round = 0; round < 400 && stable < 3; round += 1) {
+        await settle();
+        if (!offline) await syncStore.syncNow();
+        const count = await countOutbox(db);
+        stable = count === last && (offline || count === 0) ? stable + 1 : 0;
+        last = count;
+      }
+      if (stable < 3) throw new Error(`El cliente no se estabilizó (${last} pendientes).`);
+    } finally {
+      db.close();
+    }
+  }
+
   /** Closes and reopens the client: new Pinia, new stores, same IndexedDB. */
   async function reboot(): Promise<State> {
+    // An F5 unloads the page: the previous client stops reading, sending and rendering.
+    syncStore.detach();
     setActivePinia(createPinia());
     const { useSyncStore: freshSyncStore } = await import("../../../../src/stores/sync");
     syncStore = freshSyncStore();
@@ -170,17 +192,15 @@ export async function startRoundTrip(
       await applySyncBatch(asServerDb(testDb.db), user.id, commands as never);
     },
     reloadOffline: async () => {
-      await settle();
+      await quiesce();
       return reboot();
     },
     reload: async () => {
-      // Store mutations enqueue their commands from a floating promise
-      // (`void syncListDiff(...)`), so let those settle before flushing —
-      // otherwise the flush races the enqueue and drains an empty queue.
-      await settle();
-      await syncStore.flush();
-      await settle();
-      await syncStore.flush();
+      // Store mutations enqueue their commands from floating promises
+      // (`void syncListDiff(...)`), so wait until the client is quiet — the
+      // queue stable and, online, drained — instead of a fixed number of
+      // ticks, which is not enough under full-suite load.
+      await quiesce();
       // Then do what an F5 does: a brand-new client that re-reads everything
       // through the app's own bootstrap path. Projecting the payload by hand
       // here would skip exactly the code under test.

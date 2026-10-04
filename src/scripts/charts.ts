@@ -36,7 +36,6 @@ const axisColor = () => readChartTheme().axis
 const gridColor = () => readChartTheme().grid
 const legendColor = () => readChartTheme().legend
 const pointBorderColorVar = () => readChartTheme().pointBorder
-const emptyColor = () => readChartTheme().empty
 
 // Legends name series (text, body font); axes carry figures (display font).
 const FONT_FAMILY = "'DM Sans', system-ui, sans-serif"
@@ -151,18 +150,6 @@ export interface LineChartOptions {
   yPaddingRatio?: number
 }
 
-export interface GroupedBarSeriesItem {
-  name: string
-  color: string
-  values: number[]
-}
-
-export interface DonutChartItem {
-  label: string
-  color: string
-  value: number
-}
-
 export interface MultiLineSeries {
   name: string
   /** A color or a token reference (`var(--chart-series-1)`). */
@@ -202,7 +189,7 @@ function makeExternalTooltip<TType extends ChartType>(
     if (!tooltipEl) return
 
     if (tooltip.opacity === 0) {
-      tooltipEl.classList.remove('is-visible')
+      delete tooltipEl.dataset.visible
       tooltipEl.setAttribute('aria-hidden', 'true')
       return
     }
@@ -214,7 +201,7 @@ function makeExternalTooltip<TType extends ChartType>(
     const canvasRect = chart.canvas.getBoundingClientRect()
     tooltipEl.style.left = canvasRect.left + tooltip.caretX + 'px'
     tooltipEl.style.top = canvasRect.top + tooltip.caretY + 'px'
-    tooltipEl.classList.add('is-visible')
+    tooltipEl.dataset.visible = ''
     tooltipEl.setAttribute('aria-hidden', 'false')
   }
 }
@@ -284,99 +271,6 @@ export function renderLineChart(
         axis: options.axisColor,
         grid: options.gridColor,
       }),
-    },
-  })
-}
-
-export function renderHorizontalBarChart(
-  canvas: HTMLCanvasElement,
-  data: Array<{ label: string; value: number }>,
-  palette: string[],
-  formatValue: ValueFormatter,
-): void {
-  destroyExisting(canvas)
-
-  const cleaned = data
-    .map((item) => ({
-      label: item.label,
-      value: Math.max(Number(item.value || 0), 0),
-    }))
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-
-  canvas.dataset.chartBarCount = String(cleaned.length)
-
-  if (!cleaned.length) {
-    new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels: ['Sin datos'],
-        datasets: [{ data: [0], backgroundColor: [emptyColor()] }],
-      },
-      options: {
-        indexAxis: 'y' as const,
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
-    })
-    return
-  }
-
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: cleaned.map((item) => item.label),
-      datasets: [
-        {
-          data: cleaned.map((item) => item.value),
-          backgroundColor: cleaned.map((_, idx) => palette[idx % palette.length]),
-          borderRadius: 6,
-          borderSkipped: false,
-          maxBarThickness: 22,
-          categoryPercentage: 0.72,
-        },
-      ],
-    },
-    options: {
-      indexAxis: 'y' as const,
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'bar'>((tooltip) => {
-            const dp = tooltip.dataPoints[0]
-            return `${dp.label}: ${formatValue(tooltipRawNumber(dp))}`
-          }),
-        },
-      },
-      scales: {
-        x: {
-          grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
-          border: { display: false },
-          ticks: {
-            font: axisFont(10),
-            color: axisColor(),
-            maxTicksLimit: 5,
-            padding: 8,
-            callback: (value: string | number) => formatValue(Number(value || 0)),
-          },
-          beginAtZero: true,
-        },
-        y: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: {
-            font: axisFont(11),
-            color: axisColor(),
-            padding: 6,
-          },
-        },
-      },
     },
   })
 }

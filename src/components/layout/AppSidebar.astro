@@ -2,6 +2,7 @@
 import type { SectionId } from '../../scripts/types'
 import SidebarNav from './SidebarNav.astro'
 import SidebarUserMenu from './SidebarUserMenu.astro'
+import ThemeSwitcher from './ThemeSwitcher.vue'
 
 export interface Props {
   activeSection: SectionId
@@ -10,66 +11,58 @@ export interface Props {
 const { activeSection } = Astro.props
 ---
 
-<aside class="sidebar">
-  <header class="brand-block">
-    <span class="brand-logo" aria-hidden="true">
-      <img src="/favicon.svg" alt="" width="40" height="40" />
-    </span>
-    <h1>Finance<br />Tracker</h1>
+<aside
+  class="bg-sidebar text-ink-text sidebar-collapsed:items-center sidebar-collapsed:overflow-visible sidebar-collapsed:px-2.5 desk:flex sticky top-0 z-10 hidden h-screen [scrollbar-width:none] flex-col gap-4.5 overflow-x-hidden overflow-y-auto px-3 pt-5.5 pb-3.5"
+>
+  <header
+    class="border-ink-text/8 sidebar-collapsed:justify-center sidebar-collapsed:self-stretch sidebar-collapsed:px-0 flex items-center gap-3 border-b px-1.5 pb-4.5"
+  >
+    <img src="/favicon.svg" alt="" width="40" height="40" class="size-10 shrink-0 rounded-md" />
+    <h1 class="font-display sidebar-collapsed:sr-only text-lg leading-[1.05] font-bold">
+      Finance<br />Tracker
+    </h1>
   </header>
-  <div class="sidebar-collapsed-brand" aria-hidden="true">
-    <img src="/favicon.svg" alt="" />
-  </div>
 
   <SidebarNav activeSection={activeSection} />
 
-  <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema">
-    <svg
-      class="theme-toggle-icon-moon"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.6"
-      aria-hidden="true"
-    >
-      <path d="M16 11.5A6 6 0 0 1 8.5 4a6 6 0 1 0 7.5 7.5z"></path>
-    </svg>
-    <svg
-      class="theme-toggle-icon-sun"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.6"
-      aria-hidden="true"
-    >
-      <circle cx="10" cy="10" r="3.4"></circle>
-      <path
-        d="M10 2v2M10 16v2M2 10h2M16 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"
-      ></path>
-    </svg>
-    <span class="theme-toggle-label">Modo oscuro</span>
-    <span class="theme-toggle-switch" aria-hidden="true"></span>
-  </button>
-
-  <button
-    id="sidebar-toggle"
-    class="sidebar-toggle"
-    type="button"
-    aria-label="Colapsar barra lateral"
-    aria-expanded="true"
+  <div
+    class="border-ink-text/8 sidebar-collapsed:items-center mt-auto flex w-full flex-col gap-1 border-t pt-3"
   >
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.8"
-      aria-hidden="true"
+    <div
+      class="sidebar-collapsed:justify-center sidebar-collapsed:pl-0 flex min-h-11.5 items-center justify-between gap-3 pl-3"
     >
-      <polyline points="13,4 7,10 13,16"></polyline>
-      <polyline points="8,4 2,10 8,16"></polyline>
-    </svg>
-    <span class="sidebar-toggle-label">Colapsar</span>
-  </button>
+      <span
+        class="text-ink-muted sidebar-collapsed:hidden text-[0.9375rem] font-medium"
+        aria-hidden="true"
+      >
+        Tema
+      </span>
+      <ThemeSwitcher client:only="vue" variant="sidebar" />
+    </div>
 
-  <SidebarUserMenu />
+    <button
+      id="sidebar-toggle"
+      class="text-ink-muted hover:bg-ink-text/6 hover:text-ink-text focus-visible:outline-primary sidebar-collapsed:justify-center sidebar-collapsed:px-0 flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      type="button"
+      aria-label="Colapsar barra lateral"
+      aria-expanded="true"
+    >
+      <svg
+        class="sidebar-collapsed:rotate-180 size-4.5 shrink-0 transition-transform"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <polyline points="13,4 7,10 13,16"></polyline>
+        <polyline points="8,4 2,10 8,16"></polyline>
+      </svg>
+      <span class="sidebar-collapsed:hidden" data-sidebar-toggle-label>Colapsar</span>
+    </button>
+
+    <SidebarUserMenu />
+  </div>
 </aside>

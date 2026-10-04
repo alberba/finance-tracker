@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 
+/** `--breakpoint-desk` in src/styles/global.css (61.3125rem): sidebar and floating launcher from here up. */
+const DESK_BREAKPOINT_PX = 981
+
 const SECTION_CONFIG = {
   dashboard: { buttonLabel: 'Dashboard', headingText: /^Dashboard$/ },
   transactions: {
@@ -94,7 +97,7 @@ export class FinanceTrackerPage {
   }
 
   get issueReportDialog(): Locator {
-    return this.page.locator('#global-report-dialog')
+    return this.page.getByRole('dialog', { name: 'Crear reporte' })
   }
 
   async goto() {
@@ -252,16 +255,36 @@ export class FinanceTrackerPage {
     await this.open('data')
   }
 
+  /** Picks a backup file in Datos, which opens the import confirmation. */
+  async chooseImportFile() {
+    await this.page.locator('#import-json').setInputFiles({
+      name: 'finance-tracker-copia.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from('{}'),
+    })
+    await expect(
+      this.page.getByRole('alertdialog', { name: '¿Importar esta copia?' }),
+    ).toBeVisible()
+  }
+
+  /** The floating launcher from the `desk` breakpoint up; the «Más» sheet below it. */
   async openGlobalReportDialog() {
-    await this.page.locator('#global-report-trigger').click()
+    if ((this.page.viewportSize()?.width ?? 0) >= DESK_BREAKPOINT_PX) {
+      await this.page.locator('#global-report-trigger').click()
+    } else {
+      await this.page.getByRole('button', { name: 'Más secciones' }).click()
+      await this.page
+        .getByRole('dialog', { name: 'Más secciones' })
+        .getByRole('button', { name: 'Crear reporte' })
+        .click()
+    }
     await expect(this.issueReportDialog).toBeVisible()
   }
 
   async submitIssueReport(params: {
-    // Only the two options `#issue-report-type` actually renders. The wider
-    // `ReportType` in `src/services/issue-report-api.ts` still allows
-    // "enhancement", but the UI dropped it, so asking for it here just made
-    // `selectOption` hang until the test timed out.
+    // Only the two options the «Tipo» control renders. The wider `ReportType`
+    // in `src/services/issue-report-api.ts` still allows "enhancement", but
+    // the UI dropped it.
     type: 'bug' | 'feature'
     summary: string
     description: string
@@ -269,21 +292,24 @@ export class FinanceTrackerPage {
     actualResult?: string
   }) {
     await this.openGlobalReportDialog()
-    const form = this.issueReportDialog.locator('#issue-report-form')
-    await form.locator('#issue-report-type').selectOption(params.type)
-    await form.locator('#issue-report-summary').fill(params.summary)
-    await form.locator('#issue-report-description').fill(params.description)
+    const panel = this.issueReportDialog
+    await panel
+      .getByRole('group', { name: 'Tipo' })
+      .getByRole('button', { name: params.type === 'bug' ? 'Error' : 'Mejora' })
+      .click()
+    await panel.getByLabel('Resumen').fill(params.summary)
+    await panel.getByLabel('Descripción').fill(params.description)
     if (params.expectedResult !== undefined) {
-      await form.locator('#issue-report-expected').fill(params.expectedResult)
+      await panel.getByLabel('Resultado esperado').fill(params.expectedResult)
     }
     if (params.actualResult !== undefined) {
-      await form.locator('#issue-report-actual').fill(params.actualResult)
+      await panel.getByLabel('Resultado actual').fill(params.actualResult)
     }
-    await form.getByRole('button', { name: 'Crear reporte' }).click()
+    await panel.getByRole('button', { name: 'Crear reporte' }).click()
   }
 
   issueReportStatus(): Locator {
-    return this.issueReportDialog.locator('#issue-report-status')
+    return this.issueReportDialog.getByRole('status')
   }
 
   async open(sectionId: FinanceSectionId) {
@@ -434,16 +460,14 @@ export class FinanceTrackerPage {
       }
     }
 
-    const declaredInput = section.locator('#investment-movement-declared')
-    if (params.declared) {
-      await declaredInput.check()
-    } else {
-      await declaredInput.uncheck()
-    }
+    // The switches are visually hidden under their drawn tracks.
+    await section
+      .getByRole('switch', { name: 'Ya está declarado' })
+      .setChecked(Boolean(params.declared), { force: true })
 
-    const stockEventsCashInput = section.locator('#investment-movement-to-cash')
+    const stockEventsCashInput = section.getByRole('switch', { name: /efectivo en Stock Events/ })
     if (params.stockEventsCash && (await stockEventsCashInput.count()) > 0) {
-      await stockEventsCashInput.check()
+      await stockEventsCashInput.check({ force: true })
     }
 
     await section.getByRole('button', { name: 'Guardar movimiento' }).click()
@@ -521,8 +545,14 @@ export class FinanceTrackerPage {
     await bar.getByRole('button', { name: 'Aplicar' }).click()
   }
 
-  async deleteSelectedTransactions() {
+  /** Deletes the selection, confirming the dialog that names how many go. */
+  async deleteSelectedTransactions(count: number) {
     await this.bulkActionBar.getByRole('button', { name: 'Eliminar' }).click()
+    const label = `${count} ${count === 1 ? 'movimiento' : 'movimientos'}`
+    const dialog = this.page.getByRole('alertdialog', { name: `¿Eliminar ${label}?` })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: `Eliminar ${label}` }).click()
+    await expect(dialog).toBeHidden()
   }
 
   /**
@@ -668,64 +698,57 @@ export class FinanceTrackerPage {
     await expect(this.page.getByRole('status')).toContainText('Movimiento actualizado.')
   }
 
+  /** Picks the budget tab (Gastos, Ingresos, Inversión). */
+  async openBudgetTab(type: 'income' | 'expense' | 'investment') {
+    await this.openBudget()
+    await this.budgetSection.locator(`[data-budget-tab="${type}"]`).click()
+  }
+
+  /** Picks how many months the budget table shows. */
+  async selectBudgetRange(range: '3' | '6' | '12') {
+    await this.budgetSection.locator(`[data-budget-range="${range}"]`).click()
+    await expect(this.budgetSection.locator(`section[data-budget-months="${range}"]`)).toBeVisible()
+  }
+
+  /** The budget field of a category and month; the year view shows every month. */
+  budgetInput(category: string, monthLabel: string): Locator {
+    return this.budgetSection.getByRole('textbox', {
+      name: `Presupuesto de ${category} en ${monthLabel.toLowerCase()}`,
+    })
+  }
+
   async setBudgetValue(params: {
     typeValue: 'income' | 'expense' | 'investment'
     monthLabel: string
     categoryLabel: string
-    plannedValue: number
+    plannedValue: string
   }) {
-    await this.openBudget()
-    const monthIndex = [
-      'ENERO',
-      'FEBRERO',
-      'MARZO',
-      'ABRIL',
-      'MAYO',
-      'JUNIO',
-      'JULIO',
-      'AGOSTO',
-      'SEPTIEMBRE',
-      'OCTUBRE',
-      'NOVIEMBRE',
-      'DICIEMBRE',
-    ].indexOf(params.monthLabel)
-    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`)
-    const row = block.locator('tbody tr', {
-      hasText: params.categoryLabel,
-    })
-    await expect(row).toBeVisible()
-    const input = row.locator(
-      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`,
-    )
-    await input.fill(String(params.plannedValue))
+    await this.openBudgetTab(params.typeValue)
+    await this.selectBudgetRange('12')
+    const input = this.budgetInput(params.categoryLabel, params.monthLabel)
+    await input.fill(params.plannedValue)
+    await input.press('Tab')
   }
 
   async getBudgetValue(params: {
     typeValue: 'income' | 'expense' | 'investment'
     monthLabel: string
     categoryLabel: string
-  }): Promise<number> {
-    const monthIndex = [
-      'ENERO',
-      'FEBRERO',
-      'MARZO',
-      'ABRIL',
-      'MAYO',
-      'JUNIO',
-      'JULIO',
-      'AGOSTO',
-      'SEPTIEMBRE',
-      'OCTUBRE',
-      'NOVIEMBRE',
-      'DICIEMBRE',
-    ].indexOf(params.monthLabel)
-    const block = this.budgetSection.locator(`[data-budget-type="${params.typeValue}"]`)
-    const row = block.locator('tbody tr', { hasText: params.categoryLabel })
-    const input = row.locator(
-      `input[data-category="${params.categoryLabel}"][data-type="${params.typeValue}"][data-month="${monthIndex}"]`,
-    )
-    const value = await input.inputValue()
-    return Number(value)
+  }): Promise<string> {
+    await this.openBudgetTab(params.typeValue)
+    await this.selectBudgetRange('12')
+    return this.budgetInput(params.categoryLabel, params.monthLabel).inputValue()
+  }
+
+  /** Opens the year plan of a category from its name in the budget table. */
+  async openBudgetPlan(category: string): Promise<Locator> {
+    await this.openBudget()
+    await this.budgetSection
+      .getByRole('button', { name: `Planificar los doce meses de ${category}` })
+      .click()
+    const panel = this.page.getByRole('dialog', { name: category })
+    await expect(panel).toBeVisible()
+    return panel
   }
 
   /** Picks a month in the band's month strip ("MARZO" or "marzo"). */
@@ -915,12 +938,9 @@ export class FinanceTrackerPage {
       await panel.locator('#investment-movement-currency').fill(payload.movementCurrency)
     }
     if (typeof payload.declared === 'boolean') {
-      const checkbox = panel.locator('#investment-movement-declared')
-      if (payload.declared) {
-        await checkbox.check()
-      } else {
-        await checkbox.uncheck()
-      }
+      await panel
+        .getByRole('switch', { name: 'Ya está declarado' })
+        .setChecked(payload.declared, { force: true })
     }
 
     await panel.getByRole('button', { name: 'Guardar cambios' }).click()
@@ -1187,6 +1207,7 @@ export class FinanceTrackerPage {
   private parseMoneyText(value: string): number {
     const cleaned = value
       .replace(/\u00a0/g, '')
+      .replace(/\u2212/g, '-')
       .replace(/[€$£]/g, '')
       .replace(/\./g, '')
       .replace(',', '.')

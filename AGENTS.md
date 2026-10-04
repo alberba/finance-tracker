@@ -36,6 +36,10 @@ Lint is enforced by tooling (`eslint.config.ts`), so don't review it by hand. Pr
 (`.prettierrc`) is not gated and much of the repo is unformatted: format only the files you touch,
 by path.
 
+### CI and E2E
+
+CI or browser failures: `docs/playwright.md` covers dependency checks, worktree setup and CI sharding.
+
 ## Commands
 
 Run with `pnpm`. During `/implement`, typecheck and single test files run often; the full suite runs once at the end.

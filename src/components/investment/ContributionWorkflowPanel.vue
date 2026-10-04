@@ -5,6 +5,7 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
+import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useToast } from '../../composables/useToast'
 import type {
@@ -510,22 +511,21 @@ defineExpose({ open: openPanel })
           v-text="allocationWarning"
         ></p>
 
-        <label
+        <div
           v-if="stockEventsStore.canSyncContributionCash"
-          class="border-line flex min-h-11 items-start gap-3 border-t pt-3.5 text-[0.9375rem] font-medium"
+          class="border-line flex items-center justify-between gap-4 border-t pt-2"
         >
-          <input
-            v-model="syncStockEventsCash"
-            type="checkbox"
-            class="accent-primary mt-0.5 size-4.5"
-          />
-          <span class="grid gap-0.5">
+          <span class="grid gap-0.5 text-[0.9375rem] font-medium">
             Añadir las asignaciones al efectivo de Stock Events
             <span class="text-text-muted text-sm font-normal">
               Cada cuenta usa la lista que tiene asociada en Configuración.
             </span>
           </span>
-        </label>
+          <ToggleSwitch
+            v-model="syncStockEventsCash"
+            label="Añadir las asignaciones al efectivo de Stock Events"
+          />
+        </div>
       </div>
     </form>
 

@@ -3,8 +3,9 @@ import { computed, ref, shallowRef, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
-import BaseSelect from '../ui/BaseSelect.vue'
+import { FIELD_LABEL } from '../ui/field'
 import PillTag from '../ui/PillTag.vue'
+import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
 import type { InstrumentRowViewModel } from '../../domain/settings/view-model'
 import { searchMarketSymbols, type MarketSearchResult } from '../../services/market-api'
@@ -35,7 +36,7 @@ const isSearching = shallowRef(false)
 const searchError = shallowRef('')
 
 const canSearch = computed(() => props.instrument.provider === 'yahoo')
-const providerOptions = QUOTE_PROVIDERS.map((item) => ({ ...item }))
+const providerOptions: SegmentedOption[] = QUOTE_PROVIDERS.map((item) => ({ ...item }))
 
 function saveTicker(): void {
   if (marketStore.updateInstrumentSymbol(props.instrument.id, ticker.value)) {
@@ -117,13 +118,18 @@ function useResult(result: MarketSearchResult): void {
     </ul>
     <p v-if="searchError" class="text-loss text-sm" role="alert">{{ searchError }}</p>
 
-    <div class="flex flex-wrap items-end gap-2.5">
-      <BaseSelect
+    <div :class="FIELD_LABEL">
+      <span aria-hidden="true">Proveedor</span>
+      <SegmentedControl
         v-model="provider"
-        :label="`Proveedor de ${instrument.symbol}`"
         :options="providerOptions"
-        class="min-w-48 flex-1"
+        :label="`Proveedor de ${instrument.symbol}`"
+        data-key="provider"
+        class="flex-wrap [&>button]:h-11 [&>button]:flex-auto [&>button]:whitespace-nowrap"
       />
+    </div>
+
+    <div class="flex flex-wrap items-end gap-2.5">
       <BaseButton v-if="canSearch" :disabled="isSearching" @click="search">
         {{ isSearching ? 'Buscando…' : 'Buscar aproximados' }}
       </BaseButton>

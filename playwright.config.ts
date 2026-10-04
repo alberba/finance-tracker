@@ -11,7 +11,9 @@ export default defineConfig(
     env: { PUBLIC_SYNC_V2: 'false' },
   }),
   {
-    fullyParallel: false,
+    // One worker protects the legacy owner blob; individual tests can still
+    // be sharded across runners, each with its own D1 database.
+    fullyParallel: true,
     workers: 1,
     projects: [
       {

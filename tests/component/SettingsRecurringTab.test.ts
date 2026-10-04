@@ -56,8 +56,10 @@ describe('SettingsRecurringTab', () => {
     const amounts = wrapper
       .findAll('[data-settings-rule-amount]')
       .map((cell) => cell.text().replace(/\s/g, ' '))
-    expect(amounts).toEqual(['−900,00 €', '+2000,00 €'])
-    expect(wrapper.get('[data-settings-rules-net]').text().replace(/\s/g, ' ')).toBe('≈ +1100,00 €')
+    expect(amounts).toEqual(['−900,00 €', '+2.000,00 €'])
+    expect(wrapper.get('[data-settings-rules-net]').text().replace(/\s/g, ' ')).toBe(
+      '≈ +1.100,00 €',
+    )
   })
 
   it('pauses a rule from its switch', async () => {

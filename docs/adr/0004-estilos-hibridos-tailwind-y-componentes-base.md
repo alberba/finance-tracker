@@ -17,3 +17,6 @@ Descartamos CSS global con capas, porque conserva el radio de impacto y el coste
 Descartamos también `<style scoped>` o CSS modules como norma general, porque dispersan los
 tokens y duplican lo que Tailwind ya resuelve. La medición y las fuentes están en
 `docs/architecture/estilos-tailwind-vs-css.md`.
+
+Con la 2.0.0 la hoja heredada desapareció: lo que quedaba (reset y tipografía) pasó a
+`global.css`, que es ya la única hoja de estilos.

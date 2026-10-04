@@ -12,6 +12,7 @@ import {
 } from '../../domain/wealth/view-model'
 import type { SnapshotKind } from '../../scripts/types'
 import IconButton from '../ui/IconButton.vue'
+import LedgerInput from '../ui/LedgerInput.vue'
 import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTable.vue'
 import { GROUP_SWATCH } from './group-swatch'
 
@@ -92,22 +93,18 @@ function isInvalid(key: string): boolean {
       <span class="font-display tabular-nums">{{ formatMoney(row.calculated) }}</span>
     </template>
     <template #cell-snapshot="{ row }">
-      <label class="ml-auto flex max-w-52 items-center gap-1.5">
-        <span class="sr-only">Snapshot de {{ row.name }}</span>
-        <input
+      <span class="ml-auto flex max-w-52 min-w-28 items-center gap-1.5">
+        <LedgerInput
+          :label="`Snapshot de ${row.name}`"
           :value="inputs[row.key]"
-          type="text"
-          inputmode="decimal"
-          autocomplete="off"
           :name="`snapshot-${row.key}`"
           :placeholder="formatSnapshotInput(row.calculated)"
           :aria-invalid="isInvalid(row.key)"
-          class="font-display text-text-main placeholder:text-text-muted hover:border-line-strong hover:bg-panel focus:border-primary focus:bg-panel aria-invalid:border-loss h-11 w-full min-w-24 rounded-md border border-transparent bg-transparent px-3 text-right font-medium tabular-nums outline-none focus:shadow-[0_0_0_3px_var(--ring)]"
           data-snapshot-input
           @input="emit('update', row.key, ($event.target as HTMLInputElement).value)"
         />
         <span class="font-display text-text-muted text-sm" aria-hidden="true">€</span>
-      </label>
+      </span>
     </template>
     <template #cell-actions="{ row }">
       <IconButton
