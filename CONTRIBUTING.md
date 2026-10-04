@@ -33,10 +33,6 @@ En [GitHub Issues](https://github.com/alberba/finance-tracker/issues). El vocabu
 
 ## Antes de abrir el PR
 
-`pnpm check` conserva la validación Astro/Vue con TypeScript 6 y añade la
-comprobación nativa de los archivos TypeScript con el 7. Comandos, alcance y
-benchmark reproducible en [docs/typescript.md](./docs/typescript.md).
-
 Lo mismo que ejecuta el gate de calidad, en orden de lo más rápido a lo más lento:
 
 ```bash
