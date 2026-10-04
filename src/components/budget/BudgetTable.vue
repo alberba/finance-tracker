@@ -248,6 +248,9 @@ function inputLabel(category: string, month: number): string {
       :label="`${TYPE_LABEL[view.type]} por categoría y mes`"
       :empty-text="`No hay categorías de ${TYPE_LABEL[view.type].toLowerCase()}. Añádelas en Configuración.`"
     >
+      <template #head-deviation>
+        <span class="block whitespace-normal sm:whitespace-nowrap">Desvío {{ span }}</span>
+      </template>
       <!-- Month headers: the name and, with bars, where the month stands. -->
       <template v-for="month in months" :key="month" #[`head-month-${month}`]>
         <span v-if="bars" class="grid gap-0.5" :class="{ 'text-text-main': month === focusMonth }">

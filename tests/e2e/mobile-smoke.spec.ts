@@ -218,6 +218,7 @@ test.describe('Mobile smoke', () => {
 
     test('deja el mes en curso y oculta los demás en lugar de desplazarse de lado', async ({
       tracker,
+      page,
     }) => {
       await tracker.openBudget()
       const table = tracker.budgetSection.getByRole('table', { name: 'Gastos por categoría y mes' })
@@ -229,6 +230,7 @@ test.describe('Mobile smoke', () => {
         /Oct\s*en curso/,
         /Desvío/,
       ])
+      await page.evaluate(() => document.fonts.ready)
       const fits = await table.evaluate((element) => {
         const scroller = element.parentElement!
         return scroller.scrollWidth <= scroller.clientWidth + 1

@@ -65,7 +65,9 @@ async function waitForSynced(page: Page): Promise<void> {
 }
 
 test.describe('Sincronización offline (sync v2)', () => {
-  test('CRUD sin conexión persiste localmente y se sincroniza al reconectar, sin duplicados', async ({ browser }) => {
+  test('CRUD sin conexión persiste localmente y se sincroniza al reconectar, sin duplicados', async ({
+    browser,
+  }) => {
     const context = await browser.newContext()
     try {
       const { tracker, page } = await provisionUser(context, uniqueEmail('crud'))
@@ -113,7 +115,9 @@ test.describe('Sincronización offline (sync v2)', () => {
     }
   })
 
-  test('una edición concurrente en dos dispositivos se resuelve sola, sin diálogo ni cola congelada', async ({ browser }) => {
+  test('una edición concurrente en dos dispositivos se resuelve sola, sin diálogo ni cola congelada', async ({
+    browser,
+  }) => {
     const email = uniqueEmail('conflict')
     const contextDeviceOne = await browser.newContext()
     const contextDeviceTwo = await browser.newContext()
@@ -196,7 +200,9 @@ test.describe('Sincronización offline (sync v2)', () => {
       await contextDeviceTwo.close()
     }
   })
-  test('un movimiento guardado en el móvil aparece en el ordenador abierto sin recargar', async ({ browser }) => {
+  test('un movimiento guardado en el móvil aparece en el ordenador abierto sin recargar', async ({
+    browser,
+  }) => {
     const email = uniqueEmail('live')
     const desktopContext = await browser.newContext()
     const mobileContext = await browser.newContext({ ...devices['Pixel 5'] })
@@ -221,9 +227,9 @@ test.describe('Sincronización offline (sync v2)', () => {
       await waitForSynced(mobilePage)
 
       // No reload and no focus change: the open desktop tab must pick it up by itself.
-      await expect(
-        desktop.transactionsSection.locator('#tx-table-body tr', { hasText: 'Café desde el móvil' }),
-      ).toBeVisible({ timeout: 10000 })
+      await expect(desktop.transactionRows.filter({ hasText: 'Café desde el móvil' })).toBeVisible({
+        timeout: 10000,
+      })
     } finally {
       await desktopContext.close()
       await mobileContext.close()
