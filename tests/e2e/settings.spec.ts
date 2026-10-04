@@ -96,7 +96,7 @@ test.describe('Settings E2E', () => {
         .section('settings')
         .locator('tr[data-account-id]')
         .filter({ hasText: 'Openbank Ahorro' }),
-    ).toContainText('1234,50')
+    ).toContainText('1.234,50')
   })
 
   test('añade, reordena y elimina una categoría de gasto', async ({ tracker }) => {

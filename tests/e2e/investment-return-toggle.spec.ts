@@ -4,6 +4,7 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
   function parseMoney(text: string): number {
     const cleaned = text
       .replace(/\u00a0/g, "")
+      .replace(/\u2212/g, "-")
       .replace(/[€$£]/g, "")
       .replace(/\./g, "")
       .replace(",", ".")

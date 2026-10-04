@@ -234,7 +234,7 @@ test.describe("Finance tracker E2E", () => {
     });
     await expect(february).toBeVisible();
     // February in `src/data/seed.json`: 2085 in, 404.77 out, 200 invested.
-    await expect(february).toContainText("neto +1480,23 €");
+    await expect(february).toContainText("neto +1.480,23 €");
     const count = await tracker.getTransactionRowCount();
     await expect(february).toContainText(`${count} movimientos`);
   });
@@ -293,7 +293,7 @@ test.describe("Finance tracker E2E", () => {
       tracker.transactionsSection.getByRole("heading", { name: "Neto de febrero 2026" }),
     ).toBeVisible();
     await expect(tracker.transactionsSection.locator("#tx-month-net")).toHaveText(
-      "+1480,23 €",
+      "+1.480,23 €",
     );
     await expect(
       tracker.transactionsBreakdown.getByRole("heading", { name: "Febrero por categoría" }),
@@ -338,6 +338,7 @@ test.describe("Finance tracker E2E", () => {
       const amounts = amountTexts.map((text) =>
         Number.parseFloat(
           text
+            .replace(/\u2212/g, "-")
             .replace(/[^\d,-]/g, "")
             .replace(/\./g, "")
             .replace(",", "."),
