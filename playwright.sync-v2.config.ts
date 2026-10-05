@@ -15,6 +15,7 @@ export default defineConfig(
     workers: 1,
     testMatch: [
       'bitvavo.spec.ts',
+      'movement-commands.spec.ts',
       'multi-user-isolation.spec.ts',
       'offline-sync.spec.ts',
       'subscription-charges.spec.ts',

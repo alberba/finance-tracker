@@ -1,16 +1,17 @@
 import { defineStore } from 'pinia'
+
 import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
-  resolveCategoryId,
   resolveOrCreateCategoryId,
   resolveEntityId,
   syncListDiff,
   type CategoryKind,
 } from '../lib/client/command-mapping'
+import { syncMovements } from '../lib/client/movement-commands'
 import { computeInvestmentMovement } from '../scripts/investment-movements'
 import type {
   InvestmentSide,
@@ -21,7 +22,6 @@ import type {
   TransactionType,
 } from '../scripts/types'
 import { monthFromISO, round2, uid } from '../scripts/utils'
-import { buildInvestmentTransactionData } from './investment'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useSyncStore } from './sync'
@@ -194,24 +194,6 @@ async function waitWhileSyncing(syncStore: ReturnType<typeof useSyncStore>): Pro
   }
 }
 
-/** WP7b — maps a legacy `Transaction` row to a `transaction` sync command payload. See the WP10 fix note on `buildRecurringRuleData` above for `accountId`. */
-async function buildTransactionData(tx: Transaction, currency: string) {
-  const accountId = await resolveEntityId('account', tx.accountId)
-  if (!accountId) {
-    return null
-  }
-  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
-  return {
-    accountId,
-    categoryId,
-    type: tx.type,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    currency,
-  }
-}
-
 export interface NewRecurringRuleInput {
   type: TransactionType
   accountId: string
@@ -251,30 +233,48 @@ export const useRecurringStore = defineStore('recurring', () => {
   const { showToast } = useToast()
   const rules = computed(() => financialStateStore.state.recurringRules)
   const pendingMovements = computed(() => financialStateStore.state.pendingMovements)
-  const openPendingMovements = computed(() => pendingMovements.value.filter((item) => item.status === 'pending'))
+  const openPendingMovements = computed(() =>
+    pendingMovements.value.filter((item) => item.status === 'pending'),
+  )
   const pendingCount = computed(() => openPendingMovements.value.length)
 
   function refreshPending(today = resolveToday()): number {
     const result = generatePendingMovements(financialStateStore.state, today)
-    if (hasChanges(result.pendingMovements, financialStateStore.state.pendingMovements) || hasChanges(result.recurringRules, rules.value)) {
+    if (
+      hasChanges(result.pendingMovements, financialStateStore.state.pendingMovements) ||
+      hasChanges(result.recurringRules, rules.value)
+    ) {
       const beforePending = financialStateStore.state.pendingMovements
       const beforeRules = rules.value
       financialStateStore.commitState((draft) => {
         draft.pendingMovements = result.pendingMovements
         draft.recurringRules = result.recurringRules
       })
-      void syncListDiff('recurringRule', beforeRules, financialStateStore.state.recurringRules, (rule) =>
-        buildRecurringRuleData(rule, financialStateStore.currency),
+      void syncListDiff(
+        'recurringRule',
+        beforeRules,
+        financialStateStore.state.recurringRules,
+        (rule) => buildRecurringRuleData(rule, financialStateStore.currency),
       )
-      void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
-        buildPendingMovementData(pending, financialStateStore.currency),
+      void syncListDiff(
+        'pendingMovement',
+        beforePending,
+        financialStateStore.state.pendingMovements,
+        (pending) => buildPendingMovementData(pending, financialStateStore.currency),
       )
     }
     return result.createdCount
   }
 
   function addRule(input: NewRecurringRuleInput): boolean {
-    if (!input.accountId || !input.category || !input.description.trim() || input.amount <= 0 || !input.startDate) return false
+    if (
+      !input.accountId ||
+      !input.category ||
+      !input.description.trim() ||
+      input.amount <= 0 ||
+      !input.startDate
+    )
+      return false
     const rule: RecurringRule = {
       id: uid('rule'),
       type: input.type,
@@ -308,11 +308,19 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   function updateRule(id: string, input: NewRecurringRuleInput): boolean {
     const currentRule = rules.value.find((rule) => rule.id === id)
-    if (!currentRule || !input.accountId || !input.category || !input.description.trim() || input.amount <= 0 || !input.startDate) {
+    if (
+      !currentRule ||
+      !input.accountId ||
+      !input.category ||
+      !input.description.trim() ||
+      input.amount <= 0 ||
+      !input.startDate
+    ) {
       return false
     }
-    const hasExistingExecution = currentRule.lastExecutionDate !== null
-      || pendingMovements.value.some((pending) => pending.ruleId === id)
+    const hasExistingExecution =
+      currentRule.lastExecutionDate !== null ||
+      pendingMovements.value.some((pending) => pending.ruleId === id)
 
     // Snapshot *before* the mutation: `refreshPending`'s own diff is taken
     // after it, and compares against a copy `generatePendingMovements`
@@ -326,7 +334,10 @@ export const useRecurringStore = defineStore('recurring', () => {
       if (!rule) return
 
       const nextDate = hasExistingExecution
-        ? rule.nextOccurrenceDate || (rule.lastExecutionDate ? nextOccurrenceDate(rule, rule.lastExecutionDate) : input.startDate)
+        ? rule.nextOccurrenceDate ||
+          (rule.lastExecutionDate
+            ? nextOccurrenceDate(rule, rule.lastExecutionDate)
+            : input.startDate)
         : input.startDate
       rule.type = input.type
       rule.accountId = input.accountId
@@ -378,15 +389,23 @@ export const useRecurringStore = defineStore('recurring', () => {
     const beforePending = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
       draft.recurringRules = draft.recurringRules.filter((rule) => rule.id !== id)
-      draft.pendingMovements = draft.pendingMovements.map((pending) => pending.ruleId === id && pending.status === 'pending'
-        ? { ...pending, status: 'cancelled', updatedAt: new Date().toISOString() }
-        : pending)
+      draft.pendingMovements = draft.pendingMovements.map((pending) =>
+        pending.ruleId === id && pending.status === 'pending'
+          ? { ...pending, status: 'cancelled', updatedAt: new Date().toISOString() }
+          : pending,
+      )
     })
-    void syncListDiff('recurringRule', beforeRules, financialStateStore.state.recurringRules, (item) =>
-      buildRecurringRuleData(item, financialStateStore.currency),
+    void syncListDiff(
+      'recurringRule',
+      beforeRules,
+      financialStateStore.state.recurringRules,
+      (item) => buildRecurringRuleData(item, financialStateStore.currency),
     )
-    void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
-      buildPendingMovementData(pending, financialStateStore.currency),
+    void syncListDiff(
+      'pendingMovement',
+      beforePending,
+      financialStateStore.state.pendingMovements,
+      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
     )
   }
 
@@ -454,15 +473,16 @@ export const useRecurringStore = defineStore('recurring', () => {
         }
       }
     })
-    // An investment carries its operación and hora, which the bare payload
-    // drops — the server copy would then come back without them (#205).
-    void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      tx.type === 'investment'
-        ? buildInvestmentTransactionData(tx, financialStateStore.currency)
-        : buildTransactionData(tx, financialStateStore.currency),
+    void syncMovements(
+      beforeTransactions,
+      financialStateStore.transactions,
+      financialStateStore.currency,
     )
-    void syncListDiff('pendingMovement', beforePending, financialStateStore.state.pendingMovements, (pending) =>
-      buildPendingMovementData(pending, financialStateStore.currency),
+    void syncListDiff(
+      'pendingMovement',
+      beforePending,
+      financialStateStore.state.pendingMovements,
+      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
     )
     if (confirmed) {
       showToast('Pendiente confirmado: ya cuenta en el Registro.')
@@ -486,12 +506,24 @@ export const useRecurringStore = defineStore('recurring', () => {
         })
       : null
     const amount = investment ? Math.abs(investment.signedAmount) : round2(edit.amount)
-    const validInvestment = !investment || (investment.normalizedSymbol && investment.normalizedUnits > 0 && investment.normalizedUnitPrice > 0)
-    const valid = edit.date && edit.accountId && edit.category && edit.description.trim() && amount > 0 && validInvestment
+    const validInvestment =
+      !investment ||
+      (investment.normalizedSymbol &&
+        investment.normalizedUnits > 0 &&
+        investment.normalizedUnitPrice > 0)
+    const valid =
+      edit.date &&
+      edit.accountId &&
+      edit.category &&
+      edit.description.trim() &&
+      amount > 0 &&
+      validInvestment
     if (!valid) return false
     const before = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
-      const current = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
+      const current = draft.pendingMovements.find(
+        (item) => item.id === id && item.status === 'pending',
+      )
       if (!current) return
       current.type = targetType
       current.occurrenceDate = edit.date
@@ -514,8 +546,11 @@ export const useRecurringStore = defineStore('recurring', () => {
       }
       current.updatedAt = new Date().toISOString()
     })
-    void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
-      buildPendingMovementData(pending, financialStateStore.currency),
+    void syncListDiff(
+      'pendingMovement',
+      before,
+      financialStateStore.state.pendingMovements,
+      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
     )
     showToast('Pendiente actualizado.')
     return true
@@ -524,14 +559,19 @@ export const useRecurringStore = defineStore('recurring', () => {
   function changePendingStatus(id: string, status: 'skipped' | 'cancelled'): void {
     const before = financialStateStore.state.pendingMovements
     financialStateStore.commitState((draft) => {
-      const pending = draft.pendingMovements.find((item) => item.id === id && item.status === 'pending')
+      const pending = draft.pendingMovements.find(
+        (item) => item.id === id && item.status === 'pending',
+      )
       if (pending) {
         pending.status = status
         pending.updatedAt = new Date().toISOString()
       }
     })
-    void syncListDiff('pendingMovement', before, financialStateStore.state.pendingMovements, (pending) =>
-      buildPendingMovementData(pending, financialStateStore.currency),
+    void syncListDiff(
+      'pendingMovement',
+      before,
+      financialStateStore.state.pendingMovements,
+      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
     )
     showToast(status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.')
   }
@@ -556,9 +596,10 @@ export const useRecurringStore = defineStore('recurring', () => {
 })
 
 function resolveToday(): string {
-  const candidate = typeof window !== 'undefined'
-    ? (window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__
-    : undefined
+  const candidate =
+    typeof window !== 'undefined'
+      ? (window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__
+      : undefined
   return candidate || todayISO()
 }
 

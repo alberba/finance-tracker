@@ -676,24 +676,24 @@ function normalizeTransactions(list: unknown): Transaction[] {
         safe.subscriptionChargeDate = subscriptionChargeDate
       }
 
+      const time = normalizeTime(rawItem.time)
+      if (time) safe.time = time
+      safe.declared = Boolean(rawItem.declared)
+      const movementCurrency = String(rawItem.movementCurrency || '')
+        .trim()
+        .toUpperCase()
+        .slice(0, 3)
+      if (movementCurrency) safe.movementCurrency = movementCurrency
+
       if (type === 'investment') {
-        const time = normalizeTime(rawItem.time)
         const symbol = String(rawItem.symbol || '')
           .trim()
           .toUpperCase()
         const sideCandidate = String(rawItem.side || '').trim()
-        const side = isInvestmentSide(sideCandidate) ? sideCandidate : amount < 0 ? 'sell' : 'buy'
         const unitPrice = normalizeNonNegativeNumber(rawItem.unitPrice, 6)
         const units = normalizeNonNegativeNumber(rawItem.units, 8)
         const fee = normalizeNonNegativeNumber(rawItem.fee, 2)
-        const movementCurrency = String(rawItem.movementCurrency || '')
-          .trim()
-          .toUpperCase()
-          .slice(0, 3)
 
-        if (time) {
-          safe.time = time
-        }
         if (symbol) {
           safe.symbol = symbol
         }
@@ -701,7 +701,7 @@ function normalizeTransactions(list: unknown): Transaction[] {
         if (instrumentId) {
           safe.instrumentId = instrumentId
         }
-        safe.side = side
+        if (isInvestmentSide(sideCandidate)) safe.side = sideCandidate
         if (unitPrice !== null) {
           safe.unitPrice = unitPrice
         }
@@ -711,10 +711,6 @@ function normalizeTransactions(list: unknown): Transaction[] {
         if (fee !== null) {
           safe.fee = fee
         }
-        if (movementCurrency) {
-          safe.movementCurrency = movementCurrency
-        }
-        safe.declared = Boolean(rawItem.declared)
         const remote = remoteOperationSchema.safeParse(rawItem.remoteOperation)
         if (remote.success) {
           safe.remoteOperation = remote.data
@@ -762,11 +758,12 @@ function normalizeSubscriptions(list: unknown): Subscription[] {
 }
 
 function normalizeNonNegativeNumber(value: unknown, decimals: number): number | null {
-  const parsed = roundWithPrecision(parseFloatSafe(value, NaN), decimals)
-  if (!Number.isFinite(parsed) || parsed < 0) {
+  const parsed = parseFloatSafe(value, NaN)
+  if (!Number.isFinite(parsed)) {
     return null
   }
-  return parsed
+  const normalized = roundWithPrecision(parsed, decimals)
+  return normalized < 0 ? null : normalized
 }
 
 function roundWithPrecision(value: number, decimals: number): number {

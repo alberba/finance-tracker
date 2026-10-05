@@ -25,6 +25,7 @@ export default defineConfig(
           'mobile-smoke.spec.ts',
           'multi-user-isolation.spec.ts',
           'offline-sync.spec.ts',
+          'movement-commands.spec.ts',
           'subscription-charges.spec.ts',
         ],
       },
