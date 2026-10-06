@@ -52,21 +52,28 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
     <title>Acceso · Finanzas</title>
   </head>
   <body>
-    <main class="access-page">
-      <aside class="access-introduction">
+    <main class="mx-auto grid min-h-dvh max-w-6xl grid-cols-1 items-center gap-8 px-5 py-8 md:grid-cols-2 md:gap-20 md:px-8">
+      <aside>
         <p class="text-text-muted font-mono text-sm uppercase">Finanzas personales</p>
-        <h1>
+        <h1 class="font-display my-4 text-5xl leading-tight font-normal tracking-tight sm:text-6xl lg:text-7xl">
           Tu dinero.
           <br />
           Tu espacio.
         </h1>
-        <p>Presupuesto, inversiones y objetivos, en un mismo lugar.</p>
-        <a href="/?demo=true">Explorar la demo</a>
+        <p class="text-text-muted">Presupuesto, inversiones y objetivos, en un mismo lugar.</p>
+        <a class="mt-6 inline-block text-primary underline underline-offset-4" href="/?demo=true">
+          Explorar la demo
+        </a>
       </aside>
-      <section class="access-card" aria-labelledby="access-heading">
-        <p class="text-text-muted font-mono text-sm uppercase">Bienvenido</p>
-        <h2 id="access-heading">Accede a Finanzas</h2>
-        <p>
+      <section
+        class="border-line border-t pt-8 md:border-t-0 md:border-l md:pt-0 md:pl-12"
+        aria-labelledby="access-heading"
+      >
+        <p class="text-text-muted mb-3 font-mono text-sm uppercase">Bienvenido</p>
+        <h2 id="access-heading" class="mb-3 font-display text-2xl">
+          Accede a Finanzas
+        </h2>
+        <p class="mb-8">
           Elige cómo quieres entrar. Si ya usabas Finanzas, entra con un código enviado a tu correo
           habitual.
         </p>
@@ -82,48 +89,3 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
     </main>
   </body>
 </html>
-<style>
-  .access-page {
-    max-width: 1100px;
-    margin: 0 auto;
-    min-height: 100dvh;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-    gap: 5rem;
-    padding: 3rem 2rem;
-  }
-  .access-introduction h1 {
-    font-family: Georgia, serif;
-    font-weight: 400;
-    font-size: clamp(3rem, 6vw, 5.5rem);
-    line-height: 1.03;
-    letter-spacing: -0.04em;
-    margin: 1rem 0 2rem;
-  }
-  .access-card {
-    border-left: 1px solid currentColor;
-    padding-left: 3rem;
-  }
-  .access-card h2 {
-    margin-bottom: 1rem;
-  }
-  .access-card > p {
-    margin-bottom: 2rem;
-  }
-  @media (max-width: 720px) {
-    .access-page {
-      grid-template-columns: 1fr;
-      gap: 2rem;
-      padding: 2rem 1.25rem;
-    }
-    .access-introduction h1 {
-      font-size: 3rem;
-    }
-    .access-card {
-      border-left: 0;
-      border-top: 1px solid currentColor;
-      padding: 2rem 0 0;
-    }
-  }
-</style>
