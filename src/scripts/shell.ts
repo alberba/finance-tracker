@@ -5,6 +5,7 @@ import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
+import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
 import { describeCheckAge } from '../lib/client/sync-connection'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
@@ -234,7 +235,7 @@ function initSyncMenu(): void {
 
   const sessionRequest = fetch('/api/session')
     .then((response) => (response.ok ? response.json() : null))
-    .then((body: { user?: { id?: string; email?: string } } | null) => {
+    .then((body: { user?: { id?: string; email?: string }; authentication?: string } | null) => {
       if (emailEl && body?.user?.email) {
         emailEl.replaceChildren(body.user.email)
       }
@@ -256,7 +257,10 @@ function initSyncMenu(): void {
       const pending = syncStore.pendingCount
       const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
       const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
-      const checked = syncStore.lastCheckedAt === null ? '' : ` · ${describeCheckAge(Date.now() - syncStore.lastCheckedAt)}`
+      const checked =
+        syncStore.lastCheckedAt === null
+          ? ''
+          : ` · ${describeCheckAge(Date.now() - syncStore.lastCheckedAt)}`
       statusEl.hidden = false
       statusEl.replaceChildren(`${label}${suffix}${checked}`)
     }
@@ -271,17 +275,30 @@ function initSyncMenu(): void {
     void sessionRequest
       .then(async (session) => {
         if (syncStore?.userId) {
-          await syncStore.logout()
-        } else if (session?.user?.id) {
-          await wipeAllClientData(session.user.id)
-        } else {
-          wipeLegacyClientData()
+          try {
+            await syncStore.prepareLogout()
+          } catch {
+            const discardPending = window.confirm(
+              'Hay cambios pendientes que no se pudieron sincronizar. ¿Descartarlos definitivamente y cerrar sesión?',
+            )
+            if (!discardPending) {
+              logoutAction.removeAttribute('aria-disabled')
+              return
+            }
+          }
         }
-        window.location.href = '/cdn-cgi/access/logout'
+        if (session?.authentication === 'better-auth') {
+          await requireAuthenticationResult(await authentication.signOut())
+        }
+        if (syncStore?.userId) await syncStore.logout({ discardPending: true })
+        else if (session?.user?.id) await wipeAllClientData(session.user.id)
+        else wipeLegacyClientData()
+        window.location.href =
+          session?.authentication === 'better-auth' ? '/login' : '/cdn-cgi/access/logout'
       })
       .catch((error: unknown) => {
         logoutAction.removeAttribute('aria-disabled')
-        console.error('No se pudo borrar el almacenamiento privado antes de cerrar sesión.', error)
+        console.error('No se pudo cerrar sesión.', error)
       })
   })
 }

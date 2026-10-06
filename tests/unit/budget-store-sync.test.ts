@@ -42,7 +42,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
   afterEach(async () => {
     vi.unstubAllEnvs()
     if (activeStore) {
-      await activeStore.logout()
+      await activeStore.logout({ discardPending: true })
       activeStore = null
     }
     await wipeIdbCache(USER_ID)

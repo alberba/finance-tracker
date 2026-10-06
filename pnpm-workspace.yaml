@@ -16,8 +16,9 @@ overrides:
   picomatch: 2.3.2
   postcss: 8.5.26
   rollup: 4.59.0
-  sharp: 0.35.4
+  sharp: 0.35.5
   smol-toml: 1.7.1
+  source-map-js: 1.2.2
   yaml: 2.8.3
   browserslist: 4.28.7
   baseline-browser-mapping: ^2.11.0

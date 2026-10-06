@@ -37,10 +37,7 @@ import {
   type PendingCreateMatch,
 } from '../lib/client/outbox'
 import { wipeAllClientData } from '../lib/client/wipe'
-import {
-  type CommandStatus,
-  type SyncEntityType,
-} from '../lib/server/sync/command-schemas'
+import { type CommandStatus, type SyncEntityType } from '../lib/server/sync/command-schemas'
 
 export type ConnectionState = 'online' | 'offline'
 export type SyncStatus = 'idle' | 'syncing' | 'error'
@@ -121,7 +118,10 @@ export const useSyncStore = defineStore('sync', () => {
     if (!readModel || detached) return
     const pending = outboxDb ? await listOutbox(outboxDb) : []
     const projected = pending.length
-      ? applyPendingCommands(readModel, pending.map((entry) => entry.command))
+      ? applyPendingCommands(
+          readModel,
+          pending.map((entry) => entry.command),
+        )
       : readModel
     useFinancialStateStore(ownPinia).reloadState(projectSyncV2State(projected))
   }
@@ -130,6 +130,19 @@ export const useSyncStore = defineStore('sync', () => {
   function detach(): void {
     detached = true
     stop()
+  }
+
+  function identityHeaders(): Record<string, string> {
+    return userId.value ? { 'X-Finance-User-Id': userId.value } : {}
+  }
+
+  function rejectExpiredSession(response: Response): void {
+    if (response.status === 401) {
+      detach()
+      throw new Error(
+        'Tu sesión ha terminado. Tus cambios pendientes están guardados; vuelve a entrar con el mismo usuario.',
+      )
+    }
   }
 
   function isReady(): boolean {
@@ -160,7 +173,8 @@ export const useSyncStore = defineStore('sync', () => {
             lastError.value = null
           }
         } catch (error) {
-          lastError.value = error instanceof Error ? error.message : 'No se pudieron descargar tus cambios.'
+          lastError.value =
+            error instanceof Error ? error.message : 'No se pudieron descargar tus cambios.'
           syncStatus.value = 'error'
           if (!readModel) useFinancialStateStore(ownPinia).failLoad(lastError.value)
           scheduleRetry()
@@ -168,7 +182,11 @@ export const useSyncStore = defineStore('sync', () => {
         }
       } while (syncAgainRequested && connection.value === 'online')
     })()
-    try { await synchronizing } finally { synchronizing = null }
+    try {
+      await synchronizing
+    } finally {
+      synchronizing = null
+    }
   }
 
   function handleConnectionChange(next: ConnectionState): void {
@@ -192,18 +210,24 @@ export const useSyncStore = defineStore('sync', () => {
       cacheDb = await openIdbCache(nextUserId)
       outboxDb = await openOutbox(nextUserId)
       readModel = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-      revision.value = readModel?.revision ?? await getCachedRevision(cacheDb)
+      revision.value = readModel?.revision ?? (await getCachedRevision(cacheDb))
       pendingCount.value = await countOutbox(outboxDb)
       await renderReadModel()
       await syncNow({ full: true })
       initialized = true
       stopConnection = watchSyncConnection({
-        changed: () => { void syncNow() },
+        changed: () => {
+          void syncNow()
+        },
         online: () => handleConnectionChange('online'),
         offline: () => handleConnectionChange('offline'),
       })
     })()
-    try { await initializing } finally { initializing = null }
+    try {
+      await initializing
+    } finally {
+      initializing = null
+    }
   }
 
   function bootstrapState(): Promise<void> {
@@ -212,9 +236,14 @@ export const useSyncStore = defineStore('sync', () => {
 
   async function bootstrapUnlocked(): Promise<void> {
     if (!cacheDb) return
-    const response = await fetch('/api/bootstrap')
-    if (!response.ok) throw new Error(`No se pudieron cargar tus datos (${response.status}). Reintentando…`)
-    const bootstrap = await response.json() as SyncV2Bootstrap
+    const loadingUserId = userId.value
+    const loadingCacheDb = cacheDb
+    const response = await fetch('/api/bootstrap', { headers: identityHeaders() })
+    if (userId.value !== loadingUserId || cacheDb !== loadingCacheDb) return
+    rejectExpiredSession(response)
+    if (!response.ok)
+      throw new Error(`No se pudieron cargar tus datos (${response.status}). Reintentando…`)
+    const bootstrap = (await response.json()) as SyncV2Bootstrap
     readModel = await saveReadModel(cacheDb, bootstrap)
     readModelStale = false
     revision.value = readModel.revision
@@ -288,16 +317,35 @@ export const useSyncStore = defineStore('sync', () => {
   function confirmedChange(command: OutboxEntry['command'], entity: unknown): RemoteChange | null {
     if (command.action === 'settingsUpdate') {
       return entity && typeof entity === 'object'
-        ? { entityType: 'userSettings', entityId: '', changeType: 'update', payload: JSON.stringify(entity) }
+        ? {
+            entityType: 'userSettings',
+            entityId: '',
+            changeType: 'update',
+            payload: JSON.stringify(entity),
+          }
         : null
     }
     if (command.action === 'remove') {
-      return { entityType: command.entityType, entityId: command.entityId, changeType: 'remove', payload: null }
+      return {
+        entityType: command.entityType,
+        entityId: command.entityId,
+        changeType: 'remove',
+        payload: null,
+      }
     }
-    if ((command.action === 'create' || command.action === 'update') && entity && typeof entity === 'object') {
+    if (
+      (command.action === 'create' || command.action === 'update') &&
+      entity &&
+      typeof entity === 'object'
+    ) {
       const id = (entity as { id?: unknown }).id
       if (typeof id !== 'string') return null
-      return { entityType: command.entityType, entityId: id, changeType: 'update', payload: JSON.stringify(entity) }
+      return {
+        entityType: command.entityType,
+        entityId: id,
+        changeType: 'update',
+        payload: JSON.stringify(entity),
+      }
     }
     return null
   }
@@ -305,7 +353,10 @@ export const useSyncStore = defineStore('sync', () => {
   async function absorbConfirmed(changes: RemoteChange[]): Promise<void> {
     if (!readModel || !cacheDb || changes.length === 0) return
     try {
-      readModel = await saveReadModel(cacheDb, applyRemoteChanges(readModel, changes, readModel.revision))
+      readModel = await saveReadModel(
+        cacheDb,
+        applyRemoteChanges(readModel, changes, readModel.revision),
+      )
     } catch (error) {
       // The next pull brings the same rows; until then a full read is the safe fallback.
       console.warn('[sync] No se pudo incorporar un cambio confirmado', error)
@@ -368,6 +419,8 @@ export const useSyncStore = defineStore('sync', () => {
   /** Sends the outbox head; runs under the sync lock so no other client resends it. */
   async function sendBatch(): Promise<void> {
     if (!outboxDb) return
+    const sendingUserId = userId.value
+    const sendingOutboxDb = outboxDb
     // Once the head has failed, send it alone so a failure is charged to
     // the entry that caused it, not to whichever command led the batch.
     const [head] = await peekBatch(outboxDb, 1)
@@ -376,14 +429,17 @@ export const useSyncStore = defineStore('sync', () => {
       return
     }
 
+    if (userId.value !== sendingUserId || outboxDb !== sendingOutboxDb) return
     syncStatus.value = 'syncing'
     let reachedServer = false
     try {
       const response = await fetch('/api/sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Finance-User-Id': sendingUserId! },
         body: JSON.stringify({ commands: batch.map((entry) => entry.command) }),
       })
+      if (userId.value !== sendingUserId || outboxDb !== sendingOutboxDb) return
+      rejectExpiredSession(response)
       reachedServer = true
 
       if (!response.ok && response.status !== 409) {
@@ -420,10 +476,7 @@ export const useSyncStore = defineStore('sync', () => {
           acked.push(entry.seq)
           const command = entry.command
           if (result.status === 'applied') confirmed.push(confirmedChange(command, result.entity))
-          if (
-            result.entity !== undefined &&
-            cacheDb !== null
-          ) {
+          if (result.entity !== undefined && cacheDb !== null) {
             if (command.action === 'settingsUpdate') {
               // Keeps this device's `user_settings.version` current, so the next
               // settings command sends the right `baseVersion` (audit §6.4).
@@ -531,13 +584,24 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isReady() || !cacheDb || !readModel) return
     let hasMore: boolean
     do {
-      const response = await fetch(`/api/changes?since=${revision.value}`)
-      if (!response.ok) throw new Error(`No se pudieron descargar tus cambios (${response.status}).`)
-      const body = await response.json() as {
-        revision: number; changes: RemoteChange[]; hasMore?: boolean; requiresBootstrap?: boolean
+      const response = await fetch(`/api/changes?since=${revision.value}`, {
+        headers: identityHeaders(),
+      })
+      rejectExpiredSession(response)
+      if (!response.ok)
+        throw new Error(`No se pudieron descargar tus cambios (${response.status}).`)
+      const body = (await response.json()) as {
+        revision: number
+        changes: RemoteChange[]
+        hasMore?: boolean
+        requiresBootstrap?: boolean
       }
-      if (body.requiresBootstrap || body.changes.some((change) =>
-        change.entityType === 'userInstrument' || change.entityType === 'reset')) {
+      if (
+        body.requiresBootstrap ||
+        body.changes.some(
+          (change) => change.entityType === 'userInstrument' || change.entityType === 'reset',
+        )
+      ) {
         await bootstrapUnlocked()
         return
       }
@@ -723,8 +787,19 @@ export const useSyncStore = defineStore('sync', () => {
     return true
   }
 
-  /** Full local wipe (Cf-Access logout doesn't clear client storage on its own). */
-  async function logout(): Promise<void> {
+  async function prepareLogout(): Promise<void> {
+    await syncNow()
+    if (outboxDb) pendingCount.value = await countOutbox(outboxDb)
+    if (pendingCount.value > 0) {
+      throw new Error(
+        'No se pudieron sincronizar todos los cambios. Puedes quedarte o descartarlos y salir.',
+      )
+    }
+  }
+
+  /** Called only after synchronization or an explicit discard decision. */
+  async function logout(options: { discardPending?: boolean } = {}): Promise<void> {
+    if (!options.discardPending) await prepareLogout()
     stop()
     readModel = null
     cacheDb?.close()
@@ -761,6 +836,7 @@ export const useSyncStore = defineStore('sync', () => {
     /** Reloads the whole read model after a server-side write (Bitvavo import and link). */
     refreshFromServer: () => syncNow({ full: true }),
     detach,
+    prepareLogout,
     logout,
     getEntityRef,
     getSettingsVersion,

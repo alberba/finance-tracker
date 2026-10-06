@@ -6,10 +6,10 @@
  * route reads `principal.userId`, never a query/body param.
  */
 
-import { and, eq } from "drizzle-orm";
-import { users, userIdentities } from "../../../db/schema";
-import { normalizeEmail, runInTransaction, type Db } from "../../../db/repositories/shared";
-import { findLegacyOwnerToLink } from "./legacy-owner-link";
+import { and, eq } from 'drizzle-orm'
+import { users, userIdentities } from '../../../db/schema'
+import { normalizeEmail, runInTransaction, type Db } from '../../../db/repositories/shared'
+import { findLegacyOwnerToLink } from './legacy-owner-link'
 
 /**
  * Anything `resolvePrincipal`/`findLegacyOwnerToLink` can run a query
@@ -20,25 +20,26 @@ import { findLegacyOwnerToLink } from "./legacy-owner-link";
  * so both call sites now share the same best-effort wrapper, which passes
  * the same `db` through rather than a distinct transaction-scoped handle).
  */
-export type Queryable = Db;
+export type Queryable = Db
 
-export const CF_ACCESS_PROVIDER = "cf-access";
+export const CF_ACCESS_PROVIDER = 'cf-access'
 
 /** Identity resolved from a verified Cf-Access JWT, attached to `Astro.locals`. */
 export interface AuthPrincipal {
-  userId: string;
-  email: string | null;
-  provider: string;
-  subject: string;
-  isLegacyOwner: boolean;
+  userId: string
+  email: string | null
+  provider: string
+  subject: string
+  isLegacyOwner: boolean
+  isAdmin?: boolean
 }
 
 export interface ResolvePrincipalInput {
-  provider: string;
-  subject: string;
-  email?: string | null;
+  provider: string
+  subject: string
+  email?: string | null
   /** `LEGACY_OWNER_EMAIL` from `RuntimeEnv`, if configured. */
-  legacyOwnerEmail?: string | null;
+  legacyOwnerEmail?: string | null
 }
 
 async function findExistingPrincipal(
@@ -55,11 +56,11 @@ async function findExistingPrincipal(
     .from(userIdentities)
     .innerJoin(users, eq(users.id, userIdentities.userId))
     .where(and(eq(userIdentities.provider, provider), eq(userIdentities.subject, subject)))
-    .limit(1);
+    .limit(1)
 
-  const row = rows[0];
+  const row = rows[0]
   if (!row) {
-    return null;
+    return null
   }
   return {
     userId: row.userId,
@@ -67,7 +68,7 @@ async function findExistingPrincipal(
     provider,
     subject,
     isLegacyOwner: row.isLegacyOwner === 1,
-  };
+  }
 }
 
 /**
@@ -85,33 +86,33 @@ export async function resolvePrincipal(
   db: Db,
   input: ResolvePrincipalInput,
 ): Promise<AuthPrincipal> {
-  const existing = await findExistingPrincipal(db, input.provider, input.subject);
+  const existing = await findExistingPrincipal(db, input.provider, input.subject)
   if (existing) {
-    return existing;
+    return existing
   }
 
   return runInTransaction(db, async (tx) => {
     // Re-check inside the transaction: a concurrent request may have created
     // the identity between the read above and now.
-    const existingInTx = await findExistingPrincipal(tx, input.provider, input.subject);
+    const existingInTx = await findExistingPrincipal(tx, input.provider, input.subject)
     if (existingInTx) {
-      return existingInTx;
+      return existingInTx
     }
 
     const linked = await findLegacyOwnerToLink(tx, {
       email: input.email,
       legacyOwnerEmail: input.legacyOwnerEmail,
-    });
+    })
 
-    const now = new Date().toISOString();
-    let userId: string;
-    let email: string | null;
-    let isLegacyOwner: boolean;
+    const now = new Date().toISOString()
+    let userId: string
+    let email: string | null
+    let isLegacyOwner: boolean
 
     if (linked) {
-      userId = linked.userId;
-      email = linked.email;
-      isLegacyOwner = true;
+      userId = linked.userId
+      email = linked.email
+      isLegacyOwner = true
     } else {
       const inserted = await tx
         .insert(users)
@@ -123,10 +124,10 @@ export async function resolvePrincipal(
           createdAt: now,
           updatedAt: now,
         })
-        .returning({ id: users.id, email: users.email });
-      userId = inserted[0].id;
-      email = inserted[0].email;
-      isLegacyOwner = false;
+        .returning({ id: users.id, email: users.email })
+      userId = inserted[0].id
+      email = inserted[0].email
+      isLegacyOwner = false
     }
 
     await tx.insert(userIdentities).values({
@@ -135,8 +136,8 @@ export async function resolvePrincipal(
       subject: input.subject,
       email: input.email ? normalizeEmail(input.email) : null,
       createdAt: now,
-    });
+    })
 
-    return { userId, email, provider: input.provider, subject: input.subject, isLegacyOwner };
-  });
+    return { userId, email, provider: input.provider, subject: input.subject, isLegacyOwner }
+  })
 }

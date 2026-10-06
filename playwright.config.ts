@@ -20,7 +20,9 @@ export default defineConfig(
         name: 'chromium',
         use: { ...devices['Desktop Chrome'] },
         testIgnore: [
+          'authentication.spec.ts',
           'bitvavo.spec.ts',
+
           'layout-visual.spec.ts',
           'mobile-smoke.spec.ts',
           'multi-user-isolation.spec.ts',

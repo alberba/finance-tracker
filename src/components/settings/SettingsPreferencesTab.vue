@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 
+import SecuritySettings from '../auth/SecuritySettings.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -116,5 +117,7 @@ watch(
         </div>
       </NumberedBlock>
     </DocumentSurface>
+
+    <SecuritySettings />
   </section>
 </template>
