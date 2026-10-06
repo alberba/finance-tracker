@@ -1,23 +1,23 @@
-import "fake-indexeddb/auto";
-import { createPinia, setActivePinia } from "pinia";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import 'fake-indexeddb/auto'
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock("../../src/scripts/demo-mode", () => ({ isDemoMode: vi.fn(() => false) }));
+vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
-import { openIdbCache, putEntity, wipeIdbCache } from "../../src/lib/client/idb-cache";
-import { listAll, openOutbox, wipeOutbox } from "../../src/lib/client/outbox";
-import { useBudgetStore } from "../../src/stores/budget";
-import { useFinancialStateStore } from "../../src/stores/financial-state";
-import { useSyncStore } from "../../src/stores/sync";
+import { openIdbCache, putEntity, wipeIdbCache } from '../../src/lib/client/idb-cache'
+import { listAll, openOutbox, wipeOutbox } from '../../src/lib/client/outbox'
+import { useBudgetStore } from '../../src/stores/budget'
+import { useFinancialStateStore } from '../../src/stores/financial-state'
+import { useSyncStore } from '../../src/stores/sync'
 
-const USER_ID = "user-budget-store-test";
+const USER_ID = 'user-budget-store-test'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only store handle, closed in afterEach
-let activeStore: any = null;
+let activeStore: any = null
 
 async function settle(): Promise<void> {
   for (let i = 0; i < 5; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0))
   }
 }
 
@@ -31,98 +31,106 @@ async function settle(): Promise<void> {
  * already-synced budget cell, because `buildBudgetEntryData` always
  * recomputes the full identity + value shape.
  */
-describe("budget store — sync wiring keeps identity out of the update patch (issue #138)", () => {
+describe('budget store — sync wiring keeps identity out of the update patch (issue #138)', () => {
   beforeEach(async () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
-    setActivePinia(createPinia());
-    await wipeIdbCache(USER_ID);
-    await wipeOutbox(USER_ID);
-  });
+    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
+    setActivePinia(createPinia())
+    await wipeIdbCache(USER_ID)
+    await wipeOutbox(USER_ID)
+  })
 
   afterEach(async () => {
-    vi.unstubAllEnvs();
+    vi.unstubAllEnvs()
     if (activeStore) {
-      await activeStore.logout();
-      activeStore = null;
+      await activeStore.logout({ discardPending: true })
+      activeStore = null
     }
-    await wipeIdbCache(USER_ID);
-    await wipeOutbox(USER_ID);
-  });
+    await wipeIdbCache(USER_ID)
+    await wipeOutbox(USER_ID)
+  })
 
-  it("sends the full identity on the first edit and only amount/currency on the second", async () => {
-    const syncStore = useSyncStore();
-    await syncStore.init(USER_ID);
-    syncStore.connection = "offline"
-    activeStore = syncStore;
+  it('sends the full identity on the first edit and only amount/currency on the second', async () => {
+    const syncStore = useSyncStore()
+    await syncStore.init(USER_ID)
+    syncStore.connection = 'offline'
+    activeStore = syncStore
 
     // The category has already synced, so `resolveOrCreateCategoryId`
     // resolves it (by its real name+kind, ADR 0001) immediately instead of
     // minting and creating it again.
-    const cacheDb = await openIdbCache(USER_ID);
-    await putEntity(cacheDb, "category", {
-      id: "server-cat-1",
-      name: "Ocio",
-      kind: "expense",
+    const cacheDb = await openIdbCache(USER_ID)
+    await putEntity(cacheDb, 'category', {
+      id: 'server-cat-1',
+      name: 'Ocio',
+      kind: 'expense',
       version: 0,
-    });
-    cacheDb.close();
+    })
+    cacheDb.close()
 
     useFinancialStateStore().commitState((draft) => {
-      draft.expenseCategories = ["Ocio"];
-    });
+      draft.expenseCategories = ['Ocio']
+    })
 
-    const budgetStore = useBudgetStore();
-    budgetStore.updateBudgetValue("expense", "Ocio", 0, 100);
-    await settle();
+    const budgetStore = useBudgetStore()
+    budgetStore.updateBudgetValue('expense', 'Ocio', 0, 100)
+    await settle()
 
-    const outboxDb = await openOutbox(USER_ID);
-    const afterFirstEdit = await listAll(outboxDb);
-    expect(afterFirstEdit).toHaveLength(1);
+    const outboxDb = await openOutbox(USER_ID)
+    const afterFirstEdit = await listAll(outboxDb)
+    expect(afterFirstEdit).toHaveLength(1)
     expect(afterFirstEdit[0]?.command).toMatchObject({
-      action: "create",
-      entityType: "budgetEntry",
-      data: { categoryId: "server-cat-1", year: expect.any(Number), month: 1, amount: 100, currency: "EUR" },
-    });
-    outboxDb.close();
+      action: 'create',
+      entityType: 'budgetEntry',
+      data: {
+        categoryId: 'server-cat-1',
+        year: expect.any(Number),
+        month: 1,
+        amount: 100,
+        currency: 'EUR',
+      },
+    })
+    outboxDb.close()
 
     // Simulate the create having synced: seed the cache with the server row,
     // identified by the same natural key (`categoryId`, year, month) the
     // store addresses a cell by (ADR 0001), so the next edit resolves it as
     // an update instead of folding into the still-pending create.
-    const created = afterFirstEdit[0]?.command;
-    if (created?.action !== "create") throw new Error("expected a pending create");
+    const created = afterFirstEdit[0]?.command
+    if (created?.action !== 'create') throw new Error('expected a pending create')
     const { categoryId, year, month } = created.data as {
-      categoryId: string;
-      year: number;
-      month: number;
-    };
-    const cacheDb2 = await openIdbCache(USER_ID);
-    await putEntity(cacheDb2, "budgetEntry", {
-      id: "server-budget-entry-1",
+      categoryId: string
+      year: number
+      month: number
+    }
+    const cacheDb2 = await openIdbCache(USER_ID)
+    await putEntity(cacheDb2, 'budgetEntry', {
+      id: 'server-budget-entry-1',
       categoryId,
       year,
       month,
       version: 0,
-    });
-    cacheDb2.close();
+    })
+    cacheDb2.close()
 
-    budgetStore.updateBudgetValue("expense", "Ocio", 0, 250);
-    await settle();
+    budgetStore.updateBudgetValue('expense', 'Ocio', 0, 250)
+    await settle()
 
-    const outboxDb2 = await openOutbox(USER_ID);
-    const afterSecondEdit = await listAll(outboxDb2);
-    const update = afterSecondEdit.find((entry) => entry.command.action === "update");
+    const outboxDb2 = await openOutbox(USER_ID)
+    const afterSecondEdit = await listAll(outboxDb2)
+    const update = afterSecondEdit.find((entry) => entry.command.action === 'update')
     expect(update?.command).toMatchObject({
-      action: "update",
-      entityType: "budgetEntry",
-      entityId: "server-budget-entry-1",
-      patch: { amount: 250, currency: "EUR" },
-    });
+      action: 'update',
+      entityType: 'budgetEntry',
+      entityId: 'server-budget-entry-1',
+      patch: { amount: 250, currency: 'EUR' },
+    })
     // The identity fields must not be present at all — not just ignored.
-    expect(update?.command).toMatchObject({ patch: expect.not.objectContaining({ categoryId: expect.anything() }) });
-    if (update?.command.action === "update") {
-      expect(Object.keys(update.command.patch)).toEqual(["amount", "currency"]);
+    expect(update?.command).toMatchObject({
+      patch: expect.not.objectContaining({ categoryId: expect.anything() }),
+    })
+    if (update?.command.action === 'update') {
+      expect(Object.keys(update.command.patch)).toEqual(['amount', 'currency'])
     }
-    outboxDb2.close();
-  });
-});
+    outboxDb2.close()
+  })
+})

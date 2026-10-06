@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import SecuritySettings from '../auth/SecuritySettings.vue'
 import CategoryEditorBlock from '../settings/CategoryEditorBlock.vue'
 import EntityEditorCard from '../settings/EntityEditorCard.vue'
 import StockEventsPanel from '../settings/StockEventsPanel.vue'
@@ -107,6 +108,7 @@ onBeforeUnmount(() => {
       </nav>
 
       <div class="settings-doc">
+        <SecuritySettings />
         <section id="cfg-general" class="settings-block">
           <header>
             <span class="settings-block__num">01</span>
@@ -230,8 +232,7 @@ onBeforeUnmount(() => {
             <span class="settings-block__num">08</span>
             <h3>Liquidez para TWR</h3>
             <p>
-              Cuentas de brokers que se incluyen como liquidez en el cálculo de
-              cartera para TWR.
+              Cuentas de brokers que se incluyen como liquidez en el cálculo de cartera para TWR.
             </p>
           </header>
           <div class="settings-block__body">

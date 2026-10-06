@@ -202,6 +202,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  authentication-e2e:
+    name: Better Auth Worker and browser contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run isolated Better Auth Worker E2E
+        run: pnpm test:e2e:auth --reporter=dot,html
+      - name: Upload authentication report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-authentication
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
   e2e-report:
     name: Merge failed Playwright report
     if: >-

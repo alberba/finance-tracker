@@ -1,0 +1,130 @@
+---
+import AccessForm from '../components/auth/AccessForm.vue'
+import '../styles/global.css'
+import '../styles/legacy.css'
+import { getRuntimeEnv } from '../lib/server/cloudflare-env'
+import { getDb } from '../db/client'
+import { createAuthentication } from '../lib/server/auth/better-auth'
+import { registrationInvitation } from '../db/repositories/authentication'
+const env = getRuntimeEnv(Astro.locals)
+const invitation = Astro.url.searchParams.get('invitation')
+let invitationError = ''
+let verifyEmail: string | undefined
+if (env.AUTH_MODE === 'better-auth') {
+  try {
+    const session = await createAuthentication(getDb(Astro.locals), env).api.getSession({
+      headers: Astro.request.headers,
+      query: { disableCookieCache: true },
+    })
+    if (session && !session.user.emailVerified) verifyEmail = session.user.email
+  } catch {
+    /* The form remains usable while configuration is being prepared. */
+  }
+}
+const initialError = Astro.url.searchParams.has('error')
+  ? 'No se pudo completar el acceso con ese proveedor. Inténtalo de nuevo o entra con un código por correo para vincularlo desde ajustes.'
+  : undefined
+if (invitation) {
+  try {
+    await registrationInvitation(getDb(Astro.locals), invitation)
+    Astro.cookies.set('finance-invitation', invitation, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: Astro.url.protocol === 'https:',
+      path: '/',
+      maxAge: 86400,
+    })
+  } catch (error) {
+    invitationError = error instanceof Error ? error.message : 'Invitación no válida.'
+    Astro.cookies.delete('finance-invitation', { path: '/' })
+  }
+}
+Astro.response.headers.set('Cache-Control', 'no-store')
+Astro.response.headers.set('Referrer-Policy', 'no-referrer')
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#faf8f4" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Acceso · Finanzas</title>
+  </head>
+  <body>
+    <main class="access-page">
+      <aside class="access-introduction">
+        <p class="panel-kicker">Finanzas personales</p>
+        <h1>
+          Tu dinero.
+          <br />
+          Tu espacio.
+        </h1>
+        <p>Presupuesto, inversiones y objetivos, en un mismo lugar.</p>
+        <a href="/?demo=true">Explorar la demo</a>
+      </aside>
+      <section class="access-card" aria-labelledby="access-heading">
+        <p class="panel-kicker">Bienvenido</p>
+        <h2 id="access-heading">Accede a Finanzas</h2>
+        <p>
+          Elige cómo quieres entrar. Si ya usabas Finanzas, entra con un código enviado a tu correo
+          habitual.
+        </p>
+        <AccessForm
+          client:load
+          verifyEmail={verifyEmail}
+          initialError={initialError}
+          invitationError={invitationError}
+          googleEnabled={Boolean(env.GOOGLE_CLIENT_ID)}
+          githubEnabled={Boolean(env.GITHUB_CLIENT_ID)}
+        />
+      </section>
+    </main>
+  </body>
+</html>
+<style>
+  .access-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 5rem;
+    padding: 3rem 2rem;
+  }
+  .access-introduction h1 {
+    font-family: Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    line-height: 1.03;
+    letter-spacing: -0.04em;
+    margin: 1rem 0 2rem;
+  }
+  .access-card {
+    border-left: 1px solid currentColor;
+    padding-left: 3rem;
+  }
+  .access-card h2 {
+    margin-bottom: 1rem;
+  }
+  .access-card > p {
+    margin-bottom: 2rem;
+  }
+  @media (max-width: 720px) {
+    .access-page {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      padding: 2rem 1.25rem;
+    }
+    .access-introduction h1 {
+      font-size: 3rem;
+    }
+    .access-card {
+      border-left: 0;
+      border-top: 1px solid currentColor;
+      padding: 2rem 0 0;
+    }
+  }
+</style>
