@@ -1,111 +1,184 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 
+import InvestmentPositionsBlock from './InvestmentPositionsBlock.vue'
+import InvestmentQuotesBlock from './InvestmentQuotesBlock.vue'
 import ChartCanvas from '../charts/ChartCanvas.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import DocumentSurface from '../ui/DocumentSurface.vue'
+import InkBand, { type InkBandFact } from '../ui/InkBand.vue'
+import NumberedBlock from '../ui/NumberedBlock.vue'
+import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
+import { toneOf } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { renderDonutChart, renderMultiLineChart } from '../../scripts/charts'
-import { formatPercent } from '../../scripts/utils'
+import type { ReturnMode } from '../../domain/investment/view-model'
+import { formatMonthYear, formatPercent, formatShortDate } from '../../lib/format'
+import { renderMultiLineChart } from '../../scripts/charts'
+import { MONTHS } from '../../scripts/types'
+import { useFinancialStateStore } from '../../stores/financial-state'
 import { useInvestmentStore } from '../../stores/investment'
+import { useMarketStore } from '../../stores/market'
+import { useUiStore } from '../../stores/ui'
 
 defineProps<{ isActive: boolean }>()
 
 const investmentStore = useInvestmentStore()
-const { dashboardViewModel } = storeToRefs(investmentStore)
-const { formatMoney } = useMoneyFormatter()
+const marketStore = useMarketStore()
+const financialStateStore = useFinancialStateStore()
+const ui = useUiStore().ui
+const { dashboardViewModel: vm } = storeToRefs(investmentStore)
+const { formatMoney, formatSignedMoney, formatMoneyCompact } = useMoneyFormatter()
+
+type ChartUnit = 'eur' | 'pct'
+const unit = shallowRef<ChartUnit>('eur')
+
+const RETURN_MODES: SegmentedOption<ReturnMode>[] = [
+  { value: 'simple', label: 'Simple' },
+  { value: 'twr', label: 'TWR' },
+]
+const CHART_UNITS: SegmentedOption<ChartUnit>[] = [
+  { value: 'eur', label: '€' },
+  { value: 'pct', label: '%' },
+]
+
+const returnMode = computed({
+  get: () => ui.investmentReturnMode as ReturnMode,
+  set: (mode: ReturnMode) => investmentStore.setReturnMode(mode),
+})
+const month = computed({
+  get: () => String(ui.investmentMonth),
+  set: (value: string) => investmentStore.setMonth(Number(value)),
+})
+const monthOptions = computed(() =>
+  MONTHS.map((_, index) => ({
+    value: String(index),
+    label: formatMonthYear(index, financialStateStore.state.year),
+  })),
+)
+
+const signedPercent = (value: number) => formatPercent(value, { signed: true })
+
+const dailyChange = computed(() => marketStore.valuation.dailyChangePercent)
+const dailyChip = computed(() =>
+  dailyChange.value === null
+    ? null
+    : { text: `${signedPercent(dailyChange.value)} hoy`, tone: toneOf(dailyChange.value) },
+)
+
+const heroFacts = computed<InkBandFact[]>(() => [
+  {
+    label: 'Capital invertido',
+    value: formatMoney(vm.value.investedCapital),
+    valueId: 'inv-capital',
+  },
+  { label: 'Resultado', value: formatSignedMoney(vm.value.gain), tone: toneOf(vm.value.gain) },
+  {
+    label: vm.value.returnLabel,
+    value: signedPercent(vm.value.displayReturn),
+    tone: toneOf(vm.value.displayReturn),
+    labelId: 'inv-return-label',
+    valueId: 'inv-return',
+  },
+])
 
 const drawPortfolioChart = computed(() => {
-  const series = dashboardViewModel.value.portfolioSeries
-  const labels = dashboardViewModel.value.chartLabels
-  return (canvas: HTMLCanvasElement) => {
+  const labels = vm.value.chartLabels
+  if (unit.value === 'eur') {
+    const series = vm.value.valueSeries
+    return (canvas: HTMLCanvasElement) =>
+      renderMultiLineChart(canvas, series, {
+        labels,
+        formatValue: formatMoney,
+        formatAxisValue: formatMoneyCompact,
+      })
+  }
+  const series = vm.value.percentSeries
+  return (canvas: HTMLCanvasElement) =>
     renderMultiLineChart(canvas, series, {
       labels,
       formatValue: (value) => formatPercent(value),
       forceZeroTick: true,
     })
-  }
-})
-
-const drawAssetsChart = computed(() => {
-  const series = dashboardViewModel.value.assetsSeries
-  const labels = dashboardViewModel.value.chartLabels
-  return (canvas: HTMLCanvasElement) => {
-    renderMultiLineChart(canvas, series, {
-      labels,
-      formatValue: (value) => formatPercent(value),
-      forceZeroTick: true,
-    })
-  }
-})
-
-const drawAllocationChart = computed(() => {
-  const allocation = dashboardViewModel.value.allocation
-  return (canvas: HTMLCanvasElement) => {
-    renderDonutChart(canvas, allocation, formatMoney)
-  }
 })
 </script>
 
 <template>
   <div
     id="investment-tab-dashboard"
-    class="investment-subtab-panel"
-    :class="{ 'is-active': isActive }"
+    class="grid min-w-0 gap-6 sm:gap-7"
     :hidden="!isActive"
     data-investment-tab-panel="dashboard"
     role="tabpanel"
+    aria-label="Resumen"
   >
-    <div class="cards-grid slim">
-      <article class="kpi-card">
-        <p>Valor cartera</p>
-        <strong id="inv-total-value">{{ formatMoney(dashboardViewModel.portfolioValue) }}</strong>
-      </article>
-      <article class="kpi-card">
-        <p>Capital invertido</p>
-        <strong id="inv-capital">{{ formatMoney(dashboardViewModel.investedCapital) }}</strong>
-      </article>
-      <article class="kpi-card">
-        <p id="inv-return-label">{{ dashboardViewModel.returnLabel }}</p>
-        <strong id="inv-return" :class="dashboardViewModel.returnIsGood ? 'text-(--income)' : 'text-(--expense)'">
-          {{ formatPercent(dashboardViewModel.displayReturn) }}
-        </strong>
-      </article>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <BaseSelect
+        id="investment-month"
+        v-model="month"
+        name="investmentMonth"
+        label="Mes de análisis"
+        :options="monthOptions"
+        class="grow sm:flex sm:grow-0 sm:items-center sm:gap-3 [&_select]:font-semibold max-sm:[&>label]:sr-only"
+      />
+      <div class="flex items-center gap-3">
+        <span class="text-text-muted hidden text-sm font-semibold sm:inline" aria-hidden="true">
+          Rentabilidad
+        </span>
+        <SegmentedControl
+          v-model="returnMode"
+          :options="RETURN_MODES"
+          label="Modo de cálculo de rentabilidad"
+          data-key="return-mode"
+        />
+      </div>
     </div>
 
-    <div class="chart-grid-inv">
-      <article class="card">
-        <h3>Evolución de la cartera</h3>
-        <div class="chart-canvas-wrap">
+    <InkBand
+      aria-label="Situación de la cartera"
+      :label="`Valor de la cartera · ${formatShortDate(vm.asOf)}`"
+      :value="formatMoney(vm.portfolioValue)"
+      value-id="inv-total-value"
+      :chip="dailyChip"
+      :facts="heroFacts"
+    />
+
+    <DocumentSurface>
+      <NumberedBlock
+        number="01"
+        title="Evolución"
+        title-id="inv-evo-title"
+        :description="
+          unit === 'eur'
+            ? 'Valor de la cartera frente al capital aportado, mes a mes.'
+            : 'Rentabilidad acumulada de la cartera, mes a mes.'
+        "
+      >
+        <template #actions>
+          <SegmentedControl
+            v-model="unit"
+            :options="CHART_UNITS"
+            label="Unidad del gráfico"
+            variant="soft"
+          />
+        </template>
+        <div class="relative h-64 sm:h-72">
           <ChartCanvas
             id="investment-portfolio-chart"
+            class="block size-full"
             :draw="drawPortfolioChart"
-            aria-label="Evolución cartera total"
+            :aria-label="
+              unit === 'eur'
+                ? 'Valor de cartera frente a capital aportado'
+                : 'Evolución cartera total'
+            "
           />
         </div>
-      </article>
-      <article class="card">
-        <h3>Evolución por activo</h3>
-        <div class="chart-canvas-wrap">
-          <ChartCanvas
-            id="investment-assets-chart"
-            :draw="drawAssetsChart"
-            aria-label="Evolución por activo"
-          />
-        </div>
-      </article>
-    </div>
+      </NumberedBlock>
 
-    <div class="dual-grid">
-      <article class="card">
-        <h3>Distribución de activos</h3>
-        <div class="chart-canvas-wrap">
-          <ChartCanvas
-            id="investment-allocation"
-            :draw="drawAllocationChart"
-            aria-label="Distribución de cartera"
-          />
-        </div>
-      </article>
-    </div>
+      <InvestmentPositionsBlock :vm="vm" />
+
+      <InvestmentQuotesBlock />
+    </DocumentSurface>
   </div>
 </template>

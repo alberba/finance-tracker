@@ -5,13 +5,20 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 
 ## Ida: de la UI a D1
 
-1. **Constructor del payload** en el store de la sección (`src/stores/*.ts`). Ojo: hay **tres
-   constructores de movimientos**:
-   - `buildInvestmentTransactionData` (`src/stores/investment.ts`) envía `time`, `declared` y
-     `operation`.
-   - `buildTransactionData` de `src/stores/movements.ts` y el de `src/stores/recurring.ts` solo
-     envían el movimiento básico. Un camino que puede tocar inversiones tiene que elegir el
-     constructor por tipo, como hace `confirmPending`.
+1. **Comando del movimiento**: `syncMovements` (`src/lib/client/movement-commands.ts`) recibe
+   las listas antes/después y la moneda general. Inversión, Movimientos y confirmación de
+   pendientes usan la misma conversión y encolado. Su promesa termina al encolar, antes de que
+   el servidor confirme:
+   - Resuelve cuenta y categoría; conserva las cuentas con identidad pendiente y omite el comando
+     si la cuenta requerida no se puede resolver.
+   - Resuelve los instrumentos del bootstrap en caché por su id propio o su id de correlación de
+     migración; incluye la referencia cuando está disponible sin exigir un instrumento de catálogo.
+   - Prioriza la moneda propia, sin convertir importes, y envía hora y declarado para cualquier tipo.
+   - Incluye la operación anidada solo con compra/venta explícita y títulos/precio finitos presentes.
+     Una operación insuficiente se omite para conservar la previa en D1 o en un alta aún en cola. Cambiar a un tipo distinto
+     de inversión envía `null`, eliminando solo la operación.
+   - Para operaciones importadas de Bitvavo, emite únicamente declarado y descripción. Los stores
+     mantienen las restricciones de edición y borrado.
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).
 2. `src/lib/client/command-mapping.ts`: `syncListDiff` / `syncCreate` / `syncUpdate` convierten el
    antes/después en comandos.
@@ -29,14 +36,19 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 
 8. `src/lib/server/bootstrap-payload.ts` `buildBootstrapPayload` (`GET /api/bootstrap`).
 9. `src/lib/client/pending-overlay.ts`: aplica sobre el bootstrap los comandos aún en cola. Los
-   ajustes booleanos se declaran aquí.
+   ajustes booleanos se declaran aquí. Reconstruye la operación de los comandos de movimientos
+   como `tradeDetail` para que también se vea tras reiniciar sin conexión; omitirla conserva la previa.
 10. `src/lib/client/v2-state-projection.ts` `projectSyncV2State`: filas relacionales → estado.
 11. `src/scripts/state.ts` `normalizeState` (valores por defecto y normalización) y
     `src/scripts/types.ts` (tipo `State`). Si la proyección emite un campo que `normalizeState`
-    no conserva, se pierde.
+    no conserva, se pierde. Moneda propia, hora y declarado se conservan para cualquier movimiento;
+    solo los campos de operación se limpian cuando deja de ser inversión. No se inventan compra/venta,
+    títulos ni precio cuando faltan.
 
-**Fuera de la cadena**: `src/pages/api/data/import.ts` mapea los ajustes por su cuenta al
-importar.
+**Fuera de la cadena**: la copia JSON de Datos. `src/pages/api/data/export.ts` vuelca las filas
+y `src/pages/api/data/import.ts` las recrea campo a campo, así que un campo nuevo también se
+añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFullDataset`) comprueba
+que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
 
 ## Test
 

@@ -1,25 +1,30 @@
 <script setup lang="ts">
+import BaseButton from '../ui/BaseButton.vue'
 import { useInvitationSettings } from '../../composables/useInvitationSettings'
 const { registration, maxUses, days, link, administratorId, busy, error, create, update } =
   useInvitationSettings()
 </script>
 <template>
-  <section aria-labelledby="invitations-heading">
-    <h3 id="invitations-heading">Invitaciones y registro</h3>
+  <section
+    class="bg-panel border-line grid gap-4 rounded-lg border p-5"
+    aria-labelledby="invitations-heading"
+  >
+    <h3 id="invitations-heading" class="font-display text-xl font-bold">Invitaciones y registro</h3>
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="registration">
       <p>Registro {{ registration.publicRegistration ? 'público' : 'solo por invitación' }}</p>
-      <button
+      <BaseButton
         :disabled="busy"
         @click="update({ action: 'policy', publicRegistration: !registration.publicRegistration })"
       >
         {{ registration.publicRegistration ? 'Cerrar registro público' : 'Abrir registro público' }}
-      </button>
+      </BaseButton>
       <form @submit.prevent="create">
         <label for="invitation-uses">Plazas</label
         ><input
           id="invitation-uses"
           v-model.number="maxUses"
+          class="border-line bg-panel focus:border-primary min-h-11 w-full rounded-md border px-3"
           type="number"
           min="1"
           max="10000"
@@ -29,12 +34,13 @@ const { registration, maxUses, days, link, administratorId, busy, error, create,
         ><input
           id="invitation-days"
           v-model.number="days"
+          class="border-line bg-panel focus:border-primary min-h-11 w-full rounded-md border px-3"
           type="number"
           min="1"
           max="365"
           required
         />
-        <button :disabled="busy">Crear invitación</button>
+        <BaseButton type="submit" :disabled="busy">Crear invitación</BaseButton>
       </form>
       <p v-if="link" role="status">
         Comparte este enlace: <a :href="link">{{ link }}</a>
@@ -44,15 +50,24 @@ const { registration, maxUses, days, link, administratorId, busy, error, create,
           {{ invitation.uses }} / {{ invitation.maxUses }} plazas · Caduca
           {{ new Date(invitation.expiresAt).toLocaleDateString('es') }}
           <span v-if="invitation.revoked">Revocada</span
-          ><button v-else :disabled="busy" @click="update({ action: 'revoke', id: invitation.id })">
+          ><BaseButton
+            v-else
+            :disabled="busy"
+            @click="update({ action: 'revoke', id: invitation.id })"
+          >
             Revocar invitación
-          </button>
+          </BaseButton>
         </li>
       </ul>
       <form @submit.prevent="update({ action: 'grant-admin', userId: administratorId })">
         <label for="administrator-id">Id del usuario que será administrador</label
-        ><input id="administrator-id" v-model="administratorId" required />
-        <button :disabled="busy">Autorizar administrador</button>
+        ><input
+          id="administrator-id"
+          v-model="administratorId"
+          class="border-line bg-panel focus:border-primary min-h-11 w-full rounded-md border px-3"
+          required
+        />
+        <BaseButton type="submit" :disabled="busy">Autorizar administrador</BaseButton>
       </form>
     </template>
   </section>

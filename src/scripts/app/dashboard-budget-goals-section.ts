@@ -73,9 +73,8 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) 
     ui.activeSection = normalizedSectionId
     uiStore.setActiveSection(normalizedSectionId)
 
-    Array.from(el.navTabs.querySelectorAll('.nav-btn')).forEach((button) => {
-      const isActive = (button as HTMLElement).dataset.section === normalizedSectionId
-      button.classList.toggle('is-active', isActive)
+    Array.from(el.navTabs.querySelectorAll<HTMLElement>('[data-nav-item]')).forEach((button) => {
+      const isActive = button.dataset.section === normalizedSectionId
       if (isActive) {
         button.setAttribute('aria-current', 'page')
       } else {
@@ -84,10 +83,11 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) 
     })
 
     const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
-    mobileMoreTrigger?.classList.toggle(
-      'is-active',
-      !MOBILE_PRIMARY_SECTIONS.includes(normalizedSectionId),
-    )
+    if (mobileMoreTrigger) {
+      mobileMoreTrigger.dataset.active = String(
+        !MOBILE_PRIMARY_SECTIONS.includes(normalizedSectionId),
+      )
+    }
 
     if (updateHistory) {
       const nextPath = getPathFromSection(normalizedSectionId)

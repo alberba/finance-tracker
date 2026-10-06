@@ -18,7 +18,7 @@ it('migrates trusted Access identities with the same userId and no invitation pl
   for (const filename of readdirSync('migrations-v2')
     .filter((name) => name.endsWith('.sql'))
     .sort()) {
-    if (filename === '0007_authentication.sql') {
+    if (filename === '0008_authentication.sql') {
       sqlite.exec(`INSERT INTO users(id,email,is_legacy_owner,created_at,updated_at) VALUES('existing-owner','owner@example.com',1,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
 INSERT INTO user_identities(id,user_id,provider,subject,email,created_at) VALUES('known-access','existing-owner','cf-access','access-subject','owner@example.com','2026-01-01T00:00:00Z');`)
     }

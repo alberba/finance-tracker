@@ -15,7 +15,8 @@ No revises a mano nada de esto; falla solo en CI.
 - Formato: `.prettierrc` (sin punto y coma, comillas simples, ancho 100, `trailingComma: all`).
   Ningún gate lo comprueba y parte del repo está sin formatear: el diff formatea solo los ficheros
   que toca (`pnpm exec prettier --write <rutas>`), nunca un directorio entero.
-- Lint: `eslint.config.ts` (TypeScript, Vue, Astro, CSS con tokens Tailwind 4).
+- Lint: `eslint.config.ts` (TypeScript, Vue, Astro, CSS con tokens Tailwind 4, también en los
+  bloques `<style>` de Vue).
 - Tipos: `pnpm check` (`astro check`).
 
 Una observación de revisión sobre comillas, indentación o import order es ruido.
@@ -39,9 +40,35 @@ Fuente: `docs/architecture/frontend.md`.
   inevitables, como fuentes.
 - Tailwind entra por `src/styles/global.css` con `@import "tailwindcss"` y el plugin Vite
   `@tailwindcss/vite`.
-- `src/styles/legacy.css` se migra por zona tocada. No se reescribe en masa sin cobertura visual.
 - Los datos semilla generados desde Excel viven en `src/data/seed.json`; `src/data/seed.ts` es solo
   un wrapper tipado. No se versionan payloads generados como TypeScript largo.
+
+## Estilos
+
+Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md` y la nota
+`docs/architecture/estilos-tailwind-vs-css.md`.
+
+- Utilidades Tailwind en la plantilla por defecto, solo con tokens de `@theme` (`bg-panel`,
+  `text-gain`, `rounded-md`, `shadow-soft`…). Un valor arbitrario (`p-[22px]`, `bg-(--x)`) solo
+  cuando no exista token.
+- Un estilo que se repite entre ficheros se convierte en componente base. No en clase global ni en
+  `@apply`.
+- `<style scoped>` solo para animaciones, selectores estructurales o pseudo-elementos,
+  `::backdrop`, internos de gráficos o librerías y `v-bind()`. Siempre con variables de tema
+  (`var(--…)`) y sin `@apply`.
+- El CSS global (`src/styles/global.css`) solo lleva tokens claro y oscuro, reset, tipografía base
+  y shell, sin clases. Es la única hoja de estilos: ni hojas nuevas ni capas propias, solo las de
+  Tailwind. `tests/unit/styles-guards.test.ts` lo comprueba.
+- El tema oscuro va por tokens: los colores de `@theme` apuntan a variables que cambian con
+  `[data-theme=dark]`. Cuando haga falta una variante, `dark:` está ligada a ese atributo, no a
+  `prefers-color-scheme`.
+- Texto sobre superficie cumple AA (4,5:1) en claro y en oscuro. Para ganancias y pérdidas se usan
+  `text-gain` / `text-loss`, siempre con signo; `--income` / `--expense` son rellenos. `text-faint`
+  es para placeholders y decoración, no para texto que haya que leer. Un token de texto nuevo entra
+  en los pares del test de contraste. Los pares heredados por debajo de AA están listados en ese
+  test; la lista solo encoge y no admite entradas nuevas.
+- Nada de `style="…"` en línea salvo valores de datos dinámicos (anchos de barra, colores de serie).
+- Los tests localizan por rol, etiqueta, texto o `data-*`, nunca por clases de estilo.
 
 ## Tests
 
@@ -63,7 +90,8 @@ Fuente: `docs/testing.md`.
 
 Fuente: `docs/playwright.md`.
 
-- Cada prueba recibe un namespace único y no comparte estado con otras.
+- Legacy reinicia el blob del propietario antes de cada prueba y usa un worker por runner;
+  cada shard de CI tiene su propia D1. Sync-v2 aísla los usuarios de cada escenario.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.

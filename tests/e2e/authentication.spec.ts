@@ -57,7 +57,7 @@ async function admittedAdministrator(page: import('@playwright/test').Page) {
   const access = new AuthenticationPage(page)
   await access.goto()
   await access.signIn(email)
-  await new FinanceTrackerPage(page).open('settings')
+  await new AuthenticationPage(page).openSecurity()
   return { email, access }
 }
 
@@ -74,7 +74,7 @@ test('invitation registration grants private access without administrator contro
   const access = new AuthenticationPage(invited)
   await access.goto((await link.getAttribute('href'))!)
   await access.signIn(`invited-${crypto.randomUUID()}@example.test`)
-  await new FinanceTrackerPage(invited).open('settings')
+  await new AuthenticationPage(invited).openSecurity()
   await expect(invited.getByRole('heading', { name: 'Dispositivos y sesiones' })).toBeVisible()
   await expect(invited.getByRole('heading', { name: 'Invitaciones y registro' })).toHaveCount(0)
   await context.close()
@@ -141,7 +141,7 @@ test('cancelled passkey registration leaves no credential', async ({ page, conte
   })
   await new FinanceTrackerPage(page).reload()
   await new AuthenticationPage(page).ready()
-  await new FinanceTrackerPage(page).open('settings')
+  await new AuthenticationPage(page).openSecurity()
   await expect(page.getByRole('button', { name: 'Añadir passkey' })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Eliminar passkey' })).toHaveCount(0)
 })
@@ -159,7 +159,7 @@ for (const kind of ['selected', 'others'] as const) {
     await access.signIn(email)
     await new FinanceTrackerPage(page).reload()
     await new AuthenticationPage(page).ready()
-    await new FinanceTrackerPage(page).open('settings')
+    await new AuthenticationPage(page).openSecurity()
     await page
       .getByRole('button', {
         name: kind === 'selected' ? 'Cerrar esta sesión' : 'Cerrar las demás sesiones',
@@ -207,7 +207,7 @@ for (const provider of ['google', 'github']) {
       .click()
     await expect(page).toHaveURL(/\/$/)
     await new AuthenticationPage(page).ready()
-    await new FinanceTrackerPage(page).open('settings')
+    await new AuthenticationPage(page).openSecurity()
     await expect(
       page
         .getByRole('region', { name: 'Métodos de acceso' })
@@ -227,7 +227,7 @@ test('public registration verifies a password account before granting financial 
   const access = new AuthenticationPage(page)
   await access.goto()
   await access.signIn(administratorEmail)
-  await new FinanceTrackerPage(page).open('settings')
+  await new AuthenticationPage(page).openSecurity()
   await page.getByRole('button', { name: 'Abrir registro público' }).click()
   await expect(page.getByRole('button', { name: 'Cerrar registro público' })).toBeVisible()
   const context = await browser.newContext({ extraHTTPHeaders: authenticationHeaders(testInfo) })

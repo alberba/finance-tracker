@@ -133,4 +133,50 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     }
     outboxDb2.close()
   })
+  it('saves a year plan in one commit and syncs only the months that changed', async () => {
+    const syncStore = useSyncStore()
+    await syncStore.init(USER_ID)
+    syncStore.connection = 'offline'
+    activeStore = syncStore
+
+    const cacheDb = await openIdbCache(USER_ID)
+    await putEntity(cacheDb, 'category', {
+      id: 'server-cat-2',
+      name: 'Ocio',
+      kind: 'expense',
+      version: 0,
+    })
+    cacheDb.close()
+
+    const financialState = useFinancialStateStore()
+    financialState.commitState((draft) => {
+      draft.expenseCategories = ['Ocio']
+      draft.budget.expense = { Ocio: Array.from({ length: 12 }, () => 100) }
+    })
+    const commit = vi.spyOn(financialState, 'commitState')
+
+    const plan = Array.from({ length: 12 }, () => 100)
+    plan[3] = 150
+    plan[11] = 250.555
+    useBudgetStore().saveBudgetPlan('expense', 'Ocio', plan)
+    await settle()
+
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(financialState.state.budget.expense.Ocio[3]).toBe(150)
+    expect(financialState.state.budget.expense.Ocio[11]).toBe(250.56)
+
+    // Each changed month syncs in turn, so wait until both are queued.
+    const outboxDb = await openOutbox(USER_ID)
+    const entries = await vi.waitFor(async () => {
+      const queued = await listAll(outboxDb)
+      expect(queued).toHaveLength(2)
+      return queued
+    })
+    expect(
+      entries
+        .map((entry) => (entry.command as { data?: { month: number } }).data?.month)
+        .sort((a, b) => Number(a) - Number(b)),
+    ).toEqual([4, 12])
+    outboxDb.close()
+  })
 })

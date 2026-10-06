@@ -1,20 +1,5 @@
 import { test, expect } from "./fixtures";
 
-const MONTH_NAMES = [
-  "ENERO",
-  "FEBRERO",
-  "MARZO",
-  "ABRIL",
-  "MAYO",
-  "JUNIO",
-  "JULIO",
-  "AGOSTO",
-  "SEPTIEMBRE",
-  "OCTUBRE",
-  "NOVIEMBRE",
-  "DICIEMBRE",
-] as const;
-
 test.describe("Finance tracker E2E", () => {
   test("permite crear movimiento y persiste tras recarga", { tag: "@smoke" }, async ({
     tracker,
@@ -45,11 +30,15 @@ test.describe("Finance tracker E2E", () => {
   }) => {
     await tracker.openTransactions();
     await tracker.transactionsSection
-      .getByRole("button", { name: "Nuevo" })
+      .getByRole("button", { name: "Nuevo movimiento" })
       .click();
 
-    const form = tracker.transactionsSection.locator("#tx-form");
-    await expect(form.getByLabel("Tipo")).toHaveValue("expense");
+    const form = tracker.transactionPanel;
+    await expect(
+      form
+        .getByRole("group", { name: "Tipo de movimiento" })
+        .getByRole("button", { name: "Gasto", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     const uiExpenseCategories = await form
       .getByLabel("Categoría")
@@ -166,74 +155,8 @@ test.describe("Finance tracker E2E", () => {
 
     await tracker.reload();
     await tracker.openWealth();
-    await tracker.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: "MARZO" });
+    await tracker.selectWealthMonth("MARZO");
     expect(await tracker.getAccountSnapshotValue("Revolut")).toBe(999.99);
-  });
-
-  test("patrimonio renderiza la evolución mensual hasta el mes actual YTD", async ({
-    page,
-    tracker,
-  }) => {
-    const yearDisplay = await tracker.getDisplayedYear();
-    await tracker.openWealth();
-
-    const chartDetails = await page.evaluate((yearDisplay) => {
-      const chart = document.getElementById("chart-wealth");
-      const now = new Date();
-      if (!chart) {
-        return null;
-      }
-      return {
-        points: parseInt(chart.dataset.chartPointCount || "0"),
-        currentYear: now.getFullYear(),
-        currentMonth: now.getMonth(),
-        yearDisplay,
-      };
-    }, yearDisplay);
-
-    expect(chartDetails).not.toBeNull();
-    if (!chartDetails) {
-      return;
-    }
-    const expectedPoints =
-      chartDetails.yearDisplay === chartDetails.currentYear
-        ? chartDetails.currentMonth + 1
-        : 12;
-    expect(chartDetails.points).toBe(expectedPoints);
-  });
-
-  test("patrimonio recorta la tabla de evolución al YTD actual", async ({
-    page,
-    tracker,
-  }) => {
-    const yearDisplay = await tracker.getDisplayedYear();
-    await tracker.openWealth();
-
-    const details = await page.evaluate((yearDisplay) => {
-      const chart = document.getElementById("chart-wealth");
-      const rows = Array.from(
-        document.querySelectorAll("#wealth-timeline-body tr"),
-      );
-      return {
-        chartPoints: Number(chart?.dataset.chartPointCount || 0),
-        rowCount: rows.length,
-        lastLabel: rows.length
-          ? rows[rows.length - 1].querySelector("td")?.textContent?.trim() || ""
-          : "",
-        yearDisplay,
-        currentYear: new Date().getFullYear(),
-        currentMonth: new Date().getMonth(),
-      };
-    }, yearDisplay);
-
-    expect(details.rowCount).toBe(details.chartPoints);
-    const expectedLastMonth =
-      details.yearDisplay === details.currentYear
-        ? MONTH_NAMES[details.currentMonth]
-        : "DICIEMBRE";
-    expect(details.lastLabel).toBe(expectedLastMonth);
   });
 
   test("patrimonio permite calcular snapshot de inversión por fila y persistirlo", async ({
@@ -249,21 +172,15 @@ test.describe("Finance tracker E2E", () => {
     await tracker.saveSnapshot();
     await tracker.reload();
     await tracker.openWealth();
-    await tracker.wealthSection
-      .getByLabel("Mes snapshot")
-      .selectOption({ label: "MARZO" });
+    await tracker.selectWealthMonth("MARZO");
     expect(await tracker.getInvestmentSnapshotValue("Fondos Indexados")).toBe(
       200,
     );
   });
 
-  test("movimientos soporta filtrado, orden por columnas y edición inline", async ({
+  test("movimientos soporta búsqueda, orden y edición en el panel lateral", async ({
     tracker,
   }) => {
-    test.skip(
-      test.info().project.name === "mobile-chrome",
-      "La edición inline y recargas consecutivas no son estables dentro del timeout en emulación táctil.",
-    );
     await tracker.addCustomTransaction({
       date: "2026-02-03",
       monthLabel: "FEBRERO",
@@ -283,10 +200,11 @@ test.describe("Finance tracker E2E", () => {
 
     await tracker.filterTransactionsMonth("FEBRERO");
     await tracker.setTransactionDescriptionFilter("e2e-sort");
-    expect(await tracker.firstTransactionDateText()).toBe("2026-02-20");
+    await expect(tracker.transactionRows).toHaveCount(2);
+    expect(await tracker.firstTransactionDescription()).toBe("e2e-sort-new");
 
     await tracker.clickSortByDate();
-    expect(await tracker.firstTransactionDateText()).toBe("2026-02-03");
+    expect(await tracker.firstTransactionDescription()).toBe("e2e-sort-old");
 
     await tracker.editTransactionByDescription("e2e-sort-old", {
       amount: 303,
@@ -294,6 +212,9 @@ test.describe("Finance tracker E2E", () => {
       category: "Nómina",
     });
     await tracker.expectTransactionDescriptionVisible("e2e-sort-old-edited");
+    await expect(
+      tracker.transactionRow("e2e-sort-old-edited").locator("[data-tx-amount]"),
+    ).toHaveText("+303,00 €");
 
     await tracker.reload();
     await tracker.filterTransactionsMonth("FEBRERO");
@@ -302,94 +223,80 @@ test.describe("Finance tracker E2E", () => {
     await tracker.clearTransactionFilters();
   });
 
-  test("movimientos muestra columnas en orden: fecha, descripción, importe, cuenta, tipo, categoría", async ({
+  test("movimientos agrupa por mes con su recuento y su neto", async ({
+    tracker,
+  }) => {
+    await tracker.filterTransactionsMonth("FEBRERO");
+    await tracker.revealOlderTransactions();
+
+    const february = tracker.transactionsSection.locator("[data-ledger-group]", {
+      hasText: "Febrero 2026",
+    });
+    await expect(february).toBeVisible();
+    // February in `src/data/seed.json`: 2085 in, 404.77 out, 200 invested.
+    await expect(february).toContainText("neto +1.480,23 €");
+    const count = await tracker.getTransactionRowCount();
+    await expect(february).toContainText(`${count} movimientos`);
+  });
+
+  test("movimientos muestra columnas en orden: fecha, descripción, cuenta, tipo, importe", async ({
     page,
     tracker,
   }) => {
     await page.goto("/movimientos");
     await expect(page).toHaveURL(/\/movimientos$/);
 
-    // Two things were wrong here. `allInnerTexts()` is a one-shot read with no
-    // auto-waiting, so it could run before the lazily mounted section rendered
-    // its table and leave every index `undefined`; and `thead th` scoped to the
-    // whole section also picks up the five header cells of the summary side
-    // panel's own tables. Scope to the movements table and assert through
-    // locators, which retry.
     const headerCells = tracker.transactionsSection.locator(
-      "table:has(#tx-table-body) thead th",
+      "[data-tx-ledger] thead th",
     );
-    await expect(headerCells).toHaveCount(8);
+    await expect(headerCells).toHaveCount(7);
 
     await expect(headerCells.nth(1)).toContainText("Fecha");
     await expect(headerCells.nth(2)).toContainText("Descripción");
-    await expect(headerCells.nth(3)).toContainText("Importe");
-    await expect(headerCells.nth(4)).toContainText("Cuenta");
-    await expect(headerCells.nth(5)).toContainText("Tipo");
-    await expect(headerCells.nth(6)).toContainText("Categoría");
-    await expect(headerCells.nth(7)).toHaveText(/^\s*acciones\s*$/i);
+    await expect(headerCells.nth(3)).toContainText("Cuenta");
+    await expect(headerCells.nth(4)).toContainText("Tipo");
+    await expect(headerCells.nth(5)).toContainText("Importe");
+    await expect(headerCells.nth(6)).toHaveText(/^\s*acciones\s*$/i);
   });
 
-  test("movimientos inicia con popovers de filtros ocultos en header", async ({
+  test("movimientos guarda los filtros de importe y fecha tras un botón", async ({
     page,
     tracker,
   }) => {
     await page.goto("/movimientos");
-    await expect(page).toHaveURL(/\/movimientos$/);
     await expect(
-      tracker.transactionsSection.getByRole("heading", {
-        name: "Movimientos mensuales",
-      }),
+      tracker.transactionsSection.getByRole("heading", { name: "Movimientos", exact: true }),
     ).toBeVisible();
-    await expect(
-      tracker.transactionsSection.getByRole("heading", {
-        name: "Orden y filtros de tabla",
-      }),
-    ).toHaveCount(0);
 
-    const popovers = tracker.transactionsSection.locator(".tx-filter-popover");
-    await expect(popovers).toHaveCount(6);
-    for (let index = 0; index < 6; index += 1) {
-      await expect(popovers.nth(index)).toBeHidden();
-    }
+    const toggle = tracker.transactionsSection.getByRole("button", {
+      name: "Importe y fecha",
+    });
+    const extra = tracker.transactionsSection.locator("#tx-extra-filters");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(extra).toBeHidden();
 
-    const dateFilterTrigger = tracker.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="date"]',
-    );
-    await dateFilterTrigger.click();
-    await expect(
-      tracker.transactionsSection.locator(
-        '.tx-filter-popover[data-column="date"]',
-      ),
-    ).toBeVisible();
-    await expect(
-      tracker.transactionsSection.locator(
-        '.tx-filter-popover[data-column="account"]',
-      ),
-    ).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(extra.getByLabel("Importe mín.")).toBeVisible();
+    await expect(extra.getByLabel("Fecha exacta")).toBeVisible();
   });
 
-  test("movimientos muestra resumen lateral con totales y desglose por categorías", async ({
+  test("movimientos muestra el neto del mes y su desglose por categoría", async ({
     page,
     tracker,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile-chrome",
-      "En móvil el lateral baja debajo de la tabla.",
-    );
+  }) => {
     await page.goto("/movimientos");
     await expect(page).toHaveURL(/\/movimientos$/);
     await tracker.filterTransactionsMonth("FEBRERO");
 
-    await expect(tracker.transactionsSummarySection).toBeVisible();
     await expect(
-      tracker.transactionsSection.locator(".tx-summary-title", {
-        hasText: "TOTAL",
-      }),
+      tracker.transactionsSection.getByRole("heading", { name: "Neto de febrero 2026" }),
     ).toBeVisible();
+    await expect(tracker.transactionsSection.locator("#tx-month-net")).toHaveText(
+      "+1.480,23 €",
+    );
     await expect(
-      tracker.transactionsSection.locator(".tx-summary-title", {
-        hasText: "DESGLOSE POR CATEGORÍAS",
-      }),
+      tracker.transactionsBreakdown.getByRole("heading", { name: "Febrero por categoría" }),
     ).toBeVisible();
 
     // Figures below track February in `src/data/seed.json`: income is
@@ -421,39 +328,30 @@ test.describe("Finance tracker E2E", () => {
       ),
     ).toBeCloseTo(200, 2);
 
-    const assertSummarySortedDescByAmount = async (
+    const assertSortedDescByAmount = async (
       type: "income" | "expense" | "investment",
     ) => {
-      const amountTexts = await tracker.transactionsSection
-        .locator(
-          `#tx-category-breakdown-body tr[data-summary-type="${type}"] .tx-summary-item > strong`,
-        )
+      await tracker.showTransactionBreakdown(type);
+      const amountTexts = await tracker.transactionsBreakdown
+        .locator(`li[data-summary-type="${type}"] [data-summary-amount]`)
         .allInnerTexts();
       const amounts = amountTexts.map((text) =>
         Number.parseFloat(
           text
+            .replace(/\u2212/g, "-")
             .replace(/[^\d,-]/g, "")
             .replace(/\./g, "")
             .replace(",", "."),
         ),
       );
-      const sortedAmounts = [...amounts].sort((a, b) => b - a);
-      expect(amounts).toEqual(sortedAmounts);
+      expect(amounts.length).toBeGreaterThan(0);
+      expect(amounts).toEqual([...amounts].sort((a, b) => b - a));
     };
 
-    await assertSummarySortedDescByAmount("income");
-    await assertSummarySortedDescByAmount("expense");
-    await assertSummarySortedDescByAmount("investment");
-
-    await expect(
-      tracker.transactionsSection.locator("#tx-category-breakdown-body"),
-    ).toContainText("💼 Nómina");
-    await expect(
-      tracker.transactionsSection.locator("#tx-category-breakdown-body"),
-    ).toContainText("✈️ Viajes");
-    await expect(
-      tracker.transactionsSection.locator("#tx-category-breakdown-body"),
-    ).toContainText("₿ Crypto");
+    await assertSortedDescByAmount("income");
+    await expect(tracker.transactionsBreakdown).toContainText("💼 Nómina");
+    await assertSortedDescByAmount("expense");
+    await assertSortedDescByAmount("investment");
   });
 
   // Quarantine: raw navigation does not wait for finance-ready before interacting.
@@ -464,6 +362,7 @@ test.describe("Finance tracker E2E", () => {
   }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible();
     await tracker.openTransactions();
     await expect(
       tracker.transactionsSection.getByRole("heading", {
@@ -472,13 +371,9 @@ test.describe("Finance tracker E2E", () => {
     ).toHaveCount(0);
   });
 
-  test("movimientos permite filtros multiseleccion en popovers y cierra con un click fuera", async ({
+  test("movimientos filtra por tipo con chips y por cuenta", async ({
     tracker,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile-chrome",
-      "La selección múltiple de checkboxes en popover no es estable en emulación táctil.",
-    );
+  }) => {
     await tracker.addCustomTransaction({
       date: "2026-03-03",
       monthLabel: "MARZO",
@@ -502,75 +397,32 @@ test.describe("Finance tracker E2E", () => {
       categoryLabel: "Fondos Indexados",
       amount: 303,
       description: "e2e-multi-investment",
+      accountLabel: "MyInvestor",
     });
 
     await tracker.filterTransactionsMonth("MARZO");
     await tracker.setTransactionDescriptionFilter("e2e-multi");
+    await expect(tracker.transactionRows).toHaveCount(3);
 
-    const typeTrigger = tracker.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="type"]',
-    );
-    const typePopover = tracker.transactionsSection.locator(
-      '.tx-filter-popover[data-column="type"]',
-    );
-    await typeTrigger.click();
-    await expect(typePopover).toBeVisible();
+    await tracker.setTransactionTypeChip("Ingresos", false);
 
-    await tracker.transactionsSection
-      .locator('#tx-header-filter-type label', { hasText: 'Gasto' })
-      .click();
-    await tracker.transactionsSection
-      .locator('#tx-header-filter-type label', { hasText: 'Inversión' })
-      .click();
+    await expect(tracker.transactionRows.filter({ hasText: "e2e-multi-expense" })).toHaveCount(1);
+    await expect(tracker.transactionRows.filter({ hasText: "e2e-multi-investment" })).toHaveCount(1);
+    await expect(tracker.transactionRows.filter({ hasText: "e2e-multi-income" })).toHaveCount(0);
 
-    await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "e2e-multi-expense",
-      }),
-    ).toHaveCount(1);
-    await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "e2e-multi-investment",
-      }),
-    ).toHaveCount(1);
-    await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "e2e-multi-income",
-      }),
-    ).toHaveCount(0);
-
-    await tracker.transactionsSection
-      .getByRole("heading", { name: "Movimientos mensuales" })
-      .click();
-    await expect(typePopover).toBeHidden();
-
-    const accountTrigger = tracker.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="account"]',
-    );
-    await accountTrigger.click();
-    const accountChecks = tracker.transactionsSection.locator(
-      '#tx-header-filter-account input[type="checkbox"]',
-    );
-    if ((await accountChecks.count()) >= 2) {
-      await accountChecks.nth(0).click({ force: true });
-      await accountChecks.nth(1).click({ force: true });
-      await expect(
-        tracker.transactionsSection.locator(
-          '#tx-header-filter-account input[type="checkbox"]:checked',
-        ),
-      ).toHaveCount(2);
-    }
+    await tracker.setTransactionTypeChip("Ingresos", true);
+    await tracker.registryToolbar
+      .getByLabel("Cuenta", { exact: true })
+      .selectOption({ label: "MyInvestor" });
+    await expect(tracker.transactionRows).toHaveCount(1);
+    await expect(tracker.transactionRows.first()).toContainText("e2e-multi-investment");
 
     await tracker.clearTransactionFilters();
   });
 
-  test("movimientos soporta modal con 'Otro' y acciones masivas", async ({
+  test("movimientos soporta 'Guardar y añadir otro' y acciones masivas en la barra", async ({
     tracker,
   }) => {
-    test.skip(
-      test.info().project.name === "mobile-chrome",
-      "El flujo completo de modal persistente y acciones masivas excede el timeout en emulación táctil.",
-    );
     await tracker.addCustomTransactionKeepOpen({
       date: "2026-03-11",
       monthLabel: "MARZO",
@@ -593,110 +445,117 @@ test.describe("Finance tracker E2E", () => {
 
     await tracker.filterTransactionsMonth("MARZO");
     await tracker.setTransactionDescriptionFilter("e2e-bulk");
+    await expect(tracker.bulkActionBar).toHaveCount(0);
     await tracker.selectTransactionByDescription("e2e-bulk-a");
     await tracker.selectTransactionByDescription("e2e-bulk-b");
+    await expect(tracker.bulkActionBar).toContainText("2 seleccionados");
+    await expect(tracker.bulkActionBar).toContainText("−23,00 €");
     await tracker.applyBulkTransactionChanges({
       type: "investment",
       category: "Fondos Indexados",
     });
     await expect(
-      tracker.transactionsSection.locator("#tx-table-body"),
-    ).toContainText("📈 Fondos Indexados");
-    await expect(
-      tracker.transactionsSection.locator("#tx-table-body tr", {
-        hasText: "Fondos Indexados",
-      }),
+      tracker.transactionRows.filter({ hasText: "📈 Fondos Indexados" }),
     ).toHaveCount(2);
 
-    await tracker.selectTransactionByDescription("e2e-bulk-a");
-    await tracker.selectTransactionByDescription("e2e-bulk-b");
-    await tracker.deleteSelectedTransactions();
-    expect(await tracker.getTransactionRowCount()).toBe(0);
+    await tracker.deleteSelectedTransactions(2);
+    await expect(tracker.transactionRows).toHaveCount(0);
+    await expect(tracker.bulkActionBar).toHaveCount(0);
     await tracker.clearTransactionFilters();
   });
 
-  test("movimientos mantiene abierto el popover al seleccionar texto dentro y soltar fuera", async ({
-    page,
-    tracker,
-  }, testInfo) => {
-    test.skip(
-      testInfo.project.name === "mobile-chrome",
-      "La selección con arrastre y ratón no aplica de forma fiable en emulación táctil.",
-    );
-    await page.goto("/movimientos");
-    await expect(page).toHaveURL(/\/movimientos$/);
-    await expect(
-      tracker.transactionsSection.getByRole("heading", {
-        name: "Movimientos mensuales",
-      }),
-    ).toBeVisible();
-
-    const trigger = tracker.transactionsSection.locator(
-      '.tx-filter-trigger[data-column="description"]',
-    );
-    const popover = tracker.transactionsSection.locator(
-      '.tx-filter-popover[data-column="description"]',
-    );
-    const input = tracker.transactionsSection.locator(
-      "#tx-header-filter-description",
-    );
-
-    await trigger.click();
-    await expect(popover).toBeVisible();
-    await input.fill("texto seleccionable para e2e");
-
-    const box = await input.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) {
-      return;
-    }
-
-    // `TransactionsSection.vue`'s outside-pointerdown handler closes the
-    // popover based on where the drag *starts* (`popover.contains(target)`),
-    // not where it ends — a text-selection drag that begins inside the
-    // popover's input and is released outside it must NOT close the
-    // popover (this is exactly what `hasSelectionWithin` guards), mirroring
-    // the sibling "mantiene abierto modal" test's contract for the
-    // transaction-form dialog.
-    await page.mouse.move(box.x + 8, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + box.width + 120, box.y + box.height / 2);
-    await page.mouse.up();
-
-    await expect(popover).toBeVisible();
-
-    // Genuine outside-click-closes coverage lives in "movimientos permite
-    // filtros multiseleccion en popovers y cierra con un click fuera" below
-    // — deliberately not re-asserted here. `hasSelectionWithin` is read on
-    // the *first* pointerdown of whatever's clicked next, before the browser
-    // has blurred the still-selected input from this drag, so it stays
-    // open through that single next click too; that's an inherent one-click
-    // lag in this same-tick edge case, not something this test should pin.
-  });
-
-  test("movimientos mantiene abierto modal al seleccionar texto y soltar fuera", async ({
+  test("eliminar un movimiento pide confirmación y Cancelar lo conserva", async ({
     page,
     tracker,
   }) => {
-    await page.goto("/movimientos");
-    await expect(page).toHaveURL(/\/movimientos$/);
-    await expect(
-      tracker.transactionsSection.getByRole("heading", {
-        name: "Movimientos mensuales",
-      }),
-    ).toBeVisible();
-
-    const openModalButton = tracker.transactionsSection.getByRole("button", {
-      name: "Nuevo",
+    await tracker.addCustomTransaction({
+      date: "2026-03-13",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 13,
+      description: "e2e-borrar",
     });
-    const dialog = tracker.transactionsSection.locator("#tx-dialog");
-    const descriptionInput = tracker.transactionsSection.locator(
-      '#tx-form input[name="description"]',
-    );
+    await tracker.filterTransactionsMonth("MARZO");
+    await tracker.setTransactionDescriptionFilter("e2e-borrar");
+    const row = tracker.transactionRow("e2e-borrar");
+    const remove = row.getByRole("button", { name: "Eliminar e2e-borrar del 13 mar" });
+    const dialog = page.getByRole("alertdialog", { name: "¿Eliminar este movimiento?" });
 
-    await openModalButton.click();
+    await remove.click();
     await expect(dialog).toBeVisible();
-    await descriptionInput.fill("seleccion en modal para e2e");
+    await expect(dialog).toContainText("e2e-borrar del 13 mar");
+    await dialog.getByRole("button", { name: "Cancelar" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(row).toBeVisible();
+
+    await remove.click();
+    await dialog.getByRole("button", { name: "Eliminar movimiento" }).click();
+    await expect(page.getByRole("status")).toContainText("Movimiento eliminado.");
+    await expect(tracker.transactionRows).toHaveCount(0);
+    await tracker.clearTransactionFilters();
+  });
+
+  test("el aviso se ve por encima del panel lateral abierto", async ({ page, tracker }) => {
+    await tracker.addCustomTransactionKeepOpen({
+      date: "2026-03-14",
+      monthLabel: "MARZO",
+      type: "expense",
+      categoryLabel: "Comida",
+      amount: 14,
+      description: "e2e-aviso",
+    });
+
+    // The panel is a modal dialog in the top layer: the toast, a manual
+    // popover shown after it, renders above it.
+    await expect(tracker.transactionPanel).toBeVisible();
+    const toast = page.locator("#toast");
+    await expect(toast).toBeVisible();
+    expect(await toast.evaluate((element) => element.matches(":popover-open"))).toBe(true);
+    // Still in its corner, not centred like a bare popover.
+    const box = await toast.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport).toBeTruthy();
+    expect(box!.x).toBeGreaterThan(viewport!.width / 2);
+    expect(box!.y).toBeGreaterThan(viewport!.height / 2);
+    await expect(
+      tracker.transactionPanel.getByRole("button", { name: "Guardar y añadir otro" }),
+    ).toBeFocused();
+  });
+
+  test("movimientos cierra el panel lateral con Escape y con Cancelar", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openTransactions();
+    const open = tracker.transactionsSection.getByRole("button", {
+      name: "Nuevo movimiento",
+    });
+    const panel = page.getByRole("dialog", { name: "Nuevo movimiento" });
+
+    await open.click();
+    await expect(panel).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(open).toBeFocused();
+
+    await open.click();
+    await panel.getByRole("button", { name: "Cancelar" }).click();
+    await expect(panel).toBeHidden();
+  });
+
+  test("movimientos mantiene abierto el panel al seleccionar texto y soltar fuera", async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openTransactions();
+    await tracker.transactionsSection
+      .getByRole("button", { name: "Nuevo movimiento" })
+      .click();
+    const panel = tracker.transactionPanel;
+    const descriptionInput = panel.getByLabel("Descripción");
+    await expect(panel).toBeVisible();
+    await descriptionInput.fill("seleccion en panel para e2e");
 
     const box = await descriptionInput.boundingBox();
     expect(box).not.toBeNull();
@@ -706,10 +565,10 @@ test.describe("Finance tracker E2E", () => {
 
     await page.mouse.move(box.x + 8, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width + 160, box.y + box.height / 2);
+    await page.mouse.move(box.x - 160, box.y + box.height / 2);
     await page.mouse.up();
 
-    const isOpen = await dialog.evaluate(
+    const isOpen = await panel.evaluate(
       (element) => (element as HTMLDialogElement).open,
     );
     expect(isOpen).toBe(true);

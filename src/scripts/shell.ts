@@ -1,6 +1,7 @@
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { isSyncV2Enabled } from '../lib/client/feature-flags'
+import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
@@ -8,19 +9,10 @@ import { authentication, requireAuthenticationResult } from '../lib/client/authe
 import { describeCheckAge } from '../lib/client/sync-connection'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
-const THEME_KEY = 'theme'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-function readStorageValue(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
 }
 
 function writeStorageValue(key: string, value: string): void {
@@ -31,41 +23,32 @@ function writeStorageValue(key: string, value: string): void {
   }
 }
 
-function applySidebarState(collapsed: boolean, body: HTMLElement, toggleButton: HTMLElement): void {
-  body.classList.toggle('is-sidebar-collapsed', collapsed)
+function applySidebarState(collapsed: boolean, toggleButton: HTMLElement): void {
+  document.documentElement.dataset.sidebar = collapsed ? 'collapsed' : 'expanded'
   toggleButton.setAttribute(
     'aria-label',
     collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral',
   )
   toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
   toggleButton
-    .querySelector('.sidebar-toggle-label')
+    .querySelector('[data-sidebar-toggle-label]')
     ?.replaceChildren(collapsed ? 'Expandir' : 'Colapsar')
 }
 
 function initSidebarToggle(): void {
-  const body = document.body
   const toggleButton = document.getElementById('sidebar-toggle')
-  if (!body || !toggleButton) {
+  if (!toggleButton) {
     return
   }
 
-  const collapsed = readStorageValue(SIDEBAR_COLLAPSED_KEY) === 'true'
-  applySidebarState(collapsed, body, toggleButton)
+  // The pre-paint script already set data-sidebar; this syncs the button.
+  applySidebarState(document.documentElement.dataset.sidebar === 'collapsed', toggleButton)
 
   toggleButton.addEventListener('click', () => {
-    const nextCollapsed = !body.classList.contains('is-sidebar-collapsed')
-    applySidebarState(nextCollapsed, body, toggleButton)
+    const nextCollapsed = document.documentElement.dataset.sidebar !== 'collapsed'
+    applySidebarState(nextCollapsed, toggleButton)
     writeStorageValue(SIDEBAR_COLLAPSED_KEY, nextCollapsed ? 'true' : 'false')
   })
-}
-
-function syncThemeToggleLabel(button: HTMLElement): void {
-  const isDark = document.documentElement.dataset.theme === 'dark'
-  button.setAttribute('aria-label', isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro')
-  button
-    .querySelector('.theme-toggle-label')
-    ?.replaceChildren(isDark ? 'Modo claro' : 'Modo oscuro')
 }
 
 function repaintThemeAwareCharts(): void {
@@ -77,27 +60,9 @@ function repaintThemeAwareCharts(): void {
   }
 }
 
-function syncAllThemeToggleLabels(): void {
-  document.querySelectorAll<HTMLElement>('[data-theme-toggle]').forEach(syncThemeToggleLabel)
-}
-
-function initThemeToggles(): void {
-  const buttons = document.querySelectorAll<HTMLElement>('[data-theme-toggle]')
-  if (buttons.length === 0) {
-    return
-  }
-
-  syncAllThemeToggleLabels()
-  buttons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const isDark = document.documentElement.dataset.theme === 'dark'
-      const nextTheme = isDark ? 'light' : 'dark'
-      document.documentElement.dataset.theme = nextTheme
-      writeStorageValue(THEME_KEY, nextTheme)
-      syncAllThemeToggleLabels()
-      repaintThemeAwareCharts()
-    })
-  })
+/** Starts the theme controller (so "Sistema" tracks the OS) and repaints charts on change. */
+function initTheme(): void {
+  getThemeController().subscribe(repaintThemeAwareCharts)
 }
 
 function initMobileMoreMenu(): void {
@@ -198,12 +163,11 @@ function setUserMenuOpen(menu: HTMLElement, trigger: HTMLElement, open: boolean)
 
 function syncDemoModeAction(action: HTMLElement): void {
   const active = isDemoMode()
-  action.dataset.active = active ? 'true' : 'false'
   action
-    .querySelector('.demo-mode-action-label')
+    .querySelector('[data-demo-mode-label]')
     ?.replaceChildren(active ? 'Salir del modo demo' : 'Activar modo demo')
   action
-    .querySelector('.demo-mode-action-description')
+    .querySelector('[data-demo-mode-description]')
     ?.replaceChildren(active ? 'Volver a tus datos privados' : 'Usar únicamente datos ficticios')
 }
 
@@ -341,7 +305,7 @@ function initSyncMenu(): void {
 
 function initShellInteractions(): void {
   initSidebarToggle()
-  initThemeToggles()
+  initTheme()
   initMobileMoreMenu()
   initReportDialogActions()
   initPwaInstall()

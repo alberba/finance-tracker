@@ -16,10 +16,6 @@ export function slug(value: unknown): string {
   );
 }
 
-export function formatPercent(value: unknown): string {
-  return `${Number(value || 0).toFixed(2)}%`;
-}
-
 export function parseIntSafe(value: unknown, fallback: number): number {
   const n = parseInt(String(value ?? ""), 10);
   return Number.isFinite(n) ? n : fallback;

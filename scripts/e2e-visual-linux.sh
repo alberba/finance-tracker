@@ -7,6 +7,7 @@
 # Extra args go to Playwright: pnpm test:e2e:visual:linux --update-snapshots
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+pnpm install --frozen-lockfile
 
 docker info >/dev/null 2>&1 || {
   echo "e2e-visual-linux: Docker no responde; arranca Docker Desktop y repite" >&2

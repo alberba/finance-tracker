@@ -23,40 +23,51 @@ test.describe('contribution defaults from wealth', () => {
 
   test('prefills calculated balances and combines them with saved zero balances', async ({
     tracker,
-    page,
   }) => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot inversión Fund', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('investments', 'Fund')
+        .locator('input[data-contribution-snapshot-kind="investments"]'),
     ).toHaveValue('1000')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot liquidez MyInvestor', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
+        .locator('input[data-contribution-snapshot-kind="accounts"]'),
     ).toHaveValue('1200')
 
     await tracker.contributionWorkflowSelectMonth('FEBRERO')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot inversión Fund', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('investments', 'Fund')
+        .locator('input[data-contribution-snapshot-kind="investments"]'),
     ).toHaveValue('0')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot liquidez MyInvestor', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
+        .locator('input[data-contribution-snapshot-kind="accounts"]'),
     ).toHaveValue('1200')
   })
 
-  test('keeps edited snapshot fields across month and date changes', async ({ tracker, page }) => {
+  test('keeps edited snapshot fields across month and date changes', async ({ tracker }) => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetInvestmentSnapshot('Fund', 1100)
     await tracker.contributionWorkflowSetLiquiditySnapshot('MyInvestor', 1400)
     await tracker.contributionWorkflowSelectMonth('FEBRERO')
     await tracker.contributionWorkflowSetDate('2026-03-15')
-    await page.getByLabel('Fecha del aporte').press('Tab')
+    await tracker.contributionWorkflow().locator('#contribution-workflow-date').press('Tab')
 
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot inversión Fund', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('investments', 'Fund')
+        .locator('input[data-contribution-snapshot-kind="investments"]'),
     ).toHaveValue('1100')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot liquidez MyInvestor', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
+        .locator('input[data-contribution-snapshot-kind="accounts"]'),
     ).toHaveValue('1400')
   })
 
@@ -67,14 +78,14 @@ test.describe('contribution defaults from wealth', () => {
     await tracker.contributionWorkflowSetTotal(125)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 125)
     await tracker.contributionWorkflowSetDate('2026-03-15')
-    await page.getByLabel('Fecha del aporte').press('Tab')
+    await tracker.contributionWorkflow().locator('#contribution-workflow-date').press('Tab')
     await tracker.contributionWorkflowSelectMonth('ABRIL')
 
     await expect(page.getByRole('spinbutton', { name: 'Importe total del aporte' })).toHaveValue(
       '125',
     )
     await expect(
-      page.getByRole('spinbutton', { name: 'Asignación aporte MyInvestor' }),
+      page.getByRole('spinbutton', { name: 'Importe del aporte para MyInvestor' }),
     ).toHaveValue('125')
   })
 
@@ -92,8 +103,15 @@ test.describe('contribution defaults from wealth', () => {
     await tracker.contributionWorkflowGoToAllocationStep()
     await tracker.contributionWorkflowSetTotal(125)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 125)
-    await page.getByRole('button', { name: 'Anterior', exact: true }).click()
-    await page.getByRole('button', { name: 'Cerrar recorrido' }).click()
+    await tracker
+      .contributionWorkflow()
+      .getByRole('button', { name: 'Anterior', exact: true })
+      .click()
+    await tracker
+      .contributionWorkflow()
+      .getByRole('button', { name: 'Cancelar', exact: true })
+      .click()
+    await expect(tracker.contributionWorkflow()).toBeHidden()
 
     expect(
       await page.evaluate(() => {
@@ -123,19 +141,17 @@ test.describe('contribution defaults from wealth', () => {
     await persisted
     await tracker.reload()
     await tracker.openWealth()
-    await tracker.wealthSection.getByLabel('Mes snapshot').selectOption({ label: 'ENERO' })
-    await expect(
-      tracker.wealthSection.getByRole('spinbutton', { name: 'Snapshot de MyInvestor' }),
-    ).toHaveValue('1300')
-    await expect(
-      tracker.wealthSection.getByRole('spinbutton', { name: 'Snapshot de Fund' }),
-    ).toHaveValue('1000')
+    await tracker.selectWealthMonth('ENERO')
+    await expect(tracker.wealthSnapshotInput('MyInvestor')).toHaveValue('1300')
+    await expect(tracker.wealthSnapshotInput('Fund')).toHaveValue('1000')
 
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetDate('2026-01-15')
     await expect(
-      page.getByRole('spinbutton', { name: 'Snapshot liquidez MyInvestor', exact: true }),
+      tracker
+        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
+        .locator('input[data-contribution-snapshot-kind="accounts"]'),
     ).toHaveValue('1300')
   })
 })

@@ -25,7 +25,7 @@ ensure_var() {
 ensure_var TEST_AUTH_ENABLED true
 ensure_var LEGACY_OWNER_EMAIL legacy-owner@e2e.test
 
-[[ -d node_modules ]] || pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 
 pnpm d1:migrate:local >/dev/null
 pnpm d1:migrate:local:v2 >/dev/null

@@ -13,11 +13,13 @@ import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
 import { buildPortfolioValuation, type PortfolioValuation } from '../domain/investment/valuation'
-import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
+import { isUnlinkedMovementForInstrument } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
 import type { InstrumentType } from '../scripts/types'
 import { slug, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+
+const CLOCK_INTERVAL_MS = 60_000
 
 export interface NewInstrumentInput {
   investmentAssetId: string
@@ -32,7 +34,12 @@ export const useMarketStore = defineStore('market', () => {
   const financialStateStore = useFinancialStateStore()
   const instruments = computed(() => financialStateStore.state.instruments)
   const quotes = computed(() => financialStateStore.state.quotes)
-  const valuation = computed<PortfolioValuation>(() => buildPortfolioValuation(financialStateStore.state))
+  // Quotes age with time, not only with state changes: `tickClock` moves this
+  // forward so a fresh quote turns stale without waiting for a new commit.
+  const now = shallowRef(new Date())
+  const valuation = computed<PortfolioValuation>(() =>
+    buildPortfolioValuation(financialStateStore.state, { now: now.value }),
+  )
   const isLoading = shallowRef(false)
   const errorMessage = shallowRef<string | null>(null)
   const lastRefreshAt = shallowRef<string | null>(null)
@@ -42,7 +49,12 @@ export const useMarketStore = defineStore('market', () => {
     const symbol = input.symbol.trim().toUpperCase()
     const assetId = input.investmentAssetId.trim()
     if (!symbol || !assetId) return false
-    if (instruments.value.some((instrument) => instrument.symbol === symbol && instrument.market === input.market.trim().toUpperCase())) {
+    if (
+      instruments.value.some(
+        (instrument) =>
+          instrument.symbol === symbol && instrument.market === input.market.trim().toUpperCase(),
+      )
+    ) {
       return false
     }
     financialStateStore.commitState((draft) => {
@@ -110,14 +122,15 @@ export const useMarketStore = defineStore('market', () => {
     const assetName = financialStateStore.investmentAssets.find(
       (asset) => asset.id === instrument.investmentAssetId,
     )?.name
-    return financialStateStore.transactions.filter(
-      (transaction) => isUnlinkedMovementForInstrument(transaction, instrument, assetName),
+    return financialStateStore.transactions.filter((transaction) =>
+      isUnlinkedMovementForInstrument(transaction, instrument, assetName),
     ).length
   }
 
   function linkedMovementCount(instrumentId: string): number {
     return financialStateStore.transactions.filter(
-      (transaction) => transaction.type === 'investment' && transaction.instrumentId === instrumentId,
+      (transaction) =>
+        transaction.type === 'investment' && transaction.instrumentId === instrumentId,
     ).length
   }
 
@@ -149,9 +162,31 @@ export const useMarketStore = defineStore('market', () => {
     return linkedCount
   }
 
+  function tickClock(): void {
+    now.value = new Date()
+  }
+
+  // One shared clock however many views keep quotes live: the first starts
+  // it, the last to stop clears it.
+  let clockUsers = 0
+  let clock: ReturnType<typeof setInterval> | undefined
+
+  function startClock(): () => void {
+    clockUsers += 1
+    if (clockUsers === 1) clock = setInterval(tickClock, CLOCK_INTERVAL_MS)
+    let stopped = false
+    return () => {
+      if (stopped) return
+      stopped = true
+      clockUsers -= 1
+      if (clockUsers === 0) clearInterval(clock)
+    }
+  }
+
   async function refreshQuotes(force = false): Promise<boolean> {
     if (refreshPromise) return refreshPromise
-    if (!force && lastRefreshAt.value && Date.now() - Date.parse(lastRefreshAt.value) < 60_000) return true
+    if (!force && lastRefreshAt.value && Date.now() - Date.parse(lastRefreshAt.value) < 60_000)
+      return true
     refreshPromise = executeRefresh()
     try {
       return await refreshPromise
@@ -172,9 +207,11 @@ export const useMarketStore = defineStore('market', () => {
         })
       }
       lastRefreshAt.value = new Date().toISOString()
+      tickClock()
       return true
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
+      errorMessage.value =
+        error instanceof Error ? error.message : 'No se pudieron cargar las cotizaciones'
       return false
     } finally {
       isLoading.value = false
@@ -197,22 +234,12 @@ export const useMarketStore = defineStore('market', () => {
     linkedMovementCount,
     linkExistingMovements,
     refreshQuotes,
+    tickClock,
+    startClock,
   }
 })
 
 function normalizeUnits(value: string | number): number {
   const parsed = Number(value)
-  return Number.isFinite(parsed) && parsed >= 0
-    ? Math.round(parsed * 100_000_000) / 100_000_000
-    : 0
-}
-
-function isUnlinkedMovementForInstrument(
-  transaction: { type: string; symbol?: string; category: string; instrumentId?: string },
-  instrument: Parameters<typeof symbolsMatchInstrument>[1],
-  assetName?: string,
-): boolean {
-  if (transaction.type !== 'investment' || transaction.instrumentId) return false
-  if (symbolsMatchInstrument(transaction.symbol, instrument)) return true
-  return !transaction.symbol && Boolean(assetName && transaction.category === assetName)
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100_000_000) / 100_000_000 : 0
 }

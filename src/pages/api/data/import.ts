@@ -13,6 +13,10 @@
  * the same payload (or itself failed to import) are skipped and reported
  * under `skipped`, rather than failing the whole import.
  *
+ * With `?mode=replace` the user's current rows are wiped first, in the same
+ * transaction, so restoring a backup leaves exactly the backup — not the
+ * backup appended to what was there. Without it the rows are added.
+ *
  * `integration_credentials` is never accepted here — the export never
  * includes it, and this route does not touch that repository.
  */
@@ -33,7 +37,11 @@ import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/s
 import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
+import * as syncRepository from "../../../db/repositories/sync";
 import { runInTransaction } from "../../../db/repositories/shared";
+import type { MovementOperationInput } from "../../../db/repositories/transactions";
+import type { RemoteOperation } from "../../../lib/bitvavo-types";
+import { wipeUserData } from "../../../lib/server/wipe-user-data";
 
 type Row = Record<string, unknown>;
 
@@ -61,7 +69,7 @@ interface ImportSummary {
   skipped: Record<string, number>;
 }
 
-export const POST: APIRoute = async ({ request, locals }) =>
+export const POST: APIRoute = async ({ request, locals, url }) =>
   withApiErrorHandling("/api/data/import", async () => {
     const principal = requirePrincipal(locals);
 
@@ -78,6 +86,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
 
     const db = getDb(locals);
     const userId = principal.userId;
+    const replace = url?.searchParams.get("mode") === "replace";
 
     const imported: Record<string, number> = {};
     const skipped: Record<string, number> = {};
@@ -86,6 +95,9 @@ export const POST: APIRoute = async ({ request, locals }) =>
     };
 
     const summary: ImportSummary = await runInTransaction(db, async (tx) => {
+      if (replace) {
+        await wipeUserData(tx, userId);
+      }
       const categoryIdMap = new Map<string, string>();
       const accountIdMap = new Map<string, string>();
       const recurringRuleIdMap = new Map<string, string>();
@@ -99,6 +111,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
           name: String(row.name ?? ""),
           kind: String(row.kind ?? ""),
           sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : 0,
+          emoji: optionalString(row.emoji),
         });
         if (typeof row.id === "string") {
           categoryIdMap.set(row.id, created.id);
@@ -122,6 +135,21 @@ export const POST: APIRoute = async ({ request, locals }) =>
         bump(imported, "accounts");
       }
 
+      // -- twrLiquidityAccounts (FK: accountId required) -------------------
+      for (const row of asRows(body.twrLiquidityAccounts)) {
+        const accountId = remapId(accountIdMap, row.accountId);
+        if (!accountId) {
+          bump(skipped, "twrLiquidityAccounts");
+          continue;
+        }
+        await accountsRepository.createTwrLiquidityAccount(tx, userId, {
+          legacyId: optionalString(row.legacyId),
+          accountId,
+          name: String(row.name ?? ""),
+        });
+        bump(imported, "twrLiquidityAccounts");
+      }
+
       // -- transactions (FK: accountId, categoryId) ------------------------
       for (const row of asRows(body.transactions)) {
         const accountId = remapId(accountIdMap, row.accountId);
@@ -143,6 +171,13 @@ export const POST: APIRoute = async ({ request, locals }) =>
           description: typeof row.description === "string" ? row.description : null,
           amount: typeof row.amount === "number" ? row.amount : 0,
           currency: String(row.currency ?? "EUR"),
+          time: optionalString(row.time),
+          declared: Boolean(row.declared),
+          operation: await importOperation(tx, row.operation),
+          externalId: optionalString(row.externalId),
+          remoteOperation: isObject(row.remoteOperation)
+            ? (row.remoteOperation as unknown as RemoteOperation)
+            : null,
         });
         bump(imported, "transactions");
       }
@@ -187,7 +222,17 @@ export const POST: APIRoute = async ({ request, locals }) =>
           amount: typeof row.amount === "number" ? row.amount : 0,
           currency: String(row.currency ?? "EUR"),
           frequency: String(row.frequency ?? "monthly"),
-          nextRunDate: typeof row.nextRunDate === "string" ? row.nextRunDate : null,
+          interval: typeof row.interval === "number" ? row.interval : undefined,
+          startDate: optionalString(row.startDate),
+          endDate: optionalString(row.endDate),
+          lastExecutionDate: optionalString(row.lastExecutionDate),
+          nextRunDate: optionalString(row.nextRunDate),
+          symbol: optionalString(row.symbol),
+          side: optionalString(row.side),
+          units: optionalNumber(row.units),
+          unitPrice: optionalNumber(row.unitPrice),
+          fee: optionalNumber(row.fee),
+          time: optionalString(row.time),
           status: typeof row.status === "string" ? row.status : undefined,
         });
         if (typeof row.id === "string") {
@@ -217,6 +262,17 @@ export const POST: APIRoute = async ({ request, locals }) =>
           amount: typeof row.amount === "number" ? row.amount : 0,
           currency: String(row.currency ?? "EUR"),
           dueDate: String(row.dueDate ?? ""),
+          type: optionalString(row.type),
+          description: optionalString(row.description),
+          symbol: optionalString(row.symbol),
+          side: optionalString(row.side),
+          units: optionalNumber(row.units),
+          unitPrice: optionalNumber(row.unitPrice),
+          fee: optionalNumber(row.fee),
+          time: optionalString(row.time),
+          // The client's own movement id (`transactions.legacy_id`), which the
+          // import keeps, so it needs no remapping.
+          transactionId: optionalString(row.transactionId),
           status: typeof row.status === "string" ? row.status : undefined,
         });
         bump(imported, "pendingMovements");
@@ -374,6 +430,23 @@ export const POST: APIRoute = async ({ request, locals }) =>
         bump(imported, "stockeventsCashMappings");
       }
 
+      // -- stockeventsCashSyncEntries ------------------------------------------
+      for (const row of asRows(body.stockeventsCashSyncEntries)) {
+        const accountId = remapOptionalId(accountIdMap, row.accountId);
+        if (accountId === "__skip__" || typeof row.watchlistId !== "string" || !row.watchlistId) {
+          bump(skipped, "stockeventsCashSyncEntries");
+          continue;
+        }
+        await stockeventsCashMappingsRepository.upsertSyncEntry(tx, userId, {
+          contributionDate: String(row.contributionDate ?? ""),
+          accountId: accountId ?? null,
+          watchlistId: row.watchlistId,
+          syncedAmount: typeof row.syncedAmount === "number" ? row.syncedAmount : 0,
+          currency: String(row.currency ?? "EUR"),
+        });
+        bump(imported, "stockeventsCashSyncEntries");
+      }
+
       // -- settings (singleton) ----------------------------------------------
       if (body.settings && typeof body.settings === "object") {
         const settingsRow = body.settings as Row;
@@ -382,14 +455,8 @@ export const POST: APIRoute = async ({ request, locals }) =>
           currency: typeof settingsRow.currency === "string" ? settingsRow.currency : undefined,
           locale: typeof settingsRow.locale === "string" ? settingsRow.locale : undefined,
           theme: typeof settingsRow.theme === "string" ? settingsRow.theme : undefined,
-          stockeventsEnabled:
-            settingsRow.stockeventsEnabled === 1 || settingsRow.stockeventsEnabled === true
-              ? true
-              : undefined,
-          stockeventsTradesToCash:
-            settingsRow.stockeventsTradesToCash === 1 || settingsRow.stockeventsTradesToCash === true
-              ? true
-              : undefined,
+          stockeventsEnabled: optionalFlag(settingsRow.stockeventsEnabled),
+          stockeventsTradesToCash: optionalFlag(settingsRow.stockeventsTradesToCash),
         };
         if (existing) {
           await userSettingsRepository.update(tx, userId, patch);
@@ -397,6 +464,12 @@ export const POST: APIRoute = async ({ request, locals }) =>
           await userSettingsRepository.create(tx, userId, patch);
         }
         bump(imported, "settings");
+      } else if (replace) {
+        await userSettingsRepository.create(tx, userId, {});
+      }
+
+      if (replace) {
+        await syncRepository.ensureRevision(tx, userId);
       }
 
       return { imported, skipped };
@@ -410,4 +483,49 @@ function asRows(value: unknown): Row[] {
     return [];
   }
   return value.filter((item): item is Row => Boolean(item) && typeof item === "object");
+}
+
+function isObject(value: unknown): value is Row {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function optionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Settings flags travel as `0`/`1` from D1 or as booleans; anything else leaves the stored value. */
+function optionalFlag(value: unknown): boolean | undefined {
+  if (value === 1 || value === true) return true;
+  if (value === 0 || value === false) return false;
+  return undefined;
+}
+
+/**
+ * The exported operation of an investment movement. `instrumentId` points at
+ * the global instrument catalogue, which a restore into another deployment
+ * may not have: then the symbol alone is kept, as for an untracked ticker.
+ */
+async function importOperation(
+  tx: Parameters<typeof marketRepository.getInstrument>[0],
+  value: unknown,
+): Promise<MovementOperationInput | null> {
+  if (!isObject(value) || typeof value.side !== "string") {
+    return null;
+  }
+  const instrument =
+    typeof value.instrumentId === "string"
+      ? await marketRepository.getInstrument(tx, value.instrumentId)
+      : undefined;
+  return {
+    instrumentId: instrument?.id ?? null,
+    symbol: optionalString(value.symbol),
+    side: value.side,
+    units: optionalNumber(value.units) ?? 0,
+    unitPrice: optionalNumber(value.unitPrice) ?? 0,
+    fee: optionalNumber(value.fee) ?? 0,
+  };
 }

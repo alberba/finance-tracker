@@ -8,6 +8,8 @@ import { defineConfig } from 'eslint/config'
 import { tailwind4 } from 'tailwind-csstree'
 import tseslint from 'typescript-eslint'
 
+import { withVueStyleBlocks } from './scripts/lib/eslint-vue-style-blocks'
+
 const sharedGlobals = {
   ...globals.browser,
   ...globals.node,
@@ -59,6 +61,12 @@ export default defineConfig([
   ...astro.configs['flat/recommended'],
   ...scopedVueConfigs,
   {
+    // Lints each SFC `<style>` block with the CSS config below, on top of the
+    // Vue processor.
+    files: vueFiles,
+    processor: withVueStyleBlocks(vue.processors.vue),
+  },
+  {
     files: vueFiles,
     languageOptions: {
       globals: sharedGlobals,
@@ -80,7 +88,7 @@ export default defineConfig([
     },
     extends: ['css/recommended'],
     rules: {
-      // Design tokens (var(--primary), --line, …) live in legacy.css :root and
+      // Design tokens (var(--primary), --line, …) live in global.css :root and
       // are consumed across files; the rule can't resolve them cross-file.
       'css/no-invalid-properties': ['error', { allowUnknownVariables: true }],
     },

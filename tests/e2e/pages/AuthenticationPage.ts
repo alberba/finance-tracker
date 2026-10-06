@@ -1,3 +1,4 @@
+import { FinanceTrackerPage } from './FinanceTrackerPage'
 import { expect, type Page } from '@playwright/test'
 export class AuthenticationPage {
   constructor(readonly page: Page) {}
@@ -37,6 +38,10 @@ export class AuthenticationPage {
       `http://127.0.0.1:${port}/mail?email=${encodeURIComponent(email)}`,
     )
     return (await mail.json()).text.match(/\b\d{6}\b/)[0] as string
+  }
+  async openSecurity() {
+    await new FinanceTrackerPage(this.page).open('settings')
+    await this.page.getByRole('tab', { name: 'Preferencias', exact: true }).click()
   }
   async ready() {
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeAttached()

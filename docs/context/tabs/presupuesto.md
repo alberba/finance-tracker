@@ -46,10 +46,6 @@ Identificadores clave:
 - `src/scripts/types.ts`
 - `src/scripts/state.ts`
 
-### Estilos
-
-- `src/styles/legacy.css`
-
 ### Tests relacionados
 
 - `tests/e2e/budget.spec.ts`
@@ -162,6 +158,5 @@ Antes de tocar esta pestaña, revisar:
 2. `src/scripts/app/dashboard-budget-goals-section.ts`
 3. `src/scripts/app/calculation-helpers.ts`
 4. `src/scripts/state.ts`
-5. `src/styles/legacy.css`
-6. `tests/e2e/budget.spec.ts`
-7. `tests/e2e/pages/FinanceTrackerPage.ts`
+5. `tests/e2e/budget.spec.ts`
+6. `tests/e2e/pages/FinanceTrackerPage.ts`

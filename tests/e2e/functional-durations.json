@@ -1,0 +1,90 @@
+{
+  "budget.spec.ts": {
+    "durationMs": 24232,
+    "tests": 5
+  },
+  "contribution-defaults.spec.ts": {
+    "durationMs": 26044,
+    "tests": 5
+  },
+  "contribution-workflow.spec.ts": {
+    "durationMs": 25936,
+    "tests": 8
+  },
+  "dashboard-flows.spec.ts": {
+    "durationMs": 12146,
+    "tests": 6
+  },
+  "dashboard-section.spec.ts": {
+    "durationMs": 13686,
+    "tests": 5
+  },
+  "data.spec.ts": {
+    "durationMs": 4047,
+    "tests": 2
+  },
+  "demo-mode.spec.ts": {
+    "durationMs": 7611,
+    "tests": 2
+  },
+  "finance-tracker.spec.ts": {
+    "durationMs": 61964,
+    "tests": 18
+  },
+  "goals.spec.ts": {
+    "durationMs": 8481,
+    "tests": 3
+  },
+  "investment-charts.spec.ts": {
+    "durationMs": 19288,
+    "tests": 9
+  },
+  "investment-recurring.spec.ts": {
+    "durationMs": 9075,
+    "tests": 3
+  },
+  "investment-return-toggle.spec.ts": {
+    "durationMs": 14832,
+    "tests": 6
+  },
+  "investment-tabs.spec.ts": {
+    "durationMs": 56771,
+    "tests": 17
+  },
+  "live-market-recurring.spec.ts": {
+    "durationMs": 47287,
+    "tests": 12
+  },
+  "logout.spec.ts": {
+    "durationMs": 1738,
+    "tests": 1
+  },
+  "mobile-smoke.spec.ts": {
+    "durationMs": 21028,
+    "tests": 8
+  },
+  "reports.spec.ts": {
+    "durationMs": 15839,
+    "tests": 9
+  },
+  "settings.spec.ts": {
+    "durationMs": 20181,
+    "tests": 8
+  },
+  "sidebar-toggle.spec.ts": {
+    "durationMs": 22166,
+    "tests": 10
+  },
+  "subscriptions.spec.ts": {
+    "durationMs": 14786,
+    "tests": 5
+  },
+  "theme.spec.ts": {
+    "durationMs": 10922,
+    "tests": 4
+  },
+  "wealth.spec.ts": {
+    "durationMs": 6452,
+    "tests": 4
+  }
+}

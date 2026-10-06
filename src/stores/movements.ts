@@ -1,14 +1,18 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
+
+import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { getOrderedCategoriesForType } from '../domain/transactions/categories'
-import { resolveCategoryId, resolveEntityId, syncListDiff, type CategoryKind } from '../lib/client/command-mapping'
+import { resolveCategoryId, resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
+import { syncMovements } from '../lib/client/movement-commands'
 import {
-  buildAccountFilterOptions,
-  buildMonthBreakdown,
-  filterAndSortTransactions,
-} from '../scripts/transactions'
+  buildMonthGroups,
+  categoryBreakdown,
+  monthTotals,
+  registryYears,
+  signedAmount,
+} from '../domain/transactions/registry'
 import {
   isTransactionType,
   type BudgetType,
@@ -23,37 +27,7 @@ import { monthFromISO, parseFloatSafe, round2, todayISO, uid } from '../scripts/
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
 
-/**
- * WP7b — maps a legacy `Transaction` row to a `transaction` sync command
- * payload.
- *
- * WP10 fix: `accountId` is a *required* field in `entityCreateSchemas`
- * for `transaction`/`subscription` — the original builder passed the
- * legacy row's `accountId` straight through unresolved (the client-local
- * id, not the server-assigned account UUID `resolveEntityId('account', …)`
- * returns), so every real create command was rejected server-side. Same
- * "required FK, skip until resolved" pattern as `pendingMovement`'s
- * `recurringRuleId` in `stores/recurring.ts`. See that file's identical
- * fix note for the full story of how this went undetected.
- */
-async function buildTransactionData(tx: Transaction, currency: string) {
-  const accountId = await resolveEntityId('account', tx.accountId)
-  if (!accountId) {
-    return null
-  }
-  const categoryId = await resolveCategoryId(tx.type as CategoryKind, tx.category)
-  return {
-    accountId,
-    categoryId,
-    type: tx.type,
-    date: tx.date,
-    description: tx.description,
-    amount: tx.amount,
-    currency,
-  }
-}
-
-/** WP7b — maps a legacy `Subscription` row to a `subscription` sync command payload. See the WP10 fix note on `buildTransactionData` above for `accountId`. */
+/** Maps a subscription, skipping commands whose required account is unresolved. */
 async function buildSubscriptionData(subscription: Subscription, currency: string) {
   const accountId = await resolveEntityId('account', subscription.accountId)
   if (!accountId) {
@@ -74,12 +48,6 @@ async function buildSubscriptionData(subscription: Subscription, currency: strin
   }
 }
 
-const TYPE_FILTER_OPTIONS = [
-  { value: 'income', label: 'Ingreso' },
-  { value: 'expense', label: 'Gasto' },
-  { value: 'investment', label: 'Inversión' },
-] as const
-
 export interface NewTransactionInput {
   date: string
   month: number
@@ -92,6 +60,8 @@ export interface NewTransactionInput {
 
 export interface EditedTransactionInput {
   date: string
+  /** The month it counts in; defaults to the month of the date. */
+  month?: number
   accountId: string
   type: string
   category: string
@@ -122,6 +92,14 @@ export interface EditedSubscriptionInput {
   frequency: SubscriptionFrequency
 }
 
+function currentYear(): number {
+  return Number(todayISO().slice(0, 4))
+}
+
+function todayMonth(): number {
+  return monthFromISO(todayISO()) ?? 0
+}
+
 export const useMovementsStore = defineStore('movements', () => {
   const financialStateStore = useFinancialStateStore()
   const uiStore = useUiStore()
@@ -142,38 +120,46 @@ export const useMovementsStore = defineStore('movements', () => {
   const subscriptions = computed(() => financialStateStore.subscriptions)
   const categoryEmojis = computed(() => financialStateStore.state.categoryEmojis)
 
-  const visibleTransactions = computed(() =>
-    filterAndSortTransactions({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      filters: ui.txFilters,
-      sort: ui.txSort,
-      getAccountName,
-    }),
+  const years = computed(() => registryYears(financialStateStore.transactions, currentYear()))
+
+  /** The selected year's movements under the toolbar filters, by month. */
+  const monthGroups = computed(() =>
+    buildMonthGroups(financialStateStore.transactions, ui.txYear, ui.txFilters, ui.txSort),
   )
 
-  const breakdown = computed(() =>
-    buildMonthBreakdown({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      incomeCategories: financialStateStore.state.incomeCategories,
-      expenseCategories: financialStateStore.state.expenseCategories,
-      investmentCategories: financialStateStore.state.investmentCategories,
-    }),
+  const visibleTransactions = computed(() => monthGroups.value.flatMap((group) => group.rows))
+
+  /** Movements of the selected year, whatever the filters (the tab's count). */
+  const yearCount = computed(() =>
+    buildMonthGroups(
+      financialStateStore.transactions,
+      ui.txYear,
+      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      ui.txSort,
+    ).reduce((sum, group) => sum + group.count, 0),
   )
 
-  const accountFilterOptions = computed(() =>
-    buildAccountFilterOptions({
-      transactions: financialStateStore.transactions,
-      month: ui.txFilterMonth,
-      getAccountName,
-    }),
+  /** Totals of the month the ink band shows. */
+  const bandTotals = computed(() =>
+    monthTotals(financialStateStore.transactions, ui.txYear, ui.txFilterMonth),
   )
 
-  const typeFilterOptions = TYPE_FILTER_OPTIONS
+  /** True while the band shows the current month, so it cannot move forward. */
+  const isLatestMonth = computed(
+    () =>
+      ui.txYear > currentYear() ||
+      (ui.txYear === currentYear() && ui.txFilterMonth >= todayMonth()),
+  )
 
+  const selectedTransactions = computed(() => {
+    const selected = new Set(ui.txSelectedIds)
+    return financialStateStore.transactions.filter((item) => selected.has(item.id))
+  })
   const selectedVisibleCount = computed(
     () => visibleTransactions.value.filter((item) => ui.txSelectedIds.includes(item.id)).length,
+  )
+  const selectedSum = computed(() =>
+    round2(selectedTransactions.value.reduce((sum, item) => sum + signedAmount(item), 0)),
   )
   const allVisibleSelected = computed(
     () =>
@@ -181,14 +167,50 @@ export const useMovementsStore = defineStore('movements', () => {
       selectedVisibleCount.value === visibleTransactions.value.length,
   )
 
+  // A selection only covers rows the user can see: changing the year or a
+  // filter drops it, so a bulk delete never reaches hidden movements.
+  watch(
+    () => [ui.txYear, JSON.stringify(ui.txFilters)],
+    () => {
+      ui.txSelectedIds = []
+    },
+  )
+
+  function breakdownFor(type: TransactionType) {
+    return categoryBreakdown(financialStateStore.transactions, ui.txYear, ui.txFilterMonth, type)
+  }
+
   function orderedCategories(type: BudgetType): string[] {
     return getOrderedCategoriesForType(financialStateStore.state, type)
   }
 
   function setMonth(month: number): void {
     ui.txFilterMonth = month
+  }
+
+  /** Moves the band one month back or forward, across the turn of the year. */
+  function stepMonth(delta: -1 | 1): void {
+    const index = ui.txYear * 12 + ui.txFilterMonth + delta
+    const year = Math.floor(index / 12)
+    if (year !== ui.txYear) setYear(year)
+    ui.txFilterMonth = index - year * 12
+  }
+
+  /** Shows another year, starting at its latest month with movements. */
+  function setYear(year: number): void {
+    ui.txYear = year
     ui.txSelectedIds = []
-    ui.txEditingId = ''
+    if (year === currentYear()) {
+      ui.txFilterMonth = todayMonth()
+      return
+    }
+    const months = buildMonthGroups(
+      financialStateStore.transactions,
+      year,
+      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      ui.txSort,
+    ).map((group) => group.month)
+    ui.txFilterMonth = months[0] ?? 11
   }
 
   function toggleSort(column: TxSortColumn): void {
@@ -196,36 +218,8 @@ export const useMovementsStore = defineStore('movements', () => {
       ui.txSort.direction = ui.txSort.direction === 'asc' ? 'desc' : 'asc'
     } else {
       ui.txSort.column = column
-      ui.txSort.direction = column === 'date' || column === 'amount' ? 'desc' : 'asc'
+      ui.txSort.direction = 'desc'
     }
-  }
-
-  function toggleFilterPopover(column: TxSortColumn): void {
-    ui.txOpenHeaderFilter = ui.txOpenHeaderFilter === column ? '' : column
-  }
-
-  function closeFilterPopover(): void {
-    ui.txOpenHeaderFilter = ''
-  }
-
-  function clearFilterColumn(column: TxSortColumn): void {
-    if (column === 'date') {
-      ui.txFilters.date = ''
-    } else if (column === 'account') {
-      ui.txFilters.accountIds = []
-    } else if (column === 'type') {
-      ui.txFilters.types = []
-    } else if (column === 'category') {
-      ui.txFilters.category = ''
-    } else if (column === 'description') {
-      ui.txFilters.description = ''
-    } else if (column === 'amount') {
-      ui.txFilters.amountMin = ''
-      ui.txFilters.amountMax = ''
-    }
-    ui.txOpenHeaderFilter = ''
-    ui.txEditingId = ''
-    ui.txSelectedIds = []
   }
 
   function setSelected(id: string, selected: boolean): void {
@@ -242,13 +236,8 @@ export const useMovementsStore = defineStore('movements', () => {
     ui.txSelectedIds = selected ? visibleTransactions.value.map((item) => item.id) : []
   }
 
-  function startEdit(id: string): void {
-    ui.txEditingId = id
+  function clearSelection(): void {
     ui.txSelectedIds = []
-  }
-
-  function cancelEdit(): void {
-    ui.txEditingId = ''
   }
 
   function addTransaction(input: NewTransactionInput): boolean {
@@ -270,13 +259,12 @@ export const useMovementsStore = defineStore('movements', () => {
         amount: round2(input.amount),
       })
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     return true
   }
 
   function saveEdit(id: string, fields: EditedTransactionInput): boolean {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return false
     const date = fields.date.trim()
     const accountId = fields.accountId.trim()
     const type = fields.type.trim()
@@ -299,31 +287,27 @@ export const useMovementsStore = defineStore('movements', () => {
         return
       }
       tx.date = date
-      tx.month = monthFromISO(date) ?? tx.month
+      tx.month = fields.month ?? monthFromISO(date) ?? tx.month
       tx.accountId = accountId
       tx.type = type
       tx.category = category
       tx.description = description
       tx.amount = round2(amount)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
 
-    ui.txEditingId = ''
     ui.investmentTxEditingId = ''
     showToast('Movimiento actualizado.')
     return true
   }
 
   function deleteTransaction(id: string): void {
+    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = ui.txSelectedIds.filter((itemId) => itemId !== id)
     showToast('Movimiento eliminado.')
   }
@@ -352,7 +336,7 @@ export const useMovementsStore = defineStore('movements', () => {
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions.forEach((item) => {
-        if (!selectedIds.has(item.id)) {
+        if (item.remoteOperation || !selectedIds.has(item.id)) {
           return
         }
         updated += 1
@@ -367,9 +351,7 @@ export const useMovementsStore = defineStore('movements', () => {
         }
       })
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     showToast(`Actualizadas ${updated} filas.`)
   }
 
@@ -383,11 +365,11 @@ export const useMovementsStore = defineStore('movements', () => {
     const removed = selectedIds.size
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
-      draft.transactions = draft.transactions.filter((item) => !selectedIds.has(item.id))
+      draft.transactions = draft.transactions.filter(
+        (item) => item.remoteOperation || !selectedIds.has(item.id),
+      )
     })
-    void syncListDiff('transaction', before, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
-    )
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = []
     showToast(`Eliminadas ${removed} filas.`)
   }
@@ -403,8 +385,10 @@ export const useMovementsStore = defineStore('movements', () => {
     financialStateStore.commitState((draft) => {
       materializeDueSubscriptions(draft, todayISO())
     })
-    await syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+    await syncMovements(
+      beforeTransactions,
+      financialStateStore.transactions,
+      financialStateStore.currency,
     )
     await syncListDiff(
       'subscription',
@@ -416,7 +400,13 @@ export const useMovementsStore = defineStore('movements', () => {
 
   function addSubscription(input: NewSubscriptionInput): boolean {
     const name = input.name.trim()
-    if (!name || input.amount <= 0 || !input.accountId || !input.category || !input.firstChargeDate) {
+    if (
+      !name ||
+      input.amount <= 0 ||
+      !input.accountId ||
+      !input.category ||
+      !input.firstChargeDate
+    ) {
       showToast('Completa nombre, cuenta, categoría, fecha e importe válido.')
       return false
     }
@@ -440,13 +430,18 @@ export const useMovementsStore = defineStore('movements', () => {
       draft.subscriptions.push(subscription)
       generatedCount = materializeDueSubscriptions(draft, todayISO()).generatedCount
     })
-    void syncListDiff('subscription', beforeSubscriptions, financialStateStore.subscriptions, (subscription) =>
-      buildSubscriptionData(subscription, financialStateStore.currency),
+    void syncListDiff(
+      'subscription',
+      beforeSubscriptions,
+      financialStateStore.subscriptions,
+      (subscription) => buildSubscriptionData(subscription, financialStateStore.currency),
     )
     // `materializeDueSubscriptions` may also push already-due charges as
     // ordinary transactions in the same commit — diff those too.
-    void syncListDiff('transaction', beforeTransactions, financialStateStore.transactions, (tx) =>
-      buildTransactionData(tx, financialStateStore.currency),
+    void syncMovements(
+      beforeTransactions,
+      financialStateStore.transactions,
+      financialStateStore.currency,
     )
     showToast(
       generatedCount > 0
@@ -514,23 +509,26 @@ export const useMovementsStore = defineStore('movements', () => {
     accounts,
     subscriptions,
     categoryEmojis,
+    years,
+    monthGroups,
     visibleTransactions,
-    breakdown,
-    accountFilterOptions,
-    typeFilterOptions,
+    yearCount,
+    bandTotals,
+    isLatestMonth,
+    selectedTransactions,
     selectedVisibleCount,
+    selectedSum,
     allVisibleSelected,
+    breakdownFor,
     getAccountName,
     orderedCategories,
     setMonth,
+    stepMonth,
+    setYear,
     toggleSort,
-    toggleFilterPopover,
-    closeFilterPopover,
-    clearFilterColumn,
     setSelected,
     setAllSelected,
-    startEdit,
-    cancelEdit,
+    clearSelection,
     addTransaction,
     saveEdit,
     deleteTransaction,

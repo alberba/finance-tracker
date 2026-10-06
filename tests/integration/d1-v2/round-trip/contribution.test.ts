@@ -110,6 +110,7 @@ describe('round trip: contribution wealth adjustment', () => {
     await vi.waitFor(async () => expect(await trip.pending()).toHaveLength(1))
     useSettingsStore().toggleTwrLiquidity(newAccountId, true)
     save(100, newAccountId)
+    await vi.waitFor(async () => expect(await trip.pending()).toHaveLength(4))
 
     const offline = await trip.reloadOffline()
     expect(offline.snapshots['3'].accounts[newAccountId]).toBe(500)

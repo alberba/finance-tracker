@@ -696,6 +696,17 @@ export const useSyncStore = defineStore('sync', () => {
     return { entityId: match.id, version }
   }
 
+  /** Global instruments live in the cached bootstrap, outside the per-entity sync collections. */
+  async function getInstrumentId(localId: string): Promise<string | null> {
+    if (!isReady() || !cacheDb) return null
+    const bootstrap = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+    const instruments = bootstrap?.instruments ?? []
+    const instrument =
+      instruments.find((row) => row.id === localId) ??
+      instruments.find((row) => row.legacyId === localId)
+    return instrument?.id ?? null
+  }
+
   /**
    * Reads the client-minted id (ADR 0001) off a still-queued, not-yet-
    * acknowledged `create` command matching `matches`, without amending or
@@ -822,12 +833,15 @@ export const useSyncStore = defineStore('sync', () => {
     flush,
     pullChanges,
     syncNow,
+    /** Reloads the whole read model after a server-side write (Bitvavo import and link). */
+    refreshFromServer: () => syncNow({ full: true }),
     detach,
     prepareLogout,
     logout,
     getEntityRef,
     getSettingsVersion,
     findEntityRef,
+    getInstrumentId,
     peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,

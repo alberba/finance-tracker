@@ -1,7 +1,13 @@
+import { remoteOperationSchema } from '../bitvavo-types'
 import { categoryEmojiKey } from '../../scripts/category-emoji'
 import { normalizeState } from '../../scripts/state'
 import { getFirstUpcomingChargeDate } from '../../scripts/subscriptions'
-import { isSubscriptionFrequency, type GoalKey, type InvestmentSide, type State } from '../../scripts/types'
+import {
+  isSubscriptionFrequency,
+  type GoalKey,
+  type InvestmentSide,
+  type State,
+} from '../../scripts/types'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
 
@@ -42,7 +48,9 @@ function projectOperation(entity: CachedEntity): Record<string, unknown> {
     ...(entity.symbol ? { symbol: String(entity.symbol) } : {}),
     ...(entity.side ? { side: String(entity.side) as InvestmentSide } : {}),
     ...(entity.units === null || entity.units === undefined ? {} : { units: Number(entity.units) }),
-    ...(entity.unitPrice === null || entity.unitPrice === undefined ? {} : { unitPrice: Number(entity.unitPrice) }),
+    ...(entity.unitPrice === null || entity.unitPrice === undefined
+      ? {}
+      : { unitPrice: Number(entity.unitPrice) }),
     ...(entity.fee === null || entity.fee === undefined ? {} : { fee: Number(entity.fee) }),
     ...(entity.time ? { time: String(entity.time) } : {}),
   }
@@ -83,11 +91,24 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     meta: { source: 'sync-v2', generatedAt: new Date().toISOString(), version: 1, savedAt: null },
     year: new Date().getFullYear(),
     currency: bootstrap.settings?.currency || 'EUR',
-    twrLiquidityAccountIds: [], accounts: [], investmentAssets: [], liabilities: [],
-    incomeCategories: [], expenseCategories: [], investmentCategories: [], categoryEmojis: {},
-    transactions: [], subscriptions: [], snapshots: {},
-    budget: { income: {}, expense: {}, investment: {} }, goals: {}, contributions: [],
-    instruments: [], quotes: {}, recurringRules: [], pendingMovements: [],
+    twrLiquidityAccountIds: [],
+    accounts: [],
+    investmentAssets: [],
+    liabilities: [],
+    incomeCategories: [],
+    expenseCategories: [],
+    investmentCategories: [],
+    categoryEmojis: {},
+    transactions: [],
+    subscriptions: [],
+    snapshots: {},
+    budget: { income: {}, expense: {}, investment: {} },
+    goals: {},
+    contributions: [],
+    instruments: [],
+    quotes: {},
+    recurringRules: [],
+    pendingMovements: [],
     stockEvents: { enabled: false, apiKey: '', symbolMappings: [] },
   })
   const categories = categoryNamesById(bootstrap.categories)
@@ -99,9 +120,15 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     name: String(account.name || ''),
     openingBalance: Number(account.openingBalance || 0),
   })
-  projected.accounts = bootstrap.accounts.filter((account) => account.kind === 'cash').map(projectAccount)
-  projected.investmentAssets = bootstrap.accounts.filter((account) => account.kind === 'investment').map(projectAccount)
-  projected.liabilities = bootstrap.accounts.filter((account) => account.kind === 'liability').map(projectAccount)
+  projected.accounts = bootstrap.accounts
+    .filter((account) => account.kind === 'cash')
+    .map(projectAccount)
+  projected.investmentAssets = bootstrap.accounts
+    .filter((account) => account.kind === 'investment')
+    .map(projectAccount)
+  projected.liabilities = bootstrap.accounts
+    .filter((account) => account.kind === 'liability')
+    .map(projectAccount)
   projected.twrLiquidityAccountIds = (bootstrap.twrLiquidityAccounts || [])
     .map((entry) => accountIds.get(String(entry.accountId)) || String(entry.legacyId || ''))
     .filter(Boolean)
@@ -114,35 +141,47 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     projected[stateKey] = categoriesOfKind.map((category) => String(category.name))
     for (const category of categoriesOfKind) {
       if (category.emoji) {
-        categoryEmojis[categoryEmojiKey(kind as keyof typeof CATEGORY_STATE_KEYS, String(category.name))] =
-          String(category.emoji)
+        categoryEmojis[
+          categoryEmojiKey(kind as keyof typeof CATEGORY_STATE_KEYS, String(category.name))
+        ] = String(category.emoji)
       }
     }
   }
   projected.categoryEmojis = categoryEmojis
 
   projected.transactions = bootstrap.transactions.map((transaction) => {
+    const remote = remoteOperationSchema.safeParse(transaction.remoteOperation)
     const trade = transaction.tradeDetail as CachedEntity | null | undefined
     const instrument = (bootstrap.instruments || []).find((item) => item.id === trade?.instrumentId)
     return {
-      id: legacyId(transaction), date: String(transaction.date),
+      id: legacyId(transaction),
+      date: String(transaction.date),
       month: monthFromISO(String(transaction.date)) ?? 0,
       type: String(transaction.type) as State['transactions'][number]['type'],
-      accountId: accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
+      accountId:
+        accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
       category: categories.get(String(transaction.categoryId)) || 'Sin categoría',
-      description: String(transaction.description || ''), amount: Number(transaction.amount || 0),
+      description: String(transaction.description || ''),
+      amount: Number(transaction.amount || 0),
       createdAt: String(transaction.createdAt || ''),
       ...(transaction.time ? { time: String(transaction.time) } : {}),
       declared: Boolean(transaction.declared),
-      ...(trade ? {
-        side: String(trade.side) as State['transactions'][number]['side'],
-        units: Number(trade.quantity || 0), unitPrice: Number(trade.price || 0),
-        fee: Number(trade.fee || 0), movementCurrency: String(trade.currency || projected.currency),
-        // The stored ticker is what the user typed; the instrument is only a
-        // fallback for rows migrated from v1, which have no `symbol` column.
-        ...(trade.symbol || instrument ? { symbol: String(trade.symbol || instrument?.symbol) } : {}),
-        ...(instrument ? { instrumentId: legacyId(instrument) } : {}),
-      } : {}),
+      movementCurrency: String(transaction.currency || trade?.currency || projected.currency),
+      ...(remote.success ? { remoteOperation: remote.data } : {}),
+      ...(trade
+        ? {
+            side: String(trade.side) as State['transactions'][number]['side'],
+            units: Number(trade.quantity || 0),
+            unitPrice: Number(trade.price || 0),
+            fee: Number(trade.fee || 0),
+            // The stored ticker is what the user typed; the instrument is only a
+            // fallback for rows migrated from v1, which have no `symbol` column.
+            ...(trade.symbol || instrument
+              ? { symbol: String(trade.symbol || instrument?.symbol) }
+              : {}),
+            ...(instrument ? { instrumentId: legacyId(instrument) } : {}),
+          }
+        : {}),
     }
   })
 
@@ -170,7 +209,8 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
 
   projected.budget = { income: {}, expense: {}, investment: {} }
   for (const entry of bootstrap.budgetEntries) {
-    const kind = bootstrap.categories.find((category) => category.id === entry.categoryId)?.kind as keyof State['budget']
+    const kind = bootstrap.categories.find((category) => category.id === entry.categoryId)
+      ?.kind as keyof State['budget']
     if (!(kind in projected.budget)) continue
     const category = categories.get(String(entry.categoryId)) || 'Sin categoría'
     const amounts = projected.budget[kind][category] || Array(12).fill(0)
@@ -209,46 +249,57 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
   // keyed by month alone for the state's year: a row from another year must
   // never take a slot in it (audit §4.6 — projecting every row into the same
   // month-keyed map mixed the years together).
-  projected.snapshots = Object.fromEntries(bootstrap.wealthSnapshots
-    .filter((snapshot) => Number(snapshot.year) === projected.year)
-    .map((snapshot) => {
-      // `snapshot.month` is the server's canonical 1-12; `State.snapshots` is
-      // keyed (and stores `.month`) 0-based, matching `ui.snapshotMonth`.
-      const month = Number(snapshot.month) - 1
-      const balances: State['snapshots'][string] = {
-        month,
-        accounts: {},
-        investments: {},
-        liabilities: {},
-      }
-      for (const balance of snapshot.balances || []) {
-        const accountId = accountIds.get(String(balance.accountId)) || String(balance.accountId || '')
-        if (!accountId) continue
-        const kind = bootstrap.accounts.find((account) => account.id === balance.accountId)?.kind
-        if (kind === 'investment') balances.investments[accountId] = Number(balance.balance || 0)
-        else if (kind === 'liability') balances.liabilities[accountId] = Number(balance.balance || 0)
-        else balances.accounts[accountId] = Number(balance.balance || 0)
-      }
-      return [String(month), balances]
-    }))
+  projected.snapshots = Object.fromEntries(
+    bootstrap.wealthSnapshots
+      .filter((snapshot) => Number(snapshot.year) === projected.year)
+      .map((snapshot) => {
+        // `snapshot.month` is the server's canonical 1-12; `State.snapshots` is
+        // keyed (and stores `.month`) 0-based, matching `ui.snapshotMonth`.
+        const month = Number(snapshot.month) - 1
+        const balances: State['snapshots'][string] = {
+          month,
+          accounts: {},
+          investments: {},
+          liabilities: {},
+        }
+        for (const balance of snapshot.balances || []) {
+          const accountId =
+            accountIds.get(String(balance.accountId)) || String(balance.accountId || '')
+          if (!accountId) continue
+          const kind = bootstrap.accounts.find((account) => account.id === balance.accountId)?.kind
+          if (kind === 'investment') balances.investments[accountId] = Number(balance.balance || 0)
+          else if (kind === 'liability')
+            balances.liabilities[accountId] = Number(balance.balance || 0)
+          else balances.accounts[accountId] = Number(balance.balance || 0)
+        }
+        return [String(month), balances]
+      }),
+  )
 
-  const recurringRuleIds = new Map(bootstrap.recurringRules.map((rule) => [rule.id, legacyId(rule)]))
+  const recurringRuleIds = new Map(
+    bootstrap.recurringRules.map((rule) => [rule.id, legacyId(rule)]),
+  )
   projected.recurringRules = bootstrap.recurringRules.map((rule) => ({
-    id: legacyId(rule), type: String(rule.type) as State['recurringRules'][number]['type'],
+    id: legacyId(rule),
+    type: String(rule.type) as State['recurringRules'][number]['type'],
     accountId: accountIds.get(String(rule.accountId)) || '',
     category: categories.get(String(rule.categoryId)) || 'Sin categoría',
-    description: String(rule.name || ''), amount: Number(rule.amount || 0),
+    description: String(rule.name || ''),
+    amount: Number(rule.amount || 0),
     ...projectOperation(rule),
     frequency: String(rule.frequency) as State['recurringRules'][number]['frequency'],
     interval: Number(rule.interval || 1),
     startDate: String(rule.startDate || rule.nextRunDate || ''),
-    endDate: rule.endDate ? String(rule.endDate) : null, active: rule.status === 'active',
+    endDate: rule.endDate ? String(rule.endDate) : null,
+    active: rule.status === 'active',
     lastExecutionDate: rule.lastExecutionDate ? String(rule.lastExecutionDate) : null,
     nextOccurrenceDate: rule.nextRunDate ? String(rule.nextRunDate) : null,
   }))
   projected.pendingMovements = bootstrap.pendingMovements.map((pending) => ({
-    id: legacyId(pending), occurrenceKey: `${recurringRuleIds.get(String(pending.recurringRuleId)) || pending.recurringRuleId}:${pending.dueDate}`,
-    ruleId: recurringRuleIds.get(String(pending.recurringRuleId)) || String(pending.recurringRuleId),
+    id: legacyId(pending),
+    occurrenceKey: `${recurringRuleIds.get(String(pending.recurringRuleId)) || pending.recurringRuleId}:${pending.dueDate}`,
+    ruleId:
+      recurringRuleIds.get(String(pending.recurringRuleId)) || String(pending.recurringRuleId),
     occurrenceDate: String(pending.dueDate),
     type: String(pending.type || 'expense') as State['pendingMovements'][number]['type'],
     accountId: accountIds.get(String(pending.accountId)) || '',
@@ -257,46 +308,69 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
     amount: Number(pending.amount || 0),
     ...projectOperation(pending),
     status: String(pending.status) as State['pendingMovements'][number]['status'],
-    createdAt: String(pending.createdAt || ''), updatedAt: String(pending.updatedAt || ''),
+    createdAt: String(pending.createdAt || ''),
+    updatedAt: String(pending.updatedAt || ''),
     transactionId: pending.transactionId ? String(pending.transactionId) : null,
   }))
 
   projected.instruments = (bootstrap.instruments || []).map((instrument) => ({
-    id: legacyId(instrument), investmentAssetId: String(instrument.userInstrument.alias || ''),
+    id: legacyId(instrument),
+    investmentAssetId: String(instrument.userInstrument.alias || ''),
     type: String(instrument.assetClass || 'stock') as State['instruments'][number]['type'],
-    symbol: String(instrument.symbol), market: '', currency: String(instrument.currency),
-    provider: String(instrument.provider), active: true,
+    symbol: String(instrument.symbol),
+    market: '',
+    currency: String(instrument.currency),
+    provider: String(instrument.provider),
+    active: true,
   }))
-  projected.quotes = Object.fromEntries((bootstrap.instruments || []).flatMap((instrument) => {
-    const latest = [...instrument.quotes].sort((left, right) => String(left.quotedAt).localeCompare(String(right.quotedAt))).at(-1)
-    if (!latest) return []
-    const instrumentId = legacyId(instrument)
-    return [[instrumentId, {
-      instrumentId, price: Number(latest.price || 0), currency: String(latest.currency),
-      timestamp: String(latest.quotedAt), source: 'sync-v2', status: 'fresh' as const,
-      isStale: false, previousClose: null, changePercent: null,
-    }]]
-  }))
+  projected.quotes = Object.fromEntries(
+    (bootstrap.instruments || []).flatMap((instrument) => {
+      const latest = [...instrument.quotes]
+        .sort((left, right) => String(left.quotedAt).localeCompare(String(right.quotedAt)))
+        .at(-1)
+      if (!latest) return []
+      const instrumentId = legacyId(instrument)
+      return [
+        [
+          instrumentId,
+          {
+            instrumentId,
+            price: Number(latest.price || 0),
+            currency: String(latest.currency),
+            timestamp: String(latest.quotedAt),
+            source: 'sync-v2',
+            status: 'fresh' as const,
+            isStale: false,
+            previousClose: null,
+            changePercent: null,
+          },
+        ],
+      ]
+    }),
+  )
   const stockeventsEnabledRaw =
     bootstrap.settings?.stockeventsEnabled ?? bootstrap.settings?.stockevents_enabled
   projected.stockEvents.enabled = stockeventsEnabledRaw === true || stockeventsEnabledRaw === 1
   const tradesToCashRaw =
     bootstrap.settings?.stockeventsTradesToCash ?? bootstrap.settings?.stockevents_trades_to_cash
   projected.stockEvents.tradesToCash = tradesToCashRaw === true || tradesToCashRaw === 1
-  projected.stockEvents.symbolMappings = (bootstrap.stockeventsSymbolMappings || []).map((mapping) => ({
-    symbol: String(mapping.legacyId || mapping.stockeventsSymbol).toUpperCase(),
-    sync: mapping.sync === true || mapping.sync === 1,
-    watchlistId: String(mapping.watchlistId || ''),
-    targetSymbol: String(mapping.stockeventsSymbol || '').toUpperCase(),
-    hidden: mapping.hidden === true || mapping.hidden === 1,
-  }))
+  projected.stockEvents.symbolMappings = (bootstrap.stockeventsSymbolMappings || []).map(
+    (mapping) => ({
+      symbol: String(mapping.legacyId || mapping.stockeventsSymbol).toUpperCase(),
+      sync: mapping.sync === true || mapping.sync === 1,
+      watchlistId: String(mapping.watchlistId || ''),
+      targetSymbol: String(mapping.stockeventsSymbol || '').toUpperCase(),
+      hidden: mapping.hidden === true || mapping.hidden === 1,
+    }),
+  )
   // Server rows (and queued `settingsUpdate` overlays) address accounts by
   // their server id; the UI model addresses them by legacy id.
   const toLocalAccountId = (serverId: unknown): string => {
     const key = String(serverId || '')
     return accountIds.get(key) || key
   }
-  const queuedCashMappings = (bootstrap.settings as Record<string, unknown> | null)?.stockeventsCashMappings
+  const queuedCashMappings = (bootstrap.settings as Record<string, unknown> | null)
+    ?.stockeventsCashMappings
   const cashSource = Array.isArray(queuedCashMappings)
     ? (queuedCashMappings as CachedEntity[])
     : bootstrap.stockeventsCashMappings || []
@@ -306,12 +380,14 @@ export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
       accountId: toLocalAccountId(mapping.accountId),
       watchlistId: String(mapping.watchlistId),
     }))
-  projected.stockEvents.cashSyncEntries = (bootstrap.stockeventsCashSyncEntries || []).map((entry) => ({
-    contributionDate: String(entry.contributionDate || '').slice(0, 10),
-    accountId: toLocalAccountId(entry.accountId),
-    watchlistId: String(entry.watchlistId || ''),
-    syncedAmount: Number(entry.syncedAmount ?? 0),
-  }))
+  projected.stockEvents.cashSyncEntries = (bootstrap.stockeventsCashSyncEntries || []).map(
+    (entry) => ({
+      contributionDate: String(entry.contributionDate || '').slice(0, 10),
+      accountId: toLocalAccountId(entry.accountId),
+      watchlistId: String(entry.watchlistId || ''),
+      syncedAmount: Number(entry.syncedAmount ?? 0),
+    }),
+  )
 
   return normalizeState(projected)
 }

@@ -11,7 +11,9 @@ export default defineConfig(
     env: { PUBLIC_SYNC_V2: 'false' },
   }),
   {
-    fullyParallel: false,
+    // One worker protects the legacy owner blob; individual tests can still
+    // be sharded across runners, each with its own D1 database.
+    fullyParallel: true,
     workers: 1,
     projects: [
       {
@@ -19,10 +21,13 @@ export default defineConfig(
         use: { ...devices['Desktop Chrome'] },
         testIgnore: [
           'authentication.spec.ts',
+          'bitvavo.spec.ts',
+
           'layout-visual.spec.ts',
           'mobile-smoke.spec.ts',
           'multi-user-isolation.spec.ts',
           'offline-sync.spec.ts',
+          'movement-commands.spec.ts',
           'subscription-charges.spec.ts',
         ],
       },
