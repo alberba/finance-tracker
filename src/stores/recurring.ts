@@ -473,17 +473,18 @@ export const useRecurringStore = defineStore('recurring', () => {
         }
       }
     })
-    void syncMovements(
-      beforeTransactions,
-      financialStateStore.transactions,
-      financialStateStore.currency,
-    )
-    void syncListDiff(
-      'pendingMovement',
-      beforePending,
-      financialStateStore.state.pendingMovements,
-      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
-    )
+    const afterTransactions = financialStateStore.transactions
+    const afterPending = financialStateStore.state.pendingMovements
+    const currency = financialStateStore.currency
+    // In order, not side by side: both resolve the same category, and the
+    // pending must be built once the movement has queued its create, or each
+    // mints its own id and the pending references one that is never created.
+    void (async () => {
+      await syncMovements(beforeTransactions, afterTransactions, currency)
+      await syncListDiff('pendingMovement', beforePending, afterPending, (item) =>
+        buildPendingMovementData(item, currency),
+      )
+    })()
     if (confirmed) {
       showToast('Pendiente confirmado: ya cuenta en el Registro.')
       void stockEventsStore.syncMovement(transaction)
