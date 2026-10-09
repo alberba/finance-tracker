@@ -1,6 +1,6 @@
 import type { Transaction } from '../../scripts/types'
 import { useSyncStore } from '../../stores/sync'
-import { resolveCategoryId, resolveEntityId, syncListDiff } from './command-mapping'
+import { resolveEntityId, resolveOrCreateCategoryId, syncListDiff } from './command-mapping'
 
 /** Resolves movement references and enqueues the changes; server confirmation happens later. */
 export async function syncMovements(
@@ -19,7 +19,7 @@ async function buildMovementData(movement: Transaction, currency: string) {
   }
   const accountId = await resolveEntityId('account', movement.accountId)
   if (!accountId) return null
-  const categoryId = await resolveCategoryId(movement.type, movement.category)
+  const categoryId = await resolveOrCreateCategoryId(movement.type, movement.category)
   const operation = await buildOperation(movement)
   return {
     accountId,
