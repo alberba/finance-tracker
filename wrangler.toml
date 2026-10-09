@@ -22,7 +22,10 @@ migrations_dir = "migrations-v2"
 
 [vars]
 # Puente temporal de #275; cambiar solo tras docs/operations/authentication.md.
-AUTH_MODE = "cf-access"
+AUTH_MODE = "better-auth"
+BETTER_AUTH_URL = "https://finance-tracker.albertsalomv.workers.dev"
+RESEND_FROM = "Finance Tracker <notificaciones@alberba.es>"
+GOOGLE_CLIENT_ID = "96248101075-6g36ota528ksjrpu4tgfjs5s80gucje7.apps.googleusercontent.com"
 AUTH_ENFORCED = "true"
 # Two Access applications guard this Worker, each with its own AUD tag: the
 # production hostname app ("Acceso albert") and the previews-only Worker
