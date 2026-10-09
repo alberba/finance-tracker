@@ -1,0 +1,36 @@
+name: Setup
+description: pnpm, Node and frozen-lockfile install, with Chromium for Playwright on request
+
+inputs:
+  playwright:
+    description: Install Chromium (cached by lockfile) and its system dependencies
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10.26.0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Cache Chromium
+      if: ${{ inputs.playwright == 'true' }}
+      id: chromium-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+    - name: Install Chromium
+      if: ${{ inputs.playwright == 'true' && steps.chromium-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: pnpm exec playwright install --with-deps chromium
+    - name: Install Chromium system dependencies
+      if: ${{ inputs.playwright == 'true' && steps.chromium-cache.outputs.cache-hit == 'true' }}
+      shell: bash
+      run: pnpm exec playwright install-deps chromium
