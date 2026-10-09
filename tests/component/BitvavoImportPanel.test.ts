@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import BitvavoImportPanel from '../../src/components/settings/BitvavoImportPanel.vue'
 
+const NBSP = ' '
+
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configured: false })))
@@ -66,8 +68,8 @@ it('blocks confirmation until every possible duplicate has an explicit resolutio
   await prepare.trigger('click')
   await flushPromises()
   const figures = wrapper.findAll('dd').map((dd) => dd.text())
-  expect(figures).toEqual(['0,1', '100,00', '0,00', '10,00'])
-  expect(wrapper.text()).toContain('1 ene 2020, 01:00:00')
+  expect(figures).toEqual(['0,1', `100,00${NBSP}€`, `0,00${NBSP}€`, `10,00${NBSP}€`])
+  expect(wrapper.text()).toContain('1 ene 2020, 01:00 · Europe/Madrid')
   const confirm = wrapper
     .findAll('button')
     .find((button) => button.text() === 'Confirmar importación completa')!

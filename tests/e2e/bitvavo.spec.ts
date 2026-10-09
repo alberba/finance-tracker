@@ -66,7 +66,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.openDetails('Compra')
     const detail = bitvavo.details
     await expect(detail.getByText('0,01789334395', { exact: true })).toBeVisible()
-    await expect(detail.getByText('2020-01-01T00:00:00.000Z', { exact: true })).toBeVisible()
+    await expect(detail.getByText('1 ene 2020, 00:00 UTC', { exact: true })).toBeVisible()
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toBeVisible()
     const instrumentId = await seedMarketInstrument(context.request)
     await detail.getByRole('button', { name: 'Cerrar', exact: true }).click()

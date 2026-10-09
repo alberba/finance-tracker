@@ -13,7 +13,8 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMarketStore } from '../../stores/market'
 
 // "03 Cotizaciones": market price, today's change and status per instrument,
-// with the held units editable in place. Hidden while no instrument is set up.
+// with the held units editable in place. Without instruments it keeps its
+// place in the document and the ledger shows the empty state.
 const marketStore = useMarketStore()
 const financialStateStore = useFinancialStateStore()
 const { formatMoney } = useMoneyFormatter()
@@ -36,7 +37,6 @@ const columns: LedgerColumn<InstrumentValuation>[] = [
 
 <template>
   <NumberedBlock
-    v-if="quotes.length"
     number="03"
     title="Cotizaciones"
     title-id="inv-mkt-title"
@@ -44,7 +44,7 @@ const columns: LedgerColumn<InstrumentValuation>[] = [
     data-investment-quotes
   >
     <template #actions>
-      <div class="grid justify-items-end gap-1">
+      <div v-if="quotes.length" class="grid justify-items-end gap-1">
         <p class="font-display text-xl font-medium tabular-nums">
           {{ formatMoney(marketStore.valuation.totalValue) }}
         </p>

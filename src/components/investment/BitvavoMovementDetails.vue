@@ -4,7 +4,13 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
 import { useBitvavoMovementDetails } from '../../composables/useBitvavoMovementDetails'
-import { formatDecimal, formatShortDate } from '../../lib/format'
+import {
+  formatDecimal,
+  formatMoney,
+  formatQuotePrice,
+  formatShortDate,
+  formatTime,
+} from '../../lib/format'
 import type { Transaction } from '../../scripts/types'
 
 const props = defineProps<{ transaction: Transaction }>()
@@ -32,10 +38,14 @@ const { open, instrumentId, busy, error, options, show, link } = useBitvavoMovem
       <dt>Identidad externa</dt>
       <dd class="font-mono break-all">{{ operation.externalId }}</dd>
       <dt>Instante</dt>
-      <dd class="font-mono break-all">{{ operation.executedAt }}</dd>
+      <dd class="tabular-nums">
+        {{ formatShortDate(operation.executedAt) }}, {{ formatTime(operation.executedAt, 'UTC') }}
+        UTC
+      </dd>
       <dt>Fecha y hora local</dt>
-      <dd>
-        {{ formatShortDate(operation.date) }}, {{ operation.time }} · {{ operation.timeZone }}
+      <dd class="tabular-nums">
+        {{ formatShortDate(operation.date) }},
+        {{ formatTime(operation.executedAt, operation.timeZone) }} · {{ operation.timeZone }}
       </dd>
       <dt>Operación</dt>
       <dd>
@@ -44,18 +54,14 @@ const { open, instrumentId, busy, error, options, show, link } = useBitvavoMovem
       </dd>
       <dt>Cantidad</dt>
       <dd class="font-display tabular-nums">{{ formatDecimal(operation.quantity) }}</dd>
-      <dt>Precio unitario EUR</dt>
+      <dt>Precio unitario</dt>
       <dd class="font-display tabular-nums">
-        {{ formatDecimal(operation.unitPrice, { minDigits: 2 }) }}
+        {{ formatQuotePrice(Number(operation.unitPrice), 'EUR') }}
       </dd>
-      <dt>Comisión EUR</dt>
-      <dd class="font-display tabular-nums">
-        {{ formatDecimal(operation.fee, { minDigits: 2 }) }}
-      </dd>
-      <dt>Total EUR</dt>
-      <dd class="font-display tabular-nums">
-        {{ formatDecimal(operation.cashAmount, { minDigits: 2 }) }}
-      </dd>
+      <dt>Comisión</dt>
+      <dd class="font-display tabular-nums">{{ formatMoney(operation.fee) }}</dd>
+      <dt>Total</dt>
+      <dd class="font-display tabular-nums">{{ formatMoney(operation.cashAmount) }}</dd>
     </dl>
     <p v-if="!transaction.instrumentId" class="font-semibold">Pendiente de vincular</p>
     <BaseSelect v-model="instrumentId" label="Instrumento" :options="options" />
