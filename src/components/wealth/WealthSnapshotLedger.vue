@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import type { SnapshotField } from '../../composables/useSnapshotEdit'
 import {
   formatSnapshotInput,
   GROUP_SIGN,
-  parseSnapshotInput,
   snapshotKey,
   type SnapshotGroupViewModel,
   type SnapshotRowViewModel,
@@ -21,13 +21,13 @@ import { GROUP_SWATCH } from './group-swatch'
 // focused; an empty cell falls back to the calculated balance.
 const props = defineProps<{
   groups: SnapshotGroupViewModel[]
-  inputs: Record<string, string>
+  field: (kind: SnapshotKind, id: string) => SnapshotField | undefined
   totals: SnapshotTotals
   formatMoney: (value: number) => string
 }>()
 
 const emit = defineEmits<{
-  update: [key: string, value: string]
+  update: [kind: SnapshotKind, id: string, text: string]
   calculate: [kind: SnapshotKind, row: SnapshotRowViewModel]
 }>()
 
@@ -60,10 +60,6 @@ const ledgerGroups = computed<LedgerGroup<Row>[]>(() =>
     }
   }),
 )
-
-function isInvalid(key: string): boolean {
-  return Number.isNaN(parseSnapshotInput(props.inputs[key] ?? ''))
-}
 </script>
 
 <template>
@@ -96,12 +92,12 @@ function isInvalid(key: string): boolean {
       <span class="ml-auto flex max-w-52 min-w-28 items-center gap-1.5">
         <LedgerInput
           :label="`Snapshot de ${row.name}`"
-          :value="inputs[row.key]"
+          :value="field(row.kind, row.id)?.text"
           :name="`snapshot-${row.key}`"
           :placeholder="formatSnapshotInput(row.calculated)"
-          :aria-invalid="isInvalid(row.key)"
+          :aria-invalid="field(row.kind, row.id)?.invalid"
           data-snapshot-input
-          @input="emit('update', row.key, ($event.target as HTMLInputElement).value)"
+          @input="emit('update', row.kind, row.id, ($event.target as HTMLInputElement).value)"
         />
         <span class="font-display text-text-muted text-sm" aria-hidden="true">€</span>
       </span>

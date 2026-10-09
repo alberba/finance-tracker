@@ -74,11 +74,6 @@ export function snapshotKey(kind: SnapshotKind, id: string): string {
   return `${kind}:${id}`
 }
 
-export function parseSnapshotKey(key: string): { kind: SnapshotKind; id: string } {
-  const at = key.indexOf(':')
-  return { kind: key.slice(0, at) as SnapshotKind, id: key.slice(at + 1) }
-}
-
 /**
  * A snapshot field as typed: empty means "use the calculated balance" (null),
  * Spanish decimals ("1.234,56") or a plain dot decimal; NaN when it is not a
@@ -95,23 +90,6 @@ export function parseSnapshotInput(text: string): number | null {
 /** The field text for a stored snapshot value: comma decimals, no thousands dots. */
 export function formatSnapshotInput(value: number | null): string {
   return value === null ? '' : String(value).replace('.', ',')
-}
-
-/** Totals of the snapshot as edited: each typed value, else the calculated one. */
-export function snapshotTotals(
-  groups: SnapshotGroupViewModel[],
-  inputs: Record<string, string>,
-): SnapshotTotals {
-  const totals: SnapshotTotals = { accounts: 0, investments: 0, liabilities: 0, net: 0 }
-  for (const group of groups) {
-    for (const row of group.rows) {
-      const typed = parseSnapshotInput(inputs[snapshotKey(group.kind, row.id)] ?? '')
-      totals[group.kind] += typed === null || Number.isNaN(typed) ? row.calculated : typed
-    }
-    totals[group.kind] = round2(totals[group.kind])
-  }
-  totals.net = round2(totals.accounts + totals.investments - totals.liabilities)
-  return totals
 }
 
 function visibleMonthLimit(year: number): number {
@@ -139,11 +117,19 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
     investments: investmentAssets,
     liabilities,
   }
-  const balance: Record<SnapshotKind, (id: string, month: number) => number> = {
-    accounts: (id, m) => computeAccountBalance(id, m, accounts, transactions, snapshots),
-    investments: (id, m) => computeInvestmentValue(id, m, investmentAssets, transactions, snapshots),
-    liabilities: (id, m) => computeLiabilityValue(id, m, liabilities, snapshots),
-  }
+  const balanceWith = (
+    from: Record<string, Snapshot>,
+  ): Record<SnapshotKind, (id: string, month: number) => number> => ({
+    accounts: (id, m) => computeAccountBalance(id, m, accounts, transactions, from),
+    investments: (id, m) => computeInvestmentValue(id, m, investmentAssets, transactions, from),
+    liabilities: (id, m) => computeLiabilityValue(id, m, liabilities, from),
+  })
+  const balance = balanceWith(snapshots)
+  // The calculated balance of the month leaves its own snapshot out: it is what
+  // the month reads once that snapshot is removed.
+  const otherMonths = { ...snapshots }
+  delete otherMonths[String(month)]
+  const calculated = balanceWith(otherMonths)
 
   const groups: SnapshotGroupViewModel[] = GROUPS.map(({ kind, title, unit }) => ({
     kind,
@@ -153,7 +139,7 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
       id: item.id,
       name: item.name,
       opening: round2(item.openingBalance || 0),
-      calculated: round2(balance[kind](item.id, month)),
+      calculated: round2(calculated[kind](item.id, month)),
       snapshot: getSnapshotValue(snapshots, kind, month, item.id),
     })),
   }))

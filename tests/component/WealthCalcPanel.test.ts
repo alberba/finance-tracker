@@ -10,7 +10,14 @@ function mountPanel() {
     props: {
       open: true,
       'onUpdate:open': () => {},
-      target: { key: 'santander', name: 'Santander', current: 0, calculated: 0, opening: 0 },
+      target: {
+        kind: 'accounts',
+        id: 'santander',
+        name: 'Santander',
+        current: 0,
+        calculated: 0,
+        opening: 0,
+      },
       monthName: 'marzo',
       formatMoney: (value: number) => `${value.toFixed(2).replace('.', ',')} €`,
       currency: 'EUR',
