@@ -55,3 +55,36 @@ _Avoid_: entrada de presupuesto, budget entry
 La foto de todos los saldos en un mes concreto de un año concreto. Su identidad es (año, mes);
 sin los saldos no es un snapshot.
 _Avoid_: corte, balance mensual
+
+**Regla recurrente**:
+Una plantilla de movimiento más un calendario. Cada vencimiento genera un movimiento pendiente.
+_Avoid_: automatización, programación
+
+**Compra recurrente**:
+Una regla recurrente cuya plantilla lleva una operación de compra. Es el nombre que recibe en
+Inversión, no una entidad aparte.
+_Avoid_: DCA, plan automático
+
+**Suscripción**:
+Un gasto periódico que se registra para analizar el gasto fijo. No genera movimientos por sí
+misma.
+_Avoid_: regla recurrente, cargo fijo
+
+**Posición**:
+Lo que se tiene ahora de un activo: títulos, valor, capital invertido y peso en la cartera.
+_Avoid_: holding, activo (a secas)
+
+**Cierre**:
+Un punto de valoración de la cartera en una fecha. Sale de un snapshot de patrimonio o se añade
+a mano.
+_Avoid_: corte, foto de cartera
+
+**Aporte**:
+El dinero neto que entra en la cartera entre dos cierres; es negativo cuando se retira. Separa
+la rentabilidad del ahorro.
+_Avoid_: contribución, flujo
+
+**Valor liquidativo**:
+El valor de una participación de la cartera. Parte de 100 y solo cambia con la rentabilidad,
+nunca con los aportes.
+_Avoid_: NAV, precio de participación

@@ -21,3 +21,16 @@ TEST_AUTH_ENABLED=true
 # legacy. Los specs E2E resetean ese estado en cada test (`/api/state/reset-legacy`)
 # y sin esta variable responde 403. Mismo valor que usa CI.
 LEGACY_OWNER_EMAIL=legacy-owner@e2e.test
+
+# Autenticación integrada (#275). Mantener cf-access hasta verificar el corte.
+AUTH_MODE=cf-access
+BETTER_AUTH_URL=http://localhost:4321
+BETTER_AUTH_SECRET=
+RESEND_API_KEY=
+RESEND_FROM=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+# Construir con PUBLIC_SYNC_V2=true antes de activar AUTH_MODE=better-auth.
+# Procedimiento: docs/operations/authentication.md

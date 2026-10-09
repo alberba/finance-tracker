@@ -1,6 +1,5 @@
-const CACHE_VERSION = 'finance-tracker-v2'
+const CACHE_VERSION = 'finance-tracker-v3'
 const APP_SHELL = [
-  '/',
   '/manifest.webmanifest',
   '/favicon.svg',
   '/icons/apple-touch-icon.png',
@@ -31,7 +30,8 @@ self.addEventListener('fetch', (event) => {
   if (
     request.method !== 'GET' ||
     url.origin !== self.location.origin ||
-    url.pathname.startsWith('/api/')
+    url.pathname.startsWith('/api/') ||
+    url.pathname === '/login'
   ) {
     return
   }
@@ -57,7 +57,13 @@ async function cacheResourceUrls(urls) {
   const sameOriginUrls = [...new Set(urls)]
     .slice(0, 100)
     .map((value) => new URL(value, self.location.origin))
-    .filter((url) => url.origin === self.location.origin && !url.pathname.startsWith('/api/'))
+    .filter(
+      (url) =>
+        url.origin === self.location.origin &&
+        !url.pathname.startsWith('/api/') &&
+        url.pathname !== '/login' &&
+        !url.searchParams.has('invitation'),
+    )
 
   await Promise.allSettled(
     sameOriginUrls.map(async (url) => {
@@ -66,7 +72,7 @@ async function cacheResourceUrls(urls) {
         return
       }
       const response = await fetch(request)
-      if (response.ok) {
+      if (response.ok && !response.redirected) {
         await cache.put(request, response)
       }
     }),
@@ -77,7 +83,7 @@ async function networkFirst(request) {
   const cache = await caches.open(CACHE_VERSION)
   try {
     const response = await fetch(request)
-    if (response.ok) {
+    if (response.ok && !response.redirected) {
       await cache.put(request, response.clone())
     }
     return response
@@ -91,7 +97,7 @@ async function staleWhileRevalidate(request) {
   const cached = await cache.match(request)
   const network = fetch(request)
     .then(async (response) => {
-      if (response.ok) {
+      if (response.ok && !response.redirected) {
         await cache.put(request, response.clone())
       }
       return response

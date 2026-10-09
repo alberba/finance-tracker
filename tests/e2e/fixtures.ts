@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 declare global {
@@ -35,6 +36,7 @@ type Fixtures = {
   // Freezes `Date` before the app loads. The selected year and month default to
   // today, so a snapshot taken in one month differs from the next.
   fixedTime: string | undefined
+  snapshotTime: string | undefined
 }
 
 const GOOGLE_FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
@@ -42,8 +44,12 @@ const GOOGLE_FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
 export const test = base.extend<Fixtures>({
   // `extraHTTPHeaders` sends the test-auth header to every origin. Google Fonts
   // rejects it in the CORS preflight, and screenshots fall back to system fonts.
-  context: async ({ context }, use) => {
+  context: async ({ context }, use, testInfo) => {
     await context.route(GOOGLE_FONTS, async (route) => {
+      if (testInfo.tags.includes('@snapshot')) {
+        await route.fulfill({ contentType: 'text/css', body: '' })
+        return
+      }
       const headers = { ...route.request().headers() }
       delete headers['x-test-user-email']
       await route.continue({ headers })
@@ -51,9 +57,32 @@ export const test = base.extend<Fixtures>({
     await use(context)
   },
   fixedTime: [undefined, { option: true }],
-  tracker: async ({ page, fixedTime }, use) => {
-    if (fixedTime) {
-      await page.clock.setFixedTime(new Date(fixedTime))
+  snapshotTime: [undefined, { option: true }],
+  tracker: async ({ page, fixedTime, snapshotTime }, use, testInfo) => {
+    const snapshot = testInfo.tags.includes('@snapshot')
+    const time = snapshot ? snapshotTime : fixedTime
+    if (time) {
+      await page.clock.setFixedTime(new Date(time))
+    }
+    if (snapshot) {
+      const css = await readFile('tests/e2e/screenshot-stable.css', 'utf8')
+      await page.addInitScript((styles) => {
+        const insert = () => {
+          const style = document.createElement('style')
+          style.textContent = styles
+          document.documentElement.append(style)
+        }
+        if (document.documentElement) {
+          insert()
+        } else {
+          const observer = new MutationObserver(() => {
+            if (!document.documentElement) return
+            observer.disconnect()
+            insert()
+          })
+          observer.observe(document, { childList: true })
+        }
+      }, css)
     }
     // The legacy blob is owner-only and no longer accepts a client-selected
     // namespace. Legacy browser specs therefore reset the one owner blob and

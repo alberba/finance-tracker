@@ -1,64 +1,7 @@
-import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 
-async function expectModalCentered(
-  page: Page,
-  selector: string,
-  tolerance = 24,
-) {
-  const dialog = page.locator(selector);
-  await expect(dialog).toBeVisible();
-  await dialog.evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
-  });
-
-  const viewport = page.viewportSize();
-  const box = await dialog.boundingBox();
-  if (!viewport || !box) {
-    throw new Error(`No se pudo medir el modal ${selector}.`);
-  }
-
-  const dialogCenterX = box.x + box.width / 2;
-  const dialogCenterY = box.y + box.height / 2;
-  const viewportCenterX = viewport.width / 2;
-  const viewportCenterY = viewport.height / 2;
-
-  expect(Math.abs(dialogCenterX - viewportCenterX)).toBeLessThanOrEqual(
-    tolerance,
-  );
-  expect(Math.abs(dialogCenterY - viewportCenterY)).toBeLessThanOrEqual(
-    tolerance,
-  );
-}
-
-async function expectModalAnchoredToLauncher(
-  page: Page,
-  selector: string,
-  inset = 22,
-  tolerance = 4,
-) {
-  const dialog = page.locator(selector);
-  await expect(dialog).toBeVisible();
-  await dialog.evaluate(async (element) => {
-    await Promise.all(element.getAnimations().map((animation) => animation.finished));
-  });
-
-  const viewport = page.viewportSize();
-  const box = await dialog.boundingBox();
-  if (!viewport || !box) {
-    throw new Error(`No se pudo medir el panel ${selector}.`);
-  }
-
-  expect(
-    Math.abs(viewport.width - (box.x + box.width) - inset),
-  ).toBeLessThanOrEqual(tolerance);
-  expect(
-    Math.abs(viewport.height - (box.y + box.height) - inset),
-  ).toBeLessThanOrEqual(tolerance);
-}
-
 test.describe("Reports E2E", () => {
-  test("expande el formulario desde el acceso global anclado", async ({
+  test("abre el panel lateral de reporte desde el acceso global", async ({
     page,
     tracker,
   }) => {
@@ -82,30 +25,26 @@ test.describe("Reports E2E", () => {
       .toBeGreaterThan(compactWidth);
 
     await tracker.openGlobalReportDialog();
-    await expect(tracker.issueReportDialog).toHaveAttribute("open", "");
-    await expectModalAnchoredToLauncher(page, "#global-report-dialog");
-    await expect(tracker.issueReportDialog).not.toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toHaveCSS(
-      "animation-name",
-      "report-dialog-in",
-    );
-    await expect(tracker.issueReportDialog.getByLabel("Resumen")).toBeFocused();
-    await expect(
-      tracker.issueReportDialog.locator("#issue-report-steps"),
-    ).toHaveCount(0);
-    await expect(
-      tracker.issueReportDialog.locator("#issue-report-mention-claude"),
-    ).toHaveCount(0);
+    const panel = tracker.issueReportDialog;
+    // Polled: the side panel slides in from the right edge.
+    await expect
+      .poll(() => panel.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    await expect(panel.getByLabel("Resumen")).toBeFocused();
+    await expect(trigger).toBeHidden();
 
     await page.keyboard.press("Escape");
-    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toBeHidden();
+    await expect(panel).toBeHidden();
     await expect(trigger).toBeFocused();
 
     await trigger.click();
-    await page.locator("#global-report-dialog-close").click();
-    await expect(tracker.issueReportDialog).toHaveClass(/is-closing/);
-    await expect(tracker.issueReportDialog).toBeHidden();
+    await panel.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(panel).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    await trigger.click();
+    await panel.getByRole("button", { name: "Cancelar" }).click();
+    await expect(panel).toBeHidden();
     await expect(trigger).toBeFocused();
   });
 
@@ -175,7 +114,6 @@ test.describe("Reports E2E", () => {
       expectedResult: "El cambio debe persistir.",
       actualResult: "El cambio desaparece al recargar.",
     });
-    expect(submittedPayload).not.toHaveProperty("mentionClaude");
     expect(submittedPayload).not.toHaveProperty("stepsToReproduce");
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",
@@ -187,10 +125,10 @@ test.describe("Reports E2E", () => {
     tracker,
   }) => {
     await tracker.openGlobalReportDialog();
-    const form = tracker.issueReportDialog.locator("#issue-report-form");
-    await form.locator("#issue-report-summary").fill("abc");
-    await form.locator("#issue-report-description").fill("corta");
-    await form.getByRole("button", { name: "Crear reporte" }).click();
+    const panel = tracker.issueReportDialog;
+    await panel.getByLabel("Resumen").fill("abc");
+    await panel.getByLabel("Descripción").fill("corta");
+    await panel.getByRole("button", { name: "Crear reporte" }).click();
     await expect(tracker.issueReportStatus()).toContainText(
       "el resumen debe tener al menos 5 caracteres",
     );
@@ -292,40 +230,37 @@ test.describe("Reports E2E", () => {
     await expect(status).not.toContainText("Token de Cf-Access");
   });
 
-  test("los modales principales se abren centrados en pantalla", async ({
+  test("los paneles laterales se anclan al borde derecho", async ({
     page,
     tracker,
   }) => {
+    // The movement form is a side panel now, anchored to the right edge.
     await tracker.openTransactions();
     await tracker.transactionsSection
-      .getByRole("button", { name: "Nuevo" })
+      .getByRole("button", { name: "Nuevo movimiento" })
       .click();
-    await expectModalCentered(page, "#tx-dialog");
-    // Close it before navigating. Sections are rendered one at a time now, so
-    // `openWealth()` has to click the nav tab — and an open dialog's backdrop
-    // swallows that click. It only worked while every section stayed mounted
-    // and the navigation helper could skip the click altogether.
-    await page.locator("#tx-close-modal").click();
+    const panel = page.getByRole("dialog", { name: "Nuevo movimiento" });
+    await expect(panel).toBeVisible();
+    // Polled: the panel slides in from the right.
+    await expect
+      .poll(() => panel.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    // Close it before navigating: an open dialog's backdrop swallows the
+    // click on the nav tab.
+    await panel.getByRole("button", { name: "Cerrar" }).click();
 
+    // The balance calculator is a side panel too.
     await tracker.openWealth();
-    // Match the accessible name, not the visible label: these buttons read
-    // "Calcular" but carry `aria-label="Abrir cálculo de <activo>"`
-    // (`WealthSnapshotTable.vue`), which is what `getByRole` resolves.
     await tracker.wealthSection
-      .getByRole("button", { name: /^Abrir cálculo de / })
+      .getByRole("button", { name: /^Calcular el saldo de / })
       .first()
       .click();
-    await expectModalCentered(page, "#wealth-calc-dialog");
-    await page.locator("#wealth-calc-close").click();
-
-    await tracker.openContributionWorkflowModal();
-    await expectModalCentered(page, "#contribution-workflow-dialog");
-
-    const workflowModal = page.locator("#contribution-workflow-dialog");
-    const investmentSnapshotButton = workflowModal
-      .getByRole("button", { name: /^Calcular snapshot de / })
-      .first();
-    await investmentSnapshotButton.click();
-    await expectModalCentered(page, "#contribution-calc-dialog");
+    const calc = tracker.wealthCalcPanel();
+    await expect(calc).toBeVisible();
+    await expect
+      .poll(() => calc.evaluate((element) => Math.round(element.getBoundingClientRect().right)))
+      .toBe(page.viewportSize()!.width);
+    await calc.getByRole("button", { name: "Cerrar", exact: true }).click();
+    await expect(calc).toBeHidden();
   });
 });

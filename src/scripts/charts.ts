@@ -7,6 +7,9 @@ import {
   type TooltipOptions,
 } from 'chart.js'
 
+import { formatAxisLabel } from '../lib/format'
+import { readChartTheme, resolveColor } from './chart-theme'
+
 Chart.register(...registerables)
 
 declare global {
@@ -25,21 +28,18 @@ type ValueFormatter = (value: number) => string
    "Editorial" chart language: minimal chrome, hairline grids with no
    axis borders, thin smooth lines with gradient fills and no resting
    point markers, slim rounded bars, fine donut ring, refined legends.
-   Colors are read from CSS custom properties at render time so charts
-   follow the active light/dark theme (re-rendered on theme switch).
+   Colors and axis type come from the design tokens (chart-theme.ts) at
+   render time, so charts follow the active light/dark theme (re-rendered
+   on theme switch). Series colors may be token references (`var(--…)`).
    ────────────────────────────────────────────────────────────────── */
-function cssVar(name: string, fallback: string): string {
-  if (typeof document === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return value || fallback
-}
-const axisColor = () => cssVar('--chart-axis', '#7b8b8d')
-const gridColor = () => cssVar('--chart-grid', '#edf3f0')
-const legendColor = () => cssVar('--chart-legend', '#516164')
-const pointBorderColorVar = () => cssVar('--chart-point-border', '#ffffff')
-const emptyColor = () => cssVar('--chart-empty', '#e2ece7')
+const axisColor = () => readChartTheme().axis
+const gridColor = () => readChartTheme().grid
+const legendColor = () => readChartTheme().legend
+const pointBorderColorVar = () => readChartTheme().pointBorder
 
+// Legends name series (text, body font); axes carry figures (display font).
 const FONT_FAMILY = "'DM Sans', system-ui, sans-serif"
+const axisFont = (size: number) => ({ size, family: readChartTheme().fontFamily })
 
 // Append 8-bit alpha to a 6-digit hex color (e.g. "#3B6BF0" + 0.2 -> "#3B6BF033").
 function withAlpha(color: string, alpha: number): string {
@@ -96,19 +96,19 @@ function baseScales(
       grid: { display: false },
       border: { display: false },
       ticks: {
-        font: { size: 10, family: FONT_FAMILY },
+        font: axisFont(10),
         color: colors.axis || axisColor(),
         maxRotation: 0,
         autoSkipPadding: 16,
         padding: 6,
-        callback: (_value: string | number, index: number) => (labels[index] || '').slice(0, 3),
+        callback: (_value: string | number, index: number) => formatAxisLabel(labels[index]),
       },
     },
     y: {
       grid: { color: colors.grid || gridColor(), drawTicks: false, lineWidth: 1 },
       border: { display: false },
       ticks: {
-        font: { size: 10, family: FONT_FAMILY },
+        font: axisFont(10),
         color: colors.axis || axisColor(),
         maxTicksLimit: 5,
         padding: 10,
@@ -150,22 +150,13 @@ export interface LineChartOptions {
   yPaddingRatio?: number
 }
 
-export interface GroupedBarSeriesItem {
-  name: string
-  color: string
-  values: number[]
-}
-
-export interface DonutChartItem {
-  label: string
-  color: string
-  value: number
-}
-
 export interface MultiLineSeries {
   name: string
+  /** A color or a token reference (`var(--chart-series-1)`). */
   color: string
   values: number[]
+  /** Dashed line, for reference series such as contributed capital. */
+  dashed?: boolean
 }
 
 export interface MultiLineChartOptions {
@@ -198,7 +189,7 @@ function makeExternalTooltip<TType extends ChartType>(
     if (!tooltipEl) return
 
     if (tooltip.opacity === 0) {
-      tooltipEl.classList.remove('is-visible')
+      delete tooltipEl.dataset.visible
       tooltipEl.setAttribute('aria-hidden', 'true')
       return
     }
@@ -210,7 +201,7 @@ function makeExternalTooltip<TType extends ChartType>(
     const canvasRect = chart.canvas.getBoundingClientRect()
     tooltipEl.style.left = canvasRect.left + tooltip.caretX + 'px'
     tooltipEl.style.top = canvasRect.top + tooltip.caretY + 'px'
-    tooltipEl.classList.add('is-visible')
+    tooltipEl.dataset.visible = ''
     tooltipEl.setAttribute('aria-hidden', 'false')
   }
 }
@@ -284,303 +275,6 @@ export function renderLineChart(
   })
 }
 
-// Tiny, chrome-less trend line for the dashboard stat cards: no axes, grid,
-// legend, tooltip or resting points — just the line and a soft gradient fill.
-export function renderSparkline(canvas: HTMLCanvasElement, values: number[], color: string): void {
-  destroyExisting(canvas)
-
-  const safeValues = values.map((v) => Number(v || 0))
-
-  new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: safeValues.map((_, i) => i),
-      datasets: [
-        {
-          data: safeValues,
-          borderColor: color,
-          backgroundColor: areaFill(color),
-          fill: true,
-          borderWidth: 2,
-          tension: 0.4,
-          pointRadius: 0,
-          pointHoverRadius: 0,
-          borderJoinStyle: 'round' as const,
-          borderCapStyle: 'round' as const,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      layout: { padding: { top: 2, bottom: 2, left: 0, right: 0 } },
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      scales: { x: { display: false }, y: { display: false } },
-      elements: { line: { capBezierPoints: true } },
-    },
-  })
-}
-
-export function renderGroupedBarChart(
-  canvas: HTMLCanvasElement,
-  labels: readonly string[],
-  series: GroupedBarSeriesItem[],
-  formatValue: ValueFormatter = (value) => String(Number(value || 0).toFixed(2)),
-): void {
-  destroyExisting(canvas)
-
-  const totalBars = labels.length * series.length
-  canvas.dataset.chartBarCount = String(totalBars)
-
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: Array.from(labels),
-      datasets: series.map((item) => ({
-        label: item.name,
-        data: item.values.map((v) => Number(v || 0)),
-        backgroundColor: item.color,
-        hoverBackgroundColor: item.color,
-        borderRadius: 6,
-        borderSkipped: false,
-        maxBarThickness: 30,
-        barPercentage: 0.74,
-        categoryPercentage: 0.62,
-      })),
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      layout: { padding: { top: 4 } },
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: refinedLegend(true),
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'bar'>((tooltip) => {
-            return tooltip.dataPoints
-              .map((dp) => `${tooltipDatasetLabel(dp)}: ${formatValue(tooltipRawNumber(dp))}`)
-              .join(' | ')
-          }),
-        },
-      },
-      scales: {
-        x: {
-          stacked: false,
-          grid: { display: false },
-          border: { display: false },
-          ticks: {
-            font: { size: 10, family: FONT_FAMILY },
-            color: axisColor(),
-            maxRotation: 0,
-            padding: 6,
-            callback: (_value: string | number, index: number) =>
-              (Array.from(labels)[index] || '').slice(0, 3),
-          },
-        },
-        y: {
-          grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
-          border: { display: false },
-          ticks: {
-            font: { size: 10, family: FONT_FAMILY },
-            color: axisColor(),
-            maxTicksLimit: 5,
-            padding: 10,
-            callback: (value: string | number) => formatValue(Number(value || 0)),
-          },
-          beginAtZero: true,
-        },
-      },
-    },
-  })
-}
-
-export function renderDonutChart(
-  canvas: HTMLCanvasElement,
-  data: DonutChartItem[],
-  formatValue: ValueFormatter,
-  options: { showLegend?: boolean } = {},
-): void {
-  destroyExisting(canvas)
-
-  const showLegend = options.showLegend ?? true
-  const clean = data.map((item) => ({
-    ...item,
-    value: Math.max(Number(item.value || 0), 0),
-  }))
-  const total = clean.reduce((sum, item) => sum + item.value, 0)
-
-  canvas.dataset.chartSegmentCount = String(clean.filter((item) => item.value > 0).length)
-  canvas.dataset.chartLegendCount = String(clean.length)
-
-  if (total <= 0) {
-    new Chart(canvas, {
-      type: 'doughnut',
-      data: {
-        labels: ['Sin datos'],
-        datasets: [{ data: [1], backgroundColor: [emptyColor()], borderWidth: 0 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        cutout: '74%',
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
-    })
-    return
-  }
-
-  new Chart(canvas, {
-    type: 'doughnut',
-    data: {
-      labels: clean.map((item) => item.label),
-      datasets: [
-        {
-          data: clean.map((item) => item.value),
-          backgroundColor: clean.map((item) => item.color),
-          hoverOffset: 6,
-          borderWidth: 3,
-          borderColor: pointBorderColorVar(),
-          borderRadius: 4,
-          spacing: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      cutout: '74%',
-      layout: { padding: 6 },
-      plugins: {
-        legend: {
-          display: showLegend,
-          position: 'right' as const,
-          labels: {
-            font: { size: 11, family: FONT_FAMILY },
-            color: legendColor(),
-            usePointStyle: true,
-            pointStyle: 'circle',
-            boxWidth: 8,
-            boxHeight: 8,
-            padding: 12,
-          },
-        },
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'doughnut'>((tooltip) => {
-            const dp = tooltip.dataPoints[0]
-            const raw = tooltipRawNumber(dp)
-            const pct = total > 0 ? (raw / total) * 100 : 0
-            return `${dp.label}: ${formatValue(raw)} (${pct.toFixed(1)}%)`
-          }),
-        },
-      },
-    },
-    plugins: [
-      {
-        id: 'center-text',
-      },
-    ],
-  })
-}
-
-export function renderHorizontalBarChart(
-  canvas: HTMLCanvasElement,
-  data: Array<{ label: string; value: number }>,
-  palette: string[],
-  formatValue: ValueFormatter,
-): void {
-  destroyExisting(canvas)
-
-  const cleaned = data
-    .map((item) => ({
-      label: item.label,
-      value: Math.max(Number(item.value || 0), 0),
-    }))
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-
-  canvas.dataset.chartBarCount = String(cleaned.length)
-
-  if (!cleaned.length) {
-    new Chart(canvas, {
-      type: 'bar',
-      data: {
-        labels: ['Sin datos'],
-        datasets: [{ data: [0], backgroundColor: [emptyColor()] }],
-      },
-      options: {
-        indexAxis: 'y' as const,
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
-    })
-    return
-  }
-
-  new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: cleaned.map((item) => item.label),
-      datasets: [
-        {
-          data: cleaned.map((item) => item.value),
-          backgroundColor: cleaned.map((_, idx) => palette[idx % palette.length]),
-          borderRadius: 6,
-          borderSkipped: false,
-          maxBarThickness: 22,
-          categoryPercentage: 0.72,
-        },
-      ],
-    },
-    options: {
-      indexAxis: 'y' as const,
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'bar'>((tooltip) => {
-            const dp = tooltip.dataPoints[0]
-            return `${dp.label}: ${formatValue(tooltipRawNumber(dp))}`
-          }),
-        },
-      },
-      scales: {
-        x: {
-          grid: { color: gridColor(), drawTicks: false, lineWidth: 1 },
-          border: { display: false },
-          ticks: {
-            font: { size: 10, family: FONT_FAMILY },
-            color: axisColor(),
-            maxTicksLimit: 5,
-            padding: 8,
-            callback: (value: string | number) => formatValue(Number(value || 0)),
-          },
-          beginAtZero: true,
-        },
-        y: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: {
-            font: { size: 11, family: FONT_FAMILY },
-            color: axisColor(),
-            padding: 6,
-          },
-        },
-      },
-    },
-  })
-}
-
 export function renderMultiLineChart(
   canvas: HTMLCanvasElement,
   series: MultiLineSeries[],
@@ -635,15 +329,19 @@ export function renderMultiLineChart(
     type: 'line',
     data: {
       labels,
-      datasets: series.map((s) => ({
-        label: s.name,
-        data: s.values.map((v) => Number(v || 0)),
-        borderColor: s.color,
-        backgroundColor: s.color,
-        pointBackgroundColor: s.color,
-        pointBorderColor: pointBorderColorVar(),
-        ...lineCommon,
-      })),
+      datasets: series.map((s) => {
+        const color = resolveColor(s.color)
+        return {
+          label: s.name,
+          data: s.values.map((v) => Number(v || 0)),
+          borderColor: color,
+          backgroundColor: color,
+          pointBackgroundColor: color,
+          pointBorderColor: pointBorderColorVar(),
+          borderDash: s.dashed ? [6, 5] : undefined,
+          ...lineCommon,
+        }
+      }),
     },
     options: {
       responsive: true,

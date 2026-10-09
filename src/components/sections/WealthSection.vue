@@ -1,256 +1,187 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import AppSection from '../ui/AppSection.vue'
-import ChartCanvas from '../charts/ChartCanvas.vue'
-import WealthSnapshotTable from '../wealth/WealthSnapshotTable.vue'
+import BaseButton from '../ui/BaseButton.vue'
+import DocumentSurface from '../ui/DocumentSurface.vue'
+import NumberedBlock from '../ui/NumberedBlock.vue'
+import PageHeader from '../ui/PageHeader.vue'
+import WealthBand from '../wealth/WealthBand.vue'
+import WealthCalcPanel, { type WealthCalcTarget } from '../wealth/WealthCalcPanel.vue'
+import WealthHistoryTable from '../wealth/WealthHistoryTable.vue'
+import WealthSnapshotLedger from '../wealth/WealthSnapshotLedger.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { useToast } from '../../composables/useToast'
-import type { SnapshotRowViewModel } from '../../domain/wealth/view-model'
-import { renderLineChart } from '../../scripts/charts'
-import { evaluateNumericExpression } from '../../scripts/math-expression'
-import { MONTHS, type SnapshotKind } from '../../scripts/types'
-import { parseIntSafe, round2 } from '../../scripts/utils'
+import {
+  formatSnapshotInput,
+  parseSnapshotInput,
+  parseSnapshotKey,
+  snapshotKey,
+  snapshotTotals,
+  type SnapshotRowViewModel,
+} from '../../domain/wealth/view-model'
+import type { SnapshotKind } from '../../scripts/types'
+import { useFinancialStateStore } from '../../stores/financial-state'
 import { useWealthStore } from '../../stores/wealth'
-import MarketQuotesPanel from '../market/MarketQuotesPanel.vue'
 
-withDefaults(
-  defineProps<{
-    isActive?: boolean
-  }>(),
-  { isActive: false },
-)
+withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const wealthStore = useWealthStore()
+const financialStateStore = useFinancialStateStore()
 const { viewModel, snapshotMonth } = storeToRefs(wealthStore)
-const { formatMoney, formatMoneyCompact } = useMoneyFormatter()
-const { showToast } = useToast()
+const { formatMoney } = useMoneyFormatter()
 
-// Snapshot inputs are transient (editable) until "Guardar snapshot" commits
-// them. Re-initialise from the view model whenever the month or committed
-// snapshots change.
+// The snapshot fields are a draft until "Guardar" commits them; `saved` holds
+// what the month has stored, to count and discard the changes.
 const inputs = reactive<Record<string, string>>({})
+const saved = ref<Record<string, string>>({})
 
-function keyOf(kind: SnapshotKind, id: string): string {
-  return `${kind}:${id}`
-}
-
-function seedInputs(kind: SnapshotKind, rows: SnapshotRowViewModel[]): void {
-  rows.forEach((row) => {
-    inputs[keyOf(kind, row.id)] = row.snapshot === null ? '' : String(row.snapshot)
-  })
-}
-
-watch(
-  viewModel,
-  (vm) => {
-    for (const key of Object.keys(inputs)) {
-      delete inputs[key]
+function reset(): void {
+  const next: Record<string, string> = {}
+  for (const group of viewModel.value.groups) {
+    for (const row of group.rows) {
+      next[snapshotKey(group.kind, row.id)] = formatSnapshotInput(row.snapshot)
     }
-    seedInputs('accounts', vm.accountRows)
-    seedInputs('investments', vm.investmentRows)
-    seedInputs('liabilities', vm.liabilityRows)
-  },
-  { immediate: true },
-)
-
-const drawWealthChart = computed(() => {
-  const series = viewModel.value.netSeries
-  const labels = viewModel.value.chartLabels
-  return (canvas: HTMLCanvasElement) => {
-    renderLineChart(canvas, series, {
-      color: '#1f6feb',
-      fill: 'rgba(37, 99, 235, 0.13)',
-      labels,
-      formatValue: formatMoney,
-      formatAxisValue: formatMoneyCompact,
-    })
   }
+  saved.value = next
+  for (const key of Object.keys(inputs)) delete inputs[key]
+  Object.assign(inputs, next)
+}
+
+watch(viewModel, reset, { immediate: true })
+
+const month = computed({
+  get: () => snapshotMonth.value,
+  set: (value: number) => wealthStore.setMonth(value),
+})
+const monthName = computed(() => viewModel.value.months[snapshotMonth.value]?.name ?? '')
+const totals = computed(() => snapshotTotals(viewModel.value.groups, inputs))
+const changes = computed(
+  () => Object.keys(inputs).filter((key) => inputs[key] !== saved.value[key]).length,
+)
+const status = computed(() => {
+  if (changes.value > 0) return { saved: false, text: 'Con cambios sin guardar' }
+  if (viewModel.value.months[snapshotMonth.value]?.saved) return { saved: true, text: 'Guardado' }
+  return { saved: false, text: 'Sin guardar: es el saldo calculado' }
 })
 
-function onMonthChange(event: Event): void {
-  wealthStore.setMonth(parseIntSafe((event.target as HTMLSelectElement).value, snapshotMonth.value))
-}
-
-function onSaveSnapshot(): void {
-  const edits = Object.entries(inputs).map(([key, value]) => {
-    const [kind, id] = key.split(':') as [SnapshotKind, string]
-    return { kind, id, value }
-  })
+function save(): void {
+  const edits = Object.entries(inputs).map(([key, value]) => ({
+    ...parseSnapshotKey(key),
+    value,
+  }))
   wealthStore.saveSnapshot(edits)
 }
 
-// Wealth-calc dialog (investment snapshots only).
-const calcDialogRef = ref<HTMLDialogElement | null>(null)
-const calcExpressionInput = ref<HTMLInputElement | null>(null)
-const calcTargetId = ref('')
-const calcTargetName = ref('')
-const calcExpression = ref('')
-const calcTitle = computed(() =>
-  calcTargetName.value ? `Calcular snapshot · ${calcTargetName.value}` : 'Calcular snapshot',
-)
+const calcOpen = ref(false)
+const calcTarget = ref<WealthCalcTarget | null>(null)
 
-function openCalc(row: SnapshotRowViewModel): void {
-  calcTargetId.value = row.id
-  calcTargetName.value = row.name
-  calcExpression.value = ''
-  calcDialogRef.value?.showModal?.()
-  void nextTick(() => calcExpressionInput.value?.focus())
+function openCalc(kind: SnapshotKind, row: SnapshotRowViewModel): void {
+  const key = snapshotKey(kind, row.id)
+  const typed = parseSnapshotInput(inputs[key] ?? '')
+  calcTarget.value = {
+    key,
+    name: row.name,
+    current: typed === null || Number.isNaN(typed) ? row.calculated : typed,
+    calculated: row.calculated,
+    opening: row.opening,
+  }
+  calcOpen.value = true
 }
 
-function closeCalc(): void {
-  if (calcDialogRef.value?.open) {
-    calcDialogRef.value.close()
-  }
-  calcTargetId.value = ''
-  calcTargetName.value = ''
-  calcExpression.value = ''
-}
-
-function applyCalc(): void {
-  if (!calcTargetId.value) {
-    closeCalc()
-    return
-  }
-  const evaluated = evaluateNumericExpression(calcExpression.value)
-  if (evaluated === null) {
-    showToast('El cálculo no es válido.')
-    calcExpressionInput.value?.focus()
-    return
-  }
-  inputs[keyOf('investments', calcTargetId.value)] = String(round2(evaluated))
-  showToast('Resultado aplicado al snapshot.')
-  closeCalc()
+function applyCalc(key: string, value: number): void {
+  inputs[key] = formatSnapshotInput(value)
 }
 </script>
 
 <template>
   <AppSection id="wealth" :is-active="isActive">
-    <div class="panel-head">
-      <div>
-        <p class="panel-kicker">Balance patrimonial</p>
-        <h2 id="wealth-title">Patrimonio total</h2>
-        <p>Liquidez + inversión - deuda, con snapshots mensuales manuales.</p>
-      </div>
-      <div class="inline-controls">
-        <label>
-          Mes snapshot
-          <select
-            id="snapshot-month"
-            name="snapshotMonth"
-            :value="snapshotMonth"
-            @change="onMonthChange"
-          >
-            <option v-for="(name, index) in MONTHS" :key="name" :value="index">{{ name }}</option>
-          </select>
-        </label>
-        <button id="save-snapshot" class="primary-btn" type="button" @click="onSaveSnapshot">
-          Guardar snapshot
-        </button>
-      </div>
+    <div class="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
+      <PageHeader
+        :kicker="`Balance patrimonial · ${financialStateStore.year}`"
+        title="Patrimonio"
+        title-id="wealth-title"
+        lede="Apunta cada mes el saldo real de tus cuentas, inversiones y deudas."
+      >
+        <template #aside>
+          <BaseButton variant="primary" data-save-snapshot @click="save">
+            <svg
+              class="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+            Guardar {{ monthName }}
+          </BaseButton>
+        </template>
+      </PageHeader>
+
+      <WealthBand
+        v-model:month="month"
+        :totals="totals"
+        :months="viewModel.months"
+        :month-name="monthName"
+        :status="status"
+        :format-money="formatMoney"
+      />
+
+      <DocumentSurface>
+        <NumberedBlock
+          number="01"
+          :title="`Saldos de ${monthName}`"
+          title-id="wealth-snapshot-title"
+          description="Lo que dejes vacío toma el saldo calculado con tus movimientos."
+        >
+          <template v-if="changes > 0" #actions>
+            <div role="status" class="flex items-center gap-1.5" data-snapshot-changes>
+              <span
+                class="bg-accent/15 text-text-main flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold"
+              >
+                <span class="bg-accent size-2 rounded-full" aria-hidden="true"></span>
+                {{ changes === 1 ? '1 cambio sin guardar' : `${changes} cambios sin guardar` }}
+              </span>
+              <BaseButton variant="ghost" @click="reset">Descartar</BaseButton>
+            </div>
+          </template>
+          <WealthSnapshotLedger
+            :groups="viewModel.groups"
+            :inputs="inputs"
+            :totals="totals"
+            :format-money="formatMoney"
+            @update="(key, value) => (inputs[key] = value)"
+            @calculate="openCalc"
+          />
+        </NumberedBlock>
+
+        <NumberedBlock
+          number="02"
+          title="Cada cuenta, mes a mes"
+          title-id="wealth-history-title"
+          :description="`Saldos al cierre de ${financialStateStore.year}, en euros redondeados. Pulsa un mes para abrir su snapshot.`"
+        >
+          <WealthHistoryTable
+            v-model:month="month"
+            :rows="viewModel.history.rows"
+            :months="viewModel.months"
+            :shown="viewModel.history.months"
+          />
+        </NumberedBlock>
+      </DocumentSurface>
     </div>
 
-    <MarketQuotesPanel title="Valoración de patrimonio en mercado" />
-
-    <div class="dual-grid">
-      <WealthSnapshotTable
-        title="Liquidez"
-        header-label="Cuenta"
-        kind="accounts"
-        list-id="snapshot-accounts"
-        :rows="viewModel.accountRows"
-        :inputs="inputs"
-        :format-money="formatMoney"
-        @update-snapshot="(key: string, value: string) => (inputs[key] = value)"
-      />
-      <WealthSnapshotTable
-        title="Inversión"
-        header-label="Activo"
-        kind="investments"
-        list-id="snapshot-investments"
-        :rows="viewModel.investmentRows"
-        :inputs="inputs"
-        :format-money="formatMoney"
-        @open-calc="openCalc"
-        @update-snapshot="(key: string, value: string) => (inputs[key] = value)"
-      />
-      <WealthSnapshotTable
-        title="Deuda / Pasivos"
-        header-label="Item"
-        kind="liabilities"
-        list-id="snapshot-liabilities"
-        :rows="viewModel.liabilityRows"
-        :inputs="inputs"
-        :format-money="formatMoney"
-        @update-snapshot="(key: string, value: string) => (inputs[key] = value)"
-      />
-      <article class="card">
-        <h3>Evolución mensual</h3>
-        <div class="chart-canvas-wrap">
-          <ChartCanvas
-            id="chart-wealth"
-            :draw="drawWealthChart"
-            aria-label="Evolución mensual patrimonio"
-          />
-        </div>
-        <div class="table-wrap compact">
-          <table>
-            <thead>
-              <tr>
-                <th>Mes</th>
-                <th>Liquidez</th>
-                <th>Inversión</th>
-                <th>Deuda</th>
-                <th>Neto</th>
-              </tr>
-            </thead>
-            <tbody id="wealth-timeline-body">
-              <tr v-for="row in viewModel.timeline" :key="row.label">
-                <td>{{ row.label }}</td>
-                <td>{{ formatMoney(row.liquidity) }}</td>
-                <td>{{ formatMoney(row.investment) }}</td>
-                <td>{{ formatMoney(row.liabilities) }}</td>
-                <td><strong>{{ formatMoney(row.net) }}</strong></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </article>
-    </div>
-
-    <dialog id="wealth-calc-dialog" ref="calcDialogRef" class="wealth-calc-dialog">
-      <form id="wealth-calc-form" class="wealth-calc-form" autocomplete="off" @submit.prevent="applyCalc">
-        <div class="wealth-calc-head">
-          <h3 id="wealth-calc-title">{{ calcTitle }}</h3>
-          <button
-            id="wealth-calc-close"
-            type="button"
-            class="tx-close-btn"
-            aria-label="Cerrar cálculo"
-            @click="closeCalc"
-          >
-            ✕
-          </button>
-        </div>
-        <label>
-          Cálculo numérico
-          <input
-            id="wealth-calc-expression"
-            ref="calcExpressionInput"
-            v-model="calcExpression"
-            name="wealthCalcExpression"
-            type="text"
-            placeholder="Ej: 1200+35,5*2"
-            autocomplete="off"
-          />
-        </label>
-        <div class="wealth-calc-actions">
-          <button id="wealth-calc-apply" type="submit" class="tx-btn-primary">
-            Aplicar al snapshot
-          </button>
-        </div>
-      </form>
-    </dialog>
+    <WealthCalcPanel
+      v-model:open="calcOpen"
+      :target="calcTarget"
+      :month-name="monthName"
+      :format-money="formatMoney"
+      :currency="financialStateStore.state.currency"
+      @apply="applyCalc"
+    />
   </AppSection>
 </template>

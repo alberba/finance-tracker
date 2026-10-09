@@ -1,14 +1,20 @@
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
+import { useToast } from '../composables/useToast'
 import { buildBudgetViewModel } from '../domain/budget/view-model'
-import { resolveOrCreateCategoryId, syncBudgetEntry, type CategoryKind } from '../lib/client/command-mapping'
-import type { BudgetType } from '../scripts/types'
+import {
+  resolveOrCreateCategoryId,
+  syncBudgetEntry,
+  type CategoryKind,
+} from '../lib/client/command-mapping'
+import type { BudgetType, State } from '../scripts/types'
 import { round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 
 export const useBudgetStore = defineStore('budget', () => {
   const financialStateStore = useFinancialStateStore()
+  const { showToast } = useToast()
 
   const viewModel = computed(() => buildBudgetViewModel(financialStateStore.state))
   const budget = computed(() => financialStateStore.budget)
@@ -26,31 +32,15 @@ export const useBudgetStore = defineStore('budget', () => {
     return investmentCategories.value
   }
 
-  function updateBudgetValue(
-    type: BudgetType,
-    category: string,
-    month: number,
-    value: number,
-  ): void {
-    financialStateStore.commitState((draft) => {
-      if (!draft.budget[type]) {
-        draft.budget[type] = {}
-      }
+  function ensureRow(draft: State, type: BudgetType, category: string): number[] {
+    draft.budget[type] ??= {}
+    const row = (draft.budget[type][category] ??= [])
+    while (row.length < 12) row.push(0)
+    return row
+  }
 
-      if (!draft.budget[type][category]) {
-        draft.budget[type][category] = Array.from({ length: 12 }, () => 0)
-      }
-
-      if (draft.budget[type][category].length < 12) {
-        draft.budget[type][category].push(
-          ...Array.from({ length: 12 - draft.budget[type][category].length }, () => 0),
-        )
-      }
-
-      draft.budget[type][category][month] = round2(value)
-    })
-
-    const amount = round2(value)
+  function syncMonths(type: BudgetType, category: string, amounts: Map<number, number>): void {
+    if (!amounts.size) return
     const year = financialStateStore.year
     const currency = financialStateStore.currency
     void (async () => {
@@ -64,8 +54,39 @@ export const useBudgetStore = defineStore('budget', () => {
       // Addressed by the cell's own natural key — category, year, month
       // (ADR 0001; audit §4.4 — a year-less key let a same-month edit in
       // another year resolve to last year's row).
-      await syncBudgetEntry(categoryId, year, month + 1, amount, currency)
+      for (const [month, amount] of amounts) {
+        await syncBudgetEntry(categoryId, year, month + 1, amount, currency)
+      }
     })()
+  }
+
+  function updateBudgetValue(
+    type: BudgetType,
+    category: string,
+    month: number,
+    value: number,
+  ): void {
+    const amount = round2(value)
+    financialStateStore.commitState((draft) => {
+      ensureRow(draft, type, category)[month] = amount
+    })
+    syncMonths(type, category, new Map([[month, amount]]))
+  }
+
+  /** The twelve months of a category at once: one commit, a sync per month that changed. */
+  function saveBudgetPlan(type: BudgetType, category: string, plan: readonly number[]): void {
+    const changed = new Map<number, number>()
+    financialStateStore.commitState((draft) => {
+      const row = ensureRow(draft, type, category)
+      plan.slice(0, 12).forEach((value, month) => {
+        const amount = round2(value)
+        if (row[month] === amount) return
+        row[month] = amount
+        changed.set(month, amount)
+      })
+    })
+    syncMonths(type, category, changed)
+    showToast(`Plan de ${category} guardado.`)
   }
 
   return {
@@ -76,5 +97,6 @@ export const useBudgetStore = defineStore('budget', () => {
     investmentCategories,
     getCategoriesForType,
     updateBudgetValue,
+    saveBudgetPlan,
   }
 })

@@ -4,6 +4,7 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
   function parseMoney(text: string): number {
     const cleaned = text
       .replace(/\u00a0/g, "")
+      .replace(/\u2212/g, "-")
       .replace(/[€$£]/g, "")
       .replace(/\./g, "")
       .replace(",", ".")
@@ -31,8 +32,6 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
     const simpleBtn = section.getByRole("button", { name: "Simple" });
     const twrBtn = section.getByRole("button", { name: "TWR" });
 
-    await expect(simpleBtn).toHaveClass(/is-active/);
-    await expect(twrBtn).not.toHaveClass(/is-active/);
     await expect(simpleBtn).toHaveAttribute("aria-pressed", "true");
     await expect(twrBtn).toHaveAttribute("aria-pressed", "false");
   });
@@ -47,12 +46,10 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
     await twrBtn.click();
 
     // El botón TWR queda activo
-    await expect(twrBtn).toHaveClass(/is-active/);
     await expect(twrBtn).toHaveAttribute("aria-pressed", "true");
 
     // El botón Simple deja de estar activo
     const simpleBtn = section.getByRole("button", { name: "Simple" });
-    await expect(simpleBtn).not.toHaveClass(/is-active/);
     await expect(simpleBtn).toHaveAttribute("aria-pressed", "false");
 
     // La etiqueta del KPI cambia a "Rentabilidad TWR"
@@ -83,7 +80,7 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
     ).toBeVisible();
   });
 
-  test("el toggle permanece visible al cambiar entre subtabs de inversión", async ({
+  test("el modo de rentabilidad se conserva al cambiar entre subtabs de inversión", async ({
     tracker,
   }) => {
     await tracker.openInvestment();
@@ -93,16 +90,15 @@ test.describe("toggle de modo de rentabilidad (Simple / TWR)", () => {
 
     // Activar TWR
     await twrBtn.click();
-    await expect(twrBtn).toHaveClass(/is-active/);
+    await expect(twrBtn).toHaveAttribute("aria-pressed", "true");
 
-    // Cambiar a pestaña Movimientos
+    // El selector solo afecta al Resumen, así que vive dentro de esa pestaña.
     await tracker.openInvestmentMovementsTab();
-    await expect(twrBtn).toBeVisible();
-    await expect(twrBtn).toHaveClass(/is-active/);
+    await expect(twrBtn).toBeHidden();
 
-    // Volver a Dashboard y el toggle sigue activo
+    // Volver al Resumen y el modo sigue activo
     await tracker.openInvestmentDashboardTab();
-    await expect(twrBtn).toHaveClass(/is-active/);
+    await expect(twrBtn).toHaveAttribute("aria-pressed", "true");
     await expect(section.locator("#inv-return-label")).toHaveText(
       "Rentabilidad TWR",
     );

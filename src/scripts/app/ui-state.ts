@@ -1,5 +1,4 @@
 import type {
-  BudgetType,
   InvestmentSubTab,
   TransactionsSubTab,
   SectionId,
@@ -7,22 +6,21 @@ import type {
   SortDirection,
   TxSortColumn,
 } from '../types'
-import type { TransactionFilters } from '../transactions'
+import type { RegistryFilters } from '../../domain/transactions/registry'
 
 export interface UiState {
   activeSection: SectionId
   month: number
-  budgetType: BudgetType
-  budgetMonth: number
+  /** Year the Movimientos registry shows. */
+  txYear: number
+  /** Month of that year the ink band shows. */
   txFilterMonth: number
   txSort: {
     column: TxSortColumn
     direction: SortDirection
   }
-  txOpenHeaderFilter: TxSortColumn | ''
   txSelectedIds: string[]
-  txFilters: TransactionFilters
-  txEditingId: string
+  txFilters: RegistryFilters
   txTab: TransactionsSubTab
   snapshotMonth: number
   investmentMonth: number

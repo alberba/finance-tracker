@@ -7,28 +7,30 @@
  * every other amount column.
  */
 
-import { and, eq, inArray } from "drizzle-orm";
-import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { investmentTradeDetails, transactions } from "../schema";
+import { and, eq, inArray } from 'drizzle-orm'
+import { fromMinorUnits, toMinorUnits } from '../../lib/money'
+import type { RemoteOperation } from '../../lib/bitvavo-types'
+import { investmentTradeDetails, transactions } from '../schema'
 import {
   type Db,
+  RejectedCommandError,
   assertOwnedReferences,
   chunkIds,
   clientIdentity,
   nowIso,
   versionGuard,
-} from "./shared";
+} from './shared'
 
-export type TransactionRow = Omit<typeof transactions.$inferSelect, "amountMinor"> & {
-  amount: number;
-};
+export type TransactionRow = Omit<typeof transactions.$inferSelect, 'amountMinor'> & {
+  amount: number
+}
 export type InvestmentTradeDetailRow = Omit<
   typeof investmentTradeDetails.$inferSelect,
-  "priceMinor" | "feeMinor"
+  'priceMinor' | 'feeMinor'
 > & {
-  price: number;
-  fee: number;
-};
+  price: number
+  fee: number
+}
 
 /**
  * The operation ("Operación", CONTEXT.md) that gives an investment movement
@@ -37,58 +39,61 @@ export type InvestmentTradeDetailRow = Omit<
  * at all.
  */
 export interface MovementOperationInput {
-  symbol?: string | null;
-  instrumentId?: string | null;
-  side: string;
-  units: number;
-  unitPrice: number;
-  fee: number;
+  symbol?: string | null
+  instrumentId?: string | null
+  side: string
+  units: number
+  unitPrice: number
+  fee: number
 }
 
 export interface CreateTransactionInput {
   /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
-  id?: string;
-  legacyId?: string | null;
-  accountId: string;
-  categoryId?: string | null;
-  type: string;
-  date: string;
-  description?: string | null;
-  amount: number;
-  currency: string;
-  time?: string | null;
-  declared?: boolean;
-  operation?: MovementOperationInput | null;
+  id?: string
+  legacyId?: string | null
+  accountId: string
+  categoryId?: string | null
+  type: string
+  date: string
+  description?: string | null
+  amount: number
+  currency: string
+  time?: string | null
+  declared?: boolean
+  operation?: MovementOperationInput | null
+  /** Provider identity of an imported movement (Bitvavo); only a backup restore sets it here. */
+  externalId?: string | null
+  remoteOperation?: RemoteOperation | null
 }
 
 export interface UpdateTransactionInput {
-  accountId?: string;
-  categoryId?: string | null;
-  type?: string;
-  date?: string;
-  description?: string | null;
-  amount?: number;
-  currency?: string;
-  time?: string | null;
-  declared?: boolean;
-  operation?: MovementOperationInput | null;
+  accountId?: string
+  categoryId?: string | null
+  type?: string
+  date?: string
+  description?: string | null
+  amount?: number
+  currency?: string
+  time?: string | null
+  declared?: boolean
+  operation?: MovementOperationInput | null
 }
 
 function toTransactionRow(row: typeof transactions.$inferSelect): TransactionRow {
-  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) };
+  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) }
 }
 
 export async function listByUser(db: Db, userId: string): Promise<TransactionRow[]> {
-  const rows = await db.select().from(transactions).where(eq(transactions.userId, userId));
-  return rows.map(toTransactionRow);
+  const rows = await db.select().from(transactions).where(eq(transactions.userId, userId))
+  return rows.map(toTransactionRow)
 }
 
 export async function get(db: Db, userId: string, id: string): Promise<TransactionRow | undefined> {
   const [row] = await db
     .select()
     .from(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
-  return row ? toTransactionRow(row) : undefined;
+    .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
+  return row ? toTransactionRow(row) : undefined
 }
 
 export async function create(
@@ -96,8 +101,11 @@ export async function create(
   userId: string,
   input: CreateTransactionInput,
 ): Promise<TransactionRow> {
-  await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
-  const now = nowIso();
+  await assertOwnedReferences(db, userId, {
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+  })
+  const now = nowIso()
   const [row] = await db
     .insert(transactions)
     .values({
@@ -113,12 +121,14 @@ export async function create(
       currency: input.currency,
       time: input.time ?? null,
       declared: input.declared ?? false,
+      externalId: input.externalId ?? null,
+      remoteOperation: input.remoteOperation ?? null,
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  await writeOperation(db, userId, row.id, input.type, input.currency, input.operation);
-  return toTransactionRow(row);
+    .returning()
+  await writeOperation(db, userId, row.id, input.type, input.currency, input.operation)
+  return toTransactionRow(row)
 }
 
 export async function update(
@@ -128,14 +138,23 @@ export async function update(
   input: UpdateTransactionInput,
   expectedVersion?: number,
 ): Promise<TransactionRow | undefined> {
-  const existing = await get(db, userId, id);
+  const existing = await get(db, userId, id)
   if (!existing) {
-    return undefined;
+    return undefined
   }
-  await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
-  const nextCurrency = input.currency ?? existing.currency;
-  const nextAmount = input.amount ?? existing.amount;
-  const nextType = input.type ?? existing.type;
+  if (existing.remoteOperation) {
+    const allowed = new Set(['declared', 'description', 'categoryId'])
+    if (Object.keys(input).some((key) => !allowed.has(key))) {
+      throw new RejectedCommandError('Bitvavo gobierna los campos financieros de este movimiento.')
+    }
+  }
+  await assertOwnedReferences(db, userId, {
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+  })
+  const nextCurrency = input.currency ?? existing.currency
+  const nextAmount = input.amount ?? existing.amount
+  const nextType = input.type ?? existing.type
   const [row] = await db
     .update(transactions)
     .set({
@@ -151,36 +170,51 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(transactions.id, id),
-      eq(transactions.userId, userId),
-      versionGuard(transactions.version, expectedVersion),
-    ))
-    .returning();
+    .where(
+      and(
+        eq(transactions.id, id),
+        eq(transactions.userId, userId),
+        versionGuard(transactions.version, expectedVersion),
+      ),
+    )
+    .returning()
   if (!row) {
-    return undefined;
+    return undefined
   }
   // Same write as the amount: an edit can never leave the two disagreeing.
-  await writeOperation(db, userId, row.id, nextType, nextCurrency, input.operation);
-  return toTransactionRow(row);
+  await writeOperation(db, userId, row.id, nextType, nextCurrency, input.operation)
+  return toTransactionRow(row)
 }
 
-export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
-  const existing = await get(db, userId, id);
+export async function remove(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
+  const existing = await get(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
+  if (existing.remoteOperation)
+    throw new RejectedCommandError('No se puede borrar un movimiento de Bitvavo.')
   // The FK has no ON DELETE CASCADE and D1 always enforces it.
-  await db.delete(investmentTradeDetails).where(and(
-    eq(investmentTradeDetails.transactionId, id),
-    eq(investmentTradeDetails.userId, userId),
-  ));
-  const deleted = await db.delete(transactions).where(and(
-    eq(transactions.id, id),
-    eq(transactions.userId, userId),
-    versionGuard(transactions.version, expectedVersion),
-  )).returning({ id: transactions.id });
-  return deleted.length > 0;
+  await db
+    .delete(investmentTradeDetails)
+    .where(
+      and(eq(investmentTradeDetails.transactionId, id), eq(investmentTradeDetails.userId, userId)),
+    )
+  const deleted = await db
+    .delete(transactions)
+    .where(
+      and(
+        eq(transactions.id, id),
+        eq(transactions.userId, userId),
+        versionGuard(transactions.version, expectedVersion),
+      ),
+    )
+    .returning({ id: transactions.id })
+  return deleted.length > 0
 }
 
 export async function bulkInsert(
@@ -189,9 +223,9 @@ export async function bulkInsert(
   inputs: CreateTransactionInput[],
 ): Promise<TransactionRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   const rows = await db
     .insert(transactions)
     .values(
@@ -210,21 +244,21 @@ export async function bulkInsert(
         updatedAt: now,
       })),
     )
-    .returning();
-  return rows.map(toTransactionRow);
+    .returning()
+  return rows.map(toTransactionRow)
 }
 
 // -- investment_trade_details -------------------------------------------------
 
 export interface CreateInvestmentTradeDetailInput {
-  transactionId: string;
-  instrumentId?: string | null;
-  symbol?: string | null;
-  side: string;
-  quantity: string;
-  price: number;
-  fee: number;
-  currency: string;
+  transactionId: string
+  instrumentId?: string | null
+  symbol?: string | null
+  side: string
+  quantity: string
+  price: number
+  fee: number
+  currency: string
 }
 
 function toInvestmentTradeDetailRow(
@@ -234,7 +268,7 @@ function toInvestmentTradeDetailRow(
     ...row,
     price: fromMinorUnits(row.priceMinor, row.currency),
     fee: fromMinorUnits(row.feeMinor, row.currency),
-  };
+  }
 }
 
 export async function getTradeDetailByTransaction(
@@ -250,8 +284,8 @@ export async function getTradeDetailByTransaction(
         eq(investmentTradeDetails.transactionId, transactionId),
         eq(investmentTradeDetails.userId, userId),
       ),
-    );
-  return row ? toInvestmentTradeDetailRow(row) : undefined;
+    )
+  return row ? toInvestmentTradeDetailRow(row) : undefined
 }
 
 /**
@@ -265,11 +299,11 @@ export async function listTradeDetailsByTransactions(
   userId: string,
   transactionIds: string[],
 ): Promise<Map<string, InvestmentTradeDetailRow>> {
-  const byTransaction = new Map<string, InvestmentTradeDetailRow>();
+  const byTransaction = new Map<string, InvestmentTradeDetailRow>()
   if (transactionIds.length === 0) {
-    return byTransaction;
+    return byTransaction
   }
-  const rows: (typeof investmentTradeDetails.$inferSelect)[] = [];
+  const rows: (typeof investmentTradeDetails.$inferSelect)[] = []
   for (const chunk of chunkIds(transactionIds)) {
     rows.push(
       ...(await db
@@ -281,13 +315,13 @@ export async function listTradeDetailsByTransactions(
             inArray(investmentTradeDetails.transactionId, chunk),
           ),
         )),
-    );
+    )
   }
   for (const row of rows) {
-    const detail = toInvestmentTradeDetailRow(row);
-    byTransaction.set(detail.transactionId, detail);
+    const detail = toInvestmentTradeDetailRow(row)
+    byTransaction.set(detail.transactionId, detail)
   }
-  return byTransaction;
+  return byTransaction
 }
 
 export async function createTradeDetail(
@@ -295,7 +329,7 @@ export async function createTradeDetail(
   userId: string,
   input: CreateInvestmentTradeDetailInput,
 ): Promise<InvestmentTradeDetailRow> {
-  const now = nowIso();
+  const now = nowIso()
   const [row] = await db
     .insert(investmentTradeDetails)
     .values({
@@ -311,8 +345,8 @@ export async function createTradeDetail(
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return toInvestmentTradeDetailRow(row);
+    .returning()
+  return toInvestmentTradeDetailRow(row)
 }
 
 /**
@@ -332,22 +366,22 @@ async function writeOperation(
   // Only an investment movement has an operation. Turning one into a gasto
   // drops it, even when the caller said nothing: otherwise the movement would
   // keep títulos and precio it no longer has any meaning for.
-  if (type !== "investment") {
-    const stale = await getTradeDetailByTransaction(db, userId, transactionId);
+  if (type !== 'investment') {
+    const stale = await getTradeDetailByTransaction(db, userId, transactionId)
     if (stale) {
-      await removeTradeDetail(db, userId, stale.id);
+      await removeTradeDetail(db, userId, stale.id)
     }
-    return;
+    return
   }
   if (operation === undefined) {
-    return;
+    return
   }
-  const existing = await getTradeDetailByTransaction(db, userId, transactionId);
+  const existing = await getTradeDetailByTransaction(db, userId, transactionId)
   if (!operation) {
     if (existing) {
-      await removeTradeDetail(db, userId, existing.id);
+      await removeTradeDetail(db, userId, existing.id)
     }
-    return;
+    return
   }
   const values = {
     instrumentId: operation.instrumentId ?? null,
@@ -358,32 +392,34 @@ async function writeOperation(
     feeMinor: toMinorUnits(operation.fee, currency),
     currency,
     updatedAt: nowIso(),
-  };
+  }
   if (existing) {
     await db
       .update(investmentTradeDetails)
       .set(values)
-      .where(and(eq(investmentTradeDetails.id, existing.id), eq(investmentTradeDetails.userId, userId)));
-    return;
+      .where(
+        and(eq(investmentTradeDetails.id, existing.id), eq(investmentTradeDetails.userId, userId)),
+      )
+    return
   }
   await db.insert(investmentTradeDetails).values({
     ...values,
     userId,
     transactionId,
     createdAt: values.updatedAt,
-  });
+  })
 }
 
 export async function removeTradeDetail(db: Db, userId: string, id: string): Promise<boolean> {
   const [row] = await db
     .select()
     .from(investmentTradeDetails)
-    .where(and(eq(investmentTradeDetails.id, id), eq(investmentTradeDetails.userId, userId)));
+    .where(and(eq(investmentTradeDetails.id, id), eq(investmentTradeDetails.userId, userId)))
   if (!row) {
-    return false;
+    return false
   }
   await db
     .delete(investmentTradeDetails)
-    .where(and(eq(investmentTradeDetails.id, id), eq(investmentTradeDetails.userId, userId)));
-  return true;
+    .where(and(eq(investmentTradeDetails.id, id), eq(investmentTradeDetails.userId, userId)))
+  return true
 }

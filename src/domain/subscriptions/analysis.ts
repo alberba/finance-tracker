@@ -1,34 +1,11 @@
 import { round2 } from '../../lib/number'
 import type { Subscription, SubscriptionFrequency } from '../../scripts/types'
 
-const FREQUENCIES: Array<{
-  frequency: SubscriptionFrequency
-  label: string
-  annualOccurrences: number
-}> = [
-  { frequency: 'weekly', label: 'Semanal', annualOccurrences: 52 },
-  { frequency: 'monthly', label: 'Mensual', annualOccurrences: 12 },
-  { frequency: 'quarterly', label: 'Trimestral', annualOccurrences: 4 },
-  { frequency: 'yearly', label: 'Anual', annualOccurrences: 1 },
-]
-
-const ANNUAL_OCCURRENCES = Object.fromEntries(
-  FREQUENCIES.map(({ frequency, annualOccurrences }) => [frequency, annualOccurrences]),
-) as Record<SubscriptionFrequency, number>
-
-export interface SubscriptionFrequencyAnalysis {
-  frequency: SubscriptionFrequency
-  label: string
-  activeCount: number
-  monthlyEquivalent: number
-  annualTotal: number
-}
-
-export interface BasicSubscriptionAnalysis {
-  activeCount: number
-  monthlyEquivalent: number
-  annualTotal: number
-  byFrequency: SubscriptionFrequencyAnalysis[]
+const ANNUAL_OCCURRENCES: Record<SubscriptionFrequency, number> = {
+  weekly: 52,
+  monthly: 12,
+  quarterly: 4,
+  yearly: 1,
 }
 
 export interface SubscriptionBreakdownRow {
@@ -36,15 +13,6 @@ export interface SubscriptionBreakdownRow {
   monthlyAmount: number
   annualAmount: number
   share: number
-}
-
-export interface SubscriptionCostRow {
-  id: string
-  name: string
-  category: string
-  monthlyAmount: number
-  annualAmount: number
-  nextChargeDate: string
 }
 
 export interface UpcomingSubscriptionCharge {
@@ -62,38 +30,10 @@ export interface SubscriptionAnalysis {
   annualCommitment: number
   pausedAnnualAmount: number
   next30DaysAmount: number
+  /** Every charge in the next 30 days; `upcomingCharges` lists only the first ones. */
+  next30DaysCount: number
   categoryBreakdown: SubscriptionBreakdownRow[]
-  accountBreakdown: SubscriptionBreakdownRow[]
-  topCosts: SubscriptionCostRow[]
   upcomingCharges: UpcomingSubscriptionCharge[]
-}
-
-export function analyzeSubscriptions(subscriptions: Subscription[]): BasicSubscriptionAnalysis {
-  const activeSubscriptions = subscriptions.filter((subscription) => subscription.active)
-  const byFrequency = FREQUENCIES.flatMap(({ frequency, label, annualOccurrences }) => {
-    const matching = activeSubscriptions.filter(
-      (subscription) => subscription.frequency === frequency,
-    )
-    if (!matching.length) return []
-    const annualTotal = round2(
-      matching.reduce((total, subscription) => total + subscription.amount, 0) *
-        annualOccurrences,
-    )
-    return [{
-      frequency,
-      label,
-      activeCount: matching.length,
-      monthlyEquivalent: round2(annualTotal / 12),
-      annualTotal,
-    }]
-  })
-  const annualTotal = round2(byFrequency.reduce((sum, row) => sum + row.annualTotal, 0))
-  return {
-    activeCount: activeSubscriptions.length,
-    monthlyEquivalent: round2(annualTotal / 12),
-    annualTotal,
-    byFrequency,
-  }
 }
 
 export function annualizeSubscription(subscription: Subscription): number {
@@ -124,19 +64,8 @@ export function buildSubscriptionAnalysis(
       paused.reduce((sum, subscription) => sum + annualizeSubscription(subscription), 0),
     ),
     next30DaysAmount: round2(upcomingCharges.reduce((sum, charge) => sum + charge.amount, 0)),
+    next30DaysCount: upcomingCharges.length,
     categoryBreakdown: buildBreakdown(active, (subscription) => subscription.category),
-    accountBreakdown: buildBreakdown(active, (subscription) => subscription.accountId),
-    topCosts: active
-      .map((subscription) => ({
-        id: subscription.id,
-        name: subscription.name,
-        category: subscription.category,
-        monthlyAmount: monthlyEquivalent(subscription),
-        annualAmount: annualizeSubscription(subscription),
-        nextChargeDate: subscription.nextChargeDate,
-      }))
-      .sort((a, b) => b.annualAmount - a.annualAmount || a.name.localeCompare(b.name))
-      .slice(0, 5),
     upcomingCharges: upcomingCharges.slice(0, 5),
   }
 }

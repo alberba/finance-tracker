@@ -1,52 +1,40 @@
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
-import { buildGoalsViewModel } from '../domain/goals/view-model'
+import { useToast } from '../composables/useToast'
+import { buildGoalsViewModel, previewGoalEdit } from '../domain/goals/view-model'
 import { syncGoalUpsert } from '../lib/client/command-mapping'
-import type { GoalField, GoalKey } from '../scripts/types'
-import { parseFloatSafe, parseIntSafe, round2 } from '../scripts/utils'
+import type { Goal, GoalKey } from '../scripts/types'
+import { round2 } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
 
 export const useGoalsStore = defineStore('goals', () => {
   const financialStateStore = useFinancialStateStore()
   const uiStore = useUiStore()
+  const { showToast } = useToast()
 
-  const viewModel = computed(() =>
-    buildGoalsViewModel(financialStateStore.state, uiStore.ui.investmentMonth),
-  )
-  const goals = computed(() => financialStateStore.goals)
-  const orderedGoals = computed(() => Object.values(goals.value))
+  /** The month the goals are measured at: the one Inversión analyses. */
+  const month = computed(() => uiStore.ui.investmentMonth)
+  const viewModel = computed(() => buildGoalsViewModel(financialStateStore.state, month.value))
 
-  function updateGoalField(key: GoalKey, field: GoalField, value: string): void {
+  function preview(key: GoalKey, draft: Goal) {
+    return previewGoalEdit(financialStateStore.state, month.value, key, draft)
+  }
+
+  function saveGoal(key: GoalKey, goal: Goal): void {
     financialStateStore.commitState((draft) => {
-      if (field === 'targetYear') {
-        draft.goals[key].targetYear = parseIntSafe(value, draft.year)
-        return
+      draft.goals[key] = {
+        name: goal.name.trim(),
+        targetYear: Math.trunc(goal.targetYear),
+        targetAmount: round2(Math.max(goal.targetAmount, 0)),
       }
-
-      if (field === 'targetAmount') {
-        draft.goals[key].targetAmount = round2(parseFloatSafe(value, 0))
-        return
-      }
-
-      draft.goals[key].name = value
     })
 
-    const goal = financialStateStore.goals[key]
-    void syncGoalUpsert(key, {
-      key,
-      name: goal.name,
-      targetYear: goal.targetYear,
-      targetAmount: goal.targetAmount,
-      currency: financialStateStore.currency,
-    })
+    const saved = financialStateStore.goals[key]
+    void syncGoalUpsert(key, { key, ...saved, currency: financialStateStore.currency })
+    showToast('Objetivo guardado.')
   }
 
-  return {
-    viewModel,
-    goals,
-    orderedGoals,
-    updateGoalField,
-  }
+  return { month, viewModel, preview, saveGoal }
 })

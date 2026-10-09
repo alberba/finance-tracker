@@ -14,28 +14,59 @@
  * server confirms and the real rows arrive.
  */
 
-import type { SyncCommandInput, SyncEntityType } from "../server/sync/command-schemas";
-import type { CachedEntity } from "./idb-cache";
-import type { SyncV2Bootstrap } from "./v2-state-projection";
+import {
+  entityCreateSchemas,
+  type SyncCommandInput,
+  type SyncEntityType,
+} from '../server/sync/command-schemas'
+import type { CachedEntity } from './idb-cache'
+import type { SyncV2Bootstrap } from './v2-state-projection'
 
 const COLLECTION_BY_ENTITY: Record<SyncEntityType, keyof SyncV2Bootstrap> = {
-  account: "accounts",
-  category: "categories",
-  transaction: "transactions",
-  subscription: "subscriptions",
-  recurringRule: "recurringRules",
-  pendingMovement: "pendingMovements",
-  budgetEntry: "budgetEntries",
-  goal: "goals",
-  contribution: "contributions",
-  userInstrument: "userInstruments",
-  wealthSnapshot: "wealthSnapshots",
-  stockeventsMapping: "stockeventsSymbolMappings",
-  stockeventsCashEntry: "stockeventsCashSyncEntries",
-};
+  account: 'accounts',
+  category: 'categories',
+  transaction: 'transactions',
+  subscription: 'subscriptions',
+  recurringRule: 'recurringRules',
+  pendingMovement: 'pendingMovements',
+  budgetEntry: 'budgetEntries',
+  goal: 'goals',
+  contribution: 'contributions',
+  userInstrument: 'userInstruments',
+  wealthSnapshot: 'wealthSnapshots',
+  stockeventsMapping: 'stockeventsSymbolMappings',
+  stockeventsCashEntry: 'stockeventsCashSyncEntries',
+}
 
 function matches(entity: CachedEntity, reference: string): boolean {
-  return entity.id === reference || entity.legacyId === reference;
+  return entity.id === reference || entity.legacyId === reference
+}
+
+/** A queued operation uses the command shape; the read model expects a trade detail. */
+function overlayEntity(
+  entityType: SyncEntityType,
+  previous: CachedEntity,
+  data: Record<string, unknown>,
+): CachedEntity {
+  const next = { ...previous, ...data }
+  if (entityType !== 'transaction') return next
+  if (next.type !== 'investment' || data.operation === null) {
+    next.tradeDetail = null
+    return next
+  }
+  const operation = entityCreateSchemas.transaction.shape.operation.safeParse(data.operation)
+  if (operation.success && operation.data) {
+    next.tradeDetail = {
+      symbol: operation.data.symbol ?? null,
+      instrumentId: operation.data.instrumentId ?? null,
+      side: operation.data.side,
+      quantity: String(operation.data.units),
+      price: operation.data.unitPrice,
+      fee: operation.data.fee,
+      currency: next.currency,
+    }
+  }
+  return next
 }
 
 /**
@@ -46,62 +77,66 @@ export function applyPendingCommands(
   bootstrap: SyncV2Bootstrap,
   commands: SyncCommandInput[],
 ): SyncV2Bootstrap {
-  const next: SyncV2Bootstrap = { ...bootstrap };
+  const next: SyncV2Bootstrap = { ...bootstrap }
 
   for (const command of commands) {
-    if (command.action === "settingsUpdate") {
-      const patch = command.patch as Record<string, unknown>;
-      const settings = { ...((next.settings as Record<string, unknown> | null) ?? {}) };
+    if (command.action === 'settingsUpdate') {
+      const patch = command.patch as Record<string, unknown>
+      const settings = { ...((next.settings as Record<string, unknown> | null) ?? {}) }
       for (const [key, value] of Object.entries(patch)) {
-        if (key === "stockeventsEnabled" || key === "stockeventsTradesToCash") {
-          settings[key] = value === true ? 1 : 0;
-        } else if (key === "stockeventsCashMappings") {
-          settings["stockeventsCashMappings"] = value;
-        } else if (key === "twrLiquidityAccountIds") {
-          settings["twrLiquidityAccountIds"] = value;
+        if (key === 'stockeventsEnabled' || key === 'stockeventsTradesToCash') {
+          settings[key] = value === true ? 1 : 0
+        } else if (key === 'stockeventsCashMappings') {
+          settings['stockeventsCashMappings'] = value
+        } else if (key === 'twrLiquidityAccountIds') {
+          settings['twrLiquidityAccountIds'] = value
         } else {
-          settings[key] = value;
+          settings[key] = value
         }
       }
-      next.settings = settings as SyncV2Bootstrap["settings"];
-      continue;
+      next.settings = settings as SyncV2Bootstrap['settings']
+      continue
     }
-    if (!("entityType" in command)) {
-      continue;
+    if (!('entityType' in command)) {
+      continue
     }
-    const collection = COLLECTION_BY_ENTITY[command.entityType as SyncEntityType];
+    const collection = COLLECTION_BY_ENTITY[command.entityType as SyncEntityType]
     if (!collection) {
-      continue;
+      continue
     }
-    const rows = ((next[collection] as CachedEntity[] | undefined) ?? []).slice();
+    const rows = ((next[collection] as CachedEntity[] | undefined) ?? []).slice()
 
-    if (command.action === "create") {
-      const data = command.data as Record<string, unknown>;
+    if (command.action === 'create') {
+      const data = command.data as Record<string, unknown>
       // An entity created from now on carries its own identity (ADR 0001),
       // so the queued row is addressed by `data.id` — the same id the server
       // will store it under.
-      const id = String(data.id ?? "");
+      const id = String(data.id ?? '')
       // A create whose row already arrived from the server is not re-added:
       // the server's version is the better one.
       if (!id || !rows.some((row) => matches(row, id))) {
-        rows.push({ ...data, id } as CachedEntity);
+        rows.push(overlayEntity(command.entityType, { id }, data))
       }
-    } else if (command.action === "update") {
-      const index = rows.findIndex((row) => matches(row, String(command.entityId)));
+    } else if (command.action === 'update') {
+      const index = rows.findIndex((row) => matches(row, String(command.entityId)))
       if (index >= 0) {
-        rows[index] = { ...rows[index], ...(command.patch as Record<string, unknown>) };
+        rows[index] = overlayEntity(
+          command.entityType,
+          rows[index],
+          command.patch as Record<string, unknown>,
+        )
       }
-    } else if (command.action === "remove") {
-      const index = rows.findIndex((row) => matches(row, String(command.entityId)));
+    } else if (command.action === 'remove') {
+      const index = rows.findIndex((row) => matches(row, String(command.entityId)))
       if (index >= 0) {
-        rows.splice(index, 1);
+        rows.splice(index, 1)
       }
     } else {
-      continue;
+      continue
     }
 
-    (next as unknown as Record<string, unknown>)[collection] = rows;
+    ;(next as unknown as Record<string, unknown>)[collection] = rows
   }
 
-  return next;
+  return next
 }

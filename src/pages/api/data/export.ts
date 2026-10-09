@@ -21,6 +21,7 @@ import * as marketRepository from "../../../db/repositories/market";
 import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
 import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
 import * as userSettingsRepository from "../../../db/repositories/user-settings";
+import { DATA_EXPORT_FORMAT } from "../../../lib/data-export-format";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 
 export const GET: APIRoute = async ({ locals }) =>
@@ -65,6 +66,30 @@ export const GET: APIRoute = async ({ locals }) =>
       stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
     ]);
 
+    const tradeDetails = await transactionsRepository.listTradeDetailsByTransactions(
+      db,
+      userId,
+      transactions.map((transaction) => transaction.id),
+    );
+    // The operation travels inside its movement (ADR 0002), in the same shape
+    // the import hands back to `transactionsRepository.create`.
+    const transactionsWithOperations = transactions.map((transaction) => {
+      const detail = tradeDetails.get(transaction.id);
+      return {
+        ...transaction,
+        operation: detail
+          ? {
+              instrumentId: detail.instrumentId,
+              symbol: detail.symbol,
+              side: detail.side,
+              units: Number(detail.quantity),
+              unitPrice: detail.price,
+              fee: detail.fee,
+            }
+          : null,
+      };
+    });
+
     const wealthSnapshotsWithBalances = await Promise.all(
       wealthSnapshots.map(async (snapshot) => ({
         ...snapshot,
@@ -85,13 +110,14 @@ export const GET: APIRoute = async ({ locals }) =>
 
     return jsonResponse(
       {
+        format: DATA_EXPORT_FORMAT,
         exportedAt: new Date().toISOString(),
         userId,
         settings: settings ?? null,
         accounts,
         categories,
         twrLiquidityAccounts,
-        transactions,
+        transactions: transactionsWithOperations,
         subscriptions,
         recurringRules,
         pendingMovements,

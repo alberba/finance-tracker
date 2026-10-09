@@ -41,7 +41,6 @@ import { useSyncStore } from "../stores/sync";
   const { saveState } = setupAppStateFormatHelpers({
     getState: () => state,
     saveStatusEl: el.saveStatus,
-    toastEl: el.toast,
     persistState: (nextState) => {
       persistState(nextState);
       financialStateStore.replaceState(nextState);
@@ -158,13 +157,13 @@ import { useSyncStore } from "../stores/sync";
 
   function bindChartTooltipEvents() {
     const hideTooltip = () => {
-      el.chartTooltip.classList.remove("is-visible");
+      delete el.chartTooltip.dataset.visible;
       el.chartTooltip.setAttribute("aria-hidden", "true");
     };
 
     const showTooltip = (message: string, x: number, y: number) => {
       el.chartTooltip.textContent = message;
-      el.chartTooltip.classList.add("is-visible");
+      el.chartTooltip.dataset.visible = "";
       el.chartTooltip.setAttribute("aria-hidden", "false");
 
       const offset = 14;

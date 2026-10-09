@@ -1,69 +1,188 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 
-import GoalEditorCard from '../goals/GoalEditorCard.vue'
-import GoalProgressCard from '../goals/GoalProgressCard.vue'
+import GoalEditPanel from '../goals/GoalEditPanel.vue'
+import GoalLedger from '../goals/GoalLedger.vue'
+import { dueLabel, portfolioPaceSentence } from '../goals/goal-text'
+import AllocationBar from '../ui/AllocationBar.vue'
 import AppSection from '../ui/AppSection.vue'
-import type { GoalField, GoalKey } from '../../scripts/types'
+import DocumentSurface from '../ui/DocumentSurface.vue'
+import InkBand from '../ui/InkBand.vue'
+import NumberedBlock from '../ui/NumberedBlock.vue'
+import PageHeader from '../ui/PageHeader.vue'
+import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
+import type { GoalPace, GoalRowViewModel } from '../../domain/goals/view-model'
+import { formatMonthName } from '../../lib/format'
+import type { GoalKey } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useGoalsStore } from '../../stores/goals'
 
-const props = withDefaults(
-  defineProps<{
-    isActive?: boolean
-  }>(),
-  { isActive: false },
-)
+withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const financialStateStore = useFinancialStateStore()
 const goalsStore = useGoalsStore()
-const { viewModel } = storeToRefs(goalsStore)
+const { viewModel, month } = storeToRefs(goalsStore)
+const { formatMoney } = useMoneyFormatter()
+const panel = useTemplateRef<InstanceType<typeof GoalEditPanel>>('panel')
 
-const formatter = computed(
-  () =>
-    new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: financialStateStore.currency || 'EUR',
-      maximumFractionDigits: 2,
-    }),
+const rows = computed(() => [...viewModel.value.net.rows, ...viewModel.value.investment.rows])
+// Mid-sentence ("a cierre de septiembre de 2026"), so the month stays lowercase.
+const monthName = computed(
+  () => `${formatMonthName(month.value).toLowerCase()} de ${financialStateStore.year}`,
 )
 
-function formatMoney(value: number): string {
-  return formatter.value.format(Number(value || 0))
+function rowOf(key: GoalKey): GoalRowViewModel {
+  return rows.value.find((row) => row.key === key)!
 }
 
-function updateGoalField(payload: { key: GoalKey; field: GoalField; value: string }): void {
-  goalsStore.updateGoalField(payload.key, payload.field, payload.value)
+function namesOf(pace: GoalPace): string[] {
+  return pace.by.map((key) => rowOf(key).name)
+}
+
+// The band leads with the pace that meets every term goal: they all measure
+// net worth, so the most demanding monthly amount covers the other two.
+const band = computed(() => {
+  const { pace, met, next } = viewModel.value
+  const binding = pace.net.by[0]
+  return {
+    value: `${formatMoney(pace.net.rate)}/mes`,
+    note: binding
+      ? `Lo marca ${rowOf(binding).name}, con plazo en ${dueLabel(rowOf(binding).goal.targetYear)}. A ese ritmo llegas a tiempo a todos.`
+      : 'Los plazos de patrimonio que tienes definidos ya están cumplidos.',
+    facts: [
+      { label: 'Cartera, al mes', value: formatMoney(pace.investment.rate) },
+      { label: 'Cumplidos', value: `${met.count} de ${met.total}`, valueId: 'goals-met' },
+      { label: 'Próximo plazo', value: next ? dueLabel(next.targetYear) : '—' },
+    ],
+  }
+})
+
+const investmentNote = computed(() => {
+  const { pace } = viewModel.value
+  if (!pace.investment.rate) return 'Cada meta se mide contra su propio valor.'
+  return `Cada meta se mide contra su propio valor. ${portfolioPaceSentence(formatMoney(pace.investment.rate), namesOf(pace.investment))}`
+})
+
+// How the portfolio goal splits into its two parts and whatever is left.
+const allocation = computed(() => {
+  const { funds, crypto, total, rest } = viewModel.value.investment.allocation
+  const whole = Math.max(total, funds + crypto)
+  if (!whole || !(funds + crypto)) return null
+  const share = (value: number) => (value / whole) * 100
+  const segments = [
+    {
+      id: 'funds',
+      label: 'Fondos indexados',
+      weight: share(funds),
+      color: 'var(--chart-series-1)',
+      detail: formatMoney(funds),
+    },
+    {
+      id: 'crypto',
+      label: 'Criptomonedas',
+      weight: share(crypto),
+      color: 'var(--chart-series-2)',
+      detail: formatMoney(crypto),
+    },
+    ...(rest > 0
+      ? [
+          {
+            id: 'rest',
+            label: 'Resto de la cartera',
+            weight: share(rest),
+            color: 'var(--line-strong)',
+            detail: formatMoney(rest),
+          },
+        ]
+      : []),
+  ].filter((segment) => segment.weight > 0)
+  const text =
+    rest > 0
+      ? `Fondos y cripto reservan ${formatMoney(funds + crypto)} de los ${formatMoney(total)} de la meta total; ${formatMoney(rest)} quedan para el resto de la cartera.`
+      : rest < 0
+        ? `Las metas de fondos y cripto superan en ${formatMoney(-rest)} la meta de la cartera total.`
+        : 'Las metas de fondos y cripto suman exactamente la meta de la cartera total.'
+  return { segments, text }
+})
+
+function edit(key: GoalKey): void {
+  panel.value?.openEdit(rowOf(key))
 }
 </script>
 
 <template>
-  <AppSection id="goals" :is-active="props.isActive">
-    <div class="panel-head">
-      <div>
-        <p class="panel-kicker">Metas financieras</p>
-        <h2 id="goals-title">Objetivos</h2>
-        <p>Seguimiento de metas patrimoniales y de inversión.</p>
-      </div>
+  <AppSection id="goals" :is-active="isActive">
+    <div class="mx-auto grid w-full max-w-7xl min-w-0 gap-6">
+      <PageHeader
+        kicker="Metas financieras"
+        title="Objetivos"
+        title-id="goals-title"
+        lede="Cuánto te falta para cada meta y a qué ritmo llegas a tiempo."
+      >
+        <template #aside>
+          <p class="text-text-muted text-sm" data-goals-month>Cifras a cierre de {{ monthName }}</p>
+        </template>
+      </PageHeader>
+
+      <InkBand
+        label="Ritmo que cumple tus plazos de patrimonio"
+        aria-label="Ritmo necesario"
+        value-id="goals-pace"
+        :value="band.value"
+        :facts="band.facts"
+      >
+        <template #note>
+          <p class="text-ink-muted text-sm sm:text-base" data-goals-pace-note>{{ band.note }}</p>
+        </template>
+      </InkBand>
+
+      <DocumentSurface>
+        <NumberedBlock
+          number="01"
+          title="Patrimonio neto"
+          title-id="goals-net-title"
+          description="Corto, medio y largo plazo se miden contra la misma cifra, así que comparten escala: la línea marca dónde estás hoy."
+        >
+          <GoalLedger
+            :rows="viewModel.net.rows"
+            label="Objetivos de patrimonio neto"
+            :format-money="formatMoney"
+            :cursor="{
+              left: viewModel.net.cursor,
+              label: `Hoy · ${formatMoney(viewModel.net.current)}`,
+            }"
+            @edit="edit"
+          />
+        </NumberedBlock>
+
+        <NumberedBlock
+          number="02"
+          title="Cartera"
+          title-id="goals-investment-title"
+          :description="investmentNote"
+        >
+          <GoalLedger
+            :rows="viewModel.investment.rows"
+            label="Objetivos de la cartera"
+            :format-money="formatMoney"
+            @edit="edit"
+          />
+          <div
+            v-if="allocation"
+            class="text-text-muted grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:items-center"
+            data-goals-allocation
+          >
+            <AllocationBar
+              :segments="allocation.segments"
+              label="Reparto de la meta de la cartera"
+            />
+            <p>{{ allocation.text }}</p>
+          </div>
+        </NumberedBlock>
+      </DocumentSurface>
     </div>
 
-    <div class="goal-edit-grid">
-      <GoalEditorCard
-        v-for="editor in viewModel.editors"
-        :key="editor.key"
-        :editor="editor"
-        @update-goal-field="updateGoalField"
-      />
-    </div>
-
-    <div class="goal-progress">
-      <GoalProgressCard
-        v-for="item in viewModel.progressItems"
-        :key="item.key"
-        :item="item"
-        :format-money="formatMoney"
-      />
-    </div>
+    <GoalEditPanel ref="panel" :month-name="monthName" />
   </AppSection>
 </template>

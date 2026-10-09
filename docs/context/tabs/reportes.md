@@ -3,7 +3,7 @@
 ## Resumen
 
 La pestaña `Reportes` permite crear reportes web que terminan como issues de GitHub.
-El flujo principal es crear un reporte simple. La automatización con `@claude` existe, pero es opcional y manual.
+El flujo es crear un reporte simple; no hay automatización asociada.
 
 Ruta pública:
 
@@ -20,17 +20,14 @@ Identificadores clave en UI:
 
 - Permitir enviar errores o mejoras desde la UI.
 - Crear una issue en GitHub con contexto técnico básico.
-- Ofrecer automatización opcional mediante `@claude`.
 
 ## Archivos principales
 
-### UI Astro
+### UI
 
-- `src/components/reports/ReportsSection.astro`
-- `src/components/reports/ReportsPanelHeader.astro`
-- `src/components/reports/IssueReportFormCard.astro`
-- `src/components/reports/ReportsGuideCard.astro`
-- `src/components/FinanceTrackerShell.astro`
+- `src/components/reports/GlobalReportLauncher.vue`: botón flotante «Reportar» (escritorio)
+- `src/components/reports/IssueReportPanel.vue`: el formulario en un panel lateral
+- `src/components/layout/MobileNavigation.astro`: «Crear reporte» en la hoja «Más» (móvil)
 
 ### Lógica frontend
 
@@ -58,20 +55,11 @@ Identificadores clave en UI:
 - `.github/scripts/issue-context.mjs`
 - `tests/unit/issue-context.test.ts`
 
-## Composición de la pestaña
+## Composición
 
-La sección `Reportes` se monta en `FinanceTrackerShell` junto al resto de pestañas.
-Internamente está formada por:
-
-1. `ReportsPanelHeader`
-   - heading principal
-   - copy de alto nivel
-2. `IssueReportFormCard`
-   - formulario de creación
-   - opción secundaria de automatización
-   - feedback de estado
-3. `ReportsGuideCard`
-   - explicación del flujo post-envío
+No es una sección propia: `FinanceWorkspace.vue` monta `GlobalReportLauncher`, que abre
+`IssueReportPanel` (panel lateral con tipo, resumen, descripción y el detalle opcional, y el estado
+del envío). En móvil lo abre la hoja «Más».
 
 ## Flujo técnico
 
@@ -81,7 +69,6 @@ Internamente está formada por:
    - `type`
    - `summary`
    - `description`
-   - `mentionClaude`
    - `section`
    - `context.userAgent`
    - `context.pathname`
@@ -92,14 +79,10 @@ Internamente está formada por:
 6. `github-issues.ts` crea la issue contra GitHub API.
 7. La UI muestra:
    - éxito simple: `Reporte creado: #...`
-   - éxito con automatización: `Reporte creado: #... (automatización en curso)`
    - error: `No se pudo crear la issue: ...`
 
 ## Defaults y comportamiento actual
 
-- `mentionClaude` está desactivado por defecto.
-- Solo se añade `@claude` al cuerpo de la issue si el checkbox está marcado.
-- Solo se devuelve `enrichmentStatus: "pending"` si `mentionClaude === true`.
 - El botón principal usa lenguaje de producto: `Crear reporte`.
 
 ## Contrato del payload
@@ -109,7 +92,6 @@ Campos esperados por backend:
 - `type`: `"bug"` | `"feature"` (`"enhancement"` se acepta como alias antiguo)
 - `summary`: string, 5-140
 - `description`: string, 12-8000
-- `mentionClaude`: boolean, por defecto `false`
 - `section`: string
 - `context.userAgent`: string
 - `context.pathname`: string
@@ -129,10 +111,6 @@ Labels base:
 El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
 Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
 
-Label adicional si hay automatización:
-
-- `enrich:pending`
-
 Metadatos que se escriben en el body:
 
 - tipo
@@ -143,7 +121,6 @@ Metadatos que se escriben en el body:
 - pasos para reproducir
 - resultado esperado
 - resultado actual
-- `@claude` opcional
 
 ## Issue #29: revisión relevante para esta pestaña
 
@@ -185,22 +162,19 @@ Implicación para futuros cambios:
 `tests/e2e/reports.spec.ts` cubre:
 
 - render principal de la pestaña
-- flujo simple sin automatización
-- flujo con automatización manual
+- flujo de creación del reporte
 - validación mínima de formulario
 - manejo de error del endpoint
 
 `tests/unit/issue-report-schema.test.ts` cubre:
 
 - normalización y validación del payload
-- default `mentionClaude = false`
 
 `tests/unit/github-issues.test.ts` cubre:
 
 - creación de issue
 - reintentos transitorios
-- ausencia/presencia de `@claude`
-- labels correctas según automatización
+- labels correctas según el tipo
 
 ## Checklist para futuras issues sobre Reportes
 

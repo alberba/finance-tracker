@@ -18,6 +18,10 @@ Single-context: `CONTEXT.md` at the repo root plus `docs/adr/`. See `docs/agents
 
 Sync: the files a field crosses from store to D1 and back, and the three movement builders, are in `docs/architecture/sync-v2.md`.
 
+### Design language
+
+UI or `/design` work: the v2 visual pieces, base components and the design rules the user has corrected before are in `docs/architecture/design-language.md`.
+
 ### Coding standards
 
 `CODING_STANDARDS.md` at the repo root is the canonical source for the Standards axis of
@@ -31,6 +35,10 @@ The docs under `docs/` stay as the narrative behind those rules (`docs/architect
 Lint is enforced by tooling (`eslint.config.ts`), so don't review it by hand. Prettier
 (`.prettierrc`) is not gated and much of the repo is unformatted: format only the files you touch,
 by path.
+
+### CI and E2E
+
+CI or browser failures: `docs/playwright.md` covers dependency checks, worktree setup and CI sharding.
 
 ## Commands
 

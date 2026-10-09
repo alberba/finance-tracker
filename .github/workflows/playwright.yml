@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, v2]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -15,35 +15,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 env:
   CI: true
 
 jobs:
-  # Advisories land on unrelated PRs, so the audit reports without blocking.
-  # `audit.yml` runs it weekly and opens an issue.
-  audit:
-    name: Production dependency audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Audit production dependencies
-        run: pnpm audit:prod
-
   quality:
+    if: ${{ !inputs.update_snapshots }}
     name: Quality and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -73,7 +53,7 @@ jobs:
 
   smoke:
     name: PR smoke E2E
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.head_ref != 'v2'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -105,7 +85,7 @@ jobs:
 
   e2e:
     name: Full E2E shard ${{ matrix.shard }}/2
-    if: github.event_name != 'pull_request'
+    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -128,7 +108,7 @@ jobs:
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Run functional E2E shard
-        run: pnpm test:e2e --shard=${{ matrix.shard }}/2
+        run: pnpm test:e2e:shard ${{ matrix.shard }}/2
       - name: Upload blob report
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -139,9 +119,81 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  specialized-e2e:
-    name: Visual and sync E2E
-    if: github.event_name != 'pull_request'
+  visual:
+    name: Visual E2E shard ${{ matrix.shard }}/2
+    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Enable the test auth shim
+        run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
+      - name: Run visual regression tests
+        run: pnpm test:e2e:visual --shard=${{ matrix.shard }}/2
+      - name: Upload visual blob report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-blob-visual-${{ matrix.shard }}
+          path: blob-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sync:
+    name: Sync v2 E2E
+    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Enable the test auth shim
+        run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
+      - name: Apply local D1 v2 migrations
+        run: pnpm d1:migrate:local:v2
+      - name: Generate an ephemeral integration encryption key
+        run: node --input-type=module -e 'import { appendFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; appendFileSync(".dev.vars", "DATA_ENCRYPTION_KEY=" + randomBytes(32).toString("base64") + "\n")'
+      - name: Run sync-v2 E2E tests
+        run: pnpm test:e2e:sync-v2
+      - name: Upload sync-v2 blob report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-blob-sync-v2
+          path: blob-report-sync-v2/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  snapshots:
+    name: Regenerate Linux snapshots
+    if: ${{ inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -161,11 +213,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
-      - name: Run visual regression tests
-        if: ${{ !inputs.update_snapshots }}
-        run: pnpm test:e2e:visual
       - name: Regenerate and commit Linux snapshots
-        if: ${{ inputs.update_snapshots }}
         run: |
           pnpm test:e2e:visual --update-snapshots
           git add 'tests/e2e/**/*-linux.png'
@@ -177,28 +225,32 @@ jobs:
             git commit -m 'test(e2e): regenerate the Linux visual snapshots'
             git push
           fi
-      - name: Apply local D1 v2 migrations
-        if: ${{ always() && !cancelled() }}
-        run: pnpm d1:migrate:local:v2
-      - name: Run sync-v2 E2E tests
-        if: ${{ always() && !cancelled() }}
-        run: pnpm test:e2e:sync-v2
-      - name: Upload visual blob report
+
+  authentication-e2e:
+    name: Better Auth Worker and browser contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run isolated Better Auth Worker E2E
+        run: pnpm test:e2e:auth --reporter=dot,html
+      - name: Upload authentication report
         if: ${{ !cancelled() }}
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-blob-visual
-          path: blob-report/
-          if-no-files-found: ignore
-          retention-days: 7
-      - name: Upload sync-v2 blob report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-blob-sync-v2
-          path: blob-report-sync-v2/
+          name: playwright-report-authentication
+          path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -207,10 +259,9 @@ jobs:
     if: >-
       ${{
         always() &&
-        github.event_name != 'pull_request' &&
-        (needs.e2e.result == 'failure' || needs.specialized-e2e.result == 'failure')
+        (needs.e2e.result == 'failure' || needs.visual.result == 'failure' || needs.sync.result == 'failure')
       }}
-    needs: [e2e, specialized-e2e]
+    needs: [e2e, visual, sync]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

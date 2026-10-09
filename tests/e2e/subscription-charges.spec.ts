@@ -54,7 +54,7 @@ test('sync v2 guarda el cobro vencido al arrancar y no lo duplica al recargar', 
   const tracker = new FinanceTrackerPage(page)
   await tracker.goto()
   await tracker.openTransactions()
-  const charges = tracker.transactionsSection.locator('#tx-table-body tr', { hasText: 'Todoist' })
+  const charges = tracker.transactionRows.filter({ hasText: 'Todoist' })
   await expect(charges).toHaveCount(1)
   await expect
     .poll(async () => {
