@@ -66,7 +66,7 @@ describe('confirmPending — category id shared by the movement and the pending 
     syncStore.findEntityRef = async (...args: Parameters<typeof realFind>) => {
       const ref = await realFind(...args)
       if (ref || args[0] !== 'category') return ref
-      const queuedId = await realPeek('category', args[1] as never)
+      const queuedId = await realPeek('category', args[1])
       return queuedId ? { entityId: queuedId, version: 0 } : null
     }
 
@@ -119,7 +119,7 @@ describe('confirmPending — category id shared by the movement and the pending 
       ],
       instruments: [],
       quotes: {},
-    } as never)
+    })
 
     expect(useRecurringStore().confirmPending('pm-eth')).toBe(true)
     await settle()

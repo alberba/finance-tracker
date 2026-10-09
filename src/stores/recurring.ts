@@ -480,10 +480,14 @@ export const useRecurringStore = defineStore('recurring', () => {
     // pending must be built once the movement has queued its create, or each
     // mints its own id and the pending references one that is never created.
     void (async () => {
-      await syncMovements(beforeTransactions, afterTransactions, currency)
-      await syncListDiff('pendingMovement', beforePending, afterPending, (item) =>
-        buildPendingMovementData(item, currency),
-      )
+      try {
+        await syncMovements(beforeTransactions, afterTransactions, currency)
+      } finally {
+        // A failed movement sync must not strand the pending as `pending`.
+        await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
+          buildPendingMovementData(pending, currency),
+        )
+      }
     })()
     if (confirmed) {
       showToast('Pendiente confirmado: ya cuenta en el Registro.')
