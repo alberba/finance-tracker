@@ -66,9 +66,6 @@ export const POST: APIRoute = async ({ request, locals }) =>
           ok: true,
           issueNumber: created.number,
           issueUrl: created.url,
-          ...(payload.mentionClaude
-            ? { enrichmentStatus: "pending" as const }
-            : {}),
         },
         201,
       );

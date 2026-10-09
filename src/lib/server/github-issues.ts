@@ -89,10 +89,6 @@ export function buildIssueBody(payload: IssueReportPayload): string {
     baseLines.push("", "## Resultado actual", "", payload.actualResult);
   }
 
-  if (payload.mentionClaude) {
-    baseLines.push("", "@claude");
-  }
-
   return baseLines.join("\n").trim();
 }
 
@@ -135,9 +131,7 @@ export async function createIssueFromWebReport(
   const owner = requiredEnv("GITHUB_OWNER", env);
   const repo = requiredEnv("GITHUB_REPO", env);
   const title = payload.summary.slice(0, 140);
-  const labels = payload.mentionClaude
-    ? [...buildIssueLabels(payload.type), "enrich:pending"]
-    : buildIssueLabels(payload.type);
+  const labels = buildIssueLabels(payload.type);
   const baseRequestBody = {
     title,
     body: buildIssueBody(payload),

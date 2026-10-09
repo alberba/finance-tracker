@@ -114,7 +114,6 @@ test.describe("Reports E2E", () => {
       expectedResult: "El cambio debe persistir.",
       actualResult: "El cambio desaparece al recargar.",
     });
-    expect(submittedPayload).not.toHaveProperty("mentionClaude");
     expect(submittedPayload).not.toHaveProperty("stepsToReproduce");
     await expect(tracker.issueReportStatus().locator("a")).toHaveAttribute(
       "href",

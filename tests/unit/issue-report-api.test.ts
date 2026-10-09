@@ -12,13 +12,13 @@ import {
 import {
   ISSUE_REPORT_ENDPOINT,
   type ReportResponse,
-  type ReportSubmissionPayload,
+  type ReportPayload,
   submitIssueReport,
 } from '../../src/services/issue-report-api'
 
 const FALLBACK_MESSAGE = 'No se pudo crear la issue.'
 
-const payload: ReportSubmissionPayload = {
+const payload: ReportPayload = {
   type: 'bug',
   summary: 'El saldo no cuadra',
   description: 'Después de importar el extracto el saldo queda distinto.',

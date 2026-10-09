@@ -5,7 +5,7 @@ import { useIssueReportContext } from '../../composables/useIssueReportContext'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
-  type ReportSubmissionPayload,
+  type ReportPayload,
   type ReportType,
 } from '../../services/issue-report-api'
 import { useUiStore } from '../../stores/ui'
@@ -67,7 +67,7 @@ async function onSubmit(): Promise<void> {
     return
   }
 
-  const payload: ReportSubmissionPayload = {
+  const payload: ReportPayload = {
     // `enhancement` remains accepted by the API for old clients, but all new
     // form submissions use the shorter GitHub-facing `feature` value.
     type: form.type === 'bug' ? 'bug' : 'feature',

@@ -121,7 +121,7 @@ jobs:
 
   visual:
     name: Visual E2E shard ${{ matrix.shard }}/2
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
+    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:

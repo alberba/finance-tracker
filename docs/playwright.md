@@ -44,9 +44,10 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 
 ## CI
 
-Las PR normales ejecutan calidad y smoke. La PR cuya rama es `v2`, los pushes a `main` o
-`master` y las ejecuciones manuales ejecutan calidad, dos shards funcionales, dos shards visuales
-y sync-v2 en paralelo. Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
+Las PR normales ejecutan calidad y smoke. La PR cuya rama es `v2` ejecuta calidad, dos shards
+funcionales y sync-v2 en paralelo. Los pushes a `main` o `master` y las ejecuciones manuales añaden
+dos shards visuales: los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
+lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual. Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
 Los shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial
