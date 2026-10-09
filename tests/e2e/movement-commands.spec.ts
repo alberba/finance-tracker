@@ -97,7 +97,7 @@ test('editing an investment from Movimientos preserves its data after sync and r
     await expect(panel.locator('#investment-movement-unit-price')).toHaveValue('120.5')
     await expect(panel.locator('#investment-movement-fee')).toHaveValue('1.2')
     await expect(panel.locator('#investment-movement-currency')).toHaveValue('USD')
-    await expect(panel.locator('#investment-movement-declared')).toBeChecked()
+    await expect(panel.getByRole('switch', { name: 'Ya está declarado' })).toBeChecked()
   } finally {
     await context.close()
   }
