@@ -239,6 +239,27 @@ test.describe("Finance tracker E2E", () => {
     await expect(february).toContainText(`${count} movimientos`);
   });
 
+  test("movimientos solo muestra el mes actual por defecto y pliega los anteriores", async ({
+    page,
+    tracker,
+  }) => {
+    await page.goto("/movimientos");
+    await expect(page).toHaveURL(/\/movimientos$/);
+
+    const march = tracker.transactionsSection.locator("[data-ledger-group]", {
+      hasText: "Marzo 2026",
+    });
+    const february = tracker.transactionsSection.locator("[data-ledger-group]", {
+      hasText: "Febrero 2026",
+    });
+
+    await expect(march).toBeVisible();
+    await expect(february).toBeHidden();
+
+    await tracker.revealOlderTransactions();
+    await expect(february).toBeVisible();
+  });
+
   test("movimientos muestra columnas en orden: fecha, descripción, cuenta, tipo, importe", async ({
     page,
     tracker,
