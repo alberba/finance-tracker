@@ -138,5 +138,12 @@ describe('confirmPending — category id shared by the movement and the pending 
     expect(pendingUpdate).toMatchObject({ patch: { status: 'confirmed' } })
     const patch = (pendingUpdate as { patch: Record<string, unknown> }).patch
     expect(createdCategoryIds).toContain(patch.categoryId)
+    expect(commands).toContainEqual(
+      expect.objectContaining({
+        action: 'create',
+        entityType: 'transaction',
+        data: expect.objectContaining({ categoryId: patch.categoryId }),
+      }),
+    )
   })
 })

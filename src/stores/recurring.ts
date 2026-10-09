@@ -238,6 +238,28 @@ export const useRecurringStore = defineStore('recurring', () => {
   )
   const pendingCount = computed(() => openPendingMovements.value.length)
 
+  /**
+   * In order, not side by side: a rule and its pendings resolve the same
+   * category, and side by side each mints its own id (issue #283).
+   */
+  async function syncRulesThenPending(
+    beforeRules: readonly RecurringRule[],
+    beforePending: readonly PendingMovement[],
+  ): Promise<void> {
+    const afterRules = financialStateStore.state.recurringRules
+    const afterPending = financialStateStore.state.pendingMovements
+    const currency = financialStateStore.currency
+    try {
+      await syncListDiff('recurringRule', beforeRules, afterRules, (rule) =>
+        buildRecurringRuleData(rule, currency),
+      )
+    } finally {
+      await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
+        buildPendingMovementData(pending, currency),
+      )
+    }
+  }
+
   function refreshPending(today = resolveToday()): number {
     const result = generatePendingMovements(financialStateStore.state, today)
     if (
@@ -250,18 +272,7 @@ export const useRecurringStore = defineStore('recurring', () => {
         draft.pendingMovements = result.pendingMovements
         draft.recurringRules = result.recurringRules
       })
-      void syncListDiff(
-        'recurringRule',
-        beforeRules,
-        financialStateStore.state.recurringRules,
-        (rule) => buildRecurringRuleData(rule, financialStateStore.currency),
-      )
-      void syncListDiff(
-        'pendingMovement',
-        beforePending,
-        financialStateStore.state.pendingMovements,
-        (pending) => buildPendingMovementData(pending, financialStateStore.currency),
-      )
+      void syncRulesThenPending(beforeRules, beforePending)
     }
     return result.createdCount
   }
@@ -395,18 +406,7 @@ export const useRecurringStore = defineStore('recurring', () => {
           : pending,
       )
     })
-    void syncListDiff(
-      'recurringRule',
-      beforeRules,
-      financialStateStore.state.recurringRules,
-      (item) => buildRecurringRuleData(item, financialStateStore.currency),
-    )
-    void syncListDiff(
-      'pendingMovement',
-      beforePending,
-      financialStateStore.state.pendingMovements,
-      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
-    )
+    void syncRulesThenPending(beforeRules, beforePending)
   }
 
   function confirmPending(id: string, edit?: Partial<PendingMovementEdit>): boolean {
