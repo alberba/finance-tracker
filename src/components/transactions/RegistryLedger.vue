@@ -85,7 +85,7 @@ const olderLabel = computed(() => {
   const hidden = split.value.hidden
   if (!hidden.length) return ''
   const count = hidden.reduce((sum, group) => sum + group.count, 0)
-  return `Ver ${formatMonthName(hidden[0].month).toLowerCase()} y anteriores · ${count} ${count === 1 ? 'movimiento' : 'movimientos'}`
+  return `Ver ${formatMonthName(hidden[0].month).toLowerCase()} y anteriores · ${count} movimientos`
 })
 
 const columns = computed<LedgerColumn<Transaction>[]>(() => [
@@ -276,6 +276,7 @@ const emptyText = computed(() =>
       v-if="olderLabel"
       variant="ghost"
       class="justify-self-center"
+      data-tx-show-older
       @click="showOlder = true"
     >
       {{ olderLabel }}

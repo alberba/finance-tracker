@@ -82,7 +82,7 @@ describe('RegistryLedger', () => {
     expect(wrapper.text()).not.toContain('Alquiler septiembre')
     expect(wrapper.text()).not.toContain('Alquiler agosto')
 
-    const button = wrapper.get('button.justify-self-center')
+    const button = wrapper.get('[data-tx-show-older]')
     expect(button.text()).toBe('Ver septiembre y anteriores · 2 movimientos')
   })
 
@@ -98,12 +98,12 @@ describe('RegistryLedger', () => {
 
     expect(wrapper.text()).not.toContain('Alquiler septiembre')
 
-    await wrapper.get('button.justify-self-center').trigger('click')
+    await wrapper.get('[data-tx-show-older]').trigger('click')
 
     expect(wrapper.findAll('tbody')).toHaveLength(2)
     expect(wrapper.text()).toContain('Alquiler octubre')
     expect(wrapper.text()).toContain('Alquiler septiembre')
-    expect(wrapper.find('button.justify-self-center').exists()).toBe(false)
+    expect(wrapper.find('[data-tx-show-older]').exists()).toBe(false)
   })
 
   it('muestra todos los movimientos cuando hay filtros activos', () => {
@@ -120,7 +120,7 @@ describe('RegistryLedger', () => {
     expect(wrapper.findAll('tbody')).toHaveLength(2)
     expect(wrapper.text()).toContain('Supermercado oct')
     expect(wrapper.text()).toContain('Supermercado sep')
-    expect(wrapper.find('button.justify-self-center').exists()).toBe(false)
+    expect(wrapper.find('[data-tx-show-older]').exists()).toBe(false)
   })
 
   it('muestra el último mes con movimientos si el mes seleccionado no tiene', () => {
@@ -142,7 +142,7 @@ describe('RegistryLedger', () => {
     expect(wrapper.text()).toContain('Nómina septiembre')
     expect(wrapper.text()).not.toContain('Nómina agosto')
 
-    const button = wrapper.get('button.justify-self-center')
-    expect(button.text()).toBe('Ver agosto y anteriores · 1 movimiento')
+    const button = wrapper.get('[data-tx-show-older]')
+    expect(button.text()).toBe('Ver agosto y anteriores · 1 movimientos')
   })
 })
