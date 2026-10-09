@@ -60,13 +60,12 @@ const filtering = computed(() => {
   )
 })
 
-// The band's month and the one before it show (or the latest month with
-// movements, when those two have none); older ones wait behind a button.
-// While filtering, every match shows.
+// The band's month shows (or the latest month with movements, when that month
+// has none); older ones wait behind a button. While filtering, every match shows.
 const split = computed(() => {
   const groups = movementsStore.monthGroups
   if (filtering.value || showOlder.value) return { shown: groups, hidden: [] }
-  const cutoff = Math.min(ui.txFilterMonth - 1, groups[0]?.month ?? 0)
+  const cutoff = Math.min(ui.txFilterMonth, groups[0]?.month ?? 0)
   return {
     shown: groups.filter((group) => group.month >= cutoff),
     hidden: groups.filter((group) => group.month < cutoff),
@@ -86,7 +85,7 @@ const olderLabel = computed(() => {
   const hidden = split.value.hidden
   if (!hidden.length) return ''
   const count = hidden.reduce((sum, group) => sum + group.count, 0)
-  return `Ver ${formatMonthName(hidden[0].month).toLowerCase()} y anteriores · ${count} movimientos`
+  return `Ver ${formatMonthName(hidden[0].month).toLowerCase()} y anteriores · ${count} ${count === 1 ? 'movimiento' : 'movimientos'}`
 })
 
 const columns = computed<LedgerColumn<Transaction>[]>(() => [
