@@ -45,7 +45,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.open()
     await bitvavo.connect(accountId)
     await bitvavo.preview()
-    await expect(bitvavo.panel.getByText('0,01789334395', { exact: true })).toBeVisible()
+    await expect(bitvavo.panel.getByText('0,00008878285', { exact: true })).toBeVisible()
     await bitvavo.confirm()
     await bitvavo.close()
     await bitvavo.tracker.openInvestmentMovementsTab()
@@ -65,7 +65,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await expect(rows).toHaveCount(2)
     await bitvavo.openDetails('Compra')
     const detail = bitvavo.details
-    await expect(detail.getByText('0,01789334395', { exact: true })).toBeVisible()
+    await expect(detail.getByText('0,00008878285', { exact: true })).toBeVisible()
     await expect(detail.getByText('1 ene 2020, 00:00 UTC', { exact: true })).toBeVisible()
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toBeVisible()
     const instrumentId = await seedMarketInstrument(context.request)
@@ -77,7 +77,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await bitvavo.tracker.filterInvestmentYear(2020)
     await bitvavo.openDetails('Compra')
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toHaveCount(0)
-    await expect(detail.getByText('0,01789334395', { exact: true })).toBeVisible()
+    await expect(detail.getByText('0,00008878285', { exact: true })).toBeVisible()
     const other = await browser.newContext({ extraHTTPHeaders: headers })
     try {
       const otherPage = await other.newPage()
@@ -87,7 +87,9 @@ test('imports a closed preview, retains exact data after reload and synchronizes
       await otherPage.getByLabel('Año', { exact: true }).selectOption('2020')
       await expect(otherBitvavo.rows).toHaveCount(2)
       const exported = await other.request.get('/api/data/export')
-      expect(await exported.text()).not.toContain('test-secret')
+      const exportedText = await exported.text()
+      expect(exportedText).not.toContain('test-secret')
+      expect(exportedText).toContain('0.01789334395')
     } finally {
       await other.close()
     }
