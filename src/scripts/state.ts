@@ -114,6 +114,11 @@ export const EMPTY_STATE_SEED = {
     savedAt: null,
   },
   year: new Date().getFullYear(),
+  onboardingPresented: false,
+  onboardingDismissed: false,
+  onboardingAccountCompleted: false,
+  onboardingMovementCompleted: false,
+  onboardingCompleted: false,
   currency: 'EUR',
   twrLiquidityAccountIds: [],
   accounts: [],
@@ -284,6 +289,11 @@ export function normalizeState(candidate: unknown): State {
     currency: String(input?.currency || base.currency || 'EUR')
       .toUpperCase()
       .slice(0, 3),
+    onboardingPresented: input?.onboardingPresented === true,
+    onboardingDismissed: input?.onboardingDismissed === true,
+    onboardingAccountCompleted: input?.onboardingAccountCompleted === true,
+    onboardingMovementCompleted: input?.onboardingMovementCompleted === true,
+    onboardingCompleted: input?.onboardingCompleted === true,
     twrLiquidityAccountIds,
     accounts,
     investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),

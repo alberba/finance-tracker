@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm'
 import { users, userIdentities } from '../../../db/schema'
 import { normalizeEmail, runInTransaction, type Db } from '../../../db/repositories/shared'
 import { findLegacyOwnerToLink } from './legacy-owner-link'
+import { initializeNewUser } from '../initialize-new-user'
 
 /**
  * Anything `resolvePrincipal`/`findLegacyOwnerToLink` can run a query
@@ -128,6 +129,7 @@ export async function resolvePrincipal(
       userId = inserted[0].id
       email = inserted[0].email
       isLegacyOwner = false
+      await initializeNewUser(tx, userId)
     }
 
     await tx.insert(userIdentities).values({

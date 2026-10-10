@@ -24,6 +24,11 @@ function createSubscription(overrides: Partial<Subscription> = {}): Subscription
 function createState(subscription: Subscription): State {
   return {
     meta: { source: 'test', generatedAt: '2026-01-01T00:00:00.000Z', version: 1, savedAt: null },
+    onboardingPresented: false,
+    onboardingDismissed: false,
+    onboardingAccountCompleted: false,
+    onboardingMovementCompleted: false,
+    onboardingCompleted: false,
     year: 2026,
     currency: 'EUR',
     twrLiquidityAccountIds: [],
@@ -63,7 +68,9 @@ describe('suscripciones', () => {
 
     expect(result.generatedCount).toBe(3)
     expect(state.transactions.map((transaction) => transaction.date)).toEqual([
-      '2026-03-31', '2026-04-30', '2026-05-31',
+      '2026-03-31',
+      '2026-04-30',
+      '2026-05-31',
     ])
     expect(state.subscriptions[0]?.nextChargeDate).toBe('2026-06-30')
   })

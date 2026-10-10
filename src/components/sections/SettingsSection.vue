@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 
 import ConnectionsPanel from '../settings/ConnectionsPanel.vue'
 import SettingsAccountsTab from '../settings/SettingsAccountsTab.vue'
@@ -12,6 +12,8 @@ import AppSection from '../ui/AppSection.vue'
 import PageHeader from '../ui/PageHeader.vue'
 import SectionTabs, { type SectionTab } from '../ui/SectionTabs.vue'
 import StatusDot from '../ui/StatusDot.vue'
+import { storeToRefs } from 'pinia'
+import { useUiStore } from '../../stores/ui'
 import { useSettingsAssets } from '../../composables/useSettingsAssets'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
@@ -29,7 +31,7 @@ const recurringStore = useRecurringStore()
 const stockEventsStore = useStockEventsStore()
 const { alerts } = useSettingsAssets()
 
-const activeTab = ref<string>('accounts')
+const { settingsTab: activeTab } = storeToRefs(useUiStore())
 
 const tabs = computed<SectionTab[]>(() => {
   const state = financialStateStore.state

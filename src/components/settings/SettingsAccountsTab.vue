@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 
 import SettingsAccountLiquidity from './SettingsAccountLiquidity.vue'
 import SettingsEntityPanel from './SettingsEntityPanel.vue'
@@ -11,6 +11,7 @@ import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { buildAccountRows, type AccountRowViewModel } from '../../domain/settings/view-model'
 import type { Entity } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
+import { useUiStore } from '../../stores/ui'
 import { useSettingsStore } from '../../stores/settings'
 import { useStockEventsStore } from '../../stores/stockevents'
 
@@ -25,6 +26,15 @@ const stockEventsStore = useStockEventsStore()
 const { formatMoney } = useMoneyFormatter()
 
 const panel = ref<InstanceType<typeof SettingsEntityPanel> | null>(null)
+const uiStore = useUiStore()
+function consumeSetupAction(): void {
+  if (uiStore.setupAction !== 'account' || !panel.value) return
+  uiStore.setupAction = null
+  panel.value.openNew()
+}
+onMounted(consumeSetupAction)
+watch(() => uiStore.setupAction, consumeSetupAction)
+
 const pendingDelete = ref<Entity | null>(null)
 const confirmOpen = computed({
   get: () => pendingDelete.value !== null,

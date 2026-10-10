@@ -6,6 +6,7 @@ import type { SectionId } from '../scripts/types'
 import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
 import DashboardSection from './sections/DashboardSection.vue'
+import WelcomeLauncher from './onboarding/WelcomeLauncher.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
 
 const sectionLoaders = {
@@ -77,6 +78,7 @@ const isReportDialogOpen = shallowRef(false)
 
 <template>
   <div class="contents" data-finance-workspace>
+    <WelcomeLauncher />
     <component :is="activeSectionComponent" :key="currentSection" :is-active="true" />
     <GlobalReportLauncher v-model:open="isReportDialogOpen" />
   </div>

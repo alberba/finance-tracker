@@ -75,7 +75,21 @@ export const useDataStore = defineStore('data', () => {
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result || '{}'))
-        financialStateStore.reloadState(data)
+        const {
+          onboardingPresented,
+          onboardingDismissed,
+          onboardingAccountCompleted,
+          onboardingMovementCompleted,
+          onboardingCompleted,
+        } = financialStateStore.state
+        financialStateStore.reloadState({
+          ...data,
+          onboardingPresented,
+          onboardingDismissed,
+          onboardingAccountCompleted,
+          onboardingMovementCompleted,
+          onboardingCompleted,
+        })
         showToast('JSON importado correctamente.')
       } catch {
         showToast('No se pudo importar el archivo.')

@@ -93,6 +93,20 @@ export const test = base.extend<Fixtures>({
       reset.ok(),
       `POST /api/state/reset-legacy devolvió ${reset.status()}. Si es 401/403, faltan TEST_AUTH_ENABLED o LEGACY_OWNER_EMAIL en .dev.vars: ejecuta \`pnpm setup:worktree\`.`,
     ).toBe(true)
+    // Unrelated legacy journeys start after onboarding; the onboarding spec
+    // provisions untouched sync-v2 users and exercises the real first show.
+    const resetStateSnapshot = await reset.json()
+    const completed = await page.request.put('/api/state', {
+      data: {
+        state: {
+          ...resetStateSnapshot.state,
+          onboardingPresented: true,
+          onboardingCompleted: true,
+        },
+        baseVersion: resetStateSnapshot.version,
+      },
+    })
+    expect(completed.ok()).toBe(true)
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
     await use(tracker)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import SidePanel from '../ui/SidePanel.vue'
@@ -29,7 +30,10 @@ const values = computed(() =>
   inputs.value.map((text) => (text.trim() === '' ? 0 : parseDecimal(text))),
 )
 const invalidAt = computed(() => values.value.map((value) => !Number.isFinite(value) || value < 0))
-const valid = computed(() => !invalidAt.value.some(Boolean))
+const needsCategory = computed(
+  () => !row.value || !budgetStore.getCategoriesForType(type.value).includes(row.value.category),
+)
+const valid = computed(() => !needsCategory.value && !invalidAt.value.some(Boolean))
 
 // The figures follow what is typed; a field that does not parse keeps its saved amount.
 const planned = computed(() =>
@@ -65,6 +69,7 @@ function reference(month: number): string {
 }
 
 function openPlan(budgetType: BudgetType, category: BudgetRow): void {
+  if (!budgetStore.getCategoriesForType(budgetType).includes(category.category)) return
   type.value = budgetType
   row.value = category
   inputs.value = category.cells.map((cell) => formatDecimalInput(cell.planned))
@@ -88,6 +93,13 @@ defineExpose({ openPlan })
     :title="row?.category ?? ''"
     title-id="budget-plan-title"
   >
+    <SetupRequirement
+      v-if="open && needsCategory"
+      message="Añade la categoría para guardar este presupuesto."
+      action="Editar categorías"
+      target="categories"
+      @resolve="open = false"
+    />
     <form id="budget-plan-form" class="grid gap-6" autocomplete="off" @submit.prevent="save">
       <p class="text-text-muted -mt-2 text-sm">
         Lo real viene de tus movimientos de {{ row?.category }}.

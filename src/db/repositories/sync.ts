@@ -4,75 +4,75 @@
  * the idempotent command log, and the entity-change log.
  */
 
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { syncChanges, syncCommands, userRevisions } from "../schema";
-import { nowIso, type Db } from "./shared";
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { syncChanges, syncCommands, userRevisions } from '../schema'
+import { nowIso, type Db } from './shared'
 
-export type UserRevisionRow = typeof userRevisions.$inferSelect;
-export type SyncCommandRow = typeof syncCommands.$inferSelect;
-export type SyncChangeRow = typeof syncChanges.$inferSelect;
+export type UserRevisionRow = typeof userRevisions.$inferSelect
+export type SyncCommandRow = typeof syncCommands.$inferSelect
+export type SyncChangeRow = typeof syncChanges.$inferSelect
 
 export interface CreateSyncCommandInput {
   /** Client-supplied `commandId`, used as the row's primary key for idempotent replay. */
-  id: string;
-  commandType: string;
-  payload: string;
-  status?: string;
-  result?: string | null;
+  id: string
+  commandType: string
+  payload: string
+  status?: string
+  result?: string | null
 }
 
 export interface CreateSyncChangeInput {
-  revision: number;
-  entityType: string;
-  entityId: string;
-  changeType: string;
-  payload?: string | null;
+  revision: number
+  entityType: string
+  entityId: string
+  changeType: string
+  payload?: string | null
 }
 
 // -- user_revisions -----------------------------------------------------------
 
 export async function getRevision(db: Db, userId: string): Promise<UserRevisionRow | undefined> {
-  const [row] = await db.select().from(userRevisions).where(eq(userRevisions.userId, userId));
-  return row;
+  const [row] = await db.select().from(userRevisions).where(eq(userRevisions.userId, userId))
+  return row
 }
 
 /** Creates the (userId → 0) cursor row if missing; a no-op if it already exists. */
 export async function ensureRevision(db: Db, userId: string): Promise<UserRevisionRow> {
-  const existing = await getRevision(db, userId);
+  const existing = await getRevision(db, userId)
   if (existing) {
-    return existing;
+    return existing
   }
   const [row] = await db
     .insert(userRevisions)
     .values({ userId, revision: 0, updatedAt: nowIso() })
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
 /** Bumps the user's revision cursor by one and returns the new value. */
 export async function bumpRevision(db: Db, userId: string): Promise<UserRevisionRow> {
-  await ensureRevision(db, userId);
+  await ensureRevision(db, userId)
   const [row] = await db
     .update(userRevisions)
     .set({ revision: sql`${userRevisions.revision} + 1`, updatedAt: nowIso() })
     .where(eq(userRevisions.userId, userId))
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
 export async function removeRevision(db: Db, userId: string): Promise<boolean> {
-  const existing = await getRevision(db, userId);
+  const existing = await getRevision(db, userId)
   if (!existing) {
-    return false;
+    return false
   }
-  await db.delete(userRevisions).where(eq(userRevisions.userId, userId));
-  return true;
+  await db.delete(userRevisions).where(eq(userRevisions.userId, userId))
+  return true
 }
 
 // -- sync_commands --------------------------------------------------------------
 
 export async function listCommandsByUser(db: Db, userId: string): Promise<SyncCommandRow[]> {
-  return db.select().from(syncCommands).where(eq(syncCommands.userId, userId));
+  return db.select().from(syncCommands).where(eq(syncCommands.userId, userId))
 }
 
 export async function getCommand(
@@ -83,8 +83,8 @@ export async function getCommand(
   const [row] = await db
     .select()
     .from(syncCommands)
-    .where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)));
-  return row;
+    .where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)))
+  return row
 }
 
 /**
@@ -105,12 +105,12 @@ export async function createCommand(
       userId,
       commandType: input.commandType,
       payload: input.payload,
-      status: input.status ?? "applied",
+      status: input.status ?? 'applied',
       result: input.result ?? null,
       createdAt: nowIso(),
     })
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
 export async function finalizeCommand(
@@ -124,8 +124,8 @@ export async function finalizeCommand(
     .update(syncCommands)
     .set({ status, result })
     .where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)))
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
 /** Atomically acquires a stale processing reservation for recovery. */
@@ -136,34 +136,36 @@ export async function claimStaleCommand(
   previousCreatedAt: string,
   staleBefore: string,
 ): Promise<boolean> {
-  if (previousCreatedAt > staleBefore) return false;
+  if (previousCreatedAt > staleBefore) return false
   const rows = await db
     .update(syncCommands)
     .set({ createdAt: nowIso() })
-    .where(and(
-      eq(syncCommands.id, id),
-      eq(syncCommands.userId, userId),
-      eq(syncCommands.status, "processing"),
-      isNull(syncCommands.result),
-      eq(syncCommands.createdAt, previousCreatedAt),
-    ))
-    .returning({ id: syncCommands.id });
-  return rows.length === 1;
+    .where(
+      and(
+        eq(syncCommands.id, id),
+        eq(syncCommands.userId, userId),
+        eq(syncCommands.status, 'processing'),
+        isNull(syncCommands.result),
+        eq(syncCommands.createdAt, previousCreatedAt),
+      ),
+    )
+    .returning({ id: syncCommands.id })
+  return rows.length === 1
 }
 
 export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
-  const existing = await getCommand(db, userId, id);
+  const existing = await getCommand(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
-  await db.delete(syncCommands).where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)));
-  return true;
+  await db.delete(syncCommands).where(and(eq(syncCommands.id, id), eq(syncCommands.userId, userId)))
+  return true
 }
 
 // -- sync_changes ---------------------------------------------------------------
 
 export async function listChangesByUser(db: Db, userId: string): Promise<SyncChangeRow[]> {
-  return db.select().from(syncChanges).where(eq(syncChanges.userId, userId));
+  return db.select().from(syncChanges).where(eq(syncChanges.userId, userId))
 }
 
 /** Walks `GET /api/changes?since` — every change with `revision > since`, for this user. */
@@ -175,15 +177,19 @@ export async function listChangesSince(
   return db
     .select()
     .from(syncChanges)
-    .where(and(eq(syncChanges.userId, userId), gt(syncChanges.revision, since)));
+    .where(and(eq(syncChanges.userId, userId), gt(syncChanges.revision, since)))
 }
 
-export async function getChange(db: Db, userId: string, id: string): Promise<SyncChangeRow | undefined> {
+export async function getChange(
+  db: Db,
+  userId: string,
+  id: string,
+): Promise<SyncChangeRow | undefined> {
   const [row] = await db
     .select()
     .from(syncChanges)
-    .where(and(eq(syncChanges.id, id), eq(syncChanges.userId, userId)));
-  return row;
+    .where(and(eq(syncChanges.id, id), eq(syncChanges.userId, userId)))
+  return row
 }
 
 export async function createChange(
@@ -202,8 +208,8 @@ export async function createChange(
       payload: input.payload ?? null,
       createdAt: nowIso(),
     })
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
 export async function bulkInsertChanges(
@@ -212,9 +218,9 @@ export async function bulkInsertChanges(
   inputs: CreateSyncChangeInput[],
 ): Promise<SyncChangeRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   return db
     .insert(syncChanges)
     .values(
@@ -228,5 +234,16 @@ export async function bulkInsertChanges(
         createdAt: now,
       })),
     )
-    .returning();
+    .returning()
+}
+
+/** Notify every device to rebuild after an import or reset, preserving cursor order. */
+export async function recordDatasetReplacement(db: Db, userId: string): Promise<void> {
+  const { revision } = await bumpRevision(db, userId)
+  await createChange(db, userId, {
+    revision,
+    entityType: 'reset',
+    entityId: userId,
+    changeType: 'reset',
+  })
 }

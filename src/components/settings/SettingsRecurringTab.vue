@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, ref } from 'vue'
 
 import SettingsRecurringRulePanel from './SettingsRecurringRulePanel.vue'
@@ -62,6 +64,7 @@ function accountName(rule: RecurringRule): string {
 function confirmDelete(): void {
   if (pendingDelete.value) recurringStore.removeRule(pendingDelete.value.id)
 }
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -76,8 +79,13 @@ function confirmDelete(): void {
     <SettingsTabIntro
       title="Ingresos y gastos recurrentes"
       description="Reglas que generan movimientos pendientes. Las compras recurrentes viven en Inversión."
-      action="Nueva regla"
+      :action="needsAccount ? undefined : 'Nueva regla'"
       @action="panel?.openNew()"
+    />
+
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para añadir reglas recurrentes."
     />
 
     <LedgerSurface>

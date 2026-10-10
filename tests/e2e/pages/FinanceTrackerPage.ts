@@ -52,7 +52,10 @@ export class FinanceTrackerPage {
   /** Month the registry band was last moved to, for month-scoped row counts. */
   private transactionsMonth: number | null = null
 
-  constructor(private readonly page: Page) {}
+  constructor(
+    private readonly page: Page,
+    private readonly options: { preserveWelcome?: boolean } = {},
+  ) {}
 
   get dashboardSection(): Locator {
     return this.page.locator('#dashboard')
@@ -103,6 +106,7 @@ export class FinanceTrackerPage {
   async goto() {
     await this.page.goto('/')
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.dismissWelcomeIfNeeded()
     await expect(
       this.dashboardSection.getByRole('heading', {
         name: 'Dashboard',
@@ -1136,7 +1140,27 @@ export class FinanceTrackerPage {
   async reload() {
     await this.page.reload()
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.dismissWelcomeIfNeeded()
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
+  }
+
+  private async dismissWelcomeIfNeeded() {
+    if (this.options.preserveWelcome) return
+    const welcome = this.page.getByRole('dialog', { name: 'Bienvenido a tus finanzas' })
+    // Readiness precedes the welcome island's watcher. Wait for its decision
+    // rather than racing an isVisible() check against the first presentation.
+    await expect
+      .poll(async () => {
+        if (await welcome.isVisible()) return true
+        if (await this.page.getByRole('button', { name: 'Retomar bienvenida' }).isVisible())
+          return true
+        return (await this.page.locator('[data-welcome-state="complete"]').count()) > 0
+      })
+      .toBe(true)
+    if (await welcome.isVisible()) {
+      await welcome.getByRole('button', { name: /^(Ahora no|Entendido)$/ }).click()
+      await expect(welcome).toBeHidden()
+    }
   }
 
   private async openSection(buttonLabel: string, sectionId: string, headingText: string | RegExp) {

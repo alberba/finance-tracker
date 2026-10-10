@@ -20,7 +20,6 @@ import * as marketRepository from '../../db/repositories/market'
 import * as stockeventsSymbolMappingsRepository from '../../db/repositories/stockevents-symbol-mappings'
 import * as stockeventsCashMappingsRepository from '../../db/repositories/stockevents-cash-mappings'
 import * as userSettingsRepository from '../../db/repositories/user-settings'
-import * as syncRepository from '../../db/repositories/sync'
 import type { Db } from '../../db/repositories/shared'
 
 export async function wipeUserData(db: Db, userId: string): Promise<void> {
@@ -117,5 +116,5 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
   }
 
   await userSettingsRepository.remove(db, userId)
-  await syncRepository.removeRevision(db, userId)
+  // Keep the cursor monotonic: clients must accept the restored dataset as newer.
 }

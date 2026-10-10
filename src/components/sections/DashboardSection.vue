@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, useTemplateRef } from 'vue'
 
 import { useDashboardViewModel } from '../../composables/useDashboardViewModel'
@@ -27,6 +29,7 @@ const today = formatWeekdayDate(todayISO())
 const month = computed({ get: () => viewModel.value.month, set: changeMonth })
 const year = computed({ get: () => viewModel.value.year, set: changeYear })
 const range = computed({ get: () => activeRange.value, set: changeRange })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -39,7 +42,11 @@ const range = computed({ get: () => activeRange.value, set: changeRange })
         lede="Cuánto tienes, cómo va el mes y qué te queda por hacer."
       >
         <template #aside>
-          <BaseButton variant="primary" @click="transactionPanel?.openNew()">
+          <BaseButton
+            variant="primary"
+            :disabled="needsAccount"
+            @click="transactionPanel?.openNew()"
+          >
             <svg
               class="size-4"
               viewBox="0 0 24 24"
@@ -55,6 +62,11 @@ const range = computed({ get: () => activeRange.value, set: changeRange })
           </BaseButton>
         </template>
       </PageHeader>
+
+      <SetupRequirement
+        v-if="needsAccount"
+        message="Crea una cuenta para registrar tu primer movimiento."
+      />
 
       <DashboardNetWorthBand
         v-model:range="range"

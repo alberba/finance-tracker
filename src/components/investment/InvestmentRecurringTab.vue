@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, ref } from 'vue'
 
 import InvestmentRecurringRulePanel from './InvestmentRecurringRulePanel.vue'
@@ -77,6 +79,7 @@ function accountName(rule: RecurringRule): string {
 function confirmDelete(): void {
   if (pendingDelete.value) recurringStore.removeRule(pendingDelete.value.id)
 }
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -97,6 +100,7 @@ function confirmDelete(): void {
         id="investment-recurring-new"
         variant="primary"
         class="max-sm:w-full"
+        :disabled="needsAccount"
         @click="panel?.openNew()"
       >
         <svg
@@ -113,6 +117,11 @@ function confirmDelete(): void {
         Nueva compra recurrente
       </BaseButton>
     </div>
+
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para añadir compras recurrentes."
+    />
 
     <section
       class="border-line bg-panel rounded-lg border px-5 py-5 sm:px-7 sm:py-6"

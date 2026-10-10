@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
@@ -107,6 +109,7 @@ function fill(rule: RecurringRule | null): void {
 }
 
 function openNew(): void {
+  if (needsAccount.value) return
   editing.value = null
   fill(null)
   open.value = true
@@ -119,6 +122,7 @@ function openEdit(rule: RecurringRule): void {
 }
 
 function save(): void {
+  if (needsAccount.value) return
   const input = {
     type: form.type,
     accountId: form.accountId,
@@ -143,6 +147,7 @@ function requestDelete(): void {
 }
 
 defineExpose({ openNew, openEdit })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -153,6 +158,11 @@ defineExpose({ openNew, openEdit })
     :title="isEditing ? 'Editar regla' : 'Nueva regla'"
     title-id="settings-recurring-panel-title"
   >
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para guardar este formulario."
+      @resolve="open = false"
+    />
     <form id="settings-recurring-form" class="grid gap-6" autocomplete="off" @submit.prevent="save">
       <SegmentedControl
         v-model="form.type"
@@ -245,7 +255,12 @@ defineExpose({ openNew, openEdit })
         Eliminar
       </BaseButton>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton variant="primary" type="submit" form="settings-recurring-form">
+      <BaseButton
+        variant="primary"
+        :disabled="needsAccount"
+        type="submit"
+        form="settings-recurring-form"
+      >
         {{ isEditing ? 'Guardar cambios' : 'Crear regla' }}
       </BaseButton>
     </template>

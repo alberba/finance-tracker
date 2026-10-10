@@ -55,6 +55,7 @@ export function applyRemoteChanges(
     if (change.entityType === 'userSettings') {
       const settings = JSON.parse(change.payload ?? 'null')
       if (!settings || typeof settings !== 'object') throw new Error('Ajustes remotos inválidos.')
+      if (Number(settings.version ?? 0) < Number(next.settings?.version ?? 0)) continue
       next = {
         ...next,
         settings,

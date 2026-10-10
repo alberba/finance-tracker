@@ -200,6 +200,12 @@ export interface StateMeta {
 }
 
 export interface State {
+  onboardingPresented: boolean
+  onboardingDismissed: boolean
+  onboardingAccountCompleted: boolean
+  onboardingMovementCompleted: boolean
+  onboardingCompleted: boolean
+
   meta: StateMeta
   year: number
   currency: string
