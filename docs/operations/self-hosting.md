@@ -7,7 +7,13 @@ pnpm local:setup
 pnpm local:up
 ```
 
-Abre <http://localhost:4321/login>. El correo y la contraseña inicial están en
+`local:up` muestra la URL de esta instancia cuando el contenedor está listo. El checkout
+principal usa el puerto 4321; cada worktree obtiene otro puerto, guardado en
+`.data/selfhost-port` y reutilizado en los siguientes arranques. Si un puerto está ocupado
+por otra aplicación, se busca uno libre. Cada proyecto conserva su propio volumen SQLite.
+La URL de autenticación se ajusta al puerto de la instancia.
+
+El correo y la contraseña inicial están en
 `.env.selfhost`, creado con permisos privados y excluido de Git y de la imagen Docker.
 La configuración se guarda en el checkout principal y los worktrees la usan mediante
 un enlace simbólico: al editar ese archivo, todos reciben los mismos cambios.
@@ -16,6 +22,11 @@ Si un worktree tenía una configuración propia, se conserva en `.env.selfhost.l
 antes de enlazar la compartida; si ya hay una copia, se usa un sufijo numérico.
 Selecciona «Contraseña» y entra con correo y contraseña. El administrador inicial ya tiene el correo verificado;
 no necesitas configurar un proveedor de correo para este acceso.
+
+La primera compilación descarga y prepara las dependencias y puede superar un minuto.
+Las siguientes reutilizan la caché de pnpm y las capas de dependencias de Docker,
+compartidas entre worktrees. Cambiar el código recompila Astro sin reconstruir la capa
+de dependencias de la imagen final; cambiar solo documentación o tests no recompila la aplicación.
 
 El servidor usa Astro con Node y SQLite local; no consulta D1 ni requiere Cloudflare
 Access. La sincronización v2 se activa al compilar la imagen. Los datos empiezan vacíos,
@@ -55,7 +66,8 @@ peticiones asíncronas. No hay una migración a otro motor ni una reescritura de
 ## Futuro despliegue en Debian
 
 La imagen y el volumen también sirven en Docker sobre Debian. Antes de publicar,
-configura `BETTER_AUTH_URL` con tu URL HTTPS, el correo y backups del volumen y de las
+configura `BETTER_AUTH_URL` con tu URL HTTPS y usa `docker compose --env-file .env.selfhost up`;
+prepara el correo y backups del volumen y de las
 claves. El puerto de Compose solo escucha en loopback para conectar tu proxy inverso.
 Falta adaptar la identificación de IP de Better Auth a un proxy de confianza: ahora
 usa `cf-connecting-ip`, por lo que este cambio está validado para uso local y no deja
@@ -64,3 +76,16 @@ cerrada la configuración de seguridad de un servidor público.
 Sentry del servidor usa el SDK Node en este destino. Sin configurar un DSN e
 inicializarlo, no envía eventos del servidor. La integración cliente existente sigue
 activa. No se han exportado ni modificado datos de Cloudflare.
+
+### Archivado de worktrees en Orca
+
+`pnpm local:archive` elimina el contenedor, la imagen, la red y el volumen de datos de este worktree, si existen. El volumen contiene su SQLite: el archivado descarta esos datos. El checkout principal está protegido y el `.env.selfhost` compartido se conserva.
+
+Para instalar el script en una ruta estable del checkout principal, ejecuta `pnpm local:archive:install`. Esto permite ejecutar el hook también en ramas antiguas que no contienen el script. Para conservar la identidad de un proyecto anterior, ejecuta una vez `pnpm local:up` con esta versión antes de detenerlo; así el archivado podrá identificar también su volumen cuando ya no quede contenedor. Configura este hook en Orca → Ajustes → finance-tracker → Script de archivado:
+
+```sh
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+node "$ORCA_ROOT_PATH/.data/orca/archive-local.mjs" "$ORCA_WORKTREE_PATH"
+```
+
+La instalación se mantiene fuera de Git; vuelve a ejecutar el instalador cuando actualices el script.

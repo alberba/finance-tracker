@@ -32,7 +32,8 @@ pnpm local:setup
 pnpm local:up
 ```
 
-Abre <http://localhost:4321/login> y usa el correo y la contraseña de `.env.selfhost`.
+Abre la URL que muestra `local:up` y usa el correo y la contraseña de `.env.selfhost`.
+Cada worktree usa su propio puerto y volumen; el checkout principal usa el puerto 4321.
 SQLite se guarda en un volumen persistente, separado de los datos de Cloudflare.
 Consulta [la guía de ejecución local y self-hosting](docs/operations/self-hosting.md).
 
