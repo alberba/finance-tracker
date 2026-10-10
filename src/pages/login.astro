@@ -47,36 +47,27 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#faf8f4" />
+    <meta name="theme-color" content="#eef1f6" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400..800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <title>Acceso · Finanzas</title>
   </head>
   <body>
-    <main class="mx-auto grid min-h-dvh max-w-6xl grid-cols-1 items-center gap-8 px-5 py-8 md:grid-cols-2 md:gap-20 md:px-8">
-      <aside>
-        <p class="text-text-muted font-mono text-sm uppercase">Finanzas personales</p>
-        <h1 class="font-display my-4 text-5xl leading-tight font-normal tracking-tight sm:text-6xl lg:text-7xl">
-          Tu dinero.
-          <br />
-          Tu espacio.
-        </h1>
-        <p class="text-text-muted">Presupuesto, inversiones y objetivos, en un mismo lugar.</p>
-        <a class="mt-6 inline-block text-primary underline underline-offset-4" href="/?demo=true">
-          Explorar la demo
-        </a>
-      </aside>
+    <main class="mx-auto flex min-h-svh w-full max-w-lg flex-col gap-4 px-5 py-8">
+      <header class="mbs-auto text-center">
+        <span class="font-display inline-flex min-h-11 items-center text-2xl font-bold tracking-tight focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2">
+          finanzas<span class="text-primary">.</span>
+        </span>
+      </header>
       <section
-        class="border-line border-t pt-8 md:border-t-0 md:border-l md:pt-0 md:pl-12"
+        class="border-line bg-panel grid content-center rounded-xl border p-access-panel shadow-soft"
         aria-labelledby="access-heading"
       >
-        <p class="text-text-muted mb-3 font-mono text-sm uppercase">Bienvenido</p>
-        <h2 id="access-heading" class="mb-3 font-display text-2xl">
-          Accede a Finanzas
-        </h2>
-        <p class="mb-8">
-          Elige cómo quieres entrar. Si ya usabas Finanzas, entra con un código enviado a tu correo
-          habitual.
-        </p>
         <AccessForm
           client:load
           verifyEmail={verifyEmail}
@@ -86,6 +77,14 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
           githubEnabled={Boolean(env.GITHUB_CLIENT_ID)}
         />
       </section>
+      <footer class="mbe-auto text-center">
+        <a
+          href="/?demo=true"
+          class="text-text-muted inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2 active:opacity-70"
+        >
+          Explorar la demo ↗
+        </a>
+      </footer>
     </main>
   </body>
 </html>

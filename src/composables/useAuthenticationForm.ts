@@ -1,5 +1,5 @@
 import { useAuthenticationAction } from './useAuthenticationAction'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import {
   authentication,
   authenticationRequest,
@@ -10,7 +10,7 @@ export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
   options: { verifyEmail?: string; initialError?: string } = {},
 ) {
-  const mode = shallowRef<AccessMode>(options.verifyEmail ? 'verify' : 'code')
+  const mode = shallowRef<AccessMode>(options.verifyEmail ? 'verify' : 'password')
   const email = shallowRef(options.verifyEmail ?? '')
   const password = shallowRef('')
   const otp = shallowRef('')
@@ -19,6 +19,16 @@ export function useAuthenticationForm(
   error.value = options.initialError ?? ''
   const needsCode = computed(() => ['code', 'verify', 'recover'].includes(mode.value))
   const needsPassword = computed(() => ['password', 'register', 'recover'].includes(mode.value))
+  watch(
+    email,
+    () => {
+      sent.value = false
+      otp.value = ''
+      message.value = ''
+      error.value = ''
+    },
+    { flush: 'sync' },
+  )
   function changeMode(value: AccessMode) {
     mode.value = value
     sent.value = false
@@ -27,10 +37,12 @@ export function useAuthenticationForm(
     error.value = ''
   }
   function sendCode() {
+    const recipient = email.value
+    const requestedMode = mode.value
     return run(async () => {
       await requireAuthenticationResult(
         await authentication.emailOtp.sendVerificationOtp({
-          email: email.value,
+          email: recipient,
           type:
             mode.value === 'recover'
               ? 'forget-password'
@@ -39,11 +51,13 @@ export function useAuthenticationForm(
                 : 'sign-in',
         }),
       )
+      if (email.value !== recipient || mode.value !== requestedMode) return
       sent.value = true
       message.value = 'Revisa tu correo. El código caduca en 10 minutos.'
     })
   }
   function submit() {
+    if (needsCode.value && (!sent.value || !/^[0-9]{6}$/.test(otp.value))) return
     return run(async () => {
       if (mode.value === 'register') {
         await requireAuthenticationResult(
@@ -55,6 +69,7 @@ export function useAuthenticationForm(
           }),
         )
         changeMode('verify')
+        password.value = ''
         message.value = 'Verifica tu correo con el enlace recibido o solicita un código.'
         return
       }
@@ -75,9 +90,16 @@ export function useAuthenticationForm(
           return
         }
       } else if (mode.value === 'password') {
-        await requireAuthenticationResult(
-          await authentication.signIn.email({ email: email.value, password: password.value }),
-        )
+        const result = await authentication.signIn.email({
+          email: email.value,
+          password: password.value,
+        })
+        if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
+          changeMode('verify')
+          password.value = ''
+          return
+        }
+        await requireAuthenticationResult(result)
       } else {
         await requireAuthenticationResult(
           await authentication.signIn.emailOtp({ email: email.value, otp: otp.value }),
