@@ -29,3 +29,6 @@ backup.sql
 
 /playwright-report-bitvavo/
 /blob-report-bitvavo/
+
+# Self-hosted secrets
+.env.selfhost
