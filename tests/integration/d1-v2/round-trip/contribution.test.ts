@@ -33,8 +33,8 @@ describe('round trip: contribution wealth adjustment', () => {
     const wealth = useWealthStore()
     wealth.setMonth(3)
     wealth.saveSnapshot([
-      { kind: 'accounts', id: otherId, value: '300' },
-      { kind: 'liabilities', id: liabilityId, value: '50' },
+      { kind: 'accounts', id: otherId, value: 300 },
+      { kind: 'liabilities', id: liabilityId, value: 50 },
     ])
     await trip.reload()
   })

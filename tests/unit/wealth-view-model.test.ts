@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  buildWealthViewModel,
-  parseSnapshotInput,
-  snapshotTotals,
-  type SnapshotGroupViewModel,
-} from '../../src/domain/wealth/view-model'
+import { buildWealthViewModel, parseSnapshotInput } from '../../src/domain/wealth/view-model'
 import type { State } from '../../src/scripts/types'
 
 /** The slice of the state the wealth view reads. */
@@ -59,7 +54,8 @@ describe('buildWealthViewModel', () => {
     expect(vm.groups[0].rows[0]).toMatchObject({
       id: 'bank',
       opening: 1000,
-      calculated: 1200,
+      // The calculated balance leaves the month's own snapshot out.
+      calculated: 1000,
       snapshot: 1200,
     })
     expect(vm.groups[0].rows[1].snapshot).toBeNull()
@@ -106,22 +102,5 @@ describe('buildWealthViewModel', () => {
     // Debt reads negative so the column adds up to the total.
     expect(rows[6].values[february]).toBe(-500)
     expect(rows[7].values[february]).toBe(1250 + 2000 - 500)
-  })
-})
-
-describe('snapshotTotals', () => {
-  const groups: SnapshotGroupViewModel[] = buildWealthViewModel(state(), 1).groups
-
-  it('uses the typed value and falls back to the calculated one', () => {
-    const totals = snapshotTotals(groups, { 'accounts:cash': '70', 'accounts:bank': '' })
-
-    expect(totals.accounts).toBe(1200 + 70)
-    expect(totals.investments).toBe(2000)
-    expect(totals.liabilities).toBe(500)
-    expect(totals.net).toBe(1270 + 2000 - 500)
-  })
-
-  it('ignores an invalid value', () => {
-    expect(snapshotTotals(groups, { 'accounts:cash': 'x' }).accounts).toBe(1250)
   })
 })

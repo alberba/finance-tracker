@@ -3,12 +3,14 @@ import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 
 import { formatSignedMoney } from '../../lib/format'
 import { evaluateNumericExpression } from '../../scripts/math-expression'
+import type { SnapshotKind } from '../../scripts/types'
 import { round2 } from '../../scripts/utils'
 import BaseButton from '../ui/BaseButton.vue'
 import SidePanel from '../ui/SidePanel.vue'
 
 export interface WealthCalcTarget {
-  key: string
+  kind: SnapshotKind
+  id: string
   name: string
   /** The snapshot as it stands in the table: typed value, else the calculated one. */
   current: number
@@ -26,7 +28,7 @@ const props = defineProps<{
   currency: string
 }>()
 
-const emit = defineEmits<{ apply: [key: string, value: number] }>()
+const emit = defineEmits<{ apply: [kind: SnapshotKind, id: string, value: number] }>()
 
 const open = defineModel<boolean>('open', { required: true })
 const expression = ref('')
@@ -78,7 +80,7 @@ function apply(): void {
     field.value?.focus()
     return
   }
-  emit('apply', props.target.key, result.value)
+  emit('apply', props.target.kind, props.target.id, result.value)
   open.value = false
 }
 </script>
