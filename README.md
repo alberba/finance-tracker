@@ -219,7 +219,7 @@ La estrategia de Vitest y sus comandos están documentados en
 [`docs/testing.md`](docs/testing.md). La configuración y el diagnóstico de los
 flujos de navegador están en [`docs/playwright.md`](docs/playwright.md).
 
-## Reportes web y automatización opcional
+## Reportes web
 
 Este repo permite enviar reportes desde la web y convertirlos en issues de GitHub:
 
@@ -230,9 +230,6 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Si activas la automatización opcional, el reporte añade mención `@claude` y se activa:
-   - `.github/workflows/issue-enrich-claude.yml` (Haiku): enriquece la issue.
-   - `.github/workflows/issue-fix-claude.yml` (Sonnet): intenta resolver y abrir PR.
 
 ### Variables y secrets requeridos
 
@@ -242,24 +239,12 @@ En Cloudflare runtime (`locals.runtime.env`):
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
 
-En GitHub Actions:
-
-- `ANTHROPIC_API_KEY`
-- `GITHUB_ISSUE_TOKEN` (opcional si no quieres usar `GITHUB_TOKEN` para PR)
-
-Opcional (GitHub Variables):
-
-- `CLAUDE_HAIKU_MODEL`
-- `CLAUDE_SONNET_MODEL`
-
 ### Labels recomendadas en GitHub
 
 - `source:web-report`, `status:triage`
 - `bug`, `feature`
 - `priority:low`, `priority:med`, `priority:high`
 - `area:frontend`, `area:backend`, `area:infra`, `area:data`
-- `enriched:haiku`
-- `autofix-attempted`, `autofix-opened-pr`, `autofix-nochange`, `autofix-failed`, `autofix:skip`
 
 ## Extraer datos desde Excel para uso local
 

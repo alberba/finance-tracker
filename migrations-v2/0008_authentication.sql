@@ -98,14 +98,14 @@ INSERT INTO auth_policy VALUES ('registration', 0);
 CREATE TRIGGER auth_admit BEFORE INSERT ON auth_admission
 WHEN NOT EXISTS (SELECT 1 FROM auth_admission WHERE user_id = NEW.user_id)
 BEGIN
- SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM auth_user WHERE id = NEW.user_id AND email_verified = 1)
- THEN RAISE(ABORT, 'EMAIL_NOT_VERIFIED') END;
- SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.user_id)
+ SELECT RAISE(ABORT, 'EMAIL_NOT_VERIFIED')
+ WHERE NOT EXISTS (SELECT 1 FROM auth_user WHERE id = NEW.user_id AND email_verified = 1);
+ SELECT RAISE(ABORT, 'INVITATION_UNAVAILABLE')
+ WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.user_id)
  AND (
  (NEW.invitation_id IS NULL AND NOT EXISTS (SELECT 1 FROM auth_policy WHERE id = 'registration' AND public_registration = 1))
  OR (NEW.invitation_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM auth_invitation WHERE id = NEW.invitation_id AND revoked = 0 AND expires_at > NEW.created_at AND uses < max_uses))
- )
- THEN RAISE(ABORT, 'INVITATION_UNAVAILABLE') END;
+ );
  UPDATE auth_invitation SET uses = uses + 1
  WHERE id = NEW.invitation_id AND NOT EXISTS (SELECT 1 FROM users WHERE id = NEW.user_id);
  INSERT INTO users(id, email, display_name, is_legacy_owner, created_at, updated_at)

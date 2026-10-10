@@ -42,9 +42,9 @@ pnpm test                    # unit + component + integration
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
-El gate completo de CI añade `pnpm audit:prod`, `pnpm test:coverage`, la comprobación de que las
-migraciones D1 locales (v1 y v2) aplican limpias, y `pnpm build`. En cada PR corren además los
-recorridos `@smoke`; la suite completa, visual y sync-v2 se lanzan al empujar a `main`.
+El gate de CI en cada PR añade `pnpm test:coverage`, la comprobación de que las migraciones D1
+locales (v1 y v2) aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
+corre al empujar a `main`; en una PR, solo con el label `run-e2e`.
 
 `pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una
 pregunta que hay que mirar, no necesariamente un fallo. Si el cambio visual es el esperado,

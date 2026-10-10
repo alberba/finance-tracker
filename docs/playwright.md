@@ -44,9 +44,17 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 
 ## CI
 
-Las PR normales ejecutan calidad y smoke. La PR cuya rama es `v2`, los pushes a `main` o
-`master` y las ejecuciones manuales ejecutan calidad, dos shards funcionales, dos shards visuales
-y sync-v2 en paralelo. Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
+Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest con cobertura,
+y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
+El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
+La PR cuya rama es `v2` ejecuta calidad, auth, dos shards funcionales y sync-v2 en paralelo. Los
+pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
+shards visuales. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
+lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
+Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
+Antes de abrir la PR, `pnpm gate` y `pnpm test:e2e:smoke` en local; espera en el CI solo a calidad.
+El setup común (pnpm, Node, install y Chromium cacheado por lockfile) vive en
+`.github/actions/setup`.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
 Los shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial

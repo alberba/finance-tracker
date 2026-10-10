@@ -6,7 +6,13 @@ import BaseSelect from '../ui/BaseSelect.vue'
 import SidePanel from '../ui/SidePanel.vue'
 import PillTag from '../ui/PillTag.vue'
 import { useBitvavoImport } from '../../composables/useBitvavoImport'
-import { formatDecimal, formatShortDate } from '../../lib/format'
+import {
+  formatDecimal,
+  formatMoney,
+  formatQuotePrice,
+  formatShortDate,
+  formatTime,
+} from '../../lib/format'
 const open = defineModel<boolean>('open', { required: true })
 const {
   form,
@@ -136,24 +142,23 @@ function close() {
           ><PillTag>{{ operation.side === 'buy' ? 'Compra' : 'Venta' }}</PillTag>
         </div>
         <p class="text-text-muted text-sm">
-          {{ formatShortDate(operation.date) }}, {{ operation.time }} · {{ operation.timeZone }}
+          {{ formatShortDate(operation.date) }},
+          {{ formatTime(operation.executedAt, operation.timeZone) }} · {{ operation.timeZone }}
         </p>
         <dl class="grid grid-cols-2 gap-2 text-sm">
           <dt>Cantidad</dt>
           <dd class="font-display text-right tabular-nums">
             {{ formatDecimal(operation.quantity) }}
           </dd>
-          <dt>Precio unitario EUR</dt>
+          <dt>Precio unitario</dt>
           <dd class="font-display text-right tabular-nums">
-            {{ formatDecimal(operation.unitPrice, { minDigits: 2 }) }}
+            {{ formatQuotePrice(Number(operation.unitPrice), 'EUR') }}
           </dd>
-          <dt>Comisión EUR</dt>
+          <dt>Comisión</dt>
+          <dd class="font-display text-right tabular-nums">{{ formatMoney(operation.fee) }}</dd>
+          <dt>Total</dt>
           <dd class="font-display text-right tabular-nums">
-            {{ formatDecimal(operation.fee, { minDigits: 2 }) }}
-          </dd>
-          <dt>Total EUR</dt>
-          <dd class="font-display text-right tabular-nums">
-            {{ formatDecimal(operation.cashAmount, { minDigits: 2 }) }}
+            {{ formatMoney(operation.cashAmount) }}
           </dd>
         </dl>
         <p v-if="operation.alreadyImported" class="text-text-muted text-sm">Ya importado</p>

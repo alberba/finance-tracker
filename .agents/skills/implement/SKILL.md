@@ -10,7 +10,7 @@ A `/design` canvas (a claude.ai artifact link) is read with the Artifact tool. I
 
 Use /tdd where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+Run typechecking regularly, single test files regularly, and the full test suite once at the end. Before the PR, `pnpm gate` plus `pnpm test:e2e:smoke` locally; the PR CI is quality only.
 
 Once done, use /code-review to review the work.
 

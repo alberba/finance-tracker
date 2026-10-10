@@ -11,7 +11,6 @@ export const issueReportSchema = z.object({
   type: z.enum(ISSUE_TYPES),
   summary: z.string().trim().min(5).max(140),
   description: z.string().trim().min(12).max(8000),
-  mentionClaude: z.boolean().optional().default(false),
   section: z.string().trim().min(1).max(64),
   context: z.object({
     userAgent: z.string().trim().max(512).optional().default(""),

@@ -38,7 +38,7 @@ by path.
 
 ### CI and E2E
 
-CI or browser failures: `docs/playwright.md` covers dependency checks, worktree setup and CI sharding.
+CI or browser failures, and what runs on a PR versus `main` (`run-e2e` label): `docs/playwright.md`.
 
 ## Commands
 

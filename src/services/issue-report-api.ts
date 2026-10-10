@@ -8,7 +8,6 @@ export interface ReportPayload {
   type: ReportType
   summary: string
   description: string
-  mentionClaude: boolean
   section: string
   context: {
     userAgent: string
@@ -24,7 +23,6 @@ interface ReportResponseOk {
   ok: true
   issueNumber: number
   issueUrl: string
-  enrichmentStatus?: 'pending' | 'completed'
 }
 
 interface ReportResponseError {
@@ -34,15 +32,11 @@ interface ReportResponseError {
 
 export type ReportResponse = ReportResponseOk | ReportResponseError
 
-export type ReportSubmissionPayload = Omit<ReportPayload, 'mentionClaude'> & {
-  mentionClaude?: boolean
-}
-
 export const ISSUE_REPORT_ENDPOINT = '/api/issues/report'
 
 const FALLBACK_MESSAGE = 'No se pudo crear la issue.'
 
-export async function submitIssueReport(payload: ReportSubmissionPayload): Promise<ReportResponse> {
+export async function submitIssueReport(payload: ReportPayload): Promise<ReportResponse> {
   if (isDemoMode()) {
     return { ok: false, error: 'Los reportes no se envían desde el modo demo.' }
   }

@@ -6,7 +6,6 @@ const payload: IssueReportPayload = {
   type: "bug",
   summary: "Error al guardar movimiento",
   description: "Al pulsar guardar, no se persiste en servidor.",
-  mentionClaude: true,
   section: "transactions",
   context: {
     userAgent: "Playwright",
@@ -60,7 +59,6 @@ describe("github issues service", () => {
       expect.arrayContaining([
         "source:web-report",
         "status:triage",
-        "enrich:pending",
         "bug",
       ]),
     );
@@ -70,46 +68,6 @@ describe("github issues service", () => {
     expect(body.body).toContain("### Problema o solicitud");
     expect(body.body).toContain("- Se envió desde la sección: transactions");
     expect(body.body).toContain("- Se envió desde la ruta: /movimientos");
-    expect(body.body).toContain("@claude");
-  });
-
-  it("crea issue simple sin mención ni label de enriquecimiento", async () => {
-    const simplePayload: IssueReportPayload = {
-      ...payload,
-      mentionClaude: false,
-    };
-    const fakeFetch = vi.fn<typeof fetch>(
-      async () =>
-        new Response(
-          JSON.stringify({
-            number: 14,
-            html_url: "https://github.com/org/repo/issues/14",
-          }),
-          {
-            status: 201,
-          },
-        ),
-    );
-
-    await createIssueFromWebReport(
-      simplePayload,
-      {
-        GITHUB_ISSUE_TOKEN: "token",
-        GITHUB_OWNER: "org",
-        GITHUB_REPO: "repo",
-      },
-      { fetch: fakeFetch as unknown as typeof fetch },
-    );
-
-    const [, init] = fakeFetch.mock.calls[0];
-    const body = JSON.parse(String(init?.body || "{}"));
-    expect(body.labels).toEqual(
-      expect.arrayContaining(["source:web-report", "status:triage", "bug"]),
-    );
-    expect(body.labels).not.toContain("type:bug");
-    expect(body.type).toBe("Bug");
-    expect(body.labels).not.toContain("enrich:pending");
-    expect(body.body).not.toContain("@claude");
   });
 
   it("mapea una mejora a label y tipo Feature", async () => {
@@ -128,7 +86,6 @@ describe("github issues service", () => {
       {
         ...payload,
         type: "feature",
-        mentionClaude: false,
       },
       {
         GITHUB_ISSUE_TOKEN: "token",

@@ -12,7 +12,7 @@ const { preference } = useThemePreference()
 const ICON_STYLES = {
   sidebar: {
     track: 'bg-ink-text/6 sidebar-collapsed:flex-col',
-    button: 'h-10 sidebar-collapsed:h-9',
+    button: 'h-10 pointer-coarse:h-11 sidebar-collapsed:h-9 sidebar-collapsed:pointer-coarse:h-11',
     active: 'bg-ink-text/14 text-ink-text',
     idle: 'text-ink-muted hover:bg-ink-text/6 hover:text-ink-text',
   },

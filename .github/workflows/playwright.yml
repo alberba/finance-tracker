@@ -4,6 +4,12 @@ on:
   push:
     branches: [main, master]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    # Sin filtro de ruta en los jobs: la rama no tiene checks obligatorios,
+    # así que un PR solo de docs puede saltarse el CI entero.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       update_snapshots:
@@ -22,28 +28,38 @@ env:
   CI: true
 
 jobs:
-  quality:
+  static:
     if: ${{ !inputs.update_snapshots }}
-    name: Quality and coverage
+    name: Lint and typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - name: Lint
         run: pnpm lint
       - name: Astro check
         run: pnpm check
+
+  unit:
+    if: ${{ !inputs.update_snapshots }}
+    name: Vitest coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
       - name: Vitest unit, component and integration coverage
         run: pnpm test:coverage
+
+  build:
+    if: ${{ !inputs.update_snapshots }}
+    name: D1 migrations and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
       - name: Verify local D1 migrations apply cleanly (v1 + v2)
         run: |
           pnpm d1:migrate:local
@@ -53,22 +69,14 @@ jobs:
 
   smoke:
     name: PR smoke E2E
-    if: github.event_name == 'pull_request' && github.head_ref != 'v2'
+    if: ${{ github.event_name == 'pull_request' && github.head_ref != 'v2' && contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Run smoke E2E
@@ -94,17 +102,9 @@ jobs:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Run functional E2E shard
@@ -121,7 +121,7 @@ jobs:
 
   visual:
     name: Visual E2E shard ${{ matrix.shard }}/2
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
+    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -130,17 +130,9 @@ jobs:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Run visual regression tests
@@ -162,17 +154,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Apply local D1 v2 migrations
@@ -200,17 +184,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\nLEGACY_OWNER_EMAIL=legacy-owner@e2e.test\n' > .dev.vars
       - name: Regenerate and commit Linux snapshots
@@ -228,21 +204,14 @@ jobs:
 
   authentication-e2e:
     name: Better Auth Worker and browser contracts
+    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2' || contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: ./.github/actions/setup
         with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+          playwright: 'true'
       - name: Run isolated Better Auth Worker E2E
         run: pnpm test:e2e:auth --reporter=dot,html
       - name: Upload authentication report
@@ -266,15 +235,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.26.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - name: Download blob reports
         continue-on-error: true
         uses: actions/download-artifact@v4
