@@ -43,9 +43,33 @@ ejecuta un servidor Node de producción dentro de Docker. La compilación habitu
 `deploy:cf` siguen seleccionando Cloudflare; Docker usa `DEPLOY_TARGET=node`.
 
 La frontera SQLite mantiene los métodos que consume el cliente Drizzle D1 para
-reutilizar los repositorios. Los batches son transacciones SQLite. Como en D1, las
-transacciones interactivas del dominio no son atómicas: no se comparte un BEGIN entre
-peticiones asíncronas. No hay una migración a otro motor ni una reescritura del dominio.
+reutilizar los repositorios. En Node, `runInTransaction` ejecuta `BEGIN IMMEDIATE` y
+conserva la propiedad de la conexión durante todo el callback async, hasta `COMMIT`
+o `ROLLBACK`. Importar (también reemplazar), inicializar, restablecer y provisionar
+usuario/identidad confirman todas sus escrituras o revierten todas. Cada comando sync
+incluye entidad, operación, cambios, cursor, auditoría y resultado en esa unidad.
+
+La reserva del comando se confirma antes de la unidad de escritura: un fallo de
+infraestructura deja una reserva `processing`, recuperable cuando vence su lease.
+Los rechazos se guardan después del rollback; el replay, los conflictos y la parada
+del lote mantienen su contrato. El lote completo no constituye una sola transacción.
+
+Todas las lecturas, escrituras y batches que pasan por el binding comparten una cola
+por conexión física, incluso con distintos handles Drizzle. Las peticiones ajenas
+esperan hasta que termina la transacción; no ven escrituras pendientes ni participan
+en su rollback. Los batches siguen siendo atómicos, también dentro de un callback.
+No se debe acceder directamente a la conexión nativa mientras el servidor la usa.
+Los callbacks deben esperar sus consultas y no lanzar trabajo en segundo plano:
+una tarea que hereda un propietario ya terminado recibe un error. Las transacciones
+interactivas anidadas no están soportadas. Mantén cortos los callbacks: bloquean la
+cola, y una llamada de red dentro de ellos retrasa las demás peticiones.
+
+La capacidad se selecciona por backend/conexión. Un fallo real al iniciar SQLite se
+propaga sin ejecutar el callback ni desactivar otra conexión. Cloudflare D1 mantiene
+sus batches atómicos y sus operaciones interactivas secuenciales de mejor esfuerzo,
+sin garantía de rollback entre consultas: no ofrece esa capacidad. No se envían
+`BEGIN` ni `SAVEPOINT` a D1 para descubrirla. Estas garantías locales corresponden
+a un único servidor Node y SQLite; no requieren cambiar de motor.
 
 ## Futuro despliegue en Debian
 
