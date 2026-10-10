@@ -151,7 +151,9 @@ function changeText(kpi: DashboardKpi): string {
               :id="`kpi-${kpi.kind}`"
               class="font-display text-text-main text-3xl leading-none font-medium tracking-tight tabular-nums"
             >
-              {{ kpi.previewValue }}
+              <span :key="kpi.previewValue" class="kpi-value inline-block">{{
+                kpi.previewValue
+              }}</span>
             </strong>
             <span v-if="kpi.previous" class="text-text-muted text-sm tabular-nums">
               {{ kpi.previous }}
@@ -174,9 +176,10 @@ function changeText(kpi: DashboardKpi): string {
               @blur="endPreview(kpi.kind, 'focus')"
             >
               <span
-                class="block min-h-1 w-full rounded-xs"
+                :key="`${year}-${month}`"
+                class="kpi-bar-fill block min-h-1 w-full rounded-xs"
                 :class="[KIND_FILL[kpi.kind], { 'opacity-30': !bar.current }]"
-                :style="{ blockSize: `${bar.height}%` }"
+                :style="{ blockSize: `${bar.height}%`, '--bar-index': index }"
                 aria-hidden="true"
               ></span>
             </button>
@@ -247,6 +250,41 @@ function changeText(kpi: DashboardKpi): string {
 @media (hover: hover) and (pointer: fine) {
   .kpi-bar:hover > span {
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kpi-bar-fill {
+    transform-origin: center bottom;
+    animation: kpi-bar-reveal 220ms var(--ease-out) both;
+    animation-delay: calc(var(--bar-index) * 10ms);
+    transition:
+      opacity 140ms var(--ease-out),
+      block-size 220ms var(--ease-out);
+  }
+
+  .kpi-value {
+    animation: kpi-value-reveal 140ms var(--ease-out);
+  }
+
+  @keyframes kpi-bar-reveal {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes kpi-value-reveal {
+    from {
+      opacity: 0.6;
+      translate: 0 0.08em;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
   }
 }
 </style>

@@ -87,13 +87,9 @@ describe('DashboardMonthCard', () => {
   )
 
   it('keeps the monthly bar heights', () => {
-    const bars = mountCard([expense]).findAll('[data-kpi="expense"] button span')
+    const bars = mountCard([expense]).findAll<HTMLSpanElement>('[data-kpi="expense"] button span')
 
-    expect(bars.map((bar) => bar.attributes('style'))).toEqual([
-      'block-size: 60%;',
-      'block-size: 100%;',
-      'block-size: 76.5%;',
-    ])
+    expect(bars.map((bar) => bar.element.style.blockSize)).toEqual(['60%', '100%', '76.5%'])
   })
 
   it('names each bar with its KPI, month and amount', () => {
