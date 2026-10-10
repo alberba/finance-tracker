@@ -52,7 +52,8 @@
     "local:up": "node scripts/local-compose.mjs up",
     "local:down": "node scripts/local-compose.mjs down",
     "local:archive": "node scripts/archive-local.mjs",
-    "local:archive:install": "node scripts/install-orca-archive.mjs"
+    "local:archive:install": "node scripts/install-orca-archive.mjs",
+    "local:up:prod": "node scripts/local-compose.mjs up production"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

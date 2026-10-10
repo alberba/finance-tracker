@@ -81,13 +81,21 @@ export function checkoutProject(checkout, mainCheckout) {
   return projectName(checkout, mainCheckout)
 }
 
-async function run(action) {
+async function run(action, mode = 'dev') {
+  if (!['dev', 'production'].includes(mode)) throw new Error('Usa el modo dev o production.')
   if (!['up', 'down'].includes(action)) throw new Error('Usa local-compose.mjs up o down.')
   execFileSync(process.execPath, ['scripts/setup-local.mjs'], { stdio: 'inherit' })
   const checkout = process.cwd()
   const mainCheckout = primaryCheckout(checkout)
   const project = checkoutProject(checkout, mainCheckout)
-  const compose = ['compose', '--project-name', project]
+  const compose = [
+    'compose',
+    '--project-name',
+    project,
+    '-f',
+    'compose.yaml',
+    ...(mode === 'dev' ? ['-f', 'compose.dev.yaml'] : []),
+  ]
   mkdirSync(resolve('.data'), { recursive: true })
   writeFileSync(resolve('.data/selfhost-project'), `${JSON.stringify({ project, checkout })}\n`)
   if (action === 'down') {
@@ -151,7 +159,7 @@ export async function startCompose(compose, preferred, runningPort) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  run(process.argv[2]).catch((error) => {
+  run(process.argv[2], process.argv[3]).catch((error) => {
     console.error(error.message)
     process.exitCode = 1
   })

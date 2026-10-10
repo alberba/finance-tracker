@@ -7,7 +7,7 @@ pnpm local:setup
 pnpm local:up
 ```
 
-`local:up` muestra la URL de esta instancia cuando el contenedor está listo. El checkout
+`local:up` arranca Astro en modo desarrollo con hot reload y muestra la URL de esta instancia cuando el contenedor está listo. El checkout
 principal usa el puerto 4321; cada worktree obtiene otro puerto, guardado en
 `.data/selfhost-port` y reutilizado en los siguientes arranques. Si un puerto está ocupado
 por otra aplicación, se busca uno libre. Cada proyecto conserva su propio volumen SQLite.
@@ -23,18 +23,16 @@ antes de enlazar la compartida; si ya hay una copia, se usa un sufijo numérico.
 Selecciona «Contraseña» y entra con correo y contraseña. El administrador inicial ya tiene el correo verificado;
 no necesitas configurar un proveedor de correo para este acceso.
 
-La primera compilación descarga y prepara las dependencias y puede superar un minuto.
-Las siguientes reutilizan la caché de pnpm y las capas de dependencias de Docker,
-compartidas entre worktrees. Cambiar el código recompila Astro sin reconstruir la capa
-de dependencias de la imagen final; cambiar solo documentación o tests no recompila la aplicación.
+La primera creación de la imagen descarga y prepara las dependencias y puede superar un minuto. Las siguientes reutilizan la caché de pnpm y las capas de Docker, compartidas entre worktrees. En desarrollo, el código y la configuración se montan desde el worktree: los cambios en Vue, Astro y CSS aparecen en el navegador sin reconstruir la imagen. Las dependencias Linux permanecen dentro del contenedor; no se monta el `node_modules` de macOS. Si cambias las dependencias, vuelve a ejecutar `pnpm local:up`.
+
+Para probar la compilación de producción con el mismo puerto y volumen, usa `pnpm local:up:prod`. Para volver al hot reload, usa `pnpm local:up`. Para trabajar a diario sin Docker, recomendamos `pnpm setup:worktree` y `pnpm dev`; este modo usa D1 local y puedes abrir `/?demo=1`.
 
 El servidor usa Astro con Node y SQLite local; no consulta D1 ni requiere Cloudflare
-Access. La sincronización v2 se activa al compilar la imagen. Los datos empiezan vacíos,
+Access. La sincronización v2 está activada en ambos modos de Docker. Los datos empiezan vacíos,
 independientes de producción. El importador de Datos admite la copia JSON v2 de la
 aplicación; esto no migra las cuentas de autenticación de Cloudflare.
 
 ```sh
-docker compose logs -f app
 pnpm local:down
 pnpm local:up
 ```
@@ -89,3 +87,18 @@ node "$ORCA_ROOT_PATH/.data/orca/archive-local.mjs" "$ORCA_WORKTREE_PATH"
 ```
 
 La instalación se mantiene fuera de Git; vuelve a ejecutar el instalador cuando actualices el script.
+
+### Configuración de Orca para desarrollo diario
+
+Script de configuración (prepara dependencias, variables y D1 local, instala la limpieza compartida y abre Astro con hot reload):
+
+```sh
+set -eu
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+cd "$ORCA_WORKTREE_PATH"
+pnpm setup:worktree
+pnpm local:archive:install
+exec pnpm dev --host 127.0.0.1
+```
+
+Astro muestra el puerto asignado y elige otro si está ocupado. Abre esa URL con `/?demo=1` para usar datos sintéticos. El script de archivado es el del apartado anterior; usa una ruta del checkout principal para seguir disponible aunque la rama archivada no lo contenga.
