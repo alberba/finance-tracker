@@ -25,6 +25,17 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - `src/styles/global.css`: tokens de tema (claro y oscuro), `@theme` de Tailwind, reset y tipografía base; la única hoja de estilos
 - `scripts/extract_excel_seed.py`: script para regenerar el seed desde un `.xlsx`
 
+## Ejecutar en OrbStack (Docker)
+
+```sh
+pnpm local:setup
+pnpm local:up
+```
+
+Abre <http://localhost:4321/login> y usa el correo y la contraseña de `.env.selfhost`.
+SQLite se guarda en un volumen persistente, separado de los datos de Cloudflare.
+Consulta [la guía de ejecución local y self-hosting](docs/operations/self-hosting.md).
+
 ## Ejecutar en local (Astro)
 
 ```bash
@@ -75,10 +86,10 @@ wrangler secret put COINGECKO_API_KEY
 
 `wrangler.toml` declara dos bases D1, cada una con su carpeta de migraciones:
 
-| Binding | Base | Migraciones | Contenido |
-|---|---|---|---|
-| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (*sync v2*), el que usa la app |
-| `finance_tracker_db` | `finance-tracker-db` | `migrations/` | Blob legacy v1 |
+| Binding                 | Base                    | Migraciones      | Contenido                                        |
+| ----------------------- | ----------------------- | ---------------- | ------------------------------------------------ |
+| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app |
+| `finance_tracker_db`    | `finance-tracker-db`    | `migrations/`    | Blob legacy v1                                   |
 
 Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.
 
@@ -103,11 +114,11 @@ El deploy lo hace **Workers Builds** (integración Git del Worker `finance-track
 no GitHub Actions. Configuración en el dashboard (Workers → finance-tracker →
 Settings → Build):
 
-| Campo | Valor |
-|---|---|
-| Build command | `pnpm build` |
-| Deploy command | `pnpm deploy:cf` |
-| Production branch | `main` |
+| Campo             | Valor            |
+| ----------------- | ---------------- |
+| Build command     | `pnpm build`     |
+| Deploy command    | `pnpm deploy:cf` |
+| Production branch | `main`           |
 
 `pnpm deploy:cf` usa `--config dist/server/wrangler.json`: el adapter de Astro
 genera ese fichero en el build a partir de `wrangler.toml`, y es el que lleva

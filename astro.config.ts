@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { defineConfig } from 'astro/config'
 import cloudflare from '@astrojs/cloudflare'
+import node from '@astrojs/node'
 
 import tailwindcss from '@tailwindcss/vite'
 
@@ -12,6 +13,7 @@ import svgLoader from 'vite-svg-loader'
 import sentry from '@sentry/astro'
 
 const require = createRequire(import.meta.url)
+const selfHosted = process.env.DEPLOY_TARGET === 'node'
 const oauthNetworkAliases =
   process.env.AUTH_E2E_NETWORK === 'true'
     ? [
@@ -35,12 +37,14 @@ export default defineConfig({
     enabled: false,
   },
 
-  adapter: cloudflare({
-    configPath: process.env.CLOUDFLARE_CONFIG_PATH,
-    persistState: process.env.CLOUDFLARE_PERSIST_PATH
-      ? { path: process.env.CLOUDFLARE_PERSIST_PATH }
-      : true,
-  }),
+  adapter: selfHosted
+    ? node({ mode: 'standalone' })
+    : cloudflare({
+        configPath: process.env.CLOUDFLARE_CONFIG_PATH,
+        persistState: process.env.CLOUDFLARE_PERSIST_PATH
+          ? { path: process.env.CLOUDFLARE_PERSIST_PATH }
+          : true,
+      }),
 
   server: {
     host: true,
@@ -48,7 +52,20 @@ export default defineConfig({
   },
 
   vite: {
-    resolve: { alias: oauthNetworkAliases },
+    resolve: {
+      alias: [
+        ...oauthNetworkAliases,
+        ...(selfHosted
+          ? [
+              {
+                find: 'cloudflare:workers',
+                replacement: resolve('src/lib/server/local/runtime.ts'),
+              },
+              { find: '@sentry/cloudflare', replacement: '@sentry/node' },
+            ]
+          : []),
+      ],
+    },
     envPrefix: ['PUBLIC_', 'AUTH_TEST_PORT'],
     plugins: [tailwindcss(), svgLoader()],
   },

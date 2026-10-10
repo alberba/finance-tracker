@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.astro
+.wrangler
+.data
+.scratch
+.env*
+.dev.vars*
+coverage
+playwright-report*
+test-results
+backup.sql
