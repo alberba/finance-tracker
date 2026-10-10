@@ -8,6 +8,8 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 main_checkout="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 
+node scripts/setup-local.mjs
+
 if [[ ! -f .dev.vars ]]; then
   if [[ -f "$main_checkout/.dev.vars" && "$main_checkout" != "$PWD" ]]; then
     cp "$main_checkout/.dev.vars" .dev.vars

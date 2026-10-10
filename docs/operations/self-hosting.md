@@ -9,6 +9,11 @@ pnpm local:up
 
 Abre <http://localhost:4321/login>. El correo y la contraseña inicial están en
 `.env.selfhost`, creado con permisos privados y excluido de Git y de la imagen Docker.
+La configuración se guarda en el checkout principal y los worktrees la usan mediante
+un enlace simbólico: al editar ese archivo, todos reciben los mismos cambios.
+`pnpm local:up`, `pnpm local:down` y `pnpm setup:worktree` preparan el enlace automáticamente.
+Si un worktree tenía una configuración propia, se conserva en `.env.selfhost.local`
+antes de enlazar la compartida; si ya hay una copia, se usa un sufijo numérico.
 Selecciona «Contraseña» y entra con correo y contraseña. El administrador inicial ya tiene el correo verificado;
 no necesitas configurar un proveedor de correo para este acceso.
 

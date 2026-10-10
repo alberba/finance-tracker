@@ -49,8 +49,8 @@
     "test:e2e:shard": "tsx scripts/e2e-functional-shard.ts",
     "check:deps": "node scripts/check-installed-dependencies.mjs",
     "local:setup": "node scripts/setup-local.mjs",
-    "local:up": "docker compose up --build -d",
-    "local:down": "docker compose down"
+    "local:up": "pnpm local:setup && docker compose up --build -d",
+    "local:down": "pnpm local:setup && docker compose down"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
