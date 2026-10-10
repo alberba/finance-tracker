@@ -228,3 +228,79 @@ it('rejects work inherited from a completed transaction', async () => {
   await rejected
   expect(await db.select().from(schema.users)).toEqual([])
 })
+
+it('does not expose synchronous execution on prepared or bound statements', () => {
+  const binding = createSqliteBinding(sqlite)
+  const statement = binding.prepare('SELECT id FROM users WHERE id = ?')
+  expect(statement).not.toHaveProperty('execute')
+  expect(statement.bind('owner')).not.toHaveProperty('execute')
+})
+
+it('does not expose the native connection through a prepared statement', () => {
+  const binding = createSqliteBinding(sqlite)
+  const statement = binding.prepare('SELECT id FROM users WHERE id = ?')
+  expect(statement).not.toHaveProperty('connection')
+  expect(statement.bind('owner')).not.toHaveProperty('connection')
+})
+
+it('rejects batches spanning physical connections before executing any writes', async () => {
+  const otherSqlite = new Database(':memory:')
+  try {
+    migrateLocalDatabase(otherSqlite)
+    const binding = createSqliteBinding(sqlite)
+    const other = createSqliteBinding(otherSqlite)
+    const insert = 'INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)'
+    await expect(
+      binding.batch([
+        binding.prepare(insert).bind('first', 'first@example.test', '2026-01-01', '2026-01-01'),
+        other.prepare(insert).bind('second', 'second@example.test', '2026-01-01', '2026-01-01'),
+      ]),
+    ).rejects.toThrow('must belong to its connection')
+    expect((await binding.prepare('SELECT id FROM users').all()).results).toEqual([])
+    expect((await other.prepare('SELECT id FROM users').all()).results).toEqual([])
+  } finally {
+    otherSqlite.close()
+  }
+})
+
+it.each([
+  'BEGIN IMMEDIATE',
+  'SAVEPOINT foreign_transaction',
+  'COMMIT',
+  'END',
+  'ROLLBACK',
+  'RELEASE foreign_transaction',
+  '; /* transaction control */ COMMIT',
+  '-- transaction control\nROLLBACK',
+])('retains transaction ownership when a statement attempts %s', async (sql) => {
+  const binding = createSqliteBinding(sqlite)
+  await expect(
+    runInTransaction(db, async (tx) => {
+      await tx.insert(schema.users).values(user('uncommitted'))
+      await expect(binding.prepare(sql).run()).rejects.toThrow('Transaction control')
+      throw new Error('rollback owner')
+    }),
+  ).rejects.toThrow('rollback owner')
+  expect(await db.select().from(schema.users)).toEqual([])
+})
+
+it.each(['first', 'raw', 'all'] as const)(
+  'rejects transaction control consistently through %s',
+  async (method) => {
+    const binding = createSqliteBinding(sqlite)
+    await expect(binding.prepare('COMMIT')[method]()).rejects.toThrow('Transaction control')
+  },
+)
+
+it('rolls back prior batch writes when a transaction-control statement is rejected', async () => {
+  const binding = createSqliteBinding(sqlite)
+  await expect(
+    binding.batch([
+      binding
+        .prepare('INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)')
+        .bind('uncommitted', 'uncommitted@example.test', '2026-01-01', '2026-01-01'),
+      binding.prepare('COMMIT'),
+    ]),
+  ).rejects.toThrow('Transaction control')
+  expect(await db.select().from(schema.users)).toEqual([])
+})

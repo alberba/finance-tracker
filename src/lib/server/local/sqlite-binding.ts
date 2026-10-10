@@ -6,11 +6,24 @@ type Parameter = string | number | bigint | Buffer | null
 
 /** The SQL boundary consumed by Drizzle's async D1 driver and legacy state. */
 class SqliteStatement {
-  constructor(
-    private connection: SqliteConnection,
-    private sql: string,
-    private parameters: Parameter[] = [],
-  ) {}
+  #connection: SqliteConnection
+  #sql: string
+  #parameters: Parameter[]
+
+  constructor(connection: SqliteConnection, sql: string, parameters: Parameter[] = []) {
+    this.#connection = connection
+    this.#sql = sql
+    this.#parameters = parameters
+  }
+
+  static async batch(connection: SqliteConnection, statements: SqliteStatement[]) {
+    if (statements.some((statement) => statement.#connection !== connection)) {
+      throw new Error('SQLite batch statements must belong to its connection.')
+    }
+    return connection.access(() =>
+      connection.sqlite.transaction(() => statements.map((statement) => statement.#execute()))(),
+    )
+  }
 
   bind(...values: unknown[]): SqliteStatement {
     const parameters = values.map((value): Parameter => {
@@ -24,25 +37,32 @@ class SqliteStatement {
         return value
       throw new TypeError('Unsupported SQLite parameter.')
     })
-    return new SqliteStatement(this.connection, this.sql, parameters)
+    return new SqliteStatement(this.#connection, this.#sql, parameters)
   }
 
   async first(): Promise<unknown> {
-    return this.connection.access(
-      () => this.connection.sqlite.prepare(this.sql).get(...this.parameters) ?? null,
-    )
+    return this.#connection.access(() => this.#prepare().get(...this.#parameters) ?? null)
   }
 
-  execute() {
-    // Transaction control belongs to the connection owner, never to a statement.
-    if (/^\s*(begin|savepoint)\b/i.test(this.sql)) {
-      throw new Error('Interactive transactions are unsupported; use batch.')
+  #prepare() {
+    // Only the connection owner may control transaction lifetime, including
+    // commands preceded by SQL comments or empty statements.
+    if (
+      /^(?:\s|;|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*(begin|savepoint|commit|rollback|release|end)\b/i.test(
+        this.#sql,
+      )
+    ) {
+      throw new Error('Transaction control must use runInTransaction or batch.')
     }
-    const statement = this.connection.sqlite.prepare(this.sql)
+    return this.#connection.sqlite.prepare(this.#sql)
+  }
+
+  #execute() {
+    const statement = this.#prepare()
     if (statement.reader) {
-      return { results: statement.all(...this.parameters), success: true, meta: { changes: 0 } }
+      return { results: statement.all(...this.#parameters), success: true, meta: { changes: 0 } }
     }
-    const result = statement.run(...this.parameters)
+    const result = statement.run(...this.#parameters)
     return {
       results: [],
       success: true,
@@ -51,18 +71,17 @@ class SqliteStatement {
   }
 
   async run() {
-    return this.connection.access(() => this.execute())
+    return this.#connection.access(() => this.#execute())
   }
   async all() {
-    return this.connection.access(() => this.execute())
+    return this.#connection.access(() => this.#execute())
   }
   async raw(): Promise<unknown[][]> {
-    return this.connection.access(
+    return this.#connection.access(
       () =>
-        this.connection.sqlite
-          .prepare(this.sql)
+        this.#prepare()
           .raw()
-          .all(...this.parameters) as unknown[][],
+          .all(...this.#parameters) as unknown[][],
     )
   }
 }
@@ -118,9 +137,6 @@ export function createSqliteBinding(sqlite: Database.Database) {
   return {
     [interactiveTransaction]: <T>(fn: () => Promise<T>) => ownedConnection.transaction(fn),
     prepare: (sql: string) => new SqliteStatement(ownedConnection, sql),
-    batch: async (statements: SqliteStatement[]) =>
-      ownedConnection.access(() =>
-        sqlite.transaction(() => statements.map((statement) => statement.execute()))(),
-      ),
+    batch: (statements: SqliteStatement[]) => SqliteStatement.batch(ownedConnection, statements),
   }
 }

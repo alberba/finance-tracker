@@ -57,7 +57,10 @@ del lote mantienen su contrato. El lote completo no constituye una sola transacc
 Todas las lecturas, escrituras y batches que pasan por el binding comparten una cola
 por conexión física, incluso con distintos handles Drizzle. Las peticiones ajenas
 esperan hasta que termina la transacción; no ven escrituras pendientes ni participan
-en su rollback. Los batches siguen siendo atómicos, también dentro de un callback.
+en su rollback. Los batches siguen siendo atómicos, también dentro de un callback. Los statements
+preparados no exponen la conexión ni una ejecución síncrona pública; todos sus
+métodos respetan la cola y rechazan SQL de control transaccional, incluidos
+`COMMIT`, `ROLLBACK` y `SAVEPOINT`. Ese control pertenece al binding.
 No se debe acceder directamente a la conexión nativa mientras el servidor la usa.
 Los callbacks deben esperar sus consultas y no lanzar trabajo en segundo plano:
 una tarea que hereda un propietario ya terminado recibe un error. Las transacciones
