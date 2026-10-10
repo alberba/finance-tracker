@@ -10,7 +10,7 @@ export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
   options: { verifyEmail?: string; initialError?: string } = {},
 ) {
-  const mode = shallowRef<AccessMode>(options.verifyEmail ? 'verify' : 'code')
+  const mode = shallowRef<AccessMode>(options.verifyEmail ? 'verify' : 'password')
   const email = shallowRef(options.verifyEmail ?? '')
   const password = shallowRef('')
   const otp = shallowRef('')
@@ -55,6 +55,7 @@ export function useAuthenticationForm(
           }),
         )
         changeMode('verify')
+        password.value = ''
         message.value = 'Verifica tu correo con el enlace recibido o solicita un código.'
         return
       }

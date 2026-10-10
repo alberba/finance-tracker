@@ -7,8 +7,9 @@ withDefaults(
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'ink-danger'
     type?: 'button' | 'submit'
     disabled?: boolean
+    iconOnly?: boolean
   }>(),
-  { variant: 'secondary', type: 'button', disabled: false },
+  { variant: 'secondary', type: 'button', disabled: false, iconOnly: false },
 )
 
 defineEmits<{ click: [event: MouseEvent] }>()
@@ -26,8 +27,8 @@ const VARIANT = {
   <button
     :type="type"
     :disabled="disabled"
-    class="focus-visible:outline-primary inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-4 text-[0.9375rem] font-bold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-    :class="VARIANT[variant]"
+    class="focus-visible:outline-primary text-button inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border font-bold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 active:opacity-70 disabled:cursor-not-allowed disabled:opacity-50"
+    :class="[VARIANT[variant], iconOnly ? 'size-12 p-0' : 'min-h-11 px-4']"
     @click="$emit('click', $event)"
   >
     <slot />

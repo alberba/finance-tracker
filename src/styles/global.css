@@ -5,6 +5,15 @@
 
 @import 'tailwindcss';
 
+/* Hover feedback only applies to devices with a precise pointer. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 /* `dark:` follows the app theme attribute, not prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
@@ -23,6 +32,10 @@
   /* ══ TOKENS · LIGHT (default) ══════════════════════════════════ */
   :root {
     color-scheme: light;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --motion-fast: 140ms;
+    --motion-view: 180ms;
+    --motion-distance: 0.75rem;
 
     /* Surfaces */
     --bg-main: #eef1f6;
@@ -185,6 +198,11 @@
   --font-display: 'Syne', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
+  --text-access-title: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
+  --text-button: 0.9375rem;
+  --spacing-access-card: 52rem;
+  --spacing-access-panel: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
+
   /* Shell breakpoint: sidebar and the floating report launcher from here up;
      app bar and bottom nav below. */
   --breakpoint-desk: 61.3125rem;
@@ -254,17 +272,23 @@
 @layer base {
   html,
   body {
-    min-height: 100%;
+    min-block-size: 100%;
+  }
+
+  html {
+    overflow-wrap: break-word;
+    font-synthesis: none;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
+    min-block-size: 100svh;
     font-family: var(--font-sans);
     font-size: 15px;
     color: var(--text-main);
     line-height: 1.55;
     background: var(--bg-main);
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
     transition:
       background-color 0.3s ease,
       color 0.3s ease;
@@ -282,6 +306,18 @@
     font-family: var(--font-sans);
     font-weight: 700;
     letter-spacing: -0.01em;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
   }
 
   dialog {
