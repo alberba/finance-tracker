@@ -1,4 +1,10 @@
-import { MONTHS, type BudgetType, type GoalKey, type MonthTotals, type State } from '../../scripts/types'
+import {
+  MONTHS,
+  type BudgetType,
+  type GoalKey,
+  type MonthTotals,
+  type State,
+} from '../../scripts/types'
 import { monthFromISO, round2, todayISO } from '../../scripts/utils'
 import {
   computeInvestmentValue as computeCoreInvestmentValue,
@@ -49,7 +55,7 @@ export interface DashboardKpi {
   previous: string | null
   change: { label: string; trend: DashboardTrend; tone: DashboardTone } | null
   /** Up to the last six months, oldest first; height is a share of the highest (0–100). */
-  bars: Array<{ month: string; height: number; current: boolean }>
+  bars: Array<{ month: string; value: string; height: number; current: boolean }>
 }
 
 export interface DashboardIncomeSplit {
@@ -203,7 +209,12 @@ export function buildDashboardViewModelFromState({
     months: MONTHS.map((_, value) => ({ value, label: formatMonthName(value) })),
     ranges: RANGE_OPTIONS,
     netWorth: buildNetWorthBand(nets, safeMonth, state.currency || 'EUR'),
-    netWorthChart: buildNetWorthChart(nets, getLatestDataMonth(state, safeMonth), heroRange, formatMoney),
+    netWorthChart: buildNetWorthChart(
+      nets,
+      getLatestDataMonth(state, safeMonth),
+      heroRange,
+      formatMoney,
+    ),
     kpis: (['income', 'expense', 'investment'] as const).map((kind) =>
       buildKpi(kind, series(kind), safeMonth, formatMoney),
     ),
@@ -232,11 +243,11 @@ export function buildKpi(
     kind,
     label: KPI_LABEL[kind],
     value: formatMoney(current),
-    previous:
-      previous === null ? null : `${formatMonthName(month - 1)}: ${formatMoney(previous)}`,
+    previous: previous === null ? null : `${formatMonthName(month - 1)}: ${formatMoney(previous)}`,
     change: previous ? buildChange(current, previous, KPI_GOOD_WHEN_UP[kind]) : null,
     bars: window.map((value, index) => ({
       month: formatMonthName(firstMonth + index),
+      value: formatMoney(value),
       height: highest > 0 ? round2((value / highest) * 100) : 0,
       current: index === window.length - 1,
     })),
@@ -249,7 +260,8 @@ function buildChange(
   goodWhenUp: boolean,
 ): NonNullable<DashboardKpi['change']> {
   const pct = ((current - previous) / Math.abs(previous)) * 100
-  const trend: DashboardTrend = pct > FLAT_THRESHOLD ? 'up' : pct < -FLAT_THRESHOLD ? 'down' : 'flat'
+  const trend: DashboardTrend =
+    pct > FLAT_THRESHOLD ? 'up' : pct < -FLAT_THRESHOLD ? 'down' : 'flat'
   const tone: DashboardTone =
     trend === 'flat' ? 'neutral' : (trend === 'up') === goodWhenUp ? 'good' : 'bad'
   return { label: formatPercent(Math.abs(pct)), trend, tone }
@@ -270,14 +282,24 @@ export function buildIncomeSplit(
 
   return {
     segments: [
-      { key: 'expense', label: 'Gastos', weight: weight(totals.expense), share: formatPercent(weight(totals.expense)) },
+      {
+        key: 'expense',
+        label: 'Gastos',
+        weight: weight(totals.expense),
+        share: formatPercent(weight(totals.expense)),
+      },
       {
         key: 'investment',
         label: 'Inversión',
         weight: weight(totals.investment),
         share: formatPercent(weight(totals.investment)),
       },
-      { key: 'unspent', label: 'Sin gastar', weight: weight(unspent), share: formatPercent(weight(unspent)) },
+      {
+        key: 'unspent',
+        label: 'Sin gastar',
+        weight: weight(unspent),
+        share: formatPercent(weight(unspent)),
+      },
     ],
     keptPer100: formatMoney(share(unspent)),
     unspent: formatMoney(unspent),
@@ -439,7 +461,11 @@ function buildWealthSplit(
     { kind: 'cash', label: 'Efectivo', value: wealth.liquidity },
     { kind: 'funds', label: 'Fondos', value: fundsValue },
     { kind: 'crypto', label: 'Cripto', value: cryptoValue },
-    { kind: 'other', label: 'Otras inversiones', value: wealth.investment - fundsValue - cryptoValue },
+    {
+      kind: 'other',
+      label: 'Otras inversiones',
+      value: wealth.investment - fundsValue - cryptoValue,
+    },
   ]
   const items = buckets
     .map((item) => ({ ...item, value: Math.max(round2(item.value), 0) }))
@@ -485,7 +511,10 @@ function buildGoals(state: State, month: number, formatMoney: Money): DashboardG
   const goals = buildGoalsViewModel(state, month).net.rows.filter(
     (item) => SAVINGS_GOALS.includes(item.key) && item.defined,
   )
-  const saved = goals.reduce((sum, item) => sum + Math.max(Math.min(item.current, item.target), 0), 0)
+  const saved = goals.reduce(
+    (sum, item) => sum + Math.max(Math.min(item.current, item.target), 0),
+    0,
+  )
   const target = goals.reduce((sum, item) => sum + item.target, 0)
 
   return {
