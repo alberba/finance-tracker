@@ -265,6 +265,19 @@ test('public registration verifies a password account before granting financial 
   await expect(invited.getByRole('button', { name: 'Verificar correo', exact: true })).toBeVisible()
   await expect(invited.getByLabel('Código de seis cifras')).toBeDisabled()
   expect((await context.request.get('/api/bootstrap')).status()).toBe(401)
+  const pendingContext = await browser.newContext({
+    extraHTTPHeaders: authenticationHeaders(testInfo),
+  })
+  const pendingPage = await pendingContext.newPage()
+  await new AuthenticationPage(pendingPage).goto()
+  await pendingPage.getByLabel('Correo electrónico').fill(email)
+  await pendingPage.getByLabel('Contraseña', { exact: true }).fill('verified-password-for-e2e')
+  await pendingPage.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
+  await expect(pendingPage.getByRole('heading', { name: 'Revisa tu correo' })).toBeVisible()
+  await expect(pendingPage.getByRole('note', { name: 'Verificación del correo' })).toContainText(
+    email,
+  )
+  await pendingContext.close()
   const port = Number(process.env.AUTH_TEST_PORT ?? 4466) + 1
   const mail = await page.request.get(
     `http://127.0.0.1:${port}/mail?email=${encodeURIComponent(email)}`,

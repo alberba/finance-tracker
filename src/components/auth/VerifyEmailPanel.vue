@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import BaseButton from '../ui/BaseButton.vue'
 
-defineProps<{ email: string; busy: boolean; sent: boolean; message: string }>()
+defineProps<{ busy: boolean; sent: boolean; message: string }>()
+const email = defineModel<string>('email', { required: true })
 const otp = defineModel<string>('otp', { required: true })
 defineEmits<{ sendCode: []; submit: [] }>()
 </script>
@@ -29,7 +30,7 @@ defineEmits<{ sendCode: []; submit: [] }>()
         </svg>
       </div>
       <div class="grid gap-2" role="status">
-        <p>Verifica tu correo con el enlace que hemos enviado a</p>
+        <p>Verifica tu correo con el enlace de activación enviado a</p>
         <p class="font-bold [overflow-wrap:anywhere]">{{ email }}</p>
       </div>
       <p class="text-text-muted max-w-xs text-sm leading-relaxed">
@@ -51,11 +52,10 @@ defineEmits<{ sendCode: []; submit: [] }>()
       >
         <div class="flex items-stretch gap-2">
           <input
-            :value="email"
+            v-model="email"
             aria-label="Correo electrónico"
             type="email"
-            readonly
-            class="border-line bg-subtle min-h-12 w-full min-w-0 flex-1 rounded-md border px-3"
+            class="border-line bg-panel focus-visible:outline-primary min-h-12 w-full min-w-0 flex-1 rounded-md border px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2"
           />
           <BaseButton :disabled="busy" @click="$emit('sendCode')"
             ><span class="text-xs">{{
@@ -74,7 +74,7 @@ defineEmits<{ sendCode: []; submit: [] }>()
           pattern="[0-9]{6}"
           maxlength="6"
           required
-          class="border-line bg-panel focus-visible:outline-primary disabled:bg-subtle min-h-12 w-full rounded-md border px-3 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
+          class="border-line bg-panel focus-visible:outline-primary disabled:bg-subtle min-h-12 w-full rounded-md border px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
         />
         <BaseButton variant="primary" type="submit" :disabled="busy || !sent">{{
           busy ? 'Un momento…' : 'Verificar correo'

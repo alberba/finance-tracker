@@ -5,15 +5,6 @@
 
 @import 'tailwindcss';
 
-/* Hover feedback only applies to devices with a precise pointer. */
-@custom-variant hover {
-  @media (hover: hover) and (pointer: fine) {
-    &:hover {
-      @slot;
-    }
-  }
-}
-
 /* `dark:` follows the app theme attribute, not prefers-color-scheme. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
@@ -200,7 +191,6 @@
 
   --text-access-title: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
   --text-button: 0.9375rem;
-  --spacing-access-card: 52rem;
   --spacing-access-panel: clamp(1.5rem, 1.2rem + 1.2vw, 2rem);
 
   /* Shell breakpoint: sidebar and the floating report launcher from here up;
@@ -275,14 +265,7 @@
     min-block-size: 100%;
   }
 
-  html {
-    overflow-wrap: break-word;
-    font-synthesis: none;
-    -webkit-text-size-adjust: 100%;
-  }
-
   body {
-    min-block-size: 100svh;
     font-family: var(--font-sans);
     font-size: 15px;
     color: var(--text-main);
@@ -306,18 +289,6 @@
     font-family: var(--font-sans);
     font-weight: 700;
     letter-spacing: -0.01em;
-  }
-
-  input,
-  textarea,
-  select {
-    font-size: max(16px, 1rem);
-  }
-
-  button,
-  a,
-  [role='button'] {
-    touch-action: manipulation;
   }
 
   dialog {
