@@ -36,6 +36,12 @@ Pinia es la fuente de verdad del estado en cliente. `useFinancialStateStore` (`s
 2. Un store en `src/stores/<sección>.ts` que expone el view-model como `computed` sobre `useFinancialStateStore().state` y muta con `financialStateStore.commitState((draft) => …)`.
 3. El componente de la sección lee el store con `storeToRefs` y emite acciones explícitas.
 
+Es una guía para organizar estado y comportamiento de sección, no una obligación de añadir las tres
+capas a cada operación. Una acción sencilla puede vivir donde ya se entiende y modifica ese estado;
+un composable o adaptador se justifica cuando asume una responsabilidad propia, como gestionar el
+ciclo de vida de una integración o traducir la navegación del navegador. Pasar una llamada a otro
+archivo o cambiar el nombre de sus métodos no crea por sí solo esa responsabilidad.
+
 ## Verificacion
 
 - Cambios funcionales de frontend deben tener cobertura E2E nueva o actualizada.
