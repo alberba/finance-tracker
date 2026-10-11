@@ -26,7 +26,10 @@ Una observación de revisión sobre comillas, indentación o import order es rui
 Fuente: `docs/architecture/frontend.md`.
 
 - Astro renderiza shell, rutas y markup sin reactividad propia. Vue queda para islas interactivas,
-  siempre con Composition API y composables.
+  con Composition API. El patrón por sección de `docs/architecture/frontend.md` orienta la
+  organización; un composable o adaptador debe tener una responsabilidad propia, como gestionar
+  ciclo de vida o traducir una integración. Delegar una llamada o renombrar métodos, por sí solo,
+  no justifica otra capa.
 - `FinanceTrackerShell.astro` solo compone layout, sidebar y secciones. La navegación vive en
   `src/components/layout`.
 - Una isla Vue no habla directamente con `window` salvo dentro de un adaptador o composable dedicado.
