@@ -18,7 +18,7 @@ port="${VISUAL_PORT:-$((5100 + $(printf %s "$PWD" | cksum | cut -d' ' -f1) % 400
 image="mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
 log=".wrangler/visual-dev-server.log"
 
-if curl -fs -o /dev/null "http://127.0.0.1:$port/"; then
+if curl -sS -o /dev/null "http://127.0.0.1:$port/"; then
   echo "e2e-visual-linux: el puerto $port ya está ocupado; usa VISUAL_PORT=<otro>" >&2
   exit 1
 fi
@@ -33,10 +33,10 @@ set +m
 trap 'kill -- "-$server_pgid" 2>/dev/null || true' EXIT
 
 for _ in $(seq 60); do
-  curl -fs -o /dev/null "http://127.0.0.1:$port/" && break
+  curl -fs -o /dev/null "http://127.0.0.1:$port/login" && break
   sleep 2
 done
-curl -fs -o /dev/null "http://127.0.0.1:$port/" || { echo "e2e-visual-linux: el dev server no arrancó, ver $log" >&2; exit 1; }
+curl -fs -o /dev/null "http://127.0.0.1:$port/login" || { echo "e2e-visual-linux: el dev server no arrancó, ver $log" >&2; exit 1; }
 
 docker run --rm --ipc=host -v "$PWD:$PWD" -w "$PWD" \
   -e CI= -e PLAYWRIGHT_BASE_URL="http://127.0.0.1:$port" \
