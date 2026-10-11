@@ -1,30 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
+import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'
+import { projectSyncV2State } from '../../src/lib/client/v2-state-projection'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { categoryEmojiKey } from '../../src/scripts/category-emoji'
 
-const seedData = JSON.parse(
-  readFileSync(new URL('../../src/data/seed.json', import.meta.url), 'utf8'),
-) as Partial<State>
-const seed: State = {
-  ...seedData,
-  twrLiquidityAccountIds: [],
-  categoryEmojis: {},
-  subscriptions: [],
-  recurringRules: [],
-  pendingMovements: [],
-  instruments: [],
-  stockEvents: {
-    enabled: false,
-    apiKey: '',
-    tradesToCash: false,
-    symbolMappings: [],
-    cashMappings: [],
-    cashSyncEntries: [],
-  },
-} as State
+const require = createRequire(import.meta.url)
+const seed = normalizeState(require('../../src/data/seed.json'))
 
 function buildSeedExport(seed: State) {
   const currency = seed.currency
@@ -57,10 +40,7 @@ function buildSeedExport(seed: State) {
     ...category,
     id: `seed-category-${index}`,
     legacyId: null,
-    emoji:
-      seed.categoryEmojis[
-        categoryEmojiKey(category.kind as 'income' | 'expense' | 'investment', category.name)
-      ],
+    emoji: seed.categoryEmojis[`${category.kind}:${category.name}`],
   }))
   const categoryIds = new Map(
     categories.map((category) => [`${category.kind}:${category.name}`, category.id]),
@@ -212,13 +192,12 @@ export async function readScenarioState(page: Page): Promise<State> {
   await new FinanceTrackerPage(page).waitForSync()
   const response = await page.request.get('/api/bootstrap')
   expect(response.ok()).toBe(true)
-  const { projectSyncV2State } = await import('../../src/lib/client/v2-state-projection')
   return projectSyncV2State(await response.json())
 }
 
 /** Installs scenario edits through the existing backup contract, then reloads the app. */
 export async function editScenarioState(page: Page, edit: (state: State) => void): Promise<void> {
-  const state = structuredClone(seed)
+  const state = await readScenarioState(page)
   edit(state)
   if (state.instruments.length) {
     // The global catalogue has no write API, as in seed-market-instrument.ts.
