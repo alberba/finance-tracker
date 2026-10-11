@@ -1,25 +1,20 @@
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
+import { MONTHS } from '../scripts/types'
 import type { DashboardHeroRange } from '../domain/dashboard/view-model'
 import { buildDashboardViewModelFromState } from '../domain/dashboard/view-model'
 import { isSectionId } from '../scripts/types'
-import type { SectionId } from '../scripts/types'
+import { parseIntSafe } from '../scripts/utils'
+import { useSectionNavigation } from '../composables/useSectionNavigation'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
-
-interface DashboardControllerActions {
-  changeYear: (year: number) => void
-  changeMonth: (month: number) => void
-  changeRange: (range: DashboardHeroRange) => void
-  navigate: (sectionId: SectionId) => void
-}
 
 export const useDashboardStore = defineStore('dashboard', () => {
   const financialStateStore = useFinancialStateStore()
   const uiStore = useUiStore()
+  const { navigateTo } = useSectionNavigation()
   const heroRange = shallowRef<DashboardHeroRange>('1a')
-  let controllerActions: DashboardControllerActions | null = null
 
   const viewModel = computed(() =>
     buildDashboardViewModelFromState({
@@ -31,37 +26,33 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   const activeRange = computed(() => heroRange.value)
 
-  function registerControllerActions(actions: DashboardControllerActions): void {
-    controllerActions = actions
+  function changeYear(year: number): void {
+    financialStateStore.commitState((draft) => {
+      draft.year = parseIntSafe(year, draft.year)
+    })
   }
 
-  function requestYearChange(year: number): void {
-    controllerActions?.changeYear(year)
+  function changeMonth(month: number): void {
+    const parsedMonth = parseIntSafe(month, uiStore.ui.month)
+    uiStore.setDashboardMonth(MONTHS[parsedMonth] ? parsedMonth : 0)
   }
 
-  function requestMonthChange(month: number): void {
-    uiStore.setDashboardMonth(month)
-    controllerActions?.changeMonth(month)
-  }
-
-  function requestRangeChange(range: DashboardHeroRange): void {
+  function changeRange(range: DashboardHeroRange): void {
     heroRange.value = range
-    controllerActions?.changeRange(range)
   }
 
-  function requestNavigation(target: string): void {
+  function navigate(target: string): void {
     if (isSectionId(target)) {
-      controllerActions?.navigate(target)
+      navigateTo(target)
     }
   }
 
   return {
     viewModel,
     activeRange,
-    registerControllerActions,
-    requestYearChange,
-    requestMonthChange,
-    requestRangeChange,
-    requestNavigation,
+    changeYear,
+    changeMonth,
+    changeRange,
+    navigate,
   }
 })
