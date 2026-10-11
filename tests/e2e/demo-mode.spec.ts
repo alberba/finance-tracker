@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 test.describe('Modo demo', () => {

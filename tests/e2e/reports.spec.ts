@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures";
+import { syncV2Test as test, expect } from './fixtures'
 
 test.describe("Reports E2E", () => {
   test("abre el panel lateral de reporte desde el acceso global", async ({

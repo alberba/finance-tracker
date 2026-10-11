@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 
 const LEGACY_KEYS = [
   'finance-tracker-state-v1',
@@ -9,7 +9,7 @@ const LEGACY_KEYS = [
   'finance-tracker-pending-v1::demo',
 ]
 
-test('cerrar sesión borra los datos privados locales aunque sync v2 esté apagado @smoke', async ({
+test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async ({
   page,
   tracker,
 }) => {
