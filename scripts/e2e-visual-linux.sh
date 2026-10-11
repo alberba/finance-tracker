@@ -27,7 +27,7 @@ mkdir -p .wrangler
 pnpm d1:migrate:local >/dev/null
 pnpm d1:migrate:local:v2 >/dev/null
 set -m
-ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port "$port" --ignore-lock >"$log" 2>&1 &
+PUBLIC_SYNC_V2=true ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port "$port" --ignore-lock >"$log" 2>&1 &
 server_pgid=$!
 set +m
 trap 'kill -- "-$server_pgid" 2>/dev/null || true' EXIT

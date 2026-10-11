@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 
 test.describe('Mobile smoke', () => {
   test(
@@ -173,11 +173,15 @@ test.describe('Mobile smoke', () => {
     )
   })
 
-  test('mantiene accesible el modo demo desde la experiencia PWA', async ({ page, request }) => {
+  test('mantiene accesible el modo demo desde la experiencia PWA', async ({
+    page,
+    request,
+    tracker,
+  }) => {
     await request.post('/api/state/reset', {
       headers: { 'x-finance-namespace': 'demo' },
     })
-    await page.goto('/')
+    await tracker.goto()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
 

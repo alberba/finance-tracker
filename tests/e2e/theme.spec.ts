@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 
 const html = (page: Page) => page.locator('html')
 const sidebarTheme = (page: Page) =>

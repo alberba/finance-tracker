@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 
 const sidebar = (page: Page) => page.getByRole('complementary')
 const sidebarNav = (page: Page) => page.getByRole('navigation', { name: 'Secciones del tracker' })
@@ -7,13 +7,13 @@ const toggle = (page: Page) => page.locator('#sidebar-toggle')
 const html = (page: Page) => page.locator('html')
 
 test.describe('Sidebar toggle', () => {
-  test('la inicialización del sidebar no lanza errores en carga', async ({ page }) => {
+  test('la inicialización del sidebar no lanza errores en carga', async ({ page, tracker }) => {
     const pageErrors: string[] = []
     page.on('pageerror', (error) => {
       pageErrors.push(error.message)
     })
 
-    await page.goto('/')
+    await tracker.goto()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.locator('#dashboard')).toBeVisible()
 
