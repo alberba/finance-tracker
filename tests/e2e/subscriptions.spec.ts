@@ -12,10 +12,15 @@ async function replaceBackup(
   const exported = await page.request.get('/api/data/export')
   expect(exported.ok()).toBe(true)
   const backup = (await exported.json()) as BackupRow
+  for (const [key, value] of Object.entries(backup)) {
+    if (Array.isArray(value)) backup[key] = []
+  }
   Object.assign(backup, collections)
 
   const imported = await page.request.post('/api/data/import?mode=replace', { data: backup })
   expect(imported.ok()).toBe(true)
+  const result = (await imported.json()) as { skipped?: Record<string, number> }
+  expect(result.skipped ?? {}).toEqual({})
   await tracker.reload()
 }
 
