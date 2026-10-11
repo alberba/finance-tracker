@@ -13,7 +13,6 @@ declare global {
 type Fixtures = {
   testUserEmail: string
   tracker: FinanceTrackerPage
-  syncV2Seed: boolean
   // Freezes `Date` before the app loads. The selected year and month default to
   // today, so a snapshot taken in one month differs from the next.
   fixedTime: string | undefined
@@ -37,17 +36,20 @@ export const test = base.extend<Fixtures>({
     })
     await use(context)
   },
-  testUserEmail: async ({}, use) => {
-    await use(`pw-${randomUUID()}@e2e.test`)
+  testUserEmail: async ({ browserName }, use, testInfo) => {
+    await use(
+      testInfo.tags.includes('@snapshot')
+        ? `pw-${browserName}-visual-snapshot@e2e.test`
+        : `pw-${randomUUID()}@e2e.test`,
+    )
   },
   extraHTTPHeaders: async ({ testUserEmail }, use) => {
     await use({ 'X-Test-User-Email': testUserEmail })
   },
   fixedTime: [undefined, { option: true }],
   snapshotTime: [undefined, { option: true }],
-  syncV2Seed: [true, { option: true }],
   tracker: async (
-    { page, context, fixedTime, snapshotTime, syncV2Seed, testUserEmail },
+    { page, context, fixedTime, snapshotTime, testUserEmail },
     use,
     testInfo,
   ) => {
@@ -86,9 +88,7 @@ export const test = base.extend<Fixtures>({
       initialization.ok(),
       `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
-    if (syncV2Seed) {
-      await seedSyncV2User(context.request, email)
-    }
+    await seedSyncV2User(context.request, email)
 
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
@@ -97,5 +97,3 @@ export const test = base.extend<Fixtures>({
 })
 
 export { expect }
-
-export const syncV2Test = test

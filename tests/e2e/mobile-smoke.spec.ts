@@ -1,20 +1,22 @@
 import { test, expect } from './fixtures'
+import { editScenarioState } from './seed-sync-v2'
 
 test.describe('Mobile smoke', () => {
   test(
     'mantiene legible el patrimonio y los movimientos en formato PWA',
     { tag: '@smoke' },
     async ({ page, tracker }) => {
-      const currentMonth = new Intl.DateTimeFormat('es-ES', { month: 'long' })
-        .format(new Date())
-        .toLocaleUpperCase('es-ES')
       await page.goto('/patrimonio')
-      await tracker.saveAccountSnapshot({
-        monthLabel: currentMonth,
-        accountName: 'Revolut',
-        value: 9_999_999_999.99,
+      const currentMonthIndex = new Date().getMonth()
+      await editScenarioState(page, (state) => {
+        const snapshot = state.snapshots[String(currentMonthIndex)]
+        state.snapshots[String(currentMonthIndex)] = {
+          ...snapshot,
+          month: currentMonthIndex,
+          accounts: { ...snapshot?.accounts, revolut: 9_999_999_999.99 },
+        }
       })
-      await page.goto('/')
+      await tracker.goto()
       await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
       await expect(
         tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
@@ -173,11 +175,8 @@ test.describe('Mobile smoke', () => {
     )
   })
 
-  test('mantiene accesible el modo demo desde la experiencia PWA', async ({ page, request }) => {
-    await request.post('/api/state/reset', {
-      headers: { 'x-finance-namespace': 'demo' },
-    })
-    await page.goto('/')
+  test('mantiene accesible el modo demo desde la experiencia PWA', async ({ page, tracker }) => {
+    await tracker.goto()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
 
