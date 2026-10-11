@@ -5,6 +5,7 @@ import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'
 import { projectSyncV2State } from '../../src/lib/client/v2-state-projection'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { categoryEmojiKey } from '../../src/scripts/category-emoji'
 
 const require = createRequire(import.meta.url)
 const seed = normalizeState(require('../../src/data/seed.json'))
@@ -40,7 +41,10 @@ function buildSeedExport(seed: State) {
     ...category,
     id: `seed-category-${index}`,
     legacyId: null,
-    emoji: seed.categoryEmojis[`${category.kind}:${category.name}`],
+    emoji:
+      seed.categoryEmojis[
+        categoryEmojiKey(category.kind as 'income' | 'expense' | 'investment', category.name)
+      ],
   }))
   const categoryIds = new Map(
     categories.map((category) => [`${category.kind}:${category.name}`, category.id]),
