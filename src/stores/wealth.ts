@@ -2,18 +2,12 @@ import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
-import { buildWealthViewModel, parseSnapshotInput } from '../domain/wealth/view-model'
+import type { SnapshotCommitEdit } from '../composables/useSnapshotEdit'
+import { buildWealthViewModel } from '../domain/wealth/view-model'
 import { formatMonthName } from '../lib/format'
 import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
-import type { SnapshotKind } from '../scripts/types'
 import { useFinancialStateStore } from './financial-state'
 import { useUiStore } from './ui'
-
-export interface SnapshotEdit {
-  kind: SnapshotKind
-  id: string
-  value: string
-}
 
 export const useWealthStore = defineStore('wealth', () => {
   const financialStateStore = useFinancialStateStore()
@@ -30,7 +24,7 @@ export const useWealthStore = defineStore('wealth', () => {
     ui.snapshotMonth = month
   }
 
-  function saveSnapshot(edits: SnapshotEdit[]): void {
+  function saveSnapshot(edits: SnapshotCommitEdit[]): void {
     const month = ui.snapshotMonth
     financialStateStore.commitState((draft) => {
       if (!draft.snapshots[String(month)]) {
@@ -43,11 +37,10 @@ export const useWealthStore = defineStore('wealth', () => {
       }
       const snapshot = draft.snapshots[String(month)]
       edits.forEach(({ kind, id, value }) => {
-        const numeric = parseSnapshotInput(value)
-        if (numeric === null || Number.isNaN(numeric)) {
+        if (value === null) {
           delete snapshot[kind][id]
         } else {
-          snapshot[kind][id] = numeric
+          snapshot[kind][id] = value
         }
       })
     })

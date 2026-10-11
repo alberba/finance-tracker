@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { storeToRefs } from 'pinia'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
 import AppSection from '../ui/AppSection.vue'
 import BaseButton from '../ui/BaseButton.vue'
@@ -13,14 +13,9 @@ import WealthCalcPanel, { type WealthCalcTarget } from '../wealth/WealthCalcPane
 import WealthHistoryTable from '../wealth/WealthHistoryTable.vue'
 import WealthSnapshotLedger from '../wealth/WealthSnapshotLedger.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import {
-  formatSnapshotInput,
-  parseSnapshotInput,
-  parseSnapshotKey,
-  snapshotKey,
-  snapshotTotals,
-  type SnapshotRowViewModel,
-} from '../../domain/wealth/view-model'
+import { useSnapshotEdit } from '../../composables/useSnapshotEdit'
+import { useToast } from '../../composables/useToast'
+import { formatSnapshotInput, type SnapshotRowViewModel } from '../../domain/wealth/view-model'
 import type { SnapshotKind } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useWealthStore } from '../../stores/wealth'
@@ -31,25 +26,14 @@ const wealthStore = useWealthStore()
 const financialStateStore = useFinancialStateStore()
 const { viewModel, snapshotMonth } = storeToRefs(wealthStore)
 const { formatMoney } = useMoneyFormatter()
+const { showToast } = useToast()
 
-// The snapshot fields are a draft until "Guardar" commits them; `saved` holds
-// what the month has stored, to count and discard the changes.
-const inputs = reactive<Record<string, string>>({})
-const saved = ref<Record<string, string>>({})
-
-function reset(): void {
-  const next: Record<string, string> = {}
-  for (const group of viewModel.value.groups) {
-    for (const row of group.rows) {
-      next[snapshotKey(group.kind, row.id)] = formatSnapshotInput(row.snapshot)
-    }
-  }
-  saved.value = next
-  for (const key of Object.keys(inputs)) delete inputs[key]
-  Object.assign(inputs, next)
-}
-
-watch(viewModel, reset, { immediate: true })
+const edit = useSnapshotEdit({
+  groups: computed(() => viewModel.value.groups),
+  context: computed(() => `${financialStateStore.year}:${snapshotMonth.value}`),
+  commit: (edits) => wealthStore.saveSnapshot(edits),
+})
+const { totals, changes } = edit
 
 const month = computed({
   get: () => snapshotMonth.value,
@@ -59,10 +43,6 @@ const monthName = computed(() => viewModel.value.months[snapshotMonth.value]?.na
 const needsAccount = computed(() =>
   viewModel.value.groups.every((group) => group.rows.length === 0),
 )
-const totals = computed(() => snapshotTotals(viewModel.value.groups, inputs))
-const changes = computed(
-  () => Object.keys(inputs).filter((key) => inputs[key] !== saved.value[key]).length,
-)
 const status = computed(() => {
   if (changes.value > 0) return { saved: false, text: 'Con cambios sin guardar' }
   if (viewModel.value.months[snapshotMonth.value]?.saved) return { saved: true, text: 'Guardado' }
@@ -71,31 +51,26 @@ const status = computed(() => {
 
 function save(): void {
   if (needsAccount.value) return
-  const edits = Object.entries(inputs).map(([key, value]) => ({
-    ...parseSnapshotKey(key),
-    value,
-  }))
-  wealthStore.saveSnapshot(edits)
+  if (!edit.save()) showToast('Corrige los saldos no válidos antes de guardar.')
 }
 
 const calcOpen = ref(false)
 const calcTarget = ref<WealthCalcTarget | null>(null)
 
 function openCalc(kind: SnapshotKind, row: SnapshotRowViewModel): void {
-  const key = snapshotKey(kind, row.id)
-  const typed = parseSnapshotInput(inputs[key] ?? '')
   calcTarget.value = {
-    key,
+    kind,
+    id: row.id,
     name: row.name,
-    current: typed === null || Number.isNaN(typed) ? row.calculated : typed,
+    current: edit.field(kind, row.id)?.effective ?? row.calculated,
     calculated: row.calculated,
     opening: row.opening,
   }
   calcOpen.value = true
 }
 
-function applyCalc(key: string, value: number): void {
-  inputs[key] = formatSnapshotInput(value)
+function applyCalc(kind: SnapshotKind, id: string, value: number): void {
+  edit.set(kind, id, formatSnapshotInput(value))
 }
 </script>
 
@@ -156,15 +131,15 @@ function applyCalc(key: string, value: number): void {
                 <span class="bg-accent size-2 rounded-full" aria-hidden="true"></span>
                 {{ changes === 1 ? '1 cambio sin guardar' : `${changes} cambios sin guardar` }}
               </span>
-              <BaseButton variant="ghost" @click="reset">Descartar</BaseButton>
+              <BaseButton variant="ghost" @click="edit.discard">Descartar</BaseButton>
             </div>
           </template>
           <WealthSnapshotLedger
             :groups="viewModel.groups"
-            :inputs="inputs"
+            :field="edit.field"
             :totals="totals"
             :format-money="formatMoney"
-            @update="(key, value) => (inputs[key] = value)"
+            @update="edit.set"
             @calculate="openCalc"
           />
         </NumberedBlock>

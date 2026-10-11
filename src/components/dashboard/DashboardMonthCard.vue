@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+
 import BaseSelect from '../ui/BaseSelect.vue'
 import type {
   DashboardIncomeSplit,
@@ -12,7 +14,7 @@ import type {
 // The month card: the three month figures side by side (rows on mobile), each
 // with its change against the previous month and its last six months, and
 // below them where the month's income went.
-defineProps<{
+const props = defineProps<{
   monthName: string
   status: string
   kpis: DashboardKpi[]
@@ -23,6 +25,35 @@ defineProps<{
 
 const month = defineModel<number>('month', { required: true })
 const year = defineModel<number>('year', { required: true })
+
+type BarInteraction = 'hover' | 'focus'
+type BarPreview = { hover?: number; focus?: number; active: BarInteraction }
+const previews = ref<Partial<Record<DashboardKpiKind, BarPreview>>>({})
+const figures = computed(() =>
+  props.kpis.map((kpi) => {
+    const preview = previews.value[kpi.kind]
+    const index = preview?.[preview.active] ?? preview?.hover ?? preview?.focus
+    return {
+      ...kpi,
+      previewValue: index === undefined ? kpi.value : (kpi.bars[index]?.value ?? kpi.value),
+    }
+  }),
+)
+
+watch([month, year], () => {
+  previews.value = {}
+})
+
+function previewBar(kind: DashboardKpiKind, interaction: BarInteraction, index: number): void {
+  const preview = (previews.value[kind] ??= { active: interaction })
+  preview[interaction] = index
+  preview.active = interaction
+}
+
+function endPreview(kind: DashboardKpiKind, interaction: BarInteraction): void {
+  const preview = previews.value[kind]
+  if (preview) delete preview[interaction]
+}
 
 const KIND_FILL: Record<DashboardKpiKind, string> = {
   income: 'bg-income',
@@ -67,13 +98,7 @@ function changeText(kpi: DashboardKpi): string {
         <p class="text-text-muted font-mono text-xs tracking-widest uppercase">{{ status }}</p>
       </div>
       <div class="flex gap-2">
-        <BaseSelect
-          id="dashboard-month"
-          v-model="month"
-          label="Mes"
-          hide-label
-          :options="months"
-        />
+        <BaseSelect id="dashboard-month" v-model="month" label="Mes" hide-label :options="months" />
         <BaseSelect
           id="year-display"
           v-model="year"
@@ -87,10 +112,10 @@ function changeText(kpi: DashboardKpi): string {
 
     <div class="grid py-5 md:grid-cols-3">
       <article
-        v-for="kpi in kpis"
+        v-for="kpi in figures"
         :key="kpi.kind"
         class="border-line grid content-start gap-3.5 border-t px-4 py-4 first:border-t-0 sm:px-7 md:border-t-0 md:border-l md:py-0 md:first:border-l-0"
-        :aria-label="`${kpi.label}: ${kpi.value}${kpi.change ? `, ${changeText(kpi)}` : ''}`"
+        :aria-label="`${kpi.label}: ${kpi.previewValue}${kpi.change ? `, ${changeText(kpi)}` : ''}`"
         :data-kpi="kpi.kind"
       >
         <div class="flex items-center justify-between gap-3">
@@ -126,20 +151,38 @@ function changeText(kpi: DashboardKpi): string {
               :id="`kpi-${kpi.kind}`"
               class="font-display text-text-main text-3xl leading-none font-medium tracking-tight tabular-nums"
             >
-              {{ kpi.value }}
+              <span :key="kpi.previewValue" class="kpi-value inline-block">{{
+                kpi.previewValue
+              }}</span>
             </strong>
             <span v-if="kpi.previous" class="text-text-muted text-sm tabular-nums">
               {{ kpi.previous }}
             </span>
           </div>
-          <div class="flex h-14 shrink-0 items-end gap-1" title="Últimos 6 meses" aria-hidden="true">
-            <span
-              v-for="bar in kpi.bars"
+          <div
+            class="flex h-14 shrink-0 items-end gap-1"
+            role="group"
+            :aria-label="`Historial mensual de ${kpi.label.toLowerCase()}`"
+          >
+            <button
+              v-for="(bar, index) in kpi.bars"
               :key="bar.month"
-              class="min-h-1 w-2 rounded-xs"
-              :class="[KIND_FILL[kpi.kind], { 'opacity-30': !bar.current }]"
-              :style="{ height: `${bar.height}%` }"
-            ></span>
+              type="button"
+              class="kpi-bar text-text-main relative flex h-full w-2 cursor-pointer items-end rounded-xs p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+              :aria-label="`${kpi.label}, ${bar.month}: ${bar.value}`"
+              @mousemove="previewBar(kpi.kind, 'hover', index)"
+              @mouseleave="endPreview(kpi.kind, 'hover')"
+              @focus="previewBar(kpi.kind, 'focus', index)"
+              @blur="endPreview(kpi.kind, 'focus')"
+            >
+              <span
+                :key="`${year}-${month}`"
+                class="kpi-bar-fill block min-h-1 w-full rounded-xs"
+                :class="[KIND_FILL[kpi.kind], { 'opacity-30': !bar.current }]"
+                :style="{ blockSize: `${bar.height}%`, '--bar-index': index }"
+                aria-hidden="true"
+              ></span>
+            </button>
           </div>
         </div>
       </article>
@@ -170,11 +213,20 @@ function changeText(kpi: DashboardKpi): string {
           ></span>
         </div>
         <ul class="text-text-muted flex flex-wrap gap-x-6 gap-y-1 text-sm">
-          <li v-for="segment in split.segments" :key="segment.key" class="flex items-center gap-1.5">
-            <span class="size-2 rounded-xs" :class="SPLIT_FILL[segment.key]" aria-hidden="true"></span>
+          <li
+            v-for="segment in split.segments"
+            :key="segment.key"
+            class="flex items-center gap-1.5"
+          >
+            <span
+              class="size-2 rounded-xs"
+              :class="SPLIT_FILL[segment.key]"
+              aria-hidden="true"
+            ></span>
             {{ segment.label }}
             <span class="font-display text-text-main tabular-nums">
-              {{ segment.share }}<template v-if="segment.key === 'unspent'"> · {{ split.unspent }}</template>
+              {{ segment.share
+              }}<template v-if="segment.key === 'unspent'"> · {{ split.unspent }}</template>
             </span>
           </li>
         </ul>
@@ -182,3 +234,57 @@ function changeText(kpi: DashboardKpi): string {
     </div>
   </section>
 </template>
+
+<style scoped>
+.kpi-bar::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: -25%;
+}
+
+.kpi-bar:is(:focus-visible, :active) > span {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kpi-bar:hover > span {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .kpi-bar-fill {
+    transform-origin: center bottom;
+    animation: kpi-bar-reveal 220ms var(--ease-out) both;
+    animation-delay: calc(var(--bar-index) * 10ms);
+    transition:
+      opacity 140ms var(--ease-out),
+      block-size 220ms var(--ease-out);
+  }
+
+  .kpi-value {
+    animation: kpi-value-reveal 140ms var(--ease-out);
+  }
+
+  @keyframes kpi-bar-reveal {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes kpi-value-reveal {
+    from {
+      opacity: 0.6;
+      translate: 0 0.08em;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+}
+</style>

@@ -38,6 +38,7 @@ import { parseAudiences, verifyAccessJwt } from '../../src/lib/server/auth/jwks'
 import { users, userIdentities, userSettings, categories, userRevisions } from '../../src/db/schema'
 import { resolvePrincipal, CF_ACCESS_PROVIDER } from '../../src/lib/server/auth/principal'
 import { getDb } from '../../src/db/client'
+import { interactiveTransaction } from '../../src/db/transaction-capability'
 import { onRequest } from '../../src/middleware'
 
 beforeEach(() => {
@@ -184,7 +185,7 @@ describe('verifyAccessJwt', () => {
 /**
  * Minimal fake Drizzle query builder covering exactly the chain shapes used
  * by `principal.ts`/`legacy-owner-link.ts`: `select().from().innerJoin?()
- * .where().limit()`, `insert().values().returning()`, and `transaction()`.
+ * .where().limit()`, `insert().values().returning()`, and an explicit transaction capability.
  * Dispatches by table identity (the real schema table objects, imported
  * above) rather than re-implementing SQL — good enough for a unit test;
  * WP5's real-D1 tier (out of scope here) exercises the real SQL.
@@ -229,7 +230,9 @@ function createFakeDb(options: {
           }
         },
       }),
-      transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(makeDb()),
+      $client: {
+        [interactiveTransaction]: async (fn: () => Promise<unknown>) => fn(),
+      },
     }
   }
 

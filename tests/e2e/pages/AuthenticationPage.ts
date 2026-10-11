@@ -8,6 +8,8 @@ export class AuthenticationPage {
     await this.ready()
   }
   async signIn(email: string) {
+    await this.page.getByRole('button', { name: 'Código por correo', exact: true }).click()
+    await expect(this.page.getByLabel('Código de seis cifras')).toBeDisabled()
     await this.page.getByLabel('Correo electrónico').fill(email)
     await this.page.getByRole('button', { name: 'Enviar código', exact: true }).click()
     await expect(this.page.getByRole('status')).toContainText('Revisa tu correo')
@@ -20,10 +22,13 @@ export class AuthenticationPage {
   async recover(email: string) {
     await this.goto()
     await this.page.getByRole('button', { name: 'Recuperar acceso', exact: true }).click()
+    await expect(this.page.getByLabel('Nueva contraseña')).toBeDisabled()
+    await expect(this.page.getByLabel('Código de seis cifras')).toBeDisabled()
     await this.page.getByLabel('Correo electrónico').fill(email)
-    await this.page.getByLabel('Nueva contraseña').fill('recovered-password-for-e2e')
     await this.page.getByRole('button', { name: 'Enviar código', exact: true }).click()
     await expect(this.page.getByRole('status')).toContainText('Revisa tu correo')
+    await expect(this.page.getByLabel('Nueva contraseña')).toBeEnabled()
+    await this.page.getByLabel('Nueva contraseña').fill('recovered-password-for-e2e')
     await this.page.getByLabel('Código de seis cifras').fill(await this.deliveredCode(email))
     await this.page
       .getByRole('form', { name: 'Acceso a Finanzas' })

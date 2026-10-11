@@ -48,6 +48,16 @@ function executeSql(sql: string) {
 test('private pages and financial APIs require a Better Auth session @smoke', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole('button', { name: 'Verificar mi correo', exact: true })).toHaveCount(
+    0,
+  )
+  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Código por correo', exact: true }).click()
+  await expect(page.getByLabel('Código de seis cifras')).toBeDisabled()
+  await page.getByRole('button', { name: 'Acceder con contraseña', exact: true }).click()
+  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
 })
 
@@ -234,10 +244,7 @@ test('public registration verifies a password account before granting financial 
   const invited = await context.newPage()
   const invitedAccess = new AuthenticationPage(invited)
   await invitedAccess.goto()
-  await invited
-    .getByRole('group', { name: 'Método de acceso' })
-    .getByRole('button', { name: 'Crear cuenta' })
-    .click()
+  await invited.getByRole('button', { name: 'Crear cuenta', exact: true }).click()
   const email = `password-${namespace}@example.test`
   await invited.getByLabel('Correo electrónico').fill(email)
   await invited.getByLabel('Contraseña', { exact: true }).fill('verified-password-for-e2e')
@@ -245,8 +252,32 @@ test('public registration verifies a password account before granting financial 
     .getByRole('form', { name: 'Acceso a Finanzas' })
     .getByRole('button', { name: 'Crear cuenta' })
     .click()
+  await expect(invited.getByRole('heading', { name: 'Revisa tu correo' })).toBeVisible()
+  const verification = invited.getByRole('note', { name: 'Verificación del correo' })
+  await expect(verification).toContainText(email)
+  await expect(verification).toContainText('carpeta de spam')
+  await expect(invited.getByLabel('Contraseña', { exact: true })).toHaveCount(0)
   await expect(invited.getByRole('status')).toContainText('Verifica tu correo')
+  await expect(invited.getByRole('button', { name: 'Recuperar acceso', exact: true })).toHaveCount(
+    0,
+  )
+  await invited.getByText('Prefiero usar un código', { exact: true }).click()
+  await expect(invited.getByRole('button', { name: 'Verificar correo', exact: true })).toBeVisible()
+  await expect(invited.getByLabel('Código de seis cifras')).toBeDisabled()
   expect((await context.request.get('/api/bootstrap')).status()).toBe(401)
+  const pendingContext = await browser.newContext({
+    extraHTTPHeaders: authenticationHeaders(testInfo),
+  })
+  const pendingPage = await pendingContext.newPage()
+  await new AuthenticationPage(pendingPage).goto()
+  await pendingPage.getByLabel('Correo electrónico').fill(email)
+  await pendingPage.getByLabel('Contraseña', { exact: true }).fill('verified-password-for-e2e')
+  await pendingPage.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
+  await expect(pendingPage.getByRole('heading', { name: 'Revisa tu correo' })).toBeVisible()
+  await expect(pendingPage.getByRole('note', { name: 'Verificación del correo' })).toContainText(
+    email,
+  )
+  await pendingContext.close()
   const port = Number(process.env.AUTH_TEST_PORT ?? 4466) + 1
   const mail = await page.request.get(
     `http://127.0.0.1:${port}/mail?email=${encodeURIComponent(email)}`,

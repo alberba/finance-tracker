@@ -21,6 +21,28 @@ test.describe('Patrimonio', () => {
     await expect(total).toHaveText(before ?? '')
   })
 
+  test('una entrada inválida no se guarda hasta corregirla', async ({ page, tracker }) => {
+    await tracker.openWealth()
+    await tracker.selectWealthMonth('MARZO')
+    const input = tracker.wealthSnapshotInput('Revolut')
+
+    await input.fill('12x')
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await tracker.wealthSection.locator('[data-save-snapshot]').click()
+    await expect(page.locator('#toast')).toContainText(
+      'Corrige los saldos no válidos antes de guardar.',
+    )
+    await expect(input).toHaveValue('12x')
+    await expect(tracker.wealthSection.locator('[data-wealth-status]')).toHaveText(
+      'Con cambios sin guardar',
+    )
+
+    await input.fill('150')
+    await tracker.wealthSection.locator('[data-save-snapshot]').click()
+    await expect(tracker.wealthSection.locator('[data-wealth-status]')).toHaveText('Guardado')
+    await expect(input).toHaveValue('150')
+  })
+
   test('marca en la tira los meses con snapshot guardado', async ({ tracker }) => {
     await tracker.openWealth()
     const months = tracker.wealthSection.getByRole('group', { name: 'Mes del snapshot' })

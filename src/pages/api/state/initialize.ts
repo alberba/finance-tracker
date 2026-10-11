@@ -28,21 +28,19 @@ export const POST: APIRoute = async ({ request, locals }) =>
       // Empty/absent body is fine — initialize takes no required fields.
     }
 
-    const existingSettings = await userSettingsRepository.get(db, userId)
-    if (existingSettings) {
-      await syncRepository.ensureRevision(db, userId)
-      return jsonResponse({ ok: true, alreadyInitialized: true, settings: existingSettings }, 200)
-    }
-
     const result = await runInTransaction(db, async (tx) => {
+      const existingSettings = await userSettingsRepository.get(tx, userId)
+      if (existingSettings) {
+        await syncRepository.ensureRevision(tx, userId)
+        return { alreadyInitialized: true, settings: existingSettings }
+      }
       const settings = await userSettingsRepository.create(tx, userId, {
         currency: requestedCurrency ?? 'EUR',
       })
-      const existingCategories = await accountsRepository.listCategoriesByUser(tx, userId)
-      const categories = existingCategories
+      const categories = await accountsRepository.listCategoriesByUser(tx, userId)
       await syncRepository.ensureRevision(tx, userId)
-      return { settings, categories }
+      return { alreadyInitialized: false, settings, categories }
     })
 
-    return jsonResponse({ ok: true, alreadyInitialized: false, ...result }, 201)
+    return jsonResponse({ ok: true, ...result }, result.alreadyInitialized ? 200 : 201)
   })

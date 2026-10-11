@@ -12,15 +12,7 @@ import { normalizeEmail, runInTransaction, type Db } from '../../../db/repositor
 import { findLegacyOwnerToLink } from './legacy-owner-link'
 import { initializeNewUser } from '../initialize-new-user'
 
-/**
- * Anything `resolvePrincipal`/`findLegacyOwnerToLink` can run a query
- * against. Previously distinguished a real `Tx` handle from `Db`
- * (`db.transaction()`'s callback parameter) — collapsed to just `Db` when
- * this switched to `runInTransaction` (see its doc comment: real D1 rejects
- * `db.transaction()`'s raw `BEGIN` just like it rejects `shared.ts`'s own,
- * so both call sites now share the same best-effort wrapper, which passes
- * the same `db` through rather than a distinct transaction-scoped handle).
- */
+/** Query handle whose local connection ownership is retained across async calls. */
 export type Queryable = Db
 
 export const CF_ACCESS_PROVIDER = 'cf-access'

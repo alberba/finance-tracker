@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      target: development
+    environment:
+      CHOKIDAR_USEPOLLING: 'true'
+      CHOKIDAR_INTERVAL: '250'
+    volumes:
+      - ./src:/app/src:ro
+      - ./public:/app/public:ro
+      - ./scripts:/app/scripts:ro
+      - ./migrations-v2:/app/migrations-v2:ro
+      - ./astro.config.ts:/app/astro.config.ts:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./wrangler.toml:/app/wrangler.toml:ro
+      - ./sentry.server.config.ts:/app/sentry.server.config.ts:ro
+      - ./sentry.client.config.js:/app/sentry.client.config.js:ro

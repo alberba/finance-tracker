@@ -3,7 +3,7 @@
  *
  * Design (per `docs/migration/work-packages.md` WP4):
  * - Each command is reserved before mutation, so concurrent replay of one
- *   `commandId` is applied at most once. SQLite tests also wrap the remaining
+ *   `commandId` is applied at most once. Node + SQLite also wraps the remaining
  *   writes in a transaction; D1 executes them sequentially because it has no
  *   interactive multi-statement transaction API.
  * - Idempotent replay: `sync_commands.id` (the client's `commandId`) is the

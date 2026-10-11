@@ -2,42 +2,43 @@ import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('Dashboard section', () => {
-  test('compone la cabecera, la franja tinta, el mes y los seis bloques', { tag: '@smoke' }, async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openDashboard()
-    const dashboard = tracker.dashboardSection
+  test(
+    'compone la cabecera, la franja tinta, el mes y los seis bloques',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      await tracker.openDashboard()
+      const dashboard = tracker.dashboardSection
 
-    await expect(dashboard.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
-    await expect(dashboard.getByRole('button', { name: 'Nuevo movimiento' })).toBeVisible()
+      await expect(dashboard.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
+      await expect(dashboard.getByRole('button', { name: 'Nuevo movimiento' })).toBeVisible()
 
-    const band = dashboard.getByRole('region', { name: 'Patrimonio neto' })
-    await expect(band.locator('#kpi-net-worth')).toContainText('€')
-    await expect(band.locator('#chart-networth')).toBeVisible()
+      const band = dashboard.getByRole('region', { name: 'Patrimonio neto' })
+      await expect(band.locator('#kpi-net-worth')).toContainText('€')
+      await expect(band.locator('#chart-networth')).toBeVisible()
 
-    await expect(dashboard.locator('#kpi-income')).toContainText('€')
-    await expect(dashboard.locator('#kpi-expense')).toContainText('€')
-    await expect(dashboard.locator('#kpi-investment')).toContainText('€')
-    await expect(dashboard.locator('#year-display')).toBeDisabled()
-    await expect(dashboard.locator('#dashboard-month')).toBeVisible()
+      await expect(dashboard.locator('#kpi-income')).toContainText('€')
+      await expect(dashboard.locator('#kpi-expense')).toContainText('€')
+      await expect(dashboard.locator('#kpi-investment')).toContainText('€')
+      await expect(dashboard.locator('#year-display')).toBeDisabled()
+      await expect(dashboard.locator('#dashboard-month')).toBeVisible()
 
-    for (const name of [
-      'Distribución del patrimonio',
-      'Top gastos del mes',
-      'Pendientes',
-      'Movimientos recientes',
-      'Objetivos de ahorro',
-      'Cotizaciones',
-    ]) {
-      await expect(dashboard.getByRole('heading', { name, exact: true })).toBeVisible()
-    }
-    await expect(page.locator('#chart-cashflow')).toHaveCount(0)
-    await expect.poll(() => page.evaluate(() => '__dashboardViewModel' in window)).toBe(false)
+      for (const name of [
+        'Distribución del patrimonio',
+        'Top gastos del mes',
+        'Pendientes',
+        'Movimientos recientes',
+        'Objetivos de ahorro',
+        'Cotizaciones',
+      ]) {
+        await expect(dashboard.getByRole('heading', { name, exact: true })).toBeVisible()
+      }
+      await expect(page.locator('#chart-cashflow')).toHaveCount(0)
+      await expect.poll(() => page.evaluate(() => '__dashboardViewModel' in window)).toBe(false)
 
-    await dashboard.getByRole('button', { name: 'Ver presupuesto del mes' }).click()
-    await expect(page).toHaveURL(/\/presupuesto$/)
-  })
+      await dashboard.getByRole('button', { name: 'Ver presupuesto del mes' }).click()
+      await expect(page).toHaveURL(/\/presupuesto$/)
+    },
+  )
 
   test('sincroniza el año, el mes y el rango con el controlador principal', async ({
     page,
@@ -69,6 +70,98 @@ test.describe('Dashboard section', () => {
     await expect(page.locator('#settings-year')).toHaveValue('2027')
   })
 
+  for (const { kind, january, february } of [
+    { kind: 'income', january: '2.000,00 €', february: '2.085,00 €' },
+    { kind: 'expense', january: '352,89 €', february: '404,77 €' },
+    { kind: 'investment', january: '250,00 €', february: '200,00 €' },
+  ]) {
+    test(`consulta y restaura los importes de ${kind} con hover`, async ({ tracker }) => {
+      await tracker.openDashboard()
+      const dashboard = tracker.dashboardSection
+      await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
+      const kpi = dashboard.locator(`[data-kpi="${kind}"]`)
+      const figure = kpi.locator(`#kpi-${kind}`)
+      const bars = kpi.getByRole('button')
+
+      await bars.nth(0).hover()
+      await expect(figure).toHaveText(january)
+      await bars.nth(1).hover()
+      await expect(figure).toHaveText(february)
+      await bars.nth(3).hover()
+      await expect(figure).toHaveText('0,00 €')
+      await bars.nth(0).hover()
+      await dashboard.getByRole('heading', { name: 'Dashboard', exact: true }).hover()
+      await expect(figure).toHaveText('0,00 €')
+    })
+
+    test(`consulta y restaura los importes de ${kind} con Tab mientras el puntero sigue sobre otra barra`, async ({
+      tracker,
+    }) => {
+      await tracker.openDashboard()
+      const dashboard = tracker.dashboardSection
+      const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
+      await month.selectOption('3')
+      const kpi = dashboard.locator(`[data-kpi="${kind}"]`)
+      const figure = kpi.locator(`#kpi-${kind}`)
+      const bars = kpi.getByRole('button')
+
+      await bars.nth(0).hover()
+      await bars.nth(0).focus()
+      await expect(figure).toHaveText(january)
+      await bars.nth(0).press('Tab')
+      await expect(bars.nth(1)).toBeFocused()
+      await expect(figure).toHaveText(february)
+      await dashboard.getByRole('heading', { name: 'Dashboard', exact: true }).hover()
+      await expect(figure).toHaveText(february)
+      await month.focus()
+      await expect(figure).toHaveText('0,00 €')
+    })
+  }
+
+  test('descarta la consulta al cambiar el mes con el puntero inmóvil sobre las barras', async ({
+    tracker,
+  }) => {
+    await tracker.openDashboard()
+    const dashboard = tracker.dashboardSection
+    const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
+    await month.selectOption('3')
+    const kpi = dashboard.locator('[data-kpi="investment"]')
+    await kpi.getByRole('button').nth(0).hover()
+    await expect(kpi.locator('#kpi-investment')).toHaveText('250,00 €')
+
+    await month.selectOption('4')
+    await expect(kpi.locator('#kpi-investment')).toHaveText('0,00 €')
+  })
+
+  test.describe('Consulta local del KPI', () => {
+    test.beforeEach(async ({ tracker }) => {
+      await tracker.openDashboard()
+      const dashboard = tracker.dashboardSection
+      await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
+      await dashboard.locator('[data-kpi="income"]').getByRole('button').nth(0).hover()
+    })
+
+    test('mantiene la comparación del mes seleccionado', async ({ tracker }) => {
+      const income = tracker.dashboardSection.locator('[data-kpi="income"]')
+      await expect(income.locator('[data-kpi-change]')).toHaveText('100,00 %')
+      await expect(income).toContainText('Marzo: 2.000,00 €')
+    })
+
+    test('mantiene los importes de los otros KPI', async ({ tracker }) => {
+      const dashboard = tracker.dashboardSection
+      await expect(dashboard.locator('#kpi-expense')).toHaveText('0,00 €')
+      await expect(dashboard.locator('#kpi-investment')).toHaveText('0,00 €')
+    })
+
+    test('mantiene el periodo seleccionado', async ({ tracker }) => {
+      const dashboard = tracker.dashboardSection
+      await expect(dashboard.getByRole('combobox', { name: 'Mes', exact: true })).toHaveValue('3')
+      await expect(dashboard.getByRole('combobox', { name: 'Año', exact: true })).toHaveValue(
+        '2026',
+      )
+    })
+  })
+
   test('confirma y salta pendientes hasta dejarlo todo al día', async ({ page, tracker }) => {
     await tracker.openDashboard()
     const pending = page.locator('#dashboard [data-dashboard-pending]')
@@ -90,7 +183,10 @@ test.describe('Dashboard section', () => {
       .getByRole('button', { name: 'Saltar este vencimiento de Compra VWCE recurrente' })
       .click()
     await expect(items).toHaveCount(1)
-    await items.first().getByRole('button', { name: /^Confirmar/ }).click()
+    await items
+      .first()
+      .getByRole('button', { name: /^Confirmar/ })
+      .click()
 
     await expect(items).toHaveCount(0)
     await expect(pending.locator('[data-pending-empty]')).toBeVisible()
@@ -128,13 +224,27 @@ test.describe('Dashboard section', () => {
           ]
         }),
       )
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ quotes }) })
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes }),
+      })
     })
 
     await tracker.openSettings()
     const liveMarket = new LiveMarketPage(page)
-    await liveMarket.addInstrument({ asset: 'ETF Plata', type: 'etf', symbol: 'VWCE', currency: 'EUR' })
-    await liveMarket.addInstrument({ asset: 'ETF Plata', type: 'etf', symbol: 'LATE', currency: 'EUR' })
+    await liveMarket.addInstrument({
+      asset: 'ETF Plata',
+      type: 'etf',
+      symbol: 'VWCE',
+      currency: 'EUR',
+    })
+    await liveMarket.addInstrument({
+      asset: 'ETF Plata',
+      type: 'etf',
+      symbol: 'LATE',
+      currency: 'EUR',
+    })
     await tracker.openDashboard()
 
     const quotes = page.locator('#dashboard [data-dashboard-quotes]')
