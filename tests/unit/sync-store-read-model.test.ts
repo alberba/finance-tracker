@@ -114,7 +114,10 @@ describe('review: read model across devices', () => {
         currency: 'EUR',
       },
     }
-    const transactionChange = { ...transaction, declared: true }
+    const transactionChange: Omit<typeof transaction, 'tradeDetail'> & {
+      tradeDetail?: typeof transaction.tradeDetail
+      declared: boolean
+    } = { ...transaction, declared: true }
     delete transactionChange.tradeDetail
     let initial = true
     vi.stubGlobal(
