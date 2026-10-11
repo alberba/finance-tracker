@@ -1,4 +1,5 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { editScenarioState } from './seed-sync-v2'
+import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
@@ -6,10 +7,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     page,
     tracker,
   }) => {
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado local')
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.recurringRules.push({
         id: 'legacy-expense-rule',
         type: 'expense',
@@ -25,9 +23,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
         lastExecutionDate: null,
         nextOccurrenceDate: '2026-09-01',
       })
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
     await tracker.openSettingsTab('Recurrentes')
 
@@ -267,20 +263,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       units: 5,
       fee: 0,
     })
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado local')
-      const state = JSON.parse(raw) as {
-        transactions: Array<{ symbol?: string }>
-        meta?: { savedAt?: string }
-      }
+    await editScenarioState(page, (state) => {
       const movement = state.transactions.find((transaction) => transaction.symbol === 'AGED')
       if (!movement) throw new Error('No se encontró el movimiento legacy')
       delete movement.symbol
       state.meta = { ...(state.meta || {}), savedAt: new Date(Date.now() + 60_000).toISOString() }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
 
     const liveMarket = new LiveMarketPage(page)
@@ -424,10 +412,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await page.evaluate(() => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado local')
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.recurringRules.push({
         id: 'rule-expense-reclass',
         type: 'expense',
@@ -443,9 +428,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
         lastExecutionDate: null,
         nextOccurrenceDate: '2026-07-01',
       })
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
 
     const liveMarket = new LiveMarketPage(page)
