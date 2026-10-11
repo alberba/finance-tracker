@@ -7,8 +7,8 @@ export async function syncMovements(
   before: readonly Transaction[],
   after: readonly Transaction[],
   currency: string,
-): Promise<void> {
-  await syncListDiff('transaction', before, after, (movement) =>
+): Promise<boolean | void> {
+  return syncListDiff('transaction', before, after, (movement) =>
     buildMovementData(movement, currency),
   )
 }
@@ -20,6 +20,7 @@ async function buildMovementData(movement: Transaction, currency: string) {
   const accountId = await resolveEntityId('account', movement.accountId)
   if (!accountId) return null
   const categoryId = await resolveOrCreateCategoryId(movement.type, movement.category)
+  if (movement.category && !categoryId) return null
   const operation = await buildOperation(movement)
   return {
     accountId,
