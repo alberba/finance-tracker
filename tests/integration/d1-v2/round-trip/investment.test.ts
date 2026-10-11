@@ -195,6 +195,47 @@ describe('round trip: inversión', () => {
     expect(await trip.pending()).toEqual([])
   })
 
+  it('recovers missing occurrences after a pending enqueue fails and the client restarts', async () => {
+    Object.assign(window, { __FINANCE_TODAY__: '2026-10-01' })
+    trip.setOffline(true)
+    const { useRecurringStore } = await import('../../../../src/stores/recurring')
+    const realEnqueue = trip.syncStore.enqueueCommand.bind(trip.syncStore)
+    let failed!: () => void
+    const failure = new Promise<void>((resolve) => {
+      failed = resolve
+    })
+    let occurrences = 0
+    trip.syncStore.enqueueCommand = async (command) => {
+      if (command.action === 'create' && command.entityType === 'pendingMovement' && ++occurrences === 2) {
+        failed()
+        return null
+      }
+      return realEnqueue(command)
+    }
+    useRecurringStore().addRule({
+      type: 'expense',
+      accountId,
+      category: 'Ocio',
+      description: 'Cuota con fallo local',
+      amount: 25,
+      frequency: 'monthly',
+      interval: 1,
+      startDate: '2026-09-01',
+    })
+    await failure
+    await trip.reloadOffline()
+    expect(useRecurringStore().refreshPending()).toBe(1)
+    await trip.reloadOffline()
+    trip.setOffline(false)
+    const reloaded = await trip.reload()
+    expect(reloaded.recurringRules).toHaveLength(1)
+    expect(reloaded.pendingMovements.map((item) => item.occurrenceDate)).toEqual([
+      '2026-09-01',
+      '2026-10-01',
+    ])
+    expect(await trip.pending()).toEqual([])
+  })
+
   it('keeps concurrent rule creation and shared category references after reload', async () => {
     Object.assign(window, { __FINANCE_TODAY__: '2026-10-01' })
     trip.setOffline(true)

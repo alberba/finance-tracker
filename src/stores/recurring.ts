@@ -248,6 +248,7 @@ export const useRecurringStore = defineStore('recurring', () => {
   function queueRulesThenPending(
     beforeRules: readonly RecurringRule[],
     beforePending: readonly PendingMovement[],
+    rulesBeforePending: readonly RecurringRule[] = financialStateStore.state.recurringRules,
     message?: string,
   ): void {
     const afterRules = financialStateStore.state.recurringRules
@@ -259,15 +260,23 @@ export const useRecurringStore = defineStore('recurring', () => {
       // pending resolves its own id from the queue. No remote ack is needed.
       if (!rulesEnqueued) {
         if (
-          (await syncListDiff('recurringRule', beforeRules, afterRules, (rule) =>
+          (await syncListDiff('recurringRule', beforeRules, rulesBeforePending, (rule) =>
             buildRecurringRuleData(rule, currency),
           )) === false
         )
           return false
         rulesEnqueued = true
       }
-      return syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
-        buildPendingMovementData(pending, currency),
+      if (
+        (await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
+          buildPendingMovementData(pending, currency),
+        )) === false
+      )
+        return false
+      // Advance the calendar only after every occurrence is durable. A restart
+      // after a partial enqueue can then regenerate the missing occurrences.
+      return syncListDiff('recurringRule', rulesBeforePending, afterRules, (rule) =>
+        buildRecurringRuleData(rule, currency),
       )
     }, message)
   }
@@ -291,7 +300,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     const beforePending = pendingMovements.value
     const count = generatePending(today)
     if (hasChanges(beforeRules, rules.value) || hasChanges(beforePending, pendingMovements.value)) {
-      queueRulesThenPending(beforeRules, beforePending)
+      queueRulesThenPending(beforeRules, beforePending, beforeRules)
     } else {
       void drainSyncJobs()
     }
@@ -331,8 +340,14 @@ export const useRecurringStore = defineStore('recurring', () => {
     const beforeRules = rules.value
     const beforePending = pendingMovements.value
     financialStateStore.commitState((draft) => draft.recurringRules.push(rule))
+    const rulesBeforePending = rules.value
     generatePending(resolveToday())
-    queueRulesThenPending(beforeRules, beforePending, 'Regla recurrente guardada.')
+    queueRulesThenPending(
+      beforeRules,
+      beforePending,
+      rulesBeforePending,
+      'Regla recurrente guardada.',
+    )
     return true
   }
 
@@ -390,8 +405,14 @@ export const useRecurringStore = defineStore('recurring', () => {
         if (input.time) rule.time = input.time
       }
     })
+    const rulesBeforePending = rules.value
     generatePending(resolveToday())
-    queueRulesThenPending(beforeRules, beforePending, 'Regla recurrente actualizada.')
+    queueRulesThenPending(
+      beforeRules,
+      beforePending,
+      rulesBeforePending,
+      'Regla recurrente actualizada.',
+    )
     return true
   }
 
