@@ -32,3 +32,4 @@ backup.sql
 
 # Self-hosted secrets
 .env.selfhost
+.env.selfhost.local*

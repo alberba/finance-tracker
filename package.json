@@ -49,8 +49,11 @@
     "test:e2e:shard": "tsx scripts/e2e-functional-shard.ts",
     "check:deps": "node scripts/check-installed-dependencies.mjs",
     "local:setup": "node scripts/setup-local.mjs",
-    "local:up": "docker compose up --build -d",
-    "local:down": "docker compose down"
+    "local:up": "node scripts/local-compose.mjs up",
+    "local:down": "node scripts/local-compose.mjs down",
+    "local:archive": "node scripts/archive-local.mjs",
+    "local:archive:install": "node scripts/install-orca-archive.mjs",
+    "local:up:prod": "node scripts/local-compose.mjs up production"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

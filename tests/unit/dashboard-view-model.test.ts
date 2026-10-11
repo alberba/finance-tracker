@@ -64,6 +64,14 @@ describe('buildKpi', () => {
   it('draws fewer bars early in the year', () => {
     expect(buildKpi('income', year(100, 200), 1, money).bars).toHaveLength(2)
   })
+
+  it('keeps each monthly amount with the configured monetary format, including zero and losses', () => {
+    const kpi = buildKpi('investment', year(0, -1234.5, 2500.75), 2, (value) =>
+      formatMoney(value, 'USD'),
+    )
+
+    expect(kpi.bars.map((bar) => bar.value)).toEqual(['0,00 US$', '−1.234,50 US$', '2.500,75 US$'])
+  })
 })
 
 describe('buildIncomeSplit', () => {
