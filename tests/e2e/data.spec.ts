@@ -1,10 +1,21 @@
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
+import { readScenarioState } from './seed-sync-v2'
 
 test.describe('Data E2E', () => {
   test(
     'renderiza datos y backups dentro del workspace Vue',
     { tag: '@smoke' },
     async ({ page, tracker }) => {
+      await tracker.addAccount({ name: 'Cuenta de copia' })
+      await tracker.addCustomTransaction({
+        date: '2026-08-12',
+        monthLabel: 'AGOSTO',
+        type: 'expense',
+        categoryLabel: 'Gastos generales',
+        amount: 7.5,
+        description: 'Movimiento de copia',
+        accountLabel: 'Cuenta de copia',
+      })
       await tracker.openData()
 
       const dataSection = tracker.section('data')
@@ -18,6 +29,16 @@ test.describe('Data E2E', () => {
   )
 
   test('exporta una copia y la vuelve a importar tras confirmar', async ({ page, tracker }) => {
+    await tracker.addAccount({ name: 'Cuenta de copia' })
+    await tracker.addCustomTransaction({
+      date: '2026-08-12',
+      monthLabel: 'AGOSTO',
+      type: 'expense',
+      categoryLabel: 'Gastos generales',
+      amount: 7.5,
+      description: 'Movimiento de copia',
+      accountLabel: 'Cuenta de copia',
+    })
     await tracker.openData()
 
     const dataSection = tracker.section('data')
@@ -37,7 +58,12 @@ test.describe('Data E2E', () => {
     await dialog.getByRole('button', { name: 'Sustituir mis datos' }).click()
 
     await expect(dialog).toBeHidden()
-    await expect(page.getByText('JSON importado correctamente.')).toBeVisible()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(figures).toContainText(/Movimientos\s*[1-9]/)
+    const restored = await readScenarioState(page)
+    expect(restored.accounts).toContainEqual(expect.objectContaining({ name: 'Cuenta de copia' }))
+    expect(restored.transactions).toContainEqual(
+      expect.objectContaining({ description: 'Movimiento de copia' }),
+    )
   })
 })

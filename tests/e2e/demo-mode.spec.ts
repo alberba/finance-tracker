@@ -1,5 +1,6 @@
-import { test, expect } from './fixtures'
+import { syncV2Test as test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { readScenarioState } from './seed-sync-v2'
 
 test.describe('Modo demo', () => {
   test('entra por la ruta pública y mantiene los cambios fuera de las APIs persistentes', async ({
@@ -25,11 +26,6 @@ test.describe('Modo demo', () => {
 
     await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
-    await expect
-      .poll(() =>
-        page.evaluate(() => localStorage.getItem('finance-tracker-state-v1::demo')),
-      )
-      .not.toBeNull()
     await page.goto('/movimientos')
 
     const tracker = new FinanceTrackerPage(page)
@@ -42,11 +38,8 @@ test.describe('Modo demo', () => {
       description: 'Cambio local de demo',
     })
 
-    await expect
-      .poll(() =>
-        page.evaluate(() => localStorage.getItem('finance-tracker-state-v1::demo')),
-      )
-      .toContain('Cambio local de demo')
+    await tracker.filterTransactionsMonth('AGOSTO')
+    await expect(tracker.transactionRow('Cambio local de demo')).toBeVisible()
 
     await tracker.submitIssueReport({
       type: 'bug',
@@ -65,6 +58,8 @@ test.describe('Modo demo', () => {
   }) => {
     await page.goto('/')
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    const authenticatedState = await readScenarioState(page)
+    authenticatedState.meta.generatedAt = ''
 
     const userMenuButton = page.getByRole('button', { name: 'Abrir menú de usuario' })
     await userMenuButton.click()
@@ -76,25 +71,23 @@ test.describe('Modo demo', () => {
 
     await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
-    await expect
-      .poll(() =>
-        page.evaluate(() => ({
-          demoFlag: localStorage.getItem('finance-demo-mode'),
-          demoState: localStorage.getItem('finance-tracker-state-v1::demo'),
-        })),
-      )
-      .toMatchObject({
-        demoFlag: '1',
-        demoState: expect.stringContaining('Cuenta Corriente'),
-      })
+    const tracker = new FinanceTrackerPage(page)
+    await tracker.addCustomTransaction({
+      date: '2026-08-12',
+      monthLabel: 'AGOSTO',
+      type: 'expense',
+      categoryLabel: 'Comida',
+      amount: 7.5,
+      description: 'Edición aislada de demo',
+    })
 
     await userMenuButton.click()
     await userMenu.getByRole('menuitem', { name: /Salir del modo demo/ }).click()
 
     await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeHidden()
-    await expect
-      .poll(() => page.evaluate(() => localStorage.getItem('finance-demo-mode')))
-      .toBeNull()
+    const currentState = await readScenarioState(page)
+    currentState.meta.generatedAt = ''
+    expect(currentState).toEqual(authenticatedState)
   })
 })
