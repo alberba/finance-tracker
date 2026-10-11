@@ -6,12 +6,12 @@ disable-model-invocation: true
 
 Implement the work described by the user in the spec or tickets.
 
-A `/design` canvas (a claude.ai artifact link) is read with the Artifact tool. Its HTML artboards are large: grep or `sed -n` the artboard you need instead of reading the whole file.
+If the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask.
 
-Use /tdd where possible, at pre-agreed seams.
+Call the Skill tool with "tdd" where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end. Before the PR, `pnpm gate` plus `pnpm test:e2e:smoke` locally; the PR CI is quality only.
+Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 
-Once done, use /code-review to review the work.
+Once done, call the Skill tool with "code-review" to review the work.
 
 Commit your work to the current branch.
