@@ -100,7 +100,7 @@ export const useDataStore = defineStore('data', () => {
     window.location.reload()
   }
 
-  /** "Empezar de cero" provisions a private space for authenticated users. */
+  /** "Empezar de cero" resets the authenticated user's private space. */
   const canStartFresh = computed(() => !isDemoMode())
 
   async function startFresh(): Promise<void> {
