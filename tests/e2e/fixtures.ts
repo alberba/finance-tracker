@@ -1,6 +1,7 @@
 import { test as base, expect, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { seedSyncV2User } from './seed-sync-v2'
 
 declare global {
   interface Window {
@@ -33,6 +34,7 @@ export async function mirrorStateToServer(page: Page): Promise<void> {
 
 type Fixtures = {
   tracker: FinanceTrackerPage
+  syncV2Seed: boolean
   // Freezes `Date` before the app loads. The selected year and month default to
   // today, so a snapshot taken in one month differs from the next.
   fixedTime: string | undefined
@@ -100,3 +102,53 @@ export const test = base.extend<Fixtures>({
 })
 
 export { expect }
+
+/** Runs browser scenarios against sync v2 with a fresh, isolated identity. */
+export const syncV2Test = test.extend<Fixtures>({
+  syncV2Seed: [true, { option: true }],
+  tracker: async ({ page, context, fixedTime, snapshotTime, syncV2Seed }, use, testInfo) => {
+    const snapshot = testInfo.tags.includes('@snapshot')
+    const time = snapshot ? snapshotTime : fixedTime
+    if (time) {
+      await page.clock.setFixedTime(new Date(time))
+    }
+    if (snapshot) {
+      const css = await readFile('tests/e2e/screenshot-stable.css', 'utf8')
+      await page.addInitScript((styles) => {
+        const insert = () => {
+          const style = document.createElement('style')
+          style.textContent = styles
+          document.documentElement.append(style)
+        }
+        if (document.documentElement) {
+          insert()
+        } else {
+          const observer = new MutationObserver(() => {
+            if (!document.documentElement) return
+            observer.disconnect()
+            insert()
+          })
+          observer.observe(document, { childList: true })
+        }
+      }, css)
+    }
+
+    const email = `pw-${testInfo.workerIndex}-${testInfo.parallelIndex}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@e2e.test`
+    await context.setExtraHTTPHeaders({ 'X-Test-User-Email': email })
+    const initialization = await context.request.post('/api/state/initialize', {
+      headers: { 'X-Test-User-Email': email },
+      data: {},
+    })
+    expect(
+      initialization.ok(),
+      `No se pudo inicializar la identidad E2E (${initialization.status()})`,
+    ).toBe(true)
+    if (syncV2Seed) {
+      await seedSyncV2User(context.request, email)
+    }
+
+    const tracker = new FinanceTrackerPage(page)
+    await tracker.goto()
+    await use(tracker)
+  },
+})
