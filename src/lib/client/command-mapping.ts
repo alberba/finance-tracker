@@ -102,6 +102,16 @@ type JsonRecord = Record<string, unknown>
  */
 export type EntityMatch = PendingCreateMatch
 
+const pendingEntityCreates = new Map<string, Promise<string | null>>()
+
+function entityCreateKey(
+  userId: string | null,
+  entityType: SyncEntityType,
+  entityId: string,
+): string {
+  return JSON.stringify([userId, entityType, entityId])
+}
+
 /** Matches a still-queued `create` by the identity the client gave it. */
 function identityMatch(id: string): EntityMatch {
   return (entity) => entity.id === id
@@ -163,13 +173,26 @@ export async function syncCreate(
   }
   const syncStore = useSyncStore()
   const entityId = typeof data.id === 'string' && data.id ? data.id : id
-  if (await resolveEntityId(entityType, entityId)) return true
-  const entry = await syncStore.enqueueCommand({
-    action: 'create',
-    entityType,
-    data: { ...data, id: entityId },
-  })
-  if (entry) return true
+  const key = entityCreateKey(syncStore.userId, entityType, entityId)
+  const alreadyCreating = pendingEntityCreates.get(key)
+  if (alreadyCreating) return Boolean(await alreadyCreating)
+
+  const creation = (async () => {
+    const existingId = await resolveStoredEntityId(syncStore, entityType, entityId)
+    if (existingId) return existingId
+    const entry = await syncStore.enqueueCommand({
+      action: 'create',
+      entityType,
+      data: { ...data, id: entityId },
+    })
+    return entry ? entityId : null
+  })()
+  pendingEntityCreates.set(key, creation)
+  try {
+    return Boolean(await creation)
+  } finally {
+    if (pendingEntityCreates.get(key) === creation) pendingEntityCreates.delete(key)
+  }
 }
 
 /**
@@ -332,6 +355,19 @@ export async function resolveEntityId(
     return null
   }
   const syncStore = useSyncStore()
+  const key = entityCreateKey(syncStore.userId, entityType, localId)
+  const creating = pendingEntityCreates.get(key)
+  if (creating) return creating
+  const existingId = await resolveStoredEntityId(syncStore, entityType, localId)
+  if (existingId) return existingId
+  return pendingEntityCreates.get(key) ?? null
+}
+
+async function resolveStoredEntityId(
+  syncStore: ReturnType<typeof useSyncStore>,
+  entityType: SyncEntityType,
+  localId: string,
+): Promise<string | null> {
   const ref = await syncStore.getEntityRef(entityType, localId)
   return ref?.entityId ?? (await syncStore.peekPendingCreateId(entityType, identityMatch(localId)))
 }
@@ -451,7 +487,8 @@ export async function resolveOrCreateCategoryId(
   // Memo key for the in-flight mint below. Purely local (never sent) — the
   // category's identity is the UUID minted here.
   const memoKey = `${kind}:${name}`
-  const inFlight = pendingCategoryMints.get(memoKey)
+  const memoKeyForUser = JSON.stringify([syncStore.userId, memoKey])
+  const inFlight = pendingCategoryMints.get(memoKeyForUser)
   if (inFlight) {
     return inFlight
   }
@@ -463,11 +500,11 @@ export async function resolveOrCreateCategoryId(
       (await syncStore.peekPendingCreateId('category', matches))
     )
   })()
-  pendingCategoryMints.set(memoKey, mint)
+  pendingCategoryMints.set(memoKeyForUser, mint)
   try {
     return await mint
   } finally {
-    pendingCategoryMints.delete(memoKey)
+    pendingCategoryMints.delete(memoKeyForUser)
   }
 }
 
