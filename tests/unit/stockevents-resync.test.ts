@@ -54,7 +54,7 @@ const btcBuy: Transaction = {
 }
 
 function seedState(transactions: Transaction[], tradesToCash = false): void {
-  useFinancialStateStore().reloadState(
+  useFinancialStateStore().replaceState(
     normalizeState({
       accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
       investmentCategories: ['Crypto'],
@@ -109,9 +109,7 @@ describe('stockEvents syncMovement — skip warning', () => {
 
     expect(result).toBe('skipped')
     expect(createStockEventsTransaction).not.toHaveBeenCalled()
-    expect(toastText()).toBe(
-      'Stock Events: BTC no tiene sincronización activada o lista asignada.',
-    )
+    expect(toastText()).toBe('Stock Events: BTC no tiene sincronización activada o lista asignada.')
     expect(console.warn).toHaveBeenCalled()
   })
 

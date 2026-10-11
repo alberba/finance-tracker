@@ -36,7 +36,6 @@ function json(body: unknown) {
 
 describe('review: read model across devices', () => {
   beforeEach(() => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
     vi.stubGlobal('navigator', { onLine: true })
     vi.stubGlobal('window', new EventTarget())
     setActivePinia(createPinia())
@@ -115,7 +114,10 @@ describe('review: read model across devices', () => {
         currency: 'EUR',
       },
     }
-    const transactionChange = { ...transaction, declared: true }
+    const transactionChange: Omit<typeof transaction, 'tradeDetail'> & {
+      tradeDetail?: typeof transaction.tradeDetail
+      declared: boolean
+    } = { ...transaction, declared: true }
     delete transactionChange.tradeDetail
     let initial = true
     vi.stubGlobal(

@@ -40,7 +40,6 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
   let userId: string
 
   beforeEach(() => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
     vi.stubGlobal('navigator', { onLine: true })
     setActivePinia(createPinia())
     userCounter += 1
@@ -289,7 +288,6 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
 
 describe('logout and session expiry preserve queued work', () => {
   beforeEach(() => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
     vi.stubGlobal('navigator', { onLine: true })
     setActivePinia(createPinia())
   })

@@ -16,18 +16,16 @@ cutover, so that:
 - `scripts/export-v2-to-v1-json.ts` has a known-good v1 shape to diff/merge
   against if a post-cutover issue requires reconciling v2 writes back into a
   v1-shaped export.
-- Nothing here requires v1 to stay *writable* — only readable. Writes to v1
-  should already be impossible in practice once traffic is on the v2 build
-  (nothing in the deployed app calls the legacy `/api/state*` routes once
-  `PUBLIC_SYNC_V2=true`), but no code change actively blocks them either;
-  this checklist's day-0 step confirms that in practice.
+- The current authenticated client uses sync v2 and no longer selects the
+  whole-state blob protocol. Older Pages deployments and rollback bundles may
+  still call the owner-gated legacy `/api/state*` routes, so those server
+  contracts remain available during the compatibility window.
 
 ## Day 0 (immediately after cutover, part of exiting maintenance mode)
 
-- [ ] Confirm the deployed build has `PUBLIC_SYNC_V2=true` and
-      `AUTH_ENFORCED=true` (cutover runbook §6) — this is what stops any
-      client from calling the legacy unauthenticated `/api/state*` routes in
-      practice.
+- [ ] Confirm the deployed build is the reviewed sync-v2 client and has
+      `AUTH_ENFORCED=true` (cutover runbook §6). Older deployed/rollback
+      bundles may still use the retained owner-gated legacy routes.
 - [ ] Confirm `wrangler.toml` still declares both `[[d1_databases]]` blocks
       (`finance_tracker_db` and `finance_tracker_db_v2`) and that
       `migrations_dir = "migrations"` for the legacy block is unchanged.
@@ -57,7 +55,7 @@ For each check, record date + who performed it in the tracking ticket:
       `wrangler d1 export finance-tracker-db-v2 --remote` snapshot, as a
       final parity re-confirmation before decommission (owner-user's data
       will have diverged from the original migrated snapshot by normal usage
-      — expect and reconcile *new* v2-only activity, not systematic drift in
+      — expect and reconcile _new_ v2-only activity, not systematic drift in
       the originally migrated rows).
 
 ## Rollback still available during the window
@@ -96,9 +94,8 @@ Only after every weekly check above is complete with no open issues:
 - [ ] After the app deploy with the binding removed has been verified
       healthy (repeat the owner verification checklist from
       `cutover-runbook.md` §7), delete the legacy database:
-      ```
-      wrangler d1 delete finance-tracker-db
-      ```
+      `     wrangler d1 delete finance-tracker-db
+  `
       This step is **irreversible** beyond the archived export above —
       confirm the archive file (first bullet) is verified readable before
       running it.

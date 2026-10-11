@@ -2,7 +2,6 @@ import { defineStore, getActivePinia } from 'pinia'
 import { onScopeDispose, shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
-import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { useToast } from '../composables/useToast'
 import {
   getAllEntities,
@@ -71,7 +70,6 @@ interface SyncCommandResult {
 const RETRY_BASE_DELAY_MS = 1000
 const RETRY_MAX_DELAY_MS = 30_000
 export const useSyncStore = defineStore('sync', () => {
-  const enabled = isSyncV2Enabled()
   // Late async renders must reach this store's own Pinia, not whichever is active by then.
   const ownPinia = getActivePinia()
   const { showToast } = useToast()
@@ -124,7 +122,7 @@ export const useSyncStore = defineStore('sync', () => {
         )
       : readModel
     const financialStateStore = useFinancialStateStore(ownPinia)
-    financialStateStore.reloadState(projectSyncV2State(projected, financialStateStore.year))
+    financialStateStore.replaceState(projectSyncV2State(projected, financialStateStore.year))
   }
 
   /** An unloaded page: stops every background read, send and render of this client. */
@@ -147,7 +145,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   function isReady(): boolean {
-    return enabled && !detached && cacheDb !== null && outboxDb !== null && userId.value !== null
+    return !detached && cacheDb !== null && outboxDb !== null && userId.value !== null
   }
 
   /** Coalesces reconnects, remote notices and local writes into one cycle. */
@@ -197,7 +195,7 @@ export const useSyncStore = defineStore('sync', () => {
 
   /** Shares initialization so the shell cannot race the workspace. */
   async function init(nextUserId: string, options: { email?: string | null } = {}): Promise<void> {
-    if (!enabled || isReadOnlyDemoActive()) return
+    if (isReadOnlyDemoActive()) return
     if (userId.value === nextUserId && initializing) return initializing
     if (initialized && userId.value === nextUserId) return
     stop()
@@ -819,7 +817,6 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   return {
-    enabled,
     userId,
     email,
     isLegacyOwner,

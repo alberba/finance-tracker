@@ -201,7 +201,7 @@ async function loadForMutation(
 async function transactionWithTradeDetail(
   db: Db,
   userId: string,
-  row: { id: string },
+  row: VersionedRow,
 ): Promise<VersionedRow> {
   const tradeDetail = await transactionsRepository.getTradeDetailByTransaction(db, userId, row.id)
   return { ...row, tradeDetail } as VersionedRow

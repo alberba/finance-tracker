@@ -15,7 +15,7 @@ decommission sign-off).
 > notas de los pasos 2, 4 y 6 sobre "Pages no lee `wrangler.toml`" y sobre
 > configurar bindings y variables en el dashboard de Pages **ya no aplican**.
 > Ahora la app es un **Worker** desplegado por Workers Builds con
-> `pnpm deploy:cf`, y `wrangler.toml` (vía `dist/server/wrangler.json`) *sí*
+> `pnpm deploy:cf`, y `wrangler.toml` (vía `dist/server/wrangler.json`) _sí_
 > es la fuente de verdad de bindings y `[vars]` en runtime. Ver README,
 > "Deploy en Cloudflare Workers + D1". Se conserva como registro del cutover
 > ya ejecutado.
@@ -34,7 +34,7 @@ today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 - [ ] WP10 acceptance criteria met: `pnpm test:unit`, `pnpm test:integration`,
       `pnpm lint`, `pnpm check`, `pnpm build`, `pnpm test:e2e` all green in CI
       on the commit being deployed.
-- [ ] A full dry run of *this* runbook has been executed at least once
+- [ ] A full dry run of _this_ runbook has been executed at least once
       against a staging copy (real acceptance criterion from
       `work-packages.md`'s WP11 entry) — the rollback path
       (`migrate:export-v1-json` + binding/deploy revert) exercised at least
@@ -61,14 +61,14 @@ today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 > maintenance-mode lever in this section does exist.
 >
 > This supersedes Contradiction #2 in `work-packages.md`, which said there was
-> "no auth boundary at all". That was about the *application code* — which is
+> "no auth boundary at all". That was about the _application code_ — which is
 > still true, v1 routes trust a client-supplied `x-finance-namespace` header —
 > but Access is enforcing at the edge in front of it.
 >
 > Two values still have to be read from the dashboard before the window:
 >
 > 1. **`CF_ACCESS_AUD`** — Zero Trust → Access → Applications → `finance
->    tracker` → *Application Audience (AUD) Tag*. Without it the WP3
+tracker` → _Application Audience (AUD) Tag_. Without it the WP3
 >    middleware cannot verify a single JWT and `AUTH_ENFORCED=true` would 401
 >    every request.
 > 2. **The exact email GitHub puts in the JWT** — see the warning under
@@ -76,11 +76,11 @@ today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 >    `https://<app-hostname>/cdn-cgi/access/get-identity`; the `email` field
 >    in that JSON is verbatim what the middleware will compare against.
 
-This app has no built-in maintenance-mode flag (no code path checks one) and
-today's legacy routes (`src/pages/api/state.ts`, `state/reset-legacy.ts`) are
-**unauthenticated** — the only lever available without shipping new code is
-the Cloudflare Access policy fronting this app (WP3's
-`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`).
+This app has no built-in maintenance-mode flag. The retained legacy routes
+(`src/pages/api/state.ts`, `state/reset-legacy.ts`) are restricted to the
+reserved legacy owner; older deployed client bundles may still call them. The
+Cloudflare Access policy remains the lever for blocking all application
+requests during maintenance (WP3's `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`).
 
 1. In the Cloudflare Zero Trust dashboard, edit the Access policy for this
    application to **allow only the migration operator** (deny the
@@ -135,7 +135,7 @@ Skip this whole section if `finance-tracker-db-v2` already exists (re-running
    drives `wrangler d1 …` CLI commands only; the runtime bindings the
    deployed app actually receives are the ones configured in the Pages
    project's **Settings → Functions → D1 database bindings**.
-   Consequence: the placeholder never breaks a deploy, but it *does* break
+   Consequence: the placeholder never breaks a deploy, but it _does_ break
    step 3 below, and **the `finance_tracker_db_v2` binding must be added in
    the Pages dashboard** (same binding name) or every v2 route 500s at
    runtime with "binding no disponible".
@@ -147,7 +147,7 @@ Skip this whole section if `finance-tracker-db-v2` already exists (re-running
    per the script in `package.json`)
 4. Add the `finance_tracker_db_v2` binding to the Pages project (Settings →
    Functions → D1 database bindings, for both Production and Preview) and
-   redeploy, *before* running the migration tool, so the binding is live for
+   redeploy, _before_ running the migration tool, so the binding is live for
    the deploy in step 6. Committing `wrangler.toml` alone does **not** do
    this — see the note in step 2.
 
@@ -210,7 +210,7 @@ pnpm migrate:validate-parity -- \
 - Exit code `1` (any discrepancy listed: counts, monthly totals, wealth per
   snapshot, budget/goal totals) → **abort criterion**, go to §8.
 
-## 6. Deploy with the binding flip + feature flags
+## 6. Deploy with the binding flip and authentication settings
 
 Set these in the **Pages project** (Settings → Environment variables), not in
 `wrangler.toml` — per the step-2 note, Pages does not read that file here.
@@ -219,19 +219,18 @@ runs) from **runtime** variables (present in the Function at request time),
 and getting that distinction wrong is the most likely silent failure of this
 whole cutover:
 
-| Variable | Cutover value | Where it must be set |
-|---|---|---|
-| `PUBLIC_SYNC_V2` | `true` | **Build-time.** Read via `import.meta.env` in `src/lib/client/feature-flags.ts`, so it is inlined into the client bundle at build. Setting it only as a runtime variable silently leaves the app on the legacy `localStorage` path with no error anywhere |
-| `AUTH_ENFORCED` | `true` | Runtime (read from `locals.runtime.env` in `src/middleware.ts`) |
-| `LEGACY_OWNER_EMAIL` | (unchanged, already set in step 0) | Runtime |
-| `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` | (unchanged, already set in step 0) | Runtime |
-| `DATA_ENCRYPTION_KEY` | (unchanged, already set in step 0) | Runtime, marked **encrypted/secret** in the dashboard |
-| `TEST_AUTH_ENABLED` | **unset** | Must not exist in this environment at all — it enables an `X-Test-User-Email` auth bypass |
+| Variable                                  | Cutover value                      | Where it must be set                                                                      |
+| ----------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| `AUTH_ENFORCED`                           | `true`                             | Runtime (read from `locals.runtime.env` in `src/middleware.ts`)                           |
+| `LEGACY_OWNER_EMAIL`                      | (unchanged, already set in step 0) | Runtime                                                                                   |
+| `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` | (unchanged, already set in step 0) | Runtime                                                                                   |
+| `DATA_ENCRYPTION_KEY`                     | (unchanged, already set in step 0) | Runtime, marked **encrypted/secret** in the dashboard                                     |
+| `TEST_AUTH_ENABLED`                       | **unset**                          | Must not exist in this environment at all — it enables an `X-Test-User-Email` auth bypass |
 
 Remember Pages keeps **Production and Preview** environment variables
-separate. Set both if preview deployments should also run the v2 path;
-leaving Preview on the old values is a legitimate choice, but then preview
-URLs keep exercising the legacy path.
+separate. The current authenticated client always uses sync v2. Historical
+Pages deployments and rollback bundles may still use the legacy API, whose
+owner-gated server routes remain available during the retention window.
 
 Both `finance_tracker_db` and `finance_tracker_db_v2` bindings stay bound to
 the Pages project — v1's binding is a read-only reference kept for the
@@ -239,9 +238,7 @@ the Pages project — v1's binding is a read-only reference kept for the
 untouched.
 
 Deploy through the project's normal Pages flow (push to the production
-branch, or `wrangler pages deploy`). A `PUBLIC_SYNC_V2` change only takes
-effect on a **fresh build** — re-promoting an existing deployment will not
-pick it up.
+branch, or `wrangler pages deploy`).
 
 ## 7. Owner verification checklist (smoke test before exiting maintenance)
 
@@ -284,11 +281,10 @@ Rollback procedure:
 
 1. **If v2 received no real user writes yet** (i.e. failure was caught before
    or during step 7, only the migrated data is in v2 — no new owner writes
-   layered on top): simply redeploy the pre-cutover build (previous deploy,
-   `AUTH_ENFORCED` back to unset/`false`, `PUBLIC_SYNC_V2` back to unset/
-   `false`) and confirm the app serves the legacy path against
-   `finance_tracker_db` again. v1 was never modified, so this alone restores
-   full service.
+   layered on top): redeploy the pre-cutover build and its compatible auth
+   configuration, then confirm that its retained legacy client can reach
+   `finance_tracker_db`. v1 was never modified, so this alone restores full
+   service.
 2. **If v2 already received writes from the owner** (failure discovered
    later, e.g. during step 7's own testing before deciding to abort): first
    export v2 back to a v1-shaped JSON snapshot so those writes aren't lost:
@@ -299,7 +295,7 @@ Rollback procedure:
      --out=.data/rollback-v2-to-v1.json
    ```
    Review this file, reconcile/merge it with the v1 data manually (or via
-   the legacy `PUT /api/state`-shaped import path) if needed, *then* redeploy
+   the legacy `PUT /api/state`-shaped import path) if needed, _then_ redeploy
    the pre-cutover build as in step 1.
    - Note: `export-v2-to-v1-json.ts` reads from a **local** v2 sqlite file,
      not directly from remote D1. If the writes only exist in the remote v2
@@ -332,11 +328,11 @@ and decommission process. Monitoring thresholds below are against D1 Free
 tier quotas (500 MB storage, 5,000,000 reads/day, 100,000 writes/day per
 account) for the **v2** database, `finance-tracker-db-v2`:
 
-| Metric | Free quota | Watch (60%) | Warn (75%) | Alert (90%) | Escalation trigger |
-|---|---|---|---|---|---|
-| Storage | 500 MB | 300 MB | 375 MB | 450 MB | 400 MB — start planning a paid-plan upgrade or data pruning |
-| Reads/day | 5,000,000 | 3,000,000 | 3,750,000 | 4,500,000 | sustained rate implying >80% by day's end |
-| Writes/day | 100,000 | 60,000 | 75,000 | 90,000 | 80,000 — investigate write amplification (e.g. runaway outbox retries) immediately |
+| Metric     | Free quota | Watch (60%) | Warn (75%) | Alert (90%) | Escalation trigger                                                                 |
+| ---------- | ---------- | ----------- | ---------- | ----------- | ---------------------------------------------------------------------------------- |
+| Storage    | 500 MB     | 300 MB      | 375 MB     | 450 MB      | 400 MB — start planning a paid-plan upgrade or data pruning                        |
+| Reads/day  | 5,000,000  | 3,000,000   | 3,750,000  | 4,500,000   | sustained rate implying >80% by day's end                                          |
+| Writes/day | 100,000    | 60,000      | 75,000     | 90,000      | 80,000 — investigate write amplification (e.g. runaway outbox retries) immediately |
 
 Check via `wrangler d1 info finance-tracker-db-v2` (storage) and the
 Cloudflare dashboard's D1 analytics (reads/writes/day) daily for the first

@@ -3,15 +3,6 @@
 import type { AuthPrincipal } from './lib/server/auth/principal'
 
 declare global {
-  interface ImportMetaEnv {
-    /**
-     * Feature flag (WP7) gating the IndexedDB/outbox `/api/sync` client path.
-     * Defaults to off (unset/anything but `"true"`/`"1"`) — see
-     * `src/lib/client/feature-flags.ts`.
-     */
-    readonly PUBLIC_SYNC_V2?: string
-  }
-
   interface ImportMeta {
     readonly env: ImportMetaEnv
   }

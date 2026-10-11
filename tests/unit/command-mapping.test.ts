@@ -57,28 +57,7 @@ describe('command-mapping (WP7b)', () => {
     await wipeOutbox(USER_ID)
   })
 
-  describe('disabled (PUBLIC_SYNC_V2 off)', () => {
-    it('every function is a no-op and never touches Pinia/IndexedDB', async () => {
-      // No `setActivePinia`/store init needed at all — proves these bail
-      // out before touching the sync store.
-      await expect(syncCreate('account', 'local-1', { name: 'x' })).resolves.toBeUndefined()
-      await expect(syncUpdate('account', 'local-1', { name: 'y' })).resolves.toBeUndefined()
-      await expect(syncRemove('account', 'local-1')).resolves.toBeUndefined()
-      await expect(syncGoalUpsert('short', { name: 'z' })).resolves.toBeUndefined()
-      await expect(syncSettingsUpdate({ currency: 'EUR' })).resolves.toBeUndefined()
-      await expect(resolveEntityId('account', 'local-1')).resolves.toBeNull()
-      await expect(resolveCategoryId('expense', 'Comida')).resolves.toBeNull()
-      await expect(
-        syncListDiff('account', [], [{ id: 'a' }], () => ({ name: 'a' })),
-      ).resolves.toBeUndefined()
-    })
-  })
-
-  describe('enabled (PUBLIC_SYNC_V2 on)', () => {
-    beforeEach(() => {
-      vi.stubEnv('PUBLIC_SYNC_V2', 'true')
-    })
-
+  describe('authenticated sync', () => {
     it("syncCreate enqueues a create command carrying the entity's own identity", async () => {
       const store = await initSyncStore()
       await syncCreate('account', 'local-acc-1', {

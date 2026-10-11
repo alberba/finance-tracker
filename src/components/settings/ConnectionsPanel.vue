@@ -3,13 +3,11 @@ import { shallowRef } from 'vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import BitvavoImportPanel from './BitvavoImportPanel.vue'
 import StockEventsPanel from './StockEventsPanel.vue'
-import { isSyncV2Enabled } from '../../lib/client/feature-flags'
 
 defineProps<{ isActive: boolean }>()
 
 const stockEventsOpen = shallowRef(false)
 const bitvavoOpen = shallowRef(false)
-const bitvavoEnabled = isSyncV2Enabled()
 const providers = [
   {
     id: 'stockevents',
@@ -21,20 +19,16 @@ const providers = [
       stockEventsOpen.value = true
     },
   },
-  ...(bitvavoEnabled
-    ? [
-        {
-          id: 'bitvavo',
-          name: 'Bitvavo',
-          initials: 'BV',
-          description: 'Conecta tu cuenta e importa el historial de compras y ventas en euros.',
-          action: 'Ajustes e importación',
-          open: () => {
-            bitvavoOpen.value = true
-          },
-        },
-      ]
-    : []),
+  {
+    id: 'bitvavo',
+    name: 'Bitvavo',
+    initials: 'BV',
+    description: 'Conecta tu cuenta e importa el historial de compras y ventas en euros.',
+    action: 'Ajustes e importación',
+    open: () => {
+      bitvavoOpen.value = true
+    },
+  },
 ]
 </script>
 
@@ -86,6 +80,6 @@ const providers = [
       </ul>
     </section>
     <StockEventsPanel v-model:open="stockEventsOpen" />
-    <BitvavoImportPanel v-if="bitvavoEnabled" v-model:open="bitvavoOpen" />
+    <BitvavoImportPanel v-model:open="bitvavoOpen" />
   </section>
 </template>

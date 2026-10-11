@@ -2,8 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
- * WP10 — multi-user isolation E2E, sync-v2 flow (`PUBLIC_SYNC_V2=true`,
- * see `playwright.sync-v2.config.ts`).
+ * WP10 — multi-user isolation E2E through the authenticated sync-v2 flow.
  *
  * Two independent browser contexts stand in for "user A" and "user B",
  * each authenticated via the `X-Test-User-Email` shim (`src/middleware.ts`,
@@ -74,9 +73,7 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     const { tracker: trackerB } = await provisionUser(contextB, uniqueEmail('b'))
     await trackerB.filterTransactionsMonth('ENERO')
 
-    await expect(
-      trackerB.transactionsSection.getByText('Gasto exclusivo de A'),
-    ).toHaveCount(0)
+    await expect(trackerB.transactionsSection.getByText('Gasto exclusivo de A')).toHaveCount(0)
   })
 
   test('el usuario B no ve la cuenta creada por el usuario A', async () => {
@@ -89,7 +86,9 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     await expect(pageB.getByText('Cuenta Secreta de A')).toHaveCount(0)
   })
 
-  test('cada usuario conserva sus propios datos entre sesiones (misma identidad, contexto nuevo)', async ({ browser }) => {
+  test('cada usuario conserva sus propios datos entre sesiones (misma identidad, contexto nuevo)', async ({
+    browser,
+  }) => {
     const email = uniqueEmail('owner')
     const { tracker: trackerA } = await provisionUser(contextA, email)
     await trackerA.addAccount({ name: 'Cuenta Persistente', openingBalance: 250 })

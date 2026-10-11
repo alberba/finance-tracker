@@ -3,20 +3,17 @@ import { computed, shallowRef } from 'vue'
 
 import { BASE_SEED, EMPTY_STATE_SEED, normalizeState } from '../scripts/state'
 import type { State } from '../scripts/types'
-import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { isDemoMode } from '../scripts/demo-mode'
 import { clone } from '../scripts/utils'
 
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
-type StateCommitHandler = (state: State) => void
-type StateReloadHandler = (state: State) => void
 
 export const useFinancialStateStore = defineStore('financial-state', () => {
-  const state = shallowRef<State>(normalizeState(clone(isSyncV2Enabled() && !isDemoMode() ? EMPTY_STATE_SEED : BASE_SEED)))
+  const state = shallowRef<State>(
+    normalizeState(clone(isDemoMode() ? BASE_SEED : EMPTY_STATE_SEED)),
+  )
   const status = shallowRef<FinanceStoreStatus>('idle')
   const errorMessage = shallowRef<string | null>(null)
-  let stateCommitHandler: StateCommitHandler | undefined
-  let stateReloadHandler: StateReloadHandler | undefined
 
   const currency = computed(() => state.value.currency)
   const year = computed(() => state.value.year)
@@ -55,28 +52,7 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
   }
 
   function commitState(mutator: (draft: State) => void): State {
-    const nextState = patchState(mutator)
-    stateCommitHandler?.(nextState)
-    return nextState
-  }
-
-  function registerStateCommitHandler(handler: StateCommitHandler): void {
-    stateCommitHandler = handler
-  }
-
-  /**
-   * Replaces the whole financial state (imports, seed resets) and notifies the
-   * reload handler so any legacy section still rendered imperatively repaints
-   * against the new state. Bridges the migration until every section is Vue.
-   */
-  function reloadState(nextState: unknown): State {
-    const next = replaceState(nextState)
-    stateReloadHandler?.(next)
-    return next
-  }
-
-  function registerStateReloadHandler(handler: StateReloadHandler): void {
-    stateReloadHandler = handler
+    return patchState(mutator)
   }
 
   return {
@@ -100,8 +76,5 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
     failLoad,
     patchState,
     commitState,
-    registerStateCommitHandler,
-    reloadState,
-    registerStateReloadHandler,
   }
 })

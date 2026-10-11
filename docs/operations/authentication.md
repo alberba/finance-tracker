@@ -53,8 +53,9 @@ conservan las claves financieras.
 
 1. Elegir el origen HTTPS canónico. Escribir `BETTER_AUTH_URL` y `RESEND_FROM`
    como variables del Worker; `LEGACY_OWNER_EMAIL` debe ser el correo real del
-   propietario. Construir con `PUBLIC_SYNC_V2=true` antes del corte: los usuarios
-   invitados necesitan el modelo multiusuario y las colas separadas.
+   propietario. El cliente autenticado ya usa sync v2 sin una variable de
+   selección de protocolo; los usuarios invitados usan el modelo multiusuario
+   y las colas separadas.
 2. Crear una clave aleatoria de al menos 32 caracteres, por ejemplo
    `openssl rand -base64 32`. Guardar con
    `pnpm exec wrangler secret put BETTER_AUTH_SECRET`. Usar una distinta para

@@ -79,7 +79,7 @@ describe('round trip: shared movement commands (#263)', () => {
     const changes = await listChangesSince(trip.testDb.db as unknown as Db, trip.userId, 0)
     const createPayload = changes
       .filter((change) => change.entityType === 'transaction' && change.entityId === id)
-      .map((change) => JSON.parse(change.payload))
+      .flatMap((change) => (change.payload ? [JSON.parse(change.payload)] : []))
       .find((payload) => payload.tradeDetail)
     expect(createPayload).toMatchObject({
       tradeDetail: {

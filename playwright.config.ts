@@ -8,7 +8,6 @@ export default defineConfig(
     htmlOutputFolder: 'playwright-report',
     blobOutputDir: 'blob-report',
     tag: '@sync-v2',
-    env: { PUBLIC_SYNC_V2: 'true' },
   }),
   {
     // A scenario owns its isolated user; each CI shard has its own D1.
