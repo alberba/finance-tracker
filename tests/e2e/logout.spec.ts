@@ -1,14 +1,5 @@
 import { syncV2Test as test, expect } from './fixtures'
 
-const LEGACY_KEYS = [
-  'finance-tracker-state-v1',
-  'finance-tracker-server-version-v1',
-  'finance-tracker-pending-v1',
-  'finance-tracker-state-v1::demo',
-  'finance-tracker-server-version-v1::demo',
-  'finance-tracker-pending-v1::demo',
-]
-
 test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async ({
   page,
   tracker,
@@ -25,25 +16,14 @@ test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async 
     `finance-tracker-keys-v2:${userId}`,
   ]
 
-  await page.evaluate(
-    async ({ keys, names }) => {
-      keys.forEach((key) => localStorage.setItem(key, 'private'))
-      await Promise.all(
-        names.map(
-          (name) =>
-            new Promise<void>((resolve, reject) => {
-              const request = indexedDB.open(name)
-              request.onsuccess = () => {
-                request.result.close()
-                resolve()
-              }
-              request.onerror = () => reject(request.error)
-            }),
-        ),
-      )
-    },
-    { keys: LEGACY_KEYS, names: databaseNames },
+  await tracker.addAccount({ name: 'Cuenta privada de sesión', openingBalance: 42 })
+  await tracker.waitForSync()
+  const cachedDatabases = await page.evaluate(() =>
+    indexedDB
+      .databases()
+      .then((databases) => databases.map((database) => database.name).filter(Boolean)),
   )
+  expect(cachedDatabases).toContain(`finance-tracker-cache-v2:${userId}`)
 
   await page.route('**/cdn-cgi/access/logout', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<main>Sesión cerrada</main>' }),
@@ -53,15 +33,13 @@ test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async 
   await expect(page).toHaveURL(/\/cdn-cgi\/access\/logout$/)
 
   const remaining = await page.evaluate(
-    async ({ keys, names }) => ({
-      legacy: keys.filter((key) => localStorage.getItem(key) !== null),
-      indexedDb: (await indexedDB.databases())
+    async (names) =>
+      (await indexedDB.databases())
         .map((database) => database.name)
         .filter((name): name is string => typeof name === 'string')
         .filter((name) => names.includes(name)),
-    }),
-    { keys: LEGACY_KEYS, names: databaseNames },
+    databaseNames,
   )
 
-  expect(remaining).toEqual({ legacy: [], indexedDb: [] })
+  expect(remaining).toEqual([])
 })

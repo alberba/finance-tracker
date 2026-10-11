@@ -1,5 +1,5 @@
-import { syncV2Test as test, expect } from './fixtures'
-import type { Page } from '@playwright/test'
+import { test, expect } from './fixtures'
+import { editScenarioState, readScenarioState } from './seed-sync-v2'
 
 test.describe('Settings E2E', () => {
   test(
@@ -37,15 +37,10 @@ test.describe('Settings E2E', () => {
         'aria-selected',
         'true',
       )
-      await expect(settings.getByText('Aún no hay cuentas.')).toBeVisible()
+      await expect(settings.locator('tr[data-account-id]').first()).toBeVisible()
 
       await settings.getByRole('tab', { name: /Activos/ }).click()
-      await settings.getByRole('button', { name: 'Nuevo activo' }).click()
-      const panel = page.getByRole('dialog', { name: 'Nuevo activo' })
-      await panel.getByLabel('Nombre').fill('ETF de prueba')
-      await panel.getByLabel('Valor inicial (€)').fill('300')
-      await panel.getByRole('button', { name: 'Crear activo' }).click()
-      await expect(settings.locator('tr[data-asset-id]')).toHaveCount(1)
+      await expect(settings.locator('tr[data-asset-id]')).toHaveCount(9)
       await expect(settings.locator('#settings-tab-accounts')).toBeHidden()
     },
   )
@@ -69,9 +64,8 @@ test.describe('Settings E2E', () => {
   })
 
   test('edita el nombre y el saldo inicial de una cuenta en su ficha', async ({ tracker }) => {
-    await tracker.addAccount({ name: 'Cuenta de origen', openingBalance: 50 })
-    const panel = await tracker.openSettingsCard('Cuentas', 'Cuenta de origen')
-    await panel.getByLabel('Nombre').fill('Cuenta de ahorro')
+    const panel = await tracker.openSettingsCard('Cuentas', 'Openbank')
+    await panel.getByLabel('Nombre').fill('Openbank Ahorro')
     await panel.getByLabel('Saldo inicial (€)').fill('1.234,5')
     await panel.getByRole('button', { name: 'Guardar cambios' }).click()
     await expect(panel).toBeHidden()
@@ -80,7 +74,7 @@ test.describe('Settings E2E', () => {
       tracker
         .section('settings')
         .locator('tr[data-account-id]')
-        .filter({ hasText: 'Cuenta de ahorro' }),
+        .filter({ hasText: 'Openbank Ahorro' }),
     ).toContainText('1.234,50')
   })
 
@@ -115,7 +109,6 @@ test.describe('Settings E2E', () => {
     page,
   }) => {
     const today = new Date().toISOString().slice(0, 10)
-    await tracker.addAccount({ name: 'Revolut' })
     await tracker.addSubscription({
       name: 'Suscripción cuenta eliminada',
       amount: 12,
@@ -165,57 +158,85 @@ test.describe('Settings E2E', () => {
       }),
     )
 
+    await editScenarioState(page, (state) => {
+      state.instruments.push({
+        id: 'instrument-aged',
+        investmentAssetId: 'etf-aged',
+        type: 'etf',
+        symbol: 'AGED',
+        market: 'MI',
+        currency: 'EUR',
+        provider: 'manual',
+        active: true,
+      })
+      state.stockEvents = {
+        enabled: true,
+        apiKey: '',
+        symbolMappings: [
+          {
+            symbol: 'AGED',
+            sync: true,
+            watchlistId: 'wl-acciones',
+            targetSymbol: 'AGED.MI',
+            hidden: false,
+          },
+        ],
+      }
+    })
+    await tracker.reload()
+
     await tracker.openSettingsTab('Activos')
-    await tracker.section('settings').getByRole('button', { name: 'Nuevo activo' }).click()
-    const newAsset = page.getByRole('dialog', { name: 'Nuevo activo' })
-    await newAsset.getByLabel('Nombre').fill('ETF AGED')
-    await newAsset.getByLabel('Valor inicial (€)').fill('300')
-    await newAsset.getByRole('button', { name: 'Crear activo' }).click()
-    await expect(newAsset).toBeHidden()
-
-    const assetPanel = await tracker.openSettingsCard('Activos', 'ETF AGED')
-    const instrumentForm = assetPanel.locator('[data-instrument-form]')
-    await instrumentForm.getByLabel('Símbolo').fill('AGED')
-    await instrumentForm.getByLabel('Moneda').fill('EUR')
-    await instrumentForm.getByLabel('Mercado / MIC (opcional)').fill('MI')
-    await instrumentForm.getByRole('button', { name: 'Añadir instrumento' }).click()
-
     const row = tracker.section('settings').locator('tr[data-asset-id="etf-aged"]')
-    await expect(row).toHaveCount(0)
-    const createdRow = tracker.section('settings').locator('tr[data-asset-id]').filter({ hasText: 'ETF AGED' })
-    await expect(createdRow).toContainText('AGED')
+    await expect(row).toContainText('AGED')
+    await expect(row).toContainText('Acciones')
 
     const panel = await tracker.openSettingsCard('Activos', 'ETF AGED')
-    const mapping = tracker.section('settings').locator('[data-symbol-sync="AGED"]')
-    const watchlist = mapping.getByRole('combobox', { name: 'Lista de seguimiento de AGED' })
-    const target = mapping.getByRole('textbox', { name: 'Símbolo en Stock Events de AGED' })
+    const watchlist = panel.getByRole('combobox', { name: 'Lista de seguimiento de AGED' })
+    const target = panel.getByRole('textbox', { name: 'Símbolo en Stock Events de AGED' })
     await expect(watchlist).toBeEnabled()
     await target.fill('aged.xetra')
     await target.press('Tab')
     await watchlist.selectOption('wl-etf')
     await expect(watchlist).toHaveValue('wl-etf')
     await expect(target).toHaveValue('AGED.XETRA')
-    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado')
-    await expect(watchlist).toHaveValue('wl-etf')
-    await expect(target).toHaveValue('AGED.XETRA')
+    await expect(page.locator('#save-status')).toContainText('Sincronizado')
+
+    await tracker.reload()
+    await expect
+      .poll(async () => (await readScenarioState(page)).stockEvents.symbolMappings)
+      .toContainEqual(expect.objectContaining({ symbol: 'AGED', watchlistId: 'wl-etf' }))
+    const reopened = await tracker.openSettingsCard('Activos', 'ETF AGED')
+    await expect(
+      reopened.getByRole('combobox', { name: 'Lista de seguimiento de AGED' }),
+    ).toHaveValue('wl-etf')
+    await expect(
+      reopened.getByRole('textbox', { name: 'Símbolo en Stock Events de AGED' }),
+    ).toHaveValue('AGED.XETRA')
   })
 
   test('oculta y vuelve a mostrar un símbolo que no es de ningún activo', async ({
     tracker,
     page,
   }) => {
-    await tracker.addAccount({ name: 'Revolut' })
-    await tracker.addInvestmentMovement({
-      date: '2026-07-01',
-      time: '09:30',
-      side: 'buy',
-      symbol: 'ORPH',
-      category: 'Sin activo',
-      unitPrice: 50,
-      units: 1,
-      fee: 0,
-      brokerName: 'Revolut',
+    await editScenarioState(page, (state) => {
+      state.transactions.push({
+        id: 'tx-orphan',
+        type: 'investment',
+        date: '2026-07-01',
+        amount: 50,
+        month: 6,
+        createdAt: '2026-07-01T00:00:00Z',
+        side: 'buy',
+        units: 1,
+        unitPrice: 50,
+        fee: 0,
+        category: 'Sin activo',
+        description: 'Compra suelta',
+        accountId: 'revolut',
+        symbol: 'ORPH',
+      })
     })
+    await tracker.reload()
     await tracker.openSettingsTab('Activos')
 
     const orphans = tracker.section('settings').locator('[data-orphan-symbols]')

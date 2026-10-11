@@ -1,4 +1,4 @@
-import { syncV2Test as test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
 import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
@@ -34,52 +34,59 @@ function shortDate(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00Z`))
 }
 
+function todayLocal(): string {
+  const today = new Date()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${today.getFullYear()}-${month}-${day}`
+}
+
 test.describe('suscripciones de gastos', () => {
-  test('presenta las suscripciones y su panel con controles accesibles en móvil', { tag: '@smoke' }, async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openSubscriptionsTab()
+  test(
+    'presenta las suscripciones y su panel con controles accesibles en móvil',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      await tracker.openSubscriptionsTab()
 
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    await expect(
-      subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
-    ).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
-    await expect(subscriptions.getByText('Aún no hay suscripciones')).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Próximos 30 días' })).toBeVisible()
+      const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+      await expect(
+        subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
+      ).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
+      await expect(subscriptions.getByText('Aún no hay suscripciones')).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Próximos 30 días' })).toBeVisible()
 
-    await tracker.openNewSubscriptionPanel()
-    const panel = page.getByRole('dialog', { name: 'Nueva suscripción' })
-    await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
-    await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
-    await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
+      await tracker.openNewSubscriptionPanel()
+      const panel = page.getByRole('dialog', { name: 'Nueva suscripción' })
+      await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
+      await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
+      await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
 
-    await page.setViewportSize({ width: 375, height: 812 })
+      await page.setViewportSize({ width: 375, height: 812 })
 
-    const mobileControls = [
-      panel.getByLabel('Nombre'),
-      panel.getByLabel('Importe'),
-      panel.getByLabel('Cuenta'),
-      panel.getByRole('button', { name: 'Mensual' }),
-      panel.getByRole('button', { name: 'Añadir suscripción' }),
-    ]
-    for (const control of mobileControls) {
-      await control.scrollIntoViewIfNeeded()
-      await expect(control).toBeInViewport()
-      expect(
-        await control.evaluate((element) => element.getBoundingClientRect().height),
-      ).toBeGreaterThanOrEqual(42)
-    }
-  })
+      const mobileControls = [
+        panel.getByLabel('Nombre'),
+        panel.getByLabel('Importe'),
+        panel.getByLabel('Cuenta'),
+        panel.getByRole('button', { name: 'Mensual' }),
+        panel.getByRole('button', { name: 'Añadir suscripción' }),
+      ]
+      for (const control of mobileControls) {
+        await control.scrollIntoViewIfNeeded()
+        await expect(control).toBeInViewport()
+        expect(
+          await control.evaluate((element) => element.getBoundingClientRect().height),
+        ).toBeGreaterThanOrEqual(42)
+      }
+    },
+  )
 
   test('crea un gasto en su primer cobro, se conserva al recargar y no se duplica', async ({
     page,
     tracker,
   }) => {
-    const today = new Date().toISOString().slice(0, 10)
-    await tracker.addAccount({ name: 'Revolut' })
+    const today = todayLocal()
     await tracker.addSubscription({
       name: 'E2E Streaming',
       amount: 14.99,
@@ -110,8 +117,7 @@ test.describe('suscripciones de gastos', () => {
     page,
     tracker,
   }) => {
-    const today = new Date().toISOString().slice(0, 10)
-    await tracker.addAccount({ name: 'Revolut' })
+    const today = todayLocal()
     await tracker.addSubscription({
       name: 'E2E Pausable',
       amount: 8,
@@ -218,7 +224,7 @@ test.describe('suscripciones de gastos', () => {
   })
 
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayLocal()
     const pausedDate = addDays(today, -10)
     const nextChargeDate = addDays(pausedDate, 14)
 

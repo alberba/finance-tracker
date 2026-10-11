@@ -1,4 +1,5 @@
 import { syncV2Test as test, expect } from './fixtures'
+import { readScenarioState } from './seed-sync-v2'
 
 test.describe('Data E2E', () => {
   test(
@@ -57,7 +58,12 @@ test.describe('Data E2E', () => {
     await dialog.getByRole('button', { name: 'Sustituir mis datos' }).click()
 
     await expect(dialog).toBeHidden()
-    await expect(page.getByText('JSON importado correctamente.')).toBeVisible()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(figures).toContainText(/Movimientos\s*[1-9]/)
+    const restored = await readScenarioState(page)
+    expect(restored.accounts).toContainEqual(expect.objectContaining({ name: 'Cuenta de copia' }))
+    expect(restored.transactions).toContainEqual(
+      expect.objectContaining({ description: 'Movimiento de copia' }),
+    )
   })
 })
