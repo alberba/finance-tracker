@@ -1,4 +1,5 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { editScenarioState } from './seed-sync-v2'
+import { test, expect } from './fixtures'
 
 test.describe('inversión tabs y TWR', () => {
   test('una venta manual resta la comisión y conserva el neto al recargar', async ({ tracker }) => {
@@ -72,12 +73,7 @@ test.describe('inversión tabs y TWR', () => {
       })
     })
 
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) {
-        throw new Error('No se encontró el estado financiero inicial')
-      }
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.stockEvents = {
         enabled: true,
         apiKey: '',
@@ -91,9 +87,7 @@ test.describe('inversión tabs y TWR', () => {
           },
         ],
       }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
     await (
       await tracker.openInvestmentMovementPanel()
@@ -134,18 +128,13 @@ test.describe('inversión tabs y TWR', () => {
   })
 
   test('no ofrece ajustar efectivo para símbolos sin mapeo activo', async ({ tracker, page }) => {
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado financiero inicial')
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.stockEvents = {
         enabled: true,
         apiKey: 'test-stock-events-key',
         symbolMappings: [],
       }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
     await (
       await tracker.openInvestmentMovementPanel()
@@ -187,14 +176,9 @@ test.describe('inversión tabs y TWR', () => {
     // Warmup: compile the lazy investment chunk before the reload flow.
     await tracker.openInvestmentMovementsTab()
 
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado financiero inicial')
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.stockEvents = { enabled: true, apiKey: '', symbolMappings: [] }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
     await tracker.openInvestmentMovementsTab()
 
@@ -215,16 +199,16 @@ test.describe('inversión tabs y TWR', () => {
     ).toHaveCount(0)
 
     // El mapeo llega después: aparece el botón y el reenvío crea la transacción.
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado financiero inicial')
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
+      expect(state.transactions.find((movement) => movement.date === '2026-09-04')).toMatchObject({
+        symbol: 'RESEND',
+        units: 0.0047,
+        side: 'buy',
+      })
       state.stockEvents.symbolMappings = [
         { symbol: 'RESEND', sync: true, watchlistId: 'wl-etf', targetSymbol: '', hidden: false },
       ]
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
     await tracker.openInvestmentMovementsTab()
     const resend = tracker

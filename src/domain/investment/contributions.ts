@@ -20,7 +20,7 @@ import type {
   SnapshotRow,
   State,
 } from '../../scripts/types'
-import { clone, monthFromISO, parseFloatSafe, parseIntSafe, round2 } from '../../scripts/utils'
+import { clone, monthFromISO, parseFloatSafe, parseIntSafe, round2, uid } from '../../scripts/utils'
 
 export interface SnapshotInputValue {
   kind: SnapshotKind
@@ -389,10 +389,7 @@ export function applyContributionSave(
 
   const flow = getFlowFromAllocations(flowAllocations)
   const payload: Contribution = {
-    id:
-      existingIndex >= 0
-        ? nextState.contributions[existingIndex].id
-        : `contrib-snapshot-${nextState.year}-${month + 1}`,
+    id: existingIndex >= 0 ? nextState.contributions[existingIndex].id : uid('contrib'),
     date,
     amount: flow,
     portfolioDate: date,
@@ -422,7 +419,7 @@ export function upsertContributionFlow(draft: State, date: string, flow: number)
     (item) => String(item.portfolioDate || item.date) === date,
   )
   const payload: Contribution = {
-    id: current.id,
+    id: existingIndex >= 0 ? draft.contributions[existingIndex].id : uid('contrib'),
     date,
     amount: flow,
     portfolioDate: date,

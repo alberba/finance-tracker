@@ -57,7 +57,7 @@ export function applyRemoteChanges(
       if (!settings || typeof settings !== 'object') throw new Error('Ajustes remotos inválidos.')
       next = {
         ...next,
-        settings,
+        settings: { ...next.settings, ...settings },
         twrLiquidityAccounts: settings.twrLiquidityAccounts ?? next.twrLiquidityAccounts,
         stockeventsCashMappings: settings.stockeventsCashMappings ?? next.stockeventsCashMappings,
       }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { generatePendingMovements } from '../domain/recurring/pending'
@@ -52,6 +52,7 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
     return null
   }
   const categoryId = await resolveOrCreateCategoryId(rule.type as CategoryKind, rule.category)
+  if (!categoryId) return null
   return {
     name: rule.description,
     type: rule.type,
@@ -112,14 +113,13 @@ function clearInvestmentFields(target: {
 
 /**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
- * command payload. Returns `null` (skip, see `syncListDiff`) when the
- * account hasn't synced yet; the parent rule is waited for rather than
- * skipped (see `resolveRecurringRuleId`). Both `recurringRuleId` and
+ * command payload. Returns `null` (skip, see `syncListDiff`) when either
+ * required reference has not been enqueued. Both `recurringRuleId` and
  * `accountId` are required fields in `entityCreateSchemas.pendingMovement`
  * (see the WP10 fix note on `buildRecurringRuleData` above for `accountId`).
  */
 async function buildPendingMovementData(pending: PendingMovement, currency: string) {
-  const recurringRuleId = await resolveRecurringRuleId(pending.ruleId)
+  const recurringRuleId = await resolveEntityId('recurringRule', pending.ruleId)
   if (!recurringRuleId) {
     return null
   }
@@ -128,6 +128,11 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
     return null
   }
   const categoryId = await resolveOrCreateCategoryId(pending.type as CategoryKind, pending.category)
+  if (!categoryId) return null
+  const transactionId = pending.transactionId
+    ? await resolveEntityId('transaction', pending.transactionId)
+    : null
+  if (pending.transactionId && !transactionId) return null
   return {
     recurringRuleId,
     accountId,
@@ -138,59 +143,8 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
     type: pending.type,
     description: pending.description,
     ...operationData(pending),
-    transactionId: pending.transactionId,
+    transactionId,
     status: pending.status,
-  }
-}
-
-/**
- * How many times `resolveRecurringRuleId` re-asks for a rule's server id
- * before giving up. Each attempt costs one flush plus one macrotask.
- */
-const RULE_RESOLUTION_ATTEMPTS = 10
-
-/**
- * A pending movement cannot exist server-side before the rule that
- * generated it: `recurringRuleId` is a required reference
- * (`entityCreateSchemas.pendingMovement`). But `addRule` enqueues the
- * rule's `create` and generates its first occurrences in the same tick, so
- * at that instant the rule has no server id yet — and a skipped occurrence
- * is never mutated again, so it used to be skipped forever and the pending
- * movement simply never reached D1 (audit §3.2c).
- *
- * So wait for the rule to cross instead of giving up: each attempt asks
- * the outbox to flush and re-reads the local cache, which is where the
- * server's answer lands.
- */
-async function resolveRecurringRuleId(localRuleId: string): Promise<string | null> {
-  for (let attempt = 0; attempt < RULE_RESOLUTION_ATTEMPTS; attempt += 1) {
-    const resolved = await resolveEntityId('recurringRule', localRuleId)
-    if (resolved) {
-      return resolved
-    }
-    const syncStore = useSyncStore()
-    if (!syncStore.enabled) {
-      return null
-    }
-    // `flush()` returns at once when another flush is already in flight —
-    // and `addRule` starts one. Asking again in the next tick would burn
-    // every attempt without the rule ever crossing, and the occurrence is
-    // dropped for good. So wait for the flush that *is* running to land.
-    await syncStore.flush()
-    await waitWhileSyncing(syncStore)
-  }
-  return null
-}
-
-/** How many macrotasks to give an in-flight flush before asking again. */
-const FLUSH_SETTLE_TICKS = 20
-
-async function waitWhileSyncing(syncStore: ReturnType<typeof useSyncStore>): Promise<void> {
-  for (let tick = 0; tick < FLUSH_SETTLE_TICKS; tick += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    if (syncStore.syncStatus !== 'syncing') {
-      return
-    }
   }
 }
 
@@ -237,44 +191,120 @@ export const useRecurringStore = defineStore('recurring', () => {
     pendingMovements.value.filter((item) => item.status === 'pending'),
   )
   const pendingCount = computed(() => openPendingMovements.value.length)
+  const syncStore = useSyncStore()
+  const syncJobs: Array<{ work: () => Promise<boolean | void>; message?: string }> = []
+  let enqueuing: Promise<void> | null = null
+  let retryRequested = false
 
-  /**
-   * In order, not side by side: a rule and its pendings resolve the same
-   * category, and side by side each mints its own id (issue #283).
-   */
-  async function syncRulesThenPending(
+  // These jobs only retain changes still awaiting a durable enqueue. Hydration
+  // and remote refreshes are never compared with a second copy of the model.
+  function drainSyncJobs(): Promise<void> {
+    if (enqueuing) {
+      retryRequested = true
+      return enqueuing
+    }
+    enqueuing = (async () => {
+      while (syncJobs.length) {
+        const job = syncJobs[0]
+        try {
+          if ((await job.work()) === false) throw new Error('El cambio no se ha encolado.')
+        } catch {
+          showToast(
+            '⚠️ El cambio aún no está guardado. Se reintentará al reconectar o actualizar pendientes.',
+          )
+          return
+        }
+        syncJobs.shift()
+        if (job.message) showToast(job.message)
+      }
+    })().finally(() => {
+      enqueuing = null
+      if (retryRequested) {
+        retryRequested = false
+        void drainSyncJobs()
+      }
+    })
+    return enqueuing
+  }
+
+  function enqueueSync(work: () => Promise<boolean | void>, message?: string): void {
+    syncJobs.push({ work, message })
+    void drainSyncJobs()
+  }
+
+  watch(
+    () => syncStore.connection,
+    (connection) => {
+      if (connection === 'online') void drainSyncJobs()
+    },
+  )
+  watch(
+    () => syncStore.userId,
+    (userId, previous) => {
+      if (previous && userId !== previous) syncJobs.length = 0
+    },
+  )
+
+  function queueRulesThenPending(
     beforeRules: readonly RecurringRule[],
     beforePending: readonly PendingMovement[],
-  ): Promise<void> {
+    rulesBeforePending: readonly RecurringRule[] = financialStateStore.state.recurringRules,
+    message?: string,
+  ): void {
     const afterRules = financialStateStore.state.recurringRules
     const afterPending = financialStateStore.state.pendingMovements
     const currency = financialStateStore.currency
-    try {
-      await syncListDiff('recurringRule', beforeRules, afterRules, (rule) =>
+    let rulesEnqueued = false
+    enqueueSync(async () => {
+      // The rule's create must finish its IndexedDB transaction before a
+      // pending resolves its own id from the queue. No remote ack is needed.
+      if (!rulesEnqueued) {
+        if (
+          (await syncListDiff('recurringRule', beforeRules, rulesBeforePending, (rule) =>
+            buildRecurringRuleData(rule, currency),
+          )) === false
+        )
+          return false
+        rulesEnqueued = true
+      }
+      if (
+        (await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
+          buildPendingMovementData(pending, currency),
+        )) === false
+      )
+        return false
+      // Advance the calendar only after every occurrence is durable. A restart
+      // after a partial enqueue can then regenerate the missing occurrences.
+      return syncListDiff('recurringRule', rulesBeforePending, afterRules, (rule) =>
         buildRecurringRuleData(rule, currency),
       )
-    } finally {
-      await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
-        buildPendingMovementData(pending, currency),
-      )
-    }
+    }, message)
   }
 
-  function refreshPending(today = resolveToday()): number {
+  function generatePending(today: string): number {
     const result = generatePendingMovements(financialStateStore.state, today)
     if (
       hasChanges(result.pendingMovements, financialStateStore.state.pendingMovements) ||
       hasChanges(result.recurringRules, rules.value)
     ) {
-      const beforePending = financialStateStore.state.pendingMovements
-      const beforeRules = rules.value
       financialStateStore.commitState((draft) => {
         draft.pendingMovements = result.pendingMovements
         draft.recurringRules = result.recurringRules
       })
-      void syncRulesThenPending(beforeRules, beforePending)
     }
     return result.createdCount
+  }
+
+  function refreshPending(today = resolveToday()): number {
+    const beforeRules = rules.value
+    const beforePending = pendingMovements.value
+    const count = generatePending(today)
+    if (hasChanges(beforeRules, rules.value) || hasChanges(beforePending, pendingMovements.value)) {
+      queueRulesThenPending(beforeRules, beforePending, beforeRules)
+    } else {
+      void drainSyncJobs()
+    }
+    return count
   }
 
   function addRule(input: NewRecurringRuleInput): boolean {
@@ -307,13 +337,17 @@ export const useRecurringStore = defineStore('recurring', () => {
       lastExecutionDate: null,
       nextOccurrenceDate: input.startDate,
     }
-    const before = financialStateStore.state.recurringRules
+    const beforeRules = rules.value
+    const beforePending = pendingMovements.value
     financialStateStore.commitState((draft) => draft.recurringRules.push(rule))
-    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
-      buildRecurringRuleData(item, financialStateStore.currency),
+    const rulesBeforePending = rules.value
+    generatePending(resolveToday())
+    queueRulesThenPending(
+      beforeRules,
+      beforePending,
+      rulesBeforePending,
+      'Regla recurrente guardada.',
     )
-    refreshPending()
-    showToast('Regla recurrente guardada.')
     return true
   }
 
@@ -333,13 +367,8 @@ export const useRecurringStore = defineStore('recurring', () => {
       currentRule.lastExecutionDate !== null ||
       pendingMovements.value.some((pending) => pending.ruleId === id)
 
-    // Snapshot *before* the mutation: `refreshPending`'s own diff is taken
-    // after it, and compares against a copy `generatePendingMovements`
-    // rebuilt from the edited rule — identical but for the dates. So an
-    // edit that does not move the calendar produced no command at all, and
-    // was lost on the next reload (audit §3.2a).
-    const before = financialStateStore.state.recurringRules
-
+    const beforeRules = rules.value
+    const beforePending = pendingMovements.value
     financialStateStore.commitState((draft) => {
       const rule = draft.recurringRules.find((item) => item.id === id)
       if (!rule) return
@@ -376,28 +405,34 @@ export const useRecurringStore = defineStore('recurring', () => {
         if (input.time) rule.time = input.time
       }
     })
-    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
-      buildRecurringRuleData(item, financialStateStore.currency),
+    const rulesBeforePending = rules.value
+    generatePending(resolveToday())
+    queueRulesThenPending(
+      beforeRules,
+      beforePending,
+      rulesBeforePending,
+      'Regla recurrente actualizada.',
     )
-    refreshPending()
-    showToast('Regla recurrente actualizada.')
     return true
   }
 
   function toggleRule(id: string, active: boolean): void {
-    const before = financialStateStore.state.recurringRules
+    const before = rules.value
     financialStateStore.commitState((draft) => {
       const rule = draft.recurringRules.find((item) => item.id === id)
       if (rule) rule.active = active
     })
-    void syncListDiff('recurringRule', before, financialStateStore.state.recurringRules, (item) =>
-      buildRecurringRuleData(item, financialStateStore.currency),
+    const after = financialStateStore.state.recurringRules
+    enqueueSync(() =>
+      syncListDiff('recurringRule', before, after, (rule) =>
+        buildRecurringRuleData(rule, financialStateStore.currency),
+      ),
     )
   }
 
   function removeRule(id: string): void {
-    const beforeRules = financialStateStore.state.recurringRules
-    const beforePending = financialStateStore.state.pendingMovements
+    const beforeRules = rules.value
+    const beforePending = pendingMovements.value
     financialStateStore.commitState((draft) => {
       draft.recurringRules = draft.recurringRules.filter((rule) => rule.id !== id)
       draft.pendingMovements = draft.pendingMovements.map((pending) =>
@@ -406,7 +441,7 @@ export const useRecurringStore = defineStore('recurring', () => {
           : pending,
       )
     })
-    void syncRulesThenPending(beforeRules, beforePending)
+    queueRulesThenPending(beforeRules, beforePending)
   }
 
   function confirmPending(id: string, edit?: Partial<PendingMovementEdit>): boolean {
@@ -426,7 +461,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     const time = edit?.time ?? pending.time
     const transactionId = uid('tx')
     const beforeTransactions = financialStateStore.transactions
-    const beforePending = financialStateStore.state.pendingMovements
+    const beforePending = pendingMovements.value
     const transaction: Transaction = {
       id: transactionId,
       date: occurrenceDate,
@@ -479,18 +514,26 @@ export const useRecurringStore = defineStore('recurring', () => {
     // In order, not side by side: both resolve the same category, and the
     // pending must be built once the movement has queued its create, or each
     // mints its own id and the pending references one that is never created.
-    void (async () => {
+    let movementEnqueued = false
+    enqueueSync(async () => {
+      let pendingEnqueued: boolean | void
       try {
-        await syncMovements(beforeTransactions, afterTransactions, currency)
+        if (!movementEnqueued) {
+          movementEnqueued =
+            (await syncMovements(beforeTransactions, afterTransactions, currency)) !== false
+        }
       } finally {
-        // A failed movement sync must not strand the pending as `pending`.
-        await syncListDiff('pendingMovement', beforePending, afterPending, (pending) =>
-          buildPendingMovementData(pending, currency),
+        // Preserve the pending sync attempt even if movement sync fails.
+        pendingEnqueued = await syncListDiff(
+          'pendingMovement',
+          beforePending,
+          afterPending,
+          (pending) => buildPendingMovementData(pending, currency),
         )
       }
-    })()
+      return movementEnqueued && pendingEnqueued !== false
+    }, 'Pendiente confirmado: ya cuenta en el Registro.')
     if (confirmed) {
-      showToast('Pendiente confirmado: ya cuenta en el Registro.')
       void stockEventsStore.syncMovement(transaction)
     }
     return true
@@ -524,7 +567,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       amount > 0 &&
       validInvestment
     if (!valid) return false
-    const before = financialStateStore.state.pendingMovements
+    const before = pendingMovements.value
     financialStateStore.commitState((draft) => {
       const current = draft.pendingMovements.find(
         (item) => item.id === id && item.status === 'pending',
@@ -551,18 +594,19 @@ export const useRecurringStore = defineStore('recurring', () => {
       }
       current.updatedAt = new Date().toISOString()
     })
-    void syncListDiff(
-      'pendingMovement',
-      before,
-      financialStateStore.state.pendingMovements,
-      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
+    const after = financialStateStore.state.pendingMovements
+    enqueueSync(
+      () =>
+        syncListDiff('pendingMovement', before, after, (pending) =>
+          buildPendingMovementData(pending, financialStateStore.currency),
+        ),
+      'Pendiente actualizado.',
     )
-    showToast('Pendiente actualizado.')
     return true
   }
 
   function changePendingStatus(id: string, status: 'skipped' | 'cancelled'): void {
-    const before = financialStateStore.state.pendingMovements
+    const before = pendingMovements.value
     financialStateStore.commitState((draft) => {
       const pending = draft.pendingMovements.find(
         (item) => item.id === id && item.status === 'pending',
@@ -572,13 +616,14 @@ export const useRecurringStore = defineStore('recurring', () => {
         pending.updatedAt = new Date().toISOString()
       }
     })
-    void syncListDiff(
-      'pendingMovement',
-      before,
-      financialStateStore.state.pendingMovements,
-      (pending) => buildPendingMovementData(pending, financialStateStore.currency),
+    const after = financialStateStore.state.pendingMovements
+    enqueueSync(
+      () =>
+        syncListDiff('pendingMovement', before, after, (pending) =>
+          buildPendingMovementData(pending, financialStateStore.currency),
+        ),
+      status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.',
     )
-    showToast(status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.')
   }
 
   return {
