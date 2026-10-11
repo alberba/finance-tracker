@@ -21,11 +21,12 @@
 
 ## 1. Resumen ejecutivo
 
-El diagnóstico de fondo es que **v2 sustituyó un blob JSON completo por un modelo relacional
-que todavía no cubre el dominio**, y el camino legacy que lo compensaba ya está apagado en
-producción (`PUBLIC_SYNC_V2=true` en `.env.production:2`; `src/scripts/app.ts:63` sólo llama a
-`saveState()` `if (!isSyncV2Enabled())`). Hoy la **única** persistencia es la cola de comandos,
-así que todo campo sin columna o sin comando se pierde de forma definitiva.
+En la fecha de esta auditoría, **v2 había sustituido un blob JSON completo por un modelo relacional
+que todavía no cubría el dominio**, y el camino legacy estaba apagado en producción por
+`PUBLIC_SYNC_V2`. La retirada posterior de esa selección elimina el fallback del cliente actual;
+la retención de rutas legacy en el servidor existe para rollback y consumidores históricos
+explícitos. Los hallazgos de cobertura de campos de esta auditoría siguen requiriendo sus propios
+fixes de sync v2.
 
 De ahí salen cuatro familias de fallo, y conviene entenderlas por separado porque **los arreglos
 son de naturaleza distinta**:
@@ -422,8 +423,8 @@ previo.
 
 ### 5.4 `CONFIRMADO` — Bajo v2 no hay persistencia local del estado editado
 
-`src/scripts/app.ts:61-68` sólo llama a `saveState()` `if (!isSyncV2Enabled())`, así que
-`finance-tracker-state-v1` no se escribe. En IndexedDB sólo hay filas **del servidor**, el blob
+En el estado de código analizado por esta auditoría, `finance-tracker-state-v1` no se escribía.
+El cliente actual tampoco lo consulta en sesiones autenticadas. En IndexedDB hay filas **del servidor**, el blob
 de bootstrap y los **comandos** pendientes. El estado con los cambios del usuario vive **sólo en
 memoria de Pinia**, y al recargar los comandos del outbox **no se reaplican a la proyección**.
 
@@ -603,8 +604,9 @@ de forma visible en vez de desaparecer en silencio (§2.3). Hoy todos los `syncL
 
 ## 9. Por qué los tests no lo detectaron
 
-- **La suite E2E corre con `PUBLIC_SYNC_V2=false`** (`playwright.config.ts:11`), así que ejercita
-  el camino legacy que en producción está apagado.
+- **La suite E2E de la auditoría corría con `PUBLIC_SYNC_V2=false`** (`playwright.config.ts:11`),
+  así que entonces ejercitaba un camino distinto al de producción. La selección se retiró después;
+  los grupos funcionales actuales usan clientes autenticados sync v2.
 - **La config v2** (`playwright.sync-v2.config.ts:11,16`) sólo ejecuta `multi-user-isolation.spec.ts`
   y `offline-sync.spec.ts`, que cubren únicamente cuentas y movimientos simples.
 - **El único test de la proyección** pasa `subscriptions: []` y `recurringRules: []`

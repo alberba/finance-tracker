@@ -12,7 +12,7 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - Objetivos con barra de progreso y ritmo mensual necesario
 - Configuración editable de cuentas, activos y categorías
 - Exportación/importación JSON + exportación CSV de movimientos
-- Persistencia local en `localStorage` + backend (`/api/state`) para mantener datos entre sesiones/dispositivos
+- Persistencia autenticada en sync v2; la demo conserva su estado local aislado
 - Cotizaciones server-side para instrumentos configurados y movimientos recurrentes con revisión explícita
 
 ## Estructura principal
@@ -91,7 +91,7 @@ wrangler secret put COINGECKO_API_KEY
 | Binding                 | Base                    | Migraciones      | Contenido                                        |
 | ----------------------- | ----------------------- | ---------------- | ------------------------------------------------ |
 | `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app |
-| `finance_tracker_db`    | `finance-tracker-db`    | `migrations/`    | Blob legacy v1                                   |
+| `finance_tracker_db`    | `finance-tracker-db`    | `migrations/`    | Retención v1 para rollback y exportación histórica |
 
 Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.
 
@@ -133,9 +133,6 @@ A diferencia de Pages, aquí **los bindings y las `[vars]` de `wrangler.toml`
 son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
 (`DATA_ENCRYPTION_KEY`, `TWELVE_DATA_API_KEY`, …) siguen viviendo en
 `wrangler secret put` y no se tocan en el deploy.
-
-`PUBLIC_SYNC_V2=true` viene de `.env.production` (versionado), así que no hay
-que declararlo como variable de build.
 
 Toolchain del build: `.node-version` (24.16.0) y el campo `packageManager` de
 `package.json` fijan Node y pnpm para Workers Builds. El CI usa la rama Node 24.

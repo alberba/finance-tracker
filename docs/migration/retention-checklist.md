@@ -16,18 +16,16 @@ cutover, so that:
 - `scripts/export-v2-to-v1-json.ts` has a known-good v1 shape to diff/merge
   against if a post-cutover issue requires reconciling v2 writes back into a
   v1-shaped export.
-- Nothing here requires v1 to stay *writable* — only readable. Writes to v1
-  should already be impossible in practice once traffic is on the v2 build
-  (nothing in the deployed app calls the legacy `/api/state*` routes once
-  `PUBLIC_SYNC_V2=true`), but no code change actively blocks them either;
-  this checklist's day-0 step confirms that in practice.
+- The current authenticated client uses sync v2 and no longer selects the
+  whole-state blob protocol. Older Pages deployments and rollback bundles may
+  still call the owner-gated legacy `/api/state*` routes, so those server
+  contracts remain available during the compatibility window.
 
 ## Day 0 (immediately after cutover, part of exiting maintenance mode)
 
-- [ ] Confirm the deployed build has `PUBLIC_SYNC_V2=true` and
-      `AUTH_ENFORCED=true` (cutover runbook §6) — this is what stops any
-      client from calling the legacy unauthenticated `/api/state*` routes in
-      practice.
+- [ ] Confirm the deployed build is the reviewed sync-v2 client and has
+      `AUTH_ENFORCED=true` (cutover runbook §6). Older deployed/rollback
+      bundles may still use the retained owner-gated legacy routes.
 - [ ] Confirm `wrangler.toml` still declares both `[[d1_databases]]` blocks
       (`finance_tracker_db` and `finance_tracker_db_v2`) and that
       `migrations_dir = "migrations"` for the legacy block is unchanged.

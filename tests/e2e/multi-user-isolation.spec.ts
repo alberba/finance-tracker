@@ -2,8 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
- * WP10 — multi-user isolation E2E, sync-v2 flow (`PUBLIC_SYNC_V2=true`,
- * see `playwright.sync-v2.config.ts`).
+ * WP10 — multi-user isolation E2E through the authenticated sync-v2 flow.
  *
  * Two independent browser contexts stand in for "user A" and "user B",
  * each authenticated via the `X-Test-User-Email` shim (`src/middleware.ts`,

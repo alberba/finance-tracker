@@ -93,8 +93,8 @@ Fuente: `docs/testing.md`.
 
 Fuente: `docs/playwright.md`.
 
-- Legacy reinicia el blob del propietario antes de cada prueba y usa un worker por runner;
-  cada shard de CI tiene su propia D1. Sync-v2 aísla los usuarios de cada escenario.
+- Cada escenario autenticado usa un usuario aislado, inicializa su espacio por la API y persiste
+  mediante sync v2; cada shard de CI tiene su propia D1.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.

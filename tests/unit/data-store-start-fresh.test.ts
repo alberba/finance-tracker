@@ -20,7 +20,7 @@ function stubDom(): { reload: ReturnType<typeof vi.fn> } {
   return { reload };
 }
 
-describe("useDataStore — 'empezar de cero' (WP8)", () => {
+describe("useDataStore — 'empezar de cero'", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(initializeFreshState).mockReset();
@@ -31,29 +31,12 @@ describe("useDataStore — 'empezar de cero' (WP8)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("canStartFresh is false when sync v2 is disabled (the default)", () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "");
-    const store = useDataStore();
-    expect(store.canStartFresh).toBe(false);
-  });
-
-  it("canStartFresh is true when sync v2 is enabled", () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
+  it("canStartFresh is available to authenticated users", () => {
     const store = useDataStore();
     expect(store.canStartFresh).toBe(true);
   });
 
-  it("startFresh() is a no-op when sync v2 is disabled", async () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "");
-    const store = useDataStore();
-
-    await store.startFresh();
-
-    expect(initializeFreshState).not.toHaveBeenCalled();
-  });
-
   it("startFresh() calls the API and reloads the page on success", async () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(initializeFreshState).mockResolvedValue({ ok: true, alreadyInitialized: false });
     const { reload } = stubDom();
 
@@ -65,7 +48,6 @@ describe("useDataStore — 'empezar de cero' (WP8)", () => {
   });
 
   it("startFresh() does not reload the page when the API call fails", async () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(initializeFreshState).mockResolvedValue({ ok: false, error: "boom" });
     const { reload } = stubDom();
 

@@ -76,11 +76,11 @@ today (`package.json` scripts, `scripts/*.ts --help` output, `wrangler.toml`)
 >    `https://<app-hostname>/cdn-cgi/access/get-identity`; the `email` field
 >    in that JSON is verbatim what the middleware will compare against.
 
-This app has no built-in maintenance-mode flag (no code path checks one) and
-today's legacy routes (`src/pages/api/state.ts`, `state/reset-legacy.ts`) are
-**unauthenticated** — the only lever available without shipping new code is
-the Cloudflare Access policy fronting this app (WP3's
-`CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`).
+This app has no built-in maintenance-mode flag. The retained legacy routes
+(`src/pages/api/state.ts`, `state/reset-legacy.ts`) are restricted to the
+reserved legacy owner; older deployed client bundles may still call them. The
+Cloudflare Access policy remains the lever for blocking all application
+requests during maintenance (WP3's `CF_ACCESS_TEAM_DOMAIN`/`CF_ACCESS_AUD`).
 
 1. In the Cloudflare Zero Trust dashboard, edit the Access policy for this
    application to **allow only the migration operator** (deny the
@@ -210,7 +210,7 @@ pnpm migrate:validate-parity -- \
 - Exit code `1` (any discrepancy listed: counts, monthly totals, wealth per
   snapshot, budget/goal totals) → **abort criterion**, go to §8.
 
-## 6. Deploy with the binding flip + feature flags
+## 6. Deploy with the binding flip and authentication settings
 
 Set these in the **Pages project** (Settings → Environment variables), not in
 `wrangler.toml` — per the step-2 note, Pages does not read that file here.
@@ -221,7 +221,6 @@ whole cutover:
 
 | Variable | Cutover value | Where it must be set |
 |---|---|---|
-| `PUBLIC_SYNC_V2` | `true` | **Build-time.** Read via `import.meta.env` in `src/lib/client/feature-flags.ts`, so it is inlined into the client bundle at build. Setting it only as a runtime variable silently leaves the app on the legacy `localStorage` path with no error anywhere |
 | `AUTH_ENFORCED` | `true` | Runtime (read from `locals.runtime.env` in `src/middleware.ts`) |
 | `LEGACY_OWNER_EMAIL` | (unchanged, already set in step 0) | Runtime |
 | `CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` | (unchanged, already set in step 0) | Runtime |
@@ -229,9 +228,9 @@ whole cutover:
 | `TEST_AUTH_ENABLED` | **unset** | Must not exist in this environment at all — it enables an `X-Test-User-Email` auth bypass |
 
 Remember Pages keeps **Production and Preview** environment variables
-separate. Set both if preview deployments should also run the v2 path;
-leaving Preview on the old values is a legitimate choice, but then preview
-URLs keep exercising the legacy path.
+separate. The current authenticated client always uses sync v2. Historical
+Pages deployments and rollback bundles may still use the legacy API, whose
+owner-gated server routes remain available during the retention window.
 
 Both `finance_tracker_db` and `finance_tracker_db_v2` bindings stay bound to
 the Pages project — v1's binding is a read-only reference kept for the
@@ -239,9 +238,7 @@ the Pages project — v1's binding is a read-only reference kept for the
 untouched.
 
 Deploy through the project's normal Pages flow (push to the production
-branch, or `wrangler pages deploy`). A `PUBLIC_SYNC_V2` change only takes
-effect on a **fresh build** — re-promoting an existing deployment will not
-pick it up.
+branch, or `wrangler pages deploy`).
 
 ## 7. Owner verification checklist (smoke test before exiting maintenance)
 
@@ -284,11 +281,10 @@ Rollback procedure:
 
 1. **If v2 received no real user writes yet** (i.e. failure was caught before
    or during step 7, only the migrated data is in v2 — no new owner writes
-   layered on top): simply redeploy the pre-cutover build (previous deploy,
-   `AUTH_ENFORCED` back to unset/`false`, `PUBLIC_SYNC_V2` back to unset/
-   `false`) and confirm the app serves the legacy path against
-   `finance_tracker_db` again. v1 was never modified, so this alone restores
-   full service.
+   layered on top): redeploy the pre-cutover build and its compatible auth
+   configuration, then confirm that its retained legacy client can reach
+   `finance_tracker_db`. v1 was never modified, so this alone restores full
+   service.
 2. **If v2 already received writes from the owner** (failure discovered
    later, e.g. during step 7's own testing before deciding to abort): first
    export v2 back to a v1-shaped JSON snapshot so those writes aren't lost:

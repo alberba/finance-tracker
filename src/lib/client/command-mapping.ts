@@ -6,10 +6,8 @@
  * Design (documented per the WP7b assignment, "wire domain stores to
  * per-entity sync commands"):
  *
- * - Every exported function here is a no-op when `PUBLIC_SYNC_V2` is off
- *   (checked before touching Pinia/IndexedDB at all) — the legacy
- *   whole-blob `commitState` → `PUT /api/state` path (untouched by this
- *   file) is byte-identical either way.
+ * - The authenticated client always uses sync v2; demo calls are no-ops
+ *   before touching its isolated local state.
  * - Domain stores keep mutating `financialStateStore.state` via
  *   `commitState` exactly as before; call sites call into this module
  *   *alongside* that (usually by snapshotting the relevant array
@@ -89,7 +87,7 @@
 
 import { useSyncStore } from '../../stores/sync'
 import type { SyncEntityType } from '../server/sync/command-schemas'
-import { isSyncV2Enabled } from './feature-flags'
+import { isReadOnlyDemoActive } from './demo-source'
 import { newId } from './ids'
 import type { PendingCreateMatch } from './outbox'
 
@@ -150,7 +148,7 @@ function enqueueRemove(
 /**
  * Enqueues a `create` command carrying the entity's own identity (`id`),
  * which the server stores as the row's primary key (ADR 0001) — re-sending
- * it is a no-op instead of a duplicate. No-op when sync-v2 is off.
+ * it is a no-op instead of a duplicate. Demo state never enters the outbox.
  *
  * `data.id` wins over the `id` argument when the caller already minted one
  * (e.g. a category that another command in the same batch has to reference).
@@ -160,7 +158,7 @@ export async function syncCreate(
   id: string,
   data: JsonRecord,
 ): Promise<boolean | void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -184,7 +182,7 @@ export async function syncUpdate(
   localId: string,
   patch: JsonRecord,
 ): Promise<boolean | void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -212,7 +210,7 @@ export async function syncRemove(
   entityType: SyncEntityType,
   localId: string,
 ): Promise<boolean | void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -251,7 +249,7 @@ export async function syncUpsertByKey(
   data: JsonRecord,
   updateData: JsonRecord = data,
 ): Promise<void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -276,7 +274,7 @@ export async function syncRemoveByKey(
   matches: EntityMatch,
   label: string,
 ): Promise<void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -306,7 +304,7 @@ export async function syncSettingsUpdate(patch: {
   stockeventsTradesToCash?: boolean
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>
 }): Promise<void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const syncStore = useSyncStore()
@@ -330,7 +328,7 @@ export async function resolveEntityId(
   entityType: SyncEntityType,
   localId: string,
 ): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return null
   }
   const syncStore = useSyncStore()
@@ -344,7 +342,7 @@ export async function resolveEntityId(
  * toggle sends it once it has.
  */
 export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[]): Promise<void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const twrLiquidityAccountIds: string[] = []
@@ -379,7 +377,7 @@ async function resolveEntityIdByMatch(
   entityType: SyncEntityType,
   matches: EntityMatch,
 ): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return null
   }
   const ref = await useSyncStore().findEntityRef(entityType, matches)
@@ -395,7 +393,7 @@ async function resolveEntityIdByMatch(
  * `resolveOrCreateCategoryId` instead.
  */
 export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return null
   }
   const existing = await resolveEntityIdByMatch('category', categoryMatches(kind, name))
@@ -437,7 +435,7 @@ export async function resolveOrCreateCategoryId(
   kind: CategoryKind,
   name: string,
 ): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return null
   }
   const existing = await resolveEntityIdByMatch('category', categoryMatches(kind, name))
@@ -562,7 +560,7 @@ export async function syncListDiff<T extends { id: string }>(
   after: readonly T[],
   buildData: (item: T, previous?: T) => Promise<JsonRecord | null> | JsonRecord | null,
 ): Promise<boolean | void> {
-  if (!isSyncV2Enabled()) {
+  if (isReadOnlyDemoActive()) {
     return
   }
   const beforeById = new Map(before.map((item) => [item.id, item]))

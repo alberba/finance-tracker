@@ -5,7 +5,7 @@
  * Every bug in that audit lives in a *seam* between layers, which is exactly
  * what the existing tiers don't cross: repository tests stop at the row,
  * projection tests start from a hand-written bootstrap, and the E2E suite runs
- * with `PUBLIC_SYNC_V2=false`. So a field can be dropped by a Zod schema, never
+ * through the sync-v2 store. So a field can be dropped by a Zod schema, never
  * given a column, or read back from the wrong place, and every tier stays green.
  *
  * This harness closes the loop:
@@ -99,7 +99,6 @@ export async function startRoundTrip(
     .values({ email: `round-trip-${Math.random().toString(36).slice(2)}@example.com`, createdAt: now, updatedAt: now })
     .returning();
 
-  vi.stubEnv("PUBLIC_SYNC_V2", "true");
   vi.stubGlobal("navigator", { onLine: true });
   setActivePinia(createPinia());
 

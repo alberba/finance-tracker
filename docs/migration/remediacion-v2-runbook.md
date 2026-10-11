@@ -21,7 +21,9 @@
   aportaciones de marzo comparten `contrib-snapshot-2026-3`. Son dos filas
   reales (el v1 ya las distinguía mal), así que el reparador mueve una a
   `contrib-snapshot-2026-3@2` en vez de borrarla.
-- `PUBLIC_SYNC_V2=true` ya viene de `.env.production`. No hay flag que tocar.
+- El cliente autenticado actual usa sync v2 directamente; no requiere una
+  variable de selección de protocolo. Los endpoints legacy siguen retenidos
+  para rollback y consumidores explícitos.
 - El código de esta remediación vive en `mal-guardado-v2-multiusuario`, no en
   `main`: son 46 commits. `main` solo tiene la primera entrega (sincronización).
 

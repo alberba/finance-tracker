@@ -54,7 +54,7 @@ const btcBuy: Transaction = {
 }
 
 function seedState(transactions: Transaction[], tradesToCash = false): void {
-  useFinancialStateStore().reloadState(
+  useFinancialStateStore().replaceState(
     normalizeState({
       accounts: [{ id: 'broker', name: 'Broker', openingBalance: 0 }],
       investmentCategories: ['Crypto'],

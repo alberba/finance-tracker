@@ -10,22 +10,15 @@ import { getGlobalDemoState, isReadOnlyDemoActive } from "../../src/lib/client/d
 describe("demo-source (WP8 read-only v2 demo)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.mocked(isDemoMode).mockReturnValue(false);
   });
 
   it("is inactive when demo mode is not active", () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
     vi.mocked(isDemoMode).mockReturnValue(false);
     expect(isReadOnlyDemoActive()).toBe(false);
   });
 
-  it("is active with sync v2 off when demo mode is active", () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "");
-    vi.mocked(isDemoMode).mockReturnValue(true);
-    expect(isReadOnlyDemoActive()).toBe(true);
-  });
-
-  it("remains active with sync v2 on", () => {
-    vi.stubEnv("PUBLIC_SYNC_V2", "true");
+  it("is active when demo mode is active", () => {
     vi.mocked(isDemoMode).mockReturnValue(true);
     expect(isReadOnlyDemoActive()).toBe(true);
   });

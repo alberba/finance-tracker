@@ -6,6 +6,7 @@ vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }
 
 import { openIdbCache, putEntity, wipeIdbCache } from '../../src/lib/client/idb-cache'
 import { listAll, openOutbox, wipeOutbox } from '../../src/lib/client/outbox'
+import { isDemoMode } from '../../src/scripts/demo-mode'
 import { useBudgetStore } from '../../src/stores/budget'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useSyncStore } from '../../src/stores/sync'
@@ -33,7 +34,7 @@ async function settle(): Promise<void> {
  */
 describe('budget store — sync wiring keeps identity out of the update patch (issue #138)', () => {
   beforeEach(async () => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
+    vi.mocked(isDemoMode).mockReturnValue(false)
     setActivePinia(createPinia())
     await wipeIdbCache(USER_ID)
     await wipeOutbox(USER_ID)

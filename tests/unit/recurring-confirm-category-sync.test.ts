@@ -29,7 +29,6 @@ async function settle(): Promise<void> {
  */
 describe('confirmPending — category id shared by the movement and the pending (issue #283)', () => {
   beforeEach(async () => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
     setActivePinia(createPinia())
     await wipeIdbCache(USER_ID)
     await wipeOutbox(USER_ID)
