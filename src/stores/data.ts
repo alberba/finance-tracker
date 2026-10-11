@@ -5,7 +5,7 @@ import { computed } from 'vue'
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
 import { fetchBackup, restoreBackup } from '../lib/client/data-backup'
-import { initializeFreshState } from '../lib/client/state-initialize'
+import { resetState } from '../lib/client/state-initialize'
 import { isDemoMode } from '../scripts/demo-mode'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
@@ -27,10 +27,10 @@ export const useDataStore = defineStore('data', () => {
   const summary = computed(() => buildDataSummaryViewModel(financialStateStore.state))
 
   /** The JSON backup lives in D1 and a restore replaces what is there. */
-  const backsUpServerData = !isDemoMode()
+  const backsUpServerData = computed(() => !isDemoMode())
 
   async function exportJson(): Promise<void> {
-    if (backsUpServerData) {
+    if (backsUpServerData.value) {
       const result = await fetchBackup()
       if (!result.ok) {
         showToast(`No se pudo exportar: ${result.error}`)
@@ -61,7 +61,7 @@ export const useDataStore = defineStore('data', () => {
   }
 
   async function importJson(file: File): Promise<void> {
-    if (backsUpServerData) {
+    if (backsUpServerData.value) {
       await restoreJson(file)
       return
     }
@@ -101,22 +101,18 @@ export const useDataStore = defineStore('data', () => {
   }
 
   /** "Empezar de cero" provisions a private space for authenticated users. */
-  const canStartFresh = !isDemoMode()
+  const canStartFresh = computed(() => !isDemoMode())
 
   async function startFresh(): Promise<void> {
-    if (!canStartFresh) {
+    if (!canStartFresh.value) {
       return
     }
-    const result = await initializeFreshState()
+    const result = await resetState()
     if (!result.ok) {
       showToast(result.error ?? 'No se pudo crear el espacio nuevo.')
       return
     }
-    showToast(
-      result.alreadyInitialized
-        ? 'Ya tienes un espacio inicializado.'
-        : 'Espacio nuevo creado. Recargando…',
-    )
+    showToast('Espacio nuevo creado. Recargando…')
     window.location.reload()
   }
 

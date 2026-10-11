@@ -52,6 +52,21 @@ test.describe('Data E2E', () => {
     const download = await downloadPromise
     const path = await download.path()
 
+    await dataSection.getByRole('button', { name: 'Empezar de cero' }).click()
+    const freshDialog = page.getByRole('alertdialog', { name: '¿Empezar de cero?' })
+    await expect(freshDialog).toBeVisible()
+    const resetNavigation = page.waitForEvent('framenavigated', {
+      predicate: (frame) => frame === page.mainFrame(),
+    })
+    await freshDialog.getByRole('button', { name: 'Crear espacio vacío' }).click()
+    await resetNavigation
+
+    await expect(freshDialog).toBeHidden()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    const empty = await readScenarioState(page)
+    expect(empty.accounts).toHaveLength(0)
+    expect(empty.transactions).toHaveLength(0)
+
     await dataSection.locator('#import-json').setInputFiles(path)
     const dialog = page.getByRole('alertdialog', { name: '¿Importar esta copia?' })
     await expect(dialog).toBeVisible()
@@ -61,9 +76,14 @@ test.describe('Data E2E', () => {
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(figures).toContainText(/Movimientos\s*[1-9]/)
     const restored = await readScenarioState(page)
-    expect(restored.accounts).toContainEqual(expect.objectContaining({ name: 'Cuenta de copia' }))
+    const restoredAccount = restored.accounts.find((account) => account.name === 'Cuenta de copia')
+    expect(restoredAccount).toBeDefined()
     expect(restored.transactions).toContainEqual(
-      expect.objectContaining({ description: 'Movimiento de copia' }),
+      expect.objectContaining({
+        description: 'Movimiento de copia',
+        amount: 7.5,
+        accountId: restoredAccount?.id,
+      }),
     )
   })
 })
