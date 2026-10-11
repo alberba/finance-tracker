@@ -206,7 +206,11 @@ describe('round trip: inversión', () => {
     })
     let occurrences = 0
     trip.syncStore.enqueueCommand = async (command) => {
-      if (command.action === 'create' && command.entityType === 'pendingMovement' && ++occurrences === 2) {
+      if (
+        command.action === 'create' &&
+        command.entityType === 'pendingMovement' &&
+        ++occurrences === 2
+      ) {
         failed()
         return null
       }
@@ -546,5 +550,13 @@ describe('round trip: inversión', () => {
 
     const contribution = reloaded.contributions.find((item) => item.date === '2026-03-31')
     expect(contribution?.flowAllocations).toEqual([{ accountId, amount: 200 }])
+
+    useInvestmentStore().setContributionFlow('2026-03-31', 0)
+    const edited = await trip.reload()
+    expect(edited.contributions.find((item) => item.date === '2026-03-31')).toMatchObject({
+      amount: 0,
+      flow: 0,
+      flowAllocations: [],
+    })
   })
 })
