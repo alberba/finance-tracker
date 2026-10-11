@@ -37,8 +37,12 @@ export const test = base.extend<Fixtures>({
     })
     await use(context)
   },
-  testUserEmail: async ({}, use) => {
-    await use(`pw-${randomUUID()}@e2e.test`)
+  testUserEmail: async ({}, use, testInfo) => {
+    await use(
+      testInfo.tags.includes('@snapshot')
+        ? 'pw-visual-snapshot@e2e.test'
+        : `pw-${randomUUID()}@e2e.test`,
+    )
   },
   extraHTTPHeaders: async ({ testUserEmail }, use) => {
     await use({ 'X-Test-User-Email': testUserEmail })

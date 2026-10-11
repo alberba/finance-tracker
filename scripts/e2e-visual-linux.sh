@@ -18,7 +18,7 @@ port="${VISUAL_PORT:-$((5100 + $(printf %s "$PWD" | cksum | cut -d' ' -f1) % 400
 image="mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
 log=".wrangler/visual-dev-server.log"
 
-if curl -sS -o /dev/null "http://127.0.0.1:$port/"; then
+if curl -sS -o /dev/null "http://127.0.0.1:$port/" 2>/dev/null; then
   echo "e2e-visual-linux: el puerto $port ya está ocupado; usa VISUAL_PORT=<otro>" >&2
   exit 1
 fi
