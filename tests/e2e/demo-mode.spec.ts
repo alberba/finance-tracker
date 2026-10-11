@@ -1,4 +1,4 @@
-import { syncV2Test as test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { readScenarioState } from './seed-sync-v2'
 
