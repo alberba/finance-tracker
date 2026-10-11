@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { syncV2Test as test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 
 const sidebar = (page: Page) => page.getByRole('complementary')
 const sidebarNav = (page: Page) => page.getByRole('navigation', { name: 'Secciones del tracker' })

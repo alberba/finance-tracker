@@ -1,4 +1,4 @@
-import { syncV2Test as test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
 import type { FinanceSectionId, FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { LiveMarketPage } from './pages/LiveMarketPage'

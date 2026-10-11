@@ -1,4 +1,4 @@
-import { syncV2Test as test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 
 test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async ({
   page,

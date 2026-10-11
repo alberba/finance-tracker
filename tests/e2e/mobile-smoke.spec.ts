@@ -6,9 +6,6 @@ test.describe('Mobile smoke', () => {
     'mantiene legible el patrimonio y los movimientos en formato PWA',
     { tag: '@smoke' },
     async ({ page, tracker }) => {
-      const currentMonth = new Intl.DateTimeFormat('es-ES', { month: 'long' })
-        .format(new Date())
-        .toLocaleUpperCase('es-ES')
       await page.goto('/patrimonio')
       const currentMonthIndex = new Date().getMonth()
       await editScenarioState(page, (state) => {
