@@ -7,12 +7,11 @@ export default defineConfig(
     port: 4321,
     htmlOutputFolder: 'playwright-report',
     blobOutputDir: 'blob-report',
-    tag: '@legacy',
-    env: { PUBLIC_SYNC_V2: 'false' },
+    tag: '@sync-v2',
+    env: { PUBLIC_SYNC_V2: 'true' },
   }),
   {
-    // One worker protects the legacy owner blob; individual tests can still
-    // be sharded across runners, each with its own D1 database.
+    // A scenario owns its isolated user; each CI shard has its own D1.
     fullyParallel: true,
     workers: 1,
     projects: [

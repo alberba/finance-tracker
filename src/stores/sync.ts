@@ -123,7 +123,8 @@ export const useSyncStore = defineStore('sync', () => {
           pending.map((entry) => entry.command),
         )
       : readModel
-    useFinancialStateStore(ownPinia).reloadState(projectSyncV2State(projected))
+    const financialStateStore = useFinancialStateStore(ownPinia)
+    financialStateStore.reloadState(projectSyncV2State(projected, financialStateStore.year))
   }
 
   /** An unloaded page: stops every background read, send and render of this client. */

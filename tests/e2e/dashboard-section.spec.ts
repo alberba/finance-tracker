@@ -40,10 +40,7 @@ test.describe('Dashboard section', () => {
     },
   )
 
-  test('sincroniza el año, el mes y el rango con el controlador principal', async ({
-    page,
-    tracker,
-  }) => {
+  test('conserva el año, el mes y el rango entre secciones', async ({ page, tracker }) => {
     await tracker.addCustomTransaction({
       date: '2027-01-02',
       monthLabel: 'ENERO',
@@ -61,6 +58,7 @@ test.describe('Dashboard section', () => {
     await dashboard.locator('#dashboard-month').selectOption('0')
     await expect(dashboard.locator('#dashboard-month')).toHaveValue('0')
     await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
+    await expect(dashboard.locator('#kpi-income')).toHaveText('1,00 €')
 
     const range = dashboard.getByRole('group', { name: 'Rango temporal del gráfico' })
     await range.getByRole('button', { name: '6M' }).click()
@@ -255,4 +253,26 @@ test.describe('Dashboard section', () => {
     await expect(late).toContainText('Retrasado')
     await expect(quotes.getByRole('button', { name: 'Actualizar' })).toBeEnabled()
   })
+})
+
+test('conserva el periodo y navega desde tarjetas con atrás y adelante en demo', async ({
+  page,
+  tracker,
+}) => {
+  await tracker.goto('/dashboard?demo=1')
+  const dashboard = tracker.dashboardSection
+  await dashboard.locator('#dashboard-month').selectOption('0')
+  await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
+  await dashboard.getByRole('button', { name: 'Ver todos', exact: true }).click()
+  await expect(page).toHaveURL(/\/movimientos$/)
+  await expect(tracker.transactionsSection).toBeVisible()
+  await page.goBack()
+  await expect(dashboard).toBeVisible()
+  await expect(dashboard.locator('#dashboard-month')).toHaveValue('0')
+  await page.goForward()
+  await expect(tracker.transactionsSection).toBeVisible()
+  await expect(page.locator('[data-nav-item][data-section=transactions]:visible')).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
 })
