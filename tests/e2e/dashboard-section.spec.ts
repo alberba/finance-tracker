@@ -58,7 +58,7 @@ test.describe('Dashboard section', () => {
     await dashboard.locator('#dashboard-month').selectOption('0')
     await expect(dashboard.locator('#dashboard-month')).toHaveValue('0')
     await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
-    await expect(dashboard.locator('#kpi-income')).toHaveText('1,00 €')
+    await expect(dashboard.locator('#kpi-income')).toHaveText('2.001,00 €')
 
     const range = dashboard.getByRole('group', { name: 'Rango temporal del gráfico' })
     await range.getByRole('button', { name: '6M' }).click()
@@ -259,7 +259,8 @@ test('conserva el periodo y navega desde tarjetas con atrás y adelante en demo'
   page,
   tracker,
 }) => {
-  await tracker.goto('/dashboard?demo=1')
+  await page.goto('/dashboard?demo=1')
+  await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
   const dashboard = tracker.dashboardSection
   await dashboard.locator('#dashboard-month').selectOption('0')
   await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()

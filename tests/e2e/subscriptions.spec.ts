@@ -1,4 +1,28 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { test, expect } from './fixtures'
+import type { Page } from '@playwright/test'
+import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+
+type BackupRow = Record<string, unknown>
+
+async function replaceBackup(
+  page: Page,
+  tracker: FinanceTrackerPage,
+  collections: Record<string, unknown[]>,
+) {
+  const exported = await page.request.get('/api/data/export')
+  expect(exported.ok()).toBe(true)
+  const backup = (await exported.json()) as BackupRow
+  for (const [key, value] of Object.entries(backup)) {
+    if (Array.isArray(value)) backup[key] = []
+  }
+  Object.assign(backup, collections)
+
+  const imported = await page.request.post('/api/data/import?mode=replace', { data: backup })
+  expect(imported.ok()).toBe(true)
+  const result = (await imported.json()) as { skipped?: Record<string, number> }
+  expect(result.skipped ?? {}).toEqual({})
+  await tracker.reload()
+}
 
 function addDays(isoDate: string, days: number): string {
   const date = new Date(`${isoDate}T00:00:00.000Z`)
@@ -15,51 +39,59 @@ function shortDate(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00Z`))
 }
 
+function todayLocal(): string {
+  const today = new Date()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${today.getFullYear()}-${month}-${day}`
+}
+
 test.describe('suscripciones de gastos', () => {
-  test('presenta las suscripciones y su panel con controles accesibles en móvil', { tag: '@smoke' }, async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.openSubscriptionsTab()
+  test(
+    'presenta las suscripciones y su panel con controles accesibles en móvil',
+    { tag: '@smoke' },
+    async ({ page, tracker }) => {
+      await tracker.openSubscriptionsTab()
 
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    await expect(
-      subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
-    ).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
-    await expect(subscriptions.getByText('Aún no hay suscripciones')).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
-    await expect(subscriptions.getByRole('heading', { name: 'Próximos 30 días' })).toBeVisible()
+      const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+      await expect(
+        subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
+      ).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Tus suscripciones' })).toBeVisible()
+      await expect(subscriptions.getByText('Aún no hay suscripciones')).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
+      await expect(subscriptions.getByRole('heading', { name: 'Próximos 30 días' })).toBeVisible()
 
-    await tracker.openNewSubscriptionPanel()
-    const panel = page.getByRole('dialog', { name: 'Nueva suscripción' })
-    await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
-    await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
-    await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
+      await tracker.openNewSubscriptionPanel()
+      const panel = page.getByRole('dialog', { name: 'Nueva suscripción' })
+      await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
+      await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
+      await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
 
-    await page.setViewportSize({ width: 375, height: 812 })
+      await page.setViewportSize({ width: 375, height: 812 })
 
-    const mobileControls = [
-      panel.getByLabel('Nombre'),
-      panel.getByLabel('Importe'),
-      panel.getByLabel('Cuenta'),
-      panel.getByRole('button', { name: 'Mensual' }),
-      panel.getByRole('button', { name: 'Añadir suscripción' }),
-    ]
-    for (const control of mobileControls) {
-      await control.scrollIntoViewIfNeeded()
-      await expect(control).toBeInViewport()
-      expect(
-        await control.evaluate((element) => element.getBoundingClientRect().height),
-      ).toBeGreaterThanOrEqual(42)
-    }
-  })
+      const mobileControls = [
+        panel.getByLabel('Nombre'),
+        panel.getByLabel('Importe'),
+        panel.getByLabel('Cuenta'),
+        panel.getByRole('button', { name: 'Mensual' }),
+        panel.getByRole('button', { name: 'Añadir suscripción' }),
+      ]
+      for (const control of mobileControls) {
+        await control.scrollIntoViewIfNeeded()
+        await expect(control).toBeInViewport()
+        expect(
+          await control.evaluate((element) => element.getBoundingClientRect().height),
+        ).toBeGreaterThanOrEqual(42)
+      }
+    },
+  )
 
   test('crea un gasto en su primer cobro, se conserva al recargar y no se duplica', async ({
     page,
     tracker,
   }) => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayLocal()
     await tracker.addSubscription({
       name: 'E2E Streaming',
       amount: 14.99,
@@ -90,7 +122,7 @@ test.describe('suscripciones de gastos', () => {
     page,
     tracker,
   }) => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayLocal()
     await tracker.addSubscription({
       name: 'E2E Pausable',
       amount: 8,
@@ -126,49 +158,52 @@ test.describe('suscripciones de gastos', () => {
     page,
     tracker,
   }) => {
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) throw new Error('No se encontró el estado local')
-      const state = JSON.parse(raw)
-      state.subscriptions = [
+    await replaceBackup(page, tracker, {
+      accounts: [
+        { id: 'revolut', name: 'Revolut', kind: 'cash', currency: 'EUR', openingBalance: 0 },
+        { id: 'santander', name: 'Santander', kind: 'cash', currency: 'EUR', openingBalance: 0 },
+      ],
+      categories: [
+        { id: 'ocio', name: 'Ocio', kind: 'expense' },
+        { id: 'software', name: 'Software', kind: 'expense' },
+        { id: 'salud', name: 'Salud', kind: 'expense' },
+      ],
+      subscriptions: [
         {
           id: 'analysis-monthly',
           name: 'Streaming análisis',
           amount: 10,
           accountId: 'revolut',
-          category: 'Ocio',
+          categoryId: 'ocio',
           frequency: 'monthly',
           startDate: '2026-01-01',
           nextChargeDate: '2026-08-20',
-          active: true,
+          isActive: true,
         },
         {
           id: 'analysis-yearly',
           name: 'Nube análisis',
           amount: 120,
           accountId: 'santander',
-          category: 'Software',
+          categoryId: 'software',
           frequency: 'yearly',
           startDate: '2026-01-01',
           nextChargeDate: '2026-10-01',
-          active: true,
+          isActive: true,
         },
         {
           id: 'analysis-paused',
           name: 'Gimnasio pausado',
           amount: 30,
           accountId: 'revolut',
-          category: 'Salud',
+          categoryId: 'salud',
           frequency: 'quarterly',
           startDate: '2026-01-01',
           nextChargeDate: '2026-09-01',
-          active: false,
+          isActive: false,
         },
-      ]
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
+      ],
     })
-    await mirrorStateToServer(page)
-    await tracker.reload()
     await tracker.openTransactions()
     await tracker.openSubscriptionsTab()
 
@@ -194,51 +229,30 @@ test.describe('suscripciones de gastos', () => {
   })
 
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayLocal()
     const pausedDate = addDays(today, -10)
     const nextChargeDate = addDays(pausedDate, 14)
 
-    await tracker.addSubscription({
-      name: 'E2E Reactivada',
-      amount: 8,
-      categoryLabel: 'Comida',
-      frequency: 'weekly',
-      firstChargeDate: today,
+    await replaceBackup(page, tracker, {
+      accounts: [
+        { id: 'revolut', name: 'Revolut', kind: 'cash', currency: 'EUR', openingBalance: 0 },
+      ],
+      categories: [{ id: 'comida', name: 'Comida', kind: 'expense' }],
+      subscriptions: [
+        {
+          id: 'reactivated',
+          name: 'E2E Reactivada',
+          amount: 8,
+          accountId: 'revolut',
+          categoryId: 'comida',
+          frequency: 'weekly',
+          startDate: today,
+          nextChargeDate: pausedDate,
+          isActive: false,
+        },
+      ],
+      transactions: [],
     })
-
-    await page.evaluate(
-      ({ pausedDate }) => {
-        const rawState = localStorage.getItem('finance-tracker-state-v1')
-        if (!rawState) {
-          throw new Error('No se encontró el estado local')
-        }
-        const state = JSON.parse(rawState) as {
-          meta: { savedAt: string | null }
-          subscriptions: Array<{
-            id: string
-            name: string
-            active: boolean
-            nextChargeDate: string
-          }>
-          transactions: Array<{ subscriptionId?: string }>
-        }
-        const subscription = state.subscriptions.find((item) => item.name === 'E2E Reactivada')
-        if (!subscription) {
-          throw new Error('No se encontró la suscripción de prueba')
-        }
-        subscription.active = false
-        subscription.nextChargeDate = pausedDate
-        state.transactions = state.transactions.filter(
-          (transaction) => transaction.subscriptionId !== subscription.id,
-        )
-        state.meta.savedAt = new Date(Date.now() + 60_000).toISOString()
-        localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
-      },
-      { pausedDate },
-    )
-    await mirrorStateToServer(page)
-
-    await tracker.reload()
     await tracker.openSubscriptionsTab()
     const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
     const row = subscriptions.locator('tr[data-subscription-id]', { hasText: 'E2E Reactivada' })
