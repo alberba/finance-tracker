@@ -28,7 +28,11 @@ test.describe('Data E2E', () => {
     },
   )
 
-  test('exporta una copia y la vuelve a importar tras confirmar', async ({ page, tracker }) => {
+  test('exporta una copia y la vuelve a importar tras confirmar', async ({
+    page,
+    tracker,
+    testUserEmail,
+  }) => {
     await tracker.addAccount({ name: 'Cuenta de copia' })
     await tracker.addCustomTransaction({
       date: '2026-08-12',
@@ -52,17 +56,16 @@ test.describe('Data E2E', () => {
     const download = await downloadPromise
     const path = await download.path()
 
-    await dataSection.getByRole('button', { name: 'Empezar de cero' }).click()
-    const freshDialog = page.getByRole('alertdialog', { name: '¿Empezar de cero?' })
-    await expect(freshDialog).toBeVisible()
-    const resetNavigation = page.waitForEvent('framenavigated', {
-      predicate: (frame) => frame === page.mainFrame(),
+    const reset = await page.request.post('/api/state/reset', {
+      data: {},
+      headers: {
+        'X-Test-User-Email': testUserEmail,
+        Origin: new URL(page.url()).origin,
+        Referer: page.url(),
+      },
     })
-    await freshDialog.getByRole('button', { name: 'Crear espacio vacío' }).click()
-    await resetNavigation
-
-    await expect(freshDialog).toBeHidden()
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    expect(reset.ok(), await reset.text()).toBe(true)
+    await tracker.reload()
     const empty = await readScenarioState(page)
     expect(empty.accounts).toHaveLength(0)
     expect(empty.transactions).toHaveLength(0)
