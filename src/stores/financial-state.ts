@@ -9,7 +9,9 @@ import { clone } from '../scripts/utils'
 type FinanceStoreStatus = 'idle' | 'loading' | 'saving' | 'error'
 
 export const useFinancialStateStore = defineStore('financial-state', () => {
-  const state = shallowRef<State>(normalizeState(clone(isDemoMode() ? BASE_SEED : EMPTY_STATE_SEED)))
+  const state = shallowRef<State>(
+    normalizeState(clone(isDemoMode() ? BASE_SEED : EMPTY_STATE_SEED)),
+  )
   const status = shallowRef<FinanceStoreStatus>('idle')
   const errorMessage = shallowRef<string | null>(null)
 

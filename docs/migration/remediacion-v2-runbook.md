@@ -56,6 +56,7 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    Con wrangler no se pueden aplicar por tramos, así que hay **dos pasadas**:
    esta primera aplica las aditivas y, al llegar al cierre, `0004` falla y se
    revierte solo (lo anterior queda aplicado). Es lo esperado: el paso 3 lo mete.
+
 2. **Reparar.** El reparador escribe solo en una copia local de producción, así
    que primero hay que traerla. **El export tiene que ser con esquema**, tal cual
    sale de wrangler: así el fichero local queda con el mismo esquema que D1 y
@@ -63,23 +64,28 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    un dump de solo datos encima, porque `openLocalV2Db` aplica el juego completo
    —incluido el `0004`— y el cargue entonces choca con el `UNIQUE` de
    `contributions`, que es justo el duplicado que la reparación viene a resolver.
+
    ```bash
    wrangler d1 export finance-tracker-db-v2 --remote --output=.data/v2-prod.sql -y
    sqlite3 .data/v2-work.sqlite < .data/v2-prod.sql
    ```
+
    **Este export va después del paso 1, no antes.** El plan se calcula sobre
    esta copia; si está por detrás de D1, planifica contra datos que ya no son
    los de producción.
    Ensayo en seco y revisión del plan:
+
    ```bash
    pnpm db:repair --v2-sqlite=.data/v2-work.sqlite \
      --user-id=<id> --backup=<export anterior al corte>
    ```
+
    Con los datos actuales el plan son **11 fusiones de categorías y 1 renombrado
    de correlación**, y cero celdas o snapshots: tus presupuestos y tu patrimonio
    ya coinciden con el export del 12/08.
 
    Si el plan cuadra, ejecuta y emite el SQL para D1:
+
    ```bash
    pnpm db:repair --v2-sqlite=.data/v2-work.sqlite \
      --user-id=<id> --backup=<export anterior al corte> \
@@ -87,6 +93,7 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
 
    wrangler d1 execute finance-tracker-db-v2 --remote --file=.data/reparacion-remote.sql
    ```
+
    El SQL contiene solo las sentencias que el plan cambia (hoy: los `UPDATE`
    que repuntan referencias, los `DELETE` de las categorías duplicadas y el
    `UPDATE` del `legacy_id`), en el mismo orden que el paso local. Volcar tablas
@@ -96,6 +103,7 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
    celda planificada ya no existe en D1, el fichero aborta en ese punto. Deja intactos
    `sync_changes`, `sync_commands`, `audit_events` y `user_revisions`:
    borrarlos haría que cualquier otro dispositivo se perdiera la reparación.
+
 3. **Aplicar el cierre.**
    ```bash
    pnpm d1:migrate:remote:v2   # ahora 0004 entra sola
@@ -126,7 +134,7 @@ los presupuestos corridos un mes y una edición los reescribiría en base 0.
   siguiente. Hay una prueba que fija esto en
   `tests/integration/d1-v2/migrations/months-canonical.test.ts`.
 - **La normalización solo funciona con las filas ya dentro.** Es un `UPDATE`, así
-  que si alguien reconstruye la base desde un dump y *luego* aplica las
+  que si alguien reconstruye la base desde un dump y _luego_ aplica las
   migraciones, el desplazamiento cae sobre tablas vacías y queda sin hacer. En
   producción las filas existen cuando se aplican, que es el caso normal.
 - **Ventana cerrada.** El paso 4 lee producción y la vuelve a escribir, así que

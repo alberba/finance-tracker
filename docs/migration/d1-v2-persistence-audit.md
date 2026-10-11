@@ -1,6 +1,6 @@
 # Auditoría de persistencia D1 v2 — issue #134
 
-> **Alcance.** Auditoría completa del flujo de persistencia tras la migración a *sync v2*
+> **Alcance.** Auditoría completa del flujo de persistencia tras la migración a _sync v2_
 > (D1 multiusuario), a partir del reporte del issue
 > [#134](https://github.com/alberba/finance-tracker/issues/134): «las suscripciones no se están
 > guardando, y las compras de inversión recurrentes no guardan correctamente todos los campos».
@@ -31,12 +31,12 @@ fixes de sync v2.
 De ahí salen cuatro familias de fallo, y conviene entenderlas por separado porque **los arreglos
 son de naturaleza distinta**:
 
-| # | Familia | Qué provoca | Coste del arreglo |
-|---|---|---|---|
-| **F1** | **Un comando inválido envenena la cola para siempre** | Desde el primer fallo, *nada* se guarda nunca más, en ninguna sección | Bajo — 2 ficheros |
-| **F2** | **El `legacyId` de la migración no coincide con el que busca el cliente** | Categorías duplicadas, `categoryId: null` en cada movimiento, presupuesto descartado | Bajo — 1 fichero + script de datos |
-| **F3** | **La proyección de lectura no devuelve el dato donde el usuario lo metió** | El dato *está* en D1 pero la UI lo muestra vacío, desplazado un mes, o lo descarta | Bajo — 1 fichero |
-| **F4** | **El modelo relacional no tiene columnas para campos del dominio** | Pérdida real e irrecuperable de datos (símbolo, títulos, precio, comisión, saldos…) | Alto — requiere migración |
+| #      | Familia                                                                    | Qué provoca                                                                          | Coste del arreglo                  |
+| ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------- |
+| **F1** | **Un comando inválido envenena la cola para siempre**                      | Desde el primer fallo, _nada_ se guarda nunca más, en ninguna sección                | Bajo — 2 ficheros                  |
+| **F2** | **El `legacyId` de la migración no coincide con el que busca el cliente**  | Categorías duplicadas, `categoryId: null` en cada movimiento, presupuesto descartado | Bajo — 1 fichero + script de datos |
+| **F3** | **La proyección de lectura no devuelve el dato donde el usuario lo metió** | El dato _está_ en D1 pero la UI lo muestra vacío, desplazado un mes, o lo descarta   | Bajo — 1 fichero                   |
+| **F4** | **El modelo relacional no tiene columnas para campos del dominio**         | Pérdida real e irrecuperable de datos (símbolo, títulos, precio, comisión, saldos…)  | Alto — requiere migración          |
 
 Los dos bugs del issue son, respectivamente, un caso de **F3+F4** (suscripciones) y de
 **F3+F4 más un `syncListDiff` que falta** (inversión recurrente).
@@ -102,7 +102,7 @@ un campo requerido. Y la validación del cliente no protege: `createCommandSchem
 `z.record(z.string(), z.unknown())` (`command-schemas.ts:170`), así que **el payload por entidad
 no se valida nunca en el cliente**.
 
-Además todos los `z.object` están en modo *strip* (el de por defecto): un campo que el cliente
+Además todos los `z.object` están en modo _strip_ (el de por defecto): un campo que el cliente
 manda y el esquema no declara **desaparece sin error ni aviso**. Es el mecanismo exacto por el
 que se pierden los campos del bug (b) del issue.
 
@@ -132,7 +132,7 @@ la misma fila antes de que responda la primera ya generan el conflicto
 `apply-command.ts:282` registra el cambio con `entityType: "userSettings"`:
 
 ```ts
-const revision = await recordChange(db, userId, "userSettings", userId, "update", command.patch);
+const revision = await recordChange(db, userId, 'userSettings', userId, 'update', command.patch)
 ```
 
 Pero `openIdbCache` sólo crea object stores para los 11 de `SYNC_ENTITY_TYPES` más `__meta`
@@ -143,7 +143,7 @@ filtrar el tipo** (`src/stores/sync.ts:438-450`) → `db.transaction("userSettin
 Como `revision.value` y `setCachedRevision` están **después** del bucle, el cursor nunca avanza:
 el mismo cambio se vuelve a traer en cada pull y **el fallo es permanente**. Peor, propaga:
 `syncNow()` → `init()` rechaza → en `src/scripts/app.ts:70-82` nunca se llega a `bindEvents()`
-ni a `dataset.financeReady`, y en `src/scripts/shell.ts:277` es un `void` → *unhandled rejection*
+ni a `dataset.financeReady`, y en `src/scripts/shell.ts:277` es un `void` → _unhandled rejection_
 silenciosa.
 
 **Síntoma:** «cambié la divisa en Configuración y desde entonces la app va mal».
@@ -155,19 +155,19 @@ transacción ([Cloudflare D1 docs](https://developers.cloudflare.com/d1/sql-api/
 El DDL no declara `ON DELETE CASCADE` en ninguna FK. Y estos borrados no limpian sus
 dependencias:
 
-| Operación | Falta borrar | Evidencia |
-|---|---|---|
-| `transactions.remove` | `investment_trade_details` (FK sin cascada) | `src/db/repositories/transactions.ts:126-137`; DDL `:96`. `removeTradeDetail` (`:232`) no se llama desde ningún sitio |
-| `removeCategory` | 7 tablas la referencian | `src/db/repositories/accounts.ts:231-247` |
-| `accounts.remove` | sin comprobación de referencias | `src/db/repositories/accounts.ts:113-124`. `src/stores/settings.ts:158-167` lo delega explícitamente a «the account row's FK behavior», que **no existe** |
-| `wipeUserData` («empezar de cero») | borra `transactions` sin tocar `investment_trade_details` | `src/pages/api/state/reset.ts:103-105` |
+| Operación                          | Falta borrar                                              | Evidencia                                                                                                                                                 |
+| ---------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transactions.remove`              | `investment_trade_details` (FK sin cascada)               | `src/db/repositories/transactions.ts:126-137`; DDL `:96`. `removeTradeDetail` (`:232`) no se llama desde ningún sitio                                     |
+| `removeCategory`                   | 7 tablas la referencian                                   | `src/db/repositories/accounts.ts:231-247`                                                                                                                 |
+| `accounts.remove`                  | sin comprobación de referencias                           | `src/db/repositories/accounts.ts:113-124`. `src/stores/settings.ts:158-167` lo delega explícitamente a «the account row's FK behavior», que **no existe** |
+| `wipeUserData` («empezar de cero») | borra `transactions` sin tocar `investment_trade_details` | `src/pages/api/state/reset.ts:103-105`                                                                                                                    |
 
 Cada uno devuelve `FOREIGN KEY constraint failed` → 500 → §2.1. **Borrar un movimiento de
 inversión, renombrar una categoría o resetear la cuenta bloquean la cola.**
 
 > Nota sobre renombrar: el `legacyId` de una categoría es `${kind}:${name}`
-> (`command-mapping.ts:248-250`), así que **renombrar** se ve en el diff como *borrar la vieja +
-> crear una nueva*, no como un `update` de `name`.
+> (`command-mapping.ts:248-250`), así que **renombrar** se ve en el diff como _borrar la vieja +
+> crear una nueva_, no como un `update` de `name`.
 
 ---
 
@@ -195,7 +195,7 @@ nextChargeDate: '',                                // vacío
 );
 ```
 
-Las dos regex están ancladas con `$`, así que **fallan siempre**. No es un caso borde: *toda*
+Las dos regex están ancladas con `$`, así que **fallan siempre**. No es un caso borde: _toda_
 suscripción se descarta en cada hidratación. Ejecutando `projectSyncV2State` con una fila real de
 `/api/bootstrap` el resultado es `subscriptions -> []`.
 
@@ -264,9 +264,9 @@ sin datos de operación. El vínculo `transactionId` también se pierde → ries
 tres valores (`v2-state-projection.ts:65-67`):
 
 ```ts
-projected.accounts        = bootstrap.accounts.filter((a) => a.kind === 'cash')
+projected.accounts = bootstrap.accounts.filter((a) => a.kind === 'cash')
 projected.investmentAssets = bootstrap.accounts.filter((a) => a.kind === 'investment')
-projected.liabilities     = bootstrap.accounts.filter((a) => a.kind === 'liability')
+projected.liabilities = bootstrap.accounts.filter((a) => a.kind === 'liability')
 ```
 
 La migración escribe `cash|investment|liability` (`scripts/lib/migration-runner.ts:70-72`).
@@ -282,7 +282,7 @@ cuenta migrada sobrescribe su `kind` real con `'checking'` y la hace desaparecer
 
 ### 4.2 `CONFIRMADO` — Los saldos de Patrimonio no se guardan nunca
 
-`src/stores/wealth.ts:53-64` sincroniza sólo la *existencia* del snapshot (fecha/año/mes), y
+`src/stores/wealth.ts:53-64` sincroniza sólo la _existencia_ del snapshot (fecha/año/mes), y
 además **sólo `if (isNewSnapshot)`**. Los saldos que el usuario teclea van a `snapshot_balances`,
 que está fuera de `SYNC_ENTITY_TYPES` por diseño documentado (`command-schemas.ts:12-19`).
 
@@ -312,10 +312,10 @@ cuyo patch **no contiene `declared`** (no hay columna) → consume una versión,
 
 Dos convenciones distintas para el mismo identificador de correlación:
 
-| Origen | `legacyId` de `budgetEntry` |
-|---|---|
-| Migración | `${type}:${category}:${year}-${pad2(month0)}` (`migration-runner.ts:549`) |
-| Cliente | `${type}:${category}:${month + 1}` (`src/stores/budget.ts:78`) — **sin año** |
+| Origen    | `legacyId` de `budgetEntry`                                                  |
+| --------- | ---------------------------------------------------------------------------- |
+| Migración | `${type}:${category}:${year}-${pad2(month0)}` (`migration-runner.ts:549`)    |
+| Cliente   | `${type}:${category}:${month + 1}` (`src/stores/budget.ts:78`) — **sin año** |
 
 `findByLegacyId` hace un scan del usuario sin filtrar por año, así que en 2026 el servidor
 devuelve la fila de 2025 como «ya existe» → el `create` degenera en `noop`
@@ -350,10 +350,10 @@ mezclan en el mismo mapa**. Con el mismo desfase +1 de §4.5, y aquí el `clamp(
 
 ### 4.7 `CONFIRMADO` — El `legacyId` de las categorías no coincide → `categoryId: null` en todo
 
-| Origen | `legacyId` de `category` |
-|---|---|
-| Migración | `item.name` → `"Comida"` (`migration-runner.ts:232`) |
-| Cliente | `${kind}:${name}` → `"expense:Comida"` (`command-mapping.ts:248-250`) |
+| Origen    | `legacyId` de `category`                                              |
+| --------- | --------------------------------------------------------------------- |
+| Migración | `item.name` → `"Comida"` (`migration-runner.ts:232`)                  |
+| Cliente   | `${kind}:${name}` → `"expense:Comida"` (`command-mapping.ts:248-250`) |
 
 `resolveCategoryId` no encuentra la categoría migrada, **crea un duplicado** y devuelve `null`
 (`command-mapping.ts:259-270`). Ese `null` se propaga: **cada transacción, suscripción y regla
@@ -368,7 +368,7 @@ cada celda de presupuesto se pierde entera.
 
 Las cuatro rutas de mutación de Configuración están guardadas por `if (key === 'accounts')`
 (`src/stores/settings.ts:103, 135, 147, 163`). Añadir un activo de inversión o un pasivo **no
-emite ningún comando** y desaparece al recargar. Está documentado como *leftover* en
+emite ningún comando** y desaparece al recargar. Está documentado como _leftover_ en
 `command-mapping.ts:82-84`, pero para el usuario es pérdida de datos.
 
 ---
@@ -380,14 +380,14 @@ escribe**, porque están fuera de `SYNC_ENTITY_TYPES`. La exclusión es delibera
 documentada (`command-schemas.ts:12-19`, «left for a later WP»), pero el usuario sí las edita en
 la UI, así que para él son datos que se pierden.
 
-| Entidad | Qué edita el usuario | Qué pasa | Evidencia |
-|---|---|---|---|
-| `twr_liquidity_accounts` | Marcar cuentas de liquidez TWR | El toggle no persiste; el TWR se recalcula distinto en cada recarga | `settings.ts:239-255` no emite nada |
-| `contribution_allocations` | Reparto del flujo de una aportación | `flowAllocations` queda vacío y `flowSource` cae a legacy | `v2-state-projection.ts:138-141` |
-| `user_instruments` / `market_instruments` | Añadir instrumento, mercado, unidades en cartera | Nada persiste. Tampoco hay `updateInstrument`: `symbol`/`provider`/`assetClass` son *insert-only* e incorregibles | `src/stores/market.ts` no importa `command-mapping` |
-| `stockevents_symbol_mappings` | Qué símbolos sincronizar, watchlist, ticker destino, ocultos | Todo se pierde salvo la API key; la integración queda «desactivada» | `v2-state-projection.ts:198-201` hardcodea `sync:false, hidden:false` |
-| `categoryEmojis` | Emoji por categoría | **No existe tabla ni columna**; se pierde en cada recarga | `v2-state-projection.ts:50` lo deja en `{}` |
-| `state.year` | Año seleccionado | Vuelve al año actual | `v2-state-projection.ts:47` |
+| Entidad                                   | Qué edita el usuario                                         | Qué pasa                                                                                                          | Evidencia                                                             |
+| ----------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `twr_liquidity_accounts`                  | Marcar cuentas de liquidez TWR                               | El toggle no persiste; el TWR se recalcula distinto en cada recarga                                               | `settings.ts:239-255` no emite nada                                   |
+| `contribution_allocations`                | Reparto del flujo de una aportación                          | `flowAllocations` queda vacío y `flowSource` cae a legacy                                                         | `v2-state-projection.ts:138-141`                                      |
+| `user_instruments` / `market_instruments` | Añadir instrumento, mercado, unidades en cartera             | Nada persiste. Tampoco hay `updateInstrument`: `symbol`/`provider`/`assetClass` son _insert-only_ e incorregibles | `src/stores/market.ts` no importa `command-mapping`                   |
+| `stockevents_symbol_mappings`             | Qué símbolos sincronizar, watchlist, ticker destino, ocultos | Todo se pierde salvo la API key; la integración queda «desactivada»                                               | `v2-state-projection.ts:198-201` hardcodea `sync:false, hidden:false` |
+| `categoryEmojis`                          | Emoji por categoría                                          | **No existe tabla ni columna**; se pierde en cada recarga                                                         | `v2-state-projection.ts:50` lo deja en `{}`                           |
+| `state.year`                              | Año seleccionado                                             | Vuelve al año actual                                                                                              | `v2-state-projection.ts:47`                                           |
 
 `transactions` tampoco tiene columna para `time`, `declared`, `subscriptionId`,
 `subscriptionChargeDate` ni `month` (DDL `:102-119`), y la UI de inversión pide `time` como
@@ -465,7 +465,7 @@ queda como sospecha — pero el índice debería ser UNIQUE en cualquier caso.
 email. Si Cloudflare Access emite un `sub` distinto (cambio de IdP, paso a one-time PIN), se
 intenta crear un usuario nuevo — y `users.email` es `unique` (`schema/users.ts:16`) → la inserción
 lanza `UNIQUE constraint` → el `catch` del middleware (`src/middleware.ts:101-105`) devuelve
-**401 «Token de Cf-Access inválido o caducado»** en *todas* las peticiones, ocultando el motivo
+**401 «Token de Cf-Access inválido o caducado»** en _todas_ las peticiones, ocultando el motivo
 real.
 
 **Fix:** buscar por email normalizado antes de insertar y vincular una nueva `user_identities` al
@@ -487,12 +487,12 @@ deja de encontrarlo), `market_instruments.*` (sin `update`), `twr_liquidity_acco
 
 ### 6.6 `CONFIRMADO` — Export e import asimétricos: el rollback pierde datos
 
-| Colección | `export.ts` | `import.ts` |
-|---|---|---|
-| `twrLiquidityAccounts` | sí (`:88`) | **no se importa** |
-| `investment_trade_details` | **no se exporta** | no se importa |
-| `market_instruments` / `market_quotes` | **no se exporta** | no se importa |
-| `userInstruments` | sí (`:97`) | exige que el `instrumentId` ya exista (`:321-325`) → **se descartan todos** |
+| Colección                              | `export.ts`       | `import.ts`                                                                 |
+| -------------------------------------- | ----------------- | --------------------------------------------------------------------------- |
+| `twrLiquidityAccounts`                 | sí (`:88`)        | **no se importa**                                                           |
+| `investment_trade_details`             | **no se exporta** | no se importa                                                               |
+| `market_instruments` / `market_quotes` | **no se exporta** | no se importa                                                               |
+| `userInstruments`                      | sí (`:97`)        | exige que el `instrumentId` ya exista (`:321-325`) → **se descartan todos** |
 
 Un ciclo exportar→importar —la ruta de rollback— pierde las cuentas de liquidez TWR, **todos los
 detalles de operaciones** y **toda la cartera de instrumentos**. Además `import.ts` no llama a
@@ -514,7 +514,7 @@ detalles de operaciones** y **toda la cartera de instrumentos**. Además `import
   aplicación no está garantizado y el log crece sin tope.
 - **Dos `init()` concurrentes** (`app.ts:96` y `shell.ts:277`): `init` marca `initialized` antes
   del primer `await` (`sync.ts:167-171`), así que el segundo retorna con `cacheDb === null` y
-  `refreshPending()` corre contra el *seed*. Se autocorrige, pero es una carrera evitable.
+  `refreshPending()` corre contra el _seed_. Se autocorrige, pero es una carrera evitable.
 - **`initialize.ts` no siembra categoría de inversión** (`state/initialize.ts:17-20` y el idéntico
   en `reset.ts:120-123`): un usuario nuevo no puede registrar inversiones sin crear una a mano.
 - **Moneda por fila aplanada a la global** en `buildAccountData` y `buildTransactionData`: las
@@ -526,30 +526,30 @@ detalles de operaciones** y **toda la cartera de instrumentos**. Además `import
 
 `emite` = el cliente manda comando · `maneja` = el servidor lo aplica · `hidrata` = vuelve en `/api/bootstrap`
 
-| Entidad | Emite | Maneja | Hidrata | Estado |
-|---|---|---|---|---|
-| `user_settings` | sólo `currency` | ✅ | ✅ | El cambio **rompe `pullChanges`** §2.5; `locale`/`theme`/`year` sin ruta |
-| `accounts` | sólo `accounts` | ✅ | ✅ | `kind:'checking'` → invisible §4.1 |
-| `investmentAssets` / `liabilities` | ❌ | — | ✅ | Nunca se guardan §4.8 |
-| `categories` | ✅ | ✅ | ✅ | `legacyId` desalineado → duplicados + `categoryId:null` §4.7 |
-| `transactions` | ✅ | ✅ | ✅ | Inversión manda `accountId` local → 500 + cola envenenada §1 |
-| `investment_trade_details` | ❌ | ❌ | ✅ | Se pierden símbolo/títulos/precio/comisión/side §4.3 |
-| `subscriptions` | ✅ | ✅ | ✅ | **Descartadas al hidratar** §3.1 |
-| `recurring_rules` | parcial | ✅ | ✅ | `updateRule` no emite; 10 campos sin columna §3.2 |
-| `pending_movements` | ✅ | ✅ | ✅ | `type` hardcodeado a `'expense'` §3.2c |
-| `budget_entries` | ✅ | ✅ | ✅ | `legacyId` sin año §4.4 + off-by-one §4.5 |
-| `goals` | ✅ | ✅ | ✅ | OK (`key` inmutable) |
-| `contributions` | ✅ | ✅ | ✅ | OK |
-| `contribution_allocations` | ❌ | ❌ | ✅ | `flowAllocations` se pierde §5 |
-| `wealth_snapshots` | sólo existencia | ✅ | ✅ | `legacyId` sin año §4.6 |
-| `snapshot_balances` | ❌ | ❌ | ✅ | **Los saldos de Patrimonio no se guardan** §4.2 |
-| `twr_liquidity_accounts` | ❌ | ❌ | ✅ | El toggle TWR no persiste §5 |
-| `user_instruments` | ❌ | ✅ (nadie emite) | ✅ | `market.ts` sin cablear §5 |
-| `market_instruments` / `market_quotes` | ❌ | ❌ | ✅ | Sólo lectura |
-| `stockevents_symbol_mappings` | ❌ | ❌ | parcial | `stockevents.ts` sin cablear §5 |
-| `integration_credentials` | vía REST | ✅ | ❌ (por diseño) | Sin concurrencia optimista §6.4 |
-| `categoryEmojis`, `state.year` | **sin tabla** | — | — | Se pierden §5 |
-| `audit_events`, `sync_*`, `user_*` | infra | ✅ | N/A | `metadata` siempre `null` §6.7 |
+| Entidad                                | Emite           | Maneja           | Hidrata         | Estado                                                                   |
+| -------------------------------------- | --------------- | ---------------- | --------------- | ------------------------------------------------------------------------ |
+| `user_settings`                        | sólo `currency` | ✅               | ✅              | El cambio **rompe `pullChanges`** §2.5; `locale`/`theme`/`year` sin ruta |
+| `accounts`                             | sólo `accounts` | ✅               | ✅              | `kind:'checking'` → invisible §4.1                                       |
+| `investmentAssets` / `liabilities`     | ❌              | —                | ✅              | Nunca se guardan §4.8                                                    |
+| `categories`                           | ✅              | ✅               | ✅              | `legacyId` desalineado → duplicados + `categoryId:null` §4.7             |
+| `transactions`                         | ✅              | ✅               | ✅              | Inversión manda `accountId` local → 500 + cola envenenada §1             |
+| `investment_trade_details`             | ❌              | ❌               | ✅              | Se pierden símbolo/títulos/precio/comisión/side §4.3                     |
+| `subscriptions`                        | ✅              | ✅               | ✅              | **Descartadas al hidratar** §3.1                                         |
+| `recurring_rules`                      | parcial         | ✅               | ✅              | `updateRule` no emite; 10 campos sin columna §3.2                        |
+| `pending_movements`                    | ✅              | ✅               | ✅              | `type` hardcodeado a `'expense'` §3.2c                                   |
+| `budget_entries`                       | ✅              | ✅               | ✅              | `legacyId` sin año §4.4 + off-by-one §4.5                                |
+| `goals`                                | ✅              | ✅               | ✅              | OK (`key` inmutable)                                                     |
+| `contributions`                        | ✅              | ✅               | ✅              | OK                                                                       |
+| `contribution_allocations`             | ❌              | ❌               | ✅              | `flowAllocations` se pierde §5                                           |
+| `wealth_snapshots`                     | sólo existencia | ✅               | ✅              | `legacyId` sin año §4.6                                                  |
+| `snapshot_balances`                    | ❌              | ❌               | ✅              | **Los saldos de Patrimonio no se guardan** §4.2                          |
+| `twr_liquidity_accounts`               | ❌              | ❌               | ✅              | El toggle TWR no persiste §5                                             |
+| `user_instruments`                     | ❌              | ✅ (nadie emite) | ✅              | `market.ts` sin cablear §5                                               |
+| `market_instruments` / `market_quotes` | ❌              | ❌               | ✅              | Sólo lectura                                                             |
+| `stockevents_symbol_mappings`          | ❌              | ❌               | parcial         | `stockevents.ts` sin cablear §5                                          |
+| `integration_credentials`              | vía REST        | ✅               | ❌ (por diseño) | Sin concurrencia optimista §6.4                                          |
+| `categoryEmojis`, `state.year`         | **sin tabla**   | —                | —               | Se pierden §5                                                            |
+| `audit_events`, `sync_*`, `user_*`     | infra           | ✅               | N/A             | `metadata` siempre `null` §6.7                                           |
 
 **Sin drift DDL ↔ Drizzle.** He comparado columna por columna las 26 tablas (nombres, tipos,
 NOT NULL, DEFAULT, PK, UNIQUE, índices): **coinciden exactamente**. Ningún hallazgo en esa

@@ -109,9 +109,7 @@ describe('stockEvents syncMovement — skip warning', () => {
 
     expect(result).toBe('skipped')
     expect(createStockEventsTransaction).not.toHaveBeenCalled()
-    expect(toastText()).toBe(
-      'Stock Events: BTC no tiene sincronización activada o lista asignada.',
-    )
+    expect(toastText()).toBe('Stock Events: BTC no tiene sincronización activada o lista asignada.')
     expect(console.warn).toHaveBeenCalled()
   })
 

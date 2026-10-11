@@ -88,9 +88,9 @@ wrangler secret put COINGECKO_API_KEY
 
 `wrangler.toml` declara dos bases D1, cada una con su carpeta de migraciones:
 
-| Binding                 | Base                    | Migraciones      | Contenido                                        |
-| ----------------------- | ----------------------- | ---------------- | ------------------------------------------------ |
-| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app |
+| Binding                 | Base                    | Migraciones      | Contenido                                          |
+| ----------------------- | ----------------------- | ---------------- | -------------------------------------------------- |
+| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app   |
 | `finance_tracker_db`    | `finance-tracker-db`    | `migrations/`    | Retención v1 para rollback y exportación histórica |
 
 Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.

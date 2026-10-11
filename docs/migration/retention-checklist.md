@@ -55,7 +55,7 @@ For each check, record date + who performed it in the tracking ticket:
       `wrangler d1 export finance-tracker-db-v2 --remote` snapshot, as a
       final parity re-confirmation before decommission (owner-user's data
       will have diverged from the original migrated snapshot by normal usage
-      — expect and reconcile *new* v2-only activity, not systematic drift in
+      — expect and reconcile _new_ v2-only activity, not systematic drift in
       the originally migrated rows).
 
 ## Rollback still available during the window
@@ -94,9 +94,8 @@ Only after every weekly check above is complete with no open issues:
 - [ ] After the app deploy with the binding removed has been verified
       healthy (repeat the owner verification checklist from
       `cutover-runbook.md` §7), delete the legacy database:
-      ```
-      wrangler d1 delete finance-tracker-db
-      ```
+      `     wrangler d1 delete finance-tracker-db
+  `
       This step is **irreversible** beyond the archived export above —
       confirm the archive file (first bullet) is verified readable before
       running it.
