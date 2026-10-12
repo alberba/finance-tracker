@@ -90,9 +90,8 @@ export function versionGuard(
  *
  * Optional because the two writers differ: the client always sends one for an
  * entity it creates (the identity is its primary key from the first instant),
- * while the v1 migration (`scripts/lib/migration-runner.ts`) writes no `id` at
- * all — the column's server-side UUIDv7 default applies and the row stays
- * reconcilable by its derived `legacyId`.
+ * while imported entities may rely on the server-side UUIDv7 default for `id`
+ * and remain reconcilable by their `legacyId`.
  */
 export function clientIdentity(id: string | undefined): { id?: string } {
   return id ? { id } : {}
