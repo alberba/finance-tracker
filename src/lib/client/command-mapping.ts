@@ -52,7 +52,7 @@
  *   resolving an in-flight create waits for its durable queue write, not a
  *   server acknowledgement. Recurrence enqueues rule creates before their
  *   pending movements. A pending movement whose recurring-rule reference
- *   remains unresolved is not enqueued; the mapper warns and returns failure.
+ *   remains unresolved is not enqueued and returns failure.
  * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
  *   its flow allocations nested under `data.allocations`; the snapshot
  *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
