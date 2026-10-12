@@ -36,20 +36,23 @@ function localWorkerConfig(port: number, baseURL: string): string {
   )
   const secrets = Object.fromEntries(
     Object.entries(bindings)
-      .filter(([, binding]) => binding.type === 'secret_text')
+      .filter(
+        ([key, binding]) =>
+          binding.type === 'secret_text' &&
+          ['TWELVE_DATA_API_KEY', 'COINGECKO_API_KEY'].includes(key),
+      )
       .map(([key, binding]) => [key, binding.value]),
   )
   const folder = resolve('.scratch', 'playwright', `${port}-${workerConfigId}`)
   mkdirSync(folder, { recursive: true, mode: 0o700 })
   const configPath = resolve(folder, 'wrangler.json')
   // Playwright workers reload this module; rewriting the config restarts Vite.
-  if (existsSync(configPath)) return configPath
+  if (existsSync(configPath) && existsSync(resolve(folder, '.dev.vars'))) return configPath
   writeFileSync(
     resolve(folder, '.dev.vars'),
     Object.entries({
       ...secrets,
       TEST_AUTH_ENABLED: 'true',
-      BETTER_AUTH_URL: baseURL,
       BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
       DATA_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     })

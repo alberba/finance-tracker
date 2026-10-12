@@ -28,6 +28,7 @@ test.describe('Modo demo', () => {
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await page.goto('/movimientos')
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
 
     const tracker = new FinanceTrackerPage(page)
     await tracker.addCustomTransaction({
