@@ -76,7 +76,6 @@ export const useSyncStore = defineStore('sync', () => {
 
   const userId = shallowRef<string | null>(null)
   const email = shallowRef<string | null>(null)
-  const isLegacyOwner = shallowRef(false)
   const connection = shallowRef<ConnectionState>(
     typeof navigator === 'undefined' || navigator.onLine ? 'online' : 'offline',
   )
@@ -819,7 +818,6 @@ export const useSyncStore = defineStore('sync', () => {
   return {
     userId,
     email,
-    isLegacyOwner,
     connection,
     syncStatus,
     revision,

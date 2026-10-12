@@ -29,9 +29,8 @@ describe("POST /api/state/initialize", () => {
     principal = {
       userId: user.id,
       email: user.email,
-      provider: "cf-access",
+      provider: "better-auth",
       subject: "sub-1",
-      isLegacyOwner: false,
     };
   });
 
@@ -82,9 +81,8 @@ describe("POST /api/state/reset", () => {
     principal = {
       userId: user.id,
       email: user.email,
-      provider: "cf-access",
+      provider: "better-auth",
       subject: "sub-1",
-      isLegacyOwner: false,
     };
   });
 

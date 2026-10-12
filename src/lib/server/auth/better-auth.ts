@@ -10,7 +10,6 @@ import {
   admitVerifiedUser,
   assertNewFinancialEmail,
   authenticatedPrincipal,
-  grantAdministrator,
   registrationInvitation,
 } from '../../../db/repositories/authentication'
 import type { RuntimeEnv } from '../cloudflare-env'
@@ -263,13 +262,6 @@ export function createAuthentication(
                   }
                 }
                 await admitVerifiedUser(db, session.userId)
-                const principal = await authenticatedPrincipal(db, session.userId)
-                if (
-                  principal?.isLegacyOwner &&
-                  user.email.toLowerCase() === env.LEGACY_OWNER_EMAIL?.trim().toLowerCase()
-                ) {
-                  await grantAdministrator(db, session.userId)
-                }
               } catch {
                 throw new APIError('FORBIDDEN', {
                   message: 'La invitación ya no está disponible. Solicita otra.',

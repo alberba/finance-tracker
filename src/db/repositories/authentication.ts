@@ -48,7 +48,7 @@ export async function admitVerifiedUser(db: Db, id: string): Promise<void> {
 
 export async function authenticatedPrincipal(db: Db, id: string): Promise<AuthPrincipal | null> {
   const [row] = await db
-    .select({ id: users.id, email: users.email, legacy: users.isLegacyOwner })
+    .select({ id: users.id, email: users.email })
     .from(authAdmission)
     .innerJoin(users, eq(users.id, authAdmission.userId))
     .innerJoin(authUser, eq(authUser.id, users.id))
@@ -61,7 +61,6 @@ export async function authenticatedPrincipal(db: Db, id: string): Promise<AuthPr
     email: row.email,
     provider: 'better-auth',
     subject: row.id,
-    isLegacyOwner: row.legacy === 1,
     isAdmin: role?.role === 'admin',
   }
 }
