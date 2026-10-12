@@ -627,6 +627,32 @@ async function openSectionForLayout(
 /** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
 test.use({ snapshotTime: '2026-09-15T10:00:00+02:00' })
 
+/**
+ * Snapshots whose settings tab rail overflows: the selected tab is centered in
+ * the rail before capture, so the frame does not inherit wherever the browser
+ * left the horizontal scroll when the tab was clicked.
+ */
+const CENTERED_SETTINGS_TAB_SNAPSHOTS = new Set([
+  'page-settings-recurring.png',
+  'page-settings-recurring-dark.png',
+  'page-settings-preferences.png',
+  'page-settings-preferences-dark.png',
+])
+
+async function centerSelectedSettingsTab(page: Page): Promise<void> {
+  const selectedTab = page
+    .getByRole('tablist', { name: 'Apartados de configuración' })
+    .getByRole('tab', { selected: true })
+  if ((await selectedTab.count()) === 0) return
+  await selectedTab.evaluate((tab) => {
+    const rail = tab.closest<HTMLElement>('[role="tablist"]')
+    if (!rail) return
+    const tabRect = tab.getBoundingClientRect()
+    const railRect = rail.getBoundingClientRect()
+    rail.scrollLeft += tabRect.left + tabRect.width / 2 - (railRect.left + railRect.width / 2)
+  })
+}
+
 async function expectViewSnapshot(
   page: Page,
   open: () => Promise<void>,
@@ -654,6 +680,7 @@ async function expectViewSnapshot(
       lastTop = top
     }
   }, focus)
+  if (CENTERED_SETTINGS_TAB_SNAPSHOTS.has(name)) await centerSelectedSettingsTab(page)
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
     caret: 'hide',

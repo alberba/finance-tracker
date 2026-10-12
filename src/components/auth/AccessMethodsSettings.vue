@@ -29,6 +29,6 @@ const { accounts, passkeys, busy, error, link, addPasskey, removePasskey } =
         <BaseButton :disabled="busy" @click="removePasskey(key.id)">Eliminar passkey</BaseButton>
       </li>
     </ul>
-    <a href="/login">Configurar o recuperar contraseña</a>
+    <a href="/login" class="inline-flex min-h-11 items-center">Configurar o recuperar contraseña</a>
   </section>
 </template>
