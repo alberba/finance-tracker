@@ -1,4 +1,8 @@
 import type { PlaywrightTestConfig } from '@playwright/test'
+import { randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { unstable_getVarsForDev, unstable_readConfig } from 'wrangler'
 
 type PlaywrightRuntimeOptions = {
   port: number
@@ -9,6 +13,7 @@ type PlaywrightRuntimeOptions = {
 }
 
 const isCI = Boolean(process.env.CI)
+const workerConfigId = (process.env.PLAYWRIGHT_WORKER_CONFIG_ID ??= randomBytes(8).toString('hex'))
 
 // Each worktree gets its own port so parallel worktrees never collide on 4321.
 // The offset is even, so configs whose base ports differ by one stay apart.
@@ -16,6 +21,58 @@ function worktreeOffset(): number {
   let hash = 0
   for (const char of process.cwd()) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
   return 2 * (hash % 250)
+}
+
+// General E2E uses the same Worker and D1, with an isolated local auth origin.
+// Production vars and the developer's .dev.vars are never rewritten.
+function localWorkerConfig(port: number, baseURL: string): string {
+  const config = unstable_readConfig({ config: 'wrangler.toml' }, { hideWarnings: true })
+  const bindings = unstable_getVarsForDev(
+    config.configPath,
+    undefined,
+    config.vars,
+    undefined,
+    true,
+  )
+  const secrets = Object.fromEntries(
+    Object.entries(bindings)
+      .filter(([, binding]) => binding.type === 'secret_text')
+      .map(([key, binding]) => [key, binding.value]),
+  )
+  const folder = resolve('.scratch', 'playwright', `${port}-${workerConfigId}`)
+  mkdirSync(folder, { recursive: true, mode: 0o700 })
+  const configPath = resolve(folder, 'wrangler.json')
+  // Playwright workers reload this module; rewriting the config restarts Vite.
+  if (existsSync(configPath)) return configPath
+  writeFileSync(
+    resolve(folder, '.dev.vars'),
+    Object.entries({
+      ...secrets,
+      TEST_AUTH_ENABLED: 'true',
+      BETTER_AUTH_URL: baseURL,
+      BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
+      DATA_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    })
+      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+      .join('\n'),
+    { mode: 0o600 },
+  )
+  writeFileSync(
+    configPath,
+    JSON.stringify({
+      name: 'finance-tracker-e2e',
+      main: config.main,
+      compatibility_date: config.compatibility_date,
+      compatibility_flags: config.compatibility_flags,
+      d1_databases: config.d1_databases.map((database: { migrations_dir?: string }) => ({
+        ...database,
+        migrations_dir: resolve(database.migrations_dir ?? 'migrations-v2'),
+      })),
+      vars: { ...config.vars, BETTER_AUTH_URL: baseURL },
+    }),
+    { mode: 0o600 },
+  )
+  return configPath
 }
 
 export function createPlaywrightRuntime({
@@ -61,7 +118,11 @@ export function createPlaywrightRuntime({
           reuseExistingServer: false,
           timeout: 120_000,
           gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
-          env,
+          env: {
+            ...env,
+            CLOUDFLARE_CONFIG_PATH: localWorkerConfig(serverPort, localBaseURL),
+            CLOUDFLARE_PERSIST_PATH: resolve('.wrangler/state'),
+          },
         },
   }
 }
