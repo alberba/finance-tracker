@@ -199,7 +199,7 @@ test.describe('Settings E2E', () => {
     await watchlist.selectOption('wl-etf')
     await expect(watchlist).toHaveValue('wl-etf')
     await expect(target).toHaveValue('AGED.XETRA')
-    await expect(page.locator('#save-status')).toContainText('Sincronizado')
+    await tracker.waitForSync()
 
     await tracker.reload()
     await expect

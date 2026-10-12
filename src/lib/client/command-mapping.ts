@@ -48,16 +48,12 @@
  *
  * Known, documented leftovers (exotic edge flows intentionally NOT covered
  * here — see the WP7b report for the full list):
- * - `resolveCategoryId`/`resolveEntityId` returning `null` because the
- *   referenced category/recurring-rule hasn't synced yet is passed through
- *   as `categoryId: null` where the schema allows it. Where the schema
- *   requires the field (`budgetEntry.categoryId`, `pendingMovement.recurringRuleId`),
- *   the command is skipped with a console warning instead of sent with a
- *   bogus value — the edit will sync on the next mutation of the same row
- *   once the dependency has caught up. This is an eventual-consistency gap
- *   for the "created dependency and dependent row in the same instant,
- *   offline" case, not a data-loss bug (nothing is ever double-applied or
- *   silently dropped from local state).
+ * - Cached and in-flight entity identities are scoped to the current user;
+ *   resolving an in-flight create waits for its durable queue write, not a
+ *   server acknowledgement. Recurrence enqueues rule creates before their
+ *   pending movements. A required reference that remains unresolved
+ *   (`budgetEntry.categoryId`, `pendingMovement.recurringRuleId`) still
+ *   skips its command with a console warning instead of sending a bogus id.
  * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
  *   its flow allocations nested under `data.allocations`; the snapshot
  *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
