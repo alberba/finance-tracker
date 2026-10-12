@@ -7,13 +7,13 @@ const toggle = (page: Page) => page.locator('#sidebar-toggle')
 const html = (page: Page) => page.locator('html')
 
 test.describe('Sidebar toggle', () => {
-  test('la inicialización del sidebar no lanza errores en carga', async ({ page }) => {
+  test('la inicialización del sidebar no lanza errores en carga', async ({ page, tracker }) => {
     const pageErrors: string[] = []
     page.on('pageerror', (error) => {
       pageErrors.push(error.message)
     })
 
-    await page.goto('/')
+    await tracker.goto()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.locator('#dashboard')).toBeVisible()
 

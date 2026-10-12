@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, useTemplateRef } from 'vue'
+import { storeToRefs } from 'pinia'
 
-import { useDashboardViewModel } from '../../composables/useDashboardViewModel'
+import { useDashboardStore } from '../../stores/dashboard'
 import DashboardGoalsBlock from '../dashboard/DashboardGoalsBlock.vue'
 import DashboardMonthCard from '../dashboard/DashboardMonthCard.vue'
 import DashboardNetWorthBand from '../dashboard/DashboardNetWorthBand.vue'
@@ -19,14 +20,23 @@ import { todayISO } from '../../scripts/utils'
 
 const props = withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: true })
 
-const { viewModel, activeRange, changeYear, changeMonth, changeRange, navigate } =
-  useDashboardViewModel()
+const dashboardStore = useDashboardStore()
+const { viewModel, activeRange } = storeToRefs(dashboardStore)
 const transactionPanel = useTemplateRef<InstanceType<typeof TransactionPanel>>('transactionPanel')
 
 const today = formatWeekdayDate(todayISO())
-const month = computed({ get: () => viewModel.value.month, set: changeMonth })
-const year = computed({ get: () => viewModel.value.year, set: changeYear })
-const range = computed({ get: () => activeRange.value, set: changeRange })
+const month = computed({
+  get: () => viewModel.value.month,
+  set: dashboardStore.changeMonth,
+})
+const year = computed({
+  get: () => viewModel.value.year,
+  set: dashboardStore.changeYear,
+})
+const range = computed({
+  get: () => activeRange.value,
+  set: dashboardStore.changeRange,
+})
 </script>
 
 <template>
@@ -83,18 +93,18 @@ const range = computed({ get: () => activeRange.value, set: changeRange })
         <DashboardTopExpensesBlock
           class="border-t xl:border-t-0 xl:border-l"
           :expenses="viewModel.topExpenses"
-          @navigate="navigate"
+          @navigate="dashboardStore.navigate"
         />
         <DashboardPendingBlock class="border-t xl:border-t-0 xl:border-l" />
         <DashboardRecentBlock
           class="border-t"
           :transactions="viewModel.recentTransactions"
-          @navigate="navigate"
+          @navigate="dashboardStore.navigate"
         />
         <DashboardGoalsBlock
           class="border-t xl:col-span-2 xl:border-l"
           :goals="viewModel.goals"
-          @navigate="navigate"
+          @navigate="dashboardStore.navigate"
         />
         <DashboardQuotesBlock class="border-t xl:col-span-3" />
       </div>

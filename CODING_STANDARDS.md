@@ -26,7 +26,10 @@ Una observación de revisión sobre comillas, indentación o import order es rui
 Fuente: `docs/architecture/frontend.md`.
 
 - Astro renderiza shell, rutas y markup sin reactividad propia. Vue queda para islas interactivas,
-  siempre con Composition API y composables.
+  con Composition API. El patrón por sección de `docs/architecture/frontend.md` orienta la
+  organización; un composable o adaptador debe tener una responsabilidad propia, como gestionar
+  ciclo de vida o traducir una integración. Delegar una llamada o renombrar métodos, por sí solo,
+  no justifica otra capa.
 - `FinanceTrackerShell.astro` solo compone layout, sidebar y secciones. La navegación vive en
   `src/components/layout`.
 - Una isla Vue no habla directamente con `window` salvo dentro de un adaptador o composable dedicado.
@@ -90,8 +93,8 @@ Fuente: `docs/testing.md`.
 
 Fuente: `docs/playwright.md`.
 
-- Legacy reinicia el blob del propietario antes de cada prueba y usa un worker por runner;
-  cada shard de CI tiene su propia D1. Sync-v2 aísla los usuarios de cada escenario.
+- Cada escenario autenticado usa un usuario aislado, inicializa su espacio por la API y persiste
+  mediante sync v2; cada shard de CI tiene su propia D1.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.

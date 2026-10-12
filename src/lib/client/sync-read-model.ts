@@ -57,7 +57,7 @@ export function applyRemoteChanges(
       if (!settings || typeof settings !== 'object') throw new Error('Ajustes remotos inválidos.')
       next = {
         ...next,
-        settings,
+        settings: { ...next.settings, ...settings },
         twrLiquidityAccounts: settings.twrLiquidityAccounts ?? next.twrLiquidityAccounts,
         stockeventsCashMappings: settings.stockeventsCashMappings ?? next.stockeventsCashMappings,
       }
@@ -75,7 +75,20 @@ export function applyRemoteChanges(
       const row = JSON.parse(change.payload ?? 'null') as CachedEntity | null
       if (!row || row.id !== change.entityId) throw new Error('Entidad remota inválida.')
       if (index < 0) rows.push(row)
-      else if (Number(row.version ?? 0) >= Number(rows[index].version ?? 0)) rows[index] = row
+      else if (Number(row.version ?? 0) >= Number(rows[index].version ?? 0)) {
+        const previous = rows[index]
+        const sameVersionInvestmentWithoutOperation =
+          change.entityType === 'transaction' &&
+          row.type === 'investment' &&
+          previous.type === 'investment' &&
+          Number(row.version ?? 0) === Number(previous.version ?? 0) &&
+          !('tradeDetail' in row) &&
+          previous.tradeDetail
+        rows[index] =
+          sameVersionInvestmentWithoutOperation
+            ? { ...row, tradeDetail: previous.tradeDetail }
+            : row
+      }
     }
     next = { ...next, [key]: rows }
   }

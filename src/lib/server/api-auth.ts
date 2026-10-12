@@ -26,15 +26,6 @@ export function requirePrincipal(locals: App.Locals): AuthPrincipal {
   return principal;
 }
 
-/** Temporary cutover guard: only the reserved owner may touch the v1 blob. */
-export function requireLegacyOwner(locals: App.Locals): AuthPrincipal {
-  const principal = requirePrincipal(locals);
-  if (!principal.isLegacyOwner) {
-    throw new ForbiddenError("El estado legacy solo está disponible para su propietario.");
-  }
-  return principal;
-}
-
 /**
  * Wraps a route handler body, turning `UnauthorizedError`/generic errors into
  * JSON responses. `UnauthorizedError`/`ForbiddenError` are handled outcomes and

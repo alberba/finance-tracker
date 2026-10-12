@@ -35,7 +35,6 @@ beforeEach(async () => {
       email: 'owner@example.test',
       provider: 'test',
       subject: 'owner',
-      isLegacyOwner: false,
     },
     runtimeEnv: { finance_tracker_db_v2: binding },
   } as App.Locals
@@ -120,6 +119,31 @@ it('rolls back user provisioning when identity creation fails', async () => {
   ).rejects.toThrow()
   expect((await db.select().from(schema.users)).map((row) => row.id)).toEqual(['owner', 'other'])
   expect(await db.select().from(schema.userIdentities)).toEqual([])
+})
+
+it('reuses a test identity by provider subject without linking by email', async () => {
+  const first = await resolvePrincipal(db, {
+    provider: 'e2e-test-header',
+    subject: 'stable-subject',
+    email: 'new@example.test',
+  })
+  const repeated = await resolvePrincipal(db, {
+    provider: 'e2e-test-header',
+    subject: 'stable-subject',
+    email: 'changed@example.test',
+  })
+
+  expect(repeated.userId).toBe(first.userId)
+  expect(await db.select().from(schema.userIdentities)).toHaveLength(1)
+
+  await expect(
+    resolvePrincipal(db, {
+      provider: 'e2e-test-header',
+      subject: 'different-subject',
+      email: 'owner@example.test',
+    }),
+  ).rejects.toThrow()
+  expect(await db.select().from(schema.userIdentities)).toHaveLength(1)
 })
 
 it('rolls back a command including changes, cursor and result while retaining its recoverable reservation', async () => {

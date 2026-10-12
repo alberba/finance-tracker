@@ -31,9 +31,8 @@ describe("GET /api/session", () => {
     const principal: AuthPrincipal = {
       userId: user.id,
       email: user.email,
-      provider: "cf-access",
+      provider: "better-auth",
       subject: "sub-1",
-      isLegacyOwner: false,
     };
 
     const { GET } = await import("../../../../src/pages/api/session");
@@ -42,5 +41,7 @@ describe("GET /api/session", () => {
     const body = await response.json();
     expect(body.user.id).toBe(user.id);
     expect(body.revision).toBe(0);
+    expect(body.authentication).toBe("better-auth");
+    expect(body.user).not.toHaveProperty("isLegacyOwner");
   });
 });

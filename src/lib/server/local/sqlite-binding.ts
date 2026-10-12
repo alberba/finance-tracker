@@ -4,7 +4,7 @@ import { interactiveTransaction } from '../../../db/transaction-capability'
 
 type Parameter = string | number | bigint | Buffer | null
 
-/** The SQL boundary consumed by Drizzle's async D1 driver and legacy state. */
+/** The SQL boundary consumed by Drizzle's async D1 driver. */
 class SqliteStatement {
   #connection: SqliteConnection
   #sql: string

@@ -21,9 +21,9 @@ conservan las claves financieras.
   7 días, configurable. La cookie de invitación es HttpOnly/SameSite=Lax y caduca
   en un día. El límite y caducidad se comprueban al completar, también en OAuth.
   Una invitación nueva permite reintentar la admisión de un registro pendiente.
-- Rol `auth_role=admin` independiente de `isLegacyOwner`. El propietario migrado,
-  con correo verificado igual a `LEGACY_OWNER_EMAIL`, obtiene ese rol al entrar.
-  Un administrador puede autorizar otros usuarios ya admitidos desde ajustes.
+- Rol `auth_role=admin` persistido en D1. Un administrador puede autorizar otros
+  usuarios ya admitidos desde ajustes. Ningún correo de configuración concede
+  privilegios al iniciar sesión.
 - Vinculación implícita desactivada. Google/GitHub con correo coincidente no
   acceden a una cuenta existente: primero entrar con correo, después vincular
   desde ajustes. La vinculación exige sesión y señal de correo verificado del
@@ -52,9 +52,9 @@ conservan las claves financieras.
 ## Configuración del operador
 
 1. Elegir el origen HTTPS canónico. Escribir `BETTER_AUTH_URL` y `RESEND_FROM`
-   como variables del Worker; `LEGACY_OWNER_EMAIL` debe ser el correo real del
-   propietario. Construir con `PUBLIC_SYNC_V2=true` antes del corte: los usuarios
-   invitados necesitan el modelo multiusuario y las colas separadas.
+   como variables del Worker. El cliente autenticado usa sync v2 sin una variable de
+   selección de protocolo; los usuarios invitados usan el modelo multiusuario
+   y las colas separadas.
 2. Crear una clave aleatoria de al menos 32 caracteres, por ejemplo
    `openssl rand -base64 32`. Guardar con
    `pnpm exec wrangler secret put BETTER_AUTH_SECRET`. Usar una distinta para
@@ -82,53 +82,30 @@ conservan las claves financieras.
    válido; `localhost` sirve, `127.0.0.1` no sirve como RP ID. Los callbacks de
    local/staging necesitan su propio registro en los proveedores.
 
-## Migración y corte
+## Retirada de la transición
 
-1. Mantener Access activo y `AUTH_MODE=cf-access` (el valor omitido conserva el
-   puente). Exportar una copia D1 antes de migrar, conservando su versión/fecha.
-   `pnpm exec wrangler d1 export finance-tracker-db-v2 --remote --output <ruta>`.
-2. Aplicar `pnpm d1:migrate:remote:v2` durante una ventana controlada. 0007 prepara
-   únicamente emails ligados a una identidad `cf-access` de confianza que
-   coincide con `users.email`, conservando el id. No crea sesiones desde cookies
-   Access ni provisiona identidades por un email OAuth coincidente.
-3. Ejecutar en D1 la consulta de preflight de abajo. Cero usuarios pendientes es
-   condición del corte. Si hay datos sin identidad verificable, resolver la
-   correlación con prueba explícita del propietario antes del corte; no crear
-   una cuenta nueva ni rellenar emails basándose en parámetros del navegador.
-   Si alguien entra por Access después de 0007, ejecutar al cierre de la ventana
-   `pnpm exec wrangler d1 execute finance-tracker-db-v2 --remote --file scripts/prepare-authentication-users.sql`.
-   Es idempotente y usa las mismas identidades de confianza que 0007. No tocar ids ni credenciales financieras.
-4. En staging, definir `AUTH_MODE=better-auth`, construir/deployar con sync v2 y
-   probar las APIs privadas antes de retirar la política externa de Access.
-   Comprobar login del propietario por código, mismo `user.id` e historial,
-   administrador inicial, invitación, verificación, ambos OAuth, vinculación,
-   passkey y recuperación. Probar dos sesiones, revocación inmediata, aislamiento
-   y cola pendiente durante pérdida de sesión. No hacer logout para la primera
-   migración: provocaría un borrado voluntario; basta autenticar una vez.
-5. Validar por separado una PWA realmente instalada en Android/iOS: callback
-   Google/GitHub vuelve al origen, sesión compartida con la PWA según el navegador,
-   envío/recepción de códigos, passkey, cierre remoto y vuelta del segundo plano.
-   La emulación de Playwright no demuestra compatibilidad del dispositivo.
-6. Publicar el Worker con `AUTH_MODE=better-auth`. Solo tras verificar las
-   fronteras privadas retirar la política Access del hostname. Ese modo ignora
-   por completo las cabeceras Access. Dejar un artefacto de rollback preparado.
-7. Tras cerrar la ventana de rollback, retirar `CF_ACCESS_*`, las políticas y
-   el bloque de middleware del puente `cf-access`, conservando las identidades
-   históricas para auditoría. El puente solo autoriza JWT Access verificados y
-   nunca convierte cookies a sesiones Better Auth.
+La aplicación autoriza exclusivamente sesiones Better Auth admitidas en D1. Se retiran
+`AUTH_MODE`, `LEGACY_OWNER_EMAIL`, `CF_ACCESS_*`, el verificador de JWT Access y la
+vinculación automática del propietario. Las identidades históricas, los ids financieros
+y los roles persistidos se conservan; no se convierten cabeceras Access en sesiones.
+
+Antes de desplegar la retirada, verificar sobre una copia reciente de producción:
 
 ```sql
-SELECT u.id, u.email FROM users u
+SELECT COUNT(*) FROM users u
 LEFT JOIN auth_user a ON a.id = u.id
 LEFT JOIN auth_admission m ON m.user_id = u.id
 WHERE a.id IS NULL OR m.user_id IS NULL;
-SELECT u.id, u.email, u.is_legacy_owner, r.role FROM users u
-LEFT JOIN auth_role r ON r.user_id = u.id
-WHERE u.is_legacy_owner = 1;
+SELECT COUNT(*) FROM auth_role WHERE role = 'admin';
 PRAGMA foreign_key_check;
 ```
 
-## Verificación y rollback
+El preflight del 12 de octubre de 2026 dio cero usuarios sin admisión,
+un administrador y cero errores de claves foráneas. La recuperación utiliza un
+artefacto con Better Auth y la misma D1 v2; no restaurar una copia antigua sobre
+escrituras financieras nuevas ni volver al protocolo de blob retirado.
+
+## Verificación
 
 - Gates: `pnpm check`, `pnpm lint`, `pnpm test`, `pnpm build`.
 - HTTP/SQLite: `pnpm test:integration tests/integration/auth`.
@@ -139,16 +116,9 @@ PRAGMA foreign_key_check;
   solo funcionan con flag de pruebas y origen loopback. El alias de red OAuth
   se activa exclusivamente en el runner (`AUTH_E2E_NETWORK=true`); mantiene los
   handlers de Better Auth, callbacks y persistencia reales. No desplegar esos flags.
-  Ejecutar los comandos Astro de check/build antes o después del E2E: comparten
-  caché de Vite y ejecutarlos simultáneamente puede invalidarla.
-- Repetir el spec de logout legacy: `pnpm test:e2e tests/e2e/logout.spec.ts`.
-- Si el corte falla: reactivar Access y volver al artefacto con
-  `AUTH_MODE=cf-access`. D1 y los ids financieros se conservan; las tablas nuevas
-  pueden permanecer. No restaurar una copia antigua sobre cambios financieros
-  nuevos. Los usuarios nuevos de Better Auth conservan sus datos y volverán a
-  tener acceso al restablecer ese modo, pero el puente no les concede acceso
-  automáticamente. La cola local se conserva al perder la sesión.
-- Retirar `TEST_AUTH_ENABLED`, `TEST_RESEND_URL` y cabeceras de pruebas en prod.
+  Ejecutar check/build antes o después del E2E porque comparten caché de Vite.
+- Logout y borrado de datos privados: `pnpm test:e2e tests/e2e/logout.spec.ts`.
+- No definir `TEST_AUTH_ENABLED` ni `TEST_RESEND_URL` en producción.
   El override de email y de IP de prueba es inerte con un origen no loopback.
 
 ## Prueba de NUEVA autenticación para #274

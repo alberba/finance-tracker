@@ -385,8 +385,14 @@ export const useInvestmentStore = defineStore('investment', () => {
     financialStateStore.commitState((draft) => {
       upsertContributionFlow(draft, date, round2(flow))
     })
-    void syncListDiff('contribution', before, financialStateStore.contributions, (contribution) =>
-      buildContributionData(contribution, financialStateStore.currency),
+    void syncListDiff(
+      'contribution',
+      before,
+      financialStateStore.contributions,
+      (contribution) => ({
+        ...buildContributionData(contribution, financialStateStore.currency),
+        allocations: [],
+      }),
     )
   }
 

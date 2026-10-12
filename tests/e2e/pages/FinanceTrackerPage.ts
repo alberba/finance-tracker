@@ -774,18 +774,8 @@ export class FinanceTrackerPage {
     await this.openWealth()
     await this.selectWealthMonth(params.monthLabel)
     await this.wealthSnapshotInput(params.accountName).fill(String(params.value).replace('.', ','))
-    // The toast fires as soon as local state commits, but the app mirrors the
-    // blob to the server asynchronously. Tests that reload right after saving
-    // would otherwise race that PUT and read back the pre-save server copy, so
-    // wait for the request that actually carries this value.
-    const persisted = this.page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/state') &&
-        response.request().method() === 'PUT' &&
-        (response.request().postData() ?? '').includes(String(params.value)),
-    )
     await this.saveSnapshot()
-    await persisted
+    await this.waitForSync()
   }
 
   async getAccountSnapshotValue(accountName: string): Promise<number> {
@@ -1137,6 +1127,13 @@ export class FinanceTrackerPage {
     await this.page.reload()
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
+  }
+
+  async waitForSync() {
+    const status = this.page.locator('#sidebar-sync-status')
+    await expect(status).toContainText('Sincronizado', { timeout: 15000 })
+    await this.page.waitForLoadState('networkidle')
+    await expect(status).toContainText('Sincronizado', { timeout: 15000 })
   }
 
   private async openSection(buttonLabel: string, sectionId: string, headingText: string | RegExp) {

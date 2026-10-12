@@ -10,7 +10,5 @@ const binding = createSqliteBinding(sqlite)
 
 export const env: RuntimeEnv = {
   ...process.env,
-  AUTH_MODE: 'better-auth',
-  finance_tracker_db: binding,
   finance_tracker_db_v2: binding,
 }

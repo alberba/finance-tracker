@@ -6,10 +6,8 @@
  * Design (documented per the WP7b assignment, "wire domain stores to
  * per-entity sync commands"):
  *
- * - Every exported function here is a no-op when `PUBLIC_SYNC_V2` is off
- *   (checked before touching Pinia/IndexedDB at all) — the legacy
- *   whole-blob `commitState` → `PUT /api/state` path (untouched by this
- *   file) is byte-identical either way.
+ * - The authenticated client always uses sync v2; demo calls are no-ops
+ *   before touching its isolated local state.
  * - Domain stores keep mutating `financialStateStore.state` via
  *   `commitState` exactly as before; call sites call into this module
  *   *alongside* that (usually by snapshotting the relevant array
@@ -50,16 +48,11 @@
  *
  * Known, documented leftovers (exotic edge flows intentionally NOT covered
  * here — see the WP7b report for the full list):
- * - `resolveCategoryId`/`resolveEntityId` returning `null` because the
- *   referenced category/recurring-rule hasn't synced yet is passed through
- *   as `categoryId: null` where the schema allows it. Where the schema
- *   requires the field (`budgetEntry.categoryId`, `pendingMovement.recurringRuleId`),
- *   the command is skipped with a console warning instead of sent with a
- *   bogus value — the edit will sync on the next mutation of the same row
- *   once the dependency has caught up. This is an eventual-consistency gap
- *   for the "created dependency and dependent row in the same instant,
- *   offline" case, not a data-loss bug (nothing is ever double-applied or
- *   silently dropped from local state).
+ * - Cached and in-flight entity identities are scoped to the current user;
+ *   resolving an in-flight create waits for its durable queue write, not a
+ *   server acknowledgement. Recurrence enqueues rule creates before their
+ *   pending movements. A pending movement whose recurring-rule reference
+ *   remains unresolved is not enqueued and returns failure.
  * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
  *   its flow allocations nested under `data.allocations`; the snapshot
  *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
@@ -87,13 +80,13 @@
  *   intentionally not routed through the sync command outbox.
  */
 
-import { useSyncStore } from "../../stores/sync";
-import type { SyncEntityType } from "../server/sync/command-schemas";
-import { isSyncV2Enabled } from "./feature-flags";
-import { newId } from "./ids";
-import type { PendingCreateMatch } from "./outbox";
+import { useSyncStore } from '../../stores/sync'
+import type { SyncEntityType } from '../server/sync/command-schemas'
+import { isReadOnlyDemoActive } from './demo-source'
+import { newId } from './ids'
+import type { PendingCreateMatch } from './outbox'
 
-type JsonRecord = Record<string, unknown>;
+type JsonRecord = Record<string, unknown>
 
 /**
  * Predicate over a row: it selects a cached entity out of the local cache,
@@ -102,18 +95,28 @@ type JsonRecord = Record<string, unknown>;
  * before and after the server acknowledges it — and before/after forms of the
  * same entity always agree.
  */
-export type EntityMatch = PendingCreateMatch;
+export type EntityMatch = PendingCreateMatch
+
+const pendingEntityCreates = new Map<string, Promise<string | null>>()
+
+function entityCreateKey(
+  userId: string | null,
+  entityType: SyncEntityType,
+  entityId: string,
+): string {
+  return JSON.stringify([userId, entityType, entityId])
+}
 
 /** Matches a still-queued `create` by the identity the client gave it. */
 function identityMatch(id: string): EntityMatch {
-  return (entity) => entity.id === id;
+  return (entity) => entity.id === id
 }
 
 function warn(entityType: SyncEntityType, localId: string, verb: string): void {
-  if (typeof console !== "undefined") {
+  if (typeof console !== 'undefined') {
     console.warn(
       `[sync-v2] No se pudo ${verb} "${entityType}" (id local "${localId}"): todavía no se ha sincronizado con el servidor.`,
-    );
+    )
   }
 }
 
@@ -125,12 +128,12 @@ function enqueueUpdate(
   patch: JsonRecord,
 ): Promise<unknown> {
   return syncStore.enqueueCommand({
-    action: "update",
+    action: 'update',
     entityType,
     entityId: ref.entityId,
     baseVersion: ref.version,
     patch,
-  });
+  })
 }
 
 /** Enqueues a `remove` addressed at the server row a resolved ref points to. */
@@ -140,17 +143,17 @@ function enqueueRemove(
   ref: { entityId: string; version: number },
 ): Promise<unknown> {
   return syncStore.enqueueCommand({
-    action: "remove",
+    action: 'remove',
     entityType,
     entityId: ref.entityId,
     baseVersion: ref.version,
-  });
+  })
 }
 
 /**
  * Enqueues a `create` command carrying the entity's own identity (`id`),
  * which the server stores as the row's primary key (ADR 0001) — re-sending
- * it is a no-op instead of a duplicate. No-op when sync-v2 is off.
+ * it is a no-op instead of a duplicate. Demo state never enters the outbox.
  *
  * `data.id` wins over the `id` argument when the caller already minted one
  * (e.g. a category that another command in the same batch has to reference).
@@ -159,17 +162,32 @@ export async function syncCreate(
   entityType: SyncEntityType,
   id: string,
   data: JsonRecord,
-): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+): Promise<boolean | void> {
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const entityId = typeof data.id === "string" && data.id ? data.id : id;
-  await syncStore.enqueueCommand({
-    action: "create",
-    entityType,
-    data: { ...data, id: entityId },
-  });
+  const syncStore = useSyncStore()
+  const entityId = typeof data.id === 'string' && data.id ? data.id : id
+  const key = entityCreateKey(syncStore.userId, entityType, entityId)
+  const alreadyCreating = pendingEntityCreates.get(key)
+  if (alreadyCreating) return Boolean(await alreadyCreating)
+
+  const creation = (async () => {
+    const existingId = await resolveStoredEntityId(syncStore, entityType, entityId)
+    if (existingId) return existingId
+    const entry = await syncStore.enqueueCommand({
+      action: 'create',
+      entityType,
+      data: { ...data, id: entityId },
+    })
+    return entry ? entityId : null
+  })()
+  pendingEntityCreates.set(key, creation)
+  try {
+    return Boolean(await creation)
+  } finally {
+    if (pendingEntityCreates.get(key) === creation) pendingEntityCreates.delete(key)
+  }
 }
 
 /**
@@ -181,20 +199,24 @@ export async function syncUpdate(
   entityType: SyncEntityType,
   localId: string,
   patch: JsonRecord,
-): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+): Promise<boolean | void> {
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
+  const syncStore = useSyncStore()
+  const ref = await syncStore.getEntityRef(entityType, localId)
   if (ref) {
-    await enqueueUpdate(syncStore, entityType, ref, patch);
-    return;
+    return Boolean(await enqueueUpdate(syncStore, entityType, ref, patch))
   }
-  const merged = await syncStore.mergeIntoPendingCreate(entityType, identityMatch(localId), patch);
-  if (!merged) {
-    warn(entityType, localId, "actualizar");
+  const merged = await syncStore.mergeIntoPendingCreate(entityType, identityMatch(localId), patch)
+  if (merged === false) {
+    // A create may have been acknowledged while waiting for the outbox lock.
+    const acknowledged = await syncStore.getEntityRef(entityType, localId)
+    if (acknowledged)
+      return Boolean(await enqueueUpdate(syncStore, entityType, acknowledged, patch))
+    warn(entityType, localId, 'actualizar')
   }
+  return merged
 }
 
 /**
@@ -202,20 +224,23 @@ export async function syncUpdate(
  * still-queued `create` if the entity never synced. Warns if neither is
  * found.
  */
-export async function syncRemove(entityType: SyncEntityType, localId: string): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+export async function syncRemove(
+  entityType: SyncEntityType,
+  localId: string,
+): Promise<boolean | void> {
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
+  const syncStore = useSyncStore()
+  const ref = await syncStore.getEntityRef(entityType, localId)
   if (ref) {
-    await enqueueRemove(syncStore, entityType, ref);
-    return;
+    return Boolean(await enqueueRemove(syncStore, entityType, ref))
   }
-  const cancelled = await syncStore.cancelPendingCreate(entityType, identityMatch(localId));
+  const cancelled = await syncStore.cancelPendingCreate(entityType, identityMatch(localId))
   if (!cancelled) {
-    warn(entityType, localId, "eliminar");
+    warn(entityType, localId, 'eliminar')
   }
+  return cancelled
 }
 
 /**
@@ -242,20 +267,20 @@ export async function syncUpsertByKey(
   data: JsonRecord,
   updateData: JsonRecord = data,
 ): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const ref = await syncStore.findEntityRef(entityType, matches);
+  const syncStore = useSyncStore()
+  const ref = await syncStore.findEntityRef(entityType, matches)
   if (ref) {
-    await enqueueUpdate(syncStore, entityType, ref, updateData);
-    return;
+    await enqueueUpdate(syncStore, entityType, ref, updateData)
+    return
   }
-  const merged = await syncStore.mergeIntoPendingCreate(entityType, matches, data);
-  if (merged) {
-    return;
+  const merged = await syncStore.mergeIntoPendingCreate(entityType, matches, data)
+  if (merged !== false) {
+    return
   }
-  await syncCreate(entityType, newId(), data);
+  await syncCreate(entityType, newId(), data)
 }
 
 /**
@@ -267,18 +292,18 @@ export async function syncRemoveByKey(
   matches: EntityMatch,
   label: string,
 ): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const ref = await syncStore.findEntityRef(entityType, matches);
+  const syncStore = useSyncStore()
+  const ref = await syncStore.findEntityRef(entityType, matches)
   if (ref) {
-    await enqueueRemove(syncStore, entityType, ref);
-    return;
+    await enqueueRemove(syncStore, entityType, ref)
+    return
   }
-  const cancelled = await syncStore.cancelPendingCreate(entityType, matches);
+  const cancelled = await syncStore.cancelPendingCreate(entityType, matches)
   if (!cancelled) {
-    warn(entityType, label, "eliminar");
+    warn(entityType, label, 'eliminar')
   }
 }
 
@@ -289,24 +314,24 @@ export async function syncRemoveByKey(
  * the server reads as "create it".
  */
 export async function syncSettingsUpdate(patch: {
-  currency?: string;
-  locale?: string | null;
-  theme?: string | null;
-  twrLiquidityAccountIds?: string[];
-  stockeventsEnabled?: boolean;
-  stockeventsTradesToCash?: boolean;
-  stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>;
+  currency?: string
+  locale?: string | null
+  theme?: string | null
+  twrLiquidityAccountIds?: string[]
+  stockeventsEnabled?: boolean
+  stockeventsTradesToCash?: boolean
+  stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>
 }): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const syncStore = useSyncStore();
-  const baseVersion = await syncStore.getSettingsVersion();
+  const syncStore = useSyncStore()
+  const baseVersion = await syncStore.getSettingsVersion()
   await syncStore.enqueueCommand({
-    action: "settingsUpdate",
+    action: 'settingsUpdate',
     ...(baseVersion === null ? {} : { baseVersion }),
     patch,
-  });
+  })
 }
 
 /**
@@ -317,13 +342,29 @@ export async function syncSettingsUpdate(patch: {
  * decide whether that's acceptable (optional FK) or means the command must
  * be skipped (required FK).
  */
-export async function resolveEntityId(entityType: SyncEntityType, localId: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
+export async function resolveEntityId(
+  entityType: SyncEntityType,
+  localId: string,
+): Promise<string | null> {
+  if (isReadOnlyDemoActive()) {
+    return null
   }
-  const syncStore = useSyncStore();
-  const ref = await syncStore.getEntityRef(entityType, localId);
-  return ref?.entityId ?? await syncStore.peekPendingCreateId(entityType, identityMatch(localId));
+  const syncStore = useSyncStore()
+  const key = entityCreateKey(syncStore.userId, entityType, localId)
+  const creating = pendingEntityCreates.get(key)
+  if (creating) return creating
+  const existingId = await resolveStoredEntityId(syncStore, entityType, localId)
+  if (existingId) return existingId
+  return pendingEntityCreates.get(key) ?? null
+}
+
+async function resolveStoredEntityId(
+  syncStore: ReturnType<typeof useSyncStore>,
+  entityType: SyncEntityType,
+  localId: string,
+): Promise<string | null> {
+  const ref = await syncStore.getEntityRef(entityType, localId)
+  return ref?.entityId ?? (await syncStore.peekPendingCreateId(entityType, identityMatch(localId)))
 }
 
 /**
@@ -332,22 +373,22 @@ export async function resolveEntityId(entityType: SyncEntityType, localId: strin
  * toggle sends it once it has.
  */
 export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[]): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const twrLiquidityAccountIds: string[] = [];
+  const twrLiquidityAccountIds: string[] = []
   for (const localId of localAccountIds) {
-    const accountId = await resolveEntityId("account", localId);
+    const accountId = await resolveEntityId('account', localId)
     if (accountId) {
-      twrLiquidityAccountIds.push(accountId);
+      twrLiquidityAccountIds.push(accountId)
     } else {
-      warn("account", localId, "marcar como liquidez TWR");
+      warn('account', localId, 'marcar como liquidez TWR')
     }
   }
-  await syncSettingsUpdate({ twrLiquidityAccountIds });
+  await syncSettingsUpdate({ twrLiquidityAccountIds })
 }
 
-export type CategoryKind = "income" | "expense" | "investment";
+export type CategoryKind = 'income' | 'expense' | 'investment'
 
 /**
  * Matches a cached category by the attributes that identify it: its name
@@ -355,7 +396,7 @@ export type CategoryKind = "income" | "expense" | "investment";
  * `${kind}:${name}` string the write path used to correlate by (ADR 0001).
  */
 function categoryMatches(kind: CategoryKind, name: string): EntityMatch {
-  return (category) => category.kind === kind && category.name === name;
+  return (category) => category.kind === kind && category.name === name
 }
 
 /**
@@ -367,11 +408,11 @@ async function resolveEntityIdByMatch(
   entityType: SyncEntityType,
   matches: EntityMatch,
 ): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
+  if (isReadOnlyDemoActive()) {
+    return null
   }
-  const ref = await useSyncStore().findEntityRef(entityType, matches);
-  return ref?.entityId ?? null;
+  const ref = await useSyncStore().findEntityRef(entityType, matches)
+  return ref?.entityId ?? null
 }
 
 /**
@@ -383,15 +424,15 @@ async function resolveEntityIdByMatch(
  * `resolveOrCreateCategoryId` instead.
  */
 export async function resolveCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
+  if (isReadOnlyDemoActive()) {
+    return null
   }
-  const existing = await resolveEntityIdByMatch("category", categoryMatches(kind, name));
+  const existing = await resolveEntityIdByMatch('category', categoryMatches(kind, name))
   if (existing) {
-    return existing;
+    return existing
   }
-  await syncUpsertByKey("category", categoryMatches(kind, name), { name, kind });
-  return null;
+  await syncUpsertByKey('category', categoryMatches(kind, name), { name, kind })
+  return null
 }
 
 /**
@@ -405,7 +446,7 @@ export async function resolveCategoryId(kind: CategoryKind, name: string): Promi
  * whichever create actually lands. Every caller within this session awaits
  * the same in-flight mint instead.
  */
-const pendingCategoryMints = new Map<string, Promise<string>>();
+const pendingCategoryMints = new Map<string, Promise<string | null>>()
 
 /**
  * Like `resolveCategoryId`, but never returns `null` for a genuinely new
@@ -421,37 +462,44 @@ const pendingCategoryMints = new Map<string, Promise<string>>();
  * create has even been written — via `pendingCategoryMints`) instead of
  * minting (and creating) a second one.
  */
-export async function resolveOrCreateCategoryId(kind: CategoryKind, name: string): Promise<string | null> {
-  if (!isSyncV2Enabled()) {
-    return null;
+export async function resolveOrCreateCategoryId(
+  kind: CategoryKind,
+  name: string,
+): Promise<string | null> {
+  if (isReadOnlyDemoActive()) {
+    return null
   }
-  const existing = await resolveEntityIdByMatch("category", categoryMatches(kind, name));
+  const existing = await resolveEntityIdByMatch('category', categoryMatches(kind, name))
   if (existing) {
-    return existing;
+    return existing
   }
-  const matches = categoryMatches(kind, name);
-  const syncStore = useSyncStore();
-  const pendingId = await syncStore.peekPendingCreateId("category", matches);
+  const matches = categoryMatches(kind, name)
+  const syncStore = useSyncStore()
+  const pendingId = await syncStore.peekPendingCreateId('category', matches)
   if (pendingId) {
-    return pendingId;
+    return pendingId
   }
   // Memo key for the in-flight mint below. Purely local (never sent) — the
   // category's identity is the UUID minted here.
-  const memoKey = `${kind}:${name}`;
-  const inFlight = pendingCategoryMints.get(memoKey);
+  const memoKey = `${kind}:${name}`
+  const memoKeyForUser = JSON.stringify([syncStore.userId, memoKey])
+  const inFlight = pendingCategoryMints.get(memoKeyForUser)
   if (inFlight) {
-    return inFlight;
+    return inFlight
   }
   const mint = (async () => {
-    const id = newId();
-    await syncUpsertByKey("category", matches, { name, kind, id });
-    return id;
-  })();
-  pendingCategoryMints.set(memoKey, mint);
+    const id = newId()
+    await syncUpsertByKey('category', matches, { name, kind, id })
+    return (
+      (await resolveEntityIdByMatch('category', matches)) ??
+      (await syncStore.peekPendingCreateId('category', matches))
+    )
+  })()
+  pendingCategoryMints.set(memoKeyForUser, mint)
   try {
-    return await mint;
+    return await mint
   } finally {
-    pendingCategoryMints.delete(memoKey);
+    pendingCategoryMints.delete(memoKeyForUser)
   }
 }
 
@@ -471,17 +519,17 @@ export async function syncCategoryUpsert(
   name: string,
   data: JsonRecord = {},
 ): Promise<void> {
-  await syncUpsertByKey("category", categoryMatches(kind, name), { name, kind, ...data });
+  await syncUpsertByKey('category', categoryMatches(kind, name), { name, kind, ...data })
 }
 
 /** Removes a category addressed by its real name+kind. */
 export async function syncCategoryRemove(kind: CategoryKind, name: string): Promise<void> {
-  await syncRemoveByKey("category", categoryMatches(kind, name), name);
+  await syncRemoveByKey('category', categoryMatches(kind, name), name)
 }
 
 /** Create-if-absent / update-otherwise for a goal, addressed by its key. */
 export async function syncGoalUpsert(key: string, data: JsonRecord): Promise<void> {
-  await syncUpsertByKey("goal", (goal) => goal.key === key, data);
+  await syncUpsertByKey('goal', (goal) => goal.key === key, data)
 }
 
 /**
@@ -498,11 +546,11 @@ export async function syncBudgetEntry(
   currency: string,
 ): Promise<void> {
   await syncUpsertByKey(
-    "budgetEntry",
+    'budgetEntry',
     (entry) => entry.categoryId === categoryId && entry.year === year && entry.month === month,
     { categoryId, year, month, amount, currency },
     { amount, currency },
-  );
+  )
 }
 
 /**
@@ -516,10 +564,10 @@ export async function syncWealthSnapshot(
   balances: unknown,
 ): Promise<void> {
   await syncUpsertByKey(
-    "wealthSnapshot",
+    'wealthSnapshot',
     (snapshot) => snapshot.year === year && snapshot.month === month,
-    { snapshotDate: `${year}-${String(month).padStart(2, "0")}-01`, year, month, balances },
-  );
+    { snapshotDate: `${year}-${String(month).padStart(2, '0')}-01`, year, month, balances },
+  )
 }
 
 /**
@@ -543,34 +591,35 @@ export async function syncListDiff<T extends { id: string }>(
   before: readonly T[],
   after: readonly T[],
   buildData: (item: T, previous?: T) => Promise<JsonRecord | null> | JsonRecord | null,
-): Promise<void> {
-  if (!isSyncV2Enabled()) {
-    return;
+): Promise<boolean | void> {
+  if (isReadOnlyDemoActive()) {
+    return
   }
-  const beforeById = new Map(before.map((item) => [item.id, item]));
-  const afterIds = new Set(after.map((item) => item.id));
+  const beforeById = new Map(before.map((item) => [item.id, item]))
+  const afterIds = new Set(after.map((item) => item.id))
 
   for (const id of beforeById.keys()) {
     if (!afterIds.has(id)) {
-      await syncRemove(entityType, id);
+      if (!(await syncRemove(entityType, id))) return false
     }
   }
 
   for (const item of after) {
-    const prev = beforeById.get(item.id);
+    const prev = beforeById.get(item.id)
     if (prev && JSON.stringify(prev) === JSON.stringify(item)) {
-      continue;
+      continue
     }
-    const data = await buildData(item, prev);
+    const data = await buildData(item, prev)
     if (data === null) {
-      continue;
+      return false
     }
     if (prev) {
-      await syncUpdate(entityType, item.id, data);
+      if (!(await syncUpdate(entityType, item.id, data))) return false
     } else {
-      await syncCreate(entityType, item.id, data);
+      if (!(await syncCreate(entityType, item.id, data))) return false
     }
   }
+  return true
 }
 
 /**
@@ -580,8 +629,7 @@ export async function syncListDiff<T extends { id: string }>(
  */
 function stockeventsMappingMatches(symbol: string): EntityMatch {
   return (entity) =>
-    entity.legacyId === symbol ||
-    (entity.legacyId == null && entity.stockeventsSymbol === symbol);
+    entity.legacyId === symbol || (entity.legacyId == null && entity.stockeventsSymbol === symbol)
 }
 
 /** Create-if-absent / update-otherwise for one Stock Events symbol mapping. */
@@ -590,16 +638,16 @@ export async function syncStockeventsMappingUpsert(
   data: { stockeventsSymbol: string; sync: boolean; watchlistId: string | null; hidden: boolean },
 ): Promise<void> {
   await syncUpsertByKey(
-    "stockeventsMapping",
+    'stockeventsMapping',
     stockeventsMappingMatches(symbol),
     { legacyId: symbol, categoryId: null, ...data },
     { ...data },
-  );
+  )
 }
 
 /** Removes a Stock Events symbol mapping addressed by its local symbol. */
 export async function syncStockeventsMappingRemove(symbol: string): Promise<void> {
-  await syncRemoveByKey("stockeventsMapping", stockeventsMappingMatches(symbol), symbol);
+  await syncRemoveByKey('stockeventsMapping', stockeventsMappingMatches(symbol), symbol)
 }
 
 /**
@@ -614,7 +662,7 @@ function stockeventsCashEntryMatches(
   return (entity) =>
     entity.contributionDate === contributionDate &&
     (entity.accountId ?? null) === (accountId ?? null) &&
-    entity.watchlistId === watchlistId;
+    entity.watchlistId === watchlistId
 }
 
 /** Create-if-absent / update-otherwise for one contribution-cash sync entry. */
@@ -625,10 +673,12 @@ export async function syncStockeventsCashEntryUpsert(
   syncedAmount: number,
   currency: string,
 ): Promise<void> {
-  const matches = stockeventsCashEntryMatches(contributionDate, accountId, watchlistId);
-  await syncUpsertByKey(
-    "stockeventsCashEntry",
-    matches,
-    { contributionDate, accountId, watchlistId, syncedAmount, currency },
-  );
+  const matches = stockeventsCashEntryMatches(contributionDate, accountId, watchlistId)
+  await syncUpsertByKey('stockeventsCashEntry', matches, {
+    contributionDate,
+    accountId,
+    watchlistId,
+    syncedAmount,
+    currency,
+  })
 }

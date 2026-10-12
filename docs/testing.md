@@ -74,9 +74,8 @@ aumentan timeouts ni se cambian workers:
   explique los fallos históricos de la issue.
 
 Antes de investigar E2E, configurar en `.dev.vars` las mismas variables locales que CI:
-`TEST_AUTH_ENABLED=true` y `LEGACY_OWNER_EMAIL=legacy-owner@e2e.test`. Sin ellas, el fixture falla
-en `/api/state/reset-legacy` antes de ejecutar las aserciones del test; no es la inestabilidad del
-recorrido. No deben configurarse en producción.
+`TEST_AUTH_ENABLED=true`. Cada fixture crea su propia identidad aislada e inicializa su espacio
+mediante la API v2. El flag de pruebas no debe configurarse en producción.
 
 Para levantar la cuarentena, retirar los marcadores, corregir la espera de finalización o el
 aislamiento en la capa que corresponda y verificar diez ejecuciones consecutivas de `pnpm test`

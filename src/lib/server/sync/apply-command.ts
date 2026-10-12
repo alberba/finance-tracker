@@ -101,6 +101,12 @@ async function findByLegacyId(
   value: unknown,
 ): Promise<VersionedRow | undefined> {
   if (typeof value !== 'string' || !value) return undefined
+  if (entityType === 'transaction') {
+    const row = (await transactionsRepository.listByUser(db, userId)).find(
+      (candidate) => candidate.legacyId === value,
+    )
+    return row ? transactionWithTradeDetail(db, userId, row) : undefined
+  }
   let rows: VersionedRow[] = []
   switch (entityType) {
     case 'account':
@@ -108,9 +114,6 @@ async function findByLegacyId(
       break
     case 'category':
       rows = (await accountsRepository.listCategoriesByUser(db, userId)) as VersionedRow[]
-      break
-    case 'transaction':
-      rows = (await transactionsRepository.listByUser(db, userId)) as VersionedRow[]
       break
     case 'subscription':
       rows = (await subscriptionsRepository.listByUser(db, userId)) as VersionedRow[]
@@ -163,8 +166,10 @@ async function loadForMutation(
     case 'category':
       return (await accountsRepository.getCategory(db, userId, entityId)) as
         VersionedRow | undefined
-    case 'transaction':
-      return (await transactionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+    case 'transaction': {
+      const row = await transactionsRepository.get(db, userId, entityId)
+      return row ? transactionWithTradeDetail(db, userId, row) : undefined
+    }
     case 'subscription':
       return (await subscriptionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
     case 'recurringRule':
@@ -191,6 +196,15 @@ async function loadForMutation(
       return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined
     }
   }
+}
+
+async function transactionWithTradeDetail(
+  db: Db,
+  userId: string,
+  row: VersionedRow,
+): Promise<VersionedRow> {
+  const tradeDetail = await transactionsRepository.getTradeDetailByTransaction(db, userId, row.id)
+  return { ...row, tradeDetail } as VersionedRow
 }
 
 /**
@@ -652,7 +666,11 @@ async function performMutation(
           entityId: existing.id,
           entity: existing,
         }
-      const row = await createEntity(db, userId, command.entityType, parsed)
+      const created = await createEntity(db, userId, command.entityType, parsed)
+      const row =
+        command.entityType === 'transaction'
+          ? await transactionWithTradeDetail(db, userId, created)
+          : created
       const revision = await recordChange(db, userId, command.entityType, row.id, 'create', row)
       return {
         status: 'applied',

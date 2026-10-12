@@ -1,6 +1,6 @@
 import type { SnapshotKind, SnapshotRow } from '../../scripts/types'
 import { resolveEntityId, syncWealthSnapshot } from './command-mapping'
-import { isSyncV2Enabled } from './feature-flags'
+import { isReadOnlyDemoActive } from './demo-source'
 
 const SNAPSHOT_KINDS: SnapshotKind[] = ['accounts', 'investments', 'liabilities']
 
@@ -42,7 +42,7 @@ export async function syncSnapshotBalances(
   snapshot: SnapshotRow,
   currency: string,
 ): Promise<void> {
-  if (!isSyncV2Enabled()) return
+  if (isReadOnlyDemoActive()) return
   const balances = await buildSnapshotBalances(snapshot, currency)
   await syncWealthSnapshot(year, snapshot.month + 1, balances)
 }

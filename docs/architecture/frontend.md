@@ -9,7 +9,7 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004 y la nota `docs/architecture/estilos-tailwind-vs-css.md`).
 - `src/styles/global.css` es la única hoja de estilos: tokens, reset, tipografía base y las variantes del shell. La hoja heredada desapareció en la 2.0.0 y `tests/unit/styles-guards.test.ts` impide recrearla.
-- Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: hidrata y persiste el estado, registra el puente de commit y recarga del store y lleva la navegación lateral.
+- Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: la app autenticada hidrata desde sync-v2; la persistencia local y el watcher corresponden al demo aislado; el script también lleva la navegación lateral.
 
 ## Reglas de integracion
 
@@ -35,6 +35,12 @@ Pinia es la fuente de verdad del estado en cliente. `useFinancialStateStore` (`s
 1. Selectores puros en `src/domain/<sección>/view-model.ts`.
 2. Un store en `src/stores/<sección>.ts` que expone el view-model como `computed` sobre `useFinancialStateStore().state` y muta con `financialStateStore.commitState((draft) => …)`.
 3. El componente de la sección lee el store con `storeToRefs` y emite acciones explícitas.
+
+Es una guía para organizar estado y comportamiento de sección, no una obligación de añadir las tres
+capas a cada operación. Una acción sencilla puede vivir donde ya se entiende y modifica ese estado;
+un composable o adaptador se justifica cuando asume una responsabilidad propia, como gestionar el
+ciclo de vida de una integración o traducir la navegación del navegador. Pasar una llamada a otro
+archivo o cambiar el nombre de sus métodos no crea por sí solo esa responsabilidad.
 
 ## Verificacion
 

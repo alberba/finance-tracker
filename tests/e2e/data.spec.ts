@@ -1,10 +1,21 @@
 import { test, expect } from './fixtures'
+import { readScenarioState } from './seed-sync-v2'
 
 test.describe('Data E2E', () => {
   test(
     'renderiza datos y backups dentro del workspace Vue',
     { tag: '@smoke' },
     async ({ page, tracker }) => {
+      await tracker.addAccount({ name: 'Cuenta de copia' })
+      await tracker.addCustomTransaction({
+        date: '2026-08-12',
+        monthLabel: 'AGOSTO',
+        type: 'expense',
+        categoryLabel: 'Gastos generales',
+        amount: 7.5,
+        description: 'Movimiento de copia',
+        accountLabel: 'Cuenta de copia',
+      })
       await tracker.openData()
 
       const dataSection = tracker.section('data')
@@ -17,7 +28,21 @@ test.describe('Data E2E', () => {
     },
   )
 
-  test('exporta una copia y la vuelve a importar tras confirmar', async ({ page, tracker }) => {
+  test('exporta una copia y la vuelve a importar tras confirmar', async ({
+    page,
+    tracker,
+    testUserEmail,
+  }) => {
+    await tracker.addAccount({ name: 'Cuenta de copia' })
+    await tracker.addCustomTransaction({
+      date: '2026-08-12',
+      monthLabel: 'AGOSTO',
+      type: 'expense',
+      categoryLabel: 'Gastos generales',
+      amount: 7.5,
+      description: 'Movimiento de copia',
+      accountLabel: 'Cuenta de copia',
+    })
     await tracker.openData()
 
     const dataSection = tracker.section('data')
@@ -31,13 +56,37 @@ test.describe('Data E2E', () => {
     const download = await downloadPromise
     const path = await download.path()
 
+    const reset = await page.request.post('/api/state/reset', {
+      data: {},
+      headers: {
+        'X-Test-User-Email': testUserEmail,
+        Origin: new URL(page.url()).origin,
+        Referer: page.url(),
+      },
+    })
+    expect(reset.ok(), await reset.text()).toBe(true)
+    await tracker.reload()
+    const empty = await readScenarioState(page)
+    expect(empty.accounts).toHaveLength(0)
+    expect(empty.transactions).toHaveLength(0)
+
     await dataSection.locator('#import-json').setInputFiles(path)
     const dialog = page.getByRole('alertdialog', { name: '¿Importar esta copia?' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Sustituir mis datos' }).click()
 
     await expect(dialog).toBeHidden()
-    await expect(page.getByText('JSON importado correctamente.')).toBeVisible()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(figures).toContainText(/Movimientos\s*[1-9]/)
+    const restored = await readScenarioState(page)
+    const restoredAccount = restored.accounts.find((account) => account.name === 'Cuenta de copia')
+    expect(restoredAccount).toBeDefined()
+    expect(restored.transactions).toContainEqual(
+      expect.objectContaining({
+        description: 'Movimiento de copia',
+        amount: 7.5,
+        accountId: restoredAccount?.id,
+      }),
+    )
   })
 })

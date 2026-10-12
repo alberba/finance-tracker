@@ -1,17 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { test, expect } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { syncV2TestHeaders } from './seed-sync-v2'
 
 test('sync v2 guarda el cobro vencido al arrancar y no lo duplica al recargar', async ({
   page,
 }) => {
-  await page.context().setExtraHTTPHeaders({
-    'X-Test-User-Email': `pw-subscription-${randomUUID()}@e2e.test`,
-  })
+  const email = `pw-subscription-${randomUUID()}@e2e.test`
+  await page.context().setExtraHTTPHeaders({ 'X-Test-User-Email': email })
   const initialization = await page.request.post('/api/state/initialize', { data: {} })
   expect(initialization.ok()).toBe(true)
+  const headers = await syncV2TestHeaders(page.request, email)
   const accountId = randomUUID()
   const seeded = await page.request.post('/api/sync', {
+    headers,
     data: {
       commands: [
         {

@@ -42,69 +42,8 @@ import {
   deriveDefaultLiquidityAccountIds,
   sanitizeFlowAllocations,
 } from './contribution-workflow'
-import { isSyncV2Enabled } from '../lib/client/feature-flags'
 
 export const STORAGE_KEY = 'finance-tracker-state-v1'
-export const SERVER_STATE_ENDPOINT = '/api/state'
-/** Last server `version` this client has confirmed, for optimistic concurrency. */
-export const SERVER_VERSION_KEY = 'finance-tracker-server-version-v1'
-/** Set while localStorage holds edits not yet confirmed by the server. */
-export const PENDING_CHANGES_KEY = 'finance-tracker-pending-v1'
-
-export interface ServerState {
-  state: unknown
-  version: number
-}
-
-export type ServerSaveResult =
-  | { status: 'ok'; version: number }
-  | { status: 'conflict'; version: number; state: unknown }
-  | { status: 'error' }
-
-export function getKnownServerVersion(): number | null {
-  try {
-    const raw = localStorage.getItem(storageKey(SERVER_VERSION_KEY))
-    if (raw === null) {
-      return null
-    }
-    const value = Number(raw)
-    return Number.isFinite(value) ? value : null
-  } catch {
-    return null
-  }
-}
-
-export function setKnownServerVersion(version: number | null): void {
-  try {
-    if (version === null) {
-      localStorage.removeItem(storageKey(SERVER_VERSION_KEY))
-    } else {
-      localStorage.setItem(storageKey(SERVER_VERSION_KEY), String(version))
-    }
-  } catch {
-    /* storage unavailable — best effort */
-  }
-}
-
-export function hasPendingChanges(): boolean {
-  try {
-    return localStorage.getItem(storageKey(PENDING_CHANGES_KEY)) === '1'
-  } catch {
-    return false
-  }
-}
-
-export function setPendingChanges(pending: boolean): void {
-  try {
-    if (pending) {
-      localStorage.setItem(storageKey(PENDING_CHANGES_KEY), '1')
-    } else {
-      localStorage.removeItem(storageKey(PENDING_CHANGES_KEY))
-    }
-  } catch {
-    /* storage unavailable — best effort */
-  }
-}
 
 export const EMPTY_STATE_SEED = {
   meta: {
@@ -162,6 +101,7 @@ function asRecord(value: unknown): UnknownRecord {
 }
 
 export function loadPersistedState(): unknown | null {
+  if (!isDemoMode()) return null
   try {
     const raw = localStorage.getItem(storageKey(STORAGE_KEY))
     if (!raw) {
@@ -174,6 +114,7 @@ export function loadPersistedState(): unknown | null {
 }
 
 export function persistState(state: State): string {
+  if (!isDemoMode()) return ''
   state.meta = state.meta || {
     source: 'manual',
     generatedAt: new Date().toISOString(),
@@ -184,79 +125,6 @@ export function persistState(state: State): string {
   state.meta.savedAt = new Date().toISOString()
   localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(state))
   return state.meta.savedAt
-}
-
-export async function loadServerState(): Promise<ServerState | null> {
-  if (isDemoMode() || isSyncV2Enabled() || typeof fetch !== 'function') {
-    return null
-  }
-
-  try {
-    const response = await fetch(SERVER_STATE_ENDPOINT, {
-      method: 'GET',
-      headers: buildServerHeaders(false),
-    })
-    if (!response.ok) {
-      return null
-    }
-    const data = (await response.json()) as {
-      state?: unknown
-      version?: unknown
-    }
-    if (data?.state == null) {
-      return null
-    }
-    const version = typeof data.version === 'number' ? data.version : 0
-    setKnownServerVersion(version)
-    return { state: data.state, version }
-  } catch {
-    return null
-  }
-}
-
-/**
- * Pushes `state` to the server using the last known version as the concurrency
- * base. Returns a structured result so callers can react to conflicts and
- * transient failures instead of the previous silently-swallowed boolean.
- */
-export async function persistServerState(state: State): Promise<ServerSaveResult> {
-  const knownVersion = getKnownServerVersion()
-  if (isDemoMode() || isSyncV2Enabled()) {
-    return { status: 'ok', version: knownVersion ?? 0 }
-  }
-  try {
-    const response = await fetch(SERVER_STATE_ENDPOINT, {
-      method: 'PUT',
-      headers: buildServerHeaders(true),
-      body: JSON.stringify({
-        state,
-        ...(knownVersion !== null ? { baseVersion: knownVersion } : {}),
-      }),
-    })
-
-    if (response.status === 409) {
-      const data = (await response.json()) as {
-        state?: unknown
-        version?: unknown
-      }
-      const version = typeof data.version === 'number' ? data.version : 0
-      setKnownServerVersion(version)
-      return { status: 'conflict', version, state: data.state ?? null }
-    }
-
-    if (!response.ok) {
-      return { status: 'error' }
-    }
-
-    const data = (await response.json()) as { version?: unknown }
-    const version = typeof data.version === 'number' ? data.version : (knownVersion ?? 0) + 1
-    setKnownServerVersion(version)
-    // NOTE: the caller clears the pending flag, not us — only it knows whether
-    // newer local edits arrived while this request was in flight (still dirty).
-    return { status: 'ok', version }
-  } catch {
-    return { status: 'error' }
-  }
 }
 
 export function normalizeState(candidate: unknown): State {
@@ -351,7 +219,6 @@ export function sortTransactionsInState(targetState: State): void {
     return String(a.id).localeCompare(String(b.id))
   })
 }
-
 export function sortContributionsInState(targetState: State): void {
   targetState.contributions.sort((a, b) => {
     const byDate = String(a.portfolioDate || a.date).localeCompare(
@@ -899,16 +766,4 @@ function syncBudgetFromCategories(targetState: State): void {
       )
     })
   })
-}
-
-function buildServerHeaders(withJsonBody: boolean): HeadersInit {
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-  }
-
-  if (withJsonBody) {
-    headers['Content-Type'] = 'application/json'
-  }
-
-  return headers
 }

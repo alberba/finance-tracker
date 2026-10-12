@@ -82,7 +82,6 @@ database_name = "finance-auth-e2e"
 database_id = "${crypto.randomUUID()}"
 migrations_dir = "../../migrations-v2"
 [vars]
-AUTH_MODE = "better-auth"
 TEST_AUTH_ENABLED = "true"
 BETTER_AUTH_URL = "http://localhost:${port}"
 BETTER_AUTH_SECRET = "local-e2e-secret-for-authentication-only-275"
@@ -119,7 +118,6 @@ const app = spawn('pnpm', ['dev', '--host', '127.0.0.1', '--port', String(port),
     ...process.env,
     CLOUDFLARE_CONFIG_PATH: config,
     CLOUDFLARE_PERSIST_PATH: resolve('.scratch/auth/state'),
-    PUBLIC_SYNC_V2: 'true',
     AUTH_E2E_NETWORK: 'true',
     AUTH_TEST_PORT: String(port),
     ASTRO_DEV_BACKGROUND: '0',

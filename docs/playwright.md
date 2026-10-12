@@ -1,8 +1,8 @@
 # Playwright
 
-La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y sync-v2. Todas
-corren sobre Astro dev (`playwright.shared.ts`), en local y en CI; ninguna sirve el build de
-Wrangler.
+La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y escenarios
+especializados de sync v2. Todo cliente autenticado usa sync v2; todos los grupos corren sobre Astro
+dev (`playwright.shared.ts`), en local y en CI; ninguno sirve el build de Wrangler.
 
 ## Comandos
 
@@ -12,7 +12,7 @@ pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
 pnpm test:e2e               # funcional, sin snapshots visuales
 pnpm test:e2e:shard 1/2    # shard funcional equilibrado por tiempos históricos
 pnpm test:e2e:visual        # layout y regresión visual
-pnpm test:e2e:sync-v2       # PUBLIC_SYNC_V2=true
+pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
 pnpm test:e2e:headed        # navegador visible sobre Astro dev
 pnpm test:e2e:ui            # interfaz interactiva de Playwright
 ```
@@ -25,13 +25,12 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> pnpm test:e2e:smoke
 
 ## Estabilidad
 
-- Las pruebas legacy reinician el blob del propietario antes de cada caso. Un runner usa un
-  worker; los runners de CI tienen bases D1 independientes. Sync-v2 prueba usuarios separados.
+- Cada escenario crea un usuario aislado, inicializa su espacio por la API y carga los datos de
+  prueba mediante el formato de backup v2. Los runners de CI tienen bases D1 independientes.
 - La navegación espera `html[data-finance-ready="true"]`, que señala hidratación y bindings completos.
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
 - Cada runner usa un worker, con corte temprano y trace/vídeo únicamente en el primer retry.
-  `fullyParallel` en la configuración legacy permite repartir los casos visuales entre shards;
-  `workers: 1` mantiene secuencial el acceso al blob dentro de cada runner.
+  Los shards visuales reparten escenarios por duración.
 - `@smoke` identifica recorridos críticos. `@visual` se ejecuta como gate independiente.
 - Desktop cubre los flujos funcionales. Pixel 5 cubre móvil, layout y snapshots una sola vez.
 - No uses `waitForTimeout`; espera una respuesta, URL, locator o señal explícita de la aplicación.
@@ -109,7 +108,8 @@ el preflight CORS falla y salen fuentes del sistema.
 - Antes de probar un worktree nuevo o después de cambiar de rama/lockfile, ejecuta
   `pnpm setup:worktree`: sincroniza dependencias con `--frozen-lockfile`, prepara `.dev.vars`
   y aplica migraciones. El setup también sincroniza un `node_modules` que ya exista.
-  Sin `TEST_AUTH_ENABLED` y `LEGACY_OWNER_EMAIL`, cada spec falla en `reset-legacy` con 401/403.
+  Sin `TEST_AUTH_ENABLED`, las llamadas de autenticación de test no inicializan el usuario aislado.
+  Las identidades de prueba no tienen privilegios especiales de propietario.
 - `pnpm test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
   de la ruta del worktree, así que varios worktrees no chocan. En CI usa 4321 (4322 para sync-v2).
   Para usar un servidor ya arrancado, pásalo con `PLAYWRIGHT_BASE_URL`.

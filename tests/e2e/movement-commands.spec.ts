@@ -1,15 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { test, expect } from '@playwright/test'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { syncV2TestHeaders } from './seed-sync-v2'
 
 test('editing an investment from Movimientos preserves its data after sync and reload @smoke', async ({
   browser,
 }) => {
-  const context = await browser.newContext({
-    extraHTTPHeaders: { 'X-Test-User-Email': `movement-command-${randomUUID()}@e2e.test` },
-  })
+  const email = `movement-command-${randomUUID()}@e2e.test`
+  const context = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
   try {
+    const headers = await syncV2TestHeaders(context.request, email)
     const seed = await context.request.post('/api/sync', {
+      headers,
       data: {
         commands: [
           {
