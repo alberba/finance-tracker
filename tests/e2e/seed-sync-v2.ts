@@ -181,6 +181,22 @@ function buildSeedExport(seed: State) {
 
 const seedExport = buildSeedExport(seed)
 
+/** Headers for direct test API writes, matching the client's authenticated sync request. */
+export async function syncV2TestHeaders(
+  request: APIRequestContext,
+  email: string,
+): Promise<Record<string, string>> {
+  const response = await request.get('/api/session', {
+    headers: { 'X-Test-User-Email': email },
+  })
+  expect(response.ok(), await response.text()).toBe(true)
+  const { user } = (await response.json()) as { user: { id: string } }
+  return {
+    'X-Test-User-Email': email,
+    'X-Finance-User-Id': user.id,
+  }
+}
+
 /** Restores the app's existing finance scenario through the supported backup import API. */
 export async function seedSyncV2User(request: APIRequestContext, email: string): Promise<void> {
   const response = await request.post('/api/data/import?mode=replace', {

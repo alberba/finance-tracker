@@ -188,7 +188,7 @@ test.describe('Reports E2E', () => {
         status: 401,
         contentType: 'application/json',
         body: JSON.stringify({
-          error: 'Token de Cf-Access inválido o caducado.',
+          error: 'Inicia sesión para continuar.',
         }),
       })
     })
@@ -203,7 +203,7 @@ test.describe('Reports E2E', () => {
     await expect(status).toContainText(
       'No se pudo crear la issue: Tu sesión venció. Vuelve a entrar o recarga la página.',
     )
-    await expect(status).not.toContainText('Token de Cf-Access')
+    await expect(status).not.toContainText('Inicia sesión para continuar.')
   })
 
   test('los paneles laterales se anclan al borde derecho', async ({ page, tracker }) => {

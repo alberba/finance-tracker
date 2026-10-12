@@ -13,7 +13,6 @@ import { GET as administrationRoute } from '../../../src/pages/api/admin/registr
 let database: TestDatabase
 vi.mock('../../../src/db/client', () => ({ getDb: () => database.db }))
 const env: RuntimeEnv = {
-  AUTH_MODE: 'better-auth',
   BETTER_AUTH_URL: 'http://localhost:4321',
   BETTER_AUTH_SECRET: 'real-test-secret-with-more-than-thirty-two-characters',
   RESEND_API_KEY: 'fixture',

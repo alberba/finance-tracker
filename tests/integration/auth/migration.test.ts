@@ -9,10 +9,11 @@ import {
   authenticatedPrincipal,
   registrationAdministration,
 } from '../../../src/db/repositories/authentication'
+import { authRole } from '../../../src/db/schema/authentication'
 
 let sqlite: Database.Database | undefined
 afterEach(() => sqlite?.close())
-it('migrates trusted Access identities with the same userId and no invitation place', async () => {
+it('preserves the migrated financial identity and explicit administrator role at login', async () => {
   sqlite = new Database(':memory:')
   sqlite.pragma('foreign_keys = ON')
   for (const filename of readdirSync('migrations-v2')
@@ -33,18 +34,20 @@ INSERT INTO user_identities(id,user_id,provider,subject,email,created_at) VALUES
     {
       BETTER_AUTH_URL: 'http://localhost:4321',
       BETTER_AUTH_SECRET: 'migration-secret-with-thirty-two-characters',
-      LEGACY_OWNER_EMAIL: 'owner@example.com',
     },
     async ({ text }) => {
       otp = text.match(/\b\d{6}\b/)![0]
     },
   )
+  await db.insert(authRole).values({ userId: 'existing-owner', role: 'admin' })
   await auth.api.sendVerificationOTP({ body: { email: 'owner@example.com', type: 'sign-in' } })
   const login = await auth.api.signInEmailOTP({ body: { email: 'owner@example.com', otp } })
   expect(login.user.id).toBe('existing-owner')
-  expect(await authenticatedPrincipal(db, login.user.id)).toMatchObject({
+  expect(await authenticatedPrincipal(db, login.user.id)).toEqual({
     userId: 'existing-owner',
-    isLegacyOwner: true,
+    email: 'owner@example.com',
+    provider: 'better-auth',
+    subject: 'existing-owner',
     isAdmin: true,
   })
   expect((await registrationAdministration(db)).invitations).toEqual([])

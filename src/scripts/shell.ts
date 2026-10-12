@@ -284,14 +284,11 @@ function initSyncMenu(): void {
             }
           }
         }
-        if (session?.authentication === 'better-auth') {
-          await requireAuthenticationResult(await authentication.signOut())
-        }
+        await requireAuthenticationResult(await authentication.signOut())
         if (syncStore?.userId) await syncStore.logout({ discardPending: true })
         else if (session?.user?.id) await wipeAllClientData(session.user.id)
         else wipeLegacyClientData()
-        window.location.href =
-          session?.authentication === 'better-auth' ? '/login' : '/cdn-cgi/access/logout'
+        window.location.href = '/login'
       })
       .catch((error: unknown) => {
         logoutAction.removeAttribute('aria-disabled')

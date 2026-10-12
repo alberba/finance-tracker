@@ -40,14 +40,12 @@ describe("/api/integrations/stockevents", () => {
       email: ownerRow.email,
       provider: "test",
       subject: "owner",
-      isLegacyOwner: false,
     };
     otherUser = {
       userId: otherRow.id,
       email: otherRow.email,
       provider: "test",
       subject: "other",
-      isLegacyOwner: false,
     };
   });
 

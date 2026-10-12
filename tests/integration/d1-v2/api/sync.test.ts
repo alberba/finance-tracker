@@ -32,9 +32,8 @@ describe("POST /api/sync", () => {
     principal = {
       userId: user.id,
       email: user.email,
-      provider: "cf-access",
+      provider: "better-auth",
       subject: "sub-1",
-      isLegacyOwner: false,
     };
   });
 

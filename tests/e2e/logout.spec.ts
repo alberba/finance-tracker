@@ -25,12 +25,8 @@ test('cerrar sesión borra los datos privados locales de sync v2 @smoke', async 
   )
   expect(cachedDatabases).toContain(`finance-tracker-cache-v2:${userId}`)
 
-  await page.route('**/cdn-cgi/access/logout', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<main>Sesión cerrada</main>' }),
-  )
-
   await tracker.logout()
-  await expect(page).toHaveURL(/\/cdn-cgi\/access\/logout$/)
+  await expect(page).toHaveURL(/\/login$/)
 
   const remaining = await page.evaluate(
     async (names) =>

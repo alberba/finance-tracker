@@ -9,16 +9,14 @@ const env = getRuntimeEnv(Astro.locals)
 const invitation = Astro.url.searchParams.get('invitation')
 let invitationError = ''
 let verifyEmail: string | undefined
-if (env.AUTH_MODE === 'better-auth') {
-  try {
-    const session = await createAuthentication(getDb(Astro.locals), env).api.getSession({
-      headers: Astro.request.headers,
-      query: { disableCookieCache: true },
-    })
-    if (session && !session.user.emailVerified) verifyEmail = session.user.email
-  } catch {
-    /* The form remains usable while configuration is being prepared. */
-  }
+try {
+  const session = await createAuthentication(getDb(Astro.locals), env).api.getSession({
+    headers: Astro.request.headers,
+    query: { disableCookieCache: true },
+  })
+  if (session && !session.user.emailVerified) verifyEmail = session.user.email
+} catch {
+  /* The form remains usable while configuration is being prepared. */
 }
 const initialError = Astro.url.searchParams.has('error')
   ? 'No se pudo completar el acceso con ese proveedor. Inténtalo de nuevo o entra con un código por correo para vincularlo desde ajustes.'

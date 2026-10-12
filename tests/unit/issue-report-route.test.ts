@@ -40,9 +40,8 @@ function makeContext(body: unknown = PAYLOAD) {
     principal: {
       userId: `user-${users}`,
       email: 'quien@example.com',
-      provider: 'cf-access',
+      provider: 'better-auth',
       subject: `sub-${users}`,
-      isLegacyOwner: false,
     },
     runtimeEnv: {},
   }
