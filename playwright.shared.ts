@@ -47,7 +47,7 @@ export function createPlaywrightRuntime({
     use: {
       baseURL: externalBaseURL ?? localBaseURL,
       extraHTTPHeaders: {
-        'X-Test-User-Email': 'legacy-owner@e2e.test',
+        'X-Test-User-Email': 'developer@e2e.test',
       },
       trace: 'on-first-retry',
       screenshot: 'only-on-failure',
