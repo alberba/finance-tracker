@@ -487,6 +487,18 @@ describe('v2 repair execution', () => {
     await expect(runRepairCli(['--execute'])).rejects.toThrow(/export de respaldo/i)
   })
 
+  it('requires an explicit user identity before opening the local database', async () => {
+    const { existsSync, rmSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const dbPath = resolve('.scratch/test-repair-missing-identity.sqlite')
+
+    if (existsSync(dbPath)) rmSync(dbPath)
+    await expect(runRepairCli([`--v2-sqlite=${dbPath}`])).rejects.toThrow(
+      /--email=<email> o --user-id=<id>/i,
+    )
+    expect(existsSync(dbPath)).toBe(false)
+  })
+
   it('runs CLI in simulation mode by default leaving database untouched', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
