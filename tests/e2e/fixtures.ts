@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { seedSyncV2User } from './seed-sync-v2'
@@ -39,7 +39,7 @@ export const test = base.extend<Fixtures>({
   testUserEmail: async ({ browserName }, use, testInfo) => {
     await use(
       testInfo.tags.includes('@snapshot')
-        ? `pw-${browserName}-visual-snapshot@e2e.test`
+        ? `pw-${browserName}-${createHash('sha256').update(testInfo.testId).digest('hex').slice(0, 16)}@e2e.test`
         : `pw-${randomUUID()}@e2e.test`,
     )
   },
@@ -48,11 +48,7 @@ export const test = base.extend<Fixtures>({
   },
   fixedTime: [undefined, { option: true }],
   snapshotTime: [undefined, { option: true }],
-  tracker: async (
-    { page, context, fixedTime, snapshotTime, testUserEmail },
-    use,
-    testInfo,
-  ) => {
+  tracker: async ({ page, context, fixedTime, snapshotTime, testUserEmail }, use, testInfo) => {
     const snapshot = testInfo.tags.includes('@snapshot')
     const time = snapshot ? snapshotTime : fixedTime
     if (time) {

@@ -57,7 +57,7 @@ export function createPlaywrightRuntime({
       ? undefined
       : {
           command: serverCommand,
-          url: localBaseURL,
+          url: `${localBaseURL}/login`,
           reuseExistingServer: false,
           timeout: 120_000,
           gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },

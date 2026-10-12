@@ -83,8 +83,8 @@ describe('command-mapping (WP7b)', () => {
       const store = await initSyncStore()
 
       // `syncCreate`/`syncListDiff` are always fired with `void` from the
-      // domain stores (no `.catch`), so a rejected promise here would be an
-      // unhandled rejection in production — this must resolve.
+      // domain stores (no `.catch`), so invalid data must resolve as a failed
+      // enqueue instead of rejecting and becoming an unhandled rejection.
       await expect(
         syncCreate('account', 'local-acc-bad', {
           name: 'Cuenta',
@@ -94,7 +94,7 @@ describe('command-mapping (WP7b)', () => {
           // `entityCreateSchemas.account` doesn't declare this field.
           bogusField: 'no destino',
         }),
-      ).resolves.toBeUndefined()
+      ).resolves.toBe(false)
 
       expect(store.lastError).toBeTruthy()
 
