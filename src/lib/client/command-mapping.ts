@@ -51,9 +51,8 @@
  * - Cached and in-flight entity identities are scoped to the current user;
  *   resolving an in-flight create waits for its durable queue write, not a
  *   server acknowledgement. Recurrence enqueues rule creates before their
- *   pending movements. A required reference that remains unresolved
- *   (`budgetEntry.categoryId`, `pendingMovement.recurringRuleId`) still
- *   skips its command with a console warning instead of sending a bogus id.
+ *   pending movements. A pending movement whose recurring-rule reference
+ *   remains unresolved is not enqueued; the mapper warns and returns failure.
  * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
  *   its flow allocations nested under `data.allocations`; the snapshot
  *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
