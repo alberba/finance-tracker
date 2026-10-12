@@ -9,10 +9,8 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
  * WP3/WP8 — only honored when `TEST_AUTH_ENABLED=true` and
  * `AUTH_ENFORCED` is off, this repo's CI/dev-only configuration).
  *
- * The v1 blob is intentionally owner-only during cutover. These tests must
- * never reset or namespace that blob for arbitrary identities: each test
- * user is provisioned only in v2 and sync isolation follows the authenticated
- * principal resolved by the server.
+ * Each test user is provisioned only in v2 and sync isolation follows the
+ * authenticated principal resolved by the server.
  */
 
 const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'

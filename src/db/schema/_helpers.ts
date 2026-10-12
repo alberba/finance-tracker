@@ -10,8 +10,7 @@
  * - Money is always an `INTEGER` minimal-unit column + a sibling `TEXT`
  *   `currency` (ISO 4217, or an internal pseudo-code for crypto) column,
  *   never `REAL` — per WP1's "never REAL" design decision.
- * - Timestamps are ISO-8601 strings (`TEXT`), matching the existing v1
- *   `app_state.updated_at` convention (see `src/lib/server/d1-state.ts`).
+ * - Timestamps are ISO-8601 strings (`TEXT`).
  */
 
 import { text, integer } from "drizzle-orm/sqlite-core";
@@ -35,9 +34,8 @@ export function updatedAtColumn() {
 }
 
 /**
- * Optimistic-concurrency counter, mirroring the pattern already used by
- * v1's `app_state.version` (see `src/lib/server/d1-state.ts`): bumped on
- * every write so a stale client write can be rejected as a 409 conflict.
+ * Optimistic-concurrency counter, bumped on every write so a stale client
+ * write can be rejected as a 409 conflict.
  */
 export function versionColumn() {
   return integer("version").notNull().default(1);

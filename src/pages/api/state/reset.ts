@@ -1,10 +1,7 @@
 /**
  * `POST /api/state/reset` (WP4) — new v2 semantics per the work-package
- * spec: this used to reset the whole `x-finance-namespace`-selected
- * `app_state` blob (`src/lib/server/d1-state.ts`, still used by the legacy
- * `src/pages/api/state.ts` until cutover). Now it wipes only the
- * authenticated user's own private rows across every v2 table (per-user
- * "empezar de cero", not a namespace-wide blob reset) and re-seeds the
+ * spec: it wipes the authenticated user's own private rows across every v2
+ * table (per-user "empezar de cero") and re-seeds the
  * same defaults as `POST /api/state/initialize`.
  *
  * `integration_credentials` is deliberately left untouched (WP12 owns that
