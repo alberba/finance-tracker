@@ -47,14 +47,14 @@ pnpm dev
 ```
 
 `pnpm setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
-migraciones D1 locales de v1 y v2. Sirve igual en el checkout principal que en un worktree.
+migraciones D1 locales de v2. Sirve igual en el checkout principal que en un worktree.
 
 En local no hay Cloudflare Access: `http://localhost:4321` carga, pero sus llamadas a `/api/*`
 responden 401 («Falta la cabecera Cf-Access-Jwt-Assertion»). Para entrar:
 
 - `http://localhost:4321/?demo=1`: la demo con datos sintéticos.
-- Con la cabecera `X-Test-User-Email: legacy-owner@e2e.test`: tus datos locales, como en los E2E.
-  Por ejemplo, `agent-browser open http://localhost:4321 --headers '{"X-Test-User-Email":"legacy-owner@e2e.test"}'`.
+- Con la cabecera `X-Test-User-Email: developer@e2e.test`: tus datos locales, como en los E2E.
+  Por ejemplo, `agent-browser open http://localhost:4321 --headers '{"X-Test-User-Email":"developer@e2e.test"}'`.
 
 ### Mercado y reglas recurrentes
 
@@ -86,12 +86,11 @@ wrangler secret put COINGECKO_API_KEY
 
 ### 1) Configuración D1
 
-`wrangler.toml` declara dos bases D1, cada una con su carpeta de migraciones:
+`wrangler.toml` declara únicamente la base D1 relacional:
 
-| Binding                 | Base                    | Migraciones      | Contenido                                          |
-| ----------------------- | ----------------------- | ---------------- | -------------------------------------------------- |
-| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app   |
-| `finance_tracker_db`    | `finance-tracker-db`    | `migrations/`    | Retención v1 para rollback y exportación histórica |
+| Binding                 | Base                    | Migraciones      | Contenido                                        |
+| ----------------------- | ----------------------- | ---------------- | ------------------------------------------------ |
+| `finance_tracker_db_v2` | `finance-tracker-db-v2` | `migrations-v2/` | Modelo relacional (_sync v2_), el que usa la app |
 
 Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v2/` con el siguiente número libre (`meta/` solo guarda el snapshot inicial de Drizzle); wrangler las aplica por orden de nombre.
 
@@ -100,8 +99,6 @@ Aplicar migraciones:
 ```bash
 pnpm d1:migrate:local:v2    # v2, local
 pnpm d1:migrate:remote:v2   # v2, producción
-pnpm d1:migrate:local       # v1, local
-pnpm d1:migrate:remote      # v1, producción
 ```
 
 Si cambias `wrangler.toml`, regenera tipos:
@@ -141,11 +138,11 @@ El deploy ocurre en el push a `main`, **en paralelo al CI y sin esperarlo**: si
 los E2E fallan, el deploy sale igual. Compensación aceptada a cambio de
 latencia de deploy.
 
-### 3) Proteger acceso con Cloudflare Access
+### 3) Autenticación integrada
 
-- Crear app Access tipo **Self-hosted** sobre tu dominio de producción (`*.workers.dev` o custom).
-- Política `Allow` solo para tu email (OTP por email).
-- Sin reglas `Allow` adicionales (deny implícito al resto).
+La aplicación usa Better Auth y roles persistidos en D1. Configura las claves y proveedores según
+[autenticación](docs/operations/authentication.md). Las cabeceras de Cloudflare Access no autorizan
+peticiones y no existe un selector de protocolo de persistencia.
 
 ## Validación
 

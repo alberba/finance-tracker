@@ -109,7 +109,7 @@ el preflight CORS falla y salen fuentes del sistema.
   `pnpm setup:worktree`: sincroniza dependencias con `--frozen-lockfile`, prepara `.dev.vars`
   y aplica migraciones. El setup también sincroniza un `node_modules` que ya exista.
   Sin `TEST_AUTH_ENABLED`, las llamadas de autenticación de test no inicializan el usuario aislado.
-  `LEGACY_OWNER_EMAIL` solo autoriza consumidores explícitos de los endpoints legacy retenidos.
+  Las identidades de prueba no tienen privilegios especiales de propietario.
 - `pnpm test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
   de la ruta del worktree, así que varios worktrees no chocan. En CI usa 4321 (4322 para sync-v2).
   Para usar un servidor ya arrancado, pásalo con `PLAYWRIGHT_BASE_URL`.

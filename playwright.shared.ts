@@ -30,7 +30,7 @@ export function createPlaywrightRuntime({
   const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
   // --ignore-lock: Astro allows one dev server per project root, and the user's
   // `pnpm dev` in this worktree must keep running alongside the test server.
-  const serverCommand = `pnpm d1:migrate:local && pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${serverPort} --ignore-lock`
+  const serverCommand = `pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${serverPort} --ignore-lock`
 
   return {
     tag,

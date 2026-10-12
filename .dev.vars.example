@@ -12,17 +12,12 @@ COINGECKO_API_KEY=
 COINGECKO_API_PLAN=demo
 
 # Solo para desarrollo local / Playwright (WP8): habilita la cabecera
-# `X-Test-User-Email` como atajo de autenticación sin JWT real de Cf-Access
+# `X-Test-User-Email` como atajo de autenticación sin sesión Better Auth
 # (ver src/middleware.ts). NUNCA definir esta variable en wrangler.toml
 # [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
 TEST_AUTH_ENABLED=true
 
-# Solo para desarrollo local: identidad propietaria de los endpoints de estado
-# legacy conservados para rollback y consumidores explícitos. No se usa para sync v2.
-LEGACY_OWNER_EMAIL=legacy-owner@e2e.test
-
-# Autenticación integrada (#275). Mantener cf-access hasta verificar el corte.
-AUTH_MODE=cf-access
+# Autenticación integrada (#275).
 BETTER_AUTH_URL=http://localhost:4321
 BETTER_AUTH_SECRET=
 RESEND_API_KEY=

@@ -15,7 +15,7 @@ pnpm dev
 ```
 
 `pnpm setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
-sin Cloudflare Access está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
+con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `pnpm test:e2e:install`.
 
 ## Dónde viven las issues
@@ -43,7 +43,7 @@ pnpm test:e2e:smoke          # recorridos críticos
 ```
 
 El gate de CI en cada PR añade `pnpm test:coverage`, la comprobación de que las migraciones D1
-locales (v1 y v2) aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
+locales v2 aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
 corre al empujar a `main`; en una PR, solo con el label `run-e2e`.
 
 `pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una

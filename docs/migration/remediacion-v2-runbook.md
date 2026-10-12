@@ -22,8 +22,8 @@
   reales (el v1 ya las distinguía mal), así que el reparador mueve una a
   `contrib-snapshot-2026-3@2` en vez de borrarla.
 - El cliente autenticado actual usa sync v2 directamente; no requiere una
-  variable de selección de protocolo. Los endpoints legacy siguen retenidos
-  para rollback y consumidores explícitos.
+  variable de selección de protocolo. Los endpoints legacy se retiran al cerrar
+  la transición; ver `retention-checklist.md`.
 - El código de esta remediación vive en `mal-guardado-v2-multiusuario`, no en
   `main`: son 46 commits. `main` solo tiene la primera entrega (sincronización).
 
