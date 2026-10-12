@@ -31,8 +31,10 @@ El preflight de v2 confirmó cero usuarios financieros sin `auth_user` o
 5. Exportar y verificar una copia final de v1 después de retirar su binding;
    borrar únicamente `finance-tracker-db` y confirmar que v2 sigue disponible.
 
-Los pasos remotos se registrarán aquí con sus resultados al completarse. No se
-elimina la base v2 ni se restauran exports antiguos sobre datos nuevos.
+El registro operativo de despliegue, comprobaciones y borrado se conserva en la
+[PR #309](https://github.com/alberba/finance-tracker/pull/309) y en
+`retirement-operation.json` junto al archivo privado. No se elimina la base v2 ni
+se restauran exports antiguos sobre datos nuevos.
 
 ## Datos actuales con nombres históricos
 

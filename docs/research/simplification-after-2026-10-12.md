@@ -1,5 +1,8 @@
 # Simplificación #300: comparación después — 12 de octubre de 2026
 
+> Medición intermedia previa al cierre completo de v1. Las cifras finales tras la
+> ampliación del propietario están en [cierre de legacy](legacy-retirement-2026-10-12.md).
+
 Código medido: `c0e7da0cc78c56673dfe4d2b6fc4098e8170ee74`, sin cambios versionados pendientes. La línea base publicada en `034272e` mide `2ba9065`. [Línea base](simplification-baseline-2026-10-11.md) y [captura después con inventarios y muestras](simplification-after-2026-10-12.json). Los commits posteriores de documentación y PNG no cambian el código medido.
 
 ## Mecanismos

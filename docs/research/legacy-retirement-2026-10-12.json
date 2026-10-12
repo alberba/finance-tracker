@@ -1,0 +1,1291 @@
+{
+  "date": "2026-10-12",
+  "timezone": "Europe/Madrid",
+  "commit": "1f6843b925140d014b9e9ded7b1a11357c876a98",
+  "scope": "Explicit owner-authorized retirement after original #300 compatibility retention; deploy and v1 deletion authorized with verified archive",
+  "baseline_commit": "2ba9065e0d66214f676d96bd9f4c8cfb27bd044c",
+  "previous_capture_commit": "c0e7da0cc78c56673dfe4d2b6fc4098e8170ee74",
+  "method_profile": {
+    "loc": "Existing tracked files; grouped by src, tests, scripts, migrations and root/workflow configuration; suffixes ts/js/mjs/cjs/vue/astro/css/sql/sh/py/yml/yaml; pnpm-lock.yaml separated as data; force-lang=HTML,astro; scopes overlap main groups and must not be added to total",
+    "build": {
+      "exit_code": 0,
+      "node": "v24.16.0",
+      "pnpm": "10.26.0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "architecture": "arm64",
+      "adapter": "cloudflare",
+      "sentry_source_map_upload": false,
+      "warm_dependencies": true
+    },
+    "focused_tests": "3 serial repetitions, warm dependencies; real wall clock includes pnpm and runner startup",
+    "sizes": "Logical file bytes; gzip per file at Python default level 9, mtime=0; source maps excluded; full emitted JS is not initial route payload; server secrets/config/assets excluded",
+    "browser": {
+      "baseUrl": "http://127.0.0.1:4387",
+      "cpuSlowdownRate": 4,
+      "iterations": 7,
+      "latencyMs": 40,
+      "throughputMbps": 10
+    },
+    "browser_caveats": [
+      "Single build timing, not median; warm dependencies",
+      "Browser demo only, not authenticated sync, IndexedDB enqueue or D1 latency",
+      "appReadyMs means dashboard heading visible, not all data or interactions ready",
+      "LCP is sampled shortly after heading visibility, not final settled page LCP",
+      "Local Cloudflare worker; not production edge or self-hosting deployment",
+      "Browser benchmark measures resource snapshot at heading readiness; idle prefetch can vary",
+      "Seven cold contexts; local worker process warm after startup; third-party requests aborted",
+      "No concurrent build/test process while browser benchmark ran"
+    ]
+  },
+  "cloc_sha256": "ed9fbdd081a2ceb933ea490b3c1cfacc87d3898ae2650d0d6756439695a836c8",
+  "benchmark_script_sha256": "37a40ddc99040572837de686f5014fc70e42af03bfb93d678042e09d9d989cc9",
+  "loc": {
+    "application": {
+      "baseline": {
+        "blank": 3225,
+        "comment": 2794,
+        "code": 36782,
+        "nFiles": 323
+      },
+      "before_retirement": {
+        "blank": 3181,
+        "comment": 2702,
+        "code": 36668,
+        "nFiles": 320
+      },
+      "after_retirement": {
+        "blank": 3124,
+        "comment": 2559,
+        "code": 36255,
+        "nFiles": 314
+      },
+      "changed_files": {
+        "src/db/client.ts": {
+          "before": {
+            "blank": 4,
+            "comment": 14,
+            "code": 12,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 4,
+            "comment": 10,
+            "code": 12,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/repositories/authentication.ts": {
+          "before": {
+            "blank": 8,
+            "comment": 1,
+            "code": 124,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 8,
+            "comment": 1,
+            "code": 123,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/repositories/shared.ts": {
+          "before": {
+            "blank": 15,
+            "comment": 103,
+            "code": 148,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 15,
+            "comment": 100,
+            "code": 148,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/repositories/users.ts": {
+          "before": {
+            "blank": 17,
+            "comment": 12,
+            "code": 137,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 17,
+            "comment": 11,
+            "code": 137,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/schema/_helpers.ts": {
+          "before": {
+            "blank": 7,
+            "comment": 25,
+            "code": 22,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 7,
+            "comment": 23,
+            "code": 22,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/schema/integrations.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 11,
+            "code": 99,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 5,
+            "comment": 9,
+            "code": 99,
+            "language": "TypeScript"
+          }
+        },
+        "src/db/schema/users.ts": {
+          "before": {
+            "blank": 4,
+            "comment": 16,
+            "code": 46,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 4,
+            "comment": 14,
+            "code": 45,
+            "language": "TypeScript"
+          }
+        },
+        "src/env.d.ts": {
+          "before": {
+            "blank": 4,
+            "comment": 7,
+            "code": 19,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 4,
+            "comment": 3,
+            "code": 16,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/api-auth.ts": {
+          "before": {
+            "blank": 6,
+            "comment": 8,
+            "code": 46,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 5,
+            "comment": 7,
+            "code": 39,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/auth/better-auth.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 1,
+            "code": 287,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 5,
+            "comment": 1,
+            "code": 279,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/auth/jwks.ts": {
+          "before": {
+            "blank": 12,
+            "comment": 37,
+            "code": 46,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/lib/server/auth/legacy-owner-link.ts": {
+          "before": {
+            "blank": 6,
+            "comment": 31,
+            "code": 35,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/lib/server/auth/principal.ts": {
+          "before": {
+            "blank": 14,
+            "comment": 26,
+            "code": 95,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 11,
+            "comment": 6,
+            "code": 58,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/cloudflare-env.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 26,
+            "code": 47,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 4,
+            "comment": 23,
+            "code": 34,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/d1-state.ts": {
+          "before": {
+            "blank": 21,
+            "comment": 16,
+            "code": 152,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/lib/server/local/runtime.ts": {
+          "before": {
+            "blank": 2,
+            "comment": 0,
+            "code": 14,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 2,
+            "comment": 0,
+            "code": 12,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/local/sqlite-binding.ts": {
+          "before": {
+            "blank": 15,
+            "comment": 4,
+            "code": 123,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 15,
+            "comment": 4,
+            "code": 123,
+            "language": "TypeScript"
+          }
+        },
+        "src/lib/server/state-request.ts": {
+          "before": {
+            "blank": 0,
+            "comment": 0,
+            "code": 3,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/middleware.ts": {
+          "before": {
+            "blank": 17,
+            "comment": 15,
+            "code": 131,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 11,
+            "comment": 4,
+            "code": 104,
+            "language": "TypeScript"
+          }
+        },
+        "src/pages/api/session.ts": {
+          "before": {
+            "blank": 3,
+            "comment": 6,
+            "code": 23,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 3,
+            "comment": 6,
+            "code": 22,
+            "language": "TypeScript"
+          }
+        },
+        "src/pages/api/state.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 2,
+            "code": 55,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/pages/api/state/reset-legacy.ts": {
+          "before": {
+            "blank": 2,
+            "comment": 1,
+            "code": 15,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "src/pages/api/state/reset.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 13,
+            "code": 37,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 5,
+            "comment": 10,
+            "code": 37,
+            "language": "TypeScript"
+          }
+        },
+        "src/pages/login.astro": {
+          "before": {
+            "blank": 1,
+            "comment": 0,
+            "code": 89,
+            "language": "HTML"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 0,
+            "code": 87,
+            "language": "HTML"
+          }
+        },
+        "src/scripts/shell.ts": {
+          "before": {
+            "blank": 33,
+            "comment": 8,
+            "code": 279,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 33,
+            "comment": 8,
+            "code": 276,
+            "language": "TypeScript"
+          }
+        },
+        "src/stores/sync.ts": {
+          "before": {
+            "blank": 44,
+            "comment": 161,
+            "code": 642,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 44,
+            "comment": 161,
+            "code": 640,
+            "language": "TypeScript"
+          }
+        }
+      }
+    },
+    "tests": {
+      "baseline": {
+        "blank": 3794,
+        "comment": 969,
+        "code": 27536,
+        "nFiles": 202
+      },
+      "before_retirement": {
+        "blank": 3788,
+        "comment": 950,
+        "code": 27928,
+        "nFiles": 203
+      },
+      "after_retirement": {
+        "blank": 3648,
+        "comment": 870,
+        "code": 27070,
+        "nFiles": 199
+      },
+      "changed_files": {
+        "tests/e2e/authentication/server.mjs": {
+          "before": {
+            "blank": 1,
+            "comment": 0,
+            "code": 134,
+            "language": "JavaScript"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 0,
+            "code": 133,
+            "language": "JavaScript"
+          }
+        },
+        "tests/e2e/bitvavo.spec.ts": {
+          "before": {
+            "blank": 1,
+            "comment": 1,
+            "code": 97,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 1,
+            "code": 100,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/demo-mode.spec.ts": {
+          "before": {
+            "blank": 14,
+            "comment": 0,
+            "code": 79,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 14,
+            "comment": 0,
+            "code": 83,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/logout.spec.ts": {
+          "before": {
+            "blank": 7,
+            "comment": 0,
+            "code": 38,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 6,
+            "comment": 0,
+            "code": 35,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/movement-commands.spec.ts": {
+          "before": {
+            "blank": 3,
+            "comment": 0,
+            "code": 101,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 3,
+            "comment": 0,
+            "code": 103,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/multi-user-isolation.spec.ts": {
+          "before": {
+            "blank": 15,
+            "comment": 21,
+            "code": 82,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 15,
+            "comment": 19,
+            "code": 82,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/reports.spec.ts": {
+          "before": {
+            "blank": 27,
+            "comment": 6,
+            "code": 204,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 27,
+            "comment": 6,
+            "code": 204,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/seed-market-instrument.ts": {
+          "before": {
+            "blank": 1,
+            "comment": 1,
+            "code": 38,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 1,
+            "code": 41,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/seed-sync-v2.ts": {
+          "before": {
+            "blank": 10,
+            "comment": 4,
+            "code": 225,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 11,
+            "comment": 5,
+            "code": 239,
+            "language": "TypeScript"
+          }
+        },
+        "tests/e2e/subscription-charges.spec.ts": {
+          "before": {
+            "blank": 1,
+            "comment": 0,
+            "code": 69,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 0,
+            "code": 71,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/auth/http-boundary.test.ts": {
+          "before": {
+            "blank": 2,
+            "comment": 0,
+            "code": 166,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 2,
+            "comment": 0,
+            "code": 165,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/auth/migration.test.ts": {
+          "before": {
+            "blank": 1,
+            "comment": 0,
+            "code": 50,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 1,
+            "comment": 0,
+            "code": 53,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/bootstrap.test.ts": {
+          "before": {
+            "blank": 9,
+            "comment": 1,
+            "code": 88,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 9,
+            "comment": 1,
+            "code": 87,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/changes.test.ts": {
+          "before": {
+            "blank": 9,
+            "comment": 0,
+            "code": 79,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 9,
+            "comment": 0,
+            "code": 78,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/data-export-import.test.ts": {
+          "before": {
+            "blank": 23,
+            "comment": 10,
+            "code": 347,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 23,
+            "comment": 10,
+            "code": 345,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/session.test.ts": {
+          "before": {
+            "blank": 7,
+            "comment": 0,
+            "code": 39,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 7,
+            "comment": 0,
+            "code": 40,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/state-lifecycle.test.ts": {
+          "before": {
+            "blank": 25,
+            "comment": 4,
+            "code": 189,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 25,
+            "comment": 4,
+            "code": 187,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/stockevents-credential.test.ts": {
+          "before": {
+            "blank": 18,
+            "comment": 1,
+            "code": 97,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 18,
+            "comment": 1,
+            "code": 95,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/api/sync.test.ts": {
+          "before": {
+            "blank": 32,
+            "comment": 4,
+            "code": 258,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 32,
+            "comment": 4,
+            "code": 257,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/migration.test.ts": {
+          "before": {
+            "blank": 25,
+            "comment": 18,
+            "code": 275,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "tests/integration/d1-v2/repair/execute.test.ts": {
+          "before": {
+            "blank": 74,
+            "comment": 23,
+            "code": 528,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 76,
+            "comment": 23,
+            "code": 538,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/repositories/email-case.test.ts": {
+          "before": {
+            "blank": 16,
+            "comment": 15,
+            "code": 70,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 7,
+            "comment": 9,
+            "code": 33,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/d1-v2/setup.ts": {
+          "before": {
+            "blank": 10,
+            "comment": 43,
+            "code": 39,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 10,
+            "comment": 38,
+            "code": 39,
+            "language": "TypeScript"
+          }
+        },
+        "tests/integration/local-domain-transactions.test.ts": {
+          "before": {
+            "blank": 12,
+            "comment": 4,
+            "code": 317,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 15,
+            "comment": 4,
+            "code": 338,
+            "language": "TypeScript"
+          }
+        },
+        "tests/unit/api-error-handling.test.ts": {
+          "before": {
+            "blank": 21,
+            "comment": 2,
+            "code": 67,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 21,
+            "comment": 2,
+            "code": 67,
+            "language": "TypeScript"
+          }
+        },
+        "tests/unit/auth-middleware.test.ts": {
+          "before": {
+            "blank": 99,
+            "comment": 43,
+            "code": 483,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 26,
+            "comment": 0,
+            "code": 138,
+            "language": "TypeScript"
+          }
+        },
+        "tests/unit/d1-state.test.ts": {
+          "before": {
+            "blank": 21,
+            "comment": 6,
+            "code": 120,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "tests/unit/issue-report-route.test.ts": {
+          "before": {
+            "blank": 16,
+            "comment": 5,
+            "code": 81,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 16,
+            "comment": 5,
+            "code": 80,
+            "language": "TypeScript"
+          }
+        },
+        "tests/unit/schema-v2.test.ts": {
+          "before": {
+            "blank": 16,
+            "comment": 18,
+            "code": 137,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 16,
+            "comment": 17,
+            "code": 137,
+            "language": "TypeScript"
+          }
+        },
+        "tests/unit/security/legacy-state-auth.test.ts": {
+          "before": {
+            "blank": 14,
+            "comment": 0,
+            "code": 109,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "tests/unit/state-request.test.ts": {
+          "before": {
+            "blank": 3,
+            "comment": 0,
+            "code": 20,
+            "language": "TypeScript"
+          },
+          "after": null
+        }
+      }
+    },
+    "tooling": {
+      "baseline": {
+        "blank": 458,
+        "comment": 419,
+        "code": 4744,
+        "nFiles": 30
+      },
+      "before_retirement": {
+        "blank": 458,
+        "comment": 419,
+        "code": 4744,
+        "nFiles": 30
+      },
+      "after_retirement": {
+        "blank": 306,
+        "comment": 254,
+        "code": 2789,
+        "nFiles": 20
+      },
+      "changed_files": {
+        "scripts/e2e-visual-linux.sh": {
+          "before": {
+            "blank": 6,
+            "comment": 6,
+            "code": 32,
+            "language": "Bourne Shell"
+          },
+          "after": {
+            "blank": 6,
+            "comment": 6,
+            "code": 31,
+            "language": "Bourne Shell"
+          }
+        },
+        "scripts/export-sqlite-to-d1.mjs": {
+          "before": {
+            "blank": 8,
+            "comment": 0,
+            "code": 40,
+            "language": "JavaScript"
+          },
+          "after": null
+        },
+        "scripts/export-v2-to-v1-json.ts": {
+          "before": {
+            "blank": 23,
+            "comment": 16,
+            "code": 364,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/local-v2-db.ts": {
+          "before": null,
+          "after": {
+            "blank": 7,
+            "comment": 6,
+            "code": 39,
+            "language": "TypeScript"
+          }
+        },
+        "scripts/lib/migration-checksum.ts": {
+          "before": {
+            "blank": 4,
+            "comment": 2,
+            "code": 20,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/migration-db.ts": {
+          "before": {
+            "blank": 19,
+            "comment": 25,
+            "code": 176,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/migration-parity.ts": {
+          "before": {
+            "blank": 18,
+            "comment": 11,
+            "code": 146,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/migration-runner.ts": {
+          "before": {
+            "blank": 41,
+            "comment": 58,
+            "code": 831,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/migration-types.ts": {
+          "before": {
+            "blank": 13,
+            "comment": 22,
+            "code": 76,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/lib/migration-v2-read.ts": {
+          "before": {
+            "blank": 12,
+            "comment": 9,
+            "code": 157,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/migrate-v1-to-v2.ts": {
+          "before": {
+            "blank": 14,
+            "comment": 17,
+            "code": 118,
+            "language": "TypeScript"
+          },
+          "after": null
+        },
+        "scripts/prepare-authentication-users.sql": {
+          "before": {
+            "blank": 0,
+            "comment": 2,
+            "code": 11,
+            "language": "SQL"
+          },
+          "after": null
+        },
+        "scripts/repair-corrupted-data.ts": {
+          "before": {
+            "blank": 21,
+            "comment": 39,
+            "code": 164,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 22,
+            "comment": 39,
+            "code": 168,
+            "language": "TypeScript"
+          }
+        },
+        "scripts/setup-worktree.sh": {
+          "before": {
+            "blank": 6,
+            "comment": 5,
+            "code": 23,
+            "language": "Bourne Shell"
+          },
+          "after": {
+            "blank": 6,
+            "comment": 5,
+            "code": 21,
+            "language": "Bourne Shell"
+          }
+        },
+        "scripts/validate-migration-parity.ts": {
+          "before": {
+            "blank": 8,
+            "comment": 9,
+            "code": 56,
+            "language": "TypeScript"
+          },
+          "after": null
+        }
+      }
+    },
+    "migrations": {
+      "baseline": {
+        "blank": 5,
+        "comment": 64,
+        "code": 725,
+        "nFiles": 16
+      },
+      "before_retirement": {
+        "blank": 5,
+        "comment": 64,
+        "code": 725,
+        "nFiles": 16
+      },
+      "after_retirement": {
+        "blank": 4,
+        "comment": 59,
+        "code": 713,
+        "nFiles": 13
+      },
+      "changed_files": {
+        "migrations/0001_create_app_state.sql": {
+          "before": {
+            "blank": 0,
+            "comment": 0,
+            "code": 5,
+            "language": "SQL"
+          },
+          "after": null
+        },
+        "migrations/0002_import_seeded_state.sql": {
+          "before": {
+            "blank": 1,
+            "comment": 2,
+            "code": 6,
+            "language": "SQL"
+          },
+          "after": null
+        },
+        "migrations/0003_add_version.sql": {
+          "before": {
+            "blank": 0,
+            "comment": 3,
+            "code": 1,
+            "language": "SQL"
+          },
+          "after": null
+        }
+      }
+    },
+    "configuration": {
+      "baseline": {
+        "blank": 55,
+        "comment": 99,
+        "code": 803,
+        "nFiles": 20
+      },
+      "before_retirement": {
+        "blank": 55,
+        "comment": 98,
+        "code": 800,
+        "nFiles": 20
+      },
+      "after_retirement": {
+        "blank": 56,
+        "comment": 101,
+        "code": 859,
+        "nFiles": 20
+      },
+      "changed_files": {
+        ".github/workflows/playwright.yml": {
+          "before": {
+            "blank": 14,
+            "comment": 2,
+            "code": 238,
+            "language": "YAML"
+          },
+          "after": {
+            "blank": 14,
+            "comment": 2,
+            "code": 237,
+            "language": "YAML"
+          }
+        },
+        "playwright.shared.ts": {
+          "before": {
+            "blank": 5,
+            "comment": 4,
+            "code": 58,
+            "language": "TypeScript"
+          },
+          "after": {
+            "blank": 6,
+            "comment": 7,
+            "code": 118,
+            "language": "TypeScript"
+          }
+        }
+      }
+    }
+  },
+  "sizes": [
+    {
+      "root": "src",
+      "suffixes": [".astro", ".css", ".js", ".ts", ".vue"],
+      "files": 314,
+      "bytes": 1439054,
+      "gzip_bytes": 460920
+    },
+    {
+      "root": "dist/client",
+      "suffixes": [".js"],
+      "files": 54,
+      "bytes": 1167037,
+      "gzip_bytes": 394484
+    },
+    {
+      "root": "dist/client",
+      "suffixes": [".css"],
+      "files": 1,
+      "bytes": 72779,
+      "gzip_bytes": 13485
+    },
+    {
+      "root": "dist/server",
+      "suffixes": [".cjs", ".js", ".mjs"],
+      "files": 67,
+      "bytes": 4598181,
+      "gzip_bytes": 1053244
+    }
+  ],
+  "captures": {
+    "build": {
+      "seconds": 6.3639050840065465,
+      "exit_code": 0,
+      "node": "v24.16.0",
+      "pnpm": "10.26.0",
+      "platform": "darwin/macOS26.6.2",
+      "architecture": "arm64",
+      "adapter": "cloudflare",
+      "sentry_source_map_upload": false,
+      "warm_dependencies": true
+    },
+    "focused_test_wall_time": {
+      "runs": [
+        {
+          "seconds": 4.3726836670030025,
+          "exit_code": 0,
+          "passed": 69,
+          "failed": 0
+        },
+        {
+          "seconds": 4.3505500000028405,
+          "exit_code": 0,
+          "passed": 69,
+          "failed": 0
+        },
+        {
+          "seconds": 4.2706304589955835,
+          "exit_code": 0,
+          "passed": 69,
+          "failed": 0
+        }
+      ],
+      "median_seconds": 4.3505500000028405,
+      "method": "3 serial repetitions, warm dependencies; real wall clock includes pnpm and runner startup"
+    },
+    "browser": {
+      "environment": {
+        "baseUrl": "http://127.0.0.1:4387",
+        "cpuSlowdownRate": 4,
+        "iterations": 7,
+        "latencyMs": 40,
+        "throughputMbps": 10
+      },
+      "median": {
+        "appReadyMs": 766,
+        "domContentLoadedMs": 469.8,
+        "firstContentfulPaintMs": 192,
+        "largestContentfulPaintMs": 436,
+        "jsDecodedKb": 799.75,
+        "jsRequestCount": 33,
+        "jsTransferKb": 286.49,
+        "longTaskCount": 3,
+        "longTaskDurationMs": 375,
+        "scriptDurationMs": 230.81,
+        "taskDurationMs": 707.17
+      },
+      "runs": [
+        {
+          "appReadyMs": 1226.1,
+          "domContentLoadedMs": 721,
+          "firstContentfulPaintMs": 392,
+          "largestContentfulPaintMs": 676,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 4,
+          "longTaskDurationMs": 532,
+          "scriptDurationMs": 349.34,
+          "taskDurationMs": 1068.55
+        },
+        {
+          "appReadyMs": 771.7,
+          "domContentLoadedMs": 458.3,
+          "firstContentfulPaintMs": 192,
+          "largestContentfulPaintMs": 424,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 3,
+          "longTaskDurationMs": 397,
+          "scriptDurationMs": 230.81,
+          "taskDurationMs": 704.9
+        },
+        {
+          "appReadyMs": 739.8,
+          "domContentLoadedMs": 442.3,
+          "firstContentfulPaintMs": 188,
+          "largestContentfulPaintMs": 412,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 3,
+          "longTaskDurationMs": 368,
+          "scriptDurationMs": 222.34,
+          "taskDurationMs": 666.12
+        },
+        {
+          "appReadyMs": 703.8,
+          "domContentLoadedMs": 490.4,
+          "firstContentfulPaintMs": 216,
+          "largestContentfulPaintMs": 460,
+          "jsDecodedKb": 831.8,
+          "jsRequestCount": 38,
+          "jsTransferKb": 300.66,
+          "longTaskCount": 2,
+          "longTaskDurationMs": 261,
+          "scriptDurationMs": 223.05,
+          "taskDurationMs": 630.16
+        },
+        {
+          "appReadyMs": 791.8,
+          "domContentLoadedMs": 475.9,
+          "firstContentfulPaintMs": 192,
+          "largestContentfulPaintMs": 444,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 2,
+          "longTaskDurationMs": 375,
+          "scriptDurationMs": 243.4,
+          "taskDurationMs": 739.04
+        },
+        {
+          "appReadyMs": 766,
+          "domContentLoadedMs": 467,
+          "firstContentfulPaintMs": 212,
+          "largestContentfulPaintMs": 436,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 2,
+          "longTaskDurationMs": 347,
+          "scriptDurationMs": 230.16,
+          "taskDurationMs": 707.17
+        },
+        {
+          "appReadyMs": 761.7,
+          "domContentLoadedMs": 469.8,
+          "firstContentfulPaintMs": 188,
+          "largestContentfulPaintMs": 432,
+          "jsDecodedKb": 799.75,
+          "jsRequestCount": 33,
+          "jsTransferKb": 286.49,
+          "longTaskCount": 3,
+          "longTaskDurationMs": 386,
+          "scriptDurationMs": 233.74,
+          "taskDurationMs": 707.54
+        }
+      ]
+    }
+  },
+  "captures_application_commit": "9e5c94f54fc260c6baa45f4dc62dc57da1ac8a1e",
+  "captures_application_note": "Later changes only configure E2E runners and readiness assertions; application/bundle and six focused test files unchanged."
+}
