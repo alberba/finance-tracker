@@ -643,10 +643,10 @@ async function centerSelectedSettingsTab(page: Page): Promise<void> {
   const selectedTab = page
     .getByRole('tablist', { name: 'Apartados de configuración' })
     .getByRole('tab', { selected: true })
-  if ((await selectedTab.count()) === 0) return
+  await expect(selectedTab).toHaveCount(1)
   await selectedTab.evaluate((tab) => {
     const rail = tab.closest<HTMLElement>('[role="tablist"]')
-    if (!rail) return
+    if (!rail) throw new Error('Selected settings tab is not inside a tablist')
     const tabRect = tab.getBoundingClientRect()
     const railRect = rail.getBoundingClientRect()
     rail.scrollLeft += tabRect.left + tabRect.width / 2 - (railRect.left + railRect.width / 2)
