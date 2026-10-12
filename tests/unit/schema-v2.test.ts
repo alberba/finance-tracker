@@ -8,8 +8,7 @@ import { DatabaseSync } from "node:sqlite";
  * columns use `INTEGER` (minimal unit), never `REAL`. Runs the generated
  * `migrations-v2/0001_init_v2.sql` against a real in-memory SQLite engine
  * (via Node's built-in `node:sqlite`) and inspects `PRAGMA table_info`,
- * mirroring the `node:sqlite`-based pattern already used by
- * `scripts/export-sqlite-to-d1.mjs`.
+ * mirroring the `node:sqlite`-based pattern used by local database tooling.
  */
 
 const MIGRATION_PATH = resolve(process.cwd(), "migrations-v2/0001_init_v2.sql");

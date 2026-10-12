@@ -34,7 +34,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { usersRepository } from '../src/db/repositories'
-import { openLocalV2Db } from './lib/migration-db'
+import { openLocalV2Db } from './lib/local-v2-db'
 import {
   applyRepairPlan,
   buildRepairPlan,

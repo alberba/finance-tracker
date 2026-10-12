@@ -490,7 +490,7 @@ describe('v2 repair execution', () => {
   it('runs CLI in simulation mode by default leaving database untouched', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
+    const { openLocalV2Db } = await import('../../../../scripts/lib/local-v2-db')
 
     mkdirSync('.scratch', { recursive: true })
     const backupPath = resolve('.scratch/test-repair-backup-sim.json')
@@ -533,7 +533,7 @@ describe('v2 repair execution', () => {
   it('keeps stdout as a single JSON document when --json is passed', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
+    const { openLocalV2Db } = await import('../../../../scripts/lib/local-v2-db')
 
     mkdirSync('.scratch', { recursive: true })
     const backupPath = resolve('.scratch/test-repair-backup-json.json')
@@ -579,7 +579,7 @@ describe('v2 repair execution', () => {
   it('runs CLI in execution mode when --execute is passed applying all repairs', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const { openLocalV2Db } = await import('../../../../scripts/lib/migration-db')
+    const { openLocalV2Db } = await import('../../../../scripts/lib/local-v2-db')
 
     mkdirSync('.scratch', { recursive: true })
     const backupPath = resolve('.scratch/test-repair-backup-exec.json')
