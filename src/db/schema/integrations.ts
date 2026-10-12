@@ -1,9 +1,7 @@
 /**
  * Third-party integration credentials and symbol mappings. `ciphertext` is
  * a plain `TEXT` column here — WP12 adds the AES-GCM encrypt/decrypt layer
- * on top; this WP only declares the shape (fixes Contradiction #7: the
- * Stock Events key must land in a real column, not the `app_state.payload`
- * JSON blob).
+ * on top; this WP only declares the shape.
  */
 
 import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";

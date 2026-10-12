@@ -1,8 +1,5 @@
 /**
- * Drizzle D1 client factory for the v2 database (WP1). Analogous to
- * `getD1FromLocals` in `src/lib/server/cloudflare-env.ts`, but returns a
- * Drizzle-wrapped instance bound to the `finance_tracker_db_v2` binding
- * instead of the raw v1 `D1DatabaseLike`.
+ * Drizzle D1 client factory for the v2 relational database.
  *
  * Per WP6's design decision, repositories are the *only* code allowed to
  * call this factory and touch D1 directly — API routes must go through a
@@ -15,9 +12,8 @@ import { getRuntimeEnv } from "../lib/server/cloudflare-env";
 
 export type Db = DrizzleD1Database<typeof schema>;
 
-// Matches the codebase's existing convention (see `D1DatabaseLike` in
-// `src/lib/server/d1-state.ts`) of a hand-rolled duck-typed binding instead
-// of depending on `@cloudflare/workers-types`, which isn't installed here.
+// Keep Cloudflare's runtime binding behind the Drizzle boundary without
+// importing generated Worker types into the SQLite test runtime.
 type D1BindingLike = Parameters<typeof drizzle>[0];
 
 /** Wraps the `finance_tracker_db_v2` D1 binding in a typed Drizzle client. */

@@ -1,4 +1,3 @@
-import type { D1DatabaseLike } from './d1-state'
 import { env as cloudflareEnv } from 'cloudflare:workers'
 
 export interface RuntimeEnv {
@@ -10,12 +9,10 @@ export interface RuntimeEnv {
   GOOGLE_CLIENT_SECRET?: string
   GITHUB_CLIENT_ID?: string
   GITHUB_CLIENT_SECRET?: string
-  AUTH_MODE?: string
   /** Loopback-only external mail server for real Worker E2E. */
   TEST_RESEND_URL?: string
-  finance_tracker_db?: D1DatabaseLike
   /** v2 relational database (WP1) — Drizzle client factory in `src/db/client.ts`. */
-  finance_tracker_db_v2?: D1DatabaseLike
+  finance_tracker_db_v2?: unknown
   GITHUB_ISSUE_TOKEN?: string
   GITHUB_TOKEN?: string
   GITHUB_OWNER?: string
@@ -26,12 +23,6 @@ export interface RuntimeEnv {
   COINGECKO_API_PLAN?: string
   MARKET_QUOTE_STALE_MINUTES?: string
   MARKET_QUOTE_CACHE_SECONDS?: string
-  /** Email of the reserved "legacy owner" user created by WP9's migration tool. */
-  LEGACY_OWNER_EMAIL?: string
-  /** Cf-Access team domain (no scheme/path), e.g. `myteam.cloudflareaccess.com`. */
-  CF_ACCESS_TEAM_DOMAIN?: string
-  /** Expected `aud` claim of the Cf-Access Application protecting this app. */
-  CF_ACCESS_AUD?: string
   /**
    * Test-only principal injection. The middleware additionally requires a
    * loopback request origin, so a deployed flag cannot enable impersonation.
@@ -63,14 +54,6 @@ type LocalsWithTestRuntime = { runtimeEnv?: RuntimeEnv }
  */
 export function getRuntimeEnv(locals?: App.Locals): RuntimeEnv {
   return (locals as LocalsWithTestRuntime | undefined)?.runtimeEnv ?? (cloudflareEnv as RuntimeEnv)
-}
-
-export function getD1FromLocals(locals: App.Locals): D1DatabaseLike {
-  const db = getRuntimeEnv(locals).finance_tracker_db
-  if (!db) {
-    throw new Error("D1 binding 'finance_tracker_db' no está disponible en runtime.")
-  }
-  return db
 }
 
 export function getRuntimeEnvFromLocals(locals: App.Locals): RuntimeEnv {
