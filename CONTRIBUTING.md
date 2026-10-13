@@ -18,6 +18,10 @@ pnpm dev
 con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `pnpm test:e2e:install`.
 
+Sesiones y proveedores de login: [autenticación](docs/operations/authentication.md).
+Node/SQLite, Docker y arranque o archivado de worktrees en Orca:
+[self-hosting](docs/operations/self-hosting.md).
+
 ## Dónde viven las issues
 
 En [GitHub Issues](https://github.com/alberba/finance-tracker/issues). El vocabulario de triaje
