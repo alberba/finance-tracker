@@ -9,7 +9,20 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004 y la nota `docs/architecture/estilos-tailwind-vs-css.md`).
 - `src/styles/global.css` es la única hoja de estilos: tokens, reset, tipografía base y las variantes del shell. La hoja heredada desapareció en la 2.0.0 y `tests/unit/styles-guards.test.ts` impide recrearla.
-- Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: la app autenticada hidrata desde sync-v2; la persistencia local y el watcher corresponden al demo aislado; el script también lleva la navegación lateral.
+- Las secciones son componentes Vue (`src/components/sections/*Section.vue`); el mapa siguiente distingue su montaje, el arranque y la navegación.
+
+## Puntos de entrada por responsabilidad
+
+| Cambio                                          | Dónde empezar                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Montaje de secciones                            | `src/components/FinanceWorkspace.vue`; layout en `src/components/FinanceTrackerShell.astro`.                             |
+| Arranque y sesión del cliente                   | `src/scripts/app.ts`: inicia sync autenticado o persistencia local del demo y publica `data-finance-ready`.              |
+| Navegar desde Vue                               | `src/composables/useSectionNavigation.ts`.                                                                               |
+| Clicks del shell y atrás/adelante               | `src/scripts/app/dashboard-budget-goals-section.ts`: el nombre es histórico; su responsabilidad actual es la navegación. |
+| Convertir rutas a secciones                     | `src/scripts/app/dashboard-section-routing.ts`.                                                                          |
+| Año, mes y rango del dashboard                  | `src/stores/dashboard.ts`; mes y sección activa en `src/stores/ui.ts`.                                                   |
+| Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                                   |
+| Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                                   |
 
 ## Reglas de integracion
 

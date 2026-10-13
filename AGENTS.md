@@ -7,9 +7,10 @@
 - Triage: read [triage-labels](docs/agents/triage-labels.md) for the canonical roles and labels.
 - Domain exploration: read [domain](docs/agents/domain.md) for vocabulary and ADRs.
 - Sync changes: read [sync-v2](docs/architecture/sync-v2.md) for store-to-D1 field paths and the
-  three movement builders.
+  shared movement command conversion.
 - UI or `/design`: read [design-language](docs/architecture/design-language.md) for v2 components
   and design rules.
+- Frontend behavior: read [frontend](docs/architecture/frontend.md) for startup, navigation and section entry points.
 - Coding and review: [CODING_STANDARDS.md](CODING_STANDARDS.md) is authoritative, including the
   Standards axis of `/code-review`. Report conflicting narrative docs as drift.
 - Setup, branches, commits and PRs: read [CONTRIBUTING.md](CONTRIBUTING.md).
