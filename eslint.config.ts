@@ -33,6 +33,7 @@ export default defineConfig([
       'dist/**',
       'coverage/**',
       '.astro/**',
+      '.wrangler/**',
       'node_modules/**',
       'playwright-report/**',
       'test-results/**',
