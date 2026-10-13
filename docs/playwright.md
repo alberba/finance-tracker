@@ -51,7 +51,10 @@ pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional
 shards visuales. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
 lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
 Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
-Antes de abrir la PR, `pnpm gate` y `pnpm test:e2e:smoke` en local; espera en el CI solo a calidad.
+Antes de abrir la PR, aplica la [validación según el cambio](../../CONTRIBUTING.md#antes-de-abrir-el-pr):
+solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
+código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
+Espera en el CI solo a calidad.
 El setup común (pnpm, Node, install y Chromium cacheado por lockfile) vive en
 `.github/actions/setup`.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
