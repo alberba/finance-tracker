@@ -33,12 +33,15 @@ En [GitHub Issues](https://github.com/alberba/finance-tracker/issues). El vocabu
 
 ## Antes de abrir el PR
 
-Lo mismo que ejecuta el gate de calidad, en orden de lo más rápido a lo más lento:
+Si el cambio solo modifica texto documental, revisa los enlaces y las instrucciones, comprueba
+el formato de los Markdown tocados y ejecuta `git diff --check`. Esa revisión basta para abrir
+la PR; los cambios de código, configuración o contenido ejecutable requieren las comprobaciones
+siguientes, aunque estén dentro de `docs/`.
+
+Para esos cambios, ejecuta el gate de calidad y smoke en secuencia:
 
 ```bash
-pnpm lint
-pnpm check
-pnpm test                    # unit + component + integration
+pnpm gate                   # dependencias + lint + tipos + unit/component/integration
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
