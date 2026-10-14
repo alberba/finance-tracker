@@ -111,7 +111,19 @@ export function createPlaywrightRuntime({
       },
       trace: 'on-first-retry',
       screenshot: 'only-on-failure',
-      video: 'on-first-retry',
+      video: {
+        mode: 'on-first-retry',
+        fps: 30,
+        show: {
+          actions: {
+            cursor: 'pointer',
+            style: {
+              highlight: 'outline: 2px solid oklch(0.65 0.2 250)',
+              title: 'font-size: 16px',
+            },
+          },
+        },
+      },
     },
     webServer: externalBaseURL
       ? undefined

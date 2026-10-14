@@ -14,9 +14,14 @@ export default defineConfig(
     fullyParallel: true,
     workers: 1,
     projects: [
-      {
-        name: 'chromium',
-        use: { ...devices['Desktop Chrome'] },
+      ...[
+        { name: 'chromium', device: 'Desktop Chrome' },
+        { name: 'firefox', device: 'Desktop Firefox' },
+        { name: 'webkit', device: 'Desktop Safari' },
+      ].map(({ name, device }) => ({
+        name,
+        default: name === 'chromium',
+        use: { ...devices[device] },
         testIgnore: [
           'authentication.spec.ts',
           'bitvavo.spec.ts',
@@ -28,7 +33,7 @@ export default defineConfig(
           'movement-commands.spec.ts',
           'subscription-charges.spec.ts',
         ],
-      },
+      })),
       {
         name: 'mobile-chrome',
         use: { ...devices['Pixel 5'] },
