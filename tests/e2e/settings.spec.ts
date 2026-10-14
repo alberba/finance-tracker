@@ -2,25 +2,27 @@ import { test, expect } from './fixtures'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
 
 test.describe('Settings E2E', () => {
-  test(
-    'abre los ajustes del proveedor desde Conexiones y devuelve el foco al cerrar',
-    { tag: '@smoke' },
-    async ({ page, tracker }) => {
-      await tracker.openSettingsTab('Conexiones')
-      const connections = tracker
-        .section('settings')
-        .getByRole('region', { name: 'Conexiones', exact: true })
-      const stockEvents = connections.getByRole('button', { name: 'Stock Events', exact: true })
-      await expect(stockEvents).toBeVisible()
-      await stockEvents.click()
-      const panel = page.getByRole('dialog', { name: 'Stock Events', exact: true })
-      await expect(panel).toBeVisible()
-      await expect(panel.getByLabel('API key', { exact: true })).toBeVisible()
-      await page.keyboard.press('Escape')
-      await expect(panel).toBeHidden()
-      await expect(stockEvents).toBeFocused()
-    },
-  )
+  for (const provider of ['Stock Events', 'Bitvavo']) {
+    test(
+      `abre los ajustes de ${provider} desde Conexiones y devuelve el foco al cerrar`,
+      { tag: '@smoke' },
+      async ({ page, tracker }) => {
+        await tracker.openSettingsTab('Conexiones')
+        const connections = tracker
+          .section('settings')
+          .getByRole('region', { name: 'Conexiones', exact: true })
+        const launcher = connections.getByRole('button', { name: provider, exact: true })
+        await expect(launcher).toBeVisible()
+        await launcher.click()
+        const panel = page.getByRole('dialog', { name: provider, exact: true })
+        await expect(panel).toBeVisible()
+        await expect(panel.getByLabel('API key', { exact: true })).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(panel).toBeHidden()
+        await expect(launcher).toBeFocused()
+      },
+    )
+  }
 
   test(
     'muestra Configuración por entidades, con pestañas y contadores',

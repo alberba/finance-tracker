@@ -13,6 +13,7 @@ import { pinia } from '../stores/pinia'
 import { useUiStore } from '../stores/ui'
 import { useRecurringStore } from '../stores/recurring'
 import { useSyncStore } from '../stores/sync'
+import { registerFinanceTools, type FinanceModelContext } from '../lib/client/webmcp'
 
 ;(() => {
   'use strict'
@@ -48,6 +49,17 @@ import { useSyncStore } from '../stores/sync'
     dashboardBudgetGoalsSection.switchSection(ui.activeSection, {
       updateHistory: false,
     })
+    const context = (document as Document & { modelContext?: FinanceModelContext }).modelContext
+    try {
+      await registerFinanceTools(context, () => {
+        if (!isDemoMode() && !useSyncStore(pinia).userId) {
+          throw new Error('La sesión ya no está activa.')
+        }
+        return financialStateStore.state
+      })
+    } catch {
+      console.warn('No se pudieron registrar las herramientas WebMCP.')
+    }
     document.documentElement.dataset.financeReady = 'true'
   }
 

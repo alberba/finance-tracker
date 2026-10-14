@@ -30,6 +30,13 @@ const providers = [
     },
   },
 ]
+
+function openProvider(event: MouseEvent, open: () => void): void {
+  // WebKit doesn't focus buttons on pointer clicks. SidePanel needs the
+  // launcher focused before opening so it can restore it when closing.
+  ;(event.currentTarget as HTMLButtonElement).focus()
+  open()
+}
 </script>
 
 <template>
@@ -54,7 +61,7 @@ const providers = [
             :aria-describedby="`${provider.id}-connection-description`"
             :aria-controls="`${provider.id}-connection-panel`"
             aria-haspopup="dialog"
-            @click="provider.open()"
+            @click="openProvider($event, provider.open)"
           >
             <span class="flex w-full items-center gap-3">
               <span

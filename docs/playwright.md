@@ -10,6 +10,10 @@ dev (`playwright.shared.ts`), en local y en CI; ninguno sirve el build de Wrangl
 pnpm test:e2e:install       # instala Chromium una vez
 pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
 pnpm test:e2e               # funcional, sin snapshots visuales
+pnpm test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
+pnpm test:e2e:install:all   # instala también Firefox y WebKit
+pnpm test:e2e:cross-browser # smoke opcional en Firefox y WebKit
+pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
 pnpm test:e2e:shard 1/2    # shard funcional equilibrado por tiempos históricos
 pnpm test:e2e:visual        # layout y regresión visual
 pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
@@ -23,6 +27,16 @@ Para probar una URL ya arrancada:
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> pnpm test:e2e:smoke
 ```
 
+Para buscar dependencias accidentales entre escenarios, usa `pnpm test:e2e:shuffle`. Repite el
+orden pasando la semilla que imprime Playwright: `pnpm test:e2e:shuffle 271828182`. También puedes
+acotar la comprobación a smoke: `pnpm test:e2e:smoke --shuffle 271828182`.
+
+Firefox y WebKit están configurados con `default: false`: las ejecuciones habituales conservan
+Chromium y Pixel 5. Tras instalar los navegadores con `pnpm test:e2e:install:all`, selecciona uno
+con `pnpm test:e2e --project=firefox` o `pnpm test:e2e --project=webkit`. Los proyectos opcionales
+comparten los escenarios de desktop; los visuales solo mantienen baselines de Chromium y Pixel 5.
+`pnpm test:e2e --project='*'` incluye todos los proyectos.
+
 ## Estabilidad
 
 - Cada escenario crea un usuario aislado, inicializa su espacio por la API y carga los datos de
@@ -31,6 +45,9 @@ PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> pnpm test:e2e:smoke
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
 - Cada runner usa un worker, con corte temprano y trace/vídeo únicamente en el primer retry.
   Los shards visuales reparten escenarios por duración.
+- Los vídeos del runtime compartido se graban a 30 fps con cursor, resaltado del objetivo y título
+  de acción. Firefox y WebKit capturan hasta 25 fps. En local, añade `--retries=1` para grabar el
+  reintento de un fallo.
 - `@smoke` identifica recorridos críticos. `@visual` se ejecuta como gate independiente.
 - Desktop cubre los flujos funcionales. Pixel 5 cubre móvil, layout y snapshots una sola vez.
 - No uses `waitForTimeout`; espera una respuesta, URL, locator o señal explícita de la aplicación.
@@ -122,3 +139,37 @@ Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
 ejecuta `pnpm install --frozen-lockfile`. El script Linux sincroniza dependencias antes de elegir
 la imagen de Playwright, para que Chromium coincida con CI.
+
+## WebMCP
+
+La app registra tres herramientas de consulta mediante `document.modelContext` después de cargar
+la sesión o el demo. Leen la proyección actual del cliente, incluidos los cambios locales pendientes
+de sincronizar. No modifican datos ni cambian filtros de la interfaz:
+
+- `get_budget`: presupuesto del año configurado, con los mismos cálculos que la interfaz.
+- `get_month_totals`: ingresos, gastos, inversión y neto de un año y mes contable.
+- `search_movements`: búsqueda por descripción o categoría, con filtros opcionales de año contable,
+  mes y tipo; paginación mediante `offset` y `limit` (25 por defecto, máximo 100).
+
+Los parámetros de mes usan 1–12. Las celdas del resultado de `get_budget` conservan los índices
+0–11 del view-model. Las monedas no se convierten; la búsqueda devuelve la moneda de cada
+movimiento y los totales siguen el comportamiento del registro.
+
+El navegador debe tener abierta la app con una sesión autenticada o el demo y soporte WebMCP
+experimental. Sin esa API, la app funciona igual y omite el registro de herramientas. Al cerrar
+sesión, la navegación al login elimina las herramientas del documento anterior.
+
+Con el CLI incluido en Playwright, abre la app y luego consulta sus herramientas:
+
+```bash
+pnpm exec playwright cli open 'http://127.0.0.1:4321/dashboard?demo=1'
+pnpm exec playwright cli webmcp-list
+pnpm exec playwright cli webmcp-call search_movements --params '{"query":"comida","limit":10}'
+pnpm exec playwright cli webmcp-call get_month_totals --params '{"year":2026,"month":1}'
+pnpm exec playwright cli webmcp-call get_budget
+```
+
+Usa el puerto real de tu dev server. El MCP y CLI de Playwright habilitan WebMCP por defecto.
+La spec `webmcp.spec.ts` activa `--enable-features=WebMCP` en Chromium y comprueba consultas,
+cambios desde la UI y cierre de sesión con la API real de Playwright. La referencia es la
+[documentación oficial de WebMCP de Playwright](https://playwright.dev/docs/api/class-webmcp).
