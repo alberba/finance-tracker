@@ -304,6 +304,35 @@ it('shares rate limits between separate authentication instances backed by the s
   expect(responses.some((response) => response.status === 429)).toBe(true)
 })
 
+it('rate limits by the configured proxy header and ignores a forged cf-connecting-ip', async () => {
+  const proxied = createAuthentication(
+    database.db as unknown as Db,
+    {
+      BETTER_AUTH_URL: 'http://localhost:4321',
+      BETTER_AUTH_SECRET: 'test-secret-with-at-least-thirty-two-characters',
+      CLIENT_IP_HEADER: 'X-Real-IP',
+    },
+    async () => {},
+  )
+  const responses = await Promise.all(
+    Array.from({ length: 8 }, (_, index) =>
+      proxied.handler(
+        new Request('http://localhost:4321/api/auth/email-otp/send-verification-otp', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'http://localhost:4321',
+            'x-real-ip': '198.51.100.40',
+            'cf-connecting-ip': `203.0.113.${index + 1}`,
+          },
+          body: JSON.stringify({ email: `proxy-${index}@example.com`, type: 'sign-in' }),
+        }),
+      ),
+    ),
+  )
+  expect(responses.some((response) => response.status === 429)).toBe(true)
+})
+
 it('rejects an expired invitation without consuming a place', async () => {
   const { createInvitation, registrationAdministration } =
     await import('../../../src/db/repositories/authentication')

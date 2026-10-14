@@ -144,6 +144,25 @@ describe('authentication middleware', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store')
   })
 
+  it('accepts the configured https origin when a proxy hands the app an http URL', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const next = makeNext()
+    const env = { BETTER_AUTH_URL: 'https://finance.example.test' }
+    const request = (origin: string) =>
+      makeContext({
+        url: 'http://finance.example.test/api/session',
+        method: 'POST',
+        headers: { origin, 'Content-Type': 'application/json' },
+        env,
+      })
+
+    await onRequest(request('https://finance.example.test'), next)
+    expect(next).toHaveBeenCalledOnce()
+
+    const forged = (await onRequest(request('https://evil.example.test'), makeNext())) as Response
+    expect(forged.status).toBe(403)
+  })
+
   it('rejects cross-site API mutations before authentication', async () => {
     const context = makeContext({
       method: 'POST',

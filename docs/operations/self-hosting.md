@@ -94,9 +94,9 @@ La imagen y el volumen también sirven en Docker sobre Debian. Antes de publicar
 configura `BETTER_AUTH_URL` con tu URL HTTPS y usa `docker compose --env-file .env.selfhost up`;
 prepara el correo y backups del volumen y de las
 claves. El puerto de Compose solo escucha en loopback para conectar tu proxy inverso.
-Falta adaptar la identificación de IP de Better Auth a un proxy de confianza: ahora
-usa `cf-connecting-ip`, por lo que este cambio está validado para uso local y no deja
-cerrada la configuración de seguridad de un servidor público.
+Detrás de un proxy inverso, define `CLIENT_IP_HEADER=x-real-ip` (o la cabecera que tu proxy
+sobrescriba con la IP real). Sin ella Better Auth usa `cf-connecting-ip`, que un cliente
+puede falsificar fuera de Cloudflare.
 
 Sentry del servidor usa el SDK Node en este destino. Sin configurar un DSN e
 inicializarlo, no envía eventos del servidor. La integración cliente existente sigue

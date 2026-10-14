@@ -37,7 +37,8 @@ conservan las claves financieras.
   Rate limiting de Better Auth en D1: 60 peticiones/minuto por IP y ruta,
   10/minuto en sign-in, 5/minuto en email-otp (las reglas del plugin pueden ser
   más restrictivas). Producción usa exclusivamente `cf-connecting-ip`, que
-  Cloudflare establece. No depende de contadores en memoria de un Worker.
+  Cloudflare establece; en self-host `CLIENT_IP_HEADER` (p. ej. `x-real-ip`) indica la
+  cabecera que el proxy de confianza sobrescribe. No depende de contadores en memoria de un Worker.
 - Correo transaccional esperado antes de responder. El plugin
   `await-transactional-delivery` evita que Better Auth oculte fallos de entrega
   como tareas de fondo. Fallar el envío no completa ni admite el registro.

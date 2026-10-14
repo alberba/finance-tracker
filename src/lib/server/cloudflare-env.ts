@@ -43,6 +43,8 @@ export interface RuntimeEnv {
   DATA_ENCRYPTION_KEY_PREVIOUS?: string
   /** Version number of `DATA_ENCRYPTION_KEY`. Defaults to `1` when unset. */
   DATA_ENCRYPTION_KEY_VERSION?: string
+  /** Trusted client-IP header behind a self-hosted proxy; defaults to `cf-connecting-ip`. */
+  CLIENT_IP_HEADER?: string
 }
 
 type LocalsWithTestRuntime = { runtimeEnv?: RuntimeEnv }
