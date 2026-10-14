@@ -269,7 +269,7 @@ WP10 ──▶ WP11 (cutover runbook + 30-day dual-write/retention window)
 
 **Files**:
 
-- Create: `docs/migration-cutover-runbook.md` (or wherever project runbooks live) — step order: maintenance mode → run WP9 migration tool → run `validate-migration-parity.mjs` → flip `wrangler.toml` primary binding / DNS·routing to v2 stack → smoke test → exit maintenance mode
+- Create: `docs/migration/cutover-runbook.md` (or wherever project runbooks live) — step order: maintenance mode → run WP9 migration tool → run `validate-migration-parity.mjs` → flip `wrangler.toml` primary binding / DNS·routing to v2 stack → smoke test → exit maintenance mode
 - Modify: `wrangler.toml` — after cutover, v1 `finance_tracker_db` binding stays declared (read-only reference) for 30 days, `migrations/` directory untouched
 - Create: retention-window checklist (who/when decommissions v1, using `export-v2-to-v1-json.mjs` as the rollback lever if needed within the window)
 

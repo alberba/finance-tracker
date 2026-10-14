@@ -46,11 +46,9 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest con cobertura,
 y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
 El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
-La PR cuya rama es `v2` ejecuta calidad, auth, dos shards funcionales y sync-v2 en paralelo. Los
-pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
+Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
 shards visuales. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
 lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
-Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.

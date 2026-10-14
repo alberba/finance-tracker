@@ -68,7 +68,7 @@ jobs:
 
   smoke:
     name: PR smoke E2E
-    if: ${{ github.event_name == 'pull_request' && github.head_ref != 'v2' && contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
+    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -92,7 +92,7 @@ jobs:
 
   e2e:
     name: Full E2E shard ${{ matrix.shard }}/2
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
+    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -148,7 +148,7 @@ jobs:
 
   sync:
     name: Sync v2 E2E
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2') }}
+    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -203,7 +203,7 @@ jobs:
 
   authentication-e2e:
     name: Better Auth Worker and browser contracts
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || github.head_ref == 'v2' || contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
+    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

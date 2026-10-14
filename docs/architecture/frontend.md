@@ -24,6 +24,23 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 | Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                                   |
 | Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                                   |
 
+## Secciones: nombre en la UI → ficheros
+
+El `id` y la etiqueta salen de `src/config/app-sections.ts`. El código usa el `id` en inglés; «Resumen» no es una sección: es una pestaña de Inversión y un bloque de Presupuesto.
+
+| UI (`id`)                    | Componente en `src/components/sections/` | Componentes, dominio y store                                                                                              | Tests                                                                       |
+| ---------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Dashboard (`dashboard`)      | `DashboardSection.vue`                   | `components/dashboard`, `components/charts`; `domain/dashboard`; `stores/dashboard.ts`                                    | `unit/dashboard-view-model`; `e2e/dashboard-section`, `e2e/dashboard-flows` |
+| Movimientos (`transactions`) | `TransactionsSection.vue`                | `components/transactions`, `components/recurring`; `domain/transactions`, `domain/subscriptions`; `stores/movements.ts`   | `unit/transactions-registry`, `unit/subscriptions`; `e2e/movement-commands` |
+| Presupuesto (`budget`)       | `BudgetSection.vue`                      | `components/budget`; `domain/budget`; `stores/budget.ts`                                                                  | [Guía de Presupuesto](../context/tabs/presupuesto.md)                       |
+| Patrimonio (`wealth`)        | `WealthSection.vue`                      | `components/wealth`; `domain/wealth`; `stores/wealth.ts`                                                                  | `unit/wealth-view-model`; `component/WealthCalcPanel`; `e2e/wealth`         |
+| Inversión (`investment`)     | `InvestmentSection.vue`                  | `components/investment`; `domain/investment`, `domain/stockevents`; `stores/investment.ts`, `market.ts`, `stockevents.ts` | `unit/investment-*`; `e2e/investment-*`, `e2e/contribution-*`               |
+| Objetivos (`goals`)          | `GoalsSection.vue`                       | `components/goals`; `domain/goals`; `stores/goals.ts`                                                                     | `unit/goals-view-model`; `e2e/goals`                                        |
+| Configuración (`settings`)   | `SettingsSection.vue`                    | `components/settings`; `domain/settings`; `stores/settings.ts`, `recurring.ts`                                            | `unit/settings-view-model`; `e2e/settings`                                  |
+| Datos (`data`)               | `DataSection.vue`                        | `domain/data`; `stores/data.ts`                                                                                           | `unit/data-store-*`; `e2e/data`                                             |
+
+Rutas de tests relativas a `tests/`. Reportes no es una sección: lo abre `components/reports/GlobalReportLauncher.vue` ([guía](../context/tabs/reportes.md)).
+
 ## Reglas de integracion
 
 - Una isla Vue no debe hablar directamente con `window` salvo dentro de un adaptador o composable dedicado.
