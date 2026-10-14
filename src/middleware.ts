@@ -7,6 +7,7 @@ import { createAuthentication } from './lib/server/auth/better-auth'
 import { resolvePrincipal, type AuthPrincipal } from './lib/server/auth/principal'
 import { getRuntimeEnv, type RuntimeEnv } from './lib/server/cloudflare-env'
 import { isPublicDemoNavigation } from './lib/server/demo-access'
+import { isMaintenanceMode, maintenanceResponse } from './lib/server/maintenance'
 import {
   isLocalTestRequest,
   rejectUnsafeApiMutation,
@@ -43,6 +44,8 @@ function wrongQueueIdentity(request: Request, pathname: string, userId: string):
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const env = getRuntimeEnv(context.locals)
+
+  if (isMaintenanceMode(env)) return maintenanceResponse(context.request)
 
   if (isPublicDemoNavigation(context.request)) return next()
 

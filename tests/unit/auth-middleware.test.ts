@@ -73,6 +73,48 @@ beforeEach(() => {
 })
 
 describe('authentication middleware', () => {
+  it('answers every request with a 503 while maintenance mode is on', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const env = { MAINTENANCE_MODE: 'true' }
+
+    for (const url of [
+      'https://app.example.test/',
+      'https://app.example.test/login?demo=1',
+      'https://app.example.test/api/auth/session',
+    ]) {
+      const next = makeNext()
+      const response = (await onRequest(makeContext({ url, env }), next)) as Response
+
+      expect(response.status).toBe(503)
+      expect(response.headers.get('Retry-After')).toBeTruthy()
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
+      expect(next).not.toHaveBeenCalled()
+    }
+    expect(createAuthentication).not.toHaveBeenCalled()
+  })
+
+  it('returns JSON to API callers during maintenance', async () => {
+    const context = makeContext({
+      url: 'https://app.example.test/api/sync',
+      method: 'POST',
+      env: { MAINTENANCE_MODE: 'true' },
+    })
+
+    const response = (await onRequest(context, makeNext())) as Response
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Content-Type')).toBe('application/json')
+  })
+
+  it('serves normally when maintenance mode is not exactly "true"', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const next = makeNext()
+
+    await onRequest(makeContext({ env: { MAINTENANCE_MODE: 'false' } }), next)
+
+    expect(next).toHaveBeenCalledOnce()
+  })
+
   it('does not accept a Cf-Access assertion as a credential', async () => {
     const context = makeContext({ headers: { 'Cf-Access-Jwt-Assertion': 'valid-looking.jwt' } })
     const next = makeNext()
