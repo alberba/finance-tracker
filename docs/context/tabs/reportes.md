@@ -31,7 +31,7 @@ Identificadores clave en UI:
 
 ### Lógica frontend
 
-- `src/scripts/issue-report.ts`
+- `src/services/issue-report-api.ts`
 - `src/scripts/types.ts`
 
 ### Backend/API
@@ -64,7 +64,7 @@ del envío). En móvil lo abre la hoja «Más».
 ## Flujo técnico
 
 1. El usuario abre `/reportes`.
-2. `src/scripts/issue-report.ts` escucha el `submit` del formulario.
+2. `src/components/reports/IssueReportPanel.vue` envía el formulario con `src/services/issue-report-api.ts`.
 3. Se construye un payload con:
    - `type`
    - `summary`
@@ -151,7 +151,7 @@ Implicación para futuros cambios:
 
 - El copy de la pestaña puede cambiar con facilidad, pero los selectores de tests deben mantenerse estables.
 - Si cambia el contrato del payload, hay que actualizar:
-  - `src/scripts/issue-report.ts`
+  - `src/services/issue-report-api.ts`
   - `src/lib/server/issue-report-schema.ts`
   - `src/pages/api/issues/report.ts`
   - unit tests y E2E
@@ -181,24 +181,10 @@ Implicación para futuros cambios:
 Antes de tocar esta pestaña, revisar:
 
 1. `src/components/reports/*`
-2. `src/scripts/issue-report.ts`
+2. `src/services/issue-report-api.ts`
 3. `src/pages/api/issues/report.ts`
 4. `src/lib/server/issue-report-schema.ts`
 5. `src/lib/server/github-issues.ts`
 6. `tests/e2e/reports.spec.ts`
 7. `tests/e2e/pages/FinanceTrackerPage.ts`
 8. `README.md`
-
-## Recomendación práctica
-
-Para mantener un archivo de contexto por pestaña, esta estructura escala bien:
-
-- `docs/context/tabs/dashboard.md`
-- `docs/context/tabs/movimientos.md`
-- `docs/context/tabs/presupuesto.md`
-- `docs/context/tabs/patrimonio.md`
-- `docs/context/tabs/inversion.md`
-- `docs/context/tabs/objetivos.md`
-- `docs/context/tabs/configuracion.md`
-- `docs/context/tabs/datos.md`
-- `docs/context/tabs/reportes.md`
