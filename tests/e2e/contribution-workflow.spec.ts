@@ -1,9 +1,10 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { readScenarioState, editScenarioState } from './seed-sync-v2'
+import { test, expect } from './fixtures'
 
 test.describe('recorrido guiado de aportes', () => {
-  test('fecha inicial del aporte es hoy', async ({ tracker }) => {
+  test('fecha inicial del aporte es hoy', async ({ tracker, page }) => {
     await tracker.openContributionWorkflowModal()
-    const expectedToday = new Date().toISOString().slice(0, 10)
+    const expectedToday = await page.evaluate(() => new Date().toLocaleDateString('en-CA'))
     expect(await tracker.contributionWorkflowDateValue()).toBe(expectedToday)
   })
 
@@ -46,6 +47,10 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSave()
     await expect(modal).toBeHidden()
     await expect(page.getByRole('status')).toContainText('Aporte guardado con avisos.')
+    await tracker.waitForSync()
+    const saved = await readScenarioState(page)
+    const fundId = saved.investmentAssets.find((asset) => asset.name === 'Fondos Indexados')!.id
+    expect(saved.snapshots['0'].investments[fundId]).toBe(12000)
   })
 
   test('reparto completo guarda flow derivado por asignaciones', async ({ tracker, page }) => {
@@ -68,6 +73,9 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSave()
     await expect(page.getByRole('status')).toContainText('Aporte guardado.')
 
+    expect(await tracker.getContributionFlowByDate('2026-04-30')).toBe(300)
+    await tracker.waitForSync()
+    await tracker.reload()
     expect(await tracker.getContributionFlowByDate('2026-04-30')).toBe(300)
   })
 
@@ -100,16 +108,12 @@ test.describe('recorrido guiado de aportes', () => {
     await expect(row).toBeVisible()
     await expect(row.locator('[data-contribution-value]')).toHaveText('15.850,00 €')
 
-    const accounts = await page.evaluate(() => {
-      const raw = window.localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) {
-        return null
-      }
-      const state = JSON.parse(raw) as {
-        snapshots?: Record<string, { accounts?: Record<string, number> }>
-      }
-      return state.snapshots?.['3']?.accounts || null
-    })
+    const accounts = await page.evaluate(
+      (state) => {
+        return state.snapshots?.['3']?.accounts || null
+      },
+      await readScenarioState(page),
+    )
     expect(accounts?.myinvestor).toBe(1300)
     expect(accounts?.['trading-212']).toBe(1000)
     expect(accounts?.['trade-republic']).toBe(850)
@@ -131,26 +135,17 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 77)
     await tracker.contributionWorkflowSave()
 
-    const summary = await page.evaluate(() => {
-      const raw = window.localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) {
-        return { legacy: 0, allocations: 0 }
-      }
-      const state = JSON.parse(raw) as {
-        contributions?: Array<{
-          flowSource?: string
-          flowAllocations?: Array<{ accountId: string; amount: number }>
-          flow?: number
-          portfolioDate?: string
-        }>
-      }
-      const contributions = Array.isArray(state.contributions) ? state.contributions : []
-      const legacy = contributions.filter((item) => item.flowSource === 'legacy').length
-      const allocations = contributions.filter(
-        (item) => Array.isArray(item.flowAllocations) && item.flowAllocations.length > 0,
-      ).length
-      return { legacy, allocations }
-    })
+    const summary = await page.evaluate(
+      (state) => {
+        const contributions = Array.isArray(state.contributions) ? state.contributions : []
+        const legacy = contributions.filter((item) => item.flowSource === 'legacy').length
+        const allocations = contributions.filter(
+          (item) => Array.isArray(item.flowAllocations) && item.flowAllocations.length > 0,
+        ).length
+        return { legacy, allocations }
+      },
+      await readScenarioState(page),
+    )
 
     expect(summary.legacy).toBeGreaterThan(0)
     expect(summary.allocations).toBeGreaterThan(0)
@@ -160,23 +155,14 @@ test.describe('recorrido guiado de aportes', () => {
     tracker,
     page,
   }) => {
-    await page.evaluate(() => {
-      const raw = window.localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) {
-        return
-      }
-      const state = JSON.parse(raw) as {
-        accounts?: Array<{ id: string; name: string }>
-      }
+    await editScenarioState(page, (state) => {
       state.accounts = (state.accounts || []).filter(
         (account) =>
           String(account.name || '')
             .trim()
             .toLowerCase() !== 'trade republic',
       )
-      window.localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
 
     await tracker.openContributionWorkflowModal()
@@ -234,22 +220,16 @@ test.describe('recorrido guiado de aportes', () => {
       })
     })
 
-    await page.evaluate(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      if (!raw) {
-        throw new Error('No se encontró el estado financiero inicial')
-      }
-      const state = JSON.parse(raw)
+    await editScenarioState(page, (state) => {
       state.stockEvents = {
         enabled: true,
         apiKey: '',
         symbolMappings: [],
         cashMappings: [],
       }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
+    expect((await readScenarioState(page)).stockEvents.enabled).toBe(true)
     const accountPanel = await tracker.openSettingsCard('Cuentas', 'MyInvestor')
 
     const mappingSelect = accountPanel.getByRole('combobox', {
@@ -259,15 +239,18 @@ test.describe('recorrido guiado de aportes', () => {
     await mappingSelect.selectOption('wl-etf')
     await expect(mappingSelect).toHaveValue('wl-etf')
     await expect
-      .poll(() =>
-        page.evaluate(() => {
-          const raw = localStorage.getItem('finance-tracker-state-v1')
-          return raw ? JSON.parse(raw).stockEvents?.cashMappings : []
-        }),
+      .poll(async () =>
+        page.evaluate(
+          (state) => {
+            return state.stockEvents.cashMappings
+          },
+          await readScenarioState(page),
+        ),
       )
       .toContainEqual({ accountId: 'myinvestor', watchlistId: 'wl-etf' })
     await accountPanel.getByRole('button', { name: 'Cancelar' }).click()
     await expect(accountPanel).toBeHidden()
+    expect((await readScenarioState(page)).stockEvents.enabled).toBe(true)
 
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('JULIO')

@@ -8,7 +8,6 @@ export default defineConfig(
     htmlOutputFolder: 'playwright-report-sync-v2',
     blobOutputDir: 'blob-report-sync-v2',
     tag: '@sync-v2',
-    env: { PUBLIC_SYNC_V2: 'true' },
   }),
   {
     fullyParallel: false,

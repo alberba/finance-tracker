@@ -49,24 +49,18 @@ describe('authentication provisions only newly created financial users', () => {
     expect(await accountsRepository.listCategoriesByUser(database.db, user.id)).toEqual([])
   })
 
-  it('does not add suggestions when linking the legacy owner', async () => {
-    const [user] = await database.db
-      .insert(users)
-      .values({
-        email: 'owner@example.com',
-        isLegacyOwner: 1,
-        createdAt: '2026-01-01',
-        updatedAt: '2026-01-01',
-      })
-      .returning()
-    await resolvePrincipal(database.db, {
-      provider: 'cf-access',
-      subject: 'owner',
-      email: user.email,
-      legacyOwnerEmail: user.email,
+  it('provisions settings and default categories for a new loopback identity', async () => {
+    const principal = await resolvePrincipal(database.db, {
+      provider: 'better-auth',
+      subject: 'shim-user',
+      email: 'shim@example.com',
     })
-    expect(await userSettingsRepository.get(database.db, user.id)).toBeUndefined()
-    expect(await accountsRepository.listCategoriesByUser(database.db, user.id)).toEqual([])
+    expect((await userSettingsRepository.get(database.db, principal.userId))?.onboardingPresented).toBe(
+      0,
+    )
+    expect(await accountsRepository.listCategoriesByUser(database.db, principal.userId)).toHaveLength(
+      10,
+    )
   })
 
   it('rolls back admission if category provisioning fails', async () => {

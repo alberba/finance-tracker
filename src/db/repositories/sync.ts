@@ -236,14 +236,3 @@ export async function bulkInsertChanges(
     )
     .returning()
 }
-
-/** Notify every device to rebuild after an import or reset, preserving cursor order. */
-export async function recordDatasetReplacement(db: Db, userId: string): Promise<void> {
-  const { revision } = await bumpRevision(db, userId)
-  await createChange(db, userId, {
-    revision,
-    entityType: 'reset',
-    entityId: userId,
-    changeType: 'reset',
-  })
-}

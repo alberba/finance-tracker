@@ -490,7 +490,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         await userSettingsRepository.create(tx, userId, onboarding)
       }
 
-      await syncRepository.recordDatasetReplacement(tx, userId)
+      const { revision } = await syncRepository.bumpRevision(tx, userId)
+      await syncRepository.createChange(tx, userId, {
+        revision,
+        entityType: 'reset',
+        entityId: userId,
+        changeType: 'update',
+        payload: null,
+      })
 
       return { imported, skipped }
     })

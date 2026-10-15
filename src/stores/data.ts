@@ -1,16 +1,10 @@
-/**
- * On the v2 sync path the JSON backup is the server's relational export
- * (`src/lib/client/data-backup.ts`): exporting reads D1 and importing
- * replaces the user's rows there, then reloads so the bootstrap rebuilds the
- * state. Off v2 (and in demo mode) both keep working on the in-memory blob.
- */
+/** JSON backups use the authenticated relational export; demo remains local. */
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
 import { fetchBackup, restoreBackup } from '../lib/client/data-backup'
-import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { initializeFreshState } from '../lib/client/state-initialize'
 import { isDemoMode } from '../scripts/demo-mode'
 import { useFinancialStateStore } from './financial-state'
@@ -33,7 +27,7 @@ export const useDataStore = defineStore('data', () => {
   const summary = computed(() => buildDataSummaryViewModel(financialStateStore.state))
 
   /** The JSON backup lives in D1 and a restore replaces what is there. */
-  const backsUpServerData = isSyncV2Enabled() && !isDemoMode()
+  const backsUpServerData = !isDemoMode()
 
   async function exportJson(): Promise<void> {
     if (backsUpServerData) {
@@ -82,7 +76,7 @@ export const useDataStore = defineStore('data', () => {
           onboardingMovementCompleted,
           onboardingCompleted,
         } = financialStateStore.state
-        financialStateStore.reloadState({
+        financialStateStore.replaceState({
           ...data,
           onboardingPresented,
           onboardingDismissed,
@@ -120,8 +114,8 @@ export const useDataStore = defineStore('data', () => {
     window.location.reload()
   }
 
-  /** "Empezar de cero" (WP8) — only meaningful on the v2 sync path. */
-  const canStartFresh = isSyncV2Enabled() && !isDemoMode()
+  /** "Empezar de cero" provisions a private space for authenticated users. */
+  const canStartFresh = !isDemoMode()
 
   async function startFresh(): Promise<void> {
     if (!canStartFresh) {

@@ -36,7 +36,6 @@ function json(body: unknown) {
 
 describe('review: read model across devices', () => {
   beforeEach(() => {
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
     vi.stubGlobal('navigator', { onLine: true })
     vi.stubGlobal('window', new EventTarget())
     setActivePinia(createPinia())
@@ -93,5 +92,72 @@ describe('review: read model across devices', () => {
     expect(useFinancialStateStore().accounts.map((account) => account.name)).toContain(
       REMOTE_ACCOUNT.name,
     )
+  })
+
+  it('retains an investment operation when a same-version incremental row omits it', async () => {
+    const transaction = {
+      id: 'remote-investment',
+      accountId: REMOTE_ACCOUNT.id,
+      categoryId: null,
+      type: 'investment',
+      date: '2026-09-12',
+      description: 'Compra VWCE',
+      amount: 1206.2,
+      currency: 'EUR',
+      version: 1,
+      tradeDetail: {
+        symbol: 'VWCE',
+        side: 'buy',
+        quantity: '10',
+        price: 120.5,
+        fee: 1.2,
+        currency: 'EUR',
+      },
+    }
+    const transactionChange: Omit<typeof transaction, 'tradeDetail'> & {
+      tradeDetail?: typeof transaction.tradeDetail
+      declared: boolean
+    } = { ...transaction, declared: true }
+    delete transactionChange.tradeDetail
+    let initial = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/bootstrap')
+          return initial
+            ? json({ ...EMPTY, accounts: [REMOTE_ACCOUNT], transactions: [transaction] })
+            : new Response('1102', { status: 503 })
+        return json(
+          initial
+            ? { revision: 0, changes: [] }
+            : {
+                revision: 1,
+                changes: [
+                  {
+                    entityType: 'transaction',
+                    entityId: transaction.id,
+                    changeType: 'update',
+                    payload: JSON.stringify(transactionChange),
+                  },
+                ],
+              },
+        )
+      }),
+    )
+    const sync = useSyncStore()
+    await sync.init('review-investment-operation')
+    initial = false
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => expect(sync.revision).toBe(1))
+    await vi.waitFor(() => expect(sync.syncStatus).toBe('idle'))
+
+    expect(useFinancialStateStore().transactions[0]).toMatchObject({
+      symbol: 'VWCE',
+      side: 'buy',
+      units: 10,
+      unitPrice: 120.5,
+      fee: 1.2,
+      declared: true,
+    })
   })
 })

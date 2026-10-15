@@ -9,7 +9,37 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
 - Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004 y la nota `docs/architecture/estilos-tailwind-vs-css.md`).
 - `src/styles/global.css` es la única hoja de estilos: tokens, reset, tipografía base y las variantes del shell. La hoja heredada desapareció en la 2.0.0 y `tests/unit/styles-guards.test.ts` impide recrearla.
-- Las secciones son componentes Vue (`src/components/sections/*Section.vue`) que monta `FinanceWorkspace.vue`. `src/scripts/app.ts` ya no pinta secciones: hidrata y persiste el estado, registra el puente de commit y recarga del store y lleva la navegación lateral.
+- Las secciones son componentes Vue (`src/components/sections/*Section.vue`); el mapa siguiente distingue su montaje, el arranque y la navegación.
+
+## Puntos de entrada por responsabilidad
+
+| Cambio                                          | Dónde empezar                                                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Montaje de secciones                            | `src/components/FinanceWorkspace.vue`; layout en `src/components/FinanceTrackerShell.astro`.                             |
+| Arranque y sesión del cliente                   | `src/scripts/app.ts`: inicia sync autenticado o persistencia local del demo y publica `data-finance-ready`.              |
+| Navegar desde Vue                               | `src/composables/useSectionNavigation.ts`.                                                                               |
+| Clicks del shell y atrás/adelante               | `src/scripts/app/dashboard-budget-goals-section.ts`: el nombre es histórico; su responsabilidad actual es la navegación. |
+| Convertir rutas a secciones                     | `src/scripts/app/dashboard-section-routing.ts`.                                                                          |
+| Año, mes y rango del dashboard                  | `src/stores/dashboard.ts`; mes y sección activa en `src/stores/ui.ts`.                                                   |
+| Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                                   |
+| Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                                   |
+
+## Secciones: nombre en la UI → ficheros
+
+El `id` y la etiqueta salen de `src/config/app-sections.ts`. El código usa el `id` en inglés; «Resumen» no es una sección: es una pestaña de Inversión y un bloque de Presupuesto.
+
+| UI (`id`)                    | Componente en `src/components/sections/` | Componentes, dominio y store                                                                                              | Tests                                                                       |
+| ---------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Dashboard (`dashboard`)      | `DashboardSection.vue`                   | `components/dashboard`, `components/charts`; `domain/dashboard`; `stores/dashboard.ts`                                    | `unit/dashboard-view-model`; `e2e/dashboard-section`, `e2e/dashboard-flows` |
+| Movimientos (`transactions`) | `TransactionsSection.vue`                | `components/transactions`, `components/recurring`; `domain/transactions`, `domain/subscriptions`; `stores/movements.ts`   | `unit/transactions-registry`, `unit/subscriptions`; `e2e/movement-commands` |
+| Presupuesto (`budget`)       | `BudgetSection.vue`                      | `components/budget`; `domain/budget`; `stores/budget.ts`                                                                  | [Guía de Presupuesto](../context/tabs/presupuesto.md)                       |
+| Patrimonio (`wealth`)        | `WealthSection.vue`                      | `components/wealth`; `domain/wealth`; `stores/wealth.ts`                                                                  | `unit/wealth-view-model`; `component/WealthCalcPanel`; `e2e/wealth`         |
+| Inversión (`investment`)     | `InvestmentSection.vue`                  | `components/investment`; `domain/investment`, `domain/stockevents`; `stores/investment.ts`, `market.ts`, `stockevents.ts` | `unit/investment-*`; `e2e/investment-*`, `e2e/contribution-*`               |
+| Objetivos (`goals`)          | `GoalsSection.vue`                       | `components/goals`; `domain/goals`; `stores/goals.ts`                                                                     | `unit/goals-view-model`; `e2e/goals`                                        |
+| Configuración (`settings`)   | `SettingsSection.vue`                    | `components/settings`; `domain/settings`; `stores/settings.ts`, `recurring.ts`                                            | `unit/settings-view-model`; `e2e/settings`                                  |
+| Datos (`data`)               | `DataSection.vue`                        | `domain/data`; `stores/data.ts`                                                                                           | `unit/data-store-*`; `e2e/data`                                             |
+
+Rutas de tests relativas a `tests/`. Reportes no es una sección: lo abre `components/reports/GlobalReportLauncher.vue` ([guía](../context/tabs/reportes.md)).
 
 ## Reglas de integracion
 
@@ -35,6 +65,12 @@ Pinia es la fuente de verdad del estado en cliente. `useFinancialStateStore` (`s
 1. Selectores puros en `src/domain/<sección>/view-model.ts`.
 2. Un store en `src/stores/<sección>.ts` que expone el view-model como `computed` sobre `useFinancialStateStore().state` y muta con `financialStateStore.commitState((draft) => …)`.
 3. El componente de la sección lee el store con `storeToRefs` y emite acciones explícitas.
+
+Es una guía para organizar estado y comportamiento de sección, no una obligación de añadir las tres
+capas a cada operación. Una acción sencilla puede vivir donde ya se entiende y modifica ese estado;
+un composable o adaptador se justifica cuando asume una responsabilidad propia, como gestionar el
+ciclo de vida de una integración o traducir la navegación del navegador. Pasar una llamada a otro
+archivo o cambiar el nombre de sus métodos no crea por sí solo esa responsabilidad.
 
 ## Verificacion
 

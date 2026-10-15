@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import fixture from '../unit/fixtures/bitvavo-real-sanitized.json' with { type: 'json' }
 import { BitvavoPage } from './pages/BitvavoPage'
 import { seedMarketInstrument } from './seed-market-instrument'
+import { syncV2TestHeaders } from './seed-sync-v2'
 
 // Real D1 and server routes, with only the external Bitvavo HTTP boundary replaced.
 test('imports a closed preview, retains exact data after reload and synchronizes another client @smoke', async ({
@@ -16,7 +17,9 @@ test('imports a closed preview, retains exact data after reload and synchronizes
   const context = await browser.newContext({ extraHTTPHeaders: headers })
   const accountId = randomUUID()
   try {
+    const syncHeaders = await syncV2TestHeaders(context.request, email)
     const seeded = await context.request.post('/api/sync', {
+      headers: syncHeaders,
       data: {
         commands: [
           {
@@ -68,7 +71,7 @@ test('imports a closed preview, retains exact data after reload and synchronizes
     await expect(detail.getByText('0,00008878285', { exact: true })).toBeVisible()
     await expect(detail.getByText('1 ene 2020, 00:00 UTC', { exact: true })).toBeVisible()
     await expect(detail.getByText('Pendiente de vincular', { exact: true })).toBeVisible()
-    const instrumentId = await seedMarketInstrument(context.request)
+    const instrumentId = await seedMarketInstrument(context.request, email)
     await detail.getByRole('button', { name: 'Cerrar', exact: true }).click()
     await bitvavo.openDetails('Compra')
     await bitvavo.linkInstrument(instrumentId)

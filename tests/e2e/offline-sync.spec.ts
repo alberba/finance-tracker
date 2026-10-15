@@ -3,7 +3,7 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
  * WP10 — offline CRUD + sync-on-reconnect E2E, sync-v2 flow
- * (`PUBLIC_SYNC_V2=true`, see `playwright.sync-v2.config.ts`).
+ * (`playwright.sync-v2.config.ts`).
  *
  * The engine under test is `src/stores/sync.ts` (WP7): every domain
  * mutation is optimistic (written to IndexedDB immediately, queued in the

@@ -1,47 +1,28 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
-import type { Page } from '@playwright/test'
-
-/**
- * Edits the stored state in the page and mirrors it to the server. `edit`
- * runs in the browser, so it can only use its argument.
- */
-interface StoredState {
-  instruments: unknown[]
-  transactions: unknown[]
-  stockEvents?: unknown
-}
-
-async function editState(page: Page, edit: (state: StoredState) => void) {
-  await page.evaluate(`(() => {
-    const raw = localStorage.getItem("finance-tracker-state-v1");
-    if (!raw) throw new Error("No se encontró el estado financiero inicial");
-    const state = JSON.parse(raw);
-    (${edit.toString()})(state);
-    localStorage.setItem("finance-tracker-state-v1", JSON.stringify(state));
-  })()`)
-  await mirrorStateToServer(page)
-}
+import { test, expect } from './fixtures'
+import { editScenarioState, readScenarioState } from './seed-sync-v2'
 
 test.describe('Settings E2E', () => {
-  test(
-    'abre los ajustes del proveedor desde Conexiones y devuelve el foco al cerrar',
-    { tag: '@smoke' },
-    async ({ page, tracker }) => {
-      await tracker.openSettingsTab('Conexiones')
-      const connections = tracker
-        .section('settings')
-        .getByRole('region', { name: 'Conexiones', exact: true })
-      const stockEvents = connections.getByRole('button', { name: 'Stock Events', exact: true })
-      await expect(stockEvents).toBeVisible()
-      await stockEvents.click()
-      const panel = page.getByRole('dialog', { name: 'Stock Events', exact: true })
-      await expect(panel).toBeVisible()
-      await expect(panel.getByLabel('API key', { exact: true })).toBeVisible()
-      await page.keyboard.press('Escape')
-      await expect(panel).toBeHidden()
-      await expect(stockEvents).toBeFocused()
-    },
-  )
+  for (const provider of ['Stock Events', 'Bitvavo']) {
+    test(
+      `abre los ajustes de ${provider} desde Conexiones y devuelve el foco al cerrar`,
+      { tag: '@smoke' },
+      async ({ page, tracker }) => {
+        await tracker.openSettingsTab('Conexiones')
+        const connections = tracker
+          .section('settings')
+          .getByRole('region', { name: 'Conexiones', exact: true })
+        const launcher = connections.getByRole('button', { name: provider, exact: true })
+        await expect(launcher).toBeVisible()
+        await launcher.click()
+        const panel = page.getByRole('dialog', { name: provider, exact: true })
+        await expect(panel).toBeVisible()
+        await expect(panel.getByLabel('API key', { exact: true })).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(panel).toBeHidden()
+        await expect(launcher).toBeFocused()
+      },
+    )
+  }
 
   test(
     'muestra Configuración por entidades, con pestañas y contadores',
@@ -179,7 +160,7 @@ test.describe('Settings E2E', () => {
       }),
     )
 
-    await editState(page, (state) => {
+    await editScenarioState(page, (state) => {
       state.instruments.push({
         id: 'instrument-aged',
         investmentAssetId: 'etf-aged',
@@ -220,18 +201,12 @@ test.describe('Settings E2E', () => {
     await watchlist.selectOption('wl-etf')
     await expect(watchlist).toHaveValue('wl-etf')
     await expect(target).toHaveValue('AGED.XETRA')
-    await expect(page.locator('#save-status')).toContainText('Sincronizado')
+    await tracker.waitForSync()
 
     await tracker.reload()
-    await page.waitForFunction(() => {
-      const raw = localStorage.getItem('finance-tracker-state-v1')
-      return raw
-        ? JSON.parse(raw).stockEvents?.symbolMappings?.some(
-            (item: { symbol?: string; watchlistId?: string }) =>
-              item.symbol === 'AGED' && item.watchlistId === 'wl-etf',
-          )
-        : false
-    })
+    await expect
+      .poll(async () => (await readScenarioState(page)).stockEvents.symbolMappings)
+      .toContainEqual(expect.objectContaining({ symbol: 'AGED', watchlistId: 'wl-etf' }))
     const reopened = await tracker.openSettingsCard('Activos', 'ETF AGED')
     await expect(
       reopened.getByRole('combobox', { name: 'Lista de seguimiento de AGED' }),
@@ -245,12 +220,18 @@ test.describe('Settings E2E', () => {
     tracker,
     page,
   }) => {
-    await editState(page, (state) => {
+    await editScenarioState(page, (state) => {
       state.transactions.push({
         id: 'tx-orphan',
         type: 'investment',
         date: '2026-07-01',
         amount: 50,
+        month: 6,
+        createdAt: '2026-07-01T00:00:00Z',
+        side: 'buy',
+        units: 1,
+        unitPrice: 50,
+        fee: 0,
         category: 'Sin activo',
         description: 'Compra suelta',
         accountId: 'revolut',

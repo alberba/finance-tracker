@@ -10,21 +10,18 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { idColumn, createdAtColumn, updatedAtColumn, versionColumn } from './_helpers'
 
-/** A v2 account holder. Reserved "legacy owner" row is created by WP9. */
+/** A financial account holder. */
 export const users = sqliteTable('users', {
   id: idColumn(),
   email: text('email').notNull().unique(),
   displayName: text('display_name'),
-  /** Marks the single reserved user that legacy (pre-auth) data migrates to. */
-  isLegacyOwner: integer('is_legacy_owner').notNull().default(0),
   createdAt: createdAtColumn(),
   updatedAt: updatedAtColumn(),
 })
 
 /**
- * External identity (Cf-Access JWT `sub`, or future providers) linked to a
- * `users` row. First successful auth for an unseen `(provider, subject)`
- * pair creates both rows transactionally (WP3).
+ * External identity linked to a `users` row. First use by an unseen
+ * `(provider, subject)` pair creates both rows transactionally.
  */
 export const userIdentities = sqliteTable(
   'user_identities',

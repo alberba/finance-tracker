@@ -3,13 +3,11 @@ import { shallowRef } from 'vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import BitvavoImportPanel from './BitvavoImportPanel.vue'
 import StockEventsPanel from './StockEventsPanel.vue'
-import { isSyncV2Enabled } from '../../lib/client/feature-flags'
 
 defineProps<{ isActive: boolean }>()
 
 const stockEventsOpen = shallowRef(false)
 const bitvavoOpen = shallowRef(false)
-const bitvavoEnabled = isSyncV2Enabled()
 const providers = [
   {
     id: 'stockevents',
@@ -21,21 +19,24 @@ const providers = [
       stockEventsOpen.value = true
     },
   },
-  ...(bitvavoEnabled
-    ? [
-        {
-          id: 'bitvavo',
-          name: 'Bitvavo',
-          initials: 'BV',
-          description: 'Conecta tu cuenta e importa el historial de compras y ventas en euros.',
-          action: 'Ajustes e importación',
-          open: () => {
-            bitvavoOpen.value = true
-          },
-        },
-      ]
-    : []),
+  {
+    id: 'bitvavo',
+    name: 'Bitvavo',
+    initials: 'BV',
+    description: 'Conecta tu cuenta e importa el historial de compras y ventas en euros.',
+    action: 'Ajustes e importación',
+    open: () => {
+      bitvavoOpen.value = true
+    },
+  },
 ]
+
+function openProvider(event: MouseEvent, open: () => void): void {
+  // WebKit doesn't focus buttons on pointer clicks. SidePanel needs the
+  // launcher focused before opening so it can restore it when closing.
+  ;(event.currentTarget as HTMLButtonElement).focus()
+  open()
+}
 </script>
 
 <template>
@@ -60,7 +61,7 @@ const providers = [
             :aria-describedby="`${provider.id}-connection-description`"
             :aria-controls="`${provider.id}-connection-panel`"
             aria-haspopup="dialog"
-            @click="provider.open()"
+            @click="openProvider($event, provider.open)"
           >
             <span class="flex w-full items-center gap-3">
               <span
@@ -86,6 +87,6 @@ const providers = [
       </ul>
     </section>
     <StockEventsPanel v-model:open="stockEventsOpen" />
-    <BitvavoImportPanel v-if="bitvavoEnabled" v-model:open="bitvavoOpen" />
+    <BitvavoImportPanel v-model:open="bitvavoOpen" />
   </section>
 </template>

@@ -86,10 +86,13 @@ function subscriptionStartDate(subscription: CachedEntity): string {
 }
 
 /** Projects the relational sync-v2 read model into the UI's current State model. */
-export function projectSyncV2State(bootstrap: SyncV2Bootstrap): State {
+export function projectSyncV2State(
+  bootstrap: SyncV2Bootstrap,
+  year = new Date().getFullYear(),
+): State {
   const projected = normalizeState({
     meta: { source: 'sync-v2', generatedAt: new Date().toISOString(), version: 1, savedAt: null },
-    year: new Date().getFullYear(),
+    year,
     currency: bootstrap.settings?.currency || 'EUR',
     onboardingPresented: bootstrap.settings?.onboardingPresented === 1,
     onboardingDismissed: bootstrap.settings?.onboardingDismissed === 1,

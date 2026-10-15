@@ -258,9 +258,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     principal = {
       userId: user.id,
       email: user.email,
-      provider: 'cf-access',
+      provider: 'better-auth',
       subject: 'sub-1',
-      isLegacyOwner: false,
     }
   })
 
@@ -319,9 +318,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     const otherPrincipal: AuthPrincipal = {
       userId: otherUser.id,
       email: otherUser.email,
-      provider: 'cf-access',
+      provider: 'better-auth',
       subject: 'sub-2',
-      isLegacyOwner: false,
     }
 
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')

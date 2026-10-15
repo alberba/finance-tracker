@@ -8,8 +8,10 @@ vi.mock('../../src/lib/client/data-backup', () => ({
 
 const syncStore = { flush: vi.fn(), pendingCount: 0 }
 vi.mock('../../src/stores/sync', () => ({ useSyncStore: () => syncStore }))
+vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
 import { fetchBackup, restoreBackup } from '../../src/lib/client/data-backup'
+import { isDemoMode } from '../../src/scripts/demo-mode'
 import { useDataStore } from '../../src/stores/data'
 
 /** Same minimal DOM as `data-store-start-fresh.test.ts`, plus the download anchor. */
@@ -34,12 +36,13 @@ describe('useDataStore — JSON backup on sync v2', () => {
     vi.mocked(restoreBackup).mockReset()
     syncStore.flush.mockReset()
     syncStore.pendingCount = 0
-    vi.stubEnv('PUBLIC_SYNC_V2', 'true')
+    vi.mocked(isDemoMode).mockReturnValue(false)
   })
 
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
+    vi.mocked(isDemoMode).mockReturnValue(false)
   })
 
   it('exports the server backup, not the in-memory state', async () => {
@@ -91,8 +94,8 @@ describe('useDataStore — JSON backup on sync v2', () => {
     expect(reload).not.toHaveBeenCalled()
   })
 
-  it('keeps the in-memory blob path when sync v2 is off', async () => {
-    vi.stubEnv('PUBLIC_SYNC_V2', '')
+  it('keeps the local backup path in demo mode', async () => {
+    vi.mocked(isDemoMode).mockReturnValue(true)
     const { click } = stubDom()
 
     await useDataStore().exportJson()

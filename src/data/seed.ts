@@ -1,4 +1,4 @@
-import seedData from './seed.json'
+import seedData from './seed.json' with { type: 'json' }
 
 export const FINANCE_TRACKER_SEED = seedData
 

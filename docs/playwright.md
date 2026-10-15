@@ -1,8 +1,8 @@
 # Playwright
 
-La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y sync-v2. Todas
-corren sobre Astro dev (`playwright.shared.ts`), en local y en CI; ninguna sirve el build de
-Wrangler.
+La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y escenarios
+especializados de sync v2. Todo cliente autenticado usa sync v2; todos los grupos corren sobre Astro
+dev (`playwright.shared.ts`), en local y en CI; ninguno sirve el build de Wrangler.
 
 ## Comandos
 
@@ -10,9 +10,13 @@ Wrangler.
 pnpm test:e2e:install       # instala Chromium una vez
 pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
 pnpm test:e2e               # funcional, sin snapshots visuales
+pnpm test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
+pnpm test:e2e:install:all   # instala también Firefox y WebKit
+pnpm test:e2e:cross-browser # smoke opcional en Firefox y WebKit
+pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
 pnpm test:e2e:shard 1/2    # shard funcional equilibrado por tiempos históricos
 pnpm test:e2e:visual        # layout y regresión visual
-pnpm test:e2e:sync-v2       # PUBLIC_SYNC_V2=true
+pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
 pnpm test:e2e:headed        # navegador visible sobre Astro dev
 pnpm test:e2e:ui            # interfaz interactiva de Playwright
 ```
@@ -23,15 +27,27 @@ Para probar una URL ya arrancada:
 PLAYWRIGHT_BASE_URL=http://127.0.0.1:<puerto> pnpm test:e2e:smoke
 ```
 
+Para buscar dependencias accidentales entre escenarios, usa `pnpm test:e2e:shuffle`. Repite el
+orden pasando la semilla que imprime Playwright: `pnpm test:e2e:shuffle 271828182`. También puedes
+acotar la comprobación a smoke: `pnpm test:e2e:smoke --shuffle 271828182`.
+
+Firefox y WebKit están configurados con `default: false`: las ejecuciones habituales conservan
+Chromium y Pixel 5. Tras instalar los navegadores con `pnpm test:e2e:install:all`, selecciona uno
+con `pnpm test:e2e --project=firefox` o `pnpm test:e2e --project=webkit`. Los proyectos opcionales
+comparten los escenarios de desktop; los visuales solo mantienen baselines de Chromium y Pixel 5.
+`pnpm test:e2e --project='*'` incluye todos los proyectos.
+
 ## Estabilidad
 
-- Las pruebas legacy reinician el blob del propietario antes de cada caso. Un runner usa un
-  worker; los runners de CI tienen bases D1 independientes. Sync-v2 prueba usuarios separados.
+- Cada escenario crea un usuario aislado, inicializa su espacio por la API y carga los datos de
+  prueba mediante el formato de backup v2. Los runners de CI tienen bases D1 independientes.
 - La navegación espera `html[data-finance-ready="true"]`, que señala hidratación y bindings completos.
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
 - Cada runner usa un worker, con corte temprano y trace/vídeo únicamente en el primer retry.
-  `fullyParallel` en la configuración legacy permite repartir los casos visuales entre shards;
-  `workers: 1` mantiene secuencial el acceso al blob dentro de cada runner.
+  Los shards visuales reparten escenarios por duración.
+- Los vídeos del runtime compartido se graban a 30 fps con cursor, resaltado del objetivo y título
+  de acción. Firefox y WebKit capturan hasta 25 fps. En local, añade `--retries=1` para grabar el
+  reintento de un fallo.
 - `@smoke` identifica recorridos críticos. `@visual` se ejecuta como gate independiente.
 - Desktop cubre los flujos funcionales. Pixel 5 cubre móvil, layout y snapshots una sola vez.
 - No uses `waitForTimeout`; espera una respuesta, URL, locator o señal explícita de la aplicación.
@@ -47,12 +63,13 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest con cobertura,
 y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
 El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
-La PR cuya rama es `v2` ejecuta calidad, auth, dos shards funcionales y sync-v2 en paralelo. Los
-pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
+Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
 shards visuales. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
 lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
-Un push a `v2` se valida a través de su PR: no dispara otra ejecución.
-Antes de abrir la PR, `pnpm gate` y `pnpm test:e2e:smoke` en local; espera en el CI solo a calidad.
+Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
+solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
+código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
+Espera en el CI solo a calidad.
 El setup común (pnpm, Node, install y Chromium cacheado por lockfile) vive en
 `.github/actions/setup`.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
@@ -109,7 +126,8 @@ el preflight CORS falla y salen fuentes del sistema.
 - Antes de probar un worktree nuevo o después de cambiar de rama/lockfile, ejecuta
   `pnpm setup:worktree`: sincroniza dependencias con `--frozen-lockfile`, prepara `.dev.vars`
   y aplica migraciones. El setup también sincroniza un `node_modules` que ya exista.
-  Sin `TEST_AUTH_ENABLED` y `LEGACY_OWNER_EMAIL`, cada spec falla en `reset-legacy` con 401/403.
+  Sin `TEST_AUTH_ENABLED`, las llamadas de autenticación de test no inicializan el usuario aislado.
+  Las identidades de prueba no tienen privilegios especiales de propietario.
 - `pnpm test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
   de la ruta del worktree, así que varios worktrees no chocan. En CI usa 4321 (4322 para sync-v2).
   Para usar un servidor ya arrancado, pásalo con `PLAYWRIGHT_BASE_URL`.
@@ -121,3 +139,37 @@ Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
 ejecuta `pnpm install --frozen-lockfile`. El script Linux sincroniza dependencias antes de elegir
 la imagen de Playwright, para que Chromium coincida con CI.
+
+## WebMCP
+
+La app registra tres herramientas de consulta mediante `document.modelContext` después de cargar
+la sesión o el demo. Leen la proyección actual del cliente, incluidos los cambios locales pendientes
+de sincronizar. No modifican datos ni cambian filtros de la interfaz:
+
+- `get_budget`: presupuesto del año configurado, con los mismos cálculos que la interfaz.
+- `get_month_totals`: ingresos, gastos, inversión y neto de un año y mes contable.
+- `search_movements`: búsqueda por descripción o categoría, con filtros opcionales de año contable,
+  mes y tipo; paginación mediante `offset` y `limit` (25 por defecto, máximo 100).
+
+Los parámetros de mes usan 1–12. Las celdas del resultado de `get_budget` conservan los índices
+0–11 del view-model. Las monedas no se convierten; la búsqueda devuelve la moneda de cada
+movimiento y los totales siguen el comportamiento del registro.
+
+El navegador debe tener abierta la app con una sesión autenticada o el demo y soporte WebMCP
+experimental. Sin esa API, la app funciona igual y omite el registro de herramientas. Al cerrar
+sesión, la navegación al login elimina las herramientas del documento anterior.
+
+Con el CLI incluido en Playwright, abre la app y luego consulta sus herramientas:
+
+```bash
+pnpm exec playwright cli open 'http://127.0.0.1:4321/dashboard?demo=1'
+pnpm exec playwright cli webmcp-list
+pnpm exec playwright cli webmcp-call search_movements --params '{"query":"comida","limit":10}'
+pnpm exec playwright cli webmcp-call get_month_totals --params '{"year":2026,"month":1}'
+pnpm exec playwright cli webmcp-call get_budget
+```
+
+Usa el puerto real de tu dev server. El MCP y CLI de Playwright habilitan WebMCP por defecto.
+La spec `webmcp.spec.ts` activa `--enable-features=WebMCP` en Chromium y comprueba consultas,
+cambios desde la UI y cierre de sesión con la API real de Playwright. La referencia es la
+[documentación oficial de WebMCP de Playwright](https://playwright.dev/docs/api/class-webmcp).

@@ -4,12 +4,14 @@ import { useDataStore } from '../../src/stores/data'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 
 beforeEach(() => {
-  vi.stubEnv('PUBLIC_SYNC_V2', 'false')
   setActivePinia(createPinia())
+  window.__FINANCE_NAMESPACE__ = 'demo'
 })
-afterEach(() => vi.unstubAllEnvs())
+afterEach(() => {
+  window.__FINANCE_NAMESPACE__ = undefined
+})
 
-describe('legacy import preserves the recipient welcome', () => {
+describe('demo import preserves the recipient welcome', () => {
   it.each([false, true])('keeps completion %s when replacing financial data', async (completed) => {
     const store = useFinancialStateStore()
     store.commitState((draft) => {

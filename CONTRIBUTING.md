@@ -15,8 +15,12 @@ pnpm dev
 ```
 
 `pnpm setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
-sin Cloudflare Access está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
+con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `pnpm test:e2e:install`.
+
+Sesiones y proveedores de login: [autenticación](docs/operations/authentication.md).
+Node/SQLite, Docker y arranque o archivado de worktrees en Orca:
+[self-hosting](docs/operations/self-hosting.md).
 
 ## Dónde viven las issues
 
@@ -33,17 +37,20 @@ En [GitHub Issues](https://github.com/alberba/finance-tracker/issues). El vocabu
 
 ## Antes de abrir el PR
 
-Lo mismo que ejecuta el gate de calidad, en orden de lo más rápido a lo más lento:
+Si el cambio solo modifica texto documental, revisa los enlaces y las instrucciones, comprueba
+el formato de los Markdown tocados y ejecuta `git diff --check`. Esa revisión basta para abrir
+la PR; los cambios de código, configuración o contenido ejecutable requieren las comprobaciones
+siguientes, aunque estén dentro de `docs/`.
+
+Para esos cambios, ejecuta el gate de calidad y smoke en secuencia:
 
 ```bash
-pnpm lint
-pnpm check
-pnpm test                    # unit + component + integration
+pnpm gate                   # dependencias + lint + tipos + unit/component/integration
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
 El gate de CI en cada PR añade `pnpm test:coverage`, la comprobación de que las migraciones D1
-locales (v1 y v2) aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
+locales v2 aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
 corre al empujar a `main`; en una PR, solo con el label `run-e2e`.
 
 `pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una

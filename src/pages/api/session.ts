@@ -21,11 +21,10 @@ export const GET: APIRoute = async ({ locals }) =>
         user: {
           id: principal.userId,
           email: principal.email,
-          isLegacyOwner: principal.isLegacyOwner,
           isAdmin: principal.isAdmin ?? false,
         },
         revision: revisionRow?.revision ?? 0,
-        authentication: principal.provider === 'better-auth' ? 'better-auth' : 'cf-access',
+        authentication: 'better-auth',
       },
       200,
     )

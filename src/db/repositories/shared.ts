@@ -90,9 +90,8 @@ export function versionGuard(
  *
  * Optional because the two writers differ: the client always sends one for an
  * entity it creates (the identity is its primary key from the first instant),
- * while the v1 migration (`scripts/lib/migration-runner.ts`) writes no `id` at
- * all — the column's server-side UUIDv7 default applies and the row stays
- * reconcilable by its derived `legacyId`.
+ * while imported entities may rely on the server-side UUIDv7 default for `id`
+ * and remain reconcilable by their `legacyId`.
  */
 export function clientIdentity(id: string | undefined): { id?: string } {
   return id ? { id } : {}
@@ -118,10 +117,8 @@ export function fromFlag(value: number): boolean {
  * `users.email` is a plain `text ... unique` column, and SQLite compares text
  * case-sensitively, so `Owner@Example.com` and `owner@example.com` are two
  * different rows and two different lookups. Identity providers do not
- * guarantee any particular casing, and the cutover feeds the same address in
- * from three unrelated places — the `--legacy-owner-email` migration flag, the
- * `LEGACY_OWNER_EMAIL` variable, and the JWT's `email` claim. Normalizing at
- * every read and write is what keeps those three agreeing.
+ * guarantee any particular casing, so normalization at every read and write
+ * keeps identity lookup consistent.
  */
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()

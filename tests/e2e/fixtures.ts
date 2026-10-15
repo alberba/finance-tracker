@@ -1,6 +1,8 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect } from '@playwright/test'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { seedSyncV2User } from './seed-sync-v2'
 
 declare global {
   interface Window {
@@ -8,30 +10,8 @@ declare global {
   }
 }
 
-/**
- * Mirrors the current localStorage state to the server. The app treats the
- * server as the source of truth on reload, so tests that seed a scenario by
- * mutating localStorage must push it up too — exactly as the real app persists
- * to both stores on every save.
- */
-export async function mirrorStateToServer(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const raw = localStorage.getItem('finance-tracker-state-v1')
-    if (!raw) {
-      return
-    }
-    await fetch('/api/state', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-finance-namespace': window.__FINANCE_NAMESPACE__ ?? '',
-      },
-      body: JSON.stringify({ state: JSON.parse(raw) }),
-    })
-  })
-}
-
 type Fixtures = {
+  testUserEmail: string
   tracker: FinanceTrackerPage
   // Freezes `Date` before the app loads. The selected year and month default to
   // today, so a snapshot taken in one month differs from the next.
@@ -56,9 +36,19 @@ export const test = base.extend<Fixtures>({
     })
     await use(context)
   },
+  testUserEmail: async ({ browserName }, use, testInfo) => {
+    await use(
+      testInfo.tags.includes('@snapshot')
+        ? `pw-${browserName}-${createHash('sha256').update(testInfo.testId).digest('hex').slice(0, 16)}@e2e.test`
+        : `pw-${randomUUID()}@e2e.test`,
+    )
+  },
+  extraHTTPHeaders: async ({ testUserEmail }, use) => {
+    await use({ 'X-Test-User-Email': testUserEmail })
+  },
   fixedTime: [undefined, { option: true }],
   snapshotTime: [undefined, { option: true }],
-  tracker: async ({ page, fixedTime, snapshotTime }, use, testInfo) => {
+  tracker: async ({ page, context, fixedTime, snapshotTime, testUserEmail }, use, testInfo) => {
     const snapshot = testInfo.tags.includes('@snapshot')
     const time = snapshot ? snapshotTime : fixedTime
     if (time) {
@@ -84,29 +74,32 @@ export const test = base.extend<Fixtures>({
         }
       }, css)
     }
-    // The legacy blob is owner-only and no longer accepts a client-selected
-    // namespace. Legacy browser specs therefore reset the one owner blob and
-    // run serially; multi-user isolation is covered against the relational v2
-    // APIs instead of manufacturing tenants inside v1.
-    const reset = await page.request.post('/api/state/reset-legacy', { data: {} })
+
+    const email = testUserEmail
+    const initialization = await context.request.post('/api/state/initialize', {
+      headers: { 'X-Test-User-Email': email },
+      data: {},
+    })
     expect(
-      reset.ok(),
-      `POST /api/state/reset-legacy devolvió ${reset.status()}. Si es 401/403, faltan TEST_AUTH_ENABLED o LEGACY_OWNER_EMAIL en .dev.vars: ejecuta \`pnpm setup:worktree\`.`,
+      initialization.ok(),
+      `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
-    // Unrelated legacy journeys start after onboarding; the onboarding spec
-    // provisions untouched sync-v2 users and exercises the real first show.
-    const resetStateSnapshot = await reset.json()
-    const completed = await page.request.put('/api/state', {
+    await seedSyncV2User(context.request, email)
+    // Unrelated journeys start after onboarding; the onboarding spec provisions
+    // untouched sync-v2 users and exercises the real first show.
+    const completed = await context.request.post('/api/sync', {
+      headers: { 'X-Test-User-Email': email },
       data: {
-        state: {
-          ...resetStateSnapshot.state,
-          onboardingPresented: true,
-          onboardingCompleted: true,
-        },
-        baseVersion: resetStateSnapshot.version,
+        commands: [
+          {
+            commandId: randomUUID(),
+            action: 'settingsUpdate',
+            patch: { onboardingPresented: true, onboardingCompleted: true },
+          },
+        ],
       },
     })
-    expect(completed.ok()).toBe(true)
+    expect(completed.ok(), await completed.text()).toBe(true)
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
     await use(tracker)

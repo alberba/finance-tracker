@@ -8,19 +8,19 @@
  *
  * Uso:
  *   # Modo simulación (por defecto, no escribe en la base de datos):
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json
+ *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com
  *
  *   # Modo ejecución (aplica los cambios en la base de datos tras imprimir el plan):
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --execute
+ *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute
  *
  *   # ...y además deja el SQL para llevarlo a D1 con wrangler:
- *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --execute \
+ *   pnpm db:repair --backup=ruta/al/export-2026-08-12.json --email=usuario@example.com --execute \
  *     --v2-sqlite=.data/v2-prod.sqlite --remote-sql-out=.data/reparacion-remote.sql
  *
  * Opciones:
  *   --backup=<path>       Ruta al archivo JSON de respaldo (export v1 State o RepairBackup) [exigido]
  *   --v2-sqlite=<path>    Ruta a la base de datos local SQLite v2 (por defecto: .data/finance-tracker-v2.sqlite)
- *   --email=<email>       Email del usuario a reparar (por defecto: $LEGACY_OWNER_EMAIL o legacy-owner@finance-tracker.local)
+ *   --email=<email>       Email explícito del usuario a reparar [exigido si no se pasa --user-id]
  *   --user-id=<id>        ID explícito del usuario a reparar
  *   --execute             Aplica los cambios tras mostrar el plan de simulación (por defecto: modo simulación)
  *   --dry-run             Fuerza el modo simulación (solo lectura)
@@ -34,7 +34,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { usersRepository } from '../src/db/repositories'
-import { openLocalV2Db } from './lib/migration-db'
+import { openLocalV2Db } from './lib/local-v2-db'
 import {
   applyRepairPlan,
   buildRepairPlan,
@@ -73,7 +73,7 @@ tipo erróneo, celdas de presupuesto y snapshots sobrescritos).
 Opciones:
   --backup=<ruta>       Ruta al archivo JSON de respaldo (export v1 State o RepairBackup) [exigido]
   --v2-sqlite=<ruta>    Ruta a la base de datos v2 SQLite (por defecto: .data/finance-tracker-v2.sqlite)
-  --email=<email>       Email del usuario (por defecto: $LEGACY_OWNER_EMAIL o legacy-owner@finance-tracker.local)
+  --email=<email>       Email explícito del usuario (exigido si no se pasa --user-id)
   --user-id=<id>        ID del usuario a reparar (alternativa a --email)
   --execute             Aplica los cambios en la base de datos (por defecto solo simula)
   --dry-run             Fuerza el modo simulación (sin escrituras)
@@ -140,14 +140,19 @@ export async function runRepairCli(argv: string[]): Promise<{
     )
   }
 
+  const requestedUserId = args['user-id']?.trim()
+  const requestedEmail = args.email?.trim()
+  if (!requestedUserId && !requestedEmail) {
+    throw new Error('Pasa --email=<email> o --user-id=<id> explícitamente para seleccionar el usuario.')
+  }
+
   const v2Path = resolve(args['v2-sqlite'] ?? '.data/finance-tracker-v2.sqlite')
   const { db, close } = openLocalV2Db(v2Path)
 
   try {
-    let userId = args['user-id']
+    let userId = requestedUserId
     if (!userId) {
-      const email =
-        args.email ?? process.env.LEGACY_OWNER_EMAIL ?? 'legacy-owner@finance-tracker.local'
+      const email = requestedEmail!
       const user = await usersRepository.getByEmail(db, email)
       if (!user) {
         throw new Error(

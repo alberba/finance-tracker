@@ -1,27 +1,31 @@
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { randomUUID } from 'node:crypto'
+import { test, expect } from './fixtures'
 
 test('los requisitos bloquean solo las acciones afectadas y se resuelven al crear una cuenta', async ({
   page,
   tracker,
+  testUserEmail,
 }) => {
   await tracker.goto()
-  await page.evaluate(() => {
-    const state = JSON.parse(localStorage.getItem('finance-tracker-state-v1')!)
-    state.accounts = []
-    state.investmentAssets = []
-    state.liabilities = []
-    state.transactions = []
-    state.subscriptions = []
-    state.recurringRules = []
-    state.incomeCategories = ['Nómina']
-    state.expenseCategories = []
-    state.investmentCategories = []
-    state.budget = { income: {}, expense: {}, investment: {} }
-    state.onboardingCompleted = true
-    state.onboardingPresented = true
-    localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
+  // Start from a clean slate through the supported state APIs: reset wipes the
+  // seeded scenario (accounts, movements, categories) and re-seeds defaults,
+  // then the welcome tour is marked complete so only setup requirements show.
+  const headers = { 'X-Test-User-Email': testUserEmail }
+  const reset = await page.request.post('/api/state/reset', { headers, data: {} })
+  expect(reset.ok(), await reset.text()).toBe(true)
+  const completed = await page.request.post('/api/sync', {
+    headers,
+    data: {
+      commands: [
+        {
+          commandId: randomUUID(),
+          action: 'settingsUpdate',
+          patch: { onboardingPresented: true, onboardingCompleted: true },
+        },
+      ],
+    },
   })
-  await mirrorStateToServer(page)
+  expect(completed.ok(), await completed.text()).toBe(true)
   await tracker.reload()
 
   await tracker.openTransactions()

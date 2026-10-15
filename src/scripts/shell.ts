@@ -1,6 +1,5 @@
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
-import { isSyncV2Enabled } from '../lib/client/feature-flags'
 import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
@@ -218,20 +217,18 @@ const SYNC_STATUS_LABELS: Record<string, string> = {
 
 /**
  * Wires the menu's identity and logout entries for every authenticated
- * session. Sync status and the v2 store remain feature-flagged, but logout
- * must never be: v1 localStorage and any per-user v2 IndexedDB data are
- * private data regardless of which sync path is active.
+ * session. Authenticated sync always uses the per-user v2 store; logout also
+ * clears any stale client data left by an older build.
  */
 function initSyncMenu(): void {
   if (isDemoMode()) {
     return
   }
 
-  const syncV2Enabled = isSyncV2Enabled()
   const emailEl = document.getElementById('sidebar-user-email')
   const statusEl = document.getElementById('sidebar-sync-status')
   const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
-  const syncStore = syncV2Enabled ? useSyncStore(pinia) : null
+  const syncStore = useSyncStore(pinia)
 
   const sessionRequest = fetch('/api/session')
     .then((response) => (response.ok ? response.json() : null))
@@ -239,13 +236,13 @@ function initSyncMenu(): void {
       if (emailEl && body?.user?.email) {
         emailEl.replaceChildren(body.user.email)
       }
-      if (body?.user?.id && syncStore) {
+      if (body?.user?.id) {
         void syncStore.init(body.user.id, { email: body.user.email ?? null })
       }
       return body
     })
     .catch(() => {
-      /* Logout still clears legacy data when the session lookup fails. */
+      /* Logout still clears stale local data when session lookup fails. */
       return null
     })
 
@@ -287,14 +284,11 @@ function initSyncMenu(): void {
             }
           }
         }
-        if (session?.authentication === 'better-auth') {
-          await requireAuthenticationResult(await authentication.signOut())
-        }
+        await requireAuthenticationResult(await authentication.signOut())
         if (syncStore?.userId) await syncStore.logout({ discardPending: true })
         else if (session?.user?.id) await wipeAllClientData(session.user.id)
         else wipeLegacyClientData()
-        window.location.href =
-          session?.authentication === 'better-auth' ? '/login' : '/cdn-cgi/access/logout'
+        window.location.href = '/login'
       })
       .catch((error: unknown) => {
         logoutAction.removeAttribute('aria-disabled')

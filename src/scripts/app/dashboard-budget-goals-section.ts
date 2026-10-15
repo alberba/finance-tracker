@@ -1,12 +1,9 @@
-import { MONTHS, type SectionId } from '../types'
-import { parseIntSafe } from '../utils'
+import { type SectionId } from '../types'
 import {
   getPathFromSection,
   getSectionFromPath,
   normalizeSectionId,
 } from './dashboard-section-routing'
-import { useDashboardStore } from '../../stores/dashboard'
-import { useFinancialStateStore } from '../../stores/financial-state'
 import { pinia } from '../../stores/pinia'
 import { useUiStore } from '../../stores/ui'
 
@@ -28,9 +25,7 @@ interface DashboardNavigationDeps {
 
 export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) {
   const { ui, el } = deps
-  const dashboardStore = useDashboardStore(pinia)
   const uiStore = useUiStore(pinia)
-  const financialStateStore = useFinancialStateStore(pinia)
 
   function bindNavigationEvents() {
     el.navTabs.addEventListener('click', (event) => {
@@ -46,24 +41,6 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) 
     window.addEventListener('popstate', () => {
       const sectionId = getSectionFromPath(window.location.pathname)
       switchSection(sectionId, { updateHistory: false })
-    })
-
-    dashboardStore.registerControllerActions({
-      changeYear: (year) => {
-        financialStateStore.commitState((draft) => {
-          draft.year = parseIntSafe(year, draft.year)
-        })
-      },
-      changeMonth: (month) => {
-        ui.month = parseIntSafe(month, ui.month)
-        publishDashboard()
-      },
-      changeRange: () => {
-        publishDashboard()
-      },
-      navigate: (sectionId) => {
-        switchSection(sectionId)
-      },
     })
   }
 
@@ -97,16 +74,9 @@ export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) 
     }
   }
 
-  function publishDashboard() {
-    if (!MONTHS[ui.month]) {
-      ui.month = 0
-    }
-  }
-
   return {
     bindNavigationEvents,
     switchSection,
     getSectionFromPath,
-    publishDashboard,
   }
 }

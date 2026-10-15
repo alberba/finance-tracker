@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as accounts from '../../../../src/db/repositories/accounts'
 import { importOperation } from '../../../../src/db/repositories/bitvavo'
 import * as market from '../../../../src/db/repositories/market'
+import { listChangesSince } from '../../../../src/db/repositories/sync'
+import type { Db } from '../../../../src/db/client'
 import type { RemoteOperation } from '../../../../src/lib/bitvavo-types'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
@@ -74,6 +76,41 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
     const first = await trip.reload()
     const id = first.transactions[0].id
+    const changes = await listChangesSince(trip.testDb.db as unknown as Db, trip.userId, 0)
+    const createPayload = changes
+      .filter((change) => change.entityType === 'transaction' && change.entityId === id)
+      .flatMap((change) => (change.payload ? [JSON.parse(change.payload)] : []))
+      .find((payload) => payload.tradeDetail)
+    expect(createPayload).toMatchObject({
+      tradeDetail: {
+        symbol: 'VWCE',
+        side: 'buy',
+        quantity: '10',
+        price: 120.5,
+        fee: 1.2,
+        currency: 'USD',
+      },
+    })
+
+    await trip.asOtherDevice([
+      {
+        commandId: 'remote-movement-description',
+        action: 'update',
+        entityType: 'transaction',
+        entityId: id,
+        baseVersion: 1,
+        patch: { description: 'Compra desde otro dispositivo' },
+      },
+    ])
+    await trip.syncStore.syncNow()
+    expect(useFinancialStateStore().transactions[0]).toMatchObject({
+      description: 'Compra desde otro dispositivo',
+      symbol: 'VWCE',
+      side: 'buy',
+      units: 10,
+      unitPrice: 120.5,
+      fee: 1.2,
+    })
 
     expect(
       useMovementsStore().saveEdit(id, {

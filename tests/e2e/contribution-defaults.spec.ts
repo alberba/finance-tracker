@@ -1,10 +1,9 @@
-import type { State } from '../../src/scripts/types'
-import { test, expect, mirrorStateToServer } from './fixtures'
+import { editScenarioState, readScenarioState } from './seed-sync-v2'
+import { test, expect } from './fixtures'
 
 test.describe('contribution defaults from wealth', () => {
   test.beforeEach(async ({ page, tracker }) => {
-    await page.evaluate(() => {
-      const state: State = JSON.parse(localStorage.getItem('finance-tracker-state-v1') || '{}')
+    await editScenarioState(page, (state) => {
       state.year = 2026
       state.accounts = [{ id: 'cash', name: 'MyInvestor', openingBalance: 1200 }]
       state.investmentAssets = [{ id: 'fund', name: 'Fund', openingBalance: 1000 }]
@@ -15,9 +14,7 @@ test.describe('contribution defaults from wealth', () => {
       state.snapshots = {
         1: { month: 1, investments: { fund: 0 }, accounts: {}, liabilities: {} },
       }
-      localStorage.setItem('finance-tracker-state-v1', JSON.stringify(state))
     })
-    await mirrorStateToServer(page)
     await tracker.reload()
   })
 
@@ -93,10 +90,12 @@ test.describe('contribution defaults from wealth', () => {
     tracker,
     page,
   }) => {
-    const before = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('finance-tracker-state-v1') || '{}')
-      return { snapshots: state.snapshots, contributions: state.contributions }
-    })
+    const before = await page.evaluate(
+      (state) => {
+        return { snapshots: state.snapshots, contributions: state.contributions }
+      },
+      await readScenarioState(page),
+    )
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetInvestmentSnapshot('Fund', 1100)
@@ -114,31 +113,24 @@ test.describe('contribution defaults from wealth', () => {
     await expect(tracker.contributionWorkflow()).toBeHidden()
 
     expect(
-      await page.evaluate(() => {
-        const state = JSON.parse(localStorage.getItem('finance-tracker-state-v1') || '{}')
-        return { snapshots: state.snapshots, contributions: state.contributions }
-      }),
+      await page.evaluate(
+        (state) => {
+          return { snapshots: state.snapshots, contributions: state.contributions }
+        },
+        await readScenarioState(page),
+      ),
     ).toEqual(before)
   })
 
-  test('saving the prefilled balances adjusts wealth and survives reload', async ({
-    tracker,
-    page,
-  }) => {
+  test('saving the prefilled balances adjusts wealth and survives reload', async ({ tracker }) => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetDate('2026-01-15')
     await tracker.contributionWorkflowGoToAllocationStep()
     await tracker.contributionWorkflowSetTotal(100)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 100)
-    const persisted = page.waitForResponse((response) => {
-      if (!response.url().includes('/api/state') || response.request().method() !== 'PUT')
-        return false
-      const state = response.request().postDataJSON()?.state
-      return state?.snapshots?.['0']?.accounts?.cash === 1300
-    })
     await tracker.contributionWorkflowSave()
-    await persisted
+    await tracker.waitForSync()
     await tracker.reload()
     await tracker.openWealth()
     await tracker.selectWealthMonth('ENERO')

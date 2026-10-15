@@ -5,7 +5,7 @@
  * goals. Wraps `POST /api/state/initialize` (WP4), which is itself
  * idempotent — calling this twice never re-seeds or duplicates data.
  *
- * Gated behind `isSyncV2Enabled()` by the caller (`src/stores/data.ts`).
+ * Called by the authenticated data store; demo mode rejects the request here.
  */
 
 import { isDemoMode } from '../../scripts/demo-mode'

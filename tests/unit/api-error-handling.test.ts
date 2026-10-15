@@ -68,12 +68,12 @@ describe('withApiErrorHandling', () => {
 
   it('responde 403 con el mensaje del error y no reporta nada', async () => {
     const response = await withApiErrorHandling(ROUTE, async () => {
-      throw new ForbiddenError('El estado legacy solo está disponible para su propietario.')
+      throw new ForbiddenError('No tienes permiso para realizar esta operación.')
     })
 
     expect(response.status).toBe(403)
     expect(await response.json()).toEqual({
-      error: 'El estado legacy solo está disponible para su propietario.',
+      error: 'No tienes permiso para realizar esta operación.',
     })
     expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
   })

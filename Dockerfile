@@ -12,7 +12,7 @@ RUN --mount=type=cache,id=finance-tracker-pnpm,target=/root/.local/share/pnpm/st
 FROM dependencies AS development
 RUN mkdir -p data .astro node_modules/.vite node_modules/.vite-temp node_modules/.astro && chown node:node /app data .astro node_modules/.vite node_modules/.vite-temp node_modules/.astro
 USER node
-ENV NODE_ENV=development DEPLOY_TARGET=node PUBLIC_SYNC_V2=true SQLITE_PATH=/app/data/finance.sqlite ASTRO_DEV_BACKGROUND=0
+ENV NODE_ENV=development DEPLOY_TARGET=node SQLITE_PATH=/app/data/finance.sqlite ASTRO_DEV_BACKGROUND=0
 EXPOSE 4321
 CMD ["sh", "-c", "node scripts/local-init.mjs && exec node node_modules/astro/bin/astro.mjs dev --host 0.0.0.0 --port 4321"]
 
@@ -23,7 +23,7 @@ FROM dependencies AS build
 COPY astro.config.ts tsconfig.json wrangler.toml sentry.server.config.ts sentry.client.config.js ./
 COPY src ./src
 COPY public ./public
-ENV DEPLOY_TARGET=node PUBLIC_SYNC_V2=true
+ENV DEPLOY_TARGET=node
 RUN pnpm build
 
 FROM node:24.16.0-bookworm-slim

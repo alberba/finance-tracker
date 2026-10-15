@@ -25,7 +25,6 @@ it('requests read-only credentials, destination and local history settings', asy
 })
 
 it('blocks confirmation until every possible duplicate has an explicit resolution', async () => {
-  vi.stubEnv('PUBLIC_SYNC_V2', 'true')
   const http = vi
     .fn<typeof fetch>()
     .mockResolvedValueOnce(Response.json({ configured: true, destinations: [] }))

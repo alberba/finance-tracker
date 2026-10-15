@@ -5,15 +5,7 @@ main = "./sentry.server.config.ts"
 compatibility_date = "2026-02-23"
 compatibility_flags = ["nodejs_compat"]
 
-[[d1_databases]]
-binding = "finance_tracker_db"
-database_name = "finance-tracker-db"
-database_id = "cfcc8de2-9fb4-46b1-81cf-0f32319fd9b1"
-migrations_dir = "migrations"
-
-# v2 relational schema (WP1). Kept as a separate binding/database from the
-# legacy `finance_tracker_db` above so v1 stays readable/untouched during the
-# migration window (see docs/migration/work-packages.md, WP11).
+# v2 relational schema (WP1).
 [[d1_databases]]
 binding = "finance_tracker_db_v2"
 database_name = "finance-tracker-db-v2"
@@ -21,22 +13,13 @@ database_id = "5c310761-3066-41c4-9133-66ba39d1a65e"
 migrations_dir = "migrations-v2"
 
 [vars]
-# Puente temporal de #275; cambiar solo tras docs/operations/authentication.md.
-AUTH_MODE = "better-auth"
 BETTER_AUTH_URL = "https://finance-tracker.albertsalomv.workers.dev"
 RESEND_FROM = "Finance Tracker <notificaciones@alberba.es>"
 GOOGLE_CLIENT_ID = "96248101075-6g36ota528ksjrpu4tgfjs5s80gucje7.apps.googleusercontent.com"
 GITHUB_CLIENT_ID = "Ov23liObvTnfETsed505"
 AUTH_ENFORCED = "true"
-# Two Access applications guard this Worker, each with its own AUD tag: the
-# production hostname app ("Acceso albert") and the previews-only Worker
-# policy, which Cloudflare creates as a separate app. A token matching
-# either is accepted — see `parseAudiences` in src/lib/server/auth/jwks.ts.
-CF_ACCESS_AUD = "a794f12d18ea90cb8724a6fd4bde770add09ced87a1a34b191e7fd45d6b86d50,08d3b540b5204c3061e46086267417db34acb55634d73c491f132580c5860a04"
-CF_ACCESS_TEAM_DOMAIN = "alberba.cloudflareaccess.com"
 GITHUB_OWNER = "alberba"
 GITHUB_REPO = "finance-tracker"
-LEGACY_OWNER_EMAIL = "albertsalomv@proton.me"
 MARKET_DATA_PROVIDER = "twelve-data"
 MARKET_QUOTE_STALE_MINUTES = "15"
 MARKET_QUOTE_CACHE_SECONDS = "300"

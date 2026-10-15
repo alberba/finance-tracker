@@ -1,11 +1,6 @@
 /**
  * WP5 — real D1 test tier.
  *
- * `tests/unit/d1-state.test.ts`'s `createFakeD1()` only understands 3 SQL
- * shapes (CREATE TABLE, SELECT by id, INSERT...ON CONFLICT) and cannot
- * exercise the 26-table v2 schema's foreign keys, indexes, or query plans
- * (see `docs/migration/work-packages.md` Contradiction #5 and WP5).
- *
  * This tier applies the real `migrations-v2/*.sql` files against an
  * actual SQLite engine (`better-sqlite3`) — the same dialect D1 runs on —
  * and wraps it with the *same* Drizzle schema (`src/db/schema`) that

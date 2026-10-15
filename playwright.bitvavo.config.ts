@@ -7,7 +7,6 @@ export default defineConfig(
     htmlOutputFolder: 'playwright-report-bitvavo',
     blobOutputDir: 'blob-report-bitvavo',
     tag: '@bitvavo',
-    env: { PUBLIC_SYNC_V2: 'true' },
   }),
   {
     workers: 1,
