@@ -18,8 +18,8 @@ updates:
           - minor
       # The rest are version-update groups (applies-to defaults to version-updates): patch and
       # minor, grouped by what breaks together rather than by dependencies/devDependencies.
-      # Astro, the Cloudflare adapter and Vite are devDependencies but build the Worker that
-      # runs in production. Majors match no group and arrive as individual PRs. A dependency
+      # Astro, the Cloudflare adapter and Vite are devDependencies but build the app that
+      # runs in production (and the Worker the tests exercise). Majors match no group and arrive as individual PRs. A dependency
       # joins the first group it matches, so the catch-all goes last.
       astro-vite-cloudflare:
         patterns:

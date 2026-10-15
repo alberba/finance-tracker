@@ -53,8 +53,8 @@ callbacks para este origen. Las passkeys se pueden usar en `localhost`.
 ## Diferencia con preview
 
 `pnpm preview` prueba la compilación de Cloudflare mediante workerd. Este despliegue
-ejecuta un servidor Node de producción dentro de Docker. La compilación habitual y
-`deploy:cf` siguen seleccionando Cloudflare; Docker usa `DEPLOY_TARGET=node`.
+ejecuta un servidor Node de producción dentro de Docker. La compilación habitual
+sigue seleccionando Cloudflare (es la que ejercitan los tests); Docker usa `DEPLOY_TARGET=node`.
 
 La frontera SQLite mantiene los métodos que consume el cliente Drizzle D1 para
 reutilizar los repositorios. En Node, `runInTransaction` ejecuta `BEGIN IMMEDIATE` y
@@ -88,9 +88,41 @@ sin garantía de rollback entre consultas: no ofrece esa capacidad. No se envía
 `BEGIN` ni `SAVEPOINT` a D1 para descubrirla. Estas garantías locales corresponden
 a un único servidor Node y SQLite; no requieren cambiar de motor.
 
-## Producción (Oracle ARM)
+## Producción en Oracle
 
-Producción ejecuta esta imagen y este volumen en un servidor Oracle ARM (Debian) con Docker. Antes de publicar,
+Producción corre desde octubre de 2026 en un servidor Ubuntu ARM con Docker, detrás de
+Nginx Proxy Manager (NPM) en otra máquina. Los dos hablan por Tailscale: el servidor no
+expone la app a Internet.
+
+- **Servidor**: `~/finance-prod/compose.yaml` publica `<ip-tailscale>:4321` y monta el volumen
+  externo `finance-data` con `finance.sqlite`. `docker.service` arranca después de `tailscaled`
+  (drop-in de systemd) para que el puerto enlace tras un reinicio.
+- **`.env`** (chmod 600): las variables públicas, los secretos (`BETTER_AUTH_SECRET`,
+  `DATA_ENCRYPTION_KEY`, claves de Google/GitHub/Resend/mercado) y
+  `BETTER_AUTH_URL=https://<dominio>`. Con `LOCAL_ADMIN_EMAIL` ya presente en la base, el
+  arranque no crea otro administrador. `TEST_AUTH_ENABLED` no debe existir nunca.
+- **NPM**: proxy host `<dominio>` → `http://<ip-tailscale>:4321`, certificado Let's Encrypt,
+  Force SSL y Websockets. No hace falta configuración avanzada.
+- **IP del cliente**: `CLIENT_IP_HEADER=x-real-ip`, que NPM sobrescribe con la IP real. Una
+  cabecera `proxy_set_header` a nivel de servidor no sirve: nginx no la hereda en el
+  `location /` de NPM.
+- **Passkeys y OAuth**: el RP ID es el dominio de `BETTER_AUTH_URL`, así que cambiar de dominio
+  exige registrar passkeys nuevas. Las callbacks son `/api/auth/callback/{google,github}`.
+- **Actualizar**: enviar el árbol a `~/finance-tracker` (por ejemplo `git ls-files -co
+--exclude-standard | tar -cf - -T - | ssh servidor 'tar -x -C ~/finance-tracker'`),
+  `docker build -t finance-tracker:selfhost .` y `docker compose up -d --force-recreate`.
+  Las migraciones pendientes se aplican al arrancar.
+- **Mantenimiento**: `MAINTENANCE_MODE=true` en el `.env` y recrear el contenedor responde 503
+  a todo (el healthcheck de `/login` marcará el contenedor como no saludable, sin reiniciarlo).
+- **Copias**: un timer de systemd (`finance-backup.timer`) ejecuta cada día
+  `sqlite3 .backup` sobre el volumen, comprueba la integridad y guarda 14 copias comprimidas en
+  `/var/backups/finance`. Para restaurar: parar la app, descomprimir sobre
+  `finance.sqlite` del volumen (propietario UID 1000), borrar `-wal` y `-shm` y arrancar.
+  Están en el mismo servidor: añade una copia externa si los datos importan.
+
+## En otro servidor
+
+La misma imagen y el mismo volumen sirven en cualquier servidor con Docker. Antes de publicar,
 configura `BETTER_AUTH_URL` con tu URL HTTPS y usa `docker compose --env-file .env.selfhost up`;
 prepara el correo y backups del volumen y de las
 claves. El puerto de Compose solo escucha en loopback para conectar tu proxy inverso.

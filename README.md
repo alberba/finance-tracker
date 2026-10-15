@@ -101,8 +101,7 @@ Al cambiar `src/db/schema/`, la migración v2 se escribe a mano en `migrations-v
 Aplicar migraciones:
 
 ```bash
-pnpm d1:migrate:local:v2    # v2, local
-pnpm d1:migrate:remote:v2   # v2, producción
+pnpm d1:migrate:local:v2    # v2, local (tests y E2E)
 ```
 
 Si cambias `wrangler.toml`, regenera tipos:
@@ -111,36 +110,13 @@ Si cambias `wrangler.toml`, regenera tipos:
 pnpm cf:types
 ```
 
-### 2) Build/Deploy con Workers Builds
+### 2) Despliegue
 
-El deploy lo hace **Workers Builds** (integración Git del Worker `finance-tracker`),
-no GitHub Actions. Configuración en el dashboard (Workers → finance-tracker →
-Settings → Build):
-
-| Campo             | Valor            |
-| ----------------- | ---------------- |
-| Build command     | `pnpm build`     |
-| Deploy command    | `pnpm deploy:cf` |
-| Production branch | `main`           |
-
-`pnpm deploy:cf` usa `--config dist/server/wrangler.json`: el adapter de Astro
-genera ese fichero en el build a partir de `wrangler.toml`, y es el que lleva
-`main`, `assets` y los bindings. El `wrangler.toml` de raíz ahora sí declara
-`main` (la entrada de Sentry, que el build compila a `dist/server/entry.mjs`) y
-las `[vars]`; `assets` y los bindings se materializan en ese fichero generado,
-que sigue siendo el que se despliega.
-
-A diferencia de Pages, aquí **los bindings y las `[vars]` de `wrangler.toml`
-son la fuente de verdad en runtime**: se aplican en cada deploy. Los secretos
-(`DATA_ENCRYPTION_KEY`, `TWELVE_DATA_API_KEY`, …) siguen viviendo en
-`wrangler secret put` y no se tocan en el deploy.
-
-Toolchain del build: `.node-version` (24.16.0) y el campo `packageManager` de
-`package.json` fijan Node y pnpm para Workers Builds. El CI usa la rama Node 24.
-
-El deploy ocurre en el push a `main`, **en paralelo al CI y sin esperarlo**: si
-los E2E fallan, el deploy sale igual. Compensación aceptada a cambio de
-latencia de deploy.
+Producción corre en un servidor propio (Oracle ARM) con Docker, detrás de Nginx Proxy
+Manager; la base es SQLite en un volumen. Cloudflare Workers y D1 ya no se usan en
+producción: los pasos están en [self-hosting](docs/operations/self-hosting.md#producción-en-oracle).
+El `wrangler.toml` de la raíz solo sirve ya para desarrollo, `pnpm preview` y los tests
+(workerd + D1 local); `.node-version` y `packageManager` fijan Node y pnpm.
 
 ### 3) Autenticación integrada
 
