@@ -11,6 +11,8 @@
 - UI or `/design`: read [design-language](docs/architecture/design-language.md) for v2 components
   and design rules.
 - Frontend behavior: read [frontend](docs/architecture/frontend.md) for startup, navigation and section entry points.
+- Run, log in locally or deploy: read [self-hosting](docs/operations/self-hosting.md) for Docker,
+  SQLite and production on Oracle; [authentication](docs/operations/authentication.md) for Better Auth.
 - Coding and review: [CODING_STANDARDS.md](CODING_STANDARDS.md) is authoritative, including the
   Standards axis of `/code-review`. Report conflicting narrative docs as drift.
 - Setup, branches, commits and PRs: read [CONTRIBUTING.md](CONTRIBUTING.md).

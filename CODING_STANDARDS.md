@@ -48,8 +48,7 @@ Fuente: `docs/architecture/frontend.md`.
 
 ## Estilos
 
-Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md` y la nota
-`docs/architecture/estilos-tailwind-vs-css.md`.
+Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md`.
 
 - Utilidades Tailwind en la plantilla por defecto, solo con tokens de `@theme` (`bg-panel`,
   `text-gain`, `rounded-md`, `shadow-soft`…). Un valor arbitrario (`p-[22px]`, `bg-(--x)`) solo

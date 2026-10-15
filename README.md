@@ -35,7 +35,7 @@ pnpm local:up
 `local:up` usa Astro en desarrollo con hot reload; `pnpm local:up:prod` prueba la compilación de producción.
 Abre la URL que muestra `local:up` y usa el correo y la contraseña de `.env.selfhost`.
 Cada worktree usa su propio puerto y volumen; el checkout principal usa el puerto 4321.
-SQLite se guarda en un volumen persistente, separado de los datos de Cloudflare.
+SQLite se guarda en un volumen persistente. Es la misma imagen que corre en producción (Oracle).
 Consulta [la guía de ejecución local y self-hosting](docs/operations/self-hosting.md).
 
 ## Ejecutar en local (Astro)
@@ -49,8 +49,8 @@ pnpm dev
 `pnpm setup:worktree` crea `.dev.vars` (con el atajo de autenticación de test) y aplica las
 migraciones D1 locales de v2. Sirve igual en el checkout principal que en un worktree.
 
-En local no hay Cloudflare Access: `http://localhost:4321` carga, pero sus llamadas a `/api/*`
-responden 401 («Falta la cabecera Cf-Access-Jwt-Assertion»). Para entrar:
+En local `http://localhost:4321` carga, pero sus llamadas a `/api/*` responden 401 sin sesión de
+Better Auth (los contratos están en [autenticación](docs/operations/authentication.md)). Para entrar:
 
 - `http://localhost:4321/?demo=1`: la demo con datos sintéticos.
 - Con la cabecera `X-Test-User-Email: developer@e2e.test`: tus datos locales, como en los E2E.
@@ -82,7 +82,11 @@ wrangler secret put TWELVE_DATA_API_KEY
 wrangler secret put COINGECKO_API_KEY
 ```
 
-## Deploy en Cloudflare Workers + D1
+## Deploy en Cloudflare Workers + D1 (anterior)
+
+> **Ya no es producción.** Producción corre la imagen Docker (Node + SQLite) en un servidor
+> Oracle ARM, detrás de un proxy inverso; ver [self-hosting](docs/operations/self-hosting.md).
+> Esta sección y `wrangler.toml` describen el destino Cloudflare, que el código aún admite.
 
 ### 1) Configuración D1
 

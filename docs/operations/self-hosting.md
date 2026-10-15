@@ -88,9 +88,9 @@ sin garantía de rollback entre consultas: no ofrece esa capacidad. No se envía
 `BEGIN` ni `SAVEPOINT` a D1 para descubrirla. Estas garantías locales corresponden
 a un único servidor Node y SQLite; no requieren cambiar de motor.
 
-## Futuro despliegue en Debian
+## Producción (Oracle ARM)
 
-La imagen y el volumen también sirven en Docker sobre Debian. Antes de publicar,
+Producción ejecuta esta imagen y este volumen en un servidor Oracle ARM (Debian) con Docker. Antes de publicar,
 configura `BETTER_AUTH_URL` con tu URL HTTPS y usa `docker compose --env-file .env.selfhost up`;
 prepara el correo y backups del volumen y de las
 claves. El puerto de Compose solo escucha en loopback para conectar tu proxy inverso.
