@@ -98,6 +98,24 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
     }
 
     const summary: ImportSummary = await runInTransaction(db, async (tx) => {
+      const previousSettings = await userSettingsRepository.get(tx, userId)
+      const onboarding = {
+        onboardingPresented: previousSettings
+          ? previousSettings.onboardingPresented === 1
+          : optionalFlag((body.settings as Row | undefined)?.onboardingPresented),
+        onboardingDismissed: previousSettings
+          ? previousSettings.onboardingDismissed === 1
+          : optionalFlag((body.settings as Row | undefined)?.onboardingDismissed),
+        onboardingAccountCompleted: previousSettings
+          ? previousSettings.onboardingAccountCompleted === 1
+          : optionalFlag((body.settings as Row | undefined)?.onboardingAccountCompleted),
+        onboardingMovementCompleted: previousSettings
+          ? previousSettings.onboardingMovementCompleted === 1
+          : optionalFlag((body.settings as Row | undefined)?.onboardingMovementCompleted),
+        onboardingCompleted: previousSettings
+          ? previousSettings.onboardingCompleted === 1
+          : optionalFlag((body.settings as Row | undefined)?.onboardingCompleted),
+      }
       if (replace) {
         await wipeUserData(tx, userId)
       }
@@ -455,6 +473,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         const settingsRow = body.settings as Row
         const existing = await userSettingsRepository.get(tx, userId)
         const patch = {
+          ...onboarding,
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
           locale: typeof settingsRow.locale === 'string' ? settingsRow.locale : undefined,
           theme: typeof settingsRow.theme === 'string' ? settingsRow.theme : undefined,
@@ -468,19 +487,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         }
         bump(imported, 'settings')
       } else if (replace) {
-        await userSettingsRepository.create(tx, userId, {})
+        await userSettingsRepository.create(tx, userId, onboarding)
       }
 
-      if (replace) {
-        const { revision } = await syncRepository.bumpRevision(tx, userId)
-        await syncRepository.createChange(tx, userId, {
-          revision,
-          entityType: 'reset',
-          entityId: userId,
-          changeType: 'update',
-          payload: null,
-        })
-      }
+      const { revision } = await syncRepository.bumpRevision(tx, userId)
+      await syncRepository.createChange(tx, userId, {
+        revision,
+        entityType: 'reset',
+        entityId: userId,
+        changeType: 'update',
+        payload: null,
+      })
 
       return { imported, skipped }
     })

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
+import { computed, useTemplateRef, watch } from 'vue'
 
 import AppSection from '../ui/AppSection.vue'
 import BaseButton from '../ui/BaseButton.vue'
@@ -16,7 +18,8 @@ import { useUiStore } from '../../stores/ui'
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const movementsStore = useMovementsStore()
-const ui = useUiStore().ui
+const uiStore = useUiStore()
+const ui = uiStore.ui
 const transactionPanel = useTemplateRef<InstanceType<typeof TransactionPanel>>('transactionPanel')
 const subscriptionPanel =
   useTemplateRef<InstanceType<typeof SubscriptionPanel>>('subscriptionPanel')
@@ -43,9 +46,21 @@ const tabs = computed(() => [
 ])
 
 function createNew(): void {
+  if (needsAccount.value) return
   if (ui.txTab === 'subscriptions') subscriptionPanel.value?.openNew()
   else transactionPanel.value?.openNew()
 }
+const { needsAccount } = useAccountRequirement()
+
+watch(
+  [() => uiStore.setupAction, transactionPanel],
+  ([action, panel]) => {
+    if (action !== 'movement' || !panel) return
+    uiStore.setupAction = null
+    panel.openNew()
+  },
+  { immediate: true, flush: 'post' },
+)
 </script>
 
 <template>
@@ -58,7 +73,12 @@ function createNew(): void {
         lede="Lo que entra, lo que sale y lo que inviertes, mes a mes."
       >
         <template #aside>
-          <BaseButton id="tx-open-modal" variant="primary" @click="createNew">
+          <BaseButton
+            id="tx-open-modal"
+            variant="primary"
+            :disabled="needsAccount"
+            @click="createNew"
+          >
             <svg
               class="size-4"
               viewBox="0 0 24 24"
@@ -74,6 +94,11 @@ function createNew(): void {
           </BaseButton>
         </template>
       </PageHeader>
+
+      <SetupRequirement
+        v-if="needsAccount"
+        message="Crea una cuenta para registrar movimientos y suscripciones."
+      />
 
       <SectionTabs
         v-model="tab"

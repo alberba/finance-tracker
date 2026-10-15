@@ -2,6 +2,8 @@ import { and, eq } from 'drizzle-orm'
 import type { Db } from '../client'
 import { authAdmission, authInvitation, authPolicy, authRole, authUser, users } from '../schema'
 import type { AuthPrincipal } from '../../lib/server/auth/principal'
+import { initializeNewUser } from '../../lib/server/initialize-new-user'
+import { runInTransaction } from './shared'
 
 export async function hashAuthenticationToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
@@ -32,18 +34,26 @@ export async function registrationInvitation(db: Db, token?: string): Promise<st
 
 /** The migration trigger commits admission, financial identity and place consumption in one statement. */
 export async function admitVerifiedUser(db: Db, id: string): Promise<void> {
-  const [existing] = await db
-    .select()
-    .from(authAdmission)
-    .where(eq(authAdmission.userId, id))
-    .limit(1)
-  if (existing) return
-  const [user] = await db.select().from(authUser).where(eq(authUser.id, id)).limit(1)
-  if (!user?.emailVerified) throw new Error('Verifica tu correo antes de acceder.')
-  await db
-    .insert(authAdmission)
-    .values({ userId: id, invitationId: user.invitationId, createdAt: new Date() })
-    .onConflictDoNothing()
+  await runInTransaction(db, async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(authAdmission)
+      .where(eq(authAdmission.userId, id))
+      .limit(1)
+    if (existing) return
+    const [user] = await tx.select().from(authUser).where(eq(authUser.id, id)).limit(1)
+    if (!user?.emailVerified) throw new Error('Verifica tu correo antes de acceder.')
+    const [financialUser] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
+    await tx
+      .insert(authAdmission)
+      .values({ userId: id, invitationId: user.invitationId, createdAt: new Date() })
+      .onConflictDoNothing()
+    if (!financialUser) await initializeNewUser(tx, id)
+  })
 }
 
 export async function authenticatedPrincipal(db: Db, id: string): Promise<AuthPrincipal | null> {
@@ -78,18 +88,16 @@ export async function createInvitation(db: Db, userId: string, maxUses = 5, days
   }
   const token = `${crypto.randomUUID()}${crypto.randomUUID()}`
   const id = crypto.randomUUID()
-  await db
-    .insert(authInvitation)
-    .values({
-      id,
-      tokenHash: await hashAuthenticationToken(token),
-      maxUses,
-      uses: 0,
-      expiresAt: new Date(Date.now() + days * 86400000),
-      revoked: false,
-      createdBy: userId,
-      createdAt: new Date(),
-    })
+  await db.insert(authInvitation).values({
+    id,
+    tokenHash: await hashAuthenticationToken(token),
+    maxUses,
+    uses: 0,
+    expiresAt: new Date(Date.now() + days * 86400000),
+    revoked: false,
+    createdBy: userId,
+    createdAt: new Date(),
+  })
   return { id, token }
 }
 

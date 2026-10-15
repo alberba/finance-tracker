@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, reactive, ref } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
@@ -99,6 +101,7 @@ function fill(rule: RecurringRule | null): void {
 }
 
 function openNew(): void {
+  if (needsAccount.value) return
   editing.value = null
   fill(null)
   open.value = true
@@ -111,6 +114,7 @@ function openEdit(rule: RecurringRule): void {
 }
 
 function save(): void {
+  if (needsAccount.value) return
   const input: NewRecurringRuleInput = {
     type: 'investment',
     accountId: form.accountId,
@@ -142,6 +146,7 @@ function requestDelete(): void {
 }
 
 defineExpose({ openNew, openEdit })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -152,6 +157,11 @@ defineExpose({ openNew, openEdit })
     :title="isEditing ? 'Editar compra recurrente' : 'Nueva compra recurrente'"
     title-id="investment-recurring-panel-title"
   >
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para guardar este formulario."
+      @resolve="open = false"
+    />
     <form
       id="investment-recurring-form"
       class="grid gap-6"
@@ -283,7 +293,12 @@ defineExpose({ openNew, openEdit })
         Eliminar
       </BaseButton>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton variant="primary" type="submit" form="investment-recurring-form">
+      <BaseButton
+        variant="primary"
+        :disabled="needsAccount"
+        type="submit"
+        form="investment-recurring-form"
+      >
         {{ isEditing ? 'Guardar cambios' : 'Crear regla' }}
       </BaseButton>
     </template>

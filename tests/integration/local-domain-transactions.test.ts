@@ -91,7 +91,11 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
     const otherBefore = await accountsRepository.listByUser(db, 'other')
     // A real SQLite failure after earlier writes, without mocking a repository.
     const failureTable =
-      operation === 'import' || operation === 'replace' ? 'accounts' : 'categories'
+      operation === 'initialize'
+        ? 'user_revisions'
+        : operation === 'reset'
+          ? 'categories'
+          : 'accounts'
     sqlite.exec(`CREATE TRIGGER fail_write BEFORE INSERT ON ${failureTable}
     BEGIN SELECT RAISE(ABORT, 'injected category failure'); END`)
     const response =
@@ -193,7 +197,9 @@ it('initializes a concurrent request only once', async () => {
     initialize(context('/api/state/initialize')),
   ])
   expect(responses.map((response) => response.status).sort()).toEqual([200, 201])
-  expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toHaveLength(2)
+  expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toEqual([])
+  expect(await db.select().from(schema.userSettings)).toHaveLength(1)
+  expect(await syncRepository.getRevision(db, 'owner')).toMatchObject({ revision: 0 })
 })
 
 it('recovers a failed command after its lease expires and replays the committed result', async () => {

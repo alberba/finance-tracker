@@ -30,8 +30,16 @@ export const POST: APIRoute = async ({ locals }) =>
     const userId = principal.userId
 
     const result = await runInTransaction(db, async (tx) => {
+      const previousSettings = await userSettingsRepository.get(tx, userId)
       await wipeUserData(tx, userId)
-      const settings = await userSettingsRepository.create(tx, userId, { currency: 'EUR' })
+      const settings = await userSettingsRepository.create(tx, userId, {
+        currency: 'EUR',
+        onboardingPresented: previousSettings?.onboardingPresented === 1,
+        onboardingDismissed: previousSettings?.onboardingDismissed === 1,
+        onboardingAccountCompleted: previousSettings?.onboardingAccountCompleted === 1,
+        onboardingMovementCompleted: previousSettings?.onboardingMovementCompleted === 1,
+        onboardingCompleted: previousSettings?.onboardingCompleted === 1,
+      })
       const categories = await accountsRepository.bulkInsertCategories(
         tx,
         userId,

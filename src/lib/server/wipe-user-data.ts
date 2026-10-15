@@ -116,4 +116,5 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
   }
 
   await userSettingsRepository.remove(db, userId)
+  // Keep the cursor monotonic: clients must accept the restored dataset as newer.
 }

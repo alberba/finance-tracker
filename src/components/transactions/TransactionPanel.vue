@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
@@ -91,6 +93,7 @@ function reset(): void {
 }
 
 function openNew(): void {
+  if (needsAccount.value) return
   editingId.value = null
   form.date = form.date || todayISO()
   onDateChange()
@@ -112,6 +115,7 @@ function openEdit(tx: Transaction): void {
 }
 
 function save(keepOpen: boolean): void {
+  if (needsAccount.value) return
   if (editingId.value) {
     const saved = movementsStore.saveEdit(editingId.value, {
       date: form.date,
@@ -147,6 +151,7 @@ function openInvestmentMovements(): void {
 }
 
 defineExpose({ openNew, openEdit })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -157,6 +162,11 @@ defineExpose({ openNew, openEdit })
     :title="isEditing ? 'Editar movimiento' : 'Nuevo movimiento'"
     title-id="tx-panel-title"
   >
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para guardar este formulario."
+      @resolve="open = false"
+    />
     <form id="tx-form" class="grid gap-6" autocomplete="off" @submit.prevent="save(false)">
       <SegmentedControl
         v-model="form.type"
@@ -254,10 +264,15 @@ defineExpose({ openNew, openEdit })
 
     <template #footer>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton v-if="!isEditing" id="tx-submit-more" @click="save(true)">
+      <BaseButton
+        v-if="!isEditing"
+        id="tx-submit-more"
+        :disabled="needsAccount"
+        @click="save(true)"
+      >
         Guardar y añadir otro
       </BaseButton>
-      <BaseButton variant="primary" type="submit" form="tx-form">
+      <BaseButton variant="primary" :disabled="needsAccount" type="submit" form="tx-form">
         {{ isEditing ? 'Guardar cambios' : 'Guardar movimiento' }}
       </BaseButton>
     </template>

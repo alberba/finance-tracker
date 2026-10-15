@@ -318,6 +318,11 @@ export async function syncSettingsUpdate(patch: {
   locale?: string | null
   theme?: string | null
   twrLiquidityAccountIds?: string[]
+  onboardingPresented?: boolean
+  onboardingDismissed?: boolean
+  onboardingAccountCompleted?: boolean
+  onboardingMovementCompleted?: boolean
+  onboardingCompleted?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
   stockeventsCashMappings?: Array<{ accountId: string | null; watchlistId: string }>

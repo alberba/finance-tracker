@@ -54,7 +54,9 @@ function onCancel(event: Event): void {
       >
         <div class="grid gap-1.5">
           <KickerLabel>{{ kicker }}</KickerLabel>
-          <h2 :id="titleId" class="font-display text-2xl font-bold tracking-tight">{{ title }}</h2>
+          <h2 :id="titleId" class="text-text-main font-display text-2xl font-bold tracking-tight">
+            {{ title }}
+          </h2>
         </div>
         <IconButton label="Cerrar" icon="close" @click="open = false" />
       </header>
@@ -76,8 +78,10 @@ function onCancel(event: Event): void {
   background: var(--overlay);
 }
 
-.side-panel[open] {
-  animation: side-panel-in 0.22s ease;
+@media (prefers-reduced-motion: no-preference) {
+  .side-panel[open] {
+    animation: side-panel-in 0.22s ease-out;
+  }
 }
 
 @keyframes side-panel-in {

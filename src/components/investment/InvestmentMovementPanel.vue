@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
@@ -127,6 +129,7 @@ function resetAmounts(): void {
 }
 
 function openNew(): void {
+  if (needsAccount.value) return
   editing.value = null
   form.date = form.date || todayISO()
   form.time = form.time || nowTime()
@@ -159,6 +162,7 @@ function openEdit(tx: Transaction): void {
 }
 
 function save(): void {
+  if (needsAccount.value) return
   const input = {
     date: form.date,
     time: form.time,
@@ -186,6 +190,7 @@ function requestDelete(): void {
 }
 
 defineExpose({ openNew, openEdit })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -196,6 +201,11 @@ defineExpose({ openNew, openEdit })
     :title="isEditing ? 'Editar movimiento' : 'Nuevo movimiento'"
     title-id="investment-movement-panel-title"
   >
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para guardar este formulario."
+      @resolve="open = false"
+    />
     <form
       id="investment-movement-form"
       class="grid gap-6"
@@ -348,7 +358,12 @@ defineExpose({ openNew, openEdit })
         Eliminar
       </BaseButton>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton variant="primary" type="submit" form="investment-movement-form">
+      <BaseButton
+        variant="primary"
+        :disabled="needsAccount"
+        type="submit"
+        form="investment-movement-form"
+      >
         {{ isEditing ? 'Guardar cambios' : 'Guardar movimiento' }}
       </BaseButton>
     </template>

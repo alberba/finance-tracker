@@ -26,7 +26,7 @@
  * `enabled` flag and cash mappings travel inside `settingsUpdate`.
  */
 
-import { z } from "zod";
+import { z } from 'zod'
 
 /**
  * Outcome of one command in `POST /api/sync`'s `results`, shared with the
@@ -40,48 +40,49 @@ import { z } from "zod";
  * reservation (a retry or second tab racing the first send). Nothing is
  * stored; the batch halts and the client resends later.
  */
-export type CommandStatus = "applied" | "conflict" | "not_found" | "noop" | "rejected" | "in_progress";
+export type CommandStatus =
+  'applied' | 'conflict' | 'not_found' | 'noop' | 'rejected' | 'in_progress'
 
 /** Statuses after which `applySyncBatch` stops: later commands must wait (FIFO). */
 export function haltsBatch(status: CommandStatus): boolean {
-  return status === "conflict" || status === "in_progress";
+  return status === 'conflict' || status === 'in_progress'
 }
 
 export const SYNC_ENTITY_TYPES = [
-  "account",
-  "category",
-  "transaction",
-  "subscription",
-  "recurringRule",
-  "pendingMovement",
-  "budgetEntry",
-  "goal",
-  "contribution",
-  "userInstrument",
-  "wealthSnapshot",
-  "stockeventsMapping",
-  "stockeventsCashEntry",
-] as const;
+  'account',
+  'category',
+  'transaction',
+  'subscription',
+  'recurringRule',
+  'pendingMovement',
+  'budgetEntry',
+  'goal',
+  'contribution',
+  'userInstrument',
+  'wealthSnapshot',
+  'stockeventsMapping',
+  'stockeventsCashEntry',
+] as const
 
-export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number];
+export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number]
 
-const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES);
+const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES)
 
-const nullableString = z.string().nullable();
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const nullableString = z.string().nullable()
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 /** One account's balance nested inside a `wealthSnapshot` command — see the module doc comment. */
 const wealthSnapshotBalanceSchema = z.object({
   accountId: z.string().min(1),
   balance: z.number(),
   currency: z.string().min(1),
-});
+})
 
 /** One account's share of a contribution's flow, nested inside a `contribution` command. */
 const contributionAllocationSchema = z.object({
   accountId: nullableString,
   amount: z.number(),
-});
+})
 
 /**
  * The operation ("Operación", CONTEXT.md) that gives an investment movement
@@ -96,7 +97,7 @@ const operationFields = {
   unitPrice: z.number().nullable().optional(),
   fee: z.number().nullable().optional(),
   time: nullableString.optional(),
-};
+}
 
 /**
  * The same operation, as it travels nested inside a movement's command. The
@@ -109,7 +110,7 @@ const operationSchema = z.object({
   units: z.number(),
   unitPrice: z.number(),
   fee: z.number(),
-});
+})
 
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
 export const entityCreateSchemas = {
@@ -269,7 +270,7 @@ export const entityCreateSchemas = {
       currency: z.string().min(1),
     })
     .strict(),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>;
+} satisfies Record<SyncEntityType, z.ZodTypeAny>
 
 /**
  * What a `create` command may actually carry: the per-entity shape above plus
@@ -278,7 +279,7 @@ export const entityCreateSchemas = {
  * Kept apart from `entityCreateSchemas` on purpose — the update schemas below
  * derive from that map, and an entity's identity is not a patchable field.
  */
-const clientIdentityFields = { id: z.string().min(1).optional() };
+const clientIdentityFields = { id: z.string().min(1).optional() }
 
 export const entityCreatePayloadSchemas = {
   account: entityCreateSchemas.account.extend(clientIdentityFields),
@@ -294,7 +295,7 @@ export const entityCreatePayloadSchemas = {
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.extend(clientIdentityFields),
   stockeventsMapping: entityCreateSchemas.stockeventsMapping.extend(clientIdentityFields),
   stockeventsCashEntry: entityCreateSchemas.stockeventsCashEntry.extend(clientIdentityFields),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>;
+} satisfies Record<SyncEntityType, z.ZodTypeAny>
 
 /** Update-payload (patch) shape per entity type — every field optional. */
 export const entityUpdateSchemas = {
@@ -337,35 +338,35 @@ export const entityUpdateSchemas = {
       currency: z.string().min(1).optional(),
     })
     .strict(),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>;
+} satisfies Record<SyncEntityType, z.ZodTypeAny>
 
 const baseCommandFields = {
   commandId: z.string().min(1),
-};
+}
 
 export const createCommandSchema = z.object({
   ...baseCommandFields,
-  action: z.literal("create"),
+  action: z.literal('create'),
   entityType: entityTypeSchema,
   data: z.record(z.string(), z.unknown()),
-});
+})
 
 export const updateCommandSchema = z.object({
   ...baseCommandFields,
-  action: z.literal("update"),
+  action: z.literal('update'),
   entityType: entityTypeSchema,
   entityId: z.string().min(1),
   baseVersion: z.number().int().nonnegative(),
   patch: z.record(z.string(), z.unknown()),
-});
+})
 
 export const removeCommandSchema = z.object({
   ...baseCommandFields,
-  action: z.literal("remove"),
+  action: z.literal('remove'),
   entityType: entityTypeSchema,
   entityId: z.string().min(1),
   baseVersion: z.number().int().nonnegative(),
-});
+})
 
 /**
  * `user_settings` is a per-user singleton: addressed by `userId` alone, so
@@ -377,9 +378,14 @@ export const removeCommandSchema = z.object({
  */
 export const settingsUpdateCommandSchema = z.object({
   ...baseCommandFields,
-  action: z.literal("settingsUpdate"),
+  action: z.literal('settingsUpdate'),
   baseVersion: z.number().int().nonnegative().optional(),
   patch: z.object({
+    onboardingPresented: z.boolean().optional(),
+    onboardingDismissed: z.boolean().optional(),
+    onboardingAccountCompleted: z.boolean().optional(),
+    onboardingMovementCompleted: z.boolean().optional(),
+    onboardingCompleted: z.boolean().optional(),
     currency: z.string().min(1).optional(),
     locale: nullableString.optional(),
     theme: nullableString.optional(),
@@ -404,27 +410,27 @@ export const settingsUpdateCommandSchema = z.object({
       )
       .optional(),
   }),
-});
+})
 
 /** No-op command: exercises idempotent replay without touching any table. */
 export const noopCommandSchema = z.object({
   ...baseCommandFields,
-  action: z.literal("noop"),
-});
+  action: z.literal('noop'),
+})
 
-export const syncCommandSchema = z.discriminatedUnion("action", [
+export const syncCommandSchema = z.discriminatedUnion('action', [
   createCommandSchema,
   updateCommandSchema,
   removeCommandSchema,
   settingsUpdateCommandSchema,
   noopCommandSchema,
-]);
+])
 
-export type SyncCommandInput = z.infer<typeof syncCommandSchema>;
+export type SyncCommandInput = z.infer<typeof syncCommandSchema>
 
 /** `POST /api/sync` batches at most 5 commands per request (WP4 design decision). */
 export const syncBatchSchema = z.object({
   commands: z.array(syncCommandSchema).min(1).max(5),
-});
+})
 
-export type SyncBatchInput = z.infer<typeof syncBatchSchema>;
+export type SyncBatchInput = z.infer<typeof syncBatchSchema>

@@ -1,216 +1,304 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
-import * as accountsRepository from "../../../../src/db/repositories/accounts";
-import * as userSettingsRepository from "../../../../src/db/repositories/user-settings";
-import { createTestDb, type TestDatabase } from "../setup";
-import { seedUser } from "../repositories/fixtures";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AuthPrincipal } from '../../../../src/lib/server/auth/principal'
+import * as accountsRepository from '../../../../src/db/repositories/accounts'
+import * as userSettingsRepository from '../../../../src/db/repositories/user-settings'
+import { createTestDb, type TestDatabase } from '../setup'
+import { seedUser } from '../repositories/fixtures'
 
-let currentDb: TestDatabase["db"];
-vi.mock("../../../../src/db/client", () => ({
+let currentDb: TestDatabase['db']
+vi.mock('../../../../src/db/client', () => ({
   getDb: () => currentDb,
-}));
+}))
 
 function postJson(url: string, body?: unknown): Request {
   return new Request(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  })
 }
 
-describe("POST /api/state/initialize", () => {
-  let testDb: TestDatabase;
-  let principal: AuthPrincipal;
+describe('POST /api/state/initialize', () => {
+  let testDb: TestDatabase
+  let principal: AuthPrincipal
 
   beforeEach(async () => {
-    testDb = createTestDb();
-    currentDb = testDb.db;
-    const user = await seedUser(testDb.db, "init-user@example.com");
+    testDb = createTestDb()
+    currentDb = testDb.db
+    const user = await seedUser(testDb.db, 'init-user@example.com')
     principal = {
       userId: user.id,
       email: user.email,
-      provider: "better-auth",
-      subject: "sub-1",
-    };
-  });
+      provider: 'better-auth',
+      subject: 'sub-1',
+    }
+  })
 
   afterEach(() => {
-    testDb.close();
-  });
+    testDb.close()
+  })
 
-  it("returns 401 without a principal", async () => {
-    const { POST } = await import("../../../../src/pages/api/state/initialize");
-    const response = await POST({ request: postJson("https://example.test/api/state/initialize"), locals: {} } as never);
-    expect(response.status).toBe(401);
-  });
+  it('returns 401 without a principal', async () => {
+    const { POST } = await import('../../../../src/pages/api/state/initialize')
+    const response = await POST({
+      request: postJson('https://example.test/api/state/initialize'),
+      locals: {},
+    } as never)
+    expect(response.status).toBe(401)
+  })
 
-  it("creates default settings + categories exactly once (idempotent replay)", async () => {
-    const { POST } = await import("../../../../src/pages/api/state/initialize");
-
-    const first = await POST({
-      request: postJson("https://example.test/api/state/initialize"),
+  it('automatically provisions a new principal and initialize never duplicates categories', async () => {
+    const { resolvePrincipal } = await import('../../../../src/lib/server/auth/principal')
+    const input = { provider: 'cf-access', subject: 'new-user', email: 'new-user@example.com' }
+    principal = await resolvePrincipal(testDb.db, input)
+    const settings = await userSettingsRepository.get(testDb.db, principal.userId)
+    expect(settings?.currency).toBe('EUR')
+    const categories = await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)
+    expect(categories.map((row) => [row.name, row.kind, row.sortOrder])).toEqual([
+      ['Nómina', 'income', 0],
+      ['Otros ingresos', 'income', 1],
+      ['Vivienda', 'expense', 0],
+      ['Alimentación', 'expense', 1],
+      ['Transporte', 'expense', 2],
+      ['Suministros', 'expense', 3],
+      ['Salud', 'expense', 4],
+      ['Ocio', 'expense', 5],
+      ['Otros gastos', 'expense', 6],
+      ['Inversión', 'investment', 0],
+    ])
+    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await resolvePrincipal(testDb.db, input)).toEqual(principal)
+    const { POST } = await import('../../../../src/pages/api/state/initialize')
+    const response = await POST({
+      request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
-    } as never);
-    expect(first.status).toBe(201);
-    const firstBody = await first.json();
-    expect(firstBody.alreadyInitialized).toBe(false);
-    expect(firstBody.settings.currency).toBe("EUR");
-    expect(firstBody.categories.length).toBeGreaterThan(0);
+    } as never)
+    expect(response.status).toBe(200)
+    expect((await response.json()).alreadyInitialized).toBe(true)
+    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual(
+      categories,
+    )
+    expect(await userSettingsRepository.get(testDb.db, principal.userId)).toEqual(settings)
+  })
 
-    const second = await POST({
-      request: postJson("https://example.test/api/state/initialize"),
+  it('does not add suggestions or change preferences for an existing user', async () => {
+    const settings = await userSettingsRepository.create(testDb.db, principal.userId, {
+      currency: 'USD',
+      onboardingCompleted: true,
+    })
+    const category = await accountsRepository.createCategory(testDb.db, principal.userId, {
+      name: 'Personal',
+      kind: 'expense',
+      sortOrder: 0,
+    })
+    const { POST } = await import('../../../../src/pages/api/state/initialize')
+    await POST({
+      request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
-    } as never);
-    expect(second.status).toBe(200);
-    const secondBody = await second.json();
-    expect(secondBody.alreadyInitialized).toBe(true);
+    } as never)
+    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([
+      category,
+    ])
+    expect(await userSettingsRepository.get(testDb.db, principal.userId)).toEqual(settings)
+  })
 
-    const categories = await accountsRepository.listCategoriesByUser(testDb.db, principal.userId);
-    expect(categories).toHaveLength(firstBody.categories.length);
-  });
-});
+  it('does not add suggestions to an existing empty user with absent settings', async () => {
+    const { POST } = await import('../../../../src/pages/api/state/initialize')
+    const response = await POST({
+      request: postJson('https://example.test/api/state/initialize'),
+      locals: { principal },
+    } as never)
+    expect(response.status).toBe(201)
+    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([])
+  })
 
-describe("POST /api/state/reset", () => {
-  let testDb: TestDatabase;
-  let principal: AuthPrincipal;
+  it('preserves pre-existing categories even when settings have not been created', async () => {
+    const category = await accountsRepository.createCategory(testDb.db, principal.userId, {
+      name: 'Personal',
+      kind: 'expense',
+      sortOrder: 0,
+    })
+    const { POST } = await import('../../../../src/pages/api/state/initialize')
+    await POST({
+      request: postJson('https://example.test/api/state/initialize'),
+      locals: { principal },
+    } as never)
+    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([
+      category,
+    ])
+  })
+})
+
+describe('POST /api/state/reset', () => {
+  let testDb: TestDatabase
+  let principal: AuthPrincipal
 
   beforeEach(async () => {
-    testDb = createTestDb();
-    currentDb = testDb.db;
-    const user = await seedUser(testDb.db, "reset-user@example.com");
+    testDb = createTestDb()
+    currentDb = testDb.db
+    const user = await seedUser(testDb.db, 'reset-user@example.com')
     principal = {
       userId: user.id,
       email: user.email,
-      provider: "better-auth",
-      subject: "sub-1",
-    };
-  });
+      provider: 'better-auth',
+      subject: 'sub-1',
+    }
+  })
 
   afterEach(() => {
-    testDb.close();
-  });
+    testDb.close()
+  })
 
-  it("returns 401 without a principal", async () => {
-    const { POST } = await import("../../../../src/pages/api/state/reset");
-    const response = await POST({ request: postJson("https://example.test/api/state/reset"), locals: {} } as never);
-    expect(response.status).toBe(401);
-  });
+  it('returns 401 without a principal', async () => {
+    const { POST } = await import('../../../../src/pages/api/state/reset')
+    const response = await POST({
+      request: postJson('https://example.test/api/state/reset'),
+      locals: {},
+    } as never)
+    expect(response.status).toBe(401)
+  })
 
   it("wipes the user's private data and re-seeds defaults", async () => {
+    const syncRepository = await import('../../../../src/db/repositories/sync')
+    await syncRepository.ensureRevision(testDb.db, principal.userId)
+    await syncRepository.bumpRevision(testDb.db, principal.userId)
     await accountsRepository.create(testDb.db, principal.userId, {
-      name: "Cuenta a borrar",
-      kind: "cash",
-      currency: "EUR",
+      name: 'Cuenta a borrar',
+      kind: 'cash',
+      currency: 'EUR',
       openingBalance: 42,
-    });
-    await userSettingsRepository.create(testDb.db, principal.userId, { currency: "USD" });
+    })
+    await userSettingsRepository.create(testDb.db, principal.userId, {
+      currency: 'USD',
+      onboardingCompleted: true,
+      onboardingPresented: true,
+    })
 
-    const { POST } = await import("../../../../src/pages/api/state/reset");
+    const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({
-      request: postJson("https://example.test/api/state/reset"),
+      request: postJson('https://example.test/api/state/reset'),
       locals: { principal },
-    } as never);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.settings.currency).toBe("EUR");
+    } as never)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.settings.currency).toBe('EUR')
+    expect(body.settings.onboardingCompleted).toBe(1)
+    expect(body.settings.onboardingPresented).toBe(1)
+    expect(await syncRepository.getRevision(testDb.db, principal.userId)).toMatchObject({
+      revision: 2,
+    })
+    expect(await syncRepository.listChangesSince(testDb.db, principal.userId, 1)).toMatchObject([
+      { revision: 2, entityType: 'reset' },
+    ])
 
-    const accounts = await accountsRepository.listByUser(testDb.db, principal.userId);
-    expect(accounts).toEqual([]);
-  });
+    const accounts = await accountsRepository.listByUser(testDb.db, principal.userId)
+    expect(accounts).toEqual([])
+  })
 
-  it("wipes owned children too, without leaving orphans or failing mid-way (§2.6)", async () => {
-    const transactionsRepository = await import("../../../../src/db/repositories/transactions");
-    const recurringRulesRepository = await import("../../../../src/db/repositories/recurring-rules");
-    const pendingMovementsRepository = await import("../../../../src/db/repositories/pending-movements");
-    const wealthRepository = await import("../../../../src/db/repositories/wealth");
-    const contributionsRepository = await import("../../../../src/db/repositories/contributions");
+  it('wipes owned children too, without leaving orphans or failing mid-way (§2.6)', async () => {
+    const transactionsRepository = await import('../../../../src/db/repositories/transactions')
+    const recurringRulesRepository = await import('../../../../src/db/repositories/recurring-rules')
+    const pendingMovementsRepository =
+      await import('../../../../src/db/repositories/pending-movements')
+    const wealthRepository = await import('../../../../src/db/repositories/wealth')
+    const contributionsRepository = await import('../../../../src/db/repositories/contributions')
 
     const account = await accountsRepository.create(testDb.db, principal.userId, {
-      name: "Cuenta a borrar",
-      kind: "cash",
-      currency: "EUR",
+      name: 'Cuenta a borrar',
+      kind: 'cash',
+      currency: 'EUR',
       openingBalance: 42,
-    });
+    })
 
     // A part of a transaction: its investment operation.
     const investmentTx = await transactionsRepository.create(testDb.db, principal.userId, {
       accountId: account.id,
-      type: "investment",
-      date: "2026-09-01",
+      type: 'investment',
+      date: '2026-09-01',
       amount: 100,
-      currency: "EUR",
-    });
+      currency: 'EUR',
+    })
     await transactionsRepository.createTradeDetail(testDb.db, principal.userId, {
       transactionId: investmentTx.id,
-      side: "buy",
-      quantity: "1",
+      side: 'buy',
+      quantity: '1',
       price: 100,
       fee: 1,
-      currency: "EUR",
-    });
+      currency: 'EUR',
+    })
 
     // A part of a recurring rule: its generated (not-yet-confirmed) occurrence.
     const rule = await recurringRulesRepository.create(testDb.db, principal.userId, {
-      name: "Aportación",
-      type: "investment",
+      name: 'Aportación',
+      type: 'investment',
       accountId: account.id,
       amount: 200,
-      currency: "EUR",
-      frequency: "monthly",
-    });
+      currency: 'EUR',
+      frequency: 'monthly',
+    })
     await pendingMovementsRepository.create(testDb.db, principal.userId, {
       recurringRuleId: rule.id,
       accountId: account.id,
       amount: 200,
-      currency: "EUR",
-      dueDate: "2026-10-01",
-    });
+      currency: 'EUR',
+      dueDate: '2026-10-01',
+    })
 
     // A part of a wealth snapshot: its per-account balance.
     const snapshot = await wealthRepository.create(testDb.db, principal.userId, {
-      snapshotDate: "2026-09-30",
+      snapshotDate: '2026-09-30',
       year: 2026,
       month: 9,
-    });
+    })
     await wealthRepository.createBalance(testDb.db, principal.userId, {
       snapshotId: snapshot.id,
       accountId: account.id,
       balance: 42,
-      currency: "EUR",
-    });
+      currency: 'EUR',
+    })
 
     // A part of a contribution: its per-account allocation.
     const contribution = await contributionsRepository.create(testDb.db, principal.userId, {
-      date: "2026-09-01",
+      date: '2026-09-01',
       amount: 200,
-      currency: "EUR",
-    });
+      currency: 'EUR',
+    })
     await contributionsRepository.createAllocation(testDb.db, principal.userId, {
       contributionId: contribution.id,
       accountId: account.id,
       amount: 200,
-      currency: "EUR",
-    });
+      currency: 'EUR',
+    })
 
-    const { POST } = await import("../../../../src/pages/api/state/reset");
+    const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({
-      request: postJson("https://example.test/api/state/reset"),
+      request: postJson('https://example.test/api/state/reset'),
       locals: { principal },
-    } as never);
+    } as never)
 
-    expect(response.status).toBe(200);
-    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
-    expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
-    expect(await recurringRulesRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
-    expect(await pendingMovementsRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
-    expect(await wealthRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
-    expect(await contributionsRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
+    expect(response.status).toBe(200)
+    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await recurringRulesRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await pendingMovementsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await wealthRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await contributionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(
-      await transactionsRepository.getTradeDetailByTransaction(testDb.db, principal.userId, investmentTx.id),
-    ).toBeUndefined();
-    expect(await wealthRepository.listBalancesBySnapshot(testDb.db, principal.userId, snapshot.id)).toEqual([]);
+      await transactionsRepository.getTradeDetailByTransaction(
+        testDb.db,
+        principal.userId,
+        investmentTx.id,
+      ),
+    ).toBeUndefined()
     expect(
-      await contributionsRepository.listAllocationsByContribution(testDb.db, principal.userId, contribution.id),
-    ).toEqual([]);
-  });
-});
+      await wealthRepository.listBalancesBySnapshot(testDb.db, principal.userId, snapshot.id),
+    ).toEqual([])
+    expect(
+      await contributionsRepository.listAllocationsByContribution(
+        testDb.db,
+        principal.userId,
+        contribution.id,
+      ),
+    ).toEqual([])
+  })
+})

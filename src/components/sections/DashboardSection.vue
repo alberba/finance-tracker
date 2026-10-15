@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -37,6 +39,7 @@ const range = computed({
   get: () => activeRange.value,
   set: dashboardStore.changeRange,
 })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -49,7 +52,11 @@ const range = computed({
         lede="Cuánto tienes, cómo va el mes y qué te queda por hacer."
       >
         <template #aside>
-          <BaseButton variant="primary" @click="transactionPanel?.openNew()">
+          <BaseButton
+            variant="primary"
+            :disabled="needsAccount"
+            @click="transactionPanel?.openNew()"
+          >
             <svg
               class="size-4"
               viewBox="0 0 24 24"
@@ -65,6 +72,11 @@ const range = computed({
           </BaseButton>
         </template>
       </PageHeader>
+
+      <SetupRequirement
+        v-if="needsAccount"
+        message="Crea una cuenta para registrar tu primer movimiento."
+      />
 
       <DashboardNetWorthBand
         v-model:range="range"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -39,6 +40,9 @@ const month = computed({
   set: (value: number) => wealthStore.setMonth(value),
 })
 const monthName = computed(() => viewModel.value.months[snapshotMonth.value]?.name ?? '')
+const needsAccount = computed(() =>
+  viewModel.value.groups.every((group) => group.rows.length === 0),
+)
 const status = computed(() => {
   if (changes.value > 0) return { saved: false, text: 'Con cambios sin guardar' }
   if (viewModel.value.months[snapshotMonth.value]?.saved) return { saved: true, text: 'Guardado' }
@@ -46,6 +50,7 @@ const status = computed(() => {
 })
 
 function save(): void {
+  if (needsAccount.value) return
   if (!edit.save()) showToast('Corrige los saldos no válidos antes de guardar.')
 }
 
@@ -79,7 +84,7 @@ function applyCalc(kind: SnapshotKind, id: string, value: number): void {
         lede="Apunta cada mes el saldo real de tus cuentas, inversiones y deudas."
       >
         <template #aside>
-          <BaseButton variant="primary" data-save-snapshot @click="save">
+          <BaseButton variant="primary" data-save-snapshot :disabled="needsAccount" @click="save">
             <svg
               class="size-4"
               viewBox="0 0 24 24"
@@ -96,6 +101,11 @@ function applyCalc(kind: SnapshotKind, id: string, value: number): void {
           </BaseButton>
         </template>
       </PageHeader>
+
+      <SetupRequirement
+        v-if="needsAccount"
+        message="Crea una cuenta de efectivo, inversión o pasivo para editar y guardar tus saldos."
+      />
 
       <WealthBand
         v-model:month="month"

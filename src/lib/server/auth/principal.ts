@@ -3,6 +3,7 @@
 import { and, eq } from 'drizzle-orm'
 import { users, userIdentities } from '../../../db/schema'
 import { normalizeEmail, runInTransaction, type Db } from '../../../db/repositories/shared'
+import { initializeNewUser } from '../initialize-new-user'
 
 /** Query handle whose local connection ownership is retained across async calls. */
 export type Queryable = Db
@@ -61,6 +62,12 @@ export async function resolvePrincipal(
         updatedAt: now,
       })
       .returning({ id: users.id, email: users.email })
+
+    // Eager provisioning for the welcome tour (#296): a fresh user gets
+    // user_settings + the default categories + revision cursor now, so
+    // setup-requirement checks work before the first bootstrap.
+    // Idempotent: no-op when settings already exist.
+    await initializeNewUser(tx, user.id)
 
     await tx.insert(userIdentities).values({
       userId: user.id,

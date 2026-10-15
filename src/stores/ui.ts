@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 
 import type { UiState } from '../scripts/app/ui-state'
 import type { SectionId } from '../scripts/types'
@@ -48,6 +48,8 @@ function createDefaultUiState(): UiState {
 
 export const useUiStore = defineStore('ui', () => {
   const ui = reactive<UiState>(createDefaultUiState())
+  const settingsTab = ref('accounts')
+  const setupAction = ref<'account' | 'movement' | null>(null)
 
   function setActiveSection(sectionId: SectionId): void {
     ui.activeSection = sectionId
@@ -63,6 +65,8 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     ui,
+    settingsTab,
+    setupAction,
     setActiveSection,
     setDashboardMonth,
     replaceUiState,

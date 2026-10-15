@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { computed, reactive, ref } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
@@ -55,6 +57,7 @@ const annual = computed(() =>
 )
 
 function openNew(): void {
+  if (needsAccount.value) return
   editingId.value = null
   const categories = movementsStore.orderedCategories('expense')
   form.name = ''
@@ -77,6 +80,7 @@ function openEdit(subscription: Subscription): void {
 }
 
 function save(): void {
+  if (needsAccount.value) return
   const fields = {
     name: form.name,
     amount: Number.isFinite(amount.value) ? amount.value : 0,
@@ -91,6 +95,7 @@ function save(): void {
 }
 
 defineExpose({ openNew, openEdit })
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -101,6 +106,11 @@ defineExpose({ openNew, openEdit })
     :title="isEditing ? 'Editar suscripción' : 'Nueva suscripción'"
     title-id="subscription-panel-title"
   >
+    <SetupRequirement
+      v-if="needsAccount"
+      message="Crea una cuenta para guardar este formulario."
+      @resolve="open = false"
+    />
     <form id="subscription-form" class="grid gap-6" autocomplete="off" @submit.prevent="save">
       <fieldset class="grid gap-3.5 sm:grid-cols-[minmax(0,1fr)_11rem]">
         <legend class="text-text-muted mb-3 text-xs font-bold tracking-widest uppercase">
@@ -186,7 +196,7 @@ defineExpose({ openNew, openEdit })
 
     <template #footer>
       <BaseButton variant="ghost" @click="open = false">Cancelar</BaseButton>
-      <BaseButton variant="primary" type="submit" form="subscription-form">
+      <BaseButton variant="primary" :disabled="needsAccount" type="submit" form="subscription-form">
         {{ isEditing ? 'Guardar cambios' : 'Añadir suscripción' }}
       </BaseButton>
     </template>

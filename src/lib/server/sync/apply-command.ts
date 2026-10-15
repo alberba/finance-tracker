@@ -557,6 +557,22 @@ async function performMutation(
       // replay detection must compare like with like.
       const settingsPatchForCompare = {
         ...settingsPatch,
+        ...(typeof settingsPatch.onboardingPresented === 'boolean'
+          ? { onboardingPresented: settingsPatch.onboardingPresented ? 1 : 0 }
+          : {}),
+        ...(typeof settingsPatch.onboardingDismissed === 'boolean'
+          ? { onboardingDismissed: settingsPatch.onboardingDismissed ? 1 : 0 }
+          : {}),
+        ...(typeof settingsPatch.onboardingAccountCompleted === 'boolean'
+          ? { onboardingAccountCompleted: settingsPatch.onboardingAccountCompleted ? 1 : 0 }
+          : {}),
+        ...(typeof settingsPatch.onboardingMovementCompleted === 'boolean'
+          ? { onboardingMovementCompleted: settingsPatch.onboardingMovementCompleted ? 1 : 0 }
+          : {}),
+        ...(typeof settingsPatch.onboardingCompleted === 'boolean'
+          ? { onboardingCompleted: settingsPatch.onboardingCompleted ? 1 : 0 }
+          : {}),
+
         ...(typeof settingsPatch.stockeventsEnabled === 'boolean'
           ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
           : {}),

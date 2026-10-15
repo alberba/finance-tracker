@@ -1,5 +1,5 @@
 /**
- * "Empezar de cero" (WP8) — the only v2 path that provisions a brand-new
+ * "Empezar de cero" — the explicit v2 action that provisions a brand-new
  * private space for the authenticated user: current year, EUR (or the
  * requested currency), basic categories, no accounts/transactions/budgets/
  * goals. Wraps `POST /api/state/initialize` (WP4), which is itself

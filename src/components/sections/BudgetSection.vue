@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { storeToRefs } from 'pinia'
 import { computed, ref, useTemplateRef } from 'vue'
 
@@ -24,6 +25,7 @@ const { formatMoney, formatSignedMoney } = useMoneyFormatter()
 const panel = useTemplateRef<InstanceType<typeof BudgetPlanPanel>>('panel')
 
 const active = ref<BudgetType>('expense')
+const needsCategories = computed(() => budgetStore.getCategoriesForType(active.value).length === 0)
 const view = computed(() => viewModel.value.types[active.value])
 
 const tabs = computed(() =>
@@ -71,12 +73,14 @@ const strip = computed<FigureStripItem[]>(() => {
 })
 
 function updateCell(category: string, month: number, value: number): void {
+  if (needsCategories.value) return
   const row = view.value.rows.find((candidate) => candidate.category === category)
   if (row && Math.abs(row.cells[month].planned - value) < 0.005) return
   budgetStore.updateBudgetValue(active.value, category, month, value)
 }
 
 function openPlan(category: string): void {
+  if (needsCategories.value) return
   const row = view.value.rows.find((candidate) => candidate.category === category)
   if (row) panel.value?.openPlan(active.value, row)
 }
@@ -100,7 +104,15 @@ function openPlan(category: string): void {
         data-key="budget-tab"
       />
 
+      <SetupRequirement
+        v-if="needsCategories"
+        :message="`Añade categorías de ${TYPE_LABEL[active].toLowerCase()} para planificar este presupuesto.`"
+        action="Editar categorías"
+        target="categories"
+      />
+
       <DocumentSurface
+        v-else
         :id="`budget-panel-${active}`"
         role="tabpanel"
         :aria-label="TYPE_LABEL[active]"

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import SetupRequirement from '../onboarding/SetupRequirement.vue'
+import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -111,6 +113,7 @@ function requestDelete(tx: Transaction): void {
 function confirmDelete(): void {
   if (pendingDelete.value) investmentStore.deleteMovement(pendingDelete.value.tx.id)
 }
+const { needsAccount } = useAccountRequirement()
 </script>
 
 <template>
@@ -142,6 +145,7 @@ function confirmDelete(): void {
           id="investment-movement-new"
           variant="primary"
           class="max-sm:w-full"
+          :disabled="needsAccount"
           @click="panel?.openNew()"
         >
           <svg
@@ -158,6 +162,11 @@ function confirmDelete(): void {
           Nuevo movimiento
         </BaseButton>
       </div>
+
+      <SetupRequirement
+        v-if="needsAccount"
+        message="Crea una cuenta para registrar movimientos de inversión."
+      />
     </div>
 
     <section

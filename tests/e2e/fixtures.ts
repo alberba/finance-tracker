@@ -85,7 +85,21 @@ export const test = base.extend<Fixtures>({
       `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
     await seedSyncV2User(context.request, email)
-
+    // Unrelated journeys start after onboarding; the onboarding spec provisions
+    // untouched sync-v2 users and exercises the real first show.
+    const completed = await context.request.post('/api/sync', {
+      headers: { 'X-Test-User-Email': email },
+      data: {
+        commands: [
+          {
+            commandId: randomUUID(),
+            action: 'settingsUpdate',
+            patch: { onboardingPresented: true, onboardingCompleted: true },
+          },
+        ],
+      },
+    })
+    expect(completed.ok(), await completed.text()).toBe(true)
     const tracker = new FinanceTrackerPage(page)
     await tracker.goto()
     await use(tracker)

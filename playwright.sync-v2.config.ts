@@ -16,6 +16,7 @@ export default defineConfig(
       'bitvavo.spec.ts',
       'movement-commands.spec.ts',
       'multi-user-isolation.spec.ts',
+      'onboarding.spec.ts',
       'offline-sync.spec.ts',
       'subscription-charges.spec.ts',
     ],
