@@ -29,6 +29,15 @@ function localAuthenticationTest(env: RuntimeEnv): boolean {
   )
 }
 
+/**
+ * Header that carries the client IP. Cloudflare sets `cf-connecting-ip` itself; a
+ * self-hosted proxy must opt in through `CLIENT_IP_HEADER` (e.g. `x-real-ip`) and
+ * overwrite that header, otherwise a client could forge its own rate-limit bucket.
+ */
+function clientIpHeader(env: RuntimeEnv): string {
+  return env.CLIENT_IP_HEADER?.trim().toLowerCase() || 'cf-connecting-ip'
+}
+
 function localTestEmailEndpoint(env: RuntimeEnv): string | undefined {
   if (env.TEST_AUTH_ENABLED !== 'true' || !env.TEST_RESEND_URL || !env.BETTER_AUTH_URL)
     return undefined
@@ -80,8 +89,8 @@ export function createAuthentication(
     advanced: {
       ipAddress: {
         ipAddressHeaders: localAuthenticationTest(env)
-          ? ['X-Test-Client-IP', 'cf-connecting-ip']
-          : ['cf-connecting-ip'],
+          ? ['X-Test-Client-IP', clientIpHeader(env)]
+          : [clientIpHeader(env)],
       },
     },
     database: drizzleAdapter(db, {

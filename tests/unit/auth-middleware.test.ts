@@ -73,6 +73,48 @@ beforeEach(() => {
 })
 
 describe('authentication middleware', () => {
+  it('answers every request with a 503 while maintenance mode is on', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const env = { MAINTENANCE_MODE: 'true' }
+
+    for (const url of [
+      'https://app.example.test/',
+      'https://app.example.test/login?demo=1',
+      'https://app.example.test/api/auth/session',
+    ]) {
+      const next = makeNext()
+      const response = (await onRequest(makeContext({ url, env }), next)) as Response
+
+      expect(response.status).toBe(503)
+      expect(response.headers.get('Retry-After')).toBeTruthy()
+      expect(response.headers.get('Cache-Control')).toBe('no-store')
+      expect(next).not.toHaveBeenCalled()
+    }
+    expect(createAuthentication).not.toHaveBeenCalled()
+  })
+
+  it('returns JSON to API callers during maintenance', async () => {
+    const context = makeContext({
+      url: 'https://app.example.test/api/sync',
+      method: 'POST',
+      env: { MAINTENANCE_MODE: 'true' },
+    })
+
+    const response = (await onRequest(context, makeNext())) as Response
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Content-Type')).toBe('application/json')
+  })
+
+  it('serves normally when maintenance mode is not exactly "true"', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const next = makeNext()
+
+    await onRequest(makeContext({ env: { MAINTENANCE_MODE: 'false' } }), next)
+
+    expect(next).toHaveBeenCalledOnce()
+  })
+
   it('does not accept a Cf-Access assertion as a credential', async () => {
     const context = makeContext({ headers: { 'Cf-Access-Jwt-Assertion': 'valid-looking.jwt' } })
     const next = makeNext()
@@ -142,6 +184,25 @@ describe('authentication middleware', () => {
 
     expect(response.headers.getSetCookie()).toContain('session=renewed; Path=/; HttpOnly')
     expect(response.headers.get('Cache-Control')).toBe('no-store')
+  })
+
+  it('accepts the configured https origin when a proxy hands the app an http URL', async () => {
+    setSession({ id: 'auth-user', emailVerified: true })
+    const next = makeNext()
+    const env = { BETTER_AUTH_URL: 'https://finance.example.test' }
+    const request = (origin: string) =>
+      makeContext({
+        url: 'http://finance.example.test/api/session',
+        method: 'POST',
+        headers: { origin, 'Content-Type': 'application/json' },
+        env,
+      })
+
+    await onRequest(request('https://finance.example.test'), next)
+    expect(next).toHaveBeenCalledOnce()
+
+    const forged = (await onRequest(request('https://evil.example.test'), makeNext())) as Response
+    expect(forged.status).toBe(403)
   })
 
   it('rejects cross-site API mutations before authentication', async () => {

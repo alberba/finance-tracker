@@ -7,6 +7,7 @@ import { createAuthentication } from './lib/server/auth/better-auth'
 import { resolvePrincipal, type AuthPrincipal } from './lib/server/auth/principal'
 import { getRuntimeEnv, type RuntimeEnv } from './lib/server/cloudflare-env'
 import { isPublicDemoNavigation } from './lib/server/demo-access'
+import { isMaintenanceMode, maintenanceResponse } from './lib/server/maintenance'
 import {
   isLocalTestRequest,
   rejectUnsafeApiMutation,
@@ -28,6 +29,14 @@ function isTestAuthEnabled(env: RuntimeEnv | undefined): boolean {
   return env?.TEST_AUTH_ENABLED === 'true'
 }
 
+function publicOrigin(env: RuntimeEnv | undefined): string | undefined {
+  try {
+    return env?.BETTER_AUTH_URL ? new URL(env.BETTER_AUTH_URL).origin : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function wrongQueueIdentity(request: Request, pathname: string, userId: string): boolean {
   const queueIdentity = request.headers.get('X-Finance-User-Id')
   return Boolean((queueIdentity || pathname === '/api/sync') && queueIdentity !== userId)
@@ -36,13 +45,15 @@ function wrongQueueIdentity(request: Request, pathname: string, userId: string):
 export const onRequest = defineMiddleware(async (context, next) => {
   const env = getRuntimeEnv(context.locals)
 
+  if (isMaintenanceMode(env)) return maintenanceResponse(context.request)
+
   if (isPublicDemoNavigation(context.request)) return next()
 
   const pathname = new URL(context.request.url).pathname
   const publicAuthentication =
     pathname === '/login' || pathname === '/api/recover-access' || pathname.startsWith('/api/auth/')
 
-  const unsafeMutation = rejectUnsafeApiMutation(context.request)
+  const unsafeMutation = rejectUnsafeApiMutation(context.request, publicOrigin(env))
   if (unsafeMutation) return unsafeMutation
   if (publicAuthentication) return next()
 
