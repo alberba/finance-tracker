@@ -92,9 +92,7 @@ Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conse
 Una ejecución manual con `update_snapshots` solo regenera y commitea los snapshots Linux; no
 vuelve a ejecutar calidad, funcional ni sync-v2.
 
-Cloudflare Workers Builds es el despliegue activo. Los builds automáticos y comentarios de PR
-del proyecto Pages antiguo `finance-tracker` están desactivados; su sitio `pages.dev` existente
-se conserva. Estos ajustes viven en Cloudflare, fuera del workflow de GitHub.
+El despliegue no pasa por GitHub Actions: ver `docs/operations/self-hosting.md`.
 
 Los snapshots versionados son `*-linux.png`, la plataforma de CI. En macOS se comparan y
 actualizan dentro de la imagen Linux de Playwright con Docker, después de revisar el resultado
