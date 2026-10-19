@@ -20,7 +20,7 @@ GITHUB_CLIENT_ID = "Ov23liObvTnfETsed505"
 AUTH_ENFORCED = "true"
 GITHUB_OWNER = "alberba"
 GITHUB_REPO = "finance-tracker"
-MARKET_DATA_PROVIDER = "twelve-data"
+MARKET_DATA_PROVIDER = "yahoo"
 MARKET_QUOTE_STALE_MINUTES = "15"
 MARKET_QUOTE_CACHE_SECONDS = "300"
 # Sentry DSN for the server runtime. It is not a secret: the same value ships

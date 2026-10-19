@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
+import { LiveMarketPage } from './pages/LiveMarketPage'
 
 test.describe('Settings E2E', () => {
   for (const provider of ['Stock Events', 'Bitvavo']) {
@@ -46,6 +47,58 @@ test.describe('Settings E2E', () => {
       await expect(settings.locator('#settings-tab-accounts')).toBeHidden()
     },
   )
+
+  test('configura cotizaciones por símbolo aunque compartan categoría o no tengan activo', async ({
+    page,
+    tracker,
+  }) => {
+    await editScenarioState(page, (state) => {
+      state.instruments = []
+      for (const [index, symbol] of ['FIRST', 'SECOND', 'ORPH'].entries()) {
+        state.transactions.push({
+          id: `tx-quote-${index}`,
+          type: 'investment',
+          date: '2026-07-01',
+          amount: 100,
+          month: 6,
+          createdAt: '2026-07-01T00:00:00Z',
+          category: symbol === 'ORPH' ? 'Sin activo' : 'ETF AGED',
+          accountId: 'revolut',
+          description: `Compra ${symbol}`,
+          side: 'buy',
+          symbol,
+          units: 1,
+          unitPrice: 100,
+          fee: 0,
+        })
+      }
+    })
+    await tracker.reload()
+    await tracker.openSettingsTab('Cotizaciones')
+    const quotes = tracker.section('settings').locator('[data-settings-quotes]')
+    const first = quotes.locator('tr[data-quote-symbol="FIRST"]')
+    const second = quotes.locator('tr[data-quote-symbol="SECOND"]')
+    await expect(first).toContainText('Sin configurar')
+    await expect(second).toContainText('Sin configurar')
+    await expect(quotes.locator('tr[data-quote-symbol="ORPH"]')).toBeVisible()
+
+    await first.getByRole('button', { name: 'Configurar cotización de FIRST' }).click()
+    const market = new LiveMarketPage(page)
+    const form = market.quotePanel.locator('[data-instrument-form]')
+    await expect(form.getByLabel('Símbolo', { exact: true })).toHaveValue('FIRST')
+    await expect(form.getByLabel('Activo de agrupación')).toHaveValue('etf-aged')
+    await form.getByLabel('Símbolo', { exact: true }).fill('FIRST.DE')
+    await form.getByRole('button', { name: 'Añadir instrumento' }).click()
+    await expect(market.instrument('FIRST.DE')).toBeVisible()
+    await market.closeQuote()
+
+    await expect(quotes.locator('tr[data-quote-symbol="FIRST.DE"]')).toContainText('Yahoo')
+    await expect(first).toHaveCount(0)
+    await expect(second).toContainText('Sin configurar')
+    await tracker.openSettingsTab('Activos')
+    const asset = await tracker.openSettingsCard('Activos', 'ETF AGED')
+    await expect(asset.getByRole('button', { name: 'Guardar símbolos' })).toHaveCount(0)
+  })
 
   test('crea una cuenta desde su ficha y la ofrece al registrar movimientos', async ({
     tracker,

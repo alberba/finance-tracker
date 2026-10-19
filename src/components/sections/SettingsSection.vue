@@ -7,6 +7,7 @@ import SettingsAssetsTab from '../settings/SettingsAssetsTab.vue'
 import SettingsCategoriesTab from '../settings/SettingsCategoriesTab.vue'
 import SettingsLiabilitiesTab from '../settings/SettingsLiabilitiesTab.vue'
 import SettingsPreferencesTab from '../settings/SettingsPreferencesTab.vue'
+import SettingsQuotesTab from '../settings/SettingsQuotesTab.vue'
 import SettingsRecurringTab from '../settings/SettingsRecurringTab.vue'
 import AppSection from '../ui/AppSection.vue'
 import PageHeader from '../ui/PageHeader.vue'
@@ -24,7 +25,14 @@ import { useStockEventsStore } from '../../stores/stockevents'
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 type SettingsTab =
-  'accounts' | 'assets' | 'liabilities' | 'categories' | 'recurring' | 'preferences' | 'connections'
+  | 'accounts'
+  | 'assets'
+  | 'quotes'
+  | 'liabilities'
+  | 'categories'
+  | 'recurring'
+  | 'preferences'
+  | 'connections'
 
 const financialStateStore = useFinancialStateStore()
 const recurringStore = useRecurringStore()
@@ -42,6 +50,7 @@ const tabs = computed<SectionTab[]>(() => {
   const entries: Array<[SettingsTab, string, number | null]> = [
     ['accounts', 'Cuentas', state.accounts.length],
     ['assets', 'Activos', state.investmentAssets.length],
+    ['quotes', 'Cotizaciones', state.instruments.length],
     ['liabilities', 'Pasivos', state.liabilities.length],
     ['categories', 'Categorías', categories],
     [
@@ -74,7 +83,7 @@ onMounted(async () => {
         kicker="Datos maestros"
         title="Configuración"
         title-id="settings-title"
-        lede="Cada cuenta, activo y regla con todo lo suyo en un solo sitio."
+        lede="Cuentas, agrupaciones de inversión, cotizaciones por símbolo y reglas."
       >
         <template v-if="alerts" #aside>
           <button
@@ -101,6 +110,7 @@ onMounted(async () => {
 
       <SettingsAccountsTab :is-active="activeTab === 'accounts'" />
       <SettingsAssetsTab :is-active="activeTab === 'assets'" />
+      <SettingsQuotesTab :is-active="activeTab === 'quotes'" />
       <SettingsLiabilitiesTab :is-active="activeTab === 'liabilities'" />
       <SettingsCategoriesTab :is-active="activeTab === 'categories'" />
       <SettingsRecurringTab :is-active="activeTab === 'recurring'" />

@@ -46,7 +46,9 @@ function comparable(exported: Row): Row {
     for (const [key, field] of Object.entries(value as Row)) {
       if (VOLATILE_KEYS.has(key) || key === 'snapshotId' || key === 'contributionId') continue
       out[key] =
-        ['accountId', 'categoryId', 'recurringRuleId'].includes(key) && typeof field === 'string'
+        (['accountId', 'categoryId', 'recurringRuleId'].includes(key) ||
+          (key === 'alias' && names.has(String(field)))) &&
+        typeof field === 'string'
           ? `→${names.get(field) ?? '?'}`
           : strip(field)
     }
@@ -83,7 +85,20 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
   await marketRepository.createUserInstrument(db, userId, {
     instrumentId: instrument.id,
     categoryId: category.id,
-    alias: 'World',
+    alias: account.id,
+    quoteConfig: {
+      symbol: 'VWCE',
+      quoteSymbol: 'VWCE.DE',
+      type: 'etf',
+      provider: 'test',
+      currency: 'EUR',
+      market: 'XETRA',
+      active: true,
+      holdingUnits: 2.5,
+      holdingsSource: 'manual',
+      holdingsAsOf: '2026-04-01',
+      holdingsUpdatedAt: '2026-04-01T10:00:00Z',
+    },
   })
   await transactionsRepository.create(db, userId, {
     legacyId: 'tx-1',

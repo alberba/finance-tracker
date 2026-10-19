@@ -1,19 +1,37 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
+import BaseSelect from '../ui/BaseSelect.vue'
+import YahooQuoteLink from './YahooQuoteLink.vue'
+import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
 import { FIELD_LABEL } from '../ui/field'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
 import type { InstrumentType } from '../../scripts/types'
 import { useMarketStore, type NewInstrumentInput } from '../../stores/market'
+import { useFinancialStateStore } from '../../stores/financial-state'
 
-// Adds a quote instrument to an asset. Its movements with the same symbol can
-// be linked right after, from the instrument itself.
-const props = defineProps<{ assetId: string }>()
+// Configures a symbol's quote and the asset that groups its investment value.
+const props = withDefaults(
+  defineProps<{ assetId?: string; initialSymbol?: string; currency?: string }>(),
+  {
+    assetId: '',
+    initialSymbol: '',
+    currency: 'EUR',
+  },
+)
+const emit = defineEmits<{ added: [id: string] }>()
 
 const marketStore = useMarketStore()
+const financialStateStore = useFinancialStateStore()
+const assetId = ref(props.assetId)
+const error = ref('')
+const assetOptions = computed(() => [
+  { value: '', label: 'Selecciona un activo' },
+  ...financialStateStore.investmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+])
 
 const TYPE_OPTIONS: SegmentedOption<InstrumentType>[] = (
   Object.keys(INSTRUMENT_TYPE_LABEL) as InstrumentType[]
@@ -22,16 +40,27 @@ const providerOptions: SegmentedOption[] = QUOTE_PROVIDERS.map((item) => ({ ...i
 
 const form = reactive<Omit<NewInstrumentInput, 'investmentAssetId'>>({
   type: 'etf',
-  symbol: '',
+  symbol: props.initialSymbol,
+  quoteSymbol: '',
   market: '',
-  currency: 'EUR',
-  provider: 'twelve-data',
+  currency: props.currency,
+  provider: 'yahoo',
 })
+const yahooTicker = computed(() => yahooQuoteSymbol(form))
 
 function submit(): void {
-  if (marketStore.addInstrument({ ...form, investmentAssetId: props.assetId })) {
+  error.value = ''
+  if (marketStore.addInstrument({ ...form, investmentAssetId: assetId.value })) {
+    const added = marketStore.instruments.find(
+      (instrument) =>
+        instrument.symbol === form.symbol.trim().toUpperCase() &&
+        instrument.market === form.market.trim().toUpperCase(),
+    )
+    if (added) emit('added', added.id)
     form.symbol = ''
     form.market = ''
+  } else {
+    error.value = 'Ese símbolo y mercado ya están configurados.'
   }
 }
 </script>
@@ -71,6 +100,15 @@ function submit(): void {
       class="[&_input]:font-mono [&_input]:uppercase"
     />
     <BaseInput
+      v-model="form.quoteSymbol"
+      label="Ticker a consultar (opcional)"
+      name="quoteSymbol"
+      placeholder="VWCE.DE, BTC-EUR…"
+      spellcheck="false"
+      class="sm:col-span-2 [&_input]:font-mono [&_input]:uppercase"
+    />
+    <YahooQuoteLink v-if="form.provider === 'yahoo'" :symbol="yahooTicker" />
+    <BaseInput
       v-model="form.market"
       label="Mercado / MIC (opcional)"
       name="market"
@@ -87,6 +125,23 @@ function submit(): void {
         class="flex-wrap [&>button]:h-11 [&>button]:flex-auto [&>button]:whitespace-nowrap"
       />
     </div>
+    <BaseSelect
+      v-model="assetId"
+      label="Activo de agrupación"
+      :options="assetOptions"
+      required
+      class="sm:col-span-2"
+    />
+    <p class="text-text-muted text-sm sm:col-span-2">
+      El activo agrupa el valor de tu inversión. La cotización corresponde únicamente al símbolo.
+    </p>
+    <p
+      v-if="!financialStateStore.investmentAssets.length"
+      class="text-text-muted text-sm sm:col-span-2"
+    >
+      Crea primero una agrupación de inversión en Activos para asignarle este símbolo.
+    </p>
     <BaseButton type="submit" class="sm:col-span-2">Añadir instrumento</BaseButton>
+    <p v-if="error" class="text-loss text-sm sm:col-span-2" role="alert">{{ error }}</p>
   </form>
 </template>

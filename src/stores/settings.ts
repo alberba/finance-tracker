@@ -15,6 +15,7 @@ import { categoryEmojiKey } from '../scripts/category-emoji'
 import type { CategoryKey, Entity, EntityKey, State } from '../scripts/types'
 import { parseFloatSafe, parseIntSafe, round2, slug } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
+import { useMarketStore } from './market'
 
 export type ReorderDirection = 'up' | 'down'
 
@@ -178,6 +179,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function removeEntity(key: EntityKey, id: string): void {
     const before = financialStateStore.state[key]
+    const quoteIds =
+      key === 'investmentAssets'
+        ? financialStateStore.instruments
+            .filter((instrument) => instrument.investmentAssetId === id)
+            .map((instrument) => instrument.id)
+        : []
     const wasTwrLiquidity =
       key === 'accounts' && (financialStateStore.state.twrLiquidityAccountIds || []).includes(id)
     financialStateStore.commitState((draft) => {
@@ -202,6 +209,7 @@ export const useSettingsStore = defineStore('settings', () => {
         syncInvestmentCategoriesWithAssets(draft)
       }
     })
+    for (const quoteId of quoteIds) useMarketStore().removeInstrument(quoteId)
     // Note (documented leftover): the cascade above also drops the
     // account's transactions/subscriptions from local state, but only the
     // `account` row's own removal is synced here — cascading those deletes

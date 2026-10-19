@@ -6,25 +6,34 @@ import BaseInput from '../ui/BaseInput.vue'
 import { FIELD_LABEL } from '../ui/field'
 import PillTag from '../ui/PillTag.vue'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
+import YahooQuoteLink from './YahooQuoteLink.vue'
+import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
 import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
 import type { InstrumentRowViewModel } from '../../domain/settings/view-model'
 import { searchMarketSymbols, type MarketSearchResult } from '../../services/market-api'
 import { useMarketStore } from '../../stores/market'
 
-// One quote instrument inside an asset's card: the exact ticker its provider
-// publishes (with a search for close matches on Yahoo), the provider, and the
-// movements linked to it or waiting to be.
+// The portfolio's visible symbol and its independent provider ticker.
 const props = defineProps<{ instrument: InstrumentRowViewModel }>()
 
 const marketStore = useMarketStore()
 
-const ticker = ref(props.instrument.symbol)
+const displaySymbol = ref(props.instrument.symbol)
+const savedTicker = computed(() =>
+  props.instrument.provider === 'yahoo'
+    ? yahooQuoteSymbol(props.instrument)
+    : props.instrument.quoteSymbol || props.instrument.symbol,
+)
+const ticker = ref(savedTicker.value)
 watch(
   () => props.instrument.symbol,
-  (value) => {
-    ticker.value = value
+  (symbol) => {
+    displaySymbol.value = symbol
   },
 )
+watch(savedTicker, (value) => {
+  ticker.value = value
+})
 
 const provider = computed({
   get: () => props.instrument.provider,
@@ -36,10 +45,15 @@ const isSearching = shallowRef(false)
 const searchError = shallowRef('')
 
 const canSearch = computed(() => props.instrument.provider === 'yahoo')
+const yahooTicker = computed(() =>
+  yahooQuoteSymbol({ ...props.instrument, symbol: displaySymbol.value, quoteSymbol: ticker.value }),
+)
 const providerOptions: SegmentedOption[] = QUOTE_PROVIDERS.map((item) => ({ ...item }))
 
 function saveTicker(): void {
-  if (marketStore.updateInstrumentSymbol(props.instrument.id, ticker.value)) {
+  if (
+    marketStore.configureInstrumentSymbols(props.instrument.id, displaySymbol.value, ticker.value)
+  ) {
     results.value = []
     searchError.value = ''
   }
@@ -85,6 +99,15 @@ function useResult(result: MarketSearchResult): void {
       </span>
     </div>
 
+    <BaseInput
+      v-model="displaySymbol"
+      label="Símbolo a mostrar"
+      required
+      spellcheck="false"
+      class="[&_input]:font-mono [&_input]:uppercase"
+    />
+    <p class="text-text-muted text-sm">Este símbolo identifica tu posición y sus movimientos.</p>
+
     <div class="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
       <BaseInput
         v-model="ticker"
@@ -92,8 +115,10 @@ function useResult(result: MarketSearchResult): void {
         spellcheck="false"
         class="[&_input]:font-mono [&_input]:uppercase"
       />
-      <BaseButton @click="saveTicker">Guardar ticker</BaseButton>
+      <BaseButton @click="saveTicker">Guardar símbolos</BaseButton>
     </div>
+    <p class="text-text-muted text-sm">El ticker de consulta solo se usa para obtener el precio.</p>
+    <YahooQuoteLink v-if="canSearch" :symbol="yahooTicker" />
 
     <ul v-if="results.length" class="grid" aria-label="Tickers aproximados">
       <li
@@ -106,6 +131,10 @@ function useResult(result: MarketSearchResult): void {
           <span class="text-text-muted truncate text-xs"
             >{{ result.exchange }} · {{ result.name }}</span
           >
+          <span class="text-text-muted text-xs">{{
+            [result.type, result.currency].filter(Boolean).join(' · ')
+          }}</span>
+          <YahooQuoteLink :symbol="result.symbol" />
         </span>
         <BaseButton
           variant="ghost"

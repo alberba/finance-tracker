@@ -1,3 +1,5 @@
+import { yahooFinance, YahooFinanceHttpError } from './yahoo-finance'
+
 export interface MarketSearchResult {
   symbol: string
   name: string
@@ -34,7 +36,8 @@ export async function searchYahooSymbols(
   if (cached && cached.expiresAt > Date.now()) return cached.results
   if (cached) searchCache.delete(cacheKey)
 
-  const pending = inFlightSearches.get(cacheKey) || createSearch(cacheKey, normalizedQuery, fetchImpl, env)
+  const pending =
+    inFlightSearches.get(cacheKey) || createSearch(cacheKey, normalizedQuery, fetchImpl, env)
   try {
     return await pending
   } finally {
@@ -59,13 +62,8 @@ async function loadSearchResults(
   fetchImpl: typeof fetch,
   env: MarketSearchEnv,
 ): Promise<MarketSearchResult[]> {
-  const params = new URLSearchParams({ q: query, quotesCount: '10', newsCount: '0' })
   try {
-    const body = await fetchJson(
-      `https://query1.finance.yahoo.com/v1/finance/search?${params.toString()}`,
-      fetchImpl,
-      { Accept: 'application/json' },
-    )
+    const body = await yahooFinance.search(query, { quotesCount: 10, newsCount: 0 })
     const results = parseYahooResults(body)
     cacheSearchResults(cacheKey, results)
     return results
@@ -110,7 +108,9 @@ function cacheSearchResults(cacheKey: string, results: MarketSearchResult[]): vo
 function toSearchResult(value: unknown): MarketSearchResult | null {
   if (!value || typeof value !== 'object') return null
   const quote = value as Record<string, unknown>
-  const symbol = String(quote.symbol || '').trim().toUpperCase()
+  const symbol = String(quote.symbol || '')
+    .trim()
+    .toUpperCase()
   if (!symbol) return null
   return {
     symbol,
@@ -122,7 +122,7 @@ function toSearchResult(value: unknown): MarketSearchResult | null {
 }
 
 function shouldUseSearchFallback(error: unknown): boolean {
-  if (!(error instanceof MarketSearchError)) return true
+  if (!(error instanceof MarketSearchError || error instanceof YahooFinanceHttpError)) return true
   return error.status === 429 || error.status >= 500
 }
 
@@ -151,5 +151,5 @@ async function fetchWithTimeout(
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
 }

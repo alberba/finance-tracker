@@ -63,12 +63,9 @@
  *   its balances nested under `data.balances` (resolved to server `account`
  *   ids via `resolveEntityId`) — see `command-schemas.ts`'s doc comment for
  *   why `snapshot_balances` travels nested instead of as its own command.
- * - `market.ts`'s `instruments` conflates a global instrument definition
- *   (symbol/market/provider — `market_instruments`, an explicitly
- *   out-of-scope *global* reference table) with the per-user link
- *   (`user_instruments`: `instrumentId`/`categoryId`/`alias` only) and
- *   holdings tracking. Reconciling this needs a `market_instruments`
- *   materialization step this WP doesn't own — left unwired.
+ * - `market.ts` syncs private quote configuration and holdings through
+ *   `userInstrument.quoteConfig`. Its creation materializes the shared
+ *   catalog reference; editing a quote source never edits another user's row.
  * - `stockevents.ts` syncs its settings through `settingsUpdate`
  *   (`stockeventsEnabled`, `stockeventsCashMappings`) and its symbol/cash
  *   rows through the `stockeventsMapping`/`stockeventsCashEntry` entities.

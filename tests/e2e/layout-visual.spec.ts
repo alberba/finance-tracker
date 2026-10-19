@@ -360,8 +360,8 @@ const SETTINGS_VIEWS: Array<{
         type: 'etf',
         symbol: 'PHAG',
         currency: 'EUR',
-        keepOpen: true,
       })
+      await tracker.openSettingsCard('Activos', 'ETF Plata')
     },
   },
   {

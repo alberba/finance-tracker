@@ -28,6 +28,24 @@
 
 import { z } from 'zod'
 
+/** Private quote source and holdings; shared catalog definitions remain immutable. */
+export const quoteConfigurationSchema = z
+  .object({
+    type: z.enum(['stock', 'etf', 'fund', 'crypto']),
+    symbol: z.string().trim().min(1).max(100),
+    quoteSymbol: z.string().trim().min(1).max(100).optional(),
+    market: z.string().max(100),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+    provider: z.string().trim().min(1).max(50),
+    active: z.boolean(),
+    openingUnits: z.number().optional(),
+    holdingUnits: z.number().min(0).optional(),
+    holdingsAsOf: z.string().optional(),
+    holdingsUpdatedAt: z.string().optional(),
+    holdingsSource: z.literal('manual').optional(),
+  })
+  .strict()
+
 /**
  * Outcome of one command in `POST /api/sync`'s `results`, shared with the
  * client outbox (`src/stores/sync.ts`).
@@ -239,6 +257,7 @@ export const entityCreateSchemas = {
       instrumentId: z.string().min(1),
       categoryId: nullableString.optional(),
       alias: nullableString.optional(),
+      quoteConfig: quoteConfigurationSchema.optional(),
     })
     .strict(),
   wealthSnapshot: z
@@ -317,6 +336,7 @@ export const entityUpdateSchemas = {
     .object({
       categoryId: nullableString.optional(),
       alias: nullableString.optional(),
+      quoteConfig: quoteConfigurationSchema.optional(),
     })
     .strict(),
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.partial(),

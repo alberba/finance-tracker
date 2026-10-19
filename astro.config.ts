@@ -14,6 +14,7 @@ import sentry from '@sentry/astro'
 
 const require = createRequire(import.meta.url)
 const selfHosted = process.env.DEPLOY_TARGET === 'node'
+const sqlitePath = resolve(process.env.SQLITE_PATH ?? '.data/finance.sqlite')
 const oauthNetworkAliases =
   process.env.AUTH_E2E_NETWORK === 'true'
     ? [
@@ -52,6 +53,20 @@ export default defineConfig({
   },
 
   vite: {
+    server: {
+      // Auth rate-limit/session writes update SQLite on requests. Watching these
+      // runtime files would turn each write into another browser reload.
+      watch: selfHosted
+        ? {
+            ignored: [
+              sqlitePath,
+              `${sqlitePath}-wal`,
+              `${sqlitePath}-shm`,
+              `${sqlitePath}-journal`,
+            ],
+          }
+        : undefined,
+    },
     resolve: {
       alias: [
         ...oauthNetworkAliases,
