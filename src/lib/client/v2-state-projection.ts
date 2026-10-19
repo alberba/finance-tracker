@@ -378,6 +378,8 @@ export function projectSyncV2State(
             price: Number(latest.price || 0),
             currency: String(latest.currency),
             timestamp: String(latest.quotedAt),
+            fetchedAt: String(latest.quotedAt),
+            dataType: 'unknown',
             source: 'sync-v2',
             status: 'fresh' as const,
             isStale: false,

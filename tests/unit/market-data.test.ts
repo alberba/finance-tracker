@@ -62,6 +62,8 @@ describe('adaptador de mercado server-side', () => {
       price: 120,
       currency: 'EUR',
       timestamp: '2026-07-09T10:00:00Z',
+      fetchedAt: '2026-07-09T10:00:00Z',
+      dataType: 'unknown',
       source: 'twelve-data',
       status: 'fresh',
       isStale: false,
@@ -257,7 +259,83 @@ describe('adaptador de mercado server-side', () => {
       },
       {},
     )
-    expect(quote).toMatchObject({ price: 10, status: 'stale', isStale: true })
+    expect(quote).toMatchObject({ price: 10, status: 'stale', isStale: true, dataType: 'delayed' })
+    expect(Date.parse(quote.timestamp)).not.toBeNaN()
+    expect(Date.parse(quote.fetchedAt)).not.toBeNaN()
+  })
+
+  it('rechaza un proveedor desconocido en lugar de cotizar desde otra fuente', async () => {
+    const quote = await loadMarketQuote(
+      {
+        instrument: {
+          ...instrument,
+          id: 'unknown-provider',
+          provider: 'typo-provider',
+        },
+      },
+      { MARKET_DATA_PROVIDER: 'typo-provider' },
+    )
+    expect(quote).toMatchObject({ status: 'unavailable', source: 'unavailable' })
+  })
+
+  it('usa la hora de mercado de Yahoo cuando la envía y registra la recuperación', async () => {
+    const marketTime = new Date('2026-10-19T08:00:00Z')
+    quoteMock.mockResolvedValue({
+      regularMarketPrice: 10,
+      regularMarketTime: marketTime,
+      currency: 'EUR',
+    })
+    const quote = await loadMarketQuote(
+      {
+        instrument: {
+          ...instrument,
+          id: 'yahoo-with-time',
+          provider: 'yahoo',
+        },
+      },
+      {},
+    )
+    expect(quote).toMatchObject({
+      price: 10,
+      timestamp: marketTime.toISOString(),
+      source: 'yahoo',
+      dataType: 'unknown',
+    })
+    expect(Date.parse(quote.fetchedAt)).not.toBeNaN()
+  })
+
+  it('usa la hora propia de CoinGecko en lugar de la hora local', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          bitcoin: { eur: 55_000, eur_24h_change: 1.5, last_updated_at: 1_760_000_000 },
+        }),
+        { status: 200 },
+      ),
+    )
+    const quote = await loadMarketQuote(
+      {
+        instrument: {
+          ...instrument,
+          id: 'crypto-btc-time',
+          type: 'crypto',
+          symbol: 'BTC',
+          market: '',
+          provider: 'coingecko',
+        },
+      },
+      { COINGECKO_API_KEY: 'demo-secret', COINGECKO_API_PLAN: 'demo' },
+      fetchMock,
+    )
+    expect(quote).toMatchObject({
+      price: 55_000,
+      timestamp: new Date(1_760_000_000_000).toISOString(),
+      source: 'coingecko',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('include_last_updated_at=true'),
+      expect.anything(),
+    )
   })
 
   it('no inventa una fecha actual si Yahoo no devuelve hora de mercado', async () => {
@@ -272,7 +350,10 @@ describe('adaptador de mercado server-side', () => {
       },
       {},
     )
-    expect(quote).toMatchObject({ price: 10, timestamp: '', status: 'stale' })
+    expect(quote).toMatchObject({ price: 10, status: 'stale' })
+    expect(Date.parse(quote.timestamp)).not.toBeNaN()
+    expect(Date.parse(quote.fetchedAt)).not.toBeNaN()
+    expect(quote.dataType).toBe('unknown')
   })
 
   it('convierte las cotizaciones en peniques a libras sin multiplicar el valor por cien', async () => {

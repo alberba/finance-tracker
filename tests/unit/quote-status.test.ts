@@ -13,6 +13,8 @@ function quote(timestamp: string): Quote {
     price: 1,
     currency: 'EUR',
     timestamp,
+    fetchedAt: timestamp,
+    dataType: 'unknown',
     source: 'test',
     status: 'fresh',
     isStale: false,

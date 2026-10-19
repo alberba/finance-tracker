@@ -461,7 +461,7 @@ describe('valoración de cartera', () => {
     const valuation = buildPortfolioValuation({
       currency: 'EUR',
       instruments: [{ id: 'btc', investmentAssetId: 'crypto', type: 'crypto', symbol: 'BTC', market: '', currency: 'USD', provider: 'coingecko', active: true }],
-      quotes: { btc: { instrumentId: 'btc', price: 50_000, currency: 'USD', timestamp: '2024-01-01T00:00:00Z', source: 'mock', status: 'fresh', isStale: false, previousClose: 49_000, changePercent: 2.04 } },
+      quotes: { btc: { instrumentId: 'btc', price: 50_000, currency: 'USD', timestamp: '2024-01-01T00:00:00Z', fetchedAt: '2024-01-01T00:00:00Z', dataType: 'unknown', source: 'mock', status: 'fresh', isStale: false, previousClose: 49_000, changePercent: 2.04 } },
       transactions: [
         { id: 'buy', date: '2024-01-01', month: 0, type: 'investment', accountId: 'broker', category: 'Crypto', description: 'Compra', amount: 1000, symbol: 'BTC', side: 'buy', units: 0.1 },
         { id: 'sell', date: '2024-01-02', month: 0, type: 'investment', accountId: 'broker', category: 'Crypto', description: 'Venta', amount: -100, symbol: 'BTC', side: 'sell', units: 0.02 },

@@ -16,6 +16,7 @@ import {
   type PendingMovement,
   type PendingMovementStatus,
   type Quote,
+  type QuoteDataType,
   type QuoteStatus,
   type RecurringFrequency,
   type RecurringRule,
@@ -318,7 +319,9 @@ function normalizeQuotes(input: unknown): Record<string, Quote> {
         .trim()
         .toUpperCase()
         .slice(0, 3),
-      timestamp: String(raw.timestamp || ''),
+      timestamp: String(raw.timestamp || raw.fetchedAt || ''),
+      fetchedAt: String(raw.fetchedAt || raw.timestamp || ''),
+      dataType: normalizeQuoteDataType(raw.dataType),
       source: String(raw.source || 'unknown'),
       status,
       isStale: status !== 'fresh' || raw.isStale === true,
@@ -493,6 +496,10 @@ function normalizeStockEvents(input: unknown): StockEventsSettings {
 function normalizeOptionalNumber(value: unknown): number | null {
   const parsed = parseFloatSafe(value, NaN)
   return Number.isFinite(parsed) && parsed >= 0 ? round2(parsed) : null
+}
+
+function normalizeQuoteDataType(value: unknown): QuoteDataType {
+  return value === 'live' || value === 'delayed' || value === 'eod' ? value : 'unknown'
 }
 
 function normalizeStringList(list: unknown): string[] {

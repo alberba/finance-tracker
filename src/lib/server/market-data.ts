@@ -1,4 +1,4 @@
-import type { Instrument, Quote } from '../../scripts/types'
+import type { Instrument, Quote, QuoteDataType, QuoteProvider } from '../../scripts/types'
 import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
 import { yahooFinance, YahooFinanceHttpError } from './yahoo-finance'
 
@@ -17,7 +17,7 @@ export interface MarketQuoteRequest {
 }
 
 const DEFAULT_TIMEOUT_MS = 5_000
-const DEFAULT_PROVIDER = 'yahoo'
+const DEFAULT_PROVIDER: QuoteProvider = 'yahoo'
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000
 const memoryCache = new Map<string, { expiresAt: number; quote: Quote }>()
 const inFlightQuotes = new Map<string, Promise<Quote>>()
@@ -136,9 +136,10 @@ function resolveProvider(instrument: Instrument, env: MarketDataEnv): string {
 
 function normalizeProvider(value: string): string {
   const provider = value.trim().toLowerCase()
-  return provider === 'yahoo' || provider === 'coingecko' || provider === 'twelve-data'
-    ? provider
-    : DEFAULT_PROVIDER
+  if (!provider) return DEFAULT_PROVIDER
+  // Unknown values pass through so the fetch fails loudly instead of
+  // silently quoting from another source.
+  return provider
 }
 
 function resolveFallbackProvider(provider: string, env: MarketDataEnv): string | null {
@@ -163,7 +164,8 @@ async function fetchProviderQuoteFrom(
 ): Promise<unknown> {
   if (provider === 'yahoo') return yahooFinance.quote(yahooQuoteSymbol(instrument))
   if (provider === 'coingecko') return fetchCoinGecko(instrument, env, fetchImpl)
-  return fetchTwelveData(instrument, env, fetchImpl)
+  if (provider === 'twelve-data') return fetchTwelveData(instrument, env, fetchImpl)
+  throw new Error(`Proveedor de cotizaciones desconocido: ${provider}`)
 }
 
 async function fetchTwelveData(
@@ -193,6 +195,7 @@ async function fetchCoinGecko(
   const params = new URLSearchParams({
     vs_currencies: (instrument.currency || 'usd').toLowerCase(),
     include_24hr_change: 'true',
+    include_last_updated_at: 'true',
   })
   const coinId = resolveCoinGeckoId(instrument)
   if (coinId) params.set('ids', coinId)
@@ -215,8 +218,9 @@ function normalizeProviderQuote(
   provider = resolveProvider(instrument, env),
 ): Quote {
   const response = asRecord(raw)
+  const fetchedAt = new Date().toISOString()
   if (provider === 'yahoo') {
-    return normalizeYahooQuote(instrument, response, env)
+    return normalizeYahooQuote(instrument, response, env, fetchedAt)
   }
   const providerRow =
     provider === 'coingecko'
@@ -237,7 +241,9 @@ function normalizeProviderQuote(
       row[`${currencyKey}_24h_change`] ??
       row.usd_24h_change,
   )
-  const timestamp = normalizeTimestamp(row.datetime ?? row.timestamp ?? new Date().toISOString())
+  const timestamp = normalizeTimestamp(
+    row.datetime ?? row.timestamp ?? toMs(row.last_updated_at) ?? fetchedAt,
+  )
   const stale =
     Date.now() - Date.parse(timestamp) > readNumber(env.MARKET_QUOTE_STALE_MINUTES, 15) * 60_000
   return {
@@ -247,6 +253,8 @@ function normalizeProviderQuote(
       .toUpperCase()
       .slice(0, 3),
     timestamp,
+    fetchedAt,
+    dataType: 'unknown',
     source: provider,
     status: stale ? 'stale' : 'fresh',
     isStale: stale,
@@ -259,6 +267,7 @@ function normalizeYahooQuote(
   instrument: Instrument,
   raw: Record<string, unknown>,
   env: MarketDataEnv,
+  fetchedAt: string,
 ): Quote {
   if (instrument.type === 'crypto' && raw.quoteType && raw.quoteType !== 'CRYPTOCURRENCY')
     throw new Error('Yahoo Finance devolvió otro tipo de activo para la criptomoneda')
@@ -274,21 +283,28 @@ function normalizeYahooQuote(
     typeof rawPreviousClose === 'number' && Number.isFinite(rawPreviousClose)
       ? rawPreviousClose * unitScale
       : null
-  // The SDK coerces regularMarketTime to Date. Missing dates must never become "now".
+  // The SDK coerces regularMarketTime to Date. When the provider sends no
+  // market time, timestamp falls back to the retrieval time (fetchedAt) so it
+  // always parses — and the quote is marked delayed/stale, never "live".
+  const delayed = readNumber(raw.exchangeDataDelayedBy, 0) > 0
   const marketTime = raw.regularMarketTime
-  const timestamp =
+  const providerTimestamp =
     marketTime instanceof Date && Number.isFinite(marketTime.getTime())
       ? marketTime.toISOString()
-      : ''
+      : null
+  const dataType: QuoteDataType = delayed ? 'delayed' : 'unknown'
+  const timestamp = providerTimestamp ?? fetchedAt
   const stale =
-    !timestamp ||
-    readNumber(raw.exchangeDataDelayedBy, 0) > 0 ||
+    !providerTimestamp ||
+    delayed ||
     Date.now() - Date.parse(timestamp) > readNumber(env.MARKET_QUOTE_STALE_MINUTES, 15) * 60_000
   return {
     instrumentId: instrument.id,
     price,
     currency: isPence ? 'GBP' : currency.toUpperCase().slice(0, 3),
     timestamp,
+    fetchedAt,
+    dataType,
     source: 'yahoo',
     status: stale ? 'stale' : 'fresh',
     isStale: stale,
@@ -324,11 +340,14 @@ function buildFallbackQuote(instrument: Instrument, fallback?: Quote | null): Qu
   if (fallback) {
     return { ...fallback, instrumentId: instrument.id, status: 'stale', isStale: true }
   }
+  const fetchedAt = new Date().toISOString()
   return {
     instrumentId: instrument.id,
     price: 0,
     currency: instrument.currency || 'EUR',
-    timestamp: '',
+    timestamp: fetchedAt,
+    fetchedAt,
+    dataType: 'unknown',
     source: 'unavailable',
     status: 'unavailable',
     isStale: true,
@@ -438,6 +457,14 @@ function cacheRequest(cacheKey: string): Request {
 function normalizeTimestamp(value: unknown): string {
   const parsed = Date.parse(String(value || ''))
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString()
+}
+
+/** CoinGecko `last_updated_at` arrives as unix seconds; Date.parse needs ms. */
+function toMs(value: unknown): string | null {
+  const seconds = Number(value)
+  if (!Number.isFinite(seconds) || seconds <= 0) return null
+  const ms = seconds < 1e12 ? seconds * 1_000 : seconds
+  return new Date(ms).toISOString()
 }
 
 function calculateChangePercent(price: number, previousClose: number | null): number | null {

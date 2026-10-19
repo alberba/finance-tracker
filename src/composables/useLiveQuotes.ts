@@ -6,9 +6,11 @@ import { quoteSourceKey } from '../domain/investment/symbol-matching'
 const REFRESH_INTERVAL_MS = 5 * 60_000
 
 /**
- * Keeps market quotes live while the calling component is mounted: refreshes
- * them on mount, every five minutes while visible and online, and whenever instruments change,
- * and keeps the shared market clock running so fresh/stale follows real time.
+ * Refreshes market quotes while the calling component is mounted: on mount,
+ * every five minutes while visible and online, and whenever instruments change.
+ * It also keeps the shared market clock running so fresh/stale follows real
+ * time. "Refresh" means re-fetching the provider's latest data point, which
+ * may itself be delayed — see Quote.dataType.
  */
 export function useLiveQuotes(): void {
   const marketStore = useMarketStore()

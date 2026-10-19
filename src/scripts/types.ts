@@ -13,6 +13,16 @@ export type SnapshotKind = 'accounts' | 'investments' | 'liabilities'
 export type EntityKey = 'accounts' | 'investmentAssets' | 'liabilities'
 export type InstrumentType = 'stock' | 'etf' | 'fund' | 'crypto'
 export type QuoteStatus = 'fresh' | 'stale' | 'unavailable'
+
+/** Quote providers an instrument can point at. */
+export type QuoteProvider = 'yahoo' | 'twelve-data' | 'coingecko'
+
+/**
+ * What the price represents: `delayed` when the provider says so
+ * (e.g. Yahoo `exchangeDataDelayedBy`), `unknown` when the plan or feed
+ * doesn't document it. Never claim `live` without proof.
+ */
+export type QuoteDataType = 'live' | 'delayed' | 'eod' | 'unknown'
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'monthEnd' | 'yearly'
 export type PendingMovementStatus = 'pending' | 'confirmed' | 'skipped' | 'cancelled'
 export type CategoryKey = 'incomeCategories' | 'expenseCategories' | 'investmentCategories'
@@ -84,6 +94,10 @@ export interface Quote {
   price: number
   currency: string
   timestamp: string
+  /** When this quote was retrieved, even if the provider sent no market time. */
+  fetchedAt: string
+  /** What `timestamp` holds: provider market time, or the retrieval fallback. */
+  dataType: QuoteDataType
   source: string
   status: QuoteStatus
   isStale: boolean
