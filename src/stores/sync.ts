@@ -18,6 +18,7 @@ import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-m
 import { watchSyncConnection, withSyncLock } from '../lib/client/sync-connection'
 import { applyPendingCommands } from '../lib/client/pending-overlay'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
+import { quoteSourceKey } from '../domain/investment/symbol-matching'
 import { useFinancialStateStore } from './financial-state'
 import {
   acknowledge,
@@ -121,7 +122,17 @@ export const useSyncStore = defineStore('sync', () => {
         )
       : readModel
     const financialStateStore = useFinancialStateStore(ownPinia)
-    financialStateStore.replaceState(projectSyncV2State(projected, financialStateStore.year))
+    const nextState = projectSyncV2State(projected, financialStateStore.year)
+    // Live prices are transient; a settings acknowledgement must not erase
+    // them. Carry them only while the source still identifies the same quote.
+    for (const instrument of nextState.instruments) {
+      const previous = financialStateStore.instruments.find((row) => row.id === instrument.id)
+      if (previous && quoteSourceKey(previous) === quoteSourceKey(instrument)) {
+        const quote = financialStateStore.quotes[instrument.id]
+        if (quote && !nextState.quotes[instrument.id]) nextState.quotes[instrument.id] = quote
+      }
+    }
+    financialStateStore.replaceState(nextState)
   }
 
   /** An unloaded page: stops every background read, send and render of this client. */
@@ -698,11 +709,25 @@ export const useSyncStore = defineStore('sync', () => {
   async function getInstrumentId(localId: string): Promise<string | null> {
     if (!isReady() || !cacheDb) return null
     const bootstrap = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+    const configured = bootstrap?.userInstruments.find(
+      (row) => row.id === localId && row.quoteConfig,
+    )
+    if (configured) return String(configured.instrumentId)
     const instruments = bootstrap?.instruments ?? []
     const instrument =
       instruments.find((row) => row.id === localId) ??
       instruments.find((row) => row.legacyId === localId)
     return instrument?.id ?? null
+  }
+
+  /** Resolves a legacy catalog identity to this user's tracking row. */
+  async function getUserInstrumentId(localId: string): Promise<string | null> {
+    if (!isReady() || !cacheDb) return null
+    const bootstrap = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
+    const instrument = bootstrap?.instruments?.find(
+      (row) => row.id === localId || row.legacyId === localId,
+    )
+    return instrument?.userInstrument.id ?? null
   }
 
   /**
@@ -838,6 +863,7 @@ export const useSyncStore = defineStore('sync', () => {
     getSettingsVersion,
     findEntityRef,
     getInstrumentId,
+    getUserInstrumentId,
     peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,

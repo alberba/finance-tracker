@@ -2,7 +2,7 @@ import { test as base, expect } from '@playwright/test'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { seedSyncV2User } from './seed-sync-v2'
+import { seedSyncV2User, syncV2TestHeaders } from './seed-sync-v2'
 
 declare global {
   interface Window {
@@ -88,7 +88,7 @@ export const test = base.extend<Fixtures>({
     // Unrelated journeys start after onboarding; the onboarding spec provisions
     // untouched sync-v2 users and exercises the real first show.
     const completed = await context.request.post('/api/sync', {
-      headers: { 'X-Test-User-Email': email },
+      headers: await syncV2TestHeaders(context.request, email),
       data: {
         commands: [
           {

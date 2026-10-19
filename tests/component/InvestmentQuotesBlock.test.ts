@@ -14,7 +14,7 @@ describe('InvestmentQuotesBlock', () => {
 
     expect(wrapper.get('[data-investment-quotes]').text()).toContain('Cotizaciones')
     expect(wrapper.get('[data-ledger-empty]').text()).toBe(
-      'Aún no hay instrumentos. Añádelos a un activo en Configuración para seguir su cotización.',
+      'Aún no hay símbolos configurados. Añádelos en Configuración → Cotizaciones.',
     )
   })
 })

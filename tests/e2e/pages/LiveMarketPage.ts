@@ -3,27 +3,23 @@ import { expect, type Locator, type Page } from '@playwright/test'
 export class LiveMarketPage {
   constructor(private readonly page: Page) {}
 
-  /** The side panel with the card of an investment asset. */
-  get assetPanel(): Locator {
-    return this.page.locator('#settings-asset-panel')
+  /** The side panel for one symbol's quote configuration. */
+  get quotePanel(): Locator {
+    return this.page
+      .getByRole('dialog')
+      .filter({ has: this.page.locator('#settings-quote-panel-title') })
   }
 
-  /** The editor of an instrument inside the asset card, by its symbol. */
+  /** The editor of a quote instrument, by its symbol. */
   instrument(symbol: string): Locator {
-    return this.assetPanel.locator('[data-instrument-id]').filter({
+    return this.quotePanel.locator('[data-instrument-id]').filter({
       has: this.page.getByText(symbol, { exact: true }),
     })
   }
 
-  /** Opens the card of an asset from Configuración › Activos. */
-  async openAsset(asset: string): Promise<void> {
-    if (await this.assetPanel.isVisible()) await this.closeAsset()
-    await this.page.locator('#settings').getByRole('tab', { name: 'Activos' }).click()
-    await this.page
-      .locator('#settings')
-      .getByRole('button', { name: `Abrir la ficha de ${asset}`, exact: true })
-      .click()
-    await expect(this.assetPanel).toBeVisible()
+  async openQuotes(): Promise<void> {
+    if (await this.quotePanel.isVisible()) await this.closeQuote()
+    await this.page.locator('#settings').getByRole('tab', { name: 'Cotizaciones' }).click()
   }
 
   get recurringRules(): Locator {
@@ -48,26 +44,31 @@ export class LiveMarketPage {
     return this.page.locator('#dashboard [data-dashboard-pending]')
   }
 
-  /** Adds a quote instrument to an asset from its card, then closes it unless `keepOpen`. */
+  /** Adds a symbol's quote, choosing the asset that groups its value. */
   async addInstrument(params: {
     asset: string
     type: string
     symbol: string
+    quoteSymbol?: string
     currency: string
     provider?: string
     keepOpen?: boolean
   }): Promise<void> {
-    await this.openAsset(params.asset)
-    const panel = this.assetPanel
-    if (!(await panel.locator('[data-instrument-form]').isVisible())) {
-      await panel.getByRole('button', { name: 'Añadir otro instrumento' }).click()
-    }
+    await this.openQuotes()
+    await this.page
+      .locator('[data-settings-quotes]')
+      .getByRole('button', { name: 'Nuevo símbolo' })
+      .click()
+    const panel = this.quotePanel
     const form = panel.locator('[data-instrument-form]')
+    await form.getByLabel('Activo de agrupación').selectOption({ label: params.asset })
     await form
       .getByRole('group', { name: 'Tipo', exact: true })
       .locator(`[data-instrument-type="${params.type}"]`)
       .click()
     await form.getByLabel('Símbolo').fill(params.symbol)
+    if (params.quoteSymbol !== undefined)
+      await form.getByLabel('Ticker a consultar (opcional)').fill(params.quoteSymbol)
     await form.getByLabel('Moneda').fill(params.currency)
     if (params.provider) {
       await form
@@ -77,12 +78,15 @@ export class LiveMarketPage {
     }
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
     await expect(this.instrument(params.symbol.toUpperCase())).toBeVisible()
-    if (!params.keepOpen) await this.closeAsset()
+    if (!params.keepOpen) await this.closeQuote()
   }
 
-  async closeAsset(): Promise<void> {
-    await this.assetPanel.getByRole('button', { name: 'Cancelar' }).click()
-    await expect(this.assetPanel).toBeHidden()
+  async closeQuote(): Promise<void> {
+    await this.quotePanel
+      .locator('footer')
+      .getByRole('button', { name: 'Cerrar', exact: true })
+      .click()
+    await expect(this.quotePanel).toBeHidden()
   }
 
   async createRecurringRule(params: {
@@ -186,7 +190,7 @@ export class LiveMarketPage {
   }
 
   async saveSourceSymbol(currentSymbol: string): Promise<void> {
-    await this.instrument(currentSymbol).getByRole('button', { name: 'Guardar ticker' }).click()
+    await this.instrument(currentSymbol).getByRole('button', { name: 'Guardar símbolos' }).click()
   }
 
   async editFirstPending(description: string, amount: number): Promise<void> {

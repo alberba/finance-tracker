@@ -6,6 +6,8 @@ import {
   isSubscriptionFrequency,
   type GoalKey,
   type InvestmentSide,
+  type Instrument,
+  type InstrumentQuoteConfig,
   type State,
 } from '../../scripts/types'
 import { monthFromISO, todayISO } from '../../scripts/utils'
@@ -161,6 +163,9 @@ export function projectSyncV2State(
     const remote = remoteOperationSchema.safeParse(transaction.remoteOperation)
     const trade = transaction.tradeDetail as CachedEntity | null | undefined
     const instrument = (bootstrap.instruments || []).find((item) => item.id === trade?.instrumentId)
+    const tracking = bootstrap.userInstruments.find(
+      (row) => row.instrumentId === trade?.instrumentId,
+    )
     return {
       id: legacyId(transaction),
       date: String(transaction.date),
@@ -187,7 +192,11 @@ export function projectSyncV2State(
             ...(trade.symbol || instrument
               ? { symbol: String(trade.symbol || instrument?.symbol) }
               : {}),
-            ...(instrument ? { instrumentId: legacyId(instrument) } : {}),
+            ...(instrument
+              ? {
+                  instrumentId: tracking?.quoteConfig ? tracking.id : legacyId(instrument),
+                }
+              : {}),
           }
         : {}),
     }
@@ -321,18 +330,41 @@ export function projectSyncV2State(
     transactionId: pending.transactionId ? String(pending.transactionId) : null,
   }))
 
-  projected.instruments = (bootstrap.instruments || []).map((instrument) => ({
-    id: legacyId(instrument),
-    investmentAssetId: String(instrument.userInstrument.alias || ''),
-    type: String(instrument.assetClass || 'stock') as State['instruments'][number]['type'],
-    symbol: String(instrument.symbol),
-    market: '',
-    currency: String(instrument.currency),
-    provider: String(instrument.provider),
-    active: true,
-  }))
+  const configured = bootstrap.userInstruments.filter(
+    (row) => row.quoteConfig && typeof row.quoteConfig === 'object',
+  )
+  const trackingRows = new Map(bootstrap.userInstruments.map((row) => [row.id, row]))
+  projected.instruments = configured.map(
+    (row) =>
+      ({
+        ...(row.quoteConfig as InstrumentQuoteConfig),
+        id: row.id,
+        investmentAssetId: accountIds.get(String(row.alias)) || String(row.alias || ''),
+      }) satisfies Instrument,
+  )
+  projected.instruments.push(
+    ...(bootstrap.instruments || [])
+      .filter((instrument) => {
+        const tracking = trackingRows.get(instrument.userInstrument.id)
+        return tracking && !tracking.quoteConfig
+      })
+      .map((instrument) => ({
+        id: legacyId(instrument),
+        investmentAssetId:
+          accountIds.get(String(instrument.userInstrument.alias)) ||
+          String(instrument.userInstrument.alias || ''),
+        type: String(instrument.assetClass || 'stock') as State['instruments'][number]['type'],
+        symbol: String(instrument.symbol),
+        market: '',
+        currency: String(instrument.currency),
+        provider: String(instrument.provider),
+        active: true,
+      })),
+  )
   projected.quotes = Object.fromEntries(
     (bootstrap.instruments || []).flatMap((instrument) => {
+      const tracking = trackingRows.get(instrument.userInstrument.id)
+      if (!tracking || tracking.quoteConfig) return []
       const latest = [...instrument.quotes]
         .sort((left, right) => String(left.quotedAt).localeCompare(String(right.quotedAt)))
         .at(-1)

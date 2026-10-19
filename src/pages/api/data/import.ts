@@ -42,6 +42,7 @@ import { runInTransaction } from '../../../db/repositories/shared'
 import type { MovementOperationInput } from '../../../db/repositories/transactions'
 import type { RemoteOperation } from '../../../lib/bitvavo-types'
 import { wipeUserData } from '../../../lib/server/wipe-user-data'
+import { quoteConfigurationSchema } from '../../../lib/server/sync/command-schemas'
 
 type Row = Record<string, unknown>
 
@@ -398,7 +399,8 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           continue
         }
         const instrument = await marketRepository.getInstrument(tx, row.instrumentId)
-        if (!instrument) {
+        const configuration = quoteConfigurationSchema.safeParse(row.quoteConfig)
+        if (!instrument && !configuration.success) {
           bump(skipped, 'userInstruments')
           continue
         }
@@ -410,7 +412,8 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         await marketRepository.createUserInstrument(tx, userId, {
           instrumentId: row.instrumentId,
           categoryId: categoryId ?? null,
-          alias: typeof row.alias === 'string' ? row.alias : null,
+          alias: typeof row.alias === 'string' ? (accountIdMap.get(row.alias) ?? row.alias) : null,
+          ...(configuration.success ? { quoteConfig: configuration.data } : {}),
         })
         bump(imported, 'userInstruments')
       }

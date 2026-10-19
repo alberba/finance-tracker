@@ -12,16 +12,14 @@ import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import StatusDot from '../ui/StatusDot.vue'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useSettingsAssets, type SettingsAssetRow } from '../../composables/useSettingsAssets'
-import { INSTRUMENT_TYPE_LABEL, providerLabel } from '../../domain/investment/instrument-labels'
 import type { Entity } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSettingsStore } from '../../stores/settings'
 import { useStockEventsStore } from '../../stores/stockevents'
 
-// Activos: each investment asset with its opening value, where its quote comes
-// from, its movements and how it reaches Stock Events. Its card, in the side
-// panel, gathers all of it. Symbols in movements that no asset claims are
-// listed apart so they can still be synced or hidden.
+// Assets group investment value and Stock Events destinations. Their symbols'
+// quotes are configured separately in Cotizaciones. Unclaimed symbols can
+// still be synced or hidden here.
 defineProps<{ isActive: boolean }>()
 
 const financialStateStore = useFinancialStateStore()
@@ -46,16 +44,11 @@ const hiddenOrphans = computed(() => orphanRows.value.filter((row) => row.hidden
 
 const columns: LedgerColumn<SettingsAssetRow>[] = [
   { key: 'name', label: 'Activo', rowHeader: true },
-  { key: 'quote', label: 'Cotización', hideBelow: 'md' },
+  { key: 'symbols', label: 'Símbolos', hideBelow: 'md' },
   { key: 'movements', label: 'Movimientos', align: 'right', hideBelow: 'lg' },
   { key: 'sync', label: 'Stock Events', hideBelow: 'lg' },
   { key: 'balance', label: 'Valor inicial', align: 'right' },
 ]
-
-function kindOf(asset: SettingsAssetRow): string {
-  const first = asset.instruments[0]
-  return first ? `${INSTRUMENT_TYPE_LABEL[first.type]} · ${first.currency}` : 'Sin cotización'
-}
 
 function listsOf(asset: SettingsAssetRow): string {
   const names = asset.syncRows
@@ -85,7 +78,7 @@ function confirmDelete(): void {
   >
     <SettingsTabIntro
       title="Activos de inversión"
-      description="Valor de partida, de dónde sale su cotización y cómo llega a Stock Events."
+      description="Agrupaciones de inversión y su valor de partida. Configura el precio de cada símbolo en Cotizaciones."
       action="Nuevo activo"
       @action="panel?.openNew()"
     />
@@ -107,22 +100,13 @@ function confirmDelete(): void {
             @click="openCard(row)"
           >
             <span class="group-hover:text-primary font-semibold">{{ row.name }}</span>
-            <span class="text-text-muted text-sm">{{ kindOf(row) }}</span>
           </button>
         </template>
-        <template #cell-quote="{ row }">
-          <span v-if="row.instruments.length" class="grid gap-0.5">
-            <span class="font-mono font-medium">
-              {{ row.instruments[0].symbol }}
-              <span v-if="row.instruments.length > 1" class="text-text-muted text-sm font-normal">
-                +{{ row.instruments.length - 1 }}
-              </span>
-            </span>
-            <span class="text-text-muted text-sm">{{
-              providerLabel(row.instruments[0].provider)
-            }}</span>
-          </span>
-          <span v-else class="text-text-muted">Sin cotización</span>
+        <template #cell-symbols="{ row }">
+          <span v-if="row.symbols.length" class="font-mono text-sm">{{
+            row.symbols.join(', ')
+          }}</span>
+          <span v-else class="text-text-muted">Sin símbolos</span>
         </template>
         <template #cell-movements="{ row }">
           <span class="grid justify-items-end gap-0.5 whitespace-nowrap">

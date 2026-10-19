@@ -58,7 +58,7 @@ Better Auth (los contratos están en [autenticación](docs/operations/authentica
 
 ### Mercado y reglas recurrentes
 
-Configura instrumentos desde `Configuración`. La ruta `/api/market/quotes` consulta el proveedor en el servidor, mantiene la última cotización válida como fallback y usa Cache API en Cloudflare cuando está disponible. Define las claves como secretos, nunca en el navegador:
+Configura símbolos desde `Configuración → Cotizaciones`. Yahoo Finance es el proveedor por defecto y no necesita clave: usa símbolos de Yahoo como `VWCE.DE`, `AGED.MI` o `BTC-EUR`. Las cotizaciones y la búsqueda se consultan en el servidor mediante `yahoo-finance2`; la librería no se envía al navegador. Los proveedores opcionales requieren claves como secretos:
 
 ```bash
 wrangler secret put TWELVE_DATA_API_KEY
@@ -67,9 +67,11 @@ wrangler secret put COINGECKO_API_KEY
 
 `MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime definidas en `wrangler.toml`. La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
 
-Para probarlo en local, ejecuta `pnpm setup:worktree`, añade `TWELVE_DATA_API_KEY` a `.dev.vars` y arranca `pnpm dev`.
+Para probar Yahoo en local, ejecuta `pnpm setup:worktree` y arranca `pnpm dev`; no hace falta configurar una API key. Los instrumentos existentes conservan su proveedor: puedes cambiarlo a Yahoo Finance en `Configuración → Cotizaciones` y buscar el ticker correspondiente. El símbolo visible y el ticker de consulta son independientes: puedes mostrar `BTC` y consultar `BTC-EUR`. Cada resultado y el ticker elegido tienen un enlace a su ficha de Yahoo para comprobar el activo, el mercado y la moneda antes de guardarlo. Ambos símbolos, el proveedor y los títulos manuales se sincronizan por usuario y sobreviven a las recargas.
 
-Twelve Data documenta el endpoint `/quote` y permite autenticarlo con la clave de API. Yahoo Finance está disponible como proveedor sin clave para símbolos como `AGED.MI`, pero su endpoint de gráficos no es una API pública oficial y puede responder con HTTP 429. Las peticiones se cachean, se deduplican y, cuando Yahoo está limitado, los instrumentos Yahoo usan Twelve Data como respaldo si `TWELVE_DATA_API_KEY` está configurada. La búsqueda de símbolos aplica el mismo respaldo. CoinGecko puede quedar como respaldo opcional para cripto. [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Chart de Yahoo Finance](https://query1.finance.yahoo.com/v8/finance/chart/AGED.MI?range=5d&interval=1d) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
+Los precios se refrescan cada cinco minutos mientras la aplicación está visible y conectada. Las peticiones se cachean y deduplican, y se conserva el último precio válido si falla el proveedor. La fecha mostrada corresponde al dato de mercado; se marca como retrasado si Yahoo declara retraso o el precio es antiguo. Yahoo es una fuente no oficial y su disponibilidad, cobertura y retraso dependen del mercado: actualizar el panel no convierte un dato retrasado en tiempo real. La licencia MIT de la librería no sustituye las condiciones de uso de los datos de Yahoo.
+
+Twelve Data sigue disponible como alternativa. Para usarlo como respaldo de cotizaciones Yahoo ante errores de red, HTTP 429 o 5xx, configura `MARKET_DATA_PROVIDER=twelve-data` y `TWELVE_DATA_API_KEY`; la búsqueda usa el respaldo si hay clave. CoinGecko es otra opción para instrumentos cripto. [yahoo-finance2](https://github.com/gadicc/yahoo-finance2) · [Documentación de Twelve Data](https://twelvedata.com/docs/advanced/api-usage) · [Simple Price de CoinGecko](https://docs.coingecko.com/reference/simple-price)
 
 Para una clave CoinGecko Demo usa `COINGECKO_API_PLAN=demo`; para una clave Pro usa `COINGECKO_API_PLAN=pro`. Los instrumentos existentes se pueden cambiar de proveedor desde Configuración.
 

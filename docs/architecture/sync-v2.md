@@ -50,6 +50,14 @@ y `src/pages/api/data/import.ts` las recrea campo a campo, así que un campo nue
 añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFullDataset`) comprueba
 que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
 
+Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
+ticker de consulta opcional (`quoteSymbol`), proveedor,
+mercado, moneda y títulos manuales son privados del usuario. `alias` referencia su cuenta de
+agrupación. El alta materializa la referencia del catálogo global sin modificar definiciones de
+otros usuarios; los cambios del proveedor y ticker actualizan solo la configuración privada.
+La proyección toma esa configuración de `userInstruments`, incluidos los comandos pendientes,
+y conserva los precios transitorios solo si no cambia su fuente.
+
 ## Test
 
 `tests/integration/d1-v2/round-trip/` ejecuta los stores reales contra SQLite con

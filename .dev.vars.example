@@ -1,10 +1,10 @@
 # Copia este archivo como .dev.vars y sustituye los valores por tus claves.
 # Nunca subas .dev.vars al repositorio.
-MARKET_DATA_PROVIDER=twelve-data
+MARKET_DATA_PROVIDER=yahoo
 MARKET_QUOTE_STALE_MINUTES=15
 MARKET_QUOTE_CACHE_SECONDS=300
 
-# Proveedor principal: acciones, ETF, fondos y cripto.
+# Yahoo Finance no necesita clave. Twelve Data es una alternativa opcional.
 TWELVE_DATA_API_KEY=
 
 # Opcional: respaldo específico para cripto.

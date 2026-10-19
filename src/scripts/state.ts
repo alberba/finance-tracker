@@ -273,6 +273,9 @@ function normalizeInstruments(list: unknown): Instrument[] {
         investmentAssetId: String(raw.investmentAssetId || ''),
         type,
         symbol,
+        ...(typeof raw.quoteSymbol === 'string' && raw.quoteSymbol.trim()
+          ? { quoteSymbol: raw.quoteSymbol.trim().toUpperCase() }
+          : {}),
         market: String(raw.market || '')
           .trim()
           .toUpperCase(),

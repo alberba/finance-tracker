@@ -66,6 +66,8 @@ export interface Instrument {
   investmentAssetId: string
   type: InstrumentType
   symbol: string
+  /** Provider ticker; absent means the visible symbol is used for lookup. */
+  quoteSymbol?: string
   market: string
   currency: string
   provider: string
@@ -88,6 +90,8 @@ export interface Quote {
   previousClose: number | null
   changePercent: number | null
 }
+
+export type InstrumentQuoteConfig = Omit<Instrument, 'id' | 'investmentAssetId'>
 
 export interface RecurringRule {
   id: string

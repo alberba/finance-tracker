@@ -107,6 +107,7 @@ export function buildAccountRows(state: State): AccountRowViewModel[] {
 export interface InstrumentRowViewModel {
   id: string
   symbol: string
+  quoteSymbol?: string
   type: Instrument['type']
   market: string
   currency: string
@@ -126,6 +127,74 @@ export interface AssetRowViewModel {
   pending: number
   /** Stock Events symbols of the asset: its instruments' and its movements', sorted. */
   symbols: string[]
+}
+
+export interface QuoteSymbolRow {
+  id: string
+  symbol: string
+  currency: string
+  assetId: string
+  categories: string[]
+  movements: number
+  instrument: InstrumentRowViewModel | null
+}
+
+/** Quotes are configured by symbol, including symbols not assigned to an asset. */
+export function buildQuoteSymbolRows(state: State): QuoteSymbolRow[] {
+  const investments = state.transactions.filter((tx) => tx.type === 'investment')
+  const rows: QuoteSymbolRow[] = state.instruments.map((instrument) => {
+    const assetName = state.investmentAssets.find(
+      (asset) => asset.id === instrument.investmentAssetId,
+    )?.name
+    const movements = investments.filter((tx) =>
+      tx.instrumentId
+        ? tx.instrumentId === instrument.id
+        : isUnlinkedMovementForInstrument(tx, instrument, assetName),
+    )
+    const linked = movements.filter((tx) => tx.instrumentId === instrument.id).length
+    return {
+      id: instrument.id,
+      symbol: instrument.symbol,
+      currency: instrument.currency,
+      assetId: instrument.investmentAssetId,
+      categories: [...new Set(movements.map((tx) => tx.category))].sort(),
+      movements: movements.length,
+      instrument: {
+        ...instrument,
+        linked,
+        pending: movements.length - linked,
+      },
+    }
+  })
+  const unconfigured = new Map<string, typeof investments>()
+  for (const tx of investments) {
+    const symbol = normalizeSymbol(tx.symbol)
+    if (
+      !symbol ||
+      state.instruments.some(
+        (instrument) =>
+          tx.instrumentId === instrument.id || symbolsMatchInstrument(symbol, instrument),
+      )
+    )
+      continue
+    const movements = unconfigured.get(symbol) ?? []
+    movements.push(tx)
+    unconfigured.set(symbol, movements)
+  }
+  for (const [symbol, movements] of unconfigured) {
+    const categories = [...new Set(movements.map((tx) => tx.category))].sort()
+    const assets = state.investmentAssets.filter((asset) => categories.includes(asset.name))
+    rows.push({
+      id: `symbol:${symbol}`,
+      symbol,
+      currency: movements[0]?.movementCurrency || state.currency || 'EUR',
+      assetId: assets.length === 1 ? assets[0].id : '',
+      categories,
+      movements: movements.length,
+      instrument: null,
+    })
+  }
+  return rows.sort((a, b) => a.symbol.localeCompare(b.symbol) || a.id.localeCompare(b.id))
 }
 
 export interface AssetsViewModel {
@@ -180,6 +249,7 @@ export function buildAssetsViewModel(state: State): AssetsViewModel {
       .map((instrument) => ({
         id: instrument.id,
         symbol: instrument.symbol,
+        ...(instrument.quoteSymbol ? { quoteSymbol: instrument.quoteSymbol } : {}),
         type: instrument.type,
         market: instrument.market,
         currency: instrument.currency,

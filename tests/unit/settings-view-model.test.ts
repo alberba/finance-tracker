@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAccountRows,
   buildAssetsViewModel,
+  buildQuoteSymbolRows,
   summarizeStockEventsSync,
 } from '../../src/domain/settings/view-model'
 import type { Instrument, State, Transaction } from '../../src/scripts/types'
@@ -162,6 +163,59 @@ describe('buildAssetsViewModel · activos que ya no existen', () => {
     )
 
     expect(vm.orphanSymbols).toEqual(['OLD'])
+  })
+})
+
+describe('buildQuoteSymbolRows', () => {
+  it('lists symbols independently of categories, including symbols without an asset', () => {
+    const rows = buildQuoteSymbolRows(
+      state({
+        transactions: [
+          buy({ id: 'one', symbol: 'FIRST' }),
+          buy({ id: 'two', symbol: 'SECOND' }),
+          buy({ id: 'three', symbol: ' first ', category: 'Otra categoría' }),
+          buy({ id: 'four', symbol: 'ORPH', category: 'Sin activo' }),
+          buy({ id: 'five' }),
+        ],
+      }),
+    )
+
+    expect(rows.map((row) => [row.symbol, row.movements, row.assetId])).toEqual([
+      ['FIRST', 2, 'fund'],
+      ['ORPH', 1, ''],
+      ['SECOND', 1, 'fund'],
+    ])
+    expect(rows[0].categories).toEqual(['Fondo', 'Otra categoría'])
+    expect(rows.every((row) => row.instrument === null)).toBe(true)
+  })
+
+  it('shows the configured Yahoo ticker once for its matching movement symbols', () => {
+    const rows = buildQuoteSymbolRows(
+      state({
+        instruments: [instrument({ id: 'aged', symbol: 'AGED.MI', provider: 'yahoo' })],
+        transactions: [
+          buy({ id: 'one', symbol: 'AGED' }),
+          buy({ id: 'two', symbol: 'AGED.MI', instrumentId: 'aged' }),
+        ],
+      }),
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      symbol: 'AGED.MI',
+      movements: 2,
+      instrument: { linked: 1, pending: 1 },
+    })
+  })
+
+  it('keeps configured symbols visible even if their asset no longer exists', () => {
+    const rows = buildQuoteSymbolRows(
+      state({
+        instruments: [instrument({ id: 'old', symbol: 'OLD', investmentAssetId: 'deleted' })],
+      }),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ symbol: 'OLD', movements: 0, instrument: { id: 'old' } })
   })
 })
 

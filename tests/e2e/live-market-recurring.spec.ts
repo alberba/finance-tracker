@@ -99,11 +99,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     },
   )
 
-  test('configura Yahoo Finance para cotizaciones europeas como AGED.MI', async ({
+  test('usa Yahoo por defecto y actualiza la cotización europea sin recargar', async ({
     page,
     tracker,
   }) => {
     let requestedProvider = ''
+    let price = 9.276
     await page.route('**/api/market/quotes', async (route) => {
       const body = route.request().postDataJSON() as {
         instruments?: Array<{ id: string; provider: string; currency: string }>
@@ -114,7 +115,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
         ? {
             [instrument.id]: {
               instrumentId: instrument.id,
-              price: 9.276,
+              price,
               currency: instrument.currency,
               timestamp: new Date().toISOString(),
               source: 'yahoo',
@@ -132,6 +133,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       })
     })
 
+    await page.clock.install()
+    await tracker.reload()
     await tracker.openSettings()
     const liveMarket = new LiveMarketPage(page)
     await liveMarket.addInstrument({
@@ -139,7 +142,6 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       type: 'etf',
       symbol: 'AGED.MI',
       currency: 'EUR',
-      provider: 'yahoo',
     })
     await tracker.openInvestmentDashboardTab()
 
@@ -147,6 +149,70 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(panel.getByText('AGED.MI', { exact: true })).toBeVisible()
     await expect(panel.getByText('9,28 €')).toBeVisible()
     expect(requestedProvider).toBe('yahoo')
+
+    price = 9.5
+    const nextQuote = page.waitForResponse('**/api/market/quotes')
+    await page.clock.fastForward(5 * 60_000)
+    await nextQuote
+    await expect(panel.getByText('9,50 €')).toBeVisible()
+  })
+
+  test('cotiza BTC-EUR y conserva los títulos de los movimientos BTC', async ({
+    page,
+    tracker,
+  }) => {
+    let requestedSymbol = ''
+    await page.route('**/api/market/quotes', async (route) => {
+      const instrument = route.request().postDataJSON().instruments[0]
+      requestedSymbol = instrument.quoteSymbol || instrument.symbol
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          quotes: {
+            [instrument.id]: {
+              instrumentId: instrument.id,
+              price: 73_000,
+              currency: 'EUR',
+              timestamp: new Date().toISOString(),
+              source: 'yahoo',
+              status: 'fresh',
+              isStale: false,
+              previousClose: 72_000,
+              changePercent: 1.39,
+            },
+          },
+        }),
+      })
+    })
+    await tracker.addInvestmentMovement({
+      date: '2026-07-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'BTC',
+      category: 'Crypto',
+      units: 0.09491284,
+      unitPrice: 100,
+      fee: 0,
+    })
+    await tracker.openSettings()
+    await new LiveMarketPage(page).addInstrument({
+      asset: 'Crypto',
+      type: 'crypto',
+      symbol: 'BTC',
+      quoteSymbol: 'BTC-EUR',
+      currency: 'EUR',
+    })
+    await tracker.openInvestmentDashboardTab()
+    const quotes = page.locator('#investment [data-investment-quotes]')
+    await expect(quotes.getByLabel('Títulos de BTC', { exact: true })).toHaveValue('0.09491284')
+    await expect(quotes.getByText('73.000,00 €', { exact: true })).toBeVisible()
+    expect(requestedSymbol).toBe('BTC-EUR')
+    await tracker.waitForSync()
+    await tracker.reload()
+    await tracker.openInvestmentDashboardTab()
+    await expect(quotes.getByLabel('Títulos de BTC', { exact: true })).toHaveValue('0.09491284')
+    await expect(quotes.getByText('73.000,00 €', { exact: true })).toBeVisible()
   })
 
   test('busca y guarda el símbolo fuente aproximado de un ETF', async ({ page, tracker }) => {
@@ -179,10 +245,29 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       keepOpen: true,
     })
     await liveMarket.searchSourceSymbol('XDWH.XETRA', 'XDWH.XETRA')
+    const candidate = liveMarket
+      .instrument('XDWH.XETRA')
+      .getByRole('link', { name: 'Ver XDWH.DE en Yahoo Finance (nueva pestaña)' })
+    await expect(candidate).toHaveAttribute('href', 'https://finance.yahoo.com/quote/XDWH.DE/')
+    await expect(candidate).toHaveAttribute('target', '_blank')
     await liveMarket.selectSourceSearchResult('XDWH.XETRA', 'XDWH.DE')
     await liveMarket.saveSourceSymbol('XDWH.XETRA')
 
-    await expect(liveMarket.instrument('XDWH.DE')).toBeVisible()
+    await expect(liveMarket.instrument('XDWH.XETRA')).toBeVisible()
+    await expect(
+      liveMarket.instrument('XDWH.XETRA').getByLabel('Ticker de XDWH.XETRA en el proveedor'),
+    ).toHaveValue('XDWH.DE')
+    await expect(liveMarket.instrument('XDWH.XETRA').getByLabel('Símbolo a mostrar')).toHaveValue(
+      'XDWH.XETRA',
+    )
+    await liveMarket.closeQuote()
+    await tracker.waitForSync()
+    await tracker.reload()
+    await tracker.openSettingsTab('Cotizaciones')
+    await page.getByRole('button', { name: 'Editar cotización de XDWH.XETRA' }).click()
+    await expect(
+      liveMarket.instrument('XDWH.XETRA').getByLabel('Ticker de XDWH.XETRA en el proveedor'),
+    ).toHaveValue('XDWH.DE')
   })
 
   test('suma movimientos AGED al instrumento configurado como AGED.MI', async ({
@@ -241,7 +326,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(row).toContainText('1 por vincular')
     await liveMarket.linkExistingMovements('AGED.MI')
     await expect(row).toContainText('1 vinculados')
-    await liveMarket.closeAsset()
+    await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
     await expect(
@@ -570,7 +655,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.linkExistingMovements('LINKED')
     await expect(row).toContainText('1 vinculados')
     await expect(row).not.toContainText('por vincular')
-    await liveMarket.closeAsset()
+    await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
     await expect(
