@@ -230,6 +230,12 @@ Fondo `--color-panel`, `1px solid --color-line`, `border-radius: 20px`, `padding
 
 Escritorio: panel lateral de 380px. Móvil: hoja inferior con radio superior de 24px, agarre de 44×5px en `--color-line`, velo `oklch(0% none none / 0.42)`. Entra con `anim-sheet`. El importe va en Unbounded 700 a 32px sobre un subrayado de `2px solid --color-ctrl-line`; el resto de campos son cajas.
 
+### Panel de detalle
+
+**Role:** detalle o edición de un elemento de la sección (categoría del presupuesto, objetivo, plan del año)
+
+Escritorio: panel lateral a toda altura pegado a la derecha, `width: min(460px, 100%)`, fondo `--color-panel`, `border-inline-start: 1px solid --color-line`, `box-shadow: var(--shadow-float)`. Es más ancho que el alta porque lleva historial y gráficos. Todos los paneles de detalle miden lo mismo, sea cual sea la sección. Móvil: hoja inferior como la del alta, con `max-height: 88%`. Entra con `anim-sheet`.
+
 ### Chip de filtro
 
 **Role:** filtros y opciones excluyentes en fila
