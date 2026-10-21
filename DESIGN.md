@@ -194,6 +194,12 @@ Texto subrayado, sin fondo ni borde: Manrope 800 a 14px, `color: --color-text`, 
 
 Círculo de 44px (`border-radius: 50%`), `1px solid --color-ctrl-line` o fondo `--color-panel2`, icono de 20px. Lleva `aria-label`.
 
+### Botón circular de acción
+
+**Role:** acción rápida de una sola palabra en una vista de detalle (Comprar, Vender)
+
+Círculo (`border-radius: 50%`) solo con icono, sin texto: 64px en móvil, bajo la cifra de la vista, y 44px en escritorio, junto a la cabecera de la lista. Los iconos son los de la fila de movimientos (flecha abajo compra, flecha arriba vende). Lleva `aria-label` con la palabra («Comprar»). La acción principal de la vista va con fondo `--color-accent` e icono `--color-on-accent`; la otra, con fondo `--color-panel2` e icono `--color-text`. Sigue valiendo una acción principal por vista.
+
 ### FAB
 
 **Role:** «Apuntar» en móvil
@@ -229,6 +235,10 @@ Fondo `--color-panel`, `1px solid --color-line`, `border-radius: 20px`, `padding
 **Role:** alta y edición de un movimiento
 
 Escritorio: panel lateral de 380px. Móvil: hoja inferior con radio superior de 24px, agarre de 44×5px en `--color-line`, velo `oklch(0% none none / 0.42)`. Entra con `anim-sheet`. El importe va en Unbounded 700 a 32px sobre un subrayado de `2px solid --color-ctrl-line`; el resto de campos son cajas.
+
+**Edición de un movimiento.** En móvil el detalle de un movimiento no se despliega en la lista: abre esta misma hoja como formulario (selector Compra/Venta, fecha, títulos, precio, comisión, cuenta y nota) con el total recalculado en la cabecera. Los campos van en dos columnas, con el `gap` justo, y los botones Eliminar, Cancelar y Guardar en una sola fila; Guardar es el primario. La fecha se escribe `DD/MM/AAAA`, con ese mismo texto como ayuda y `inputmode="numeric"`. Se cierra con el botón, tocando el velo o con Escape.
+
+**Hoja arrastrable.** La hoja que lleva una lista (Inversión) se arrastra por el borde superior: hacia arriba oculta el gráfico y los chips y deja la lista a toda altura, hacia abajo vuelve; tocar el agarre también alterna. La lista hace scroll dentro de la hoja.
 
 ### Panel de detalle
 
@@ -272,6 +282,8 @@ Mono 700 a 13px, `letter-spacing: 0.04em`, `padding: 2px 8px`, `border-radius: 8
 
 `min-height: 64px; padding: 10px 0; gap: 12px`, `border-top: 1px solid --color-line`. Izquierda: icono de categoría en círculo de 40px, texto de fila (Manrope 700 16px) y meta (13px muted, una línea con elipsis). Derecha: cifra de fila Unbounded 600, alineada a la derecha y `tabular-nums`. Seleccionada: `box-shadow: inset 3px 0 0 --color-accent`. Recién apuntada: `anim-fresh`.
 
+**Variante de tres líneas** (movimientos de inversión): flecha de compra o venta a la izquierda, grande y centrada en vertical, sustituye al círculo de categoría; en el centro, la operación con la fecha y la comisión debajo, todas pegadas al borde izquierdo; a la derecha, el importe en cifra de fila con «títulos × precio» debajo en 12px muted. Mantiene el `min-height: 64px` y crece con las tres líneas.
+
 ### Campo
 
 **Role:** entrada de texto en formularios
@@ -289,6 +301,10 @@ Pista `height: 6px; border-radius: 999px; background: --color-line`; relleno `--
 **Role:** serie temporal (patrimonio, cartera)
 
 Línea `stroke: --color-accent; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round` con `vector-effect: non-scaling-stroke`. Área con degradado vertical del acento: `stop-opacity` 0.42 arriba, 0.14 al 55 %, 0 abajo. Rejilla horizontal en `--color-grid` a 1px. La línea de plan o límite es `1px dashed --color-faint`. Ejes en Manrope 12px `--color-muted`.
+
+**Recorrido.** El gráfico se recorre con el ratón o el dedo. En reposo muestra el valor de hoy, sin línea vertical y sin fecha en el eje. Al recorrerlo aparece la fecha sobre el eje x, justo bajo el punto, y oculta las marcas cercanas para no solaparse; al salir se borra el punto y vuelve el valor de hoy.
+
+**Móvil.** Va de borde a borde, de 266px de alto, con el degradado bajo una línea gruesa, sin rejilla ni cifras al lado y con solo años o meses en el eje.
 
 ### Estado vacío
 
@@ -347,12 +363,15 @@ Iconos de línea propios, sin relleno: `viewBox="0 0 24 24"`, `fill="none"`, `st
 
 Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el punto en naranja, secciones arriba, Datos y Configuración abajo) y el área principal fluida con `max-width: 1640px` centrado. Cada sección abre con la etiqueta de fecha, H1 en Unbounded y una línea de lede; debajo, una rejilla de dos columnas (contenido principal y aside de resumen) con `gap: 20px`. La raíz es `container-type: inline-size` y los tamaños fluidos usan `cqi`; no hay breakpoints por ancho: la vista la decide el dispositivo (`escritorio` / `movil`). Móvil: cabecera con título, contenido en una columna, barra inferior con FAB central y hojas inferiores para alta y detalle.
 
+**Cabecera de detalle.** Al abrir un elemento de una sección (un activo), la barra superior queda solo con la flecha y el símbolo («‹ VWCE»), en móvil y en escritorio; la flecha vuelve a la sección. No lleva título de sección ni controles a la derecha, ni dentro de la pantalla se repite la fila de volver, símbolo y nombre.
+
 ## Números
 
 - Dinero: `−1.234,56 €` (U+2212, punto de miles, coma decimal, espacio y €, dos decimales siempre).
 - Porcentaje: `+18,4 %`, siempre con signo y un decimal.
 - En cifras grandes los céntimos bajan a 0.42em en `--color-muted`.
 - Columnas de importes alineadas a la derecha con `tabular-nums`.
+- Fecha en formularios: `DD/MM/AAAA` (`06/10/2026`).
 
 ## Agent Prompt Guide
 
