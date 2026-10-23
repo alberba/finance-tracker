@@ -628,16 +628,13 @@ async function openSectionForLayout(
 test.use({ snapshotTime: '2026-09-15T10:00:00+02:00' })
 
 /**
- * Snapshots whose settings tab rail overflows: the selected tab is centered in
- * the rail before capture, so the frame does not inherit wherever the browser
- * left the horizontal scroll when the tab was clicked.
+ * Settings snapshots: the tab rail can overflow on mobile, so the selected tab
+ * is centered before capture. Otherwise the frame inherits whatever horizontal
+ * scroll the browser left when the tab was clicked, which differs run to run.
  */
-const CENTERED_SETTINGS_TAB_SNAPSHOTS = new Set([
-  'page-settings-recurring.png',
-  'page-settings-recurring-dark.png',
-  'page-settings-preferences.png',
-  'page-settings-preferences-dark.png',
-])
+function isSettingsSnapshot(name: string): boolean {
+  return name.startsWith('page-settings')
+}
 
 async function centerSelectedSettingsTab(page: Page): Promise<void> {
   const selectedTab = page
@@ -680,7 +677,7 @@ async function expectViewSnapshot(
       lastTop = top
     }
   }, focus)
-  if (CENTERED_SETTINGS_TAB_SNAPSHOTS.has(name)) await centerSelectedSettingsTab(page)
+  if (isSettingsSnapshot(name)) await centerSelectedSettingsTab(page)
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
     caret: 'hide',
