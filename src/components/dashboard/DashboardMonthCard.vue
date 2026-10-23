@@ -145,7 +145,7 @@ function changeText(kpi: DashboardKpi): string {
             {{ kpi.change.label }}
           </span>
         </div>
-        <div class="flex items-end justify-between gap-4">
+        <div class="flex flex-wrap items-end justify-between gap-3">
           <div class="grid min-w-0 gap-1.5">
             <strong
               :id="`kpi-${kpi.kind}`"
@@ -168,7 +168,7 @@ function changeText(kpi: DashboardKpi): string {
               v-for="(bar, index) in kpi.bars"
               :key="bar.month"
               type="button"
-              class="kpi-bar text-text-main relative flex h-full w-2 cursor-pointer items-end rounded-xs p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+              class="kpi-bar text-text-main relative flex h-full w-11 cursor-pointer items-end justify-center rounded-xs p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current md:w-6"
               :aria-label="`${kpi.label}, ${bar.month}: ${bar.value}`"
               @mousemove="previewBar(kpi.kind, 'hover', index)"
               @mouseleave="endPreview(kpi.kind, 'hover')"
@@ -177,7 +177,7 @@ function changeText(kpi: DashboardKpi): string {
             >
               <span
                 :key="`${year}-${month}`"
-                class="kpi-bar-fill block min-h-1 w-full rounded-xs"
+                class="kpi-bar-fill block min-h-1 w-2 rounded-xs"
                 :class="[KIND_FILL[kpi.kind], { 'opacity-30': !bar.current }]"
                 :style="{ blockSize: `${bar.height}%`, '--bar-index': index }"
                 aria-hidden="true"
@@ -236,13 +236,6 @@ function changeText(kpi: DashboardKpi): string {
 </template>
 
 <style scoped>
-.kpi-bar::after {
-  content: '';
-  position: absolute;
-  inset-block: 0;
-  inset-inline: -25%;
-}
-
 .kpi-bar:is(:focus-visible, :active) > span {
   opacity: 1;
 }
