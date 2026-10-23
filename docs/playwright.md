@@ -43,7 +43,7 @@ comparten los escenarios de desktop; los visuales solo mantienen baselines de Ch
   prueba mediante el formato de backup v2. Los runners de CI tienen bases D1 independientes.
 - La navegación espera `html[data-finance-ready="true"]`, que señala hidratación y bindings completos.
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
-- Cada runner usa un worker, con corte temprano y trace/vídeo únicamente en el primer retry.
+- Cada runner usa un worker, con corte temprano, trace del primer fallo y vídeo en el primer retry.
   Los shards visuales reparten escenarios por duración.
 - En CI, un caso que solo pasa al reintentarlo también falla el gate (`failOnFlakyTests`).
   El reintento conserva su función diagnóstica; no convierte una carrera en un resultado verde.

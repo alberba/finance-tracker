@@ -110,7 +110,7 @@ export function createPlaywrightRuntime({
       extraHTTPHeaders: {
         'X-Test-User-Email': 'developer@e2e.test',
       },
-      trace: 'on-first-retry',
+      trace: 'retain-on-first-failure',
       screenshot: 'only-on-failure',
       video: {
         mode: 'on-first-retry',
