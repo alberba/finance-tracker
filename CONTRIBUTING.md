@@ -52,8 +52,12 @@ pnpm test:e2e:smoke          # recorridos críticos
 El CI de cada PR ejecuta lint, tipos y `pnpm test`, comprueba que las migraciones D1
 locales v2 aplican limpias y ejecuta `pnpm build`. No calcula cobertura. Un único job de navegador
 comprueba los recorridos `@smoke` de la app y de autenticación, automáticamente y sin labels.
-Al empujar a `main` se repiten solo los tres jobs de calidad sobre el merge, que puede diferir del
-árbol probado en la PR. El despliegue espera esos checks, sin volver a ejecutar navegadores.
+Al empujar a `main`, un job breve busca el CI verde de la PR que produjo el merge y compara
+el árbol Git del push con el árbol que realmente se probó. Si coinciden, reutiliza la validación
+sin repetir checks. Si difieren, es un push directo o no se puede verificar la evidencia, ejecuta
+lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR y ejecuciones manuales:
+el despliegue construye la imagen Docker del commit mezclado. La evidencia caduca a los siete días;
+su ausencia siempre activa los checks de respaldo.
 La regresión extensa (auth completa, funcional, visual y sync-v2) vive en **Browser regression**:
 se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
 despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.

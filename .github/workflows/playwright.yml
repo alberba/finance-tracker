@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -23,10 +25,27 @@ env:
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
 
-# Validate the merge on main as well: it may differ from the PR's tested tree.
+# Reuse green PR validation only for an identical Git tree; otherwise validate the push.
 # Extensive browser regression belongs to browser-regression.yml, off the delivery path.
 jobs:
+  reuse:
+    name: Reuse validated PR
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      reused: ${{ steps.validation.outputs.reused }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify the pushed tree was validated in a successful PR
+        id: validation
+        run: node .github/scripts/reuse-pr-validation.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   static:
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
     name: Lint and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -39,6 +58,8 @@ jobs:
         run: pnpm check
 
   unit:
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
     name: Vitest tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -49,7 +70,9 @@ jobs:
         run: pnpm test
 
   build:
-    name: D1 migrations and build
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
+    name: D1 migrations and PR build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -59,7 +82,18 @@ jobs:
         run: |
           pnpm d1:migrate:local:v2
       - name: Production build
+        if: ${{ github.event_name != 'push' }}
         run: pnpm build
+      - name: Record the validated PR tree
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/validated-tree.txt"
+      - name: Upload the validated PR tree
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: validated-tree
+          path: ${{ runner.temp }}/validated-tree.txt
+          retention-days: 7
 
   smoke:
     name: PR smoke E2E

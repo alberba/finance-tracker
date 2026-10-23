@@ -67,10 +67,17 @@ y migraciones D1 más build) y un único job de navegador: `@smoke` de la app y 
 autenticación. No necesita labels. Los cambios que solo modifican Markdown no disparan CI;
 los scripts y la configuración dentro de `docs/` sí lo hacen. Añadir un label no repite el CI.
 
-Los pushes a `main` ejecutan solo los tres jobs de calidad sobre el merge real. Esto conserva
-la validación de cambios combinados y de pushes directos, porque `main` no tiene protección.
-El despliegue de Oracle espera ese CI verde, sin repetir ningún navegador. Una ejecución manual
-de **CI** ejecuta calidad y no dispara despliegue.
+En los pushes a `main`, `Reuse validated PR` busca un run de **CI** de PR terminado en verde,
+para el head de la PR que produjo ese merge. Descarga su artifact `validated-tree` (siete días)
+y compara el árbol Git realmente probado con el del push: incluye código, configuración y workflows.
+Un árbol idéntico reutiliza la validación y omite lint/tipos, Vitest y migraciones. Si cambió el
+contenido del merge, es un push directo, caducó el artifact o falla la consulta a GitHub, se ejecutan
+esos checks de respaldo. Nunca se reutiliza un run fallido o incompleto.
+
+El build de CI se ejecuta en PR y ejecuciones manuales, nunca en push: el despliegue ya construye
+la imagen Docker del commit mezclado antes de recrear el contenedor. El despliegue de Oracle espera
+el CI verde del push (validación reutilizada o checks de respaldo), sin repetir navegadores.
+Una ejecución manual de **CI** ejecuta calidad y build y no dispara despliegue.
 
 **Browser regression** (`browser-regression.yml`) ejecuta auth completa, funcional en cuatro
 shards, sync-v2 y visual en tres shards, los lunes a las 05:00 UTC y bajo demanda con

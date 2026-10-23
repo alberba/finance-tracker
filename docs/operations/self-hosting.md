@@ -110,7 +110,9 @@ expone la app a Internet.
   exige registrar passkeys nuevas. Las callbacks son `/api/auth/callback/{google,github}`.
 - **Despliegue automático**: `.github/workflows/deploy.yml` se ejecuta cuando el CI de `main`
   de un push termina en verde (o a mano con `workflow_dispatch` sobre `main`). Espera solo
-  lint/tipos, Vitest y migraciones/build; la regresión extensa de navegador es semanal o manual,
+  la verificación de que el árbol del push coincide con el validado en una PR verde; si no se
+  puede verificar, ejecuta lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR
+  y a mano: el despliegue construye la imagen del merge. La regresión extensa es semanal o manual,
   en otro workflow, y no dispara despliegues. Entra a Tailscale como nodo efímero,
   envía `git archive` del commit probado a `~/finance-tracker`, construye la imagen, recrea el
   contenedor y espera al healthcheck. Requiere un entorno `production` con los secretos
