@@ -1134,7 +1134,7 @@ export class FinanceTrackerPage {
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
   }
 
-  private async dismissWelcomeIfNeeded() {
+  async dismissWelcomeIfNeeded() {
     if (this.options.preserveWelcome) return
     const welcome = this.page.getByRole('dialog', { name: 'Bienvenido a tus finanzas' })
     // Readiness precedes the welcome island's watcher. Wait for its decision
