@@ -26,6 +26,9 @@ concurrency:
 
 env:
   CI: true
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: init.defaultBranch
+  GIT_CONFIG_VALUE_0: main
 
 # Browser jobs run inside the official Playwright image: the browsers and their
 # system libraries are preinstalled, so there is no `apt-get` on every run (it
