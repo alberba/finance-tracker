@@ -19,6 +19,7 @@ vi.mock('node:child_process', async (importOriginal) => ({
 
 describe('local Compose ports', () => {
   it('retries a Compose bind collision with the next port and matching auth origin', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     const spawn = vi.mocked(spawnSync)
     spawn.mockReturnValueOnce({
       status: 1,
@@ -48,6 +49,8 @@ describe('local Compose ports', () => {
         }),
       }),
     )
+    expect(stderr).toHaveBeenCalledExactlyOnceWith('port is already allocated')
+    stderr.mockRestore()
     spawn.mockReset()
   })
 

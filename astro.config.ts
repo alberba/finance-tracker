@@ -114,6 +114,8 @@ export default defineConfig({
       project: 'finance-tracker',
       org: 'alberba',
       authToken: process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+      release: { create: Boolean(process.env.SENTRY_AUTH_TOKEN) },
       telemetry: false,
       // Server-side Sentry lives in the Worker entry (`wrangler.toml` -> `main`,
       // see `sentry.server.config.ts`): this integration's automatic Worker wrap

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: () => false }))
@@ -38,7 +39,7 @@ describe('review: read model across devices', () => {
   beforeEach(() => {
     vi.stubGlobal('navigator', { onLine: true })
     vi.stubGlobal('window', new EventTarget())
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
   })
   afterEach(() => {
     vi.unstubAllGlobals()

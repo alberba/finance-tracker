@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({
@@ -42,7 +43,7 @@ async function initSyncStore() {
 
 describe('command-mapping (WP7b)', () => {
   beforeEach(async () => {
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
     await wipeIdbCache(USER_ID)
     await wipeOutbox(USER_ID)
   })

@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
@@ -23,7 +24,7 @@ let activeStore: any = null
  */
 describe('confirmPending — category id shared by the movement and the pending (issue #283)', () => {
   beforeEach(async () => {
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
     await wipeIdbCache(USER_ID)
     await wipeOutbox(USER_ID)
   })

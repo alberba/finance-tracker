@@ -1,10 +1,13 @@
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
+
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import SettingsRecurringTab from '../../src/components/settings/SettingsRecurringTab.vue'
 import type { RecurringRule } from '../../src/scripts/types'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
+
+let pinia: Pinia
 
 function rule(partial: Partial<RecurringRule> & Pick<RecurringRule, 'id' | 'type'>): RecurringRule {
   return {
@@ -25,7 +28,8 @@ function rule(partial: Partial<RecurringRule> & Pick<RecurringRule, 'id' | 'type
 
 describe('SettingsRecurringTab', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    pinia = createPinia()
+    setActivePinia(pinia)
   })
 
   function seed(): ReturnType<typeof useFinancialStateStore> {
@@ -42,7 +46,10 @@ describe('SettingsRecurringTab', () => {
 
   it('lists the income and expense rules, never the investment ones', () => {
     seed()
-    const wrapper = mount(SettingsRecurringTab, { props: { isActive: true } })
+    const wrapper = mount(SettingsRecurringTab, {
+      global: { plugins: [pinia] },
+      props: { isActive: true },
+    })
 
     expect(wrapper.text()).toContain('Alquiler histórico')
     expect(wrapper.text()).toContain('Nómina')
@@ -51,7 +58,10 @@ describe('SettingsRecurringTab', () => {
 
   it('signs each amount and nets the active rules per month', () => {
     seed()
-    const wrapper = mount(SettingsRecurringTab, { props: { isActive: true } })
+    const wrapper = mount(SettingsRecurringTab, {
+      global: { plugins: [pinia] },
+      props: { isActive: true },
+    })
 
     const amounts = wrapper
       .findAll('[data-settings-rule-amount]')
@@ -64,7 +74,10 @@ describe('SettingsRecurringTab', () => {
 
   it('pauses a rule from its switch', async () => {
     const store = seed()
-    const wrapper = mount(SettingsRecurringTab, { props: { isActive: true } })
+    const wrapper = mount(SettingsRecurringTab, {
+      global: { plugins: [pinia] },
+      props: { isActive: true },
+    })
 
     await wrapper
       .get('input[role="switch"][aria-label="Regla Alquiler histórico activa"]')

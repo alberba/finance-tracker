@@ -27,6 +27,18 @@ describe('BaseInput', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['Luz']])
   })
 
+  it('conserva el contrato de texto en los campos numéricos', async () => {
+    const wrapper = mount(BaseInput, {
+      props: { label: 'Títulos', modelValue: '' },
+      attrs: { type: 'number', step: 'any' },
+    })
+
+    await wrapper.get('input').setValue('10.5')
+    await wrapper.get('input').setValue('')
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([['10.5'], ['']])
+  })
+
   it('usa el id que se le da para el campo', () => {
     const wrapper = mount(BaseInput, {
       props: { label: 'Importe', modelValue: '' },

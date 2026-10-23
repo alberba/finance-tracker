@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({
@@ -11,7 +12,7 @@ import { useSyncStore } from '../../src/stores/sync'
 
 describe('useSyncStore — read-only demo guard (WP8)', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
   })
 
   afterEach(() => {

@@ -1,4 +1,5 @@
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
@@ -9,7 +10,7 @@ describe('reloj de mercado', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-09-26T10:00:00Z'))
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
   })
 
   afterEach(() => {

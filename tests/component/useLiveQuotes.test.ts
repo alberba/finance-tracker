@@ -1,5 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
+
 import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +10,8 @@ import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useMarketStore } from '../../src/stores/market'
 
 vi.mock('../../src/services/market-api', () => ({ fetchMarketQuotes: vi.fn() }))
+
+let pinia: Pinia
 
 const QuoteView = defineComponent({
   setup() {
@@ -23,7 +26,8 @@ describe('actualización automática de cotizaciones', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-18T12:00:00Z'))
-    setActivePinia(createPinia())
+    pinia = createPinia()
+    setActivePinia(pinia)
     vi.mocked(fetchMarketQuotes).mockResolvedValue({})
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -49,7 +53,10 @@ describe('actualización automática de cotizaciones', () => {
   })
 
   it('refresca cada cinco minutos y deduplica las vistas montadas', async () => {
-    views.push(mount(QuoteView), mount(QuoteView))
+    views.push(
+      mount(QuoteView, { global: { plugins: [pinia] } }),
+      mount(QuoteView, { global: { plugins: [pinia] } }),
+    )
     await vi.advanceTimersByTimeAsync(0)
     expect(fetchMarketQuotes).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(5 * 60_000)
@@ -62,7 +69,7 @@ describe('actualización automática de cotizaciones', () => {
   })
 
   it('pausa en segundo plano y actualiza al volver a la pestaña', async () => {
-    views.push(mount(QuoteView))
+    views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     await vi.advanceTimersByTimeAsync(0)
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     await vi.advanceTimersByTimeAsync(5 * 60_000)
@@ -76,7 +83,7 @@ describe('actualización automática de cotizaciones', () => {
 
   it('no consulta el proveedor cuando no hay conexión', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
-    views.push(mount(QuoteView))
+    views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     await vi.advanceTimersByTimeAsync(5 * 60_000)
     expect(fetchMarketQuotes).not.toHaveBeenCalled()
   })
@@ -105,7 +112,7 @@ describe('actualización automática de cotizaciones', () => {
           changePercent: null,
         },
       })
-    views.push(mount(QuoteView))
+    views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     const state = useFinancialStateStore()
     state.commitState((draft) => {
       draft.instruments[0].quoteSymbol = 'VWCE.MI'
@@ -153,7 +160,7 @@ describe('actualización automática de cotizaciones', () => {
         changePercent: null,
       },
     })
-    views.push(mount(QuoteView))
+    views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     await vi.advanceTimersByTimeAsync(0)
     useMarketStore().configureInstrumentSymbols('vwce', 'BTC', 'BTC-EUR')
     await vi.advanceTimersByTimeAsync(0)
