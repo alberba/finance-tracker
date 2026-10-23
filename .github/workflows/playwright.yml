@@ -78,7 +78,7 @@ jobs:
       - name: Run smoke E2E
         run: pnpm test:e2e:smoke --reporter=dot,html
       - name: Run authentication smoke contracts
-        run: pnpm test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results-auth-smoke
+        run: pnpm test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results/auth-smoke
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-auth-smoke
       - name: Upload failure report
@@ -91,6 +91,5 @@ jobs:
             playwright-report/
             playwright-report-auth-smoke/
             test-results/
-            test-results-auth-smoke/
           if-no-files-found: ignore
           retention-days: 7
