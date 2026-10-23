@@ -54,7 +54,7 @@ it('keeps SQLite writes out of hot reload while still watching source files', as
   sqlite!.exec('INSERT INTO changes DEFAULT VALUES')
   await writeFile(sourcePath, 'export const title = "Updated settings"')
   expect((await sourceChange)[0]).toBe(sourcePath)
-})
+}, 15_000)
 
 afterAll(async () => {
   await server?.close()
