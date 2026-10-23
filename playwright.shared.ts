@@ -98,6 +98,7 @@ export function createPlaywrightRuntime({
     fullyParallel: false,
     globalSetup: './scripts/check-installed-dependencies.mjs',
     forbidOnly: isCI,
+    failOnFlakyTests: isCI,
     retries: isCI ? 1 : 0,
     workers: 1,
     maxFailures: isCI ? 10 : 1,

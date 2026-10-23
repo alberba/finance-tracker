@@ -45,6 +45,8 @@ comparten los escenarios de desktop; los visuales solo mantienen baselines de Ch
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
 - Cada runner usa un worker, con corte temprano y trace/vídeo únicamente en el primer retry.
   Los shards visuales reparten escenarios por duración.
+- En CI, un caso que solo pasa al reintentarlo también falla el gate (`failOnFlakyTests`).
+  El reintento conserva su función diagnóstica; no convierte una carrera en un resultado verde.
 - Los vídeos del runtime compartido se graban a 30 fps con cursor, resaltado del objetivo y título
   de acción. Firefox y WebKit capturan hasta 25 fps. En local, añade `--retries=1` para grabar el
   reintento de un fallo.
