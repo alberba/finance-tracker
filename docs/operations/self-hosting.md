@@ -108,7 +108,14 @@ expone la app a Internet.
   `location /` de NPM.
 - **Passkeys y OAuth**: el RP ID es el dominio de `BETTER_AUTH_URL`, así que cambiar de dominio
   exige registrar passkeys nuevas. Las callbacks son `/api/auth/callback/{google,github}`.
-- **Actualizar**: enviar el árbol a `~/finance-tracker` (por ejemplo `git ls-files -co
+- **Despliegue automático**: `.github/workflows/deploy.yml` se ejecuta cuando el CI de `main`
+  termina en verde (o a mano con `workflow_dispatch`). Entra a Tailscale como nodo efímero,
+  envía `git archive` del commit probado a `~/finance-tracker`, construye la imagen, recrea el
+  contenedor y espera al healthcheck. Requiere un entorno `production` con los secretos
+  `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (cliente OAuth de Tailscale con el tag `tag:ci`, que
+  la ACL debe dejar llegar por SSH al servidor), `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`,
+  `DEPLOY_HOST` (IP Tailscale) y `DEPLOY_USER`.
+- **Actualizar a mano**: enviar el árbol a `~/finance-tracker` (por ejemplo `git ls-files -co
 --exclude-standard | tar -cf - -T - | ssh servidor 'tar -x -C ~/finance-tracker'`),
   `docker build -t finance-tracker:selfhost .` y `docker compose up -d --force-recreate`.
   Las migraciones pendientes se aplican al arrancar.

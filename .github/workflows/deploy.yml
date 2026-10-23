@@ -1,0 +1,72 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un despliegue a la vez y sin cancelar el que está en curso: interrumpir
+# `docker build` o `compose up` a medias dejaría producción a medio actualizar.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Oracle
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      DEPLOY_REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+      # El servidor solo es accesible por Tailscale: el runner entra como nodo efímero.
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Ship the tree
+        env:
+          DEPLOY_TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+        run: |
+          git archive "$DEPLOY_REF" | ssh -i ~/.ssh/id_deploy "$DEPLOY_TARGET" \
+            'rm -rf ~/finance-tracker.new && mkdir ~/finance-tracker.new && tar -x -C ~/finance-tracker.new && rm -rf ~/finance-tracker && mv ~/finance-tracker.new ~/finance-tracker'
+      - name: Build and recreate the container
+        env:
+          DEPLOY_TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "$DEPLOY_TARGET" bash -s <<'REMOTE'
+          set -euo pipefail
+          docker build -t finance-tracker:selfhost ~/finance-tracker
+          cd ~/finance-prod
+          docker compose up -d --force-recreate
+          # El healthcheck de la imagen marca el contenedor como sano cuando /login responde.
+          for _ in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q)")
+            [ "$status" = healthy ] && exit 0
+            sleep 5
+          done
+          echo "El contenedor no llegó a estar sano" >&2
+          docker compose logs --tail 50 >&2
+          exit 1
+          REMOTE
