@@ -73,7 +73,6 @@ test.describe('Settings E2E', () => {
         })
       }
     })
-    await tracker.reload()
     await tracker.openSettingsTab('Cotizaciones')
     const quotes = tracker.section('settings').locator('[data-settings-quotes]')
     const first = quotes.locator('tr[data-quote-symbol="FIRST"]')
@@ -238,8 +237,6 @@ test.describe('Settings E2E', () => {
         ],
       }
     })
-    await tracker.reload()
-
     await tracker.openSettingsTab('Activos')
     const row = tracker.section('settings').locator('tr[data-asset-id="etf-aged"]')
     await expect(row).toContainText('AGED')
@@ -291,7 +288,6 @@ test.describe('Settings E2E', () => {
         symbol: 'ORPH',
       })
     })
-    await tracker.reload()
     await tracker.openSettingsTab('Activos')
 
     const orphans = tracker.section('settings').locator('[data-orphan-symbols]')

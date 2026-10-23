@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
 import { normalizeState } from '../../src/scripts/state'
@@ -168,6 +167,14 @@ function buildSeedExport(seed: State) {
     userInstruments: seed.instruments.map((i) => ({
       instrumentId: i.id,
       alias: i.investmentAssetId,
+      quoteConfig: {
+        type: i.type,
+        symbol: i.symbol,
+        market: i.market,
+        currency: i.currency,
+        provider: i.provider,
+        active: i.active,
+      },
     })),
     stockeventsSymbolMappings: seed.stockEvents.symbolMappings.map((m) => ({
       ...m,
@@ -219,33 +226,6 @@ export async function readScenarioState(page: Page): Promise<State> {
 export async function editScenarioState(page: Page, edit: (state: State) => void): Promise<void> {
   const state = await readScenarioState(page)
   edit(state)
-  if (state.instruments.length) {
-    // The global catalogue has no write API, as in seed-market-instrument.ts.
-    const quoted = (value: string) => `'${value.replaceAll("'", "''")}'`
-    const now = quoted(new Date().toISOString())
-    const rows = state.instruments
-      .map(
-        (i) =>
-          `(${[i.id, i.id, i.symbol, i.symbol.trim().toUpperCase(), 'e2e-' + i.id, i.symbol, i.type, i.currency].map(quoted).join(',')},${now},${now})`,
-      )
-      .join(',')
-    execFileSync(
-      'pnpm',
-      [
-        'exec',
-        'wrangler',
-        'd1',
-        'execute',
-        'finance-tracker-db-v2',
-        '--local',
-        '--persist-to',
-        '.wrangler/state',
-        '--command',
-        `INSERT OR IGNORE INTO market_instruments (id,legacy_id,symbol,normalized_symbol,provider,name,asset_class,currency,created_at,updated_at) VALUES ${rows}`,
-      ],
-      { stdio: 'pipe' },
-    )
-  }
   const response = await page.request.post('/api/data/import?mode=replace', {
     data: buildSeedExport(state),
   })
