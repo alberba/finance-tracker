@@ -133,6 +133,14 @@ el preflight CORS falla y salen fuentes del sistema.
   arrancan con `--ignore-lock` para convivir con el `pnpm dev` del usuario; para uno propio a mano,
   `pnpm dev --port <n> --ignore-lock`. No pares el `pnpm dev` del usuario.
 
+Para saber si un fallo ya existía, lanza el spec en un worktree de `main`; `git stash` usa una
+pila compartida entre worktrees y no se toca:
+
+```bash
+git worktree add ../baseline main && cd ../baseline && pnpm setup:worktree
+pnpm test:e2e tests/e2e/<spec>.spec.ts
+```
+
 Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile del repositorio
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
 ejecuta `pnpm install --frozen-lockfile`. El script Linux sincroniza dependencias antes de elegir

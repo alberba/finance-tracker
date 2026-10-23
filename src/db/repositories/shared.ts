@@ -1,7 +1,7 @@
 /**
  * Shared helpers for the WP6 repository layer.
  *
- * Per `docs/migration/work-packages.md` WP6's design decisions, repositories
+ * Per `docs/archive/work-packages.md` WP6's design decisions, repositories
  * under `src/db/repositories/*` are the *only* code allowed to call Drizzle
  * directly — API routes (WP4) and the migration tool (WP9) go through these
  * modules, never raw SQL. Every exported method here (and in every sibling

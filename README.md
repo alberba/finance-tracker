@@ -58,14 +58,9 @@ Better Auth (los contratos están en [autenticación](docs/operations/authentica
 
 ### Mercado y reglas recurrentes
 
-Configura símbolos desde `Configuración → Cotizaciones`. Yahoo Finance es el proveedor por defecto y no necesita clave: usa símbolos de Yahoo como `VWCE.DE`, `AGED.MI` o `BTC-EUR`. Las cotizaciones y la búsqueda se consultan en el servidor mediante `yahoo-finance2`; la librería no se envía al navegador. Los proveedores opcionales requieren claves como secretos:
+Configura símbolos desde `Configuración → Cotizaciones`. Yahoo Finance es el proveedor por defecto y no necesita clave: usa símbolos de Yahoo como `VWCE.DE`, `AGED.MI` o `BTC-EUR`. Las cotizaciones y la búsqueda se consultan en el servidor mediante `yahoo-finance2`; la librería no se envía al navegador. Los proveedores opcionales requieren `TWELVE_DATA_API_KEY` o `COINGECKO_API_KEY` en el `.env` de producción ([self-hosting](docs/operations/self-hosting.md#producción-en-oracle)) o en `.dev.vars` en local.
 
-```bash
-wrangler secret put TWELVE_DATA_API_KEY
-wrangler secret put COINGECKO_API_KEY
-```
-
-`MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime definidas en `wrangler.toml`. La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
+`MARKET_DATA_PROVIDER`, `MARKET_QUOTE_STALE_MINUTES` y `MARKET_QUOTE_CACHE_SECONDS` son variables públicas de runtime (en producción, del `.env`; en desarrollo, de `wrangler.toml`). La caché local está en 300 segundos para no consumir créditos innecesariamente en el plan gratuito. Los vencimientos de reglas se generan al abrir la aplicación y permanecen fuera de balances hasta confirmarlos.
 
 Para probar Yahoo en local, ejecuta `pnpm setup:worktree` y arranca `pnpm dev`; no hace falta configurar una API key. Los instrumentos existentes conservan su proveedor: puedes cambiarlo a Yahoo Finance en `Configuración → Cotizaciones` y buscar el ticker correspondiente. El símbolo visible y el ticker de consulta son independientes: puedes mostrar `BTC` y consultar `BTC-EUR`. Cada resultado y el ticker elegido tienen un enlace a su ficha de Yahoo para comprobar el activo, el mercado y la moneda antes de guardarlo. Ambos símbolos, el proveedor y los títulos manuales se sincronizan por usuario y sobreviven a las recargas.
 
@@ -76,13 +71,6 @@ Twelve Data sigue disponible como alternativa. Para usarlo como respaldo de coti
 Para una clave CoinGecko Demo usa `COINGECKO_API_PLAN=demo`; para una clave Pro usa `COINGECKO_API_PLAN=pro`. Los instrumentos existentes se pueden cambiar de proveedor desde Configuración.
 
 El campo editable `Títulos` de `Valoración actual de cartera` fija el saldo real en ese momento; los movimientos anteriores quedan fuera y las compras y ventas posteriores de ese símbolo actualizan automáticamente la tenencia, sin crear movimientos históricos ficticios.
-
-Para producción en Cloudflare, configura las claves como secretos:
-
-```bash
-wrangler secret put TWELVE_DATA_API_KEY
-wrangler secret put COINGECKO_API_KEY
-```
 
 ## Deploy en Cloudflare Workers + D1 (anterior)
 
@@ -141,7 +129,7 @@ Los errores llegan a Sentry por dos caminos independientes:
   compartida de cliente (`src/lib/client/error-reporting.ts`) marca cada fallo
   de API que no provocó quien usa la app con `api.endpoint` (sin query string),
   `api.category` y `api.status`.
-- Servidor: `wrangler.toml` apunta `main` a `sentry.server.config.ts`, que
+- Servidor (destino Cloudflare/workerd; el servidor Node de producción no pasa por este entry): `wrangler.toml` apunta `main` a `sentry.server.config.ts`, que
   envuelve el handler de `@astrojs/cloudflare` con `Sentry.withSentry()` de
   `@sentry/cloudflare`. `withApiErrorHandling`
   (`src/lib/server/api-auth.ts`) marca los fallos de ruta no controlados con
@@ -222,7 +210,7 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
 
 ### Variables y secrets requeridos
 
-En Cloudflare runtime (`locals.runtime.env`):
+En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
 
 - `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`
 - `GITHUB_OWNER`

@@ -3,7 +3,7 @@ import { applyContributionSave } from "../../../src/domain/investment/contributi
 import { normalizeState } from "../../../src/scripts/state";
 
 /**
- * WP6 fix for Contradiction #9 (`docs/migration/work-packages.md`):
+ * WP6 fix for Contradiction #9 (`docs/archive/work-packages.md`):
  * `applyContributionSave` must not mutate its `draft` argument in place, so a
  * v2 repository can call it against a state assembled from D1 rows without
  * risking non-deterministic partial writes.

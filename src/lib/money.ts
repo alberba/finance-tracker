@@ -6,7 +6,7 @@
  * (D1 `INTEGER` money columns + a separate ISO `currency` column, per WP1's
  * "never REAL" design decision).
  *
- * Scope decision (per work-packages.md WP2): this module is a *boundary*
+ * Scope decision (per docs/archive/work-packages.md WP2): this module is a *boundary*
  * concern only. `src/domain/**` and `src/lib/finance-core.ts` keep operating
  * on floats internally; conversion to/from minimal units happens only when
  * v2 repositories (WP6) read from or write to D1. This module does not

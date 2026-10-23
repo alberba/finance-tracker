@@ -1,7 +1,7 @@
 import { isDemoMode } from './demo-mode'
 import { watch } from 'vue'
 import { type State } from './types'
-import { setupDashboardBudgetGoalsSection } from './app/dashboard-budget-goals-section'
+import { setupShellNavigation } from './app/shell-navigation'
 import { getEventElement } from './app/dom-helpers'
 import { getAppElements } from './app/elements'
 import { type UiState } from './app/ui-state'
@@ -26,7 +26,7 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
 
   const el = getAppElements()
 
-  const dashboardBudgetGoalsSection = setupDashboardBudgetGoalsSection({
+  const shellNavigation = setupShellNavigation({
     ui,
     el,
   })
@@ -44,9 +44,9 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
         { deep: true },
       )
     }
-    ui.activeSection = dashboardBudgetGoalsSection.getSectionFromPath(window.location.pathname)
+    ui.activeSection = shellNavigation.getSectionFromPath(window.location.pathname)
     bindEvents()
-    dashboardBudgetGoalsSection.switchSection(ui.activeSection, {
+    shellNavigation.switchSection(ui.activeSection, {
       updateHistory: false,
     })
     const context = (document as Document & { modelContext?: FinanceModelContext }).modelContext
@@ -88,7 +88,7 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
   }
 
   function bindEvents() {
-    dashboardBudgetGoalsSection.bindNavigationEvents()
+    shellNavigation.bindNavigationEvents()
     bindChartTooltipEvents()
   }
 

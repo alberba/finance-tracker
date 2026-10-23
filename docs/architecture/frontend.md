@@ -13,16 +13,16 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 
 ## Puntos de entrada por responsabilidad
 
-| Cambio                                          | Dónde empezar                                                                                                            |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Montaje de secciones                            | `src/components/FinanceWorkspace.vue`; layout en `src/components/FinanceTrackerShell.astro`.                             |
-| Arranque y sesión del cliente                   | `src/scripts/app.ts`: inicia sync autenticado o persistencia local del demo y publica `data-finance-ready`.              |
-| Navegar desde Vue                               | `src/composables/useSectionNavigation.ts`.                                                                               |
-| Clicks del shell y atrás/adelante               | `src/scripts/app/dashboard-budget-goals-section.ts`: el nombre es histórico; su responsabilidad actual es la navegación. |
-| Convertir rutas a secciones                     | `src/scripts/app/dashboard-section-routing.ts`.                                                                          |
-| Año, mes y rango del dashboard                  | `src/stores/dashboard.ts`; mes y sección activa en `src/stores/ui.ts`.                                                   |
-| Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                                   |
-| Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                                   |
+| Cambio                                          | Dónde empezar                                                                                               |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Montaje de secciones                            | `src/components/FinanceWorkspace.vue`; layout en `src/components/FinanceTrackerShell.astro`.                |
+| Arranque y sesión del cliente                   | `src/scripts/app.ts`: inicia sync autenticado o persistencia local del demo y publica `data-finance-ready`. |
+| Navegar desde Vue                               | `src/composables/useSectionNavigation.ts`.                                                                  |
+| Clicks del shell y atrás/adelante               | `src/scripts/app/shell-navigation.ts`.                                                                      |
+| Convertir rutas a secciones                     | `src/scripts/app/dashboard-section-routing.ts`.                                                             |
+| Año, mes y rango del dashboard                  | `src/stores/dashboard.ts`; mes y sección activa en `src/stores/ui.ts`.                                      |
+| Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                      |
+| Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                      |
 
 ## Secciones: nombre en la UI → ficheros
 

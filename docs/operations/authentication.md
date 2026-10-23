@@ -2,8 +2,9 @@
 
 Better Auth 1.7.7, su plugin passkey 1.7.7 y Resend 6.32.1 están fijados en el
 lockfile. `@better-auth/utils` 0.4.2 fija el peer requerido por core/passkey; Better
-Auth resuelve su dependencia propia. Astro 7 / Workers `nodejs_compat` / Drizzle
-0.45.3 / D1 siguen siendo el runtime. Las migraciones 0007–0009 son aditivas y
+Auth resuelve su dependencia propia. Producción corre Node + SQLite en Docker (ver
+[self-hosting](self-hosting.md#producción-en-oracle)); Workers/D1 solo quedan para
+desarrollo, `pnpm preview` y tests. Drizzle 0.45.3. Las migraciones 0007–0009 son aditivas y
 conservan las claves financieras.
 
 ## Contratos
@@ -36,9 +37,10 @@ conservan las claves financieras.
 - Códigos de seis cifras, 10 minutos, cinco intentos; secretos OTP hasheados.
   Rate limiting de Better Auth en D1: 60 peticiones/minuto por IP y ruta,
   10/minuto en sign-in, 5/minuto en email-otp (las reglas del plugin pueden ser
-  más restrictivas). Producción usa exclusivamente `cf-connecting-ip`, que
-  Cloudflare establece; en self-host `CLIENT_IP_HEADER` (p. ej. `x-real-ip`) indica la
-  cabecera que el proxy de confianza sobrescribe. No depende de contadores en memoria de un Worker.
+  más restrictivas). `CLIENT_IP_HEADER` (en producción `x-real-ip`) indica la
+  cabecera que el proxy de confianza sobrescribe. Sin la variable el valor por defecto es
+  `cf-connecting-ip`, que solo es fiable detrás de Cloudflare: fuera de él, un cliente puede
+  falsificarla. No depende de contadores en memoria.
 - Correo transaccional esperado antes de responder. El plugin
   `await-transactional-delivery` evita que Better Auth oculte fallos de entrega
   como tareas de fondo. Fallar el envío no completa ni admite el registro.
@@ -53,30 +55,28 @@ conservan las claves financieras.
 ## Configuración del operador
 
 1. Elegir el origen HTTPS canónico. Escribir `BETTER_AUTH_URL` y `RESEND_FROM`
-   como variables del Worker. El cliente autenticado usa sync v2 sin una variable de
+   en el `.env` del servidor (`~/finance-prod/.env`, chmod 600; ver self-hosting). El cliente autenticado usa sync v2 sin una variable de
    selección de protocolo; los usuarios invitados usan el modelo multiusuario
    y las colas separadas.
 2. Crear una clave aleatoria de al menos 32 caracteres, por ejemplo
-   `openssl rand -base64 32`. Guardar con
-   `pnpm exec wrangler secret put BETTER_AUTH_SECRET`. Usar una distinta para
+   `openssl rand -base64 32`. Guardar como `BETTER_AUTH_SECRET` en ese `.env`. Usar una distinta para
    local/staging/producción. Nunca usar un prefijo `PUBLIC_` para secretos.
 3. En [Resend Domains](https://resend.com/domains), añadir un dominio o subdominio
    propio y copiar los registros DNS que muestra Resend. Esperar la verificación
    SPF/DKIM. Elegir un remitente de ese dominio en `RESEND_FROM`. Crear una API
-   key de envío en [API Keys](https://resend.com/api-keys) y guardar con
-   `pnpm exec wrangler secret put RESEND_API_KEY`.
+   key de envío en [API Keys](https://resend.com/api-keys) y guardar como `RESEND_API_KEY` en el `.env`.
    Consultar [las cuotas y precios vigentes](https://resend.com/pricing) al
    configurar: el plan gratuito permite empezar sin cuota fija, pero el límite
    diario puede detener logins/recuperaciones. No se asume una cuota permanente.
 4. En [Google Auth Platform](https://console.cloud.google.com/auth/overview),
    configurar audiencia, marca y un cliente OAuth de aplicación web. Autorizar
    el origen y `${BETTER_AUTH_URL}/api/auth/callback/google`. Configurar
-   `GOOGLE_CLIENT_ID` y guardar `GOOGLE_CLIENT_SECRET` con `wrangler secret put`.
+   `GOOGLE_CLIENT_ID` y guardar `GOOGLE_CLIENT_SECRET` en el `.env`.
    Añadir los usuarios de prueba mientras la aplicación permanezca en testing.
 5. En [GitHub OAuth Apps](https://github.com/settings/developers), registrar una
    OAuth App con homepage canónica y callback
    `${BETTER_AUTH_URL}/api/auth/callback/github`. Configurar `GITHUB_CLIENT_ID` y
-   guardar `GITHUB_CLIENT_SECRET` con `wrangler secret put`. Las credenciales del
+   guardar `GITHUB_CLIENT_SECRET` en el `.env`. Las credenciales del
    login son distintas de `GITHUB_ISSUE_TOKEN`, usado para reportes.
 6. Para local, copiar las mismas variables a `.dev.vars`, usar un secreto propio
    y `BETTER_AUTH_URL=http://localhost:4321`. Las passkeys necesitan un dominio
@@ -147,6 +147,6 @@ consumida. Esta issue no implementa el PIN ni el bloqueo local.
   [passkeys](https://better-auth.com/docs/plugins/passkey),
   [Google](https://better-auth.com/docs/authentication/google),
   [GitHub](https://better-auth.com/docs/authentication/github).
-- [Resend/Workers](https://resend.com/docs/send-with-cloudflare-workers),
+- [Resend](https://resend.com/docs/send-with-nodejs),
   [dominios](https://resend.com/docs/dashboard/domains/introduction),
   [precios](https://resend.com/pricing). Comprobados el 2026-10-06.

@@ -1,6 +1,6 @@
 /**
  * Round-trip harness — the missing test tier the persistence audit asks for
- * (`docs/migration/d1-v2-persistence-audit.md` §9).
+ * (`docs/archive/d1-v2-persistence-audit.md` §9).
  *
  * Every bug in that audit lives in a *seam* between layers, which is exactly
  * what the existing tiers don't cross: repository tests stop at the row,

@@ -2,7 +2,7 @@
  * Reusable production-corruption fixture for the v2 repair planner.
  *
  * These rows mirror the defects described in
- * `docs/migration/d1-v2-persistence-audit.md`: a migrated category and a
+ * `docs/archive/d1-v2-persistence-audit.md`: a migrated category and a
  * client-derived duplicate, an account written with the old `checking` kind,
  * a budget value from 2026 overwriting the 2025 cell, and a March snapshot
  * whose month-only legacy id collided across years. IDs and timestamps are

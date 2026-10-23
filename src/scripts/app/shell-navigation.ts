@@ -23,7 +23,7 @@ interface DashboardNavigationDeps {
   el: DashboardNavigationElements
 }
 
-export function setupDashboardBudgetGoalsSection(deps: DashboardNavigationDeps) {
+export function setupShellNavigation(deps: DashboardNavigationDeps) {
   const { ui, el } = deps
   const uiStore = useUiStore(pinia)
 

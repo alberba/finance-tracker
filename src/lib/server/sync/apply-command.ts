@@ -1,7 +1,7 @@
 /**
  * Per-command sync-command applier (WP4), consumed by `POST /api/sync`.
  *
- * Design (per `docs/migration/work-packages.md` WP4):
+ * Design (per `docs/archive/work-packages.md` WP4):
  * - Each command is reserved before mutation, so concurrent replay of one
  *   `commandId` is applied at most once. Node + SQLite also wraps the remaining
  *   writes in a transaction; D1 executes them sequentially because it has no

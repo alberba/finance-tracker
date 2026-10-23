@@ -1,6 +1,6 @@
 # Runbook — remediación de persistencia v2
 
-> Sustituye a `cutover-runbook.md` para esta fase. Aquel documento describe el
+> Sustituye a `docs/archive/cutover-runbook.md` para esta fase. Aquel documento describe el
 > cutover v1 → v2, que ya se ejecutó, y está desactualizado en varios pasos
 > (llega a pedir comprobar el `ConflictResolutionDialog`, que #139 borró con el
 > ADR 0003). Este cubre lo que queda: llevar a producción las entregas 2 y 3 del

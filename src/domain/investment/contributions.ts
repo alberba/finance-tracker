@@ -301,7 +301,7 @@ export interface ContributionSaveResult {
  * `commitState` (which already hands in a disposable clone) — a v2
  * repository (WP6) may call this against a state assembled from D1 rows that
  * must not be mutated as a side effect, per Contradiction #9 in
- * `docs/migration/work-packages.md`.
+ * `docs/archive/work-packages.md`.
  */
 export function applyContributionSave(
   draft: State,

@@ -1,3 +1,5 @@
+> **Histórico, no describe el estado actual.** Conservado porque el código y otros docs lo citan.
+
 # Auditoría de persistencia D1 v2 — issue #134
 
 > **Alcance.** Auditoría completa del flujo de persistencia tras la migración a _sync v2_

@@ -1,3 +1,5 @@
+# Solo desarrollo, `pnpm preview` y tests (workerd + D1 local). Producción corre en
+# Docker + SQLite (docs/operations/self-hosting.md); este fichero no la configura.
 name = "finance-tracker"
 # Sentry owns the Worker entry: it wraps the Astro handler with
 # `@sentry/cloudflare` (see `sentry.server.config.ts`).
