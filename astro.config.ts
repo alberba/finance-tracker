@@ -53,6 +53,19 @@ export default defineConfig({
   },
 
   vite: {
+    // Discovering these during hydration replaces Vue's shared chunks mid-page.
+    optimizeDeps: {
+      include: [
+        '@better-auth/passkey/client',
+        '@sentry/astro',
+        '@sentry/browser',
+        'better-auth/client',
+        'better-auth/client/plugins',
+        'chart.js',
+        'pinia',
+        'zod',
+      ],
+    },
     server: {
       // Runtime and test artifacts change while the dev server is serving
       // requests: SQLite WAL files, the local D1 state and Playwright's reports
