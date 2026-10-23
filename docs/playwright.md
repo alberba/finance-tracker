@@ -62,16 +62,26 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 
 ## CI
 
-Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest sin cobertura,
-y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
-El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
-Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional en cuatro
-shards, sync-v2 y visual en tres shards. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
-lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
+Una PR ejecuta calidad en tres jobs paralelos (lint y typecheck, Vitest sin cobertura,
+y migraciones D1 más build) y un único job de navegador: `@smoke` de la app y `@smoke` de
+autenticación. No necesita labels. Los cambios que solo modifican Markdown no disparan CI;
+los scripts y la configuración dentro de `docs/` sí lo hacen. Añadir un label no repite el CI.
+
+Los pushes a `main` ejecutan solo los tres jobs de calidad sobre el merge real. Esto conserva
+la validación de cambios combinados y de pushes directos, porque `main` no tiene protección.
+El despliegue de Oracle espera ese CI verde, sin repetir ningún navegador. Una ejecución manual
+de **CI** ejecuta calidad y no dispara despliegue.
+
+**Browser regression** (`browser-regression.yml`) ejecuta auth completa, funcional en cuatro
+shards, sync-v2 y visual en tres shards, los lunes a las 05:00 UTC y bajo demanda con
+`workflow_dispatch` sobre la rama seleccionada. No forma parte del gate de entrega ni dispara
+el despliegue. Para cambios de riesgo, ejecuta este workflow en la rama de la PR antes de mezclar;
+los fallos programados quedan visibles en Actions y en las notificaciones de GitHub del workflow.
+Los snapshots siguen requiriendo inspección visual antes de actualizarse.
+
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
-Espera en el CI solo a calidad.
 Los jobs de navegador corren dentro de la imagen oficial de Playwright
 (`mcr.microsoft.com/playwright:v1.64.0-noble`), que ya trae Chromium y sus librerías: sin
 `apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
@@ -96,7 +106,7 @@ Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conse
 Una ejecución manual con `update_snapshots` solo regenera y commitea los snapshots Linux; no
 vuelve a ejecutar calidad, funcional ni sync-v2.
 
-El despliegue no pasa por GitHub Actions: ver `docs/operations/self-hosting.md`.
+El despliegue usa un workflow independiente: ver `docs/operations/self-hosting.md`.
 
 Los snapshots versionados son `*-linux.png`, la plataforma de CI. En macOS se comparan y
 actualizan dentro de la imagen Linux de Playwright con Docker, después de revisar el resultado
@@ -116,7 +126,7 @@ de la ruta del worktree; el log queda en `.wrangler/visual-dev-server.log`) y lo
 `pnpm test:e2e:visual` sin `:linux` en macOS compara contra snapshots de otra plataforma y genera
 `*-darwin.png`, que no se versionan.
 
-Sin Docker, los snapshots se regeneran en CI: Actions → CI → _Run workflow_ sobre la rama, con
+Sin Docker, los snapshots se regeneran en CI: Actions → Browser regression → _Run workflow_ sobre la rama, con
 `update_snapshots` marcado. El job visual regenera los `*-linux.png` y los commitea en esa rama.
 
 Los snapshots fuerzan Arial a propósito (`tests/e2e/screenshot-stable.css`), desde el primer

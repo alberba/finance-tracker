@@ -50,8 +50,13 @@ pnpm test:e2e:smoke          # recorridos críticos
 ```
 
 El CI de cada PR ejecuta lint, tipos y `pnpm test`, comprueba que las migraciones D1
-locales v2 aplican limpias y ejecuta `pnpm build`. No calcula cobertura. El E2E (smoke, auth, funcional, visual, sync-v2)
-corre al empujar a `main`; en una PR, solo con el label `run-e2e`.
+locales v2 aplican limpias y ejecuta `pnpm build`. No calcula cobertura. Un único job de navegador
+comprueba los recorridos `@smoke` de la app y de autenticación, automáticamente y sin labels.
+Al empujar a `main` se repiten solo los tres jobs de calidad sobre el merge, que puede diferir del
+árbol probado en la PR. El despliegue espera esos checks, sin volver a ejecutar navegadores.
+La regresión extensa (auth completa, funcional, visual y sync-v2) vive en **Browser regression**:
+se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
+despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.
 
 `pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una
 pregunta que hay que mirar, no necesariamente un fallo. Si el cambio visual es el esperado,
