@@ -109,7 +109,11 @@ expone la app a Internet.
 - **Passkeys y OAuth**: el RP ID es el dominio de `BETTER_AUTH_URL`, así que cambiar de dominio
   exige registrar passkeys nuevas. Las callbacks son `/api/auth/callback/{google,github}`.
 - **Despliegue automático**: `.github/workflows/deploy.yml` se ejecuta cuando el CI de `main`
-  termina en verde (o a mano con `workflow_dispatch`). Entra a Tailscale como nodo efímero,
+  de un push termina en verde (o a mano con `workflow_dispatch` sobre `main`). Espera solo
+  la verificación de que el árbol del push coincide con el validado en una PR verde; si no se
+  puede verificar, ejecuta lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR
+  y a mano: el despliegue construye la imagen del merge. La regresión extensa es semanal o manual,
+  en otro workflow, y no dispara despliegues. Entra a Tailscale como nodo efímero,
   envía `git archive` del commit probado a `~/finance-tracker`, construye la imagen, recrea el
   contenedor y espera al healthcheck. Requiere un entorno `production` con los secretos
   `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (cliente OAuth de Tailscale con el tag `tag:ci`, que

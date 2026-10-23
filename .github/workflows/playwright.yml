@@ -4,21 +4,16 @@ on:
   push:
     branches: [main, master]
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    # Sin filtro de ruta en los jobs: la rama no tiene checks obligatorios,
-    # así que un PR solo de docs puede saltarse el CI entero.
+    types: [opened, synchronize, reopened]
+    # Only prose is exempt; scripts and configuration under docs still need CI.
     paths-ignore:
       - '**.md'
-      - 'docs/**'
   workflow_dispatch:
-    inputs:
-      update_snapshots:
-        description: Regenerate the Linux visual snapshots and commit them to this branch
-        type: boolean
-        default: false
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
@@ -30,13 +25,27 @@ env:
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
 
-# Browser jobs run inside the official Playwright image: the browsers and their
-# system libraries are preinstalled, so there is no `apt-get` on every run (it
-# used to take ten minutes and occasionally time out). Keep the tag in sync with
-# the `@playwright/test` version in package.json.
+# Reuse green PR validation only for an identical Git tree; otherwise validate the push.
+# Extensive browser regression belongs to browser-regression.yml, off the delivery path.
 jobs:
+  reuse:
+    name: Reuse validated PR
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      reused: ${{ steps.validation.outputs.reused }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify the pushed tree was validated in a successful PR
+        id: validation
+        run: node .github/scripts/reuse-pr-validation.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   static:
-    if: ${{ !inputs.update_snapshots }}
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
     name: Lint and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -49,7 +58,8 @@ jobs:
         run: pnpm check
 
   unit:
-    if: ${{ !inputs.update_snapshots }}
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
     name: Vitest tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -60,8 +70,9 @@ jobs:
         run: pnpm test
 
   build:
-    if: ${{ !inputs.update_snapshots }}
-    name: D1 migrations and build
+    needs: reuse
+    if: ${{ !cancelled() && (github.event_name != 'push' || needs.reuse.outputs.reused != 'true') }}
+    name: D1 migrations and PR build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -71,11 +82,22 @@ jobs:
         run: |
           pnpm d1:migrate:local:v2
       - name: Production build
+        if: ${{ github.event_name != 'push' }}
         run: pnpm build
+      - name: Record the validated PR tree
+        if: ${{ github.event_name == 'pull_request' }}
+        run: git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/validated-tree.txt"
+      - name: Upload the validated PR tree
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: validated-tree
+          path: ${{ runner.temp }}/validated-tree.txt
+          retention-days: 7
 
   smoke:
     name: PR smoke E2E
-    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
@@ -89,185 +111,19 @@ jobs:
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run smoke E2E
         run: pnpm test:e2e:smoke --reporter=dot,html
+      - name: Run authentication smoke contracts
+        run: pnpm test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results/auth-smoke
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-auth-smoke
       - name: Upload failure report
         if: failure()
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report-smoke
-          path: playwright-report/
+          path: |
+            playwright-report/
+            playwright-report-auth-smoke/
+            test-results/
           if-no-files-found: ignore
-          retention-days: 7
-
-  e2e:
-    name: Full E2E shard ${{ matrix.shard }}/4
-    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Run functional E2E shard
-        run: pnpm test:e2e:shard ${{ matrix.shard }}/4
-      - name: Upload blob report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-blob-e2e-${{ matrix.shard }}
-          path: blob-report/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  visual:
-    name: Visual E2E shard ${{ matrix.shard }}/3
-    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Run visual regression tests
-        run: pnpm test:e2e:visual --shard=${{ matrix.shard }}/3
-      - name: Upload visual blob report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-blob-visual-${{ matrix.shard }}
-          path: blob-report/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  sync:
-    name: Sync v2 E2E
-    if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Apply local D1 v2 migrations
-        run: pnpm d1:migrate:local:v2
-      - name: Generate an ephemeral integration encryption key
-        run: node --input-type=module -e 'import { appendFileSync } from "node:fs"; import { randomBytes } from "node:crypto"; appendFileSync(".dev.vars", "DATA_ENCRYPTION_KEY=" + randomBytes(32).toString("base64") + "\n")'
-      - name: Run sync-v2 E2E tests
-        run: pnpm test:e2e:sync-v2
-      - name: Upload sync-v2 blob report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-blob-sync-v2
-          path: blob-report-sync-v2/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  snapshots:
-    name: Regenerate Linux snapshots
-    if: ${{ inputs.update_snapshots }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Regenerate and commit Linux snapshots
-        run: |
-          pnpm test:e2e:visual --update-snapshots
-          git add 'tests/e2e/**/*-linux.png'
-          if git diff --cached --quiet; then
-            echo "Snapshots unchanged"
-          else
-            git config --global --add safe.directory "$GITHUB_WORKSPACE"
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'test(e2e): regenerate the Linux visual snapshots'
-            git push
-          fi
-
-  authentication-e2e:
-    name: Better Auth Worker and browser contracts
-    if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Run isolated Better Auth Worker E2E
-        run: pnpm test:e2e:auth --reporter=dot,html
-      - name: Upload authentication report
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report-authentication
-          path: playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  e2e-report:
-    name: Merge failed Playwright report
-    if: >-
-      ${{
-        always() &&
-        (needs.e2e.result == 'failure' || needs.visual.result == 'failure' || needs.sync.result == 'failure')
-      }}
-    needs: [e2e, visual, sync]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - name: Download blob reports
-        continue-on-error: true
-        uses: actions/download-artifact@v8
-        with:
-          pattern: playwright-blob-*
-          path: all-blob-reports
-          merge-multiple: true
-      - name: Merge HTML report
-        run: pnpm exec playwright merge-reports --reporter html ./all-blob-reports
-      - name: Upload HTML report
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: playwright-report/
           retention-days: 7
