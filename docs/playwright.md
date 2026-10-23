@@ -62,7 +62,7 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 
 ## CI
 
-Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest con cobertura,
+Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest sin cobertura,
 y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
 El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
 Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional en cuatro

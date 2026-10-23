@@ -47,14 +47,14 @@ jobs:
 
   unit:
     if: ${{ !inputs.update_snapshots }}
-    name: Vitest coverage
+    name: Vitest tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-      - name: Vitest unit, component and integration coverage
-        run: pnpm test:coverage
+      - name: Vitest unit, component and integration tests
+        run: pnpm test
 
   build:
     if: ${{ !inputs.update_snapshots }}
