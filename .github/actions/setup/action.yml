@@ -3,7 +3,10 @@ description: pnpm, Node and frozen-lockfile install, with Chromium for Playwrigh
 
 inputs:
   playwright:
-    description: Install Chromium (cached by lockfile) and its system dependencies
+    description: >-
+      'true' installs Chromium and its system dependencies on the runner;
+      'container' assumes the job runs in the official Playwright image and
+      installs without native build scripts (the image has no toolchain).
     default: 'false'
 
 runs:
@@ -17,8 +20,13 @@ runs:
         node-version: 24
         cache: pnpm
     - name: Install dependencies
+      if: ${{ inputs.playwright != 'container' }}
       shell: bash
       run: pnpm install --frozen-lockfile
+    - name: Install dependencies (Playwright image)
+      if: ${{ inputs.playwright == 'container' }}
+      shell: bash
+      run: pnpm install --frozen-lockfile --ignore-scripts
     - name: Cache Chromium
       if: ${{ inputs.playwright == 'true' }}
       id: chromium-cache

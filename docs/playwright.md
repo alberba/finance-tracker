@@ -14,7 +14,7 @@ pnpm test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
 pnpm test:e2e:install:all   # instala también Firefox y WebKit
 pnpm test:e2e:cross-browser # smoke opcional en Firefox y WebKit
 pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
-pnpm test:e2e:shard 1/2    # shard funcional equilibrado por tiempos históricos
+pnpm test:e2e:shard 1/4    # shard funcional equilibrado por tiempos históricos
 pnpm test:e2e:visual        # layout y regresión visual
 pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
 pnpm test:e2e:headed        # navegador visible sobre Astro dev
@@ -63,27 +63,29 @@ pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 Una PR normal ejecuta solo calidad, en tres jobs paralelos: lint y typecheck, Vitest con cobertura,
 y migraciones D1 más build. No corre navegador: un PR que solo toca `*.md` o `docs/` no dispara CI.
 El label `run-e2e` añade smoke y el E2E de autenticación; ponlo cuando el cambio toque UI o auth.
-Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional, sync-v2 y dos
-shards visuales. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
+Los pushes a `main` y las ejecuciones manuales corren todo: calidad, auth, funcional en cuatro
+shards, sync-v2 y visual en tres shards. Los visuales no puntúan en PRs, porque su ruido de antialiasing cuesta más que
 lo que aporta; en una PR de rediseño, `pnpm test:e2e:visual:linux` en local o una ejecución manual.
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
 Espera en el CI solo a calidad.
-El setup común (pnpm, Node, install y Chromium cacheado por lockfile) vive en
-`.github/actions/setup`.
+Los jobs de navegador corren dentro de la imagen oficial de Playwright
+(`mcr.microsoft.com/playwright:v1.64.0-noble`), que ya trae Chromium y sus librerías: sin
+`apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
+común (pnpm, Node e install con lockfile) vive en `.github/actions/setup`.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
-Los shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial
+Los cuatro shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial
 en `tests/e2e/functional-durations.json` viene del CI #37229326363 (commit `b40f81a`); cada entrada
 contiene milisegundos totales y número de casos. `scripts/e2e-functional-shard.ts` descubre los
 specs actuales con Playwright y estima los nuevos con la media por caso, de modo que añadir un
 spec no requiere registrarlo para que corra. Para recalibrar, combina los blob reports con
 `pnpm exec playwright merge-reports --reporter json <directorio>` y actualiza los totales por spec.
 
-Los visuales se reparten por caso (106 por shard en el momento de este cambio), cada uno en una
-D1 independiente. Los casos `@snapshot` fijan `snapshotTime` en el fixture antes de la primera
-navegación; los controles de layout mantienen su propio `fixedTime` y las fuentes reales.
+Los visuales se reparten por caso entre tres shards, cada uno en una D1 independiente. Los casos
+`@snapshot` fijan `snapshotTime` en el fixture antes de la primera navegación; los controles de
+layout mantienen su propio `fixedTime` y las fuentes reales.
 El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render y
 responde localmente a Google Fonts. El helper espera fuentes/scroll sin volver a abrir la app.
 
@@ -107,6 +109,8 @@ pnpm test:e2e:visual:linux tests/e2e/layout-visual.spec.ts --project=mobile-chro
 El script (`scripts/e2e-visual-linux.sh`) necesita Docker en marcha y falla al principio si no
 responde. Arranca un dev server propio de este worktree en `VISUAL_PORT` (por defecto, uno derivado
 de la ruta del worktree; el log queda en `.wrangler/visual-dev-server.log`) y lo para al terminar.
+`pnpm-workspace.yaml` instala también los binarios nativos de Linux
+(`supportedArchitectures`) para que `node_modules` funcione dentro del contenedor.
 `pnpm test:e2e:visual` sin `:linux` en macOS compara contra snapshots de otra plataforma y genera
 `*-darwin.png`, que no se versionan.
 

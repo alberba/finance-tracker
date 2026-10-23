@@ -27,6 +27,10 @@ concurrency:
 env:
   CI: true
 
+# Browser jobs run inside the official Playwright image: the browsers and their
+# system libraries are preinstalled, so there is no `apt-get` on every run (it
+# used to take ten minutes and occasionally time out). Keep the tag in sync with
+# the `@playwright/test` version in package.json.
 jobs:
   static:
     if: ${{ !inputs.update_snapshots }}
@@ -71,11 +75,13 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-e2e') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run smoke E2E
@@ -91,23 +97,25 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: Full E2E shard ${{ matrix.shard }}/2
+    name: Full E2E shard ${{ matrix.shard }}/4
     if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run functional E2E shard
-        run: pnpm test:e2e:shard ${{ matrix.shard }}/2
+        run: pnpm test:e2e:shard ${{ matrix.shard }}/4
       - name: Upload blob report
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -119,23 +127,25 @@ jobs:
           retention-days: 7
 
   visual:
-    name: Visual E2E shard ${{ matrix.shard }}/2
+    name: Visual E2E shard ${{ matrix.shard }}/3
     if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run visual regression tests
-        run: pnpm test:e2e:visual --shard=${{ matrix.shard }}/2
+        run: pnpm test:e2e:visual --shard=${{ matrix.shard }}/3
       - name: Upload visual blob report
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -151,11 +161,13 @@ jobs:
     if: ${{ !inputs.update_snapshots && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Apply local D1 v2 migrations
@@ -179,13 +191,15 @@ jobs:
     if: ${{ inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Regenerate and commit Linux snapshots
@@ -195,6 +209,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Snapshots unchanged"
           else
+            git config --global --add safe.directory "$GITHUB_WORKSPACE"
             git config user.name 'github-actions[bot]'
             git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
             git commit -m 'test(e2e): regenerate the Linux visual snapshots'
@@ -206,11 +221,13 @@ jobs:
     if: ${{ !inputs.update_snapshots && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          playwright: 'true'
+          playwright: container
       - name: Run isolated Better Auth Worker E2E
         run: pnpm test:e2e:auth --reporter=dot,html
       - name: Upload authentication report
