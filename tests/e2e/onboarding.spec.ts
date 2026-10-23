@@ -35,9 +35,29 @@ async function bootstrap(request: APIRequestContext): Promise<Bootstrap> {
   return response.json()
 }
 
+// `/api/sync` requires the queue owner in `X-Finance-User-Id`, not just the
+// test auth header; resolve it once per request context.
+const identities = new WeakMap<APIRequestContext, Promise<string>>()
+
+function identity(request: APIRequestContext): Promise<string> {
+  let userId = identities.get(request)
+  if (!userId) {
+    userId = request.get('/api/session').then(async (response) => {
+      expect(response.ok(), await response.text()).toBe(true)
+      const body = (await response.json()) as { user: { id: string } }
+      return body.user.id
+    })
+    identities.set(request, userId)
+  }
+  return userId
+}
+
 async function sync(request: APIRequestContext, commands: object[]) {
-  const response = await request.post('/api/sync', { data: { commands } })
-  expect(response.ok()).toBe(true)
+  const response = await request.post('/api/sync', {
+    data: { commands },
+    headers: { 'X-Finance-User-Id': await identity(request) },
+  })
+  expect(response.ok(), await response.text()).toBe(true)
   const body = await response.json()
   expect(body.results.map((result: { status: string }) => result.status)).toEqual(
     commands.map(() => 'applied'),
