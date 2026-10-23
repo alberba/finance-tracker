@@ -18,6 +18,10 @@ const financialStateStore = useFinancialStateStore()
 const rows = computed(() => buildQuoteSymbolRows(financialStateStore.state))
 const panelOpen = ref(false)
 const selectedId = ref('')
+// The instrument whose editor is open. The watcher below only closes the panel
+// when that instrument disappears; clearing `selectedId` to open a new form must
+// not be mistaken for a deletion.
+const editingInstrumentId = ref('')
 const initialSymbol = ref('')
 const initialAssetId = ref('')
 const initialCurrency = ref('EUR')
@@ -34,6 +38,7 @@ const columns: LedgerColumn<QuoteSymbolRow>[] = [
 
 function open(row?: QuoteSymbolRow): void {
   selectedId.value = row?.instrument ? row.id : ''
+  editingInstrumentId.value = row?.instrument ? row.id : ''
   initialSymbol.value = row?.symbol ?? ''
   initialAssetId.value = row?.assetId ?? ''
   initialCurrency.value = row?.currency ?? financialStateStore.currency
@@ -42,8 +47,14 @@ function open(row?: QuoteSymbolRow): void {
 }
 
 watch(selected, (value, previous) => {
-  if (previous?.instrument && !value) panelOpen.value = false
+  if (previous?.instrument && !value && editingInstrumentId.value === previous.id)
+    panelOpen.value = false
 })
+
+function onAdded(id: string): void {
+  selectedId.value = id
+  editingInstrumentId.value = id
+}
 </script>
 
 <template>
@@ -124,7 +135,7 @@ watch(selected, (value, previous) => {
         :asset-id="initialAssetId"
         :initial-symbol="initialSymbol"
         :currency="initialCurrency"
-        @added="selectedId = $event"
+        @added="onAdded"
       />
       <template #footer>
         <BaseButton @click="panelOpen = false">Cerrar</BaseButton>
