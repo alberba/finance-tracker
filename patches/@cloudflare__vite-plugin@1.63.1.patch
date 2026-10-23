@@ -1,0 +1,49 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 0937b640cc890a9d38a4033231a236d74bffbcf3..63e2c4680492f465c6012b2c33163f25db5395c7 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -56324,7 +56324,33 @@ function createRequestHandler(handler) {
+ 			if (req.originalUrl) req.url = req.originalUrl;
+ 			const protocol = getForwardedProto(req);
+ 			request$2 = createRequestForIncomingMessage(req, res, protocol ? { protocol } : void 0);
+-			let response = await handler(toMiniflareRequest(request$2), req);
++			// workerd closes idle pooled loopback connections (a slow D1 write
++			// is enough). The next request then fails with ECONNRESET even
++			// though the worker is healthy. Buffer the body so a socket
++			// failure can be retried for any method. Disconnecting the browser
++			// no longer aborts the loopback request above, which avoids
++			// poisoning connections that the following request reuses.
++			let response;
++			let retryBody;
++			const hasBody = req.method !== "GET" && req.method !== "HEAD";
++			if (hasBody) {
++				try { retryBody = new Uint8Array(await request$2.clone().arrayBuffer()); } catch {}
++			}
++			try {
++				response = await handler(toMiniflareRequest(request$2), req);
++			} catch (error$4) {
++				const code = error$4?.cause?.code;
++				const socketError = code === "UND_ERR_SOCKET" || code === "ECONNRESET" || code === "EPIPE";
++				if (!socketError || request$2.signal.aborted || (hasBody && !retryBody)) throw error$4;
++				const retry = new Request(request$2.url, {
++					method: request$2.method,
++					headers: request$2.headers,
++					body: retryBody ?? undefined,
++					duplex: "half",
++					signal: request$2.signal
++				});
++				response = await handler(toMiniflareRequest(retry), req);
++			}
+ 			if (req.httpVersionMajor === 2) {
+ 				response = new Response$1(response.body, response);
+ 				response.headers.delete("transfer-encoding");
+@@ -56342,9 +56368,6 @@ function satisfiesMinimumViteVersion(minVersion$2) {
+ }
+ function createRequestForIncomingMessage(req, res, options) {
+ 	const controller = new AbortController();
+-	res.on("close", () => {
+-		controller.abort();
+-	});
+ 	const method = req.method ?? "GET";
+ 	const headers = createHeaders(req);
+ 	const protocol = options?.protocol ?? getScheme(req) ?? ("encrypted" in req.socket && req.socket.encrypted ? "https:" : "http:");

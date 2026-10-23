@@ -54,18 +54,26 @@ export default defineConfig({
 
   vite: {
     server: {
-      // Auth rate-limit/session writes update SQLite on requests. Watching these
-      // runtime files would turn each write into another browser reload.
-      watch: selfHosted
-        ? {
-            ignored: [
-              sqlitePath,
-              `${sqlitePath}-wal`,
-              `${sqlitePath}-shm`,
-              `${sqlitePath}-journal`,
-            ],
-          }
-        : undefined,
+      // Runtime and test artifacts change while the dev server is serving
+      // requests: SQLite WAL files, the local D1 state and Playwright's reports
+      // and traces. Watching them made Vite reload the app mid-request, which
+      // surfaced as intermittent "fetch failed" errors.
+      watch: {
+        ignored: [
+          `${sqlitePath}`,
+          `${sqlitePath}-wal`,
+          `${sqlitePath}-shm`,
+          `${sqlitePath}-journal`,
+          '**/.wrangler/**',
+          '**/.scratch/**',
+          '**/.data/**',
+          '**/coverage/**',
+          '**/blob-report/**',
+          '**/blob-report-*/**',
+          '**/playwright-report/**',
+          '**/playwright-report-*/**',
+        ],
+      },
     },
     resolve: {
       alias: [

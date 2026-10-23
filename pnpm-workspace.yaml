@@ -4,6 +4,18 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+# Keep the native binaries for the Playwright Linux image too: macOS regenerates
+# the committed `*-linux.png` snapshots inside it (scripts/e2e-visual-linux.sh).
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
 # Pins for transitive dependencies; Dependabot's groups don't revise them. Drop an entry only
 # once the parent's own range resolves to a fixed version (check with `pnpm why <name>` and
 # `pnpm audit:prod` without the pin).
@@ -28,6 +40,10 @@ overrides:
   svgo: 4.1.0
 
 patchedDependencies:
+  # Dev-server only: retry idempotent requests when a pooled loopback connection
+  # to workerd is torn down by a concurrent abort. Without it, `pnpm dev` returns
+  # intermittent "fetch failed" 500s during E2E navigations.
+  '@cloudflare/vite-plugin@1.63.1': patches/@cloudflare__vite-plugin@1.63.1.patch
   http-cache-semantics@4.2.0: patches/http-cache-semantics@4.2.0.patch
 
 auditConfig:
