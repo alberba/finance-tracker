@@ -26,7 +26,7 @@ overrides:
 
 patchedDependencies:
   '@cloudflare/vite-plugin@1.63.1':
-    hash: e036cd847f21210ffbe3e1a055fbc091fd1e885ea00fc57fe98ed2de1bf837e6
+    hash: a6062673f030330725adf1edeee4871e79dffde198c9275ac2b353c9867315ed
     path: patches/@cloudflare__vite-plugin@1.63.1.patch
   http-cache-semantics@4.2.0:
     hash: bfcf00566a3fdf00a595f838b4fb57e05aed93d48de2192d046459540f4fb98a
@@ -5060,7 +5060,7 @@ snapshots:
     dependencies:
       '@astrojs/internal-helpers': 0.12.0
       '@astrojs/underscore-redirects': 1.0.4
-      '@cloudflare/vite-plugin': 1.63.1(patch_hash=e036cd847f21210ffbe3e1a055fbc091fd1e885ea00fc57fe98ed2de1bf837e6)(@types/node@26.6.4)(vite@8.3.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3))(wrangler@4.149.0(@types/node@26.6.4))
+      '@cloudflare/vite-plugin': 1.63.1(patch_hash=a6062673f030330725adf1edeee4871e79dffde198c9275ac2b353c9867315ed)(@types/node@26.6.4)(vite@8.3.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3))(wrangler@4.149.0(@types/node@26.6.4))
       astro: 7.3.5(@types/node@26.6.4)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3)
       piccolore: 0.1.3
       vite: 8.3.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3)
@@ -5638,7 +5638,7 @@ snapshots:
     optionalDependencies:
       workerd: 1.20261006.1
 
-  '@cloudflare/vite-plugin@1.63.1(patch_hash=e036cd847f21210ffbe3e1a055fbc091fd1e885ea00fc57fe98ed2de1bf837e6)(@types/node@26.6.4)(vite@8.3.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3))(wrangler@4.149.0(@types/node@26.6.4))':
+  '@cloudflare/vite-plugin@1.63.1(patch_hash=a6062673f030330725adf1edeee4871e79dffde198c9275ac2b353c9867315ed)(@types/node@26.6.4)(vite@8.3.4(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.8.3))(wrangler@4.149.0(@types/node@26.6.4))':
     dependencies:
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261006.1)
       miniflare: 5.20261006.1-alpha(@types/node@26.6.4)
