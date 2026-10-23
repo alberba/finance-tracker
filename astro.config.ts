@@ -53,19 +53,40 @@ export default defineConfig({
   },
 
   vite: {
+    // Discovering these during hydration replaces Vue's shared chunks mid-page.
+    optimizeDeps: {
+      include: [
+        '@better-auth/passkey/client',
+        '@sentry/astro',
+        '@sentry/browser',
+        'better-auth/client',
+        'better-auth/client/plugins',
+        'chart.js',
+        'pinia',
+        'zod',
+      ],
+    },
     server: {
-      // Auth rate-limit/session writes update SQLite on requests. Watching these
-      // runtime files would turn each write into another browser reload.
-      watch: selfHosted
-        ? {
-            ignored: [
-              sqlitePath,
-              `${sqlitePath}-wal`,
-              `${sqlitePath}-shm`,
-              `${sqlitePath}-journal`,
-            ],
-          }
-        : undefined,
+      // Runtime and test artifacts change while the dev server is serving
+      // requests: SQLite WAL files, the local D1 state and Playwright's reports
+      // and traces. Watching them made Vite reload the app mid-request, which
+      // surfaced as intermittent "fetch failed" errors.
+      watch: {
+        ignored: [
+          `${sqlitePath}`,
+          `${sqlitePath}-wal`,
+          `${sqlitePath}-shm`,
+          `${sqlitePath}-journal`,
+          '**/.wrangler/**',
+          '**/.scratch/**',
+          '**/.data/**',
+          '**/coverage/**',
+          '**/blob-report/**',
+          '**/blob-report-*/**',
+          '**/playwright-report/**',
+          '**/playwright-report-*/**',
+        ],
+      },
     },
     resolve: {
       alias: [
@@ -93,6 +114,8 @@ export default defineConfig({
       project: 'finance-tracker',
       org: 'alberba',
       authToken: process.env.SENTRY_AUTH_TOKEN,
+      sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+      release: { create: Boolean(process.env.SENTRY_AUTH_TOKEN) },
       telemetry: false,
       // Server-side Sentry lives in the Worker entry (`wrangler.toml` -> `main`,
       // see `sentry.server.config.ts`): this integration's automatic Worker wrap

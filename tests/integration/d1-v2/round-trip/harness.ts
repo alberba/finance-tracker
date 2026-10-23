@@ -21,7 +21,8 @@
  */
 
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../../../helpers/pinia'
 import { vi } from 'vitest'
 import { users } from '../../../../src/db/schema'
 import { applySyncBatch } from '../../../../src/lib/server/sync/apply-command'
@@ -104,7 +105,7 @@ export async function startRoundTrip(
     .returning()
 
   vi.stubGlobal('navigator', { onLine: true })
-  setActivePinia(createPinia())
+  setActivePinia(createTestPinia())
 
   let offline = false
 
@@ -163,7 +164,7 @@ export async function startRoundTrip(
   async function reboot(): Promise<State> {
     // An F5 unloads the page: the previous client stops reading, sending and rendering.
     syncStore.detach()
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
     const { useSyncStore: freshSyncStore } = await import('../../../../src/stores/sync')
     syncStore = freshSyncStore()
     await syncStore.init(user.id)

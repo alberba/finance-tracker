@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
@@ -15,12 +16,6 @@ const USER_ID = 'user-recurring-confirm-test'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only store handle, closed in afterEach
 let activeStore: any = null
 
-async function settle(): Promise<void> {
-  for (let i = 0; i < 40; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0))
-  }
-}
-
 /**
  * Confirming an investment pending whose category has not reached the server
  * yet: the transaction's sync and the pending's sync both resolve that same
@@ -29,7 +24,7 @@ async function settle(): Promise<void> {
  */
 describe('confirmPending — category id shared by the movement and the pending (issue #283)', () => {
   beforeEach(async () => {
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
     await wipeIdbCache(USER_ID)
     await wipeOutbox(USER_ID)
   })
@@ -121,11 +116,24 @@ describe('confirmPending — category id shared by the movement and the pending 
     })
 
     expect(useRecurringStore().confirmPending('pm-eth')).toBe(true)
-    await settle()
 
-    const outboxDb = await openOutbox(USER_ID)
-    const commands = (await listAll(outboxDb)).map((entry) => entry.command)
-    outboxDb.close()
+    const readCommands = async () => {
+      const outboxDb = await openOutbox(USER_ID)
+      const commands = (await listAll(outboxDb)).map((entry) => entry.command)
+      outboxDb.close()
+      return commands
+    }
+
+    let commands: Awaited<ReturnType<typeof readCommands>> = []
+    await vi.waitFor(
+      async () => {
+        commands = await readCommands()
+        expect(
+          commands.find((c) => c.action === 'update' && c.entityType === 'pendingMovement'),
+        ).toBeDefined()
+      },
+      { timeout: 5000, interval: 25 },
+    )
 
     const createdCategoryIds = commands
       .filter((c) => c.action === 'create' && c.entityType === 'category')

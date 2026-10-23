@@ -39,7 +39,11 @@ export const test = base.extend<Fixtures>({
   testUserEmail: async ({ browserName }, use, testInfo) => {
     await use(
       testInfo.tags.includes('@snapshot')
-        ? `pw-${browserName}-${createHash('sha256').update(testInfo.testId).digest('hex').slice(0, 16)}@e2e.test`
+        ? // Playwright changes testId for --repeat-each; visible identities must stay stable.
+          `pw-${browserName}-${createHash('sha256')
+            .update(JSON.stringify([testInfo.project.name, testInfo.titlePath]))
+            .digest('hex')
+            .slice(0, 16)}@e2e.test`
         : `pw-${randomUUID()}@e2e.test`,
     )
   },

@@ -73,7 +73,7 @@ test.describe('Dashboard section', () => {
     { kind: 'expense', january: '352,89 €', february: '404,77 €' },
     { kind: 'investment', january: '250,00 €', february: '200,00 €' },
   ]) {
-    test(`consulta y restaura los importes de ${kind} con hover`, async ({ tracker }) => {
+    test(`consulta y restaura los importes de ${kind} con hover`, async ({ page, tracker }) => {
       await tracker.openDashboard()
       const dashboard = tracker.dashboardSection
       await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
@@ -81,6 +81,9 @@ test.describe('Dashboard section', () => {
       const figure = kpi.locator(`#kpi-${kind}`)
       const bars = kpi.getByRole('button')
 
+      // Un pase de sección puede dejar el puntero donde caerá la barra; sin
+      // movimiento real no hay mousemove y la vista previa no se dispara.
+      await page.mouse.move(0, 0)
       await bars.nth(0).hover()
       await expect(figure).toHaveText(january)
       await bars.nth(1).hover()
@@ -93,6 +96,7 @@ test.describe('Dashboard section', () => {
     })
 
     test(`consulta y restaura los importes de ${kind} con Tab mientras el puntero sigue sobre otra barra`, async ({
+      page,
       tracker,
     }) => {
       await tracker.openDashboard()
@@ -103,6 +107,7 @@ test.describe('Dashboard section', () => {
       const figure = kpi.locator(`#kpi-${kind}`)
       const bars = kpi.getByRole('button')
 
+      await page.mouse.move(0, 0)
       await bars.nth(0).hover()
       await bars.nth(0).focus()
       await expect(figure).toHaveText(january)
@@ -117,6 +122,7 @@ test.describe('Dashboard section', () => {
   }
 
   test('descarta la consulta al cambiar el mes con el puntero inmóvil sobre las barras', async ({
+    page,
     tracker,
   }) => {
     await tracker.openDashboard()
@@ -124,6 +130,7 @@ test.describe('Dashboard section', () => {
     const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
     await month.selectOption('3')
     const kpi = dashboard.locator('[data-kpi="investment"]')
+    await page.mouse.move(0, 0)
     await kpi.getByRole('button').nth(0).hover()
     await expect(kpi.locator('#kpi-investment')).toHaveText('250,00 €')
 
@@ -132,10 +139,11 @@ test.describe('Dashboard section', () => {
   })
 
   test.describe('Consulta local del KPI', () => {
-    test.beforeEach(async ({ tracker }) => {
+    test.beforeEach(async ({ page, tracker }) => {
       await tracker.openDashboard()
       const dashboard = tracker.dashboardSection
       await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
+      await page.mouse.move(0, 0)
       await dashboard.locator('[data-kpi="income"]').getByRole('button').nth(0).hover()
     })
 

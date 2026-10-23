@@ -30,7 +30,7 @@ withDefaults(
   { hideLabel: false, variant: 'default', suffix: undefined },
 )
 
-const value = defineModel<string>({ required: true })
+const value = defineModel<string>({ required: true, set: (next) => String(next) })
 </script>
 
 <template>

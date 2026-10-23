@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { test, expect } from './fixtures'
+import { syncV2TestHeaders } from './seed-sync-v2'
 
 test('los requisitos bloquean solo las acciones afectadas y se resuelven al crear una cuenta', async ({
   page,
@@ -14,7 +15,7 @@ test('los requisitos bloquean solo las acciones afectadas y se resuelven al crea
   const reset = await page.request.post('/api/state/reset', { headers, data: {} })
   expect(reset.ok(), await reset.text()).toBe(true)
   const completed = await page.request.post('/api/sync', {
-    headers,
+    headers: await syncV2TestHeaders(page.request, testUserEmail),
     data: {
       commands: [
         {
@@ -37,9 +38,11 @@ test('los requisitos bloquean solo las acciones afectadas y se resuelven al crea
   ).toContainText('Crea una cuenta')
 
   await tracker.openBudget()
+  // La falta de cuentas no bloquea el presupuesto: el reset deja las categorías
+  // por defecto y este apartado sigue operativo.
   await expect(
-    tracker.budgetSection.getByRole('button', { name: 'Editar categorías' }),
-  ).toBeVisible()
+    tracker.budgetSection.locator('[data-setup-requirement]').filter({ visible: true }),
+  ).toHaveCount(0)
   await tracker.budgetSection.getByRole('tab', { name: /Ingresos/ }).click()
   await expect(
     tracker.budgetSection.getByRole('table', { name: 'Ingresos por categoría y mes' }),

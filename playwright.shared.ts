@@ -98,7 +98,8 @@ export function createPlaywrightRuntime({
     fullyParallel: false,
     globalSetup: './scripts/check-installed-dependencies.mjs',
     forbidOnly: isCI,
-    retries: isCI ? 2 : 0,
+    failOnFlakyTests: isCI,
+    retries: isCI ? 1 : 0,
     workers: 1,
     maxFailures: isCI ? 10 : 1,
     reporter: isCI
@@ -109,7 +110,7 @@ export function createPlaywrightRuntime({
       extraHTTPHeaders: {
         'X-Test-User-Email': 'developer@e2e.test',
       },
-      trace: 'on-first-retry',
+      trace: 'retain-on-first-failure',
       screenshot: 'only-on-failure',
       video: {
         mode: 'on-first-retry',

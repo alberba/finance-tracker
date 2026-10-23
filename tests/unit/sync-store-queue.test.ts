@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
-import { createPinia, setActivePinia } from 'pinia'
+import { setActivePinia } from 'pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
@@ -41,7 +42,7 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
 
   beforeEach(() => {
     vi.stubGlobal('navigator', { onLine: true })
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
     userCounter += 1
     userId = `queue-user-${userCounter}`
     changes = []
@@ -289,7 +290,7 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
 describe('logout and session expiry preserve queued work', () => {
   beforeEach(() => {
     vi.stubGlobal('navigator', { onLine: true })
-    setActivePinia(createPinia())
+    setActivePinia(createTestPinia())
   })
   afterEach(() => {
     vi.unstubAllGlobals()

@@ -1,0 +1,33 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -56324,7 +56324,18 @@
+ 			if (req.originalUrl) req.url = req.originalUrl;
+ 			const protocol = getForwardedProto(req);
+ 			request$2 = createRequestForIncomingMessage(req, res, protocol ? { protocol } : void 0);
+-			let response = await handler(toMiniflareRequest(request$2), req);
++			// Retry reads after workerd closes an idle loopback connection.
++			// Mutations may already have committed, so never replay them.
++			let response;
++			try {
++				response = await handler(toMiniflareRequest(request$2), req);
++			} catch (error$4) {
++				const code = error$4?.cause?.code;
++				const socketError = code === "UND_ERR_SOCKET" || code === "ECONNRESET" || code === "EPIPE";
++				const readOnly = req.method === "GET" || req.method === "HEAD";
++				if (!socketError || request$2.signal.aborted || !readOnly) throw error$4;
++				response = await handler(toMiniflareRequest(request$2), req);
++			}
+ 			if (req.httpVersionMajor === 2) {
+ 				response = new Response$1(response.body, response);
+ 				response.headers.delete("transfer-encoding");
+@@ -56342,9 +56353,6 @@
+ }
+ function createRequestForIncomingMessage(req, res, options) {
+ 	const controller = new AbortController();
+-	res.on("close", () => {
+-		controller.abort();
+-	});
+ 	const method = req.method ?? "GET";
+ 	const headers = createHeaders(req);
+ 	const protocol = options?.protocol ?? getScheme(req) ?? ("encrypted" in req.socket && req.socket.encrypted ? "https:" : "http:");

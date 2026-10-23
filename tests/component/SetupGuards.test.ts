@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, type Component } from 'vue'
 
@@ -26,12 +26,14 @@ vi.mock('../../src/composables/useSetupNavigation', () => ({
 }))
 
 const account = { id: 'cash', name: 'Efectivo', openingBalance: 0 }
+let pinia: Pinia
 const wrappers: { unmount(): void }[] = []
 function render(component: Component, shallow = false) {
   const wrapper = mount(component, {
     shallow,
     props: { isActive: true },
     global: {
+      plugins: [pinia],
       stubs: { SetupRequirement: false, BaseButton: false, AppSection: false, PageHeader: false },
     },
   })
@@ -40,7 +42,8 @@ function render(component: Component, shallow = false) {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  pinia = createPinia()
+  setActivePinia(pinia)
   useFinancialStateStore().patchState((draft) => {
     draft.accounts = []
     draft.investmentAssets = []

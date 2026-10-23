@@ -537,10 +537,15 @@ describe('round trip: inversión', () => {
 
   it("keeps how a contribution's flow was split across accounts (§5)", async () => {
     const { useInvestmentStore } = await import('../../../../src/stores/investment')
+    const { useSettingsStore } = await import('../../../../src/stores/settings')
+    const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
+    useSettingsStore().addEntity('investmentAssets', 'Indexa', '0')
+    await trip.reload()
+    const investmentAccountId = useFinancialStateStore().investmentAssets[0].id
     const saved = useInvestmentStore().saveContribution(
       '2026-03-31',
       2,
-      [{ kind: 'investments', id: 'indexa', value: '1000' }],
+      [{ kind: 'investments', id: investmentAccountId, value: '1000' }],
       [{ accountId, amount: 200 }],
       [],
     )

@@ -133,12 +133,15 @@ for (const provider of ['google', 'github']) {
   })
 }
 it('rejects implicit matching-email linking and allows deliberate verified linking', async () => {
+  const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
   await updateRegistrationPolicy(database.db as unknown as Db, true)
   await post('/email-otp/send-verification-otp', { email, type: 'sign-in' })
   const login = await post('/sign-in/email-otp', { email, otp: code })
   const identity = (await login.json()).user.id
   const rejected = await oauth('github')
   expect(rejected.response.headers.get('location')).toContain('error=')
+  expect(loggedError).toHaveBeenCalledOnce()
+  expect(loggedError.mock.calls[0].map(String).join(' ')).toContain('account_not_linked')
   const linked = await oauth('github', cookies(login), true)
   expect(linked.response.headers.get('location')).toBe('/')
   const returnLogin = await oauth('github')
@@ -149,15 +152,19 @@ it('rejects implicit matching-email linking and allows deliberate verified linki
 })
 
 it('does not link an unverified provider even when the user deliberately requests it', async () => {
+  const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
   await updateRegistrationPolicy(database.db as unknown as Db, true)
   await post('/email-otp/send-verification-otp', { email, type: 'sign-in' })
   const login = await post('/sign-in/email-otp', { email, otp: code })
   verified = false
   const result = await oauth('github', cookies(login), true)
   expect(result.response.headers.get('location')).toContain('error=')
+  expect(loggedError).toHaveBeenCalledOnce()
+  expect(loggedError.mock.calls[0].map(String).join(' ')).toContain('untrusted provider')
 })
 
 it('external provider failure leaves the invitation available for retry', async () => {
+  const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const { token } = await createInvitation(database.db as unknown as Db, 'administrator', 1)
   const externalFetch = globalThis.fetch
   vi.stubGlobal('fetch', async () =>
@@ -165,6 +172,10 @@ it('external provider failure leaves the invitation available for retry', async 
   )
   const failed = await oauth('github', `finance-invitation=${token}`)
   expect(failed.response.headers.get('location')).toContain('error=')
+  expect(loggedError).toHaveBeenCalledOnce()
+  expect(loggedError.mock.calls[0].map(String).join(' ')).toContain(
+    'GitHub OAuth token exchange failed',
+  )
   expect((await registrationAdministration(database.db as unknown as Db)).invitations[0].uses).toBe(
     0,
   )

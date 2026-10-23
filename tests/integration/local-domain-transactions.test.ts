@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/d1'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createSqliteBinding } from '../../src/lib/server/local/sqlite-binding'
 import { migrateLocalDatabase } from '../../scripts/local-init.mjs'
 import * as schema from '../../src/db/schema'
@@ -64,6 +64,7 @@ async function exported() {
 it.each(['initialize', 'reset', 'import', 'replace'] as const)(
   'rolls back %s after a late write failure and preserves the other user',
   async (operation) => {
+    const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
     await accountsRepository.create(db, 'other', {
       name: 'Other account',
       kind: 'cash',
@@ -110,6 +111,12 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
               }),
             )
     expect(response.status).toBe(500)
+    expect(loggedError).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('[api] Unhandled route error'),
+      expect.objectContaining({
+        cause: expect.objectContaining({ message: 'injected category failure' }),
+      }),
+    )
     expect(await exported()).toEqual(before)
     expect(await accountsRepository.listByUser(db, 'other')).toEqual(otherBefore)
   },
@@ -269,6 +276,7 @@ it('rolls back the investment operation and movement with sync metadata on a fin
 })
 
 it('preserves another user importing concurrently while the first import rolls back', async () => {
+  const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const entered = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
   const transaction = binding[interactiveTransaction]
@@ -313,6 +321,12 @@ it('preserves another user importing concurrently while the first import rolls b
   await enqueued.promise
   release.resolve()
   expect((await failing).status).toBe(500)
+  expect(loggedError).toHaveBeenCalledExactlyOnceWith(
+    expect.stringContaining('[api] Unhandled route error'),
+    expect.objectContaining({
+      cause: expect.objectContaining({ message: 'injected account failure' }),
+    }),
+  )
   expect((await successful).status).toBe(200)
   expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toEqual([])
   expect(await accountsRepository.listByUser(db, 'other')).toMatchObject([
@@ -323,6 +337,7 @@ it('preserves another user importing concurrently while the first import rolls b
 it.each(['', '?mode=replace'])(
   'rolls back imported related rows after a later allocation failure %s',
   async (mode) => {
+    const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const before = await exported()
     sqlite.exec(`CREATE TRIGGER fail_allocation BEFORE INSERT ON contribution_allocations
     BEGIN SELECT RAISE(ABORT, 'injected allocation failure'); END`)
@@ -358,6 +373,12 @@ it.each(['', '?mode=replace'])(
       }),
     )
     expect(response.status).toBe(500)
+    expect(loggedError).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('[api] Unhandled route error'),
+      expect.objectContaining({
+        cause: expect.objectContaining({ message: 'injected allocation failure' }),
+      }),
+    )
     expect(await exported()).toEqual(before)
   },
 )

@@ -57,9 +57,8 @@ test.describe('Modo demo', () => {
 
   test('se activa y desactiva desde el menú de usuario sin mezclar la caché real', async ({
     page,
+    tracker,
   }) => {
-    await page.goto('/')
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     const authenticatedState = await readScenarioState(page)
     authenticatedState.meta.generatedAt = ''
 
@@ -74,7 +73,6 @@ test.describe('Modo demo', () => {
     await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
     await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    const tracker = new FinanceTrackerPage(page)
     await tracker.addCustomTransaction({
       date: '2026-08-12',
       monthLabel: 'AGOSTO',

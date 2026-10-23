@@ -289,7 +289,7 @@ export const entityCreateSchemas = {
       currency: z.string().min(1),
     })
     .strict(),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>
+} satisfies Record<SyncEntityType, z.ZodType>
 
 /**
  * What a `create` command may actually carry: the per-entity shape above plus
@@ -314,7 +314,7 @@ export const entityCreatePayloadSchemas = {
   wealthSnapshot: entityCreateSchemas.wealthSnapshot.extend(clientIdentityFields),
   stockeventsMapping: entityCreateSchemas.stockeventsMapping.extend(clientIdentityFields),
   stockeventsCashEntry: entityCreateSchemas.stockeventsCashEntry.extend(clientIdentityFields),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>
+} satisfies Record<SyncEntityType, z.ZodType>
 
 /** Update-payload (patch) shape per entity type — every field optional. */
 export const entityUpdateSchemas = {
@@ -358,7 +358,7 @@ export const entityUpdateSchemas = {
       currency: z.string().min(1).optional(),
     })
     .strict(),
-} satisfies Record<SyncEntityType, z.ZodTypeAny>
+} satisfies Record<SyncEntityType, z.ZodType>
 
 const baseCommandFields = {
   commandId: z.string().min(1),

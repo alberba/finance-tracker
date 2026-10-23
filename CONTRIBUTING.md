@@ -49,8 +49,8 @@ pnpm gate                   # dependencias + lint + tipos + unit/component/integ
 pnpm test:e2e:smoke          # recorridos críticos
 ```
 
-El gate de CI en cada PR añade `pnpm test:coverage`, la comprobación de que las migraciones D1
-locales v2 aplican limpias, y `pnpm build`. El E2E (smoke, auth, funcional, visual, sync-v2)
+El CI de cada PR ejecuta lint, tipos y `pnpm test`, comprueba que las migraciones D1
+locales v2 aplican limpias y ejecuta `pnpm build`. No calcula cobertura. El E2E (smoke, auth, funcional, visual, sync-v2)
 corre al empujar a `main`; en una PR, solo con el label `run-e2e`.
 
 `pnpm test:e2e:visual` compara píxeles y es inestable por naturaleza: un diff de snapshot es una

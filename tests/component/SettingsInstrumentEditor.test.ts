@@ -5,7 +5,8 @@ import SettingsInstrumentEditor from '../../src/components/settings/SettingsInst
 import type { InstrumentRowViewModel } from '../../src/domain/settings/view-model'
 
 it('conserva el ticker que se está eligiendo cuando cambian los contadores de movimientos', async () => {
-  setActivePinia(createPinia())
+  const pinia = createPinia()
+  setActivePinia(pinia)
   const instrument: InstrumentRowViewModel = {
     id: 'world',
     symbol: 'XDWH.XETRA',
@@ -16,7 +17,10 @@ it('conserva el ticker que se está eligiendo cuando cambian los contadores de m
     linked: 0,
     pending: 1,
   }
-  const wrapper = mount(SettingsInstrumentEditor, { props: { instrument } })
+  const wrapper = mount(SettingsInstrumentEditor, {
+    global: { plugins: [pinia] },
+    props: { instrument },
+  })
   const label = wrapper
     .findAll('label')
     .find((item) => item.text() === 'Ticker de XDWH.XETRA en el proveedor')!
