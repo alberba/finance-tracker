@@ -185,13 +185,13 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     transactionId: 'tx-1',
     status: 'confirmed',
   })
-  await budgetEntriesRepository.create(db, userId, {
+  await runWithDb(db, budgetEntriesRepository.create(userId, {
     categoryId: category.id,
     year: 2026,
     month: 4,
     amount: 50,
     currency: 'EUR',
-  })
+  }))
   await runWithDb(db, goalsRepository.create(userId, {
     key: 'fire',
     name: 'Independencia',
@@ -242,7 +242,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     syncedAmount: 300,
     currency: 'EUR',
   })
-  await userSettingsRepository.create(db, userId, {
+  await runWithDb(db, userSettingsRepository.create(userId, {
     onboardingPresented: true,
     onboardingDismissed: true,
     onboardingAccountCompleted: true,
@@ -253,7 +253,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     theme: 'dark',
     stockeventsEnabled: true,
     stockeventsTradesToCash: false,
-  })
+  }))
 }
 
 function postJson(url: string, body: unknown): Request {
@@ -385,13 +385,13 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   it.each(['append', 'replace'])(
     'preserves receiving user onboarding during %s import',
     async (mode) => {
-      await userSettingsRepository.create(testDb.db, principal.userId, {
+      await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
         onboardingPresented: true,
         onboardingDismissed: false,
         onboardingAccountCompleted: true,
         onboardingMovementCompleted: true,
         onboardingCompleted: true,
-      })
+      }))
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -409,7 +409,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await userSettingsRepository.get(testDb.db, principal.userId)).toMatchObject({
+      expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toMatchObject({
         currency: 'USD',
         onboardingPresented: 1,
         onboardingDismissed: 0,
@@ -421,7 +421,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   )
 
   it('preserves completed onboarding when replacement has no settings', async () => {
-    await userSettingsRepository.create(testDb.db, principal.userId, { onboardingCompleted: true })
+    await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, { onboardingCompleted: true }))
     const { POST } = await import('../../../../src/pages/api/data/import')
     const url = new URL('https://example.test/api/data/import?mode=replace')
     const response = await POST({
@@ -431,7 +431,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     } as never)
     expect(response.status).toBe(200)
     expect(
-      (await userSettingsRepository.get(testDb.db, principal.userId))?.onboardingCompleted,
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))?.onboardingCompleted,
     ).toBe(1)
   })
 

@@ -4,6 +4,7 @@ import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as userSettingsRepository from '../../../../src/db/repositories/user-settings'
 import { createTestDb, type TestDatabase } from '../setup'
 import { seedUser } from '../repositories/fixtures'
+import { runWithDb } from '../../../../src/db/database'
 
 let currentDb: TestDatabase['db']
 vi.mock('../../../../src/db/client', () => ({
@@ -51,7 +52,7 @@ describe('POST /api/state/initialize', () => {
     const { resolvePrincipal } = await import('../../../../src/lib/server/auth/principal')
     const input = { provider: 'cf-access', subject: 'new-user', email: 'new-user@example.com' }
     principal = await resolvePrincipal(testDb.db, input)
-    const settings = await userSettingsRepository.get(testDb.db, principal.userId)
+    const settings = await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))
     expect(settings?.currency).toBe('EUR')
     const categories = await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)
     expect(categories.map((row) => [row.name, row.kind, row.sortOrder])).toEqual([
@@ -78,14 +79,14 @@ describe('POST /api/state/initialize', () => {
     expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual(
       categories,
     )
-    expect(await userSettingsRepository.get(testDb.db, principal.userId)).toEqual(settings)
+    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
   })
 
   it('does not add suggestions or change preferences for an existing user', async () => {
-    const settings = await userSettingsRepository.create(testDb.db, principal.userId, {
+    const settings = await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
       currency: 'USD',
       onboardingCompleted: true,
-    })
+    }))
     const category = await accountsRepository.createCategory(testDb.db, principal.userId, {
       name: 'Personal',
       kind: 'expense',
@@ -99,7 +100,7 @@ describe('POST /api/state/initialize', () => {
     expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([
       category,
     ])
-    expect(await userSettingsRepository.get(testDb.db, principal.userId)).toEqual(settings)
+    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
   })
 
   it('does not add suggestions to an existing empty user with absent settings', async () => {
@@ -168,11 +169,11 @@ describe('POST /api/state/reset', () => {
       currency: 'EUR',
       openingBalance: 42,
     })
-    await userSettingsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
       currency: 'USD',
       onboardingCompleted: true,
       onboardingPresented: true,
-    })
+    }))
 
     const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({

@@ -50,7 +50,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     pendingMovementsRepository.listByUser(db, userId),
     recurringRulesRepository.listByUser(db, userId),
     subscriptionsRepository.listByUser(db, userId),
-    budgetEntriesRepository.listByUser(db, userId),
+    runWithDb(db, budgetEntriesRepository.listByUser(userId)),
     runWithDb(db, goalsRepository.listByUser(userId)),
     transactionsRepository.listByUser(db, userId),
     accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
@@ -98,7 +98,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await subscriptionsRepository.remove(db, userId, subscription.id)
   }
   for (const entry of budgetEntries) {
-    await budgetEntriesRepository.remove(db, userId, entry.id)
+    await runWithDb(db, budgetEntriesRepository.remove(userId, entry.id))
   }
   for (const goal of goals) {
     await runWithDb(db, goalsRepository.remove(userId, goal.id))
@@ -116,6 +116,6 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await accountsRepository.removeCategory(db, userId, category.id)
   }
 
-  await userSettingsRepository.remove(db, userId)
+  await runWithDb(db, userSettingsRepository.remove(userId))
   // Keep the cursor monotonic: clients must accept the restored dataset as newer.
 }

@@ -100,7 +100,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
     }
 
     const summary: ImportSummary = await runInTransaction(db, async (tx) => {
-      const previousSettings = await userSettingsRepository.get(tx, userId)
+      const previousSettings = await runWithDb(tx, userSettingsRepository.get(userId))
       const onboarding = {
         onboardingPresented: previousSettings
           ? previousSettings.onboardingPresented === 1
@@ -314,14 +314,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'budgetEntries')
           continue
         }
-        await budgetEntriesRepository.create(tx, userId, {
+        await runWithDb(tx, budgetEntriesRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           categoryId,
           year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
           month: typeof row.month === 'number' ? row.month : 1,
           amount: typeof row.amount === 'number' ? row.amount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'budgetEntries')
       }
 
@@ -481,7 +481,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
       // -- settings (singleton) ----------------------------------------------
       if (body.settings && typeof body.settings === 'object') {
         const settingsRow = body.settings as Row
-        const existing = await userSettingsRepository.get(tx, userId)
+        const existing = await runWithDb(tx, userSettingsRepository.get(userId))
         const patch = {
           ...onboarding,
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
@@ -491,13 +491,13 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           stockeventsTradesToCash: optionalFlag(settingsRow.stockeventsTradesToCash),
         }
         if (existing) {
-          await userSettingsRepository.update(tx, userId, patch)
+          await runWithDb(tx, userSettingsRepository.update(userId, patch))
         } else {
-          await userSettingsRepository.create(tx, userId, patch)
+          await runWithDb(tx, userSettingsRepository.create(userId, patch))
         }
         bump(imported, 'settings')
       } else if (replace) {
-        await userSettingsRepository.create(tx, userId, onboarding)
+        await runWithDb(tx, userSettingsRepository.create(userId, onboarding))
       }
 
       const { revision } = await syncRepository.bumpRevision(tx, userId)

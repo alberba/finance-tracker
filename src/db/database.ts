@@ -24,6 +24,12 @@ export const query = <A>(run: (db: Db) => Promise<A>): Effect.Effect<A, Database
     })
   })
 
+/** Exposes a Promise-based repository function (first parameter `db`) as an Effect over `Database`. */
+export const lift =
+  <Args extends unknown[], A>(fn: (db: Db, ...args: Args) => Promise<A>) =>
+  (...args: Args): Effect.Effect<A, DatabaseError, Database> =>
+    query((db) => fn(db, ...args))
+
 /**
  * Transitional edge: runs a repository effect against `db` from Promise-based code.
  * Rejects with the driver's original error so legacy callers keep their behaviour.

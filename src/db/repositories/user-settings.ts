@@ -1,6 +1,7 @@
 /** `user_settings` repository (WP6) — one row per user, currency/locale/theme prefs. */
 
 import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
 import { userSettings } from '../schema'
 import { type Db, nowIso, versionGuard } from './shared'
 
@@ -32,12 +33,12 @@ export interface UpdateUserSettingsInput {
   stockeventsTradesToCash?: boolean
 }
 
-export async function get(db: Db, userId: string): Promise<UserSettingsRow | undefined> {
+async function getSql(db: Db, userId: string): Promise<UserSettingsRow | undefined> {
   const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, userId))
   return row
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateUserSettingsInput = {},
@@ -64,13 +65,13 @@ export async function create(
   return row
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   input: UpdateUserSettingsInput,
   expectedVersion?: number,
 ): Promise<UserSettingsRow | undefined> {
-  const existing = await get(db, userId)
+  const existing = await getSql(db, userId)
   if (!existing) {
     return undefined
   }
@@ -136,8 +137,8 @@ export async function update(
   return row
 }
 
-export async function remove(db: Db, userId: string, expectedVersion?: number): Promise<boolean> {
-  const existing = await get(db, userId)
+async function removeSql(db: Db, userId: string, expectedVersion?: number): Promise<boolean> {
+  const existing = await getSql(db, userId)
   if (!existing) {
     return false
   }
@@ -153,3 +154,8 @@ export async function remove(db: Db, userId: string, expectedVersion?: number): 
     .returning({ id: userSettings.id })
   return deleted.length > 0
 }
+
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)

@@ -10,6 +10,7 @@ import * as stockeventsSymbolMappingsRepository from "../../../src/db/repositori
 import * as wealthRepository from "../../../src/db/repositories/wealth";
 import { createTestDb, type TestDatabase } from "../../integration/d1-v2/setup";
 import { seedUser } from "../../integration/d1-v2/repositories/fixtures";
+import { runWithDb } from '../../../src/db/database'
 
 /**
  * WP10 security suite — "no cross-account access by ID guessing".
@@ -184,13 +185,13 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     });
 
     await expect(
-      budgetEntriesRepository.create(db, userB.id, {
+      runWithDb(db, budgetEntriesRepository.create(userB.id, {
         categoryId: categoryA.id,
         year: 2026,
         month: 1,
         amount: 100,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 

@@ -126,7 +126,7 @@ async function findByLegacyId(
       rows = (await pendingMovementsRepository.listByUser(db, userId)) as VersionedRow[]
       break
     case 'budgetEntry':
-      rows = (await budgetEntriesRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, budgetEntriesRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'goal':
       rows = (await runWithDb(db, goalsRepository.listByUser(userId))) as VersionedRow[]
@@ -179,7 +179,7 @@ async function loadForMutation(
       return (await pendingMovementsRepository.get(db, userId, entityId)) as
         VersionedRow | undefined
     case 'budgetEntry':
-      return (await budgetEntriesRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, budgetEntriesRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'goal':
       return (await runWithDb(db, goalsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'contribution':
@@ -246,7 +246,7 @@ async function createEntity(
     case 'pendingMovement':
       return (await pendingMovementsRepository.create(db, userId, data)) as VersionedRow
     case 'budgetEntry':
-      return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, budgetEntriesRepository.create(userId, data))) as VersionedRow
     case 'goal':
       return (await runWithDb(db, goalsRepository.create(userId, data))) as VersionedRow
     case 'contribution': {
@@ -375,13 +375,10 @@ async function updateEntity(
         expectedVersion,
       )) as VersionedRow | undefined
     case 'budgetEntry':
-      return (await budgetEntriesRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, budgetEntriesRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'goal':
       return (await runWithDb(db, goalsRepository.update(userId, entityId, patch, expectedVersion))) as
         VersionedRow | undefined
@@ -481,7 +478,7 @@ async function removeEntity(
     case 'pendingMovement':
       return pendingMovementsRepository.remove(db, userId, entityId, expectedVersion)
     case 'budgetEntry':
-      return budgetEntriesRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, budgetEntriesRepository.remove(userId, entityId, expectedVersion))
     case 'goal':
       return runWithDb(db, goalsRepository.remove(userId, entityId, expectedVersion))
     case 'contribution':
@@ -519,12 +516,12 @@ async function recordChange(
     changeType,
     payload: payload === undefined ? null : JSON.stringify(payload),
   })
-  await auditEventsRepository.create(db, userId, {
+  await runWithDb(db, auditEventsRepository.create(userId, {
     eventType: `sync.${changeType}`,
     entityType,
     entityId,
     metadata: null,
-  })
+  }))
   return revisionRow.revision
 }
 
@@ -581,7 +578,7 @@ async function performMutation(
           ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
           : {}),
       }
-      const existing = await userSettingsRepository.get(db, userId)
+      const existing = await runWithDb(db, userSettingsRepository.get(userId))
       // Same contract as `update`: a stale `baseVersion` is a replay when the
       // server already holds the patch, and a conflict otherwise (ADR 0003 —
       // the client rebases over `currentVersion` instead of freezing the
@@ -609,10 +606,10 @@ async function performMutation(
         }
       }
       const row = existing
-        ? await userSettingsRepository.update(db, userId, settingsPatch, command.baseVersion)
-        : await userSettingsRepository.create(db, userId, settingsPatch)
+        ? await runWithDb(db, userSettingsRepository.update(userId, settingsPatch, command.baseVersion))
+        : await runWithDb(db, userSettingsRepository.create(userId, settingsPatch))
       if (existing && !row) {
-        const current = await userSettingsRepository.get(db, userId)
+        const current = await runWithDb(db, userSettingsRepository.get(userId))
         return current
           ? {
               status: 'conflict',
