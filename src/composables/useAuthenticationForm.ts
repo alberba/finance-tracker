@@ -2,11 +2,9 @@ import { useAuthenticationAction } from './useAuthenticationAction'
 import { computed, shallowRef, watch } from 'vue'
 import {
   authentication,
-  authenticationRequest,
   openFinanzas,
   requireAuthenticationResult,
 } from '../lib/client/authentication'
-import { runClientHttp } from '../lib/client/runtime'
 export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
   options: { verifyEmail?: string; initialError?: string } = {},
@@ -75,6 +73,11 @@ export function useAuthenticationForm(
         return
       }
       if (mode.value === 'recover') {
+        // Rare path: keep the Effect-backed request out of the login bundle.
+        const [{ authenticationRequest }, { runClientHttp }] = await Promise.all([
+          import('../lib/client/authentication-request'),
+          import('../lib/client/runtime'),
+        ])
         await runClientHttp(
           authenticationRequest('/api/recover-access', {
             email: email.value,

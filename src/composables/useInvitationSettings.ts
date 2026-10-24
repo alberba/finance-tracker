@@ -1,5 +1,5 @@
 import { onMounted, shallowRef } from 'vue'
-import { authenticationRequest } from '../lib/client/authentication'
+import { authenticationRequest } from '../lib/client/authentication-request'
 import { runClientHttp } from '../lib/client/runtime'
 import { useAuthenticationAction } from './useAuthenticationAction'
 export function useInvitationSettings() {
