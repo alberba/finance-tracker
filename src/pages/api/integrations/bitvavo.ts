@@ -10,6 +10,7 @@ import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../l
 import { configureBitvavo, previewBitvavo, confirmBitvavo, connectionSchema } from '../../../lib/server/bitvavo/import'
 import { InvalidCredential, RateLimit, NonEuroOperation } from '../../../lib/server/bitvavo/client'
 import { runWithDb } from '../../../db/database'
+import { runServer } from '../../../lib/server/runtime'
 
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview') }).strict(),
@@ -38,14 +39,18 @@ export const GET: APIRoute = async ({ locals }) => handle(locals, async ({ db, u
   return jsonResponse({ configured: Boolean(connection), destinations, instruments, connection: connection ? { accountId: connection.accountId, startDate: connection.startDate, timeZone: connection.timeZone, cursor: connection.cursor } : null }, 200)
 })
 export const PUT: APIRoute = async ({ locals, request }) => handle(locals, async ({ db, userId, env }) => {
-  await configureBitvavo(db, userId, env, connectionSchema.parse(await request.json()), bitvavoHttpForRequest(request, requirePrincipal(locals), env))
+  await runServer(
+    db,
+    configureBitvavo(userId, env, connectionSchema.parse(await request.json())),
+    bitvavoHttpForRequest(request, requirePrincipal(locals), env),
+  )
   return jsonResponse({ configured: true }, 200)
 })
 export const POST: APIRoute = async ({ locals, request }) => handle(locals, async ({ db, userId, env }) => {
   const action = actionSchema.parse(await request.json())
   switch (action.action) {
-    case 'preview': return jsonResponse(await previewBitvavo(db, userId, env, bitvavoHttpForRequest(request, requirePrincipal(locals), env)), 200)
-    case 'confirm': return jsonResponse(await confirmBitvavo(db, userId, action.previewId, action.resolutions), 200)
+    case 'preview': return jsonResponse(await runServer(db, previewBitvavo(userId, env), bitvavoHttpForRequest(request, requirePrincipal(locals), env)), 200)
+    case 'confirm': return jsonResponse(await runServer(db, confirmBitvavo(userId, action.previewId, action.resolutions)), 200)
     case 'linkInstrument': await runWithDb(db, repository.linkInstrument(userId, action.transactionId, action.instrumentId)); return jsonResponse({ linked: true }, 200)
   }
 })

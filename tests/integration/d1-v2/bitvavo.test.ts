@@ -16,6 +16,7 @@ import * as market from '../../../src/db/repositories/market'
 import { applySyncBatch } from '../../../src/lib/server/sync/apply-command'
 import { projectSyncV2State } from '../../../src/lib/client/v2-state-projection'
 import { runWithDb } from '../../../src/db/database'
+import { runServer } from '../../../src/lib/server/runtime'
 
 let testDb: TestDatabase
 const env = { DATA_ENCRYPTION_KEY: btoa('a'.repeat(32)) }
@@ -28,8 +29,8 @@ afterEach(() => testDb.close())
 
 async function importedUser() {
   const { user, account } = await configuredUser()
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
-  await confirmBitvavo(testDb.db, user.id, preview.id, [])
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))
   return {
     user,
     account,
@@ -40,7 +41,7 @@ async function importedUser() {
 
 it('imports a closed preview idempotently', async () => {
   const { user, preview } = await importedUser()
-  await confirmBitvavo(testDb.db, user.id, preview.id, [])
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))
   expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(2)
 })
 
@@ -62,7 +63,7 @@ it('does not expose credentials in the synchronized bootstrap', async () => {
 it('isolates an import preview from another user', async () => {
   const { preview } = await importedUser()
   const stranger = await runWithDb(testDb.db, users.create({ email: 'stranger@example.com' }))
-  await expect(confirmBitvavo(testDb.db, stranger.id, preview.id, [])).rejects.toThrow()
+  await expect(runServer(testDb.db, confirmBitvavo(stranger.id, preview.id, []))).rejects.toThrow()
   expect((await runWithDb(testDb.db, buildBootstrapPayload(stranger.id))).transactions).toEqual([])
 })
 
@@ -84,17 +85,15 @@ async function configuredUser() {
       openingBalance: 0,
     }),
   )
-  await configureBitvavo(
+  await runServer(
     testDb.db,
-    user.id,
-    env,
-    {
+    configureBitvavo(user.id, env, {
       apiKey: 'key',
       apiSecret: 'secret',
       accountId: account.id,
       startDate: '2019-01-01',
       timeZone: 'Europe/Madrid',
-    },
+    }),
     http,
   )
   return { user, account }
@@ -114,13 +113,13 @@ it('requires explicit duplicate resolution and links the chosen manual movement'
       operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
     }),
   )
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
   expect(preview.operations[0].candidates.map((candidate) => candidate.id)).toEqual([manual.id])
-  await expect(confirmBitvavo(testDb.db, user.id, preview.id, [])).rejects.toThrow('duplicados')
+  await expect(runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))).rejects.toThrow('duplicados')
   expect(await runWithDb(testDb.db, transactions.listByUser(user.id))).toHaveLength(1)
-  await confirmBitvavo(testDb.db, user.id, preview.id, [
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },
-  ])
+  ]))
   const bootstrap = await runWithDb(testDb.db, buildBootstrapPayload(user.id))
   expect(bootstrap.transactions).toHaveLength(2)
   expect(bootstrap.transactions.find((row) => row.id === manual.id)).toMatchObject({
@@ -131,15 +130,15 @@ it('requires explicit duplicate resolution and links the chosen manual movement'
 
 it('resumes a partial failure without advancing the cursor or duplicating completed movements', async () => {
   const { user } = await configuredUser()
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
   testDb.sqlite.exec(
     "CREATE TRIGGER fail_sale BEFORE INSERT ON investment_trade_details WHEN NEW.side = 'sell' BEGIN SELECT RAISE(ABORT, 'simulated failure'); END",
   )
-  await expect(confirmBitvavo(testDb.db, user.id, preview.id, [])).rejects.toThrow('reintentar')
+  await expect(runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))).rejects.toThrow('reintentar')
   expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBeNull()
   expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(1)
   testDb.sqlite.exec('DROP TRIGGER fail_sale')
-  await confirmBitvavo(testDb.db, user.id, preview.id, [])
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))
   expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(2)
   expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBe(preview.to)
   const changes = await runWithDb(testDb.db, sync.listChangesSince(user.id, 0))
@@ -159,8 +158,8 @@ it('automatically links a unique symbol belonging to the user', async () => {
     }),
   )
   await runWithDb(testDb.db, market.createUserInstrument(user.id, { instrumentId: instrument.id }))
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
-  await confirmBitvavo(testDb.db, user.id, preview.id, [])
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, []))
   expect(
     (await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions[0].tradeDetail
       ?.instrumentId,
@@ -221,7 +220,7 @@ it('offers historical sales calculated with gross plus fee as explicit duplicate
       },
     }),
   )
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
   expect(preview.operations.find((op) => op.side === 'sell')?.candidates.map((c) => c.id)).toEqual([
     manual.id,
   ])
@@ -241,10 +240,10 @@ it('preserves a local description when linking an explicit manual duplicate', as
       operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
     }),
   )
-  const preview = await previewBitvavo(testDb.db, user.id, env, http)
-  await confirmBitvavo(testDb.db, user.id, preview.id, [
+  const preview = await runServer(testDb.db, previewBitvavo(user.id, env), http)
+  await runServer(testDb.db, confirmBitvavo(user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },
-  ])
+  ]))
   expect((await runWithDb(testDb.db, transactions.get(user.id, manual.id)))?.description).toBe(
     'My purchase notes',
   )
