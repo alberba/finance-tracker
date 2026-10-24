@@ -98,7 +98,8 @@ expone la app a Internet.
   externo `finance-data` con `finance.sqlite`. `docker.service` arranca después de `tailscaled`
   (drop-in de systemd) para que el puerto enlace tras un reinicio.
 - **`.env`** (chmod 600): las variables públicas, los secretos (`BETTER_AUTH_SECRET`,
-  `DATA_ENCRYPTION_KEY`, claves de Google/GitHub/Resend/mercado) y
+  `DATA_ENCRYPTION_KEY`, claves de Google/GitHub/Resend/mercado y, opcional,
+  `OPENCODE_GO_API_KEY` para el análisis de los reportes web) y
   `BETTER_AUTH_URL=https://<dominio>`. Con `LOCAL_ADMIN_EMAIL` ya presente en la base, el
   arranque no crea otro administrador. `TEST_AUTH_ENABLED` no debe existir nunca.
 - **NPM**: proxy host `<dominio>` → `http://<ip-tailscale>:4321`, certificado Let's Encrypt,

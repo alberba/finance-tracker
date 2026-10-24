@@ -207,6 +207,10 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
+4. Si hay clave de OpenCode Go, la issue incluye una sección «Análisis generado
+   automáticamente» (DeepSeek V4.1 Flash) separada del texto del usuario. El análisis
+   tiene un plazo de 8 segundos; si falla o expira, la issue se crea sin él y el fallo
+   queda registrado una vez en el log del servidor.
 
 ### Variables y secrets requeridos
 
@@ -215,6 +219,11 @@ En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
 - `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
+
+Opcional:
+
+- `OPENCODE_GO_API_KEY`: clave de OpenCode Go para el análisis del reporte. Ausente, el
+  enriquecimiento queda desactivado y no afecta al resto del flujo.
 
 ### Labels recomendadas en GitHub
 
