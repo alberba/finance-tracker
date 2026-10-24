@@ -81,6 +81,35 @@ describe('plan del agente de GitHub Actions', () => {
     expect(() => parseAgentPlan(output)).toThrow()
   })
 
+  it.each([
+    ['not-json', 'OPENCODE_JSON'],
+    ['```json\n{}\n```', 'OPENCODE_JSON_FENCED'],
+    [JSON.stringify({ ...plan, brief: 'sin criterios' }), 'OPENCODE_PLAN'],
+  ])('distingue respuestas inválidas para el diagnóstico: %s', (content, code) => {
+    const output = events(plan)
+      .split('\n')
+      .map((line) => {
+        const event = JSON.parse(line)
+        return JSON.stringify(
+          event.type === 'text' && event.part.text === JSON.stringify(plan)
+            ? { ...event, part: { text: content } }
+            : event,
+        )
+      })
+      .join('\n')
+    expect(() => parseAgentPlan(output)).toThrow(expect.objectContaining({ code }))
+  })
+
+  it('identifica el estado HTTP del proveedor sin incluir su mensaje', () => {
+    const output = JSON.stringify({
+      type: 'error',
+      error: { data: { statusCode: 401, message: 'PRIVATE_MARKER' } },
+    })
+    expect(() => parseAgentPlan(output)).toThrow(
+      expect.objectContaining({ code: 'OPENCODE_HTTP_401' }),
+    )
+  })
+
   it('retira los metadatos del contexto que recibe el modelo y conserva las capturas para publicar', () => {
     expect(splitReportBody(body).report).toBe(
       '## Reporte desde la web\n\n### Resumen\nEl filtro no persiste',
