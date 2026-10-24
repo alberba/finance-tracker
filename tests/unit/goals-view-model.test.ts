@@ -29,6 +29,7 @@ function state(goals: Partial<Record<GoalKey, Goal>> = {}): State {
     transactions: [],
     snapshots: {},
     goals: { ...GOALS, ...goals },
+    savingGoals: [],
   } as unknown as State
 }
 
