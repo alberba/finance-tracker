@@ -29,11 +29,15 @@ function run(sqlite: Database.Database, file: string): void {
 }
 
 /**
- * Applies the migration set minus `excluded`, so a test can put one migration
- * on either side of a data change and pin down the order the two need.
+ * Applies the migrations up to the closing one minus `excluded`, so a test can
+ * put one migration on either side of a data change and pin down the order the
+ * two need. Later migrations are left out: the closing migration rebuilds
+ * tables with `SELECT *`, so columns added after it would not line up when it
+ * runs out of order.
  */
 function applyAllExcept(sqlite: Database.Database, excluded: readonly string[]): void {
   for (const file of migrationFiles()) {
+    if (file > CLOSING) break
     if (excluded.includes(file)) continue
     run(sqlite, file)
   }

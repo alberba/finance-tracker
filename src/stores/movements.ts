@@ -96,14 +96,8 @@ export interface EditedSubscriptionInput {
   frequency: SubscriptionFrequency
 }
 
-const SAVING_ACCOUNTS_MESSAGE = 'El ahorro necesita una cuenta destino distinta del origen.'
-
-function isValidSavingAccounts(input: {
-  accountId: string
-  destinationAccountId?: string
-}): boolean {
-  return Boolean(input.destinationAccountId) && input.destinationAccountId !== input.accountId
-}
+const SAVING_ACCOUNTS_MESSAGE =
+  'El ahorro necesita una cuenta de efectivo de origen y otra distinta de destino.'
 
 function currentYear(): number {
   return Number(todayISO().slice(0, 4))
@@ -118,6 +112,20 @@ export const useMovementsStore = defineStore('movements', () => {
   const uiStore = useUiStore()
   const { showToast } = useToast()
   const ui = uiStore.ui
+
+  /** A saving moves money between two different cash accounts. */
+  function isValidSavingAccounts(input: {
+    accountId: string
+    destinationAccountId?: string
+  }): boolean {
+    const cash = new Set(financialStateStore.accounts.map((account) => account.id))
+    return (
+      Boolean(input.destinationAccountId) &&
+      input.destinationAccountId !== input.accountId &&
+      cash.has(input.accountId) &&
+      cash.has(input.destinationAccountId as string)
+    )
+  }
 
   const accountNameById = computed(() => {
     const map = new Map<string, string>()
