@@ -56,7 +56,7 @@ describe('round trip: ahorro', () => {
     const { useMovementsStore } = await import('../../../../src/stores/movements')
     return useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type: 'saving',
       accountId: ids.origin,
       destinationAccountId: ids.destination,
@@ -84,7 +84,7 @@ describe('round trip: ahorro', () => {
     const reloaded = await trip.reload()
     const { computeAccountBalance } = await import('../../../../src/lib/finance-core')
     const balance = (id: string) =>
-      computeAccountBalance(id, 8, reloaded.accounts, reloaded.transactions, {})
+      computeAccountBalance(id, 9, reloaded.accounts, reloaded.transactions, {})
 
     expect(balance(ids.origin)).toBe(700)
     expect(balance(ids.destination)).toBe(300)
@@ -94,7 +94,7 @@ describe('round trip: ahorro', () => {
     const { useMovementsStore } = await import('../../../../src/stores/movements')
     const input = {
       date: '2026-09-12',
-      month: 8,
+      month: 9 as const,
       type: 'saving' as const,
       accountId: ids.origin,
       category: 'Fondo de emergencia',

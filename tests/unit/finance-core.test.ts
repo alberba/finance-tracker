@@ -202,7 +202,7 @@ describe("finance-core helpers", () => {
       {
         id: "tx-saving",
         date: "2026-01-12",
-        month: 0,
+        month: 1,
         type: "saving",
         accountId: "revolut",
         destinationAccountId: "santander",
@@ -212,17 +212,17 @@ describe("finance-core helpers", () => {
     ];
 
     const origin = (list: Transaction[]) =>
-      computeAccountBalance("revolut", 0, accounts, list, {});
+      computeAccountBalance("revolut", 1, accounts, list, {});
     const destination = (list: Transaction[]) =>
-      computeAccountBalance("santander", 0, accounts, list, {});
+      computeAccountBalance("santander", 1, accounts, list, {});
 
     expect(origin(withSaving)).toBe(origin(transactions) - 300);
     expect(destination(withSaving)).toBe(destination(transactions) + 300);
 
     const liquidity = (list: Transaction[]) =>
-      getWealthByMonth(0, accounts, investments, liabilities, list, {}).liquidity;
+      getWealthByMonth(1, accounts, investments, liabilities, list, {}).liquidity;
     expect(liquidity(withSaving)).toBe(liquidity(transactions));
-    expect(getMonthTotals(withSaving, 0).saving).toBe(300);
+    expect(getMonthTotals(withSaving, 1).saving).toBe(300);
   });
 
   it("calcula patrimonio neto mensual", () => {

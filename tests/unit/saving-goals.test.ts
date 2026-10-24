@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { buildSavingGoals } from '../../src/domain/goals/view-model'
+import type { Month } from '../../src/lib/month'
 import type { State, Transaction } from '../../src/scripts/types'
 
 function saving(id: string, category: string, amount: number, date = '2026-03-10'): Transaction {
   return {
     id,
     date,
-    month: Number(date.slice(5, 7)) - 1,
+    month: Number(date.slice(5, 7)) as Month,
     type: 'saving',
     accountId: 'corriente',
     destinationAccountId: 'hucha',
