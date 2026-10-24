@@ -127,7 +127,7 @@ export async function startRoundTrip(
       }
       if (url === '/api/sync') {
         const { commands } = JSON.parse(String(init?.body))
-        return json(await applySyncBatch(asServerDb(testDb.db), user.id, commands))
+        return json(await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands)))
       }
       throw new Error(`unexpected fetch ${url}`)
     }),
@@ -194,7 +194,7 @@ export async function startRoundTrip(
       offline = next
     },
     asOtherDevice: async (commands) => {
-      await applySyncBatch(asServerDb(testDb.db), user.id, commands as never)
+      await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands as never))
     },
     reloadOffline: async () => {
       await quiesce()

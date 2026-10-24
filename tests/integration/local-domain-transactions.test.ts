@@ -183,12 +183,12 @@ it('rolls back a command including changes, cursor and result while retaining it
   sqlite.exec(`CREATE TRIGGER fail_result BEFORE UPDATE OF result ON sync_commands
     BEGIN SELECT RAISE(ABORT, 'injected result failure'); END`)
   await expect(
-    applyOneCommand(db, 'owner', {
+    runWithDb(db, applyOneCommand('owner', {
       commandId: 'failed-command',
       action: 'create',
       entityType: 'account',
       data: { name: 'Rollback account', kind: 'cash', currency: 'EUR', openingBalance: 0 },
-    }),
+    })),
   ).rejects.toThrow()
   expect(await runWithDb(db, accountsRepository.listByUser('owner'))).toEqual([])
   expect(await db.select().from(schema.syncChanges)).toEqual([])
@@ -208,13 +208,13 @@ it('applies the same command concurrently only once through the production bindi
     data: { name: 'Once', kind: 'cash', currency: 'EUR', openingBalance: 0 },
   }
   const outcomes = await Promise.all([
-    applyOneCommand(db, 'owner', command),
-    applyOneCommand(db, 'owner', command),
+    runWithDb(db, applyOneCommand('owner', command)),
+    runWithDb(db, applyOneCommand('owner', command)),
   ])
   expect(outcomes.filter((outcome) => !outcome.replayed)).toHaveLength(1)
   expect(await runWithDb(db, accountsRepository.listByUser('owner'))).toHaveLength(1)
   expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 1 })
-  expect(await applyOneCommand(db, 'owner', command)).toMatchObject({
+  expect(await runWithDb(db, applyOneCommand('owner', command))).toMatchObject({
     status: 'applied',
     replayed: true,
   })
@@ -240,20 +240,20 @@ it('recovers a failed command after its lease expires and replays the committed 
   }
   sqlite.exec(`CREATE TRIGGER fail_result BEFORE UPDATE OF result ON sync_commands
     BEGIN SELECT RAISE(ABORT, 'injected result failure'); END`)
-  await expect(applyOneCommand(db, 'owner', command)).rejects.toMatchObject({
+  await expect(runWithDb(db, applyOneCommand('owner', command))).rejects.toMatchObject({
     cause: { message: 'injected result failure' },
   })
-  expect(await applyOneCommand(db, 'owner', command)).toMatchObject({ status: 'in_progress' })
+  expect(await runWithDb(db, applyOneCommand('owner', command))).toMatchObject({ status: 'in_progress' })
   sqlite.exec('DROP TRIGGER fail_result')
   // Advance only this reservation's lease, independent of wall-clock ordering.
   sqlite
     .prepare('UPDATE sync_commands SET created_at = ? WHERE id = ?')
     .run('2000-01-01T00:00:00.000Z', command.commandId)
-  expect(await applyOneCommand(db, 'owner', command)).toMatchObject({
+  expect(await runWithDb(db, applyOneCommand('owner', command))).toMatchObject({
     status: 'applied',
     replayed: false,
   })
-  expect(await applyOneCommand(db, 'owner', command)).toMatchObject({
+  expect(await runWithDb(db, applyOneCommand('owner', command))).toMatchObject({
     status: 'applied',
     replayed: true,
   })
@@ -280,7 +280,7 @@ it('rolls back the investment operation and movement with sync metadata on a fin
   sqlite.exec(`CREATE TRIGGER fail_result BEFORE UPDATE OF result ON sync_commands
     BEGIN SELECT RAISE(ABORT, 'injected result failure'); END`)
   await expect(
-    applyOneCommand(db, 'owner', {
+    runWithDb(db, applyOneCommand('owner', {
       commandId: 'investment-command',
       action: 'create',
       entityType: 'transaction',
@@ -292,7 +292,7 @@ it('rolls back the investment operation and movement with sync metadata on a fin
         currency: 'EUR',
         operation: { symbol: 'TEST', side: 'buy', units: 1, unitPrice: 10, fee: 0 },
       },
-    }),
+    })),
   ).rejects.toThrow()
   expect(await db.select().from(schema.transactions)).toEqual([])
   expect(await db.select().from(schema.investmentTradeDetails)).toEqual([])

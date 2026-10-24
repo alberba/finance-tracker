@@ -3,6 +3,7 @@ import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
 import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
+import { runWithDb } from "../../../../src/db/database"
 
 let currentDb: TestDatabase["db"];
 vi.mock("../../../../src/db/client", () => ({
@@ -39,22 +40,22 @@ describe("GET /api/changes", () => {
   });
 
   it("walks sync_changes with revision > since", async () => {
-    await applySyncBatch(testDb.db, principal.userId, [
+    await runWithDb(testDb.db, applySyncBatch(principal.userId, [
       {
         commandId: "cmd-1",
         action: "create",
         entityType: "category",
         data: { name: "Ocio", kind: "expense" },
       },
-    ]);
-    await applySyncBatch(testDb.db, principal.userId, [
+    ]));
+    await runWithDb(testDb.db, applySyncBatch(principal.userId, [
       {
         commandId: "cmd-2",
         action: "create",
         entityType: "category",
         data: { name: "Transporte", kind: "expense" },
       },
-    ]);
+    ]));
 
     const { GET } = await import("../../../../src/pages/api/changes");
     const response = await GET({

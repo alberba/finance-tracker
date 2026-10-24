@@ -28,14 +28,14 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
   it("applies the patch when baseVersion matches the stored settings", async () => {
     const settings = await runWithDb(testDb.db, userSettingsRepository.create(userId, { currency: "EUR" }));
 
-    const result = await applySyncBatch(testDb.db, userId, [
+    const result = await runWithDb(testDb.db, applySyncBatch(userId, [
       {
         commandId: "settings-fresh",
         action: "settingsUpdate",
         baseVersion: settings.version,
         patch: { currency: "USD" },
       },
-    ]);
+    ]));
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");
@@ -46,14 +46,14 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
     // Another device moved the row on after this one read it.
     await runWithDb(testDb.db, userSettingsRepository.update(userId, { currency: "GBP" }, settings.version));
 
-    const result = await applySyncBatch(testDb.db, userId, [
+    const result = await runWithDb(testDb.db, applySyncBatch(userId, [
       {
         commandId: "settings-stale",
         action: "settingsUpdate",
         baseVersion: settings.version,
         patch: { currency: "USD" },
       },
-    ]);
+    ]));
 
     expect(result.results[0]).toMatchObject({
       status: "conflict",
@@ -67,14 +67,14 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
     const settings = await runWithDb(testDb.db, userSettingsRepository.create(userId, { currency: "EUR" }));
     await runWithDb(testDb.db, userSettingsRepository.update(userId, { currency: "USD" }, settings.version));
 
-    const result = await applySyncBatch(testDb.db, userId, [
+    const result = await runWithDb(testDb.db, applySyncBatch(userId, [
       {
         commandId: "settings-replay",
         action: "settingsUpdate",
         baseVersion: settings.version,
         patch: { currency: "USD" },
       },
-    ]);
+    ]));
 
     expect(result.results[0].status).toBe("noop");
   });
@@ -87,25 +87,25 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
     // The patch carries no settings column at all, and an empty patch is
     // trivially "already held". Reading that as a replay would skip the TWR
     // write entirely, so it has to be a conflict.
-    const stale = await applySyncBatch(testDb.db, userId, [
+    const stale = await runWithDb(testDb.db, applySyncBatch(userId, [
       {
         commandId: "twr-stale",
         action: "settingsUpdate",
         baseVersion: settings.version,
         patch: { twrLiquidityAccountIds: [account.id] },
       },
-    ]);
+    ]));
     expect(stale.results[0].status).toBe("conflict");
     expect(await runWithDb(testDb.db, accountsRepository.listTwrLiquidityAccountsByUser(userId))).toHaveLength(0);
 
-    const fresh = await applySyncBatch(testDb.db, userId, [
+    const fresh = await runWithDb(testDb.db, applySyncBatch(userId, [
       {
         commandId: "twr-fresh",
         action: "settingsUpdate",
         baseVersion: settings.version + 1,
         patch: { twrLiquidityAccountIds: [account.id] },
       },
-    ]);
+    ]));
     expect(fresh.results[0].status).toBe("applied");
     expect(await runWithDb(testDb.db, accountsRepository.listTwrLiquidityAccountsByUser(userId))).toMatchObject([
       { accountId: account.id },
@@ -113,9 +113,9 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
   });
 
   it("still creates settings for a command that carries no baseVersion", async () => {
-    const result = await applySyncBatch(testDb.db, userId, [
+    const result = await runWithDb(testDb.db, applySyncBatch(userId, [
       { commandId: "settings-legacy", action: "settingsUpdate", patch: { currency: "USD" } },
-    ]);
+    ]));
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");

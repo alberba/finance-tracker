@@ -142,10 +142,10 @@ describe("POST /api/sync", () => {
       .set({ createdAt: "2000-01-01T00:00:00.000Z" })
       .where(eq(syncCommands.id, commandId));
 
-    const outcome = await applyOneCommand(testDb.db, principal.userId, {
+    const outcome = await runWithDb(testDb.db, applyOneCommand(principal.userId, {
       commandId, action: "create", entityType: "account",
       data: { legacyId, name: "Ya aplicada", kind: "cash", currency: "EUR", openingBalance: 25 },
-    });
+    }));
 
     expect(outcome.status).toBe("noop");
     expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toHaveLength(1);
@@ -190,7 +190,7 @@ describe("POST /api/sync", () => {
     const spy = vi.spyOn(syncRepository, "getCommand").mockReturnValueOnce(Effect.succeed(undefined));
 
     try {
-      const outcome = await applyOneCommand(testDb.db, principal.userId, { commandId, action: "noop" });
+      const outcome = await runWithDb(testDb.db, applyOneCommand(principal.userId, { commandId, action: "noop" }));
       expect(outcome).toMatchObject({ commandId, status: "in_progress", replayed: false });
       expect(spy).toHaveBeenCalledTimes(2);
     } finally {
@@ -207,8 +207,8 @@ describe("POST /api/sync", () => {
     };
 
     const outcomes = await Promise.allSettled([
-      applyOneCommand(testDb.db, principal.userId, command),
-      applyOneCommand(testDb.db, principal.userId, command),
+      runWithDb(testDb.db, applyOneCommand(principal.userId, command)),
+      runWithDb(testDb.db, applyOneCommand(principal.userId, command)),
     ]);
 
     expect(outcomes.some((outcome) => outcome.status === "fulfilled")).toBe(true);
@@ -224,22 +224,22 @@ describe("POST /api/sync", () => {
     }));
 
     const outcomes = await Promise.all([
-      applyOneCommand(testDb.db, principal.userId, {
+      runWithDb(testDb.db, applyOneCommand(principal.userId, {
         commandId: "concurrent-update-a",
         action: "update",
         entityType: "account",
         entityId: account.id,
         baseVersion: account.version,
         patch: { name: "Cambio A" },
-      }),
-      applyOneCommand(testDb.db, principal.userId, {
+      })),
+      runWithDb(testDb.db, applyOneCommand(principal.userId, {
         commandId: "concurrent-update-b",
         action: "update",
         entityType: "account",
         entityId: account.id,
         baseVersion: account.version,
         patch: { name: "Cambio B" },
-      }),
+      })),
     ]);
 
     expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(["applied", "conflict"]);
