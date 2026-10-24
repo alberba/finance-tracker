@@ -46,8 +46,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     revisionRow,
   ] = await Promise.all([
     runWithDb(db, userSettingsRepository.get(userId)),
-    accountsRepository.listByUser(db, userId),
-    accountsRepository.listCategoriesByUser(db, userId),
+    runWithDb(db, accountsRepository.listByUser(userId)),
+    runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
     transactionsRepository.listByUser(db, userId),
     runWithDb(db, subscriptionsRepository.listByUser(userId)),
     runWithDb(db, recurringRulesRepository.listByUser(userId)),
@@ -56,8 +56,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     runWithDb(db, goalsRepository.listByUser(userId)),
     wealthRepository.listByUser(db, userId),
     contributionsRepository.listByUser(db, userId),
-    marketRepository.listUserInstrumentsByUser(db, userId),
-    accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
+    runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
+    runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
@@ -109,8 +109,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
 
   const instrumentIds = userInstruments.map((userInstrument) => userInstrument.instrumentId)
   const [instrumentRows, quotesByInstrument] = await Promise.all([
-    marketRepository.listInstrumentsByIds(db, instrumentIds),
-    marketRepository.listQuotesByInstruments(db, instrumentIds),
+    runWithDb(db, marketRepository.listInstrumentsByIds(instrumentIds)),
+    runWithDb(db, marketRepository.listQuotesByInstruments(instrumentIds)),
   ])
   const instrumentsById = new Map(instrumentRows.map((instrument) => [instrument.id, instrument]))
   const instruments = userInstruments

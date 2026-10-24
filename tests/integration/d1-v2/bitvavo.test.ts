@@ -70,12 +70,12 @@ it('rejects deletion of a remote financial operation', async () => {
 
 async function configuredUser() {
   const user = await runWithDb(testDb.db, users.create({ email: 'owner@example.com' }))
-  const account = await accounts.create(testDb.db, user.id, {
+  const account = await runWithDb(testDb.db, accounts.create(user.id, {
     name: 'Bitvavo',
     kind: 'cash',
     currency: 'EUR',
     openingBalance: 0,
-  })
+  }))
   await configureBitvavo(
     testDb.db,
     user.id,
@@ -138,13 +138,13 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
 
 it('automatically links a unique symbol belonging to the user', async () => {
   const { user } = await configuredUser()
-  const instrument = await market.createInstrument(testDb.db, {
+  const instrument = await runWithDb(testDb.db, market.createInstrument({
     symbol: 'BTC',
     normalizedSymbol: 'BTC',
     provider: 'coingecko',
     currency: 'EUR',
-  })
-  await market.createUserInstrument(testDb.db, user.id, { instrumentId: instrument.id })
+  }))
+  await runWithDb(testDb.db, market.createUserInstrument(user.id, { instrumentId: instrument.id }))
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
   expect(

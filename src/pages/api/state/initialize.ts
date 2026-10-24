@@ -38,7 +38,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
       const settings = await runWithDb(tx, userSettingsRepository.create(userId, {
         currency: requestedCurrency ?? 'EUR',
       }))
-      const categories = await accountsRepository.listCategoriesByUser(tx, userId)
+      const categories = await runWithDb(tx, accountsRepository.listCategoriesByUser(userId))
       await runWithDb(tx, syncRepository.ensureRevision(userId))
       return { alreadyInitialized: false, settings, categories }
     })

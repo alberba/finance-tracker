@@ -12,7 +12,7 @@ import { runWithDb } from '../../../../src/db/database'
 /** Seeds categories the way the v1 migration writes them: `legacyId = name`. */
 async function seedMigratedCategory(db: RoundTrip["testDb"]["db"], userId: string, name: string) {
   const accountsRepository = await import("../../../../src/db/repositories/accounts");
-  return accountsRepository.createCategory(db, userId, { name, kind: "expense", legacyId: name });
+  return runWithDb(db, accountsRepository.createCategory(userId, { name, kind: "expense", legacyId: name }));
 }
 
 describe("round trip: presupuesto y categorías", () => {
@@ -37,7 +37,7 @@ describe("round trip: presupuesto y categorías", () => {
       await trip.reload();
 
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
-      const categories = await accountsRepository.listCategoriesByUser(trip.testDb.db, trip.userId);
+      const categories = await runWithDb(trip.testDb.db, accountsRepository.listCategoriesByUser(trip.userId));
       expect(categories.filter((category) => category.name === "Comida")).toHaveLength(1);
     });
 

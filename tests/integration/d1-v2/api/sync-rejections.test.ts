@@ -44,7 +44,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
       data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 0, notARealColumn: "x" },
     }]);
     await expectRejectedAndFinalized("unknown-field", result);
-    const accounts = await accountsRepository.listByUser(testDb.db, userId);
+    const accounts = await runWithDb(testDb.db, accountsRepository.listByUser(userId));
     expect(accounts).toHaveLength(0);
   });
 
@@ -103,7 +103,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     await expectRejectedAndFinalized("remove-used-category", result);
-    expect(await accountsRepository.getCategory(testDb.db, userId, category.id)).toBeDefined();
+    expect(await runWithDb(testDb.db, accountsRepository.getCategory(userId, category.id))).toBeDefined();
   });
 
   it("rejects removing an account still referenced by a transaction (§2.6)", async () => {
@@ -118,7 +118,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     await expectRejectedAndFinalized("remove-used-account", result);
-    expect(await accountsRepository.get(testDb.db, userId, account.id)).toBeDefined();
+    expect(await runWithDb(testDb.db, accountsRepository.get(userId, account.id))).toBeDefined();
   });
 
   it("still removes an unreferenced category", async () => {

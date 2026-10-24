@@ -49,7 +49,7 @@ export async function configureBitvavo(
   http: typeof fetch = fetch,
 ) {
   const config = connectionSchema.parse(input)
-  const account = await accounts.get(db, userId, config.accountId)
+  const account = await runWithDb(db, accounts.get(userId, config.accountId))
   if (!account || account.currency !== 'EUR' || account.kind === 'liability' || account.isArchived)
     throw new RejectedCommandError('Selecciona una cuenta EUR propia.')
   if (
@@ -203,7 +203,7 @@ export async function confirmBitvavo(
       throw new RejectedCommandError('La configuración cambió: genera otra vista previa.')
     if (current?.resolutions && current.resolutions !== serialized)
       throw new RejectedCommandError('Reanuda con las mismas resoluciones.')
-    const account = await accounts.get(db, userId, preview.accountId)
+    const account = await runWithDb(db, accounts.get(userId, preview.accountId))
     if (!account || account.currency !== 'EUR' || account.isArchived)
       throw new RejectedCommandError('La cuenta de destino ya no está disponible en EUR.')
     return await Effect.runPromise(

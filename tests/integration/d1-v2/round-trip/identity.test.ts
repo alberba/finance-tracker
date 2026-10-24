@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { accounts, categories, subscriptions } from "../../../../src/db/schema";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: identidad propia para entidades nuevas", () => {
   let trip: RoundTrip;
@@ -121,11 +122,11 @@ describe("round trip: identidad propia para entidades nuevas", () => {
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
       // Una fila como la escribe la migración de v1: sin identidad propia,
       // reconciliable sólo por su identificador derivado de los datos.
-      await accountsRepository.createCategory(db, userId, {
+      await runWithDb(db, accountsRepository.createCategory(userId, {
         name: "Comida",
         kind: "expense",
         legacyId: "expense:Comida",
-      });
+      }));
     });
 
     // El cliente que todavía no ha migrado esta sección reenvía su `create`

@@ -54,7 +54,7 @@ describe('POST /api/state/initialize', () => {
     principal = await resolvePrincipal(testDb.db, input)
     const settings = await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))
     expect(settings?.currency).toBe('EUR')
-    const categories = await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)
+    const categories = await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))
     expect(categories.map((row) => [row.name, row.kind, row.sortOrder])).toEqual([
       ['Nómina', 'income', 0],
       ['Otros ingresos', 'income', 1],
@@ -67,7 +67,7 @@ describe('POST /api/state/initialize', () => {
       ['Otros gastos', 'expense', 6],
       ['Inversión', 'investment', 0],
     ])
-    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([])
     expect(await resolvePrincipal(testDb.db, input)).toEqual(principal)
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     const response = await POST({
@@ -76,7 +76,7 @@ describe('POST /api/state/initialize', () => {
     } as never)
     expect(response.status).toBe(200)
     expect((await response.json()).alreadyInitialized).toBe(true)
-    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual(
+    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual(
       categories,
     )
     expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
@@ -87,17 +87,17 @@ describe('POST /api/state/initialize', () => {
       currency: 'USD',
       onboardingCompleted: true,
     }))
-    const category = await accountsRepository.createCategory(testDb.db, principal.userId, {
+    const category = await runWithDb(testDb.db, accountsRepository.createCategory(principal.userId, {
       name: 'Personal',
       kind: 'expense',
       sortOrder: 0,
-    })
+    }))
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     await POST({
       request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
     } as never)
-    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([
+    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([
       category,
     ])
     expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
@@ -110,21 +110,21 @@ describe('POST /api/state/initialize', () => {
       locals: { principal },
     } as never)
     expect(response.status).toBe(201)
-    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([])
   })
 
   it('preserves pre-existing categories even when settings have not been created', async () => {
-    const category = await accountsRepository.createCategory(testDb.db, principal.userId, {
+    const category = await runWithDb(testDb.db, accountsRepository.createCategory(principal.userId, {
       name: 'Personal',
       kind: 'expense',
       sortOrder: 0,
-    })
+    }))
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     await POST({
       request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
     } as never)
-    expect(await accountsRepository.listCategoriesByUser(testDb.db, principal.userId)).toEqual([
+    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([
       category,
     ])
   })
@@ -163,12 +163,12 @@ describe('POST /api/state/reset', () => {
     const syncRepository = await import('../../../../src/db/repositories/sync')
     await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
     await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
-    await accountsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: 'Cuenta a borrar',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 42,
-    })
+    }))
     await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
       currency: 'USD',
       onboardingCompleted: true,
@@ -192,7 +192,7 @@ describe('POST /api/state/reset', () => {
       { revision: 2, entityType: 'reset' },
     ])
 
-    const accounts = await accountsRepository.listByUser(testDb.db, principal.userId)
+    const accounts = await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))
     expect(accounts).toEqual([])
   })
 
@@ -204,12 +204,12 @@ describe('POST /api/state/reset', () => {
     const wealthRepository = await import('../../../../src/db/repositories/wealth')
     const contributionsRepository = await import('../../../../src/db/repositories/contributions')
 
-    const account = await accountsRepository.create(testDb.db, principal.userId, {
+    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: 'Cuenta a borrar',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 42,
-    })
+    }))
 
     // A part of a transaction: its investment operation.
     const investmentTx = await transactionsRepository.create(testDb.db, principal.userId, {
@@ -278,7 +278,7 @@ describe('POST /api/state/reset', () => {
     } as never)
 
     expect(response.status).toBe(200)
-    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([])
     expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId))).toEqual([])
     expect(await runWithDb(testDb.db, pendingMovementsRepository.listByUser(principal.userId))).toEqual([])

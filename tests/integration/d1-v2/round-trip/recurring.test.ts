@@ -18,18 +18,18 @@ describe('round trip: recurring rules and pending movements', () => {
       const accounts = await import('../../../../src/db/repositories/accounts')
       const rules = await import('../../../../src/db/repositories/recurring-rules')
       const pending = await import('../../../../src/db/repositories/pending-movements')
-      const account = await accounts.create(db, userId, {
+      const account = await runWithDb(db, accounts.create(userId, {
         name: 'Cuenta',
         kind: 'cash',
         currency: 'EUR',
         openingBalance: 0,
         legacyId: 'old-account',
-      })
-      const category = await accounts.createCategory(db, userId, {
+      }))
+      const category = await runWithDb(db, accounts.createCategory(userId, {
         name: 'Cuotas',
         kind: 'expense',
         legacyId: 'expense:Cuotas',
-      })
+      }))
       const rule = await runWithDb(db, rules.create(userId, {
         name: 'Cuota',
         type: 'expense',
