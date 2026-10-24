@@ -15,6 +15,7 @@ import * as recurringRulesRepository from "../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from "../../../db/repositories/pending-movements";
 import * as budgetEntriesRepository from "../../../db/repositories/budget-entries";
 import * as goalsRepository from "../../../db/repositories/goals";
+import { runWithDb } from "../../../db/database";
 import * as wealthRepository from "../../../db/repositories/wealth";
 import * as contributionsRepository from "../../../db/repositories/contributions";
 import * as marketRepository from "../../../db/repositories/market";
@@ -57,7 +58,7 @@ export const GET: APIRoute = async ({ locals }) =>
       recurringRulesRepository.listByUser(db, userId),
       pendingMovementsRepository.listByUser(db, userId),
       budgetEntriesRepository.listByUser(db, userId),
-      goalsRepository.listByUser(db, userId),
+      runWithDb(db, goalsRepository.listByUser(userId)),
       wealthRepository.listByUser(db, userId),
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
