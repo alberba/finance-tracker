@@ -1,9 +1,7 @@
 import type { APIRoute } from 'astro'
-import {
-  checkStockEventsSymbols,
-  type SymbolCheckRequest,
-} from '../../../lib/server/stockevents'
+import { checkStockEventsSymbols, type SymbolCheckRequest } from '../../../lib/server/stockevents'
 import { errorResponse, json, readApiKey } from './_helpers'
+import { runHttp } from '../../../lib/server/http'
 import { withApiErrorHandling } from '../../../lib/server/api-auth'
 
 interface CheckSymbolsBody {
@@ -18,7 +16,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
     const checks = normalizeChecks(body.checks)
     if (!checks.length) return json({ results: [] })
     try {
-      return json({ results: await checkStockEventsSymbols(apiKey, checks) })
+      return json({ results: await runHttp(checkStockEventsSymbols(apiKey, checks)) })
     } catch (error) {
       return errorResponse(error)
     }
@@ -30,7 +28,9 @@ function normalizeChecks(value: unknown): SymbolCheckRequest[] {
     .map((item) => {
       const raw = (item || {}) as Record<string, unknown>
       return {
-        symbol: String(raw.symbol || '').trim().toUpperCase(),
+        symbol: String(raw.symbol || '')
+          .trim()
+          .toUpperCase(),
         watchlistId: String(raw.watchlistId || '').trim(),
       }
     })

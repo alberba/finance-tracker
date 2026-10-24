@@ -1,5 +1,16 @@
+/**
+ * Stock Events API client (ADR-0006).
+ *
+ * Every operation returns `Effect<A, StockEventsApiError, Http>`: the caller
+ * decides when to execute it, HTTP enters through the `Http` service and the
+ * failures are typed. Timeouts are composed instead of hand-rolled.
+ */
+
+import { Data, Effect } from 'effect'
+import { Http } from './http'
+
 const STOCK_EVENTS_BASE_URL = 'https://stockevents.app/api/v1'
-const DEFAULT_TIMEOUT_MS = 8_000
+const DEFAULT_TIMEOUT = '8 seconds'
 
 export interface StockEventsWatchlist {
   id: string
@@ -41,55 +52,59 @@ export interface SymbolCheckResult {
   message?: string
 }
 
-export class StockEventsApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-  ) {
-    super(message)
-    this.name = 'StockEventsApiError'
-  }
+export class StockEventsApiError extends Data.TaggedError('StockEventsApiError')<{
+  message: string
+  status: number
+}> {}
+
+interface StockEventsResponseBody {
+  data?: unknown
+  error?: { code?: string; message?: string }
 }
 
-async function stockEventsFetch(
+function stockEventsFetch(
   apiKey: string,
   path: string,
   init: { method?: string; body?: unknown } = {},
-  fetchImpl: typeof fetch = fetch,
-): Promise<unknown> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
-  try {
-    const response = await fetchImpl(`${STOCK_EVENTS_BASE_URL}${path}`, {
-      method: init.method || 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        Accept: 'application/json',
-        ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      },
-      ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
-      signal: controller.signal,
-    })
+): Effect.Effect<unknown, StockEventsApiError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* Effect.tryPromise({
+      try: (signal) =>
+        http.request(`${STOCK_EVENTS_BASE_URL}${path}`, {
+          method: init.method || 'GET',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            Accept: 'application/json',
+            ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          },
+          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+          signal,
+        }),
+      catch: () =>
+        new StockEventsApiError({ message: 'No se pudo conectar con Stock Events', status: 502 }),
+    }).pipe(
+      Effect.timeout(DEFAULT_TIMEOUT),
+      Effect.catchTag('TimeoutError', () =>
+        Effect.fail(
+          new StockEventsApiError({ message: 'Stock Events no respondió a tiempo', status: 504 }),
+        ),
+      ),
+    )
     if (response.status === 204) {
       return null
     }
-    const body = (await response.json().catch(() => null)) as {
-      data?: unknown
-      error?: { code?: string; message?: string }
-    } | null
+    const body = yield* Effect.promise(
+      () => response.json().catch(() => null) as Promise<StockEventsResponseBody | null>,
+    )
     if (!response.ok) {
-      throw new StockEventsApiError(describeApiError(response.status, body?.error), response.status)
+      return yield* new StockEventsApiError({
+        message: describeApiError(response.status, body?.error),
+        status: response.status,
+      })
     }
     return body?.data ?? null
-  } catch (error) {
-    if (error instanceof StockEventsApiError) throw error
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new StockEventsApiError('Stock Events no respondió a tiempo', 504)
-    }
-    throw new StockEventsApiError('No se pudo conectar con Stock Events', 502)
-  } finally {
-    clearTimeout(timeout)
-  }
+  })
 }
 
 function describeApiError(
@@ -101,74 +116,68 @@ function describeApiError(
   return error?.message || `Stock Events respondió con estado ${status}`
 }
 
-export async function listStockEventsWatchlists(
+export function listStockEventsWatchlists(
   apiKey: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<StockEventsWatchlist[]> {
-  const data = await stockEventsFetch(apiKey, '/watchlists', {}, fetchImpl)
-  if (!Array.isArray(data)) return []
-  return data
-    .map((item) => {
-      const raw = (item || {}) as Record<string, unknown>
-      return {
-        id: String(raw.id || ''),
-        name: String(raw.name || ''),
-        ...(raw.currency ? { currency: String(raw.currency) } : {}),
-      }
-    })
-    .filter((watchlist) => Boolean(watchlist.id))
-}
-
-export async function listWatchlistSymbols(
-  apiKey: string,
-  watchlistId: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string[]> {
-  const data = await stockEventsFetch(
-    apiKey,
-    `/watchlists/${encodeURIComponent(watchlistId)}/symbols`,
-    {},
-    fetchImpl,
-  )
-  if (!Array.isArray(data)) return []
-  return data
-    .map((entry) => {
-      const raw = (entry || {}) as Record<string, unknown>
-      return raw.isDeleted === true
-        ? ''
-        : String(raw.symbol || '')
-            .trim()
-            .toUpperCase()
-    })
-    .filter(Boolean)
-}
-
-export async function addSymbolToWatchlist(
-  apiKey: string,
-  watchlistId: string,
-  symbol: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<void> {
-  await stockEventsFetch(
-    apiKey,
-    `/watchlists/${encodeURIComponent(watchlistId)}/symbols`,
-    { method: 'POST', body: { symbol } },
-    fetchImpl,
+): Effect.Effect<StockEventsWatchlist[], StockEventsApiError, Http> {
+  return stockEventsFetch(apiKey, '/watchlists').pipe(
+    Effect.map((data) => {
+      if (!Array.isArray(data)) return []
+      return data
+        .map((item) => {
+          const raw = (item || {}) as Record<string, unknown>
+          return {
+            id: String(raw.id || ''),
+            name: String(raw.name || ''),
+            ...(raw.currency ? { currency: String(raw.currency) } : {}),
+          }
+        })
+        .filter((watchlist) => Boolean(watchlist.id))
+    }),
   )
 }
 
-async function removeSymbolFromWatchlist(
+export function listWatchlistSymbols(
+  apiKey: string,
+  watchlistId: string,
+): Effect.Effect<string[], StockEventsApiError, Http> {
+  return stockEventsFetch(apiKey, `/watchlists/${encodeURIComponent(watchlistId)}/symbols`).pipe(
+    Effect.map((data) => {
+      if (!Array.isArray(data)) return []
+      return data
+        .map((entry) => {
+          const raw = (entry || {}) as Record<string, unknown>
+          return raw.isDeleted === true
+            ? ''
+            : String(raw.symbol || '')
+                .trim()
+                .toUpperCase()
+        })
+        .filter(Boolean)
+    }),
+  )
+}
+
+export function addSymbolToWatchlist(
   apiKey: string,
   watchlistId: string,
   symbol: string,
-  fetchImpl: typeof fetch = fetch,
-): Promise<void> {
-  await stockEventsFetch(
+): Effect.Effect<void, StockEventsApiError, Http> {
+  return stockEventsFetch(apiKey, `/watchlists/${encodeURIComponent(watchlistId)}/symbols`, {
+    method: 'POST',
+    body: { symbol },
+  }).pipe(Effect.asVoid)
+}
+
+function removeSymbolFromWatchlist(
+  apiKey: string,
+  watchlistId: string,
+  symbol: string,
+): Effect.Effect<void, StockEventsApiError, Http> {
+  return stockEventsFetch(
     apiKey,
     `/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbol)}`,
     { method: 'DELETE' },
-    fetchImpl,
-  )
+  ).pipe(Effect.asVoid)
 }
 
 /**
@@ -177,53 +186,59 @@ async function removeSymbolFromWatchlist(
  * rest are validated with an add + immediate delete dry run, so a rejected
  * add means Stock Events does not recognise the ticker.
  */
-export async function checkStockEventsSymbols(
+export function checkStockEventsSymbols(
   apiKey: string,
   checks: SymbolCheckRequest[],
-  fetchImpl: typeof fetch = fetch,
-): Promise<SymbolCheckResult[]> {
-  const symbolsByWatchlist = new Map<string, Set<string>>()
+): Effect.Effect<SymbolCheckResult[], StockEventsApiError, Http> {
+  return Effect.gen(function* () {
+    const symbolsByWatchlist = new Map<string, Set<string>>()
 
-  async function watchlistSymbols(watchlistId: string): Promise<Set<string>> {
-    const cached = symbolsByWatchlist.get(watchlistId)
-    if (cached) return cached
-    const symbols = new Set(await listWatchlistSymbols(apiKey, watchlistId, fetchImpl))
-    symbolsByWatchlist.set(watchlistId, symbols)
-    return symbols
-  }
-
-  const results: SymbolCheckResult[] = []
-  for (const check of checks) {
-    const symbol = check.symbol.trim().toUpperCase()
-    const watchlistId = check.watchlistId.trim()
-    if (!symbol || !watchlistId) {
-      results.push({ symbol, watchlistId, status: 'error', message: 'Falta símbolo o lista' })
-      continue
+    function watchlistSymbols(
+      watchlistId: string,
+    ): Effect.Effect<Set<string>, StockEventsApiError, Http> {
+      const cached = symbolsByWatchlist.get(watchlistId)
+      if (cached) return Effect.succeed(cached)
+      return listWatchlistSymbols(apiKey, watchlistId).pipe(
+        Effect.map((symbols) => {
+          const set = new Set(symbols)
+          symbolsByWatchlist.set(watchlistId, set)
+          return set
+        }),
+      )
     }
-    try {
-      const existing = await watchlistSymbols(watchlistId)
-      if (existing.has(symbol)) {
-        results.push({ symbol, watchlistId, status: 'in-watchlist' })
+
+    const results: SymbolCheckResult[] = []
+    for (const check of checks) {
+      const symbol = check.symbol.trim().toUpperCase()
+      const watchlistId = check.watchlistId.trim()
+      if (!symbol || !watchlistId) {
+        results.push({ symbol, watchlistId, status: 'error', message: 'Falta símbolo o lista' })
         continue
       }
-      await addSymbolToWatchlist(apiKey, watchlistId, symbol, fetchImpl)
-      await removeSymbolFromWatchlist(apiKey, watchlistId, symbol, fetchImpl).catch(() => undefined)
-      results.push({ symbol, watchlistId, status: 'detected' })
-    } catch (error) {
-      const status = error instanceof StockEventsApiError ? error.status : 0
-      const message = error instanceof Error ? error.message : 'Error desconocido'
-      if (status === 401 || status === 403) {
-        throw error
-      }
-      results.push({
-        symbol,
-        watchlistId,
-        status: status >= 400 && status < 500 ? 'not-detected' : 'error',
-        message,
-      })
+      const result = yield* Effect.gen(function* () {
+        const existing = yield* watchlistSymbols(watchlistId)
+        if (existing.has(symbol)) {
+          return { symbol, watchlistId, status: 'in-watchlist' } satisfies SymbolCheckResult
+        }
+        yield* addSymbolToWatchlist(apiKey, watchlistId, symbol)
+        yield* removeSymbolFromWatchlist(apiKey, watchlistId, symbol).pipe(Effect.ignore)
+        return { symbol, watchlistId, status: 'detected' } satisfies SymbolCheckResult
+      }).pipe(
+        Effect.catchIf(
+          (error) => error.status !== 401 && error.status !== 403,
+          (error) =>
+            Effect.succeed({
+              symbol,
+              watchlistId,
+              status: error.status >= 400 && error.status < 500 ? 'not-detected' : 'error',
+              message: error.message,
+            } satisfies SymbolCheckResult),
+        ),
+      )
+      results.push(result)
     }
-  }
-  return results
+    return results
+  })
 }
 
 /**
@@ -231,28 +246,27 @@ export async function checkStockEventsSymbols(
  * transaction. Stock Events keeps holdings per watchlist symbol, so the add
  * step is required for symbols that were never synced before.
  */
-export async function createStockEventsTransaction(
+export function createStockEventsTransaction(
   apiKey: string,
   payload: StockEventsTransactionPayload,
-  fetchImpl: typeof fetch = fetch,
-): Promise<StockEventsCreatedTransaction> {
-  const symbol = payload.symbol.trim().toUpperCase()
-  if (!symbol.startsWith('CASH_')) {
-    const existing = await listWatchlistSymbols(apiKey, payload.watchlistId, fetchImpl)
-    if (!existing.includes(symbol)) {
-      await addSymbolToWatchlist(apiKey, payload.watchlistId, symbol, fetchImpl)
+): Effect.Effect<StockEventsCreatedTransaction, StockEventsApiError, Http> {
+  return Effect.gen(function* () {
+    const symbol = payload.symbol.trim().toUpperCase()
+    if (!symbol.startsWith('CASH_')) {
+      const existing = yield* listWatchlistSymbols(apiKey, payload.watchlistId)
+      if (!existing.includes(symbol)) {
+        yield* addSymbolToWatchlist(apiKey, payload.watchlistId, symbol)
+      }
     }
-  }
-  const data = await stockEventsFetch(
-    apiKey,
-    '/transactions',
-    { method: 'POST', body: { ...payload, symbol } },
-    fetchImpl,
-  )
-  const raw = (data || {}) as Record<string, unknown>
-  return {
-    id: String(raw.id || ''),
-    watchlistId: String(raw.watchlistId || payload.watchlistId),
-    symbol: String(raw.symbol || symbol),
-  }
+    const data = yield* stockEventsFetch(apiKey, '/transactions', {
+      method: 'POST',
+      body: { ...payload, symbol },
+    })
+    const raw = (data || {}) as Record<string, unknown>
+    return {
+      id: String(raw.id || ''),
+      watchlistId: String(raw.watchlistId || payload.watchlistId),
+      symbol: String(raw.symbol || symbol),
+    }
+  })
 }
