@@ -1,4 +1,5 @@
 import type { RuntimeEnv } from './cloudflare-env'
+import { enrichIssueReport, type IssueEnricher } from './issue-enricher'
 import type { IssueReportPayload } from './issue-report-schema'
 
 export interface CreatedIssue {
@@ -8,6 +9,8 @@ export interface CreatedIssue {
 
 export interface GithubIssueClient {
   fetch: typeof fetch
+  /** Análisis opcional del reporte. Por defecto, el enriquecedor de DeepSeek vía OpenCode Go. */
+  enrich?: IssueEnricher
 }
 
 /**
@@ -53,7 +56,11 @@ export function getGithubIssueType(type: IssueReportPayload['type']): GithubIssu
   return canonicalReportType(type) === 'bug' ? 'Bug' : 'Feature'
 }
 
-export function buildIssueBody(payload: IssueReportPayload, reporter: IssueReporter): string {
+export function buildIssueBody(
+  payload: IssueReportPayload,
+  reporter: IssueReporter,
+  analysis?: string | null,
+): string {
   const reportType = canonicalReportType(payload.type)
   const githubType = getGithubIssueType(payload.type)
   const lines = ['## Reporte desde la web', '', '### Resumen', payload.summary, '']
@@ -78,6 +85,17 @@ export function buildIssueBody(payload: IssueReportPayload, reporter: IssueRepor
     `- Email: ${reporter.email || 'n/a'}`,
     `- Identificador: ${reporter.userId}`,
   )
+
+  // Sección aditiva y separada: el texto del usuario queda intacto por encima.
+  if (analysis) {
+    lines.push(
+      '',
+      '## Análisis generado automáticamente',
+      '> Generado con DeepSeek V4.1 Flash a partir del reporte. No es texto del usuario.',
+      '',
+      analysis,
+    )
+  }
 
   return lines.join('\n').trim()
 }
@@ -110,6 +128,33 @@ async function requestWithRetry(
   return lastResponse as Response
 }
 
+/**
+ * El enriquecimiento nunca bloquea el reporte: si algo falla, la issue se crea
+ * sin análisis. Los enriquecedores ya registran sus fallos; este catch cubre
+ * solo un enriquecedor que lance pese al contrato.
+ */
+async function enrichReport(
+  payload: IssueReportPayload,
+  env: RuntimeEnv,
+  enrich: IssueEnricher,
+): Promise<string | null> {
+  try {
+    return await enrich(
+      {
+        type: canonicalReportType(payload.type),
+        summary: payload.summary,
+        description: payload.description,
+        section: payload.section,
+        pathname: payload.context.pathname,
+      },
+      env,
+    )
+  } catch {
+    console.error('[github] El análisis del reporte se omitió por un fallo inesperado.')
+    return null
+  }
+}
+
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   reporter: IssueReporter,
@@ -121,9 +166,10 @@ export async function createIssueFromWebReport(
   const repo = requiredEnv('GITHUB_REPO', env)
   const title = payload.summary.slice(0, 140)
   const labels = buildIssueLabels(payload.type)
+  const analysis = await enrichReport(payload, env, client.enrich ?? enrichIssueReport)
   const baseRequestBody = {
     title,
-    body: buildIssueBody(payload, reporter),
+    body: buildIssueBody(payload, reporter, analysis),
     labels,
   }
   const requestBody = {
