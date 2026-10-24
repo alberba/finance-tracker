@@ -68,7 +68,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
 
     const transactionsRepository = await import("../../../../src/db/repositories/transactions");
     expect(
-      await transactionsRepository.getTradeDetailByTransaction(trip.testDb.db, trip.userId, movementId),
+      await runWithDb(trip.testDb.db, transactionsRepository.getTradeDetailByTransaction(trip.userId, movementId)),
     ).toBeUndefined();
   });
 

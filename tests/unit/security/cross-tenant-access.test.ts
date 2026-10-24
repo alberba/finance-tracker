@@ -76,7 +76,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       name: "Comida",
       kind: "expense",
     }));
-    const txA = await transactionsRepository.create(db, userA.id, {
+    const txA = await runWithDb(db, transactionsRepository.create(userA.id, {
       accountId: accountA.id,
       categoryId: categoryA.id,
       type: "expense",
@@ -84,7 +84,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       description: "Compra",
       amount: -20,
       currency: "EUR",
-    });
+    }));
 
     const outcome = await applyOneCommand(db, userB.id, {
       commandId: "attack-remove-1",
@@ -95,7 +95,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     } as never);
 
     expect(outcome.status).toBe("not_found");
-    expect(await transactionsRepository.get(db, userA.id, txA.id)).toBeDefined();
+    expect(await runWithDb(db, transactionsRepository.get(userA.id, txA.id))).toBeDefined();
   });
 
   it("does not leak user A's entity data into user B's create response by id guessing", async () => {
@@ -113,7 +113,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     // they create in their own tenant — must fail (FK/ownership check),
     // never silently attach to A's account.
     await expect(
-      transactionsRepository.create(db, userB.id, {
+      runWithDb(db, transactionsRepository.create(userB.id, {
         accountId: accountA.id,
         categoryId: null,
         type: "expense",
@@ -121,7 +121,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
         description: "Fuga",
         amount: -1,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -228,19 +228,19 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       currency: "EUR",
       openingBalance: 0,
     }));
-    const snapshotA = await wealthRepository.create(db, userA.id, {
+    const snapshotA = await runWithDb(db, wealthRepository.create(userA.id, {
       snapshotDate: "2026-08-01",
       year: 2026,
       month: 7,
-    });
+    }));
 
     await expect(
-      wealthRepository.createBalance(db, userB.id, {
+      runWithDb(db, wealthRepository.createBalance(userB.id, {
         snapshotId: snapshotA.id,
         accountId: accountA.id,
         balance: 500,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -254,19 +254,19 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       currency: "EUR",
       openingBalance: 0,
     }));
-    const contributionA = await contributionsRepository.create(db, userA.id, {
+    const contributionA = await runWithDb(db, contributionsRepository.create(userA.id, {
       date: "2026-08-01",
       amount: 100,
       currency: "EUR",
-    });
+    }));
 
     await expect(
-      contributionsRepository.createAllocation(db, userB.id, {
+      runWithDb(db, contributionsRepository.createAllocation(userB.id, {
         contributionId: contributionA.id,
         accountId: accountA.id,
         amount: 100,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 

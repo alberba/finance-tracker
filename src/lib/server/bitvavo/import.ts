@@ -100,12 +100,9 @@ export async function previewBitvavo(
     { from, to, timeZone: config.timeZone, startDate: config.startDate },
     http,
   )
-  const movements = await transactions.listByUser(db, userId)
-  const details = await transactions.listTradeDetailsByTransactions(
-    db,
-    userId,
-    movements.map((m) => m.id),
-  )
+  const movements = await runWithDb(db, transactions.listByUser(userId))
+  const details = await runWithDb(db, transactions.listTradeDetailsByTransactions(userId,
+    movements.map((m) => m.id),))
   const preview: BitvavoPreview = {
     connectionVersion: config.version,
     id: crypto.randomUUID(),

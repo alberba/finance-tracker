@@ -7,6 +7,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm'
+import { lift } from '../database'
 import { fromMinorUnits, toMinorUnits } from '../../lib/money'
 import { snapshotBalances, wealthSnapshots } from '../schema'
 import {
@@ -46,15 +47,11 @@ function toBalanceRow(row: typeof snapshotBalances.$inferSelect): SnapshotBalanc
 
 // -- wealth_snapshots ----------------------------------------------------------
 
-export async function listByUser(db: Db, userId: string): Promise<WealthSnapshotRow[]> {
+async function listByUserSql(db: Db, userId: string): Promise<WealthSnapshotRow[]> {
   return db.select().from(wealthSnapshots).where(eq(wealthSnapshots.userId, userId))
 }
 
-export async function get(
-  db: Db,
-  userId: string,
-  id: string,
-): Promise<WealthSnapshotRow | undefined> {
+async function getSql(db: Db, userId: string, id: string): Promise<WealthSnapshotRow | undefined> {
   const [row] = await db
     .select()
     .from(wealthSnapshots)
@@ -62,7 +59,7 @@ export async function get(
   return row
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateWealthSnapshotInput,
@@ -84,14 +81,14 @@ export async function create(
   return row
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: Partial<CreateWealthSnapshotInput>,
   expectedVersion?: number,
 ): Promise<WealthSnapshotRow | undefined> {
-  const existing = await get(db, userId, id)
+  const existing = await getSql(db, userId, id)
   if (!existing) {
     return undefined
   }
@@ -115,13 +112,13 @@ export async function update(
   return row
 }
 
-export async function remove(
+async function removeSql(
   db: Db,
   userId: string,
   id: string,
   expectedVersion?: number,
 ): Promise<boolean> {
-  const existing = await get(db, userId, id)
+  const existing = await getSql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -138,7 +135,7 @@ export async function remove(
   return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateWealthSnapshotInput[],
@@ -166,7 +163,7 @@ export async function bulkInsert(
 
 // -- snapshot_balances ----------------------------------------------------------
 
-export async function listBalancesBySnapshot(
+async function listBalancesBySnapshotSql(
   db: Db,
   userId: string,
   snapshotId: string,
@@ -183,7 +180,7 @@ export async function listBalancesBySnapshot(
  * (audit §5.1): one query for every snapshot's balances instead of one
  * query per snapshot.
  */
-export async function listBalancesBySnapshots(
+async function listBalancesBySnapshotsSql(
   db: Db,
   userId: string,
   snapshotIds: string[],
@@ -215,7 +212,7 @@ export async function listBalancesBySnapshots(
   return bySnapshot
 }
 
-export async function getBalance(
+async function getBalanceSql(
   db: Db,
   userId: string,
   id: string,
@@ -227,7 +224,7 @@ export async function getBalance(
   return row ? toBalanceRow(row) : undefined
 }
 
-export async function createBalance(
+async function createBalanceSql(
   db: Db,
   userId: string,
   input: CreateSnapshotBalanceInput,
@@ -250,8 +247,8 @@ export async function createBalance(
   return toBalanceRow(row)
 }
 
-export async function removeBalance(db: Db, userId: string, id: string): Promise<boolean> {
-  const existing = await getBalance(db, userId, id)
+async function removeBalanceSql(db: Db, userId: string, id: string): Promise<boolean> {
+  const existing = await getBalanceSql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -262,7 +259,7 @@ export async function removeBalance(db: Db, userId: string, id: string): Promise
 }
 
 /** Replaces every balance of a snapshot with `inputs`, atomically within the caller's transaction. */
-export async function replaceBalances(
+async function replaceBalancesSql(
   db: Db,
   userId: string,
   snapshotId: string,
@@ -271,14 +268,14 @@ export async function replaceBalances(
   await db
     .delete(snapshotBalances)
     .where(and(eq(snapshotBalances.userId, userId), eq(snapshotBalances.snapshotId, snapshotId)))
-  return bulkInsertBalances(
+  return bulkInsertBalancesSql(
     db,
     userId,
     inputs.map((input) => ({ ...input, snapshotId })),
   )
 }
 
-export async function bulkInsertBalances(
+async function bulkInsertBalancesSql(
   db: Db,
   userId: string,
   inputs: CreateSnapshotBalanceInput[],
@@ -316,3 +313,17 @@ export async function bulkInsertBalances(
   }
   return rows.map(toBalanceRow)
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)
+export const listBalancesBySnapshot = lift(listBalancesBySnapshotSql)
+export const listBalancesBySnapshots = lift(listBalancesBySnapshotsSql)
+export const getBalance = lift(getBalanceSql)
+export const createBalance = lift(createBalanceSql)
+export const removeBalance = lift(removeBalanceSql)
+export const replaceBalances = lift(replaceBalancesSql)
+export const bulkInsertBalances = lift(bulkInsertBalancesSql)

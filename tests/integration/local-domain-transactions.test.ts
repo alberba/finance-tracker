@@ -80,14 +80,14 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
         currency: 'EUR',
         openingBalance: 25,
       }))
-      await transactionsRepository.create(db, 'owner', {
+      await runWithDb(db, transactionsRepository.create('owner', {
         accountId: account.id,
         type: 'investment',
         date: '2026-01-01',
         amount: -10,
         currency: 'EUR',
         operation: { symbol: 'TEST', side: 'buy', units: 1, unitPrice: 10, fee: 0 },
-      })
+      }))
     }
     const before = await exported()
     const otherBefore = await runWithDb(db, accountsRepository.listByUser('other'))

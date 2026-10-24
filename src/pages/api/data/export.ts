@@ -53,25 +53,22 @@ export const GET: APIRoute = async ({ locals }) =>
       runWithDb(db, accountsRepository.listByUser(userId)),
       runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
       runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
-      transactionsRepository.listByUser(db, userId),
+      runWithDb(db, transactionsRepository.listByUser(userId)),
       runWithDb(db, subscriptionsRepository.listByUser(userId)),
       runWithDb(db, recurringRulesRepository.listByUser(userId)),
       runWithDb(db, pendingMovementsRepository.listByUser(userId)),
       runWithDb(db, budgetEntriesRepository.listByUser(userId)),
       runWithDb(db, goalsRepository.listByUser(userId)),
-      wealthRepository.listByUser(db, userId),
-      contributionsRepository.listByUser(db, userId),
+      runWithDb(db, wealthRepository.listByUser(userId)),
+      runWithDb(db, contributionsRepository.listByUser(userId)),
       runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
       runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
       runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
       runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
     ]);
 
-    const tradeDetails = await transactionsRepository.listTradeDetailsByTransactions(
-      db,
-      userId,
-      transactions.map((transaction) => transaction.id),
-    );
+    const tradeDetails = await runWithDb(db, transactionsRepository.listTradeDetailsByTransactions(userId,
+      transactions.map((transaction) => transaction.id),));
     // The operation travels inside its movement (ADR 0002), in the same shape
     // the import hands back to `transactionsRepository.create`.
     const transactionsWithOperations = transactions.map((transaction) => {
@@ -94,18 +91,15 @@ export const GET: APIRoute = async ({ locals }) =>
     const wealthSnapshotsWithBalances = await Promise.all(
       wealthSnapshots.map(async (snapshot) => ({
         ...snapshot,
-        balances: await wealthRepository.listBalancesBySnapshot(db, userId, snapshot.id),
+        balances: await runWithDb(db, wealthRepository.listBalancesBySnapshot(userId, snapshot.id)),
       })),
     );
 
     const contributionsWithAllocations = await Promise.all(
       contributions.map(async (contribution) => ({
         ...contribution,
-        allocations: await contributionsRepository.listAllocationsByContribution(
-          db,
-          userId,
-          contribution.id,
-        ),
+        allocations: await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId,
+          contribution.id,)),
       })),
     );
 

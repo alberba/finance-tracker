@@ -101,7 +101,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       holdingsUpdatedAt: '2026-04-01T10:00:00Z',
     },
   }))
-  await transactionsRepository.create(db, userId, {
+  await runWithDb(db, transactionsRepository.create(userId, {
     legacyId: 'tx-1',
     accountId: account.id,
     categoryId: category.id,
@@ -134,7 +134,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       quantity: '2.5',
       unitPrice: '100',
     } as never,
-  })
+  }))
   await runWithDb(db, subscriptionsRepository.create(userId, {
     name: 'Cine',
     accountId: account.id,
@@ -254,31 +254,31 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     targetAmount: 500000,
     currency: 'EUR',
   }))
-  const snapshot = await wealthRepository.create(db, userId, {
+  const snapshot = await runWithDb(db, wealthRepository.create(userId, {
     snapshotDate: '2026-03-31',
     year: 2026,
     month: 3,
-  })
-  await wealthRepository.createBalance(db, userId, {
+  }))
+  await runWithDb(db, wealthRepository.createBalance(userId, {
     snapshotId: snapshot.id,
     accountId: account.id,
     balance: 1234.56,
     currency: 'EUR',
-  })
-  const contribution = await contributionsRepository.create(db, userId, {
+  }))
+  const contribution = await runWithDb(db, contributionsRepository.create(userId, {
     date: '2026-03-10',
     amount: 300,
     currency: 'EUR',
     portfolioDate: '2026-03-09',
     portfolioValue: 10000,
     flow: 300,
-  })
-  await contributionsRepository.createAllocation(db, userId, {
+  }))
+  await runWithDb(db, contributionsRepository.createAllocation(userId, {
     contributionId: contribution.id,
     accountId: account.id,
     amount: 300,
     currency: 'EUR',
-  })
+  }))
   await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
     categoryId: category.id,
     stockeventsSymbol: 'VWCE.DE',
@@ -366,13 +366,13 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       currency: 'EUR',
       openingBalance: 10,
     }))
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: 'expense',
       date: '2024-01-01',
       amount: -5,
       currency: 'EUR',
-    })
+    }))
 
     const { GET: exportGET } = await import('../../../../src/pages/api/data/export')
     const exportResponse = await exportGET({ locals: { principal } } as never)
@@ -406,7 +406,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(importedAccounts).toHaveLength(1)
     expect(importedAccounts[0].id).not.toBe(account.id)
 
-    const importedTransactions = await transactionsRepository.listByUser(testDb.db, otherUser.id)
+    const importedTransactions = await runWithDb(testDb.db, transactionsRepository.listByUser(otherUser.id))
     expect(importedTransactions).toHaveLength(1)
     expect(importedTransactions[0].accountId).toBe(importedAccounts[0].id)
     expect(importedTransactions[0].amount).toBe(-5)
@@ -502,13 +502,13 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       currency: 'EUR',
       openingBalance: 0,
     }))
-    await transactionsRepository.create(testDb.db, target.id, {
+    await runWithDb(testDb.db, transactionsRepository.create(target.id, {
       accountId: stale.id,
       type: 'expense',
       date: '2025-01-01',
       amount: -1,
       currency: 'EUR',
-    })
+    }))
 
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
     const importResponse = await importPOST({
