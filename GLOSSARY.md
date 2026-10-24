@@ -36,10 +36,23 @@ _Avoid_: trade suelto, detalle
 
 **Plantilla de movimiento**:
 El conjunto de datos que describe qué movimiento hay que crear: tipo, importe, categoría,
-descripción, cuenta y, si es de inversión, la operación. Una regla recurrente es una plantilla
+descripción, cuenta y, si es de inversión, la operación o, si es de ahorro, la cuenta destino. Una regla recurrente es una plantilla
 más un calendario; un movimiento pendiente es una plantilla más una fecha; un movimiento es una
 plantilla ya ocurrida.
 _Avoid_: borrador, payload
+
+**Ahorro**:
+Un movimiento que aparta dinero de una cuenta de efectivo a otra, también de efectivo. Lleva
+cuenta origen y cuenta destino, que deben ser distintas; el patrimonio no cambia, sólo dónde está
+el dinero. Tiene sus propias categorías y su propio presupuesto, y se suma a la inversión como
+dinero apartado de lo gastable.
+_Avoid_: transferencia, traspaso, inversión de bajo riesgo
+
+**Objetivo de ahorro**:
+Un objetivo creado por el usuario cuyo progreso es la suma de los ahorros de una categoría de
+ahorro, incluidos los anteriores a su creación. Los objetivos de patrimonio (corto, medio y largo
+plazo) se siguen midiendo contra el patrimonio y no se ligan a una categoría.
+_Avoid_: meta de ahorro, objetivo ligado a una cuenta
 
 **Cuenta**:
 Un sitio donde hay dinero, con un tipo: efectivo, inversión o pasivo. Las tres listas de la
