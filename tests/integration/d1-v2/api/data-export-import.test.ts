@@ -167,7 +167,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     time: '10:00',
     status: 'paused',
   }))
-  await pendingMovementsRepository.create(db, userId, {
+  await runWithDb(db, pendingMovementsRepository.create(userId, {
     recurringRuleId: rule.id,
     accountId: account.id,
     categoryId: category.id,
@@ -184,7 +184,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     time: '10:00',
     transactionId: 'tx-1',
     status: 'confirmed',
-  })
+  }))
   await runWithDb(db, budgetEntriesRepository.create(userId, {
     categoryId: category.id,
     year: 2026,
@@ -224,13 +224,13 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     amount: 300,
     currency: 'EUR',
   })
-  await stockeventsSymbolMappingsRepository.create(db, userId, {
+  await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
     categoryId: category.id,
     stockeventsSymbol: 'VWCE.DE',
     sync: true,
     watchlistId: 'wl-1',
     hidden: true,
-  })
+  }))
   await stockeventsCashMappingsRepository.upsertMapping(db, userId, {
     accountId: account.id,
     watchlistId: 'wl-1',

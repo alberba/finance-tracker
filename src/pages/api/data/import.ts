@@ -283,7 +283,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'pendingMovements')
           continue
         }
-        await pendingMovementsRepository.create(tx, userId, {
+        await runWithDb(tx, pendingMovementsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           recurringRuleId,
           accountId: accountId ?? null,
@@ -303,7 +303,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           // import keeps, so it needs no remapping.
           transactionId: optionalString(row.transactionId),
           status: typeof row.status === 'string' ? row.status : undefined,
-        })
+        }))
         bump(imported, 'pendingMovements')
       }
 
@@ -432,14 +432,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsSymbolMappings')
           continue
         }
-        await stockeventsSymbolMappingsRepository.create(tx, userId, {
+        await runWithDb(tx, stockeventsSymbolMappingsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           categoryId: categoryId ?? null,
           stockeventsSymbol: String(row.stockeventsSymbol ?? ''),
           sync: row.sync === 1 || row.sync === true,
           watchlistId: typeof row.watchlistId === 'string' ? row.watchlistId : null,
           hidden: row.hidden === 1 || row.hidden === true,
-        })
+        }))
         bump(imported, 'stockeventsSymbolMappings')
       }
 

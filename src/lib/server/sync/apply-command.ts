@@ -123,7 +123,7 @@ async function findByLegacyId(
       rows = (await runWithDb(db, recurringRulesRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'pendingMovement':
-      rows = (await pendingMovementsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, pendingMovementsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'budgetEntry':
       rows = (await runWithDb(db, budgetEntriesRepository.listByUser(userId))) as VersionedRow[]
@@ -140,7 +140,7 @@ async function findByLegacyId(
     case 'userInstrument':
       return undefined
     case 'stockeventsMapping':
-      rows = (await stockeventsSymbolMappingsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'stockeventsCashEntry':
       return undefined
@@ -176,7 +176,7 @@ async function loadForMutation(
     case 'recurringRule':
       return (await runWithDb(db, recurringRulesRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'pendingMovement':
-      return (await pendingMovementsRepository.get(db, userId, entityId)) as
+      return (await runWithDb(db, pendingMovementsRepository.get(userId, entityId))) as
         VersionedRow | undefined
     case 'budgetEntry':
       return (await runWithDb(db, budgetEntriesRepository.get(userId, entityId))) as VersionedRow | undefined
@@ -190,7 +190,7 @@ async function loadForMutation(
     case 'wealthSnapshot':
       return (await wealthRepository.get(db, userId, entityId)) as VersionedRow | undefined
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.get(db, userId, entityId)) as
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.get(userId, entityId))) as
         VersionedRow | undefined
     case 'stockeventsCashEntry': {
       const entries = await stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId)
@@ -244,7 +244,7 @@ async function createEntity(
     case 'recurringRule':
       return (await runWithDb(db, recurringRulesRepository.create(userId, data))) as VersionedRow
     case 'pendingMovement':
-      return (await pendingMovementsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, pendingMovementsRepository.create(userId, data))) as VersionedRow
     case 'budgetEntry':
       return (await runWithDb(db, budgetEntriesRepository.create(userId, data))) as VersionedRow
     case 'goal':
@@ -266,7 +266,7 @@ async function createEntity(
     case 'userInstrument':
       return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.create(db, userId, {
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
         id: typeof data.id === 'string' ? data.id : undefined,
         legacyId: data.legacyId ?? null,
         categoryId: data.categoryId ?? null,
@@ -275,7 +275,7 @@ async function createEntity(
         watchlistId:
           typeof data.watchlistId === 'string' && data.watchlistId ? data.watchlistId : null,
         hidden: data.hidden === true,
-      })) as VersionedRow
+      }))) as VersionedRow
     case 'stockeventsCashEntry': {
       const accountId = typeof data.accountId === 'string' && data.accountId ? data.accountId : null
       if (accountId) {
@@ -361,13 +361,10 @@ async function updateEntity(
         patch,
         expectedVersion,))) as VersionedRow | undefined
     case 'pendingMovement':
-      return (await pendingMovementsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, pendingMovementsRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'budgetEntry':
       return (await runWithDb(db, budgetEntriesRepository.update(userId,
         entityId,
@@ -406,9 +403,7 @@ async function updateEntity(
         expectedVersion,
       )) as VersionedRow | undefined
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.update(userId,
         entityId,
         {
           categoryId: patch.categoryId,
@@ -417,8 +412,7 @@ async function updateEntity(
           watchlistId: patch.watchlistId,
           hidden: patch.hidden,
         },
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'stockeventsCashEntry': {
       const updated = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
         contributionDate: String(patch.contributionDate),
@@ -470,7 +464,7 @@ async function removeEntity(
     case 'recurringRule':
       return runWithDb(db, recurringRulesRepository.remove(userId, entityId, expectedVersion))
     case 'pendingMovement':
-      return pendingMovementsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, pendingMovementsRepository.remove(userId, entityId, expectedVersion))
     case 'budgetEntry':
       return runWithDb(db, budgetEntriesRepository.remove(userId, entityId, expectedVersion))
     case 'goal':
@@ -480,7 +474,7 @@ async function removeEntity(
     case 'userInstrument':
       return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion)
     case 'stockeventsMapping':
-      return stockeventsSymbolMappingsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion))
     case 'stockeventsCashEntry':
       return stockeventsCashMappingsRepository.removeSyncEntry(
         db,

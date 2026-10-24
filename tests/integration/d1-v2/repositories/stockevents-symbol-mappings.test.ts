@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as mappingsRepo from "../../../../src/db/repositories/stockevents-symbol-mappings";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("stockevents-symbol-mappings repository", () => {
   let testDb: TestDatabase;
@@ -18,19 +19,19 @@ describe("stockevents-symbol-mappings repository", () => {
     const { db } = testDb;
     const user = await seedUser(db);
 
-    const created = await mappingsRepo.create(db, user.id, { stockeventsSymbol: "AAPL" });
+    const created = await runWithDb(db, mappingsRepo.create(user.id, { stockeventsSymbol: "AAPL" }));
     expect(created.stockeventsSymbol).toBe("AAPL");
 
-    const updated = await mappingsRepo.update(db, user.id, created.id, { stockeventsSymbol: "AAPL.US" });
+    const updated = await runWithDb(db, mappingsRepo.update(user.id, created.id, { stockeventsSymbol: "AAPL.US" }));
     expect(updated?.stockeventsSymbol).toBe("AAPL.US");
 
-    expect(await mappingsRepo.remove(db, user.id, created.id)).toBe(true);
+    expect(await runWithDb(db, mappingsRepo.remove(user.id, created.id))).toBe(true);
   });
 
   it("rejects creating a mapping for a non-existent user (FK violation)", async () => {
     const { db } = testDb;
     await expect(
-      mappingsRepo.create(db, "does-not-exist", { stockeventsSymbol: "AAPL" }),
+      runWithDb(db, mappingsRepo.create("does-not-exist", { stockeventsSymbol: "AAPL" })),
     ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
   });
 
@@ -38,9 +39,9 @@ describe("stockevents-symbol-mappings repository", () => {
     const { db } = testDb;
     const userA = await seedUser(db);
     const userB = await seedUser(db);
-    const created = await mappingsRepo.create(db, userA.id, { stockeventsSymbol: "AAPL" });
+    const created = await runWithDb(db, mappingsRepo.create(userA.id, { stockeventsSymbol: "AAPL" }));
 
-    expect(await mappingsRepo.get(db, userB.id, created.id)).toBeUndefined();
-    expect(await mappingsRepo.listByUser(db, userB.id)).toHaveLength(0);
+    expect(await runWithDb(db, mappingsRepo.get(userB.id, created.id))).toBeUndefined();
+    expect(await runWithDb(db, mappingsRepo.listByUser(userB.id))).toHaveLength(0);
   });
 });

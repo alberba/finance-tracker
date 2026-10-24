@@ -74,15 +74,15 @@ describe("recurring-rules repository", () => {
       currency: "EUR",
       frequency: "monthly",
     }));
-    const pending = await pendingMovementsRepo.create(db, user.id, {
+    const pending = await runWithDb(db, pendingMovementsRepo.create(user.id, {
       recurringRuleId: rule.id,
       amount: 750,
       currency: "EUR",
       dueDate: "2026-10-01",
-    });
+    }));
 
     expect(await runWithDb(db, recurringRulesRepo.remove(user.id, rule.id))).toBe(true);
 
-    expect(await pendingMovementsRepo.get(db, user.id, pending.id)).toBeUndefined();
+    expect(await runWithDb(db, pendingMovementsRepo.get(user.id, pending.id))).toBeUndefined();
   });
 });
