@@ -17,6 +17,10 @@ COINGECKO_API_PLAN=demo
 # [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
 TEST_AUTH_ENABLED=true
 
+# Opcional: enriquecer los reportes web con un análisis de DeepSeek V4.1 Flash
+# vía OpenCode Go. Vacía, el reporte se crea igual sin análisis.
+OPENCODE_GO_API_KEY=
+
 # Autenticación integrada (#275).
 BETTER_AUTH_URL=http://localhost:4321
 BETTER_AUTH_SECRET=

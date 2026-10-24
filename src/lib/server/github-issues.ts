@@ -1,4 +1,5 @@
 import type { RuntimeEnv } from './cloudflare-env'
+import { enrichIssueReport, type IssueEnricher } from './issue-enricher'
 import {
   uploadIssueAttachment,
   type AttachmentUploader,
@@ -15,6 +16,8 @@ export interface GithubIssueClient {
   fetch: typeof fetch
   /** Subidor de adjuntos. Por defecto, el que habla con la API real de GitHub. */
   uploadAttachment?: AttachmentUploader
+  /** Análisis opcional del reporte. Por defecto, el enriquecedor de DeepSeek vía OpenCode Go. */
+  enrich?: IssueEnricher
 }
 
 /** Resultado de subir un adjunto, con el nombre que se muestra en la issue. */
@@ -83,6 +86,7 @@ function attachmentLines(outcomes: AttachmentOutcome[]): string[] {
 export function buildIssueBody(
   payload: IssueReportPayload,
   reporter: IssueReporter,
+  analysis?: string | null,
   attachments: AttachmentOutcome[] = [],
 ): string {
   const reportType = canonicalReportType(payload.type)
@@ -113,6 +117,17 @@ export function buildIssueBody(
     `- Email: ${reporter.email || 'n/a'}`,
     `- Identificador: ${reporter.userId}`,
   )
+
+  // Sección aditiva y separada: el texto del usuario queda intacto por encima.
+  if (analysis) {
+    lines.push(
+      '',
+      '## Análisis generado automáticamente',
+      '> Generado con DeepSeek V4.1 Flash a partir del reporte. No es texto del usuario.',
+      '',
+      analysis,
+    )
+  }
 
   return lines.join('\n').trim()
 }
@@ -164,6 +179,33 @@ async function uploadAttachments(
   return outcomes
 }
 
+/**
+ * El enriquecimiento nunca bloquea el reporte: si algo falla, la issue se crea
+ * sin análisis. Los enriquecedores ya registran sus fallos; este catch cubre
+ * solo un enriquecedor que lance pese al contrato.
+ */
+async function enrichReport(
+  payload: IssueReportPayload,
+  env: RuntimeEnv,
+  enrich: IssueEnricher,
+): Promise<string | null> {
+  try {
+    return await enrich(
+      {
+        type: canonicalReportType(payload.type),
+        summary: payload.summary,
+        description: payload.description,
+        section: payload.section,
+        pathname: payload.context.pathname,
+      },
+      env,
+    )
+  } catch {
+    console.error('[github] El análisis del reporte se omitió por un fallo inesperado.')
+    return null
+  }
+}
+
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   reporter: IssueReporter,
@@ -185,9 +227,10 @@ export async function createIssueFromWebReport(
     client.uploadAttachment ?? uploadIssueAttachment,
     { fetch: client.fetch, token, owner, repo },
   )
+  const analysis = await enrichReport(payload, env, client.enrich ?? enrichIssueReport)
   const baseRequestBody = {
     title,
-    body: buildIssueBody(payload, reporter, outcomes),
+    body: buildIssueBody(payload, reporter, analysis, outcomes),
     labels,
   }
   const requestBody = {

@@ -17,6 +17,11 @@ export interface RuntimeEnv {
   GITHUB_TOKEN?: string
   GITHUB_OWNER?: string
   GITHUB_REPO?: string
+  /**
+   * Clave de OpenCode Go para enriquecer los reportes con DeepSeek V4.1 Flash
+   * (`issue-enricher.ts`). Opcional: sin ella la issue se crea sin análisis.
+   */
+  OPENCODE_GO_API_KEY?: string
   MARKET_DATA_PROVIDER?: string
   TWELVE_DATA_API_KEY?: string
   COINGECKO_API_KEY?: string
