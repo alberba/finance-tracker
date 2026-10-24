@@ -3,6 +3,7 @@ import { ZodError } from 'zod'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { reportApiRouteFailure } from '../../../lib/server/error-tracking'
 import { createIssueFromWebReport } from '../../../lib/server/github-issues'
+import { runHttp } from '../../../lib/server/http'
 import { parseIssueReportPayload } from '../../../lib/server/issue-report-schema'
 import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 
@@ -64,7 +65,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
         email: principal.email,
         name: principal.name ?? null,
       }
-      const created = await createIssueFromWebReport(payload, reporter, env)
+      const created = await runHttp(createIssueFromWebReport(payload, reporter, env))
       return jsonResponse(
         {
           ok: true,

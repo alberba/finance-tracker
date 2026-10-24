@@ -1,5 +1,16 @@
+/**
+ * GitHub issue creation for the in-app report form (ADR-0006).
+ *
+ * Returns `Effect<CreatedIssue, GithubIssueError, Http>`: retries and the
+ * type-less fallback are composed, and HTTP enters through the `Http` service.
+ * Attachments, duplicate checking and the auxiliary-failure reporter stay
+ * injectable for the tests, as they were before the migration.
+ */
+
+import { Data, Duration, Effect } from 'effect'
 import type { RuntimeEnv } from './cloudflare-env'
 import { reportReportSideFailure, type ReportSideFailureReporter } from './error-tracking'
+import { Http } from './http'
 import {
   checkIssueDuplicate,
   type IssueDuplicateChecker,
@@ -20,7 +31,6 @@ export interface CreatedIssue {
 }
 
 export interface GithubIssueClient {
-  fetch: typeof fetch
   /** Subidor de adjuntos. Por defecto, el que habla con la API real de GitHub. */
   uploadAttachment?: AttachmentUploader
   /** Comprobación semántica previa; la redacción se ejecuta en GitHub Actions. */
@@ -48,8 +58,14 @@ export interface IssueReporter {
 const GITHUB_API_BASE = 'https://api.github.com'
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422])
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 500
 
 export type GithubIssueType = 'Bug' | 'Feature'
+
+export class GithubIssueError extends Data.TaggedError('GithubIssueError')<{
+  message: string
+}> {}
 
 /** Cabeceras de todas las llamadas a la API de GitHub de este servicio. */
 function githubHeaders(token: string): Record<string, string> {
@@ -62,12 +78,12 @@ function githubHeaders(token: string): Record<string, string> {
 
 /** El endpoint de adjuntos exige el id numérico del repositorio. */
 async function fetchRepositoryId(
-  fetchFn: typeof fetch,
+  request: typeof fetch,
   owner: string,
   repo: string,
   headers: Record<string, string>,
 ): Promise<number> {
-  const response = await fetchFn(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers })
+  const response = await request(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers })
   if (!response.ok) {
     throw new Error(`No se pudo leer el repositorio (${response.status}).`)
   }
@@ -85,23 +101,27 @@ function once<T>(fn: () => Promise<T>): () => Promise<T> {
   return () => (pending ??= fn())
 }
 
-function requiredEnv(name: keyof RuntimeEnv, env: RuntimeEnv): string {
+function requiredVar(
+  name: keyof RuntimeEnv,
+  env: RuntimeEnv,
+): Effect.Effect<string, GithubIssueError> {
   const value = String(env[name] || '').trim()
-  if (!value) {
-    throw new Error(`Falta variable de entorno requerida: ${name}`)
-  }
   return value
+    ? Effect.succeed(value)
+    : Effect.fail(new GithubIssueError({ message: `Falta variable de entorno requerida: ${name}` }))
 }
 
-function requiredAnyEnv(names: ReadonlyArray<keyof RuntimeEnv>, env: RuntimeEnv): string {
+function requiredAnyVar(
+  names: ReadonlyArray<keyof RuntimeEnv>,
+  env: RuntimeEnv,
+): Effect.Effect<string, GithubIssueError> {
   for (const name of names) {
     const value = String(env[name] || '').trim()
-    if (value) {
-      return value
-    }
+    if (value) return Effect.succeed(value)
   }
-
-  throw new Error(`Falta variable de entorno requerida: ${names.join(' o ')}`)
+  return Effect.fail(
+    new GithubIssueError({ message: `Falta variable de entorno requerida: ${names.join(' o ')}` }),
+  )
 }
 
 function canonicalReportType(type: IssueReportPayload['type']): 'bug' | 'feature' {
@@ -169,28 +189,6 @@ export function buildIssueLabels(type: IssueReportPayload['type']): string[] {
   return ['source:web-report', 'needs-triage', canonicalReportType(type)]
 }
 
-async function requestWithRetry(
-  requestFn: () => Promise<Response>,
-  retries: number,
-  retryDelayMs: number,
-): Promise<Response> {
-  let lastResponse: Response | null = null
-
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await requestFn()
-    if (!RETRYABLE_STATUS.has(response.status)) {
-      return response
-    }
-    lastResponse = response
-
-    if (attempt < retries) {
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)))
-    }
-  }
-
-  return lastResponse as Response
-}
-
 /** Motivo fijo para Sentry: solo el estado HTTP, nunca el texto libre del error. */
 function uploadFailureReason(error: string): string {
   const status = /^GitHub devolvió (\d{3})\./.exec(error)?.[1]
@@ -251,94 +249,128 @@ async function findDuplicate(
   }
 }
 
-export async function createIssueFromWebReport(
+function postIssue(
+  request: typeof fetch,
+  token: string,
+  owner: string,
+  repo: string,
+  body: object,
+): Effect.Effect<Response, GithubIssueError> {
+  return Effect.tryPromise({
+    try: (signal) =>
+      request(`${GITHUB_API_BASE}/repos/${owner}/${repo}/issues`, {
+        method: 'POST',
+        headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal,
+      }),
+    catch: () => new GithubIssueError({ message: 'No se pudo contactar con GitHub.' }),
+  })
+}
+
+/** Retries only the statuses GitHub documents as transient. */
+function postWithRetry(
+  request: typeof fetch,
+  token: string,
+  owner: string,
+  repo: string,
+  body: object,
+): Effect.Effect<Response, GithubIssueError> {
+  return Effect.gen(function* () {
+    let response = yield* postIssue(request, token, owner, repo, body)
+    let attempt = 0
+    while (attempt < MAX_RETRIES && RETRYABLE_STATUS.has(response.status)) {
+      yield* Effect.sleep(Duration.millis(RETRY_DELAY_MS * (attempt + 1)))
+      response = yield* postIssue(request, token, owner, repo, body)
+      attempt += 1
+    }
+    return response
+  })
+}
+
+export function createIssueFromWebReport(
   payload: IssueReportPayload,
   reporter: IssueReporter,
   env: RuntimeEnv,
-  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) },
-): Promise<CreatedIssue> {
-  const token = requiredAnyEnv(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
-  const owner = requiredEnv('GITHUB_OWNER', env)
-  const repo = requiredEnv('GITHUB_REPO', env)
-  const headers = githubHeaders(token)
-  const uploadAttachment = client.uploadAttachment ?? uploadIssueAttachment
-  const checkDuplicate = client.checkDuplicate ?? checkIssueDuplicate
-  const title = payload.summary.slice(0, 140)
-  const labels = buildIssueLabels(payload.type)
-  // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
-  // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
-  // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
-  const reportFailure = client.reportFailure ?? reportReportSideFailure
-  const duplicate = await findDuplicate(payload, env, checkDuplicate, reportFailure)
-  if (duplicate) {
-    return { ...duplicate, duplicate: true }
-  }
-  const outcomes = await uploadAttachments(
-    payload.attachments ?? [],
-    uploadAttachment,
-    {
-      fetch: client.fetch,
-      headers,
-      repositoryId: once(() => fetchRepositoryId(client.fetch, owner, repo, headers)),
-    },
-    reportFailure,
-  )
-  const baseRequestBody = {
-    title,
-    body: buildIssueBody(payload, reporter, outcomes),
-    labels,
-  }
-  const requestBody = {
-    ...baseRequestBody,
-    // GitHub accepts the issue type by name. If the repository does not have
-    // issue types enabled, the fallback below creates the issue without it.
-    type: getGithubIssueType(payload.type),
-  }
+  client: GithubIssueClient = {},
+): Effect.Effect<CreatedIssue, GithubIssueError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const token = yield* requiredAnyVar(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
+    const owner = yield* requiredVar('GITHUB_OWNER', env)
+    const repo = yield* requiredVar('GITHUB_REPO', env)
+    const headers = githubHeaders(token)
+    const uploadAttachment = client.uploadAttachment ?? uploadIssueAttachment
+    const checkDuplicate = client.checkDuplicate ?? checkIssueDuplicate
+    const reportFailure = client.reportFailure ?? reportReportSideFailure
+    const title = payload.summary.slice(0, 140)
+    const labels = buildIssueLabels(payload.type)
 
-  const requestIssue = (body: object) =>
-    requestWithRetry(
-      () =>
-        client.fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/issues`, {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-      2,
-      500,
+    const duplicate = yield* Effect.promise(() =>
+      findDuplicate(payload, env, checkDuplicate, reportFailure),
+    )
+    if (duplicate) {
+      return { ...duplicate, duplicate: true }
+    }
+
+    // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
+    // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
+    // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
+    const outcomes = yield* Effect.promise(() =>
+      uploadAttachments(
+        payload.attachments ?? [],
+        uploadAttachment,
+        {
+          fetch: http.request,
+          headers,
+          repositoryId: once(() => fetchRepositoryId(http.request, owner, repo, headers)),
+        },
+        reportFailure,
+      ),
     )
 
-  let response = await requestIssue(requestBody)
-
-  if (!response.ok) {
-    const details = await response.text()
-
-    // Some GitHub installations expose labels/issues but not structured issue
-    // types. A type rejection must not prevent the report from being created.
-    if (TYPE_RETRY_STATUS.has(response.status)) {
-      response = await requestIssue(baseRequestBody)
-    } else {
-      // El cuerpo de GitHub queda del lado del servidor: el mensaje del error
-      // viaja a Sentry con `reportApiRouteFailure` y no debe repetirlo.
-      console.error(`[github] GitHub API devolvió ${response.status}`, details.slice(0, 500))
-      throw new Error(`GitHub API devolvió ${response.status}.`)
+    const baseRequestBody = {
+      title,
+      body: buildIssueBody(payload, reporter, outcomes),
+      labels,
     }
-  }
+    const requestBody = {
+      ...baseRequestBody,
+      // GitHub accepts the issue type by name. If the repository does not have
+      // issue types enabled, the fallback below creates the issue without it.
+      type: getGithubIssueType(payload.type),
+    }
 
-  if (!response.ok) {
-    const details = await response.text()
-    console.error(`[github] GitHub API devolvió ${response.status}`, details.slice(0, 500))
-    throw new Error(`GitHub API devolvió ${response.status}.`)
-  }
+    let response = yield* postWithRetry(http.request, token, owner, repo, requestBody)
 
-  const data = (await response.json()) as {
-    number?: number
-    html_url?: string
-  }
-  const issueNumber = Number(data.number)
-  const issueUrl = String(data.html_url || '')
-  if (!Number.isFinite(issueNumber) || !issueUrl) {
-    throw new Error('Respuesta inválida al crear issue en GitHub.')
-  }
+    if (!response.ok) {
+      if (TYPE_RETRY_STATUS.has(response.status)) {
+        response = yield* postWithRetry(http.request, token, owner, repo, baseRequestBody)
+      }
+      if (!response.ok) {
+        // El cuerpo de GitHub queda del lado del servidor: el mensaje del error
+        // viaja a Sentry con `reportApiRouteFailure` y no debe repetirlo.
+        const details = yield* Effect.promise(() => response.text())
+        console.error(`[github] GitHub API devolvió ${response.status}`, details.slice(0, 500))
+        return yield* new GithubIssueError({
+          message: `GitHub API devolvió ${response.status}.`,
+        })
+      }
+    }
 
-  return { number: issueNumber, url: issueUrl }
+    const data = yield* Effect.promise(
+      () =>
+        response.json().catch(() => null) as Promise<{
+          number?: number
+          html_url?: string
+        } | null>,
+    )
+    const issueNumber = Number(data?.number)
+    const issueUrl = String(data?.html_url || '')
+    if (!Number.isFinite(issueNumber) || !issueUrl) {
+      return yield* new GithubIssueError({ message: 'Respuesta inválida al crear issue en GitHub.' })
+    }
+
+    return { number: issueNumber, url: issueUrl }
+  })
 }

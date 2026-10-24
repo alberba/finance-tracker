@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 
 // Se mockean el cliente de GitHub (para forzar el fallo controlado) y el
 // tracking (para que el SDK real de Sentry nunca se importe): acá solo se
@@ -55,7 +56,7 @@ beforeEach(() => {
 describe('POST /api/issues/report con el cliente de GitHub caído', () => {
   it('respondiendo 500 sigue reportando el fallo como error de ruta', async () => {
     const error = new Error('GitHub respondió 502')
-    githubIssues.createIssueFromWebReport.mockRejectedValue(error)
+    githubIssues.createIssueFromWebReport.mockReturnValue(Effect.fail(error))
 
     const response = await POST(makeContext())
 
@@ -73,10 +74,12 @@ describe('POST /api/issues/report con el cliente de GitHub caído', () => {
 
 describe('POST /api/issues/report con el cliente de GitHub sano', () => {
   it('crea la issue sin reportar nada', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 654,
-      url: 'https://github.com/alberba/finance-tracker/issues/654',
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 654,
+        url: 'https://github.com/alberba/finance-tracker/issues/654',
+      }),
+    )
 
     const response = await POST(makeContext())
 

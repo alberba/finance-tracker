@@ -1,9 +1,12 @@
+import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildIssueBody,
-  createIssueFromWebReport,
+  createIssueFromWebReport as createIssueFromWebReportEffect,
+  type GithubIssueClient,
   type IssueReporter,
 } from '../../src/lib/server/github-issues'
+import { Http } from '../../src/lib/server/http'
 import {
   parseIssueReportPayload,
   type IssueReportPayload,
@@ -25,6 +28,21 @@ const reporter: IssueReporter = {
   userId: 'user-42',
   email: 'ana@example.com',
   name: 'ana',
+}
+
+/** El test es el borde: ejecuta el efecto con un `fetch` falso como capa Http. */
+function createIssueFromWebReport(
+  payload: IssueReportPayload,
+  reporter: IssueReporter,
+  env: Record<string, string>,
+  client: { fetch: typeof fetch } & GithubIssueClient,
+): Promise<{ number: number; url: string; duplicate?: boolean }> {
+  const { fetch: request, ...rest } = client
+  return Effect.runPromise(
+    Effect.provideService(createIssueFromWebReportEffect(payload, reporter, env, rest), Http, {
+      request,
+    }),
+  )
 }
 
 /** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
