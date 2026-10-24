@@ -84,6 +84,7 @@ describe('WebMCP finance queries', () => {
       currency: 'EUR',
       income: 2000,
       expense: 0,
+      saving: 0,
       investment: 0,
       net: 2000,
     })

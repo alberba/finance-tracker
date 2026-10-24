@@ -68,6 +68,8 @@
     --expense-bg: #fdeceb;
     --invest: #6a52e8;
     --invest-bg: #ece9fd;
+    --saving: #0e7490;
+    --saving-bg: #e0f4f8;
     --accent: #f59e0b;
 
     /* Gain / loss text: income and expense hues darkened to reach AA
@@ -143,6 +145,8 @@
     --expense-bg: #2e1718;
     --invest: #a78bfa;
     --invest-bg: #211b38;
+    --saving: #22d3ee;
+    --saving-bg: #0e2a30;
     --accent: #fbbf24;
 
     --gain: #34d399;
@@ -209,6 +213,7 @@
   --color-income: var(--income);
   --color-expense: var(--expense);
   --color-invest: var(--invest);
+  --color-saving: var(--saving);
   --color-accent: var(--accent);
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);

@@ -28,7 +28,8 @@ import type { Tone } from '../../components/ui/tone'
 export type DashboardHeroRange = '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'
 export type DashboardTrend = 'up' | 'down' | 'flat'
-export type DashboardKpiKind = BudgetType
+/** The third KPI adds saving and investment together, so it has no kind of its own for saving. */
+export type DashboardKpiKind = Exclude<BudgetType, 'saving'>
 
 export interface DashboardMonthOption {
   value: number
@@ -61,7 +62,7 @@ export interface DashboardKpi {
 
 export interface DashboardIncomeSplit {
   segments: Array<{
-    key: 'expense' | 'investment' | 'unspent'
+    key: 'expense' | 'saving' | 'investment' | 'unspent'
     label: string
     weight: number
     share: string
@@ -159,7 +160,7 @@ type Wealth = { liquidity: number; investment: number; liabilities: number; net:
 const KPI_LABEL: Record<DashboardKpiKind, string> = {
   income: 'Ingresos',
   expense: 'Gastos',
-  investment: 'Ahorro o inversión',
+  investment: 'Ahorro e inversión',
 }
 const KPI_GOOD_WHEN_UP: Record<DashboardKpiKind, boolean> = {
   income: true,
@@ -198,7 +199,10 @@ export function buildDashboardViewModelFromState({
       state.snapshots,
     )
   const nets = ALL_MONTHS.map((target) => wealthByMonth(target).net)
-  const series = (kind: DashboardKpiKind) => monthTotals.map((totals) => round2(totals[kind]))
+  const series = (kind: DashboardKpiKind) =>
+    monthTotals.map((totals) =>
+      round2(kind === 'investment' ? totals.saving + totals.investment : totals[kind]),
+    )
 
   return {
     year: state.year,
@@ -272,14 +276,14 @@ function buildChange(
   return { label: formatPercent(Math.abs(pct)), trend, tone }
 }
 
-/** Where the month's income went: expenses, investment and what is left unspent. */
+/** Where the month's income went: expenses, saving, investment and what is left unspent. */
 export function buildIncomeSplit(
   totals: MonthTotals,
   formatMoney: Money,
 ): DashboardIncomeSplit | null {
   if (totals.income <= 0) return null
   const share = (value: number) => round2((Math.max(value, 0) / totals.income) * 100)
-  const spent = totals.expense + totals.investment
+  const spent = totals.expense + totals.saving + totals.investment
   // When spending passes the income, the bar shows how the spending split.
   const base = Math.max(totals.income, spent)
   const weight = (value: number) => round2((Math.max(value, 0) / base) * 100)
@@ -292,6 +296,12 @@ export function buildIncomeSplit(
         label: 'Gastos',
         weight: weight(totals.expense),
         share: formatPercent(weight(totals.expense)),
+      },
+      {
+        key: 'saving',
+        label: 'Ahorro',
+        weight: weight(totals.saving),
+        share: formatPercent(weight(totals.saving)),
       },
       {
         key: 'investment',

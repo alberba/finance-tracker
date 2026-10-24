@@ -15,6 +15,7 @@ import {
   type Db,
   RejectedCommandError,
   assertOwnedReferences,
+  assertSavingAccounts,
   chunkIds,
   clientIdentity,
   nowIso,
@@ -53,6 +54,8 @@ export interface CreateTransactionInput {
   legacyId?: string | null
   accountId: string
   categoryId?: string | null
+  /** Only a saving carries one; any other type stores null. */
+  destinationAccountId?: string | null
   type: string
   date: string
   description?: string | null
@@ -70,6 +73,7 @@ export interface CreateTransactionInput {
 export interface UpdateTransactionInput {
   accountId?: string
   categoryId?: string | null
+  destinationAccountId?: string | null
   type?: string
   date?: string
   description?: string | null
@@ -107,6 +111,13 @@ export async function create(
     accountId: input.accountId,
     categoryId: input.categoryId,
   })
+  const destinationAccountId = input.type === 'saving' ? (input.destinationAccountId ?? null) : null
+  if (input.type === 'saving') {
+    if (!destinationAccountId) {
+      throw new RejectedCommandError('El ahorro necesita una cuenta destino.')
+    }
+    await assertSavingAccounts(db, userId, { accountId: input.accountId, destinationAccountId })
+  }
   const now = nowIso()
   const [row] = await db
     .insert(transactions)
@@ -116,6 +127,7 @@ export async function create(
       legacyId: input.legacyId ?? null,
       accountId: input.accountId,
       categoryId: input.categoryId ?? null,
+      destinationAccountId,
       type: input.type,
       date: input.date,
       description: input.description ?? null,
@@ -158,11 +170,29 @@ export async function update(
   const nextCurrency = input.currency ?? existing.currency
   const nextAmount = input.amount ?? existing.amount
   const nextType = input.type ?? existing.type
+  const nextAccountId = input.accountId ?? existing.accountId
+  // Leaving saving drops the destination; staying keeps it unless the patch says otherwise.
+  const nextDestination =
+    nextType !== 'saving'
+      ? null
+      : input.destinationAccountId === undefined
+        ? existing.destinationAccountId
+        : input.destinationAccountId
+  if (nextType === 'saving') {
+    if (!nextDestination) {
+      throw new RejectedCommandError('El ahorro necesita una cuenta destino.')
+    }
+    await assertSavingAccounts(db, userId, {
+      accountId: nextAccountId,
+      destinationAccountId: nextDestination,
+    })
+  }
   const [row] = await db
     .update(transactions)
     .set({
       accountId: input.accountId ?? existing.accountId,
       categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
+      destinationAccountId: nextDestination,
       type: nextType,
       date: input.date ?? existing.date,
       description: input.description === undefined ? existing.description : input.description,

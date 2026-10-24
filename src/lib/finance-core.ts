@@ -3,7 +3,7 @@ import { round2 } from "./number";
 
 export { round2 };
 
-export type TxType = "income" | "expense" | "investment";
+export type TxType = "income" | "expense" | "saving" | "investment";
 
 export interface Transaction {
   id: string;
@@ -11,6 +11,7 @@ export interface Transaction {
   month: Month;
   type: TxType;
   accountId: string;
+  destinationAccountId?: string;
   category: string;
   description?: string;
   amount: number;
@@ -69,6 +70,7 @@ export function getMonthTotals(
 ): {
   income: number;
   expense: number;
+  saving: number;
   investment: number;
 } {
   return transactions
@@ -82,12 +84,15 @@ export function getMonthTotals(
         if (item.type === "expense") {
           acc.expense += amount;
         }
+        if (item.type === "saving") {
+          acc.saving += amount;
+        }
         if (item.type === "investment") {
           acc.investment += amount;
         }
         return acc;
       },
-      { income: 0, expense: 0, investment: 0 },
+      { income: 0, expense: 0, saving: 0, investment: 0 },
     );
 }
 
@@ -175,7 +180,10 @@ export function computeAccountBalance(
   }
 
   transactions.forEach((item) => {
-    if (item.accountId !== accountId) {
+    const isOrigin = item.accountId === accountId;
+    // A saving also lands in its destination account (ADR 0006).
+    const isDestination = item.type === "saving" && item.destinationAccountId === accountId;
+    if (!isOrigin && !isDestination) {
       return;
     }
     const txMonth = Number(item.month);
@@ -184,7 +192,11 @@ export function computeAccountBalance(
     }
 
     const amount = Number(item.amount || 0);
-    if (item.type === "income") {
+    if (item.type === "saving") {
+      // Moves between cash accounts: out of the origin, into the destination, net worth unchanged.
+      if (isOrigin) balance -= amount;
+      if (isDestination) balance += amount;
+    } else if (item.type === "income") {
       balance += amount;
     } else if (item.type === "expense" || item.type === "investment") {
       balance -= amount;

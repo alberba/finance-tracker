@@ -121,6 +121,7 @@ const TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
   { text: '--income', surfaces: PAGE_SURFACES },
   { text: '--expense', surfaces: PAGE_SURFACES },
   { text: '--invest', surfaces: PAGE_SURFACES },
+  { text: '--saving', surfaces: PAGE_SURFACES },
   { text: '--accent', surfaces: PAGE_SURFACES },
   { text: '--on-primary', surfaces: ['--primary-fill', '--primary-fill-hover'] },
   { text: '--ink-text', surfaces: INK_SURFACES },

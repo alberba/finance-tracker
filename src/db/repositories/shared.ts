@@ -187,6 +187,33 @@ export class RejectedCommandError extends Error {
  * untrusted (client) input must call this first; bulk-insert paths used
  * only by the trusted migration tool (WP9) are exempt.
  */
+export async function assertSavingAccounts(
+  db: Db,
+  userId: string,
+  refs: { accountId?: string | null; destinationAccountId?: string | null },
+): Promise<void> {
+  const { accountId, destinationAccountId } = refs
+  if (accountId && accountId === destinationAccountId) {
+    throw new RejectedCommandError('El ahorro necesita una cuenta destino distinta del origen.')
+  }
+  for (const [id, label] of [
+    [accountId, 'origen'],
+    [destinationAccountId, 'destino'],
+  ] as const) {
+    if (!id) continue
+    const [account] = await db
+      .select({ kind: schema.accounts.kind })
+      .from(schema.accounts)
+      .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)))
+    if (!account) {
+      throw new RejectedCommandError('La cuenta indicada no existe o no pertenece al usuario.')
+    }
+    if (account.kind !== 'cash') {
+      throw new RejectedCommandError(`La cuenta ${label} de un ahorro debe ser de efectivo.`)
+    }
+  }
+}
+
 export async function assertOwnedReferences(
   db: Db,
   userId: string,

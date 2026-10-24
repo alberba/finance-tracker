@@ -4,12 +4,13 @@ import type { TransactionType } from '../../scripts/types'
 export const TYPE_LABEL: Record<TransactionType, string> = {
   expense: 'Gasto',
   income: 'Ingreso',
+  saving: 'Ahorro',
   investment: 'Inversión',
 }
 
-/** The three movement types in the order the panels and the bulk bar offer them. */
+/** The movement types in the order the panels and the bulk bar offer them. */
 export const TYPE_OPTIONS: SegmentedOption<TransactionType>[] = (
-  ['expense', 'income', 'investment'] as const
+  ['expense', 'income', 'saving', 'investment'] as const
 ).map((value) => ({ value, label: TYPE_LABEL[value] }))
 
 /**
@@ -25,6 +26,7 @@ export function categorySelectOptions(names: string[], current: string) {
 export const TYPE_PLURAL: Record<TransactionType, string> = {
   expense: 'Gastos',
   income: 'Ingresos',
+  saving: 'Ahorros',
   investment: 'Inversión',
 }
 
@@ -32,6 +34,7 @@ export const TYPE_PLURAL: Record<TransactionType, string> = {
 export const TYPE_TAG: Record<TransactionType, string> = {
   expense: 'bg-expense/12 text-loss',
   income: 'bg-income/12 text-gain',
+  saving: 'bg-saving/12 text-saving',
   investment: 'bg-invest/12 text-invest',
 }
 
@@ -39,6 +42,7 @@ export const TYPE_TAG: Record<TransactionType, string> = {
 export const TYPE_DOT: Record<TransactionType, string> = {
   expense: 'var(--expense)',
   income: 'var(--income)',
+  saving: 'var(--saving)',
   investment: 'var(--invest)',
 }
 

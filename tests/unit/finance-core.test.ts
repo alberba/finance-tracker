@@ -103,7 +103,7 @@ describe("finance-core helpers", () => {
 
   it("calcula totales mensuales por tipo", () => {
     const totals = getMonthTotals(transactions, 1);
-    expect(totals).toEqual({ income: 2000, expense: 250, investment: 500 });
+    expect(totals).toEqual({ income: 2000, expense: 250, saving: 0, investment: 500 });
   });
 
   it("calcula reales por categoría", () => {
@@ -194,6 +194,35 @@ describe("finance-core helpers", () => {
       snapshots,
     );
     expect(liabilityMonth1).toBe(89000);
+  });
+
+  it("un ahorro resta de la cuenta origen, suma a la destino y no cambia el patrimonio", () => {
+    const withSaving: Transaction[] = [
+      ...transactions,
+      {
+        id: "tx-saving",
+        date: "2026-01-12",
+        month: 0,
+        type: "saving",
+        accountId: "revolut",
+        destinationAccountId: "santander",
+        category: "Fondo de emergencia",
+        amount: 300,
+      },
+    ];
+
+    const origin = (list: Transaction[]) =>
+      computeAccountBalance("revolut", 0, accounts, list, {});
+    const destination = (list: Transaction[]) =>
+      computeAccountBalance("santander", 0, accounts, list, {});
+
+    expect(origin(withSaving)).toBe(origin(transactions) - 300);
+    expect(destination(withSaving)).toBe(destination(transactions) + 300);
+
+    const liquidity = (list: Transaction[]) =>
+      getWealthByMonth(0, accounts, investments, liabilities, list, {}).liquidity;
+    expect(liquidity(withSaving)).toBe(liquidity(transactions));
+    expect(getMonthTotals(withSaving, 0).saving).toBe(300);
   });
 
   it("calcula patrimonio neto mensual", () => {

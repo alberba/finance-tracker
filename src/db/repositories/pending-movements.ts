@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, assertOwnedReferences, assertSavingAccounts, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type PendingMovementRow = Omit<
   typeof pendingMovements.$inferSelect,
@@ -22,6 +22,7 @@ export interface CreatePendingMovementInput {
   legacyId?: string | null;
   recurringRuleId: string;
   accountId?: string | null;
+  destinationAccountId?: string | null;
   categoryId?: string | null;
   amount: number;
   currency: string;
@@ -40,6 +41,7 @@ export interface CreatePendingMovementInput {
 
 export interface UpdatePendingMovementInput {
   accountId?: string | null;
+  destinationAccountId?: string | null;
   categoryId?: string | null;
   amount?: number;
   currency?: string;
@@ -118,6 +120,10 @@ export async function create(
     categoryId: input.categoryId,
     recurringRuleId: input.recurringRuleId,
   });
+  const destinationAccountId = input.type === "saving" ? (input.destinationAccountId ?? null) : null;
+  if (destinationAccountId) {
+    await assertSavingAccounts(db, userId, { accountId: input.accountId, destinationAccountId });
+  }
   const now = nowIso();
   const [row] = await db
     .insert(pendingMovements)
@@ -127,6 +133,7 @@ export async function create(
       legacyId: input.legacyId ?? null,
       recurringRuleId: input.recurringRuleId,
       accountId: input.accountId ?? null,
+      destinationAccountId,
       categoryId: input.categoryId ?? null,
       amountMinor: toMinorUnits(input.amount, input.currency),
       currency: input.currency,
@@ -154,17 +161,29 @@ export async function update(
   await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
   const nextCurrency = input.currency ?? existing.currency;
   const nextAmount = input.amount ?? existing.amount;
+  const nextType = input.type === undefined ? existing.type : input.type;
+  const nextAccountId = input.accountId === undefined ? existing.accountId : input.accountId;
+  const nextDestination =
+    nextType !== "saving"
+      ? null
+      : input.destinationAccountId === undefined
+        ? existing.destinationAccountId
+        : input.destinationAccountId;
+  if (nextDestination) {
+    await assertSavingAccounts(db, userId, { accountId: nextAccountId, destinationAccountId: nextDestination });
+  }
   const [row] = await db
     .update(pendingMovements)
     .set({
-      accountId: input.accountId === undefined ? existing.accountId : input.accountId,
+      accountId: nextAccountId,
+      destinationAccountId: nextDestination,
       categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,
       dueDate: input.dueDate ?? existing.dueDate,
       ...templateValues(
         {
-          type: input.type === undefined ? existing.type : input.type,
+          type: nextType,
           description: input.description === undefined ? existing.description : input.description,
           symbol: input.symbol === undefined ? existing.symbol : input.symbol,
           side: input.side === undefined ? existing.side : input.side,

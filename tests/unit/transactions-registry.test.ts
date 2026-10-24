@@ -46,12 +46,13 @@ describe('accountingYear', () => {
 })
 
 describe('monthTotals', () => {
-  it('adds each type and nets income minus expenses and investment', () => {
+  it('adds each type and nets income minus expenses and investment, not saving', () => {
     const transactions = [
       tx('nomina', '2026-09-01', 'income', 2450),
       tx('alquiler', '2026-09-01', 'expense', 850),
       tx('luz', '2026-09-15', 'expense', 48.17),
       tx('vwce', '2026-09-25', 'investment', 300),
+      tx('hucha', '2026-09-26', 'saving', 120, { destinationAccountId: 'ahorro' }),
       tx('agosto', '2026-08-30', 'expense', 71.9),
       tx('otro-ano', '2025-09-10', 'income', 999),
     ]
@@ -59,6 +60,7 @@ describe('monthTotals', () => {
     expect(monthTotals(transactions, 2026, 9)).toEqual({
       income: 2450,
       expense: 898.17,
+      saving: 120,
       investment: 300,
       net: 1251.83,
     })

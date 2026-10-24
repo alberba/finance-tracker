@@ -166,8 +166,11 @@ export async function remove(db: Db, userId: string, id: string, expectedVersion
   }
   const inUse = await isReferenced(db, userId, [
     { table: transactions, column: transactions.accountId },
+    { table: transactions, column: transactions.destinationAccountId },
     { table: pendingMovements, column: pendingMovements.accountId },
+    { table: pendingMovements, column: pendingMovements.destinationAccountId },
     { table: recurringRules, column: recurringRules.accountId },
+    { table: recurringRules, column: recurringRules.destinationAccountId },
     { table: subscriptions, column: subscriptions.accountId },
     { table: twrLiquidityAccounts, column: twrLiquidityAccounts.accountId },
     { table: contributionAllocations, column: contributionAllocations.accountId },

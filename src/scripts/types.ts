@@ -1,6 +1,6 @@
 import type { Month } from '../lib/month'
 
-export const TRANSACTION_TYPES = ['income', 'expense', 'investment'] as const
+export const TRANSACTION_TYPES = ['income', 'expense', 'saving', 'investment'] as const
 export type TransactionType = (typeof TRANSACTION_TYPES)[number]
 export const SUBSCRIPTION_FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
 export type SubscriptionFrequency = (typeof SUBSCRIPTION_FREQUENCIES)[number]
@@ -27,7 +27,8 @@ export type QuoteProvider = 'yahoo' | 'twelve-data' | 'coingecko'
 export type QuoteDataType = 'live' | 'delayed' | 'eod' | 'unknown'
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'monthEnd' | 'yearly'
 export type PendingMovementStatus = 'pending' | 'confirmed' | 'skipped' | 'cancelled'
-export type CategoryKey = 'incomeCategories' | 'expenseCategories' | 'investmentCategories'
+export type CategoryKey =
+  'incomeCategories' | 'expenseCategories' | 'savingCategories' | 'investmentCategories'
 export type GoalKey =
   'short' | 'medium' | 'long' | 'investmentTotal' | 'investmentFunds' | 'investmentCrypto'
 
@@ -44,6 +45,8 @@ export interface Transaction {
   month: Month
   type: TransactionType
   accountId: string
+  /** Only a saving (ahorro) has one: the cash account the money moves to. */
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -113,6 +116,7 @@ export interface RecurringRule {
   id: string
   type: TransactionType
   accountId: string
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -138,6 +142,7 @@ export interface PendingMovement {
   occurrenceDate: string
   type: TransactionType
   accountId: string
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -235,6 +240,7 @@ export interface State {
   liabilities: Entity[]
   incomeCategories: string[]
   expenseCategories: string[]
+  savingCategories: string[]
   investmentCategories: string[]
   /**
    * User-chosen emoji overrides, keyed by `categoryEmojiKey(type, category)`.
@@ -258,6 +264,7 @@ export interface State {
 export interface MonthTotals {
   income: number
   expense: number
+  saving: number
   investment: number
 }
 
@@ -315,7 +322,12 @@ const GOAL_KEYS = [
   'investmentCrypto',
 ] as const
 const ENTITY_KEYS = ['accounts', 'investmentAssets', 'liabilities'] as const
-const CATEGORY_KEYS = ['incomeCategories', 'expenseCategories', 'investmentCategories'] as const
+const CATEGORY_KEYS = [
+  'incomeCategories',
+  'expenseCategories',
+  'savingCategories',
+  'investmentCategories',
+] as const
 const SNAPSHOT_KINDS = ['accounts', 'investments', 'liabilities'] as const
 
 export const DEFAULT_GOALS = (year: number): Record<GoalKey, Goal> => ({

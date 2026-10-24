@@ -20,11 +20,19 @@ async function buildMovementData(movement: Transaction, currency: string) {
   }
   const accountId = await resolveEntityId('account', movement.accountId)
   if (!accountId) return null
+  // A saving is meaningless without a resolvable destination: skip until it resolves.
+  const destinationAccountId =
+    movement.type === 'saving' && movement.destinationAccountId
+      ? await resolveEntityId('account', movement.destinationAccountId)
+      : null
+  if (movement.type === 'saving' && !destinationAccountId) return null
   const categoryId = await resolveOrCreateCategoryId(movement.type, movement.category)
   if (movement.category && !categoryId) return null
   const operation = await buildOperation(movement)
   return {
     accountId,
+    // Explicit null clears the destination when a saving becomes another type.
+    destinationAccountId,
     categoryId,
     type: movement.type,
     date: movement.date,

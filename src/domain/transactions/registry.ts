@@ -25,6 +25,7 @@ export function accountingYear(tx: Dated): number | null {
 export interface MonthTotals {
   income: number
   expense: number
+  saving: number
   investment: number
   /** Income minus expenses minus investment. */
   net: number
@@ -36,14 +37,16 @@ function inMonth(tx: Transaction, year: number, month: Month): boolean {
 
 /** What came in, went out and was invested in one month of a year. */
 export function monthTotals(transactions: Transaction[], year: number, month: Month): MonthTotals {
-  const totals = { income: 0, expense: 0, investment: 0 }
+  const totals = { income: 0, expense: 0, saving: 0, investment: 0 }
   transactions.forEach((tx) => {
     if (inMonth(tx, year, month)) totals[tx.type] += Number(tx.amount || 0)
   })
   const income = round2(totals.income)
   const expense = round2(totals.expense)
+  const saving = round2(totals.saving)
   const investment = round2(totals.investment)
-  return { income, expense, investment, net: round2(income - expense - investment) }
+  // A saving moves money between cash accounts, so it does not reduce the net.
+  return { income, expense, saving, investment, net: round2(income - expense - investment) }
 }
 
 /** What the registry toolbar narrows the year down to. Empty means no filter. */
@@ -65,9 +68,13 @@ export interface MonthGroup {
   rows: Transaction[]
 }
 
-/** The amount as it moves the net: income adds, expenses and investment subtract. */
+/**
+ * The amount as it moves the net: income adds, expenses and investment subtract, and a saving
+ * moves money between cash accounts so it leaves the net alone.
+ */
 export function signedAmount(tx: Pick<Transaction, 'type' | 'amount'>): number {
   const amount = Number(tx.amount || 0)
+  if (tx.type === 'saving') return 0
   return tx.type === 'income' ? amount : -amount
 }
 

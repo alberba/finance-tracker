@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements, recurringRules } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, assertOwnedReferences, assertSavingAccounts, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type RecurringRuleRow = Omit<
   typeof recurringRules.$inferSelect,
@@ -23,6 +23,7 @@ export interface CreateRecurringRuleInput {
   name: string;
   type: string;
   accountId?: string | null;
+  destinationAccountId?: string | null;
   categoryId?: string | null;
   amount: number;
   currency: string;
@@ -45,6 +46,7 @@ export interface UpdateRecurringRuleInput {
   name?: string;
   type?: string;
   accountId?: string | null;
+  destinationAccountId?: string | null;
   categoryId?: string | null;
   amount?: number;
   currency?: string;
@@ -108,6 +110,10 @@ export async function create(
   input: CreateRecurringRuleInput,
 ): Promise<RecurringRuleRow> {
   await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
+  const destinationAccountId = input.type === "saving" ? (input.destinationAccountId ?? null) : null;
+  if (destinationAccountId) {
+    await assertSavingAccounts(db, userId, { accountId: input.accountId, destinationAccountId });
+  }
   const now = nowIso();
   const [row] = await db
     .insert(recurringRules)
@@ -118,6 +124,7 @@ export async function create(
       name: input.name,
       type: input.type,
       accountId: input.accountId ?? null,
+      destinationAccountId,
       categoryId: input.categoryId ?? null,
       amountMinor: toMinorUnits(input.amount, input.currency),
       currency: input.currency,
@@ -150,12 +157,24 @@ export async function update(
   await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
   const nextCurrency = input.currency ?? existing.currency;
   const nextAmount = input.amount ?? existing.amount;
+  const nextType = input.type ?? existing.type;
+  const nextAccountId = input.accountId === undefined ? existing.accountId : input.accountId;
+  const nextDestination =
+    nextType !== "saving"
+      ? null
+      : input.destinationAccountId === undefined
+        ? existing.destinationAccountId
+        : input.destinationAccountId;
+  if (nextDestination) {
+    await assertSavingAccounts(db, userId, { accountId: nextAccountId, destinationAccountId: nextDestination });
+  }
   const [row] = await db
     .update(recurringRules)
     .set({
       name: input.name ?? existing.name,
-      type: input.type ?? existing.type,
-      accountId: input.accountId === undefined ? existing.accountId : input.accountId,
+      type: nextType,
+      accountId: nextAccountId,
+      destinationAccountId: nextDestination,
       categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,

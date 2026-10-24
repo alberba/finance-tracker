@@ -47,9 +47,13 @@ function buildAccountData(key: EntityKey, currency: string) {
   }
 }
 
-const CATEGORY_KIND_BY_KEY: Record<CategoryKey, 'income' | 'expense' | 'investment'> = {
+const CATEGORY_KIND_BY_KEY: Record<
+  CategoryKey,
+  'income' | 'expense' | 'saving' | 'investment'
+> = {
   incomeCategories: 'income',
   expenseCategories: 'expense',
+  savingCategories: 'saving',
   investmentCategories: 'investment',
 }
 

@@ -59,6 +59,7 @@ function createPendingMovement(
     occurrenceDate,
     type: rule.type,
     accountId: rule.accountId,
+    ...(rule.destinationAccountId ? { destinationAccountId: rule.destinationAccountId } : {}),
     category: rule.category,
     description: rule.description,
     amount: rule.amount,

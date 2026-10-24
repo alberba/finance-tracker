@@ -5,6 +5,7 @@ import type { BudgetType } from '../../scripts/types'
 export const TYPE_LABEL: Record<BudgetType, string> = {
   expense: 'Gastos',
   income: 'Ingresos',
+  saving: 'Ahorro',
   investment: 'Inversión',
 }
 
@@ -12,6 +13,7 @@ export const TYPE_LABEL: Record<BudgetType, string> = {
 export const REMAINING_LABEL: Record<BudgetType, string> = {
   expense: 'Queda por gastar',
   income: 'Falta por ingresar',
+  saving: 'Queda por ahorrar',
   investment: 'Queda por invertir',
 }
 
@@ -19,6 +21,7 @@ export const REMAINING_LABEL: Record<BudgetType, string> = {
 export const PAST_LABEL: Record<BudgetType, string> = {
   expense: 'Gastado',
   income: 'Ingresado',
+  saving: 'Ahorrado',
   investment: 'Invertido',
 }
 
