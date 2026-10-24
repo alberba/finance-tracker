@@ -10,6 +10,7 @@ import {
   type InstrumentQuoteConfig,
   type State,
 } from '../../scripts/types'
+import { asMonth, monthIndex } from '../month'
 import { monthFromISO, todayISO } from '../../scripts/utils'
 import type { CachedEntity } from './idb-cache'
 
@@ -170,9 +171,7 @@ export function projectSyncV2State(
       id: legacyId(transaction),
       date: String(transaction.date),
       month:
-        typeof transaction.accountingMonth === 'number'
-          ? transaction.accountingMonth - 1
-          : (monthFromISO(String(transaction.date)) ?? 0),
+        asMonth(transaction.accountingMonth) ?? monthFromISO(String(transaction.date)) ?? 1,
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
@@ -234,11 +233,11 @@ export function projectSyncV2State(
     if (!(kind in projected.budget)) continue
     const category = categories.get(String(entry.categoryId)) || 'Sin categoría'
     const amounts = projected.budget[kind][category] || Array(12).fill(0)
-    // `entry.month` is canonical 1-12 (ADR: month is 1-12 in DB/commands/domain);
-    // the UI's array is 0-11, so the conversion happens here, at the edge of
-    // the projection (audit §4.5 — without it, every month is off by one and
-    // December has no slot to land in at all).
-    amounts[Number(entry.month) - 1] = Number(entry.amount || 0)
+    // `entry.month` is 1-12, like everywhere else (ADR 0006); the plan's
+    // 12-slot array is addressed through its one index helper.
+    const month = asMonth(Number(entry.month))
+    if (!month) continue
+    amounts[monthIndex(month)] = Number(entry.amount || 0)
     projected.budget[kind][category] = amounts
   }
 
@@ -273,9 +272,8 @@ export function projectSyncV2State(
     bootstrap.wealthSnapshots
       .filter((snapshot) => Number(snapshot.year) === projected.year)
       .map((snapshot) => {
-        // `snapshot.month` is the server's canonical 1-12; `State.snapshots` is
-        // keyed (and stores `.month`) 0-based, matching `ui.snapshotMonth`.
-        const month = Number(snapshot.month) - 1
+        const month = asMonth(Number(snapshot.month))
+        if (!month) return null
         const balances: State['snapshots'][string] = {
           month,
           accounts: {},
@@ -293,7 +291,8 @@ export function projectSyncV2State(
           else balances.accounts[accountId] = Number(balance.balance || 0)
         }
         return [String(month), balances]
-      }),
+      })
+      .filter((entry): entry is [string, State['snapshots'][string]] => entry !== null),
   )
 
   const recurringRuleIds = new Map(

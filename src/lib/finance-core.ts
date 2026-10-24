@@ -1,3 +1,4 @@
+import { ALL_MONTHS, type Month, type MonthOrStart } from './month'
 import { round2 } from "./number";
 
 export { round2 };
@@ -7,7 +8,7 @@ export type TxType = "income" | "expense" | "investment";
 export interface Transaction {
   id: string;
   date: string;
-  month: number;
+  month: Month;
   type: TxType;
   accountId: string;
   category: string;
@@ -22,7 +23,7 @@ export interface Entity {
 }
 
 export interface Snapshot {
-  month: number;
+  month: Month;
   accounts: Record<string, number>;
   investments: Record<string, number>;
   liabilities: Record<string, number>;
@@ -64,7 +65,7 @@ export function slug(value: string): string {
 
 export function getMonthTotals(
   transactions: Transaction[],
-  month: number,
+  month: Month,
 ): {
   income: number;
   expense: number;
@@ -93,7 +94,7 @@ export function getMonthTotals(
 export function getCategoryActuals(
   transactions: Transaction[],
   type: TxType,
-  month: number,
+  month: Month,
   categories: string[],
 ): Record<string, number> {
   const map: Record<string, number> = {};
@@ -121,7 +122,7 @@ export function getCategoryActuals(
 export function getSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",
-  month: number,
+  month: Month,
   itemId: string,
 ): number | null {
   const snapshot = snapshots[String(month)];
@@ -136,9 +137,9 @@ function getLatestSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",
   itemId: string,
-  month: number,
-): { month: number; value: number } | null {
-  for (let m = month; m >= 0; m -= 1) {
+  month: MonthOrStart,
+): { month: Month; value: number } | null {
+  for (const m of ALL_MONTHS.filter((candidate) => candidate <= month).reverse()) {
     const value = getSnapshotValue(snapshots, kind, m, itemId);
     if (value !== null) {
       return { month: m, value };
@@ -149,7 +150,7 @@ function getLatestSnapshotValue(
 
 export function computeAccountBalance(
   accountId: string,
-  month: number,
+  month: MonthOrStart,
   accounts: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
@@ -165,7 +166,7 @@ export function computeAccountBalance(
     accountId,
     month,
   );
-  let startMonth = -1;
+  let startMonth = 0; // before January: no snapshot yet
   let balance = Number(account.openingBalance || 0);
 
   if (latestSnapshot) {
@@ -206,7 +207,7 @@ export function matchesInvestmentAsset(category: string, asset: Entity): boolean
 
 export function computeInvestmentValue(
   assetId: string,
-  month: number,
+  month: MonthOrStart,
   assets: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
@@ -222,7 +223,7 @@ export function computeInvestmentValue(
     assetId,
     month,
   );
-  let startMonth = -1;
+  let startMonth = 0; // before January: no snapshot yet
   let value = Number(asset.openingBalance || 0);
 
   if (latestSnapshot) {
@@ -249,7 +250,7 @@ export function computeInvestmentValue(
 
 export function computeLiabilityValue(
   liabilityId: string,
-  month: number,
+  month: MonthOrStart,
   liabilities: Entity[],
   snapshots: Record<string, Snapshot>,
 ): number {
@@ -272,7 +273,7 @@ export function computeLiabilityValue(
 }
 
 export function getWealthByMonth(
-  month: number,
+  month: MonthOrStart,
   accounts: Entity[],
   investmentAssets: Entity[],
   liabilities: Entity[],

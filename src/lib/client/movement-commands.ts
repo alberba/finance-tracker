@@ -35,9 +35,7 @@ async function buildMovementData(movement: Transaction, currency: string) {
     declared: Boolean(movement.declared),
     // Only a month other than the date's is stored; otherwise it follows the date.
     accountingMonth:
-      !Number.isInteger(movement.month) || movement.month === monthFromISO(movement.date)
-        ? null
-        : movement.month + 1,
+      movement.month === monthFromISO(movement.date) ? null : movement.month,
     ...(operation === undefined ? {} : { operation }),
   }
 }

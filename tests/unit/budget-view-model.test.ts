@@ -6,11 +6,12 @@ import {
   defaultWindowStart,
   moveWindow,
 } from '../../src/domain/budget/view-model'
+import { monthIndex } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 
 /** 3 October 2026: January to September are closed, October is in progress. */
 const NOW = new Date(2026, 9, 3)
-const OCTOBER = 9
+const OCTOBER = 10
 
 function plan(value: number, overrides: Record<number, number> = {}): number[] {
   return Array.from({ length: 12 }, (_, month) => overrides[month] ?? value)
@@ -33,11 +34,11 @@ function state(overrides: Partial<State> = {}): State {
       investment: { Fondos: plan(200) },
     },
     transactions: [
-      tx('expense', 'Comida', 0, 280),
-      tx('expense', 'Comida', 1, 320.5),
+      tx('expense', 'Comida', 1, 280),
+      tx('expense', 'Comida', 2, 320.5),
       tx('expense', 'Comida', OCTOBER, 40),
-      tx('expense', 'Ocio', 0, 150),
-      tx('income', 'Nómina', 0, 1900),
+      tx('expense', 'Ocio', 1, 150),
+      tx('income', 'Nómina', 1, 1900),
     ],
     ...overrides,
   } as unknown as State
@@ -50,13 +51,13 @@ describe('buildBudgetViewModel', () => {
     expect(vm.currentMonth).toBe(OCTOBER)
     const statuses = vm.types.expense.rows[0].cells.map((cell) => cell.status)
     expect(statuses.slice(0, 9)).toEqual(Array(9).fill('closed'))
-    expect(statuses[OCTOBER]).toBe('current')
+    expect(statuses[monthIndex(OCTOBER)]).toBe('current')
     expect(statuses.slice(10)).toEqual(['planned', 'planned'])
   })
 
   it('treats a past year as closed and a future one as planned', () => {
-    expect(buildBudgetViewModel(state({ year: 2025 }), NOW).currentMonth).toBe(12)
-    expect(buildBudgetViewModel(state({ year: 2027 }), NOW).currentMonth).toBe(-1)
+    expect(buildBudgetViewModel(state({ year: 2025 }), NOW).currentMonth).toBe(13)
+    expect(buildBudgetViewModel(state({ year: 2027 }), NOW).currentMonth).toBe(0)
   })
 
   it('sums what was recorded per month and leaves the months to come without an actual', () => {
@@ -65,7 +66,7 @@ describe('buildBudgetViewModel', () => {
     expect(comida.cells[0]).toMatchObject({ planned: 300, actual: 280, diff: -20, tone: 'gain' })
     expect(comida.cells[1]).toMatchObject({ actual: 320.5, diff: 20.5, tone: 'loss' })
     expect(comida.cells[2]).toMatchObject({ actual: 0, diff: -300 })
-    expect(comida.cells[OCTOBER]).toMatchObject({ actual: 40, diff: null, tone: null })
+    expect(comida.cells[monthIndex(OCTOBER)]).toMatchObject({ actual: 40, diff: null, tone: null })
     expect(comida.cells[11]).toMatchObject({ actual: null, diff: null })
   })
 
@@ -99,7 +100,7 @@ describe('buildBudgetViewModel', () => {
     const vm = buildBudgetViewModel(
       state({
         expenseCategories: ['Comida'],
-        transactions: [tx('expense', 'Viajes', 0, 90)] as unknown as State['transactions'],
+        transactions: [tx('expense', 'Viajes', 1, 90)] as unknown as State['transactions'],
       }),
       NOW,
     )
@@ -111,23 +112,23 @@ describe('buildBudgetViewModel', () => {
 
 describe('budget window', () => {
   it('opens on the month before, the current one and the next', () => {
-    expect(defaultWindowStart(3, OCTOBER)).toBe(8)
-    expect(defaultWindowStart(6, OCTOBER)).toBe(5)
-    expect(defaultWindowStart(12, OCTOBER)).toBe(0)
+    expect(defaultWindowStart(3, OCTOBER)).toBe(9)
+    expect(defaultWindowStart(6, OCTOBER)).toBe(6)
+    expect(defaultWindowStart(12, OCTOBER)).toBe(1)
   })
 
   it('stays inside the year at both ends', () => {
-    expect(defaultWindowStart(3, 0)).toBe(0)
-    expect(defaultWindowStart(3, 11)).toBe(9)
-    expect(defaultWindowStart(3, 12)).toBe(9)
-    expect(defaultWindowStart(6, -1)).toBe(0)
+    expect(defaultWindowStart(3, 0)).toBe(1)
+    expect(defaultWindowStart(3, 11)).toBe(10)
+    expect(defaultWindowStart(3, 12)).toBe(10)
+    expect(defaultWindowStart(6, -1)).toBe(1)
   })
 
   it('moves one month at a time and stops at the edges', () => {
     expect(moveWindow(8, 3, -1)).toBe(7)
     expect(moveWindow(8, 3, 1)).toBe(9)
-    expect(moveWindow(0, 3, -1)).toBe(0)
-    expect(moveWindow(9, 3, 1)).toBe(9)
+    expect(moveWindow(1, 3, -1)).toBe(1)
+    expect(moveWindow(9, 3, 1)).toBe(10)
   })
 })
 

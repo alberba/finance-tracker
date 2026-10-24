@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import type { WealthHistoryRow, WealthMonthViewModel } from '../../domain/wealth/view-model'
 import { formatWholeAmount } from '../../lib/format'
+import { monthIndex, type Month } from '../../lib/month'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { GROUP_SWATCH } from './group-swatch'
 
@@ -14,12 +15,12 @@ const props = defineProps<{
   rows: WealthHistoryRow[]
   months: WealthMonthViewModel[]
   /** Months shown, in order; indexes into each row's `values`. */
-  shown: number[]
+  shown: Month[]
 }>()
 
-const month = defineModel<number>('month', { required: true })
+const month = defineModel<Month>('month', { required: true })
 
-const visible = computed(() => props.shown.map((index) => props.months[index]))
+const visible = computed(() => props.shown.map((shown) => props.months[monthIndex(shown)]))
 
 const columns = computed<LedgerColumn<WealthHistoryRow>[]>(() => [
   { key: 'label', label: 'Cuenta o activo', rowHeader: true },

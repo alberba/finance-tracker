@@ -15,7 +15,7 @@ import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import type { ReturnMode } from '../../domain/investment/view-model'
 import { formatMonthYear, formatPercent, formatShortDate } from '../../lib/format'
 import { renderMultiLineChart } from '../../scripts/charts'
-import { MONTHS } from '../../scripts/types'
+import { ALL_MONTHS, asMonth } from '../../lib/month'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useInvestmentStore } from '../../stores/investment'
 import { useMarketStore } from '../../stores/market'
@@ -48,12 +48,12 @@ const returnMode = computed({
 })
 const month = computed({
   get: () => String(ui.investmentMonth),
-  set: (value: string) => investmentStore.setMonth(Number(value)),
+  set: (value: string) => investmentStore.setMonth(asMonth(Number(value)) ?? ui.investmentMonth),
 })
 const monthOptions = computed(() =>
-  MONTHS.map((_, index) => ({
-    value: String(index),
-    label: formatMonthYear(index, financialStateStore.state.year),
+  ALL_MONTHS.map((month) => ({
+    value: String(month),
+    label: formatMonthYear(month, financialStateStore.state.year),
   })),
 )
 

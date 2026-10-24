@@ -1,3 +1,4 @@
+import type { Month } from '../lib/month'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
@@ -20,7 +21,7 @@ export const useWealthStore = defineStore('wealth', () => {
     buildWealthViewModel(financialStateStore.state, ui.snapshotMonth),
   )
 
-  function setMonth(month: number): void {
+  function setMonth(month: Month): void {
     ui.snapshotMonth = month
   }
 

@@ -14,6 +14,7 @@ import type {
 } from '../../domain/investment/contributions'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
 import { evaluateNumericExpression } from '../../scripts/math-expression'
+import { ALL_MONTHS, atMonth, type Month } from '../../lib/month'
 import { MONTHS, type SnapshotKind } from '../../scripts/types'
 import { monthFromISO, round2, todayISO } from '../../scripts/utils'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -38,7 +39,7 @@ interface NamedItem {
 
 const open = ref(false)
 const step = ref<1 | 2>(1)
-const month = ref(0)
+const month = ref<Month>(1)
 const date = ref('')
 const total = ref('0')
 const syncStockEventsCash = ref(false)
@@ -64,7 +65,7 @@ const STEPS = [
   { step: 2, label: 'Reparto del aporte' },
 ] as const
 
-const monthOptions = MONTHS.map((label, index) => ({ value: index, label }))
+const monthOptions = ALL_MONTHS.map((month) => ({ value: month, label: atMonth(MONTHS, month) }))
 
 function snapKey(kind: SnapshotKind, id: string): string {
   return `${kind}:${id}`
@@ -167,7 +168,7 @@ const remainingLabel = computed(() => {
   return remaining.value > 0 ? 'Falta por repartir' : 'Repartido de más'
 })
 
-function onMonthChange(value: number): void {
+function onMonthChange(value: Month): void {
   month.value = value
   date.value = toSnapshotDate(financialStateStore.year, value)
   seed()

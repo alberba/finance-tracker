@@ -103,7 +103,7 @@ describe("round trip: patrimonio", () => {
 
     const reloaded = await trip.reload();
 
-    expect(reloaded.snapshots["2"]?.accounts?.[accountId]).toBe(2000);
+    expect(reloaded.snapshots["3"]?.accounts?.[accountId]).toBe(2000);
   });
 
   it("does not mix up snapshots from two different years (§4.6)", async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildInvestmentDashboardViewModel } from '../../src/domain/investment/view-model'
+import type { Month } from '../../src/lib/month'
 import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'
 
@@ -15,7 +16,7 @@ function buy(
   return {
     id,
     date,
-    month: Number(date.slice(5, 7)) - 1,
+    month: Number(date.slice(5, 7)) as Month,
     type: 'investment',
     accountId: 'broker',
     category,
@@ -55,7 +56,7 @@ function portfolio(overrides: Record<string, unknown> = {}): State {
 
 describe('buildInvestmentDashboardViewModel · posiciones', () => {
   it('lista las posiciones con valor, de mayor a menor, con peso sobre el total', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.positions.map((position) => position.id)).toEqual(['fondos', 'oro'])
     const [fondos, oro] = vm.positions
@@ -66,7 +67,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
   })
 
   it('omite los activos sin valor en el mes', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 0, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 1, 'simple')
 
     expect(vm.positions.map((position) => position.id)).toEqual(['fondos'])
     expect(vm.positions[0].weight).toBe(100)
@@ -74,8 +75,8 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
 
   it('calcula resultado y rentabilidad con el valor del snapshot', () => {
     const vm = buildInvestmentDashboardViewModel(
-      portfolio({ snapshots: { '2': { month: 2, accounts: {}, investments: { fondos: 2420 }, liabilities: {} } } }),
-      2,
+      portfolio({ snapshots: { '3': { month: 3, accounts: {}, investments: { fondos: 2420 }, liabilities: {} } } }),
+      3,
       'simple',
     )
 
@@ -86,7 +87,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
   })
 
   it('da el detalle de cada posición: instrumento, títulos, precio medio y último movimiento', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 6, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 7, 'simple')
 
     const oro = vm.positions.find((position) => position.id === 'oro')!
     expect(oro.symbol).toBe('SGLN')
@@ -96,7 +97,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
   })
 
   it('solo cuenta los movimientos hasta el mes de análisis', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     const oro = vm.positions.find((position) => position.id === 'oro')!
     expect(oro.units).toBe(4)
@@ -119,7 +120,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
           },
         ],
       }),
-      6,
+      7,
       'simple',
     )
 
@@ -132,14 +133,14 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
       ...state.transactions[0],
       id: 't5',
       date: '2026-03-01',
-      month: 2,
+      month: 3,
       side: 'sell',
       units: 5,
       unitPrice: 150,
       amount: -750,
     })
 
-    const fondos = buildInvestmentDashboardViewModel(state, 2, 'simple').positions.find(
+    const fondos = buildInvestmentDashboardViewModel(state, 3, 'simple').positions.find(
       (position) => position.id === 'fondos',
     )!
     expect(fondos.units).toBe(15)
@@ -152,7 +153,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
         transactions: [],
         investmentAssets: [{ id: 'fondos', name: 'Fondos', openingBalance: 1000 }],
       }),
-      0,
+      1,
       'simple',
     )
 
@@ -165,7 +166,7 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
   })
 
   it('asigna a cada posición un color de la paleta de series', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.positions.map((position) => position.color)).toEqual([
       'var(--chart-series-1)',
@@ -176,13 +177,13 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
 
 describe('buildInvestmentDashboardViewModel · series', () => {
   it('da una etiqueta por punto: el inicio de año y cada mes hasta el de análisis', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.chartLabels).toEqual(['01/01', 'ENERO', 'FEBRERO', 'MARZO'])
   })
 
   it('en € compara el valor de cartera con el capital aportado', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.valueSeries.map((series) => series.name)).toEqual([
       'Valor de cartera',
@@ -192,7 +193,7 @@ describe('buildInvestmentDashboardViewModel · series', () => {
   })
 
   it('en % da una sola serie de rentabilidad acumulada', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.percentSeries).toHaveLength(1)
     expect(vm.percentSeries[0].name).toBe('Cartera Total')
@@ -200,12 +201,12 @@ describe('buildInvestmentDashboardViewModel · series', () => {
   })
 
   it('cada posición trae su serie de rentabilidad con los mismos puntos', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 2, 'simple')
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 
     expect(vm.positions[0].series.values).toHaveLength(vm.chartLabels.length)
   })
 
   it('fecha el valor de la cartera al cierre del mes de análisis', () => {
-    expect(buildInvestmentDashboardViewModel(portfolio(), 1, 'simple').asOf).toBe('2026-02-28')
+    expect(buildInvestmentDashboardViewModel(portfolio(), 2, 'simple').asOf).toBe('2026-02-28')
   })
 })

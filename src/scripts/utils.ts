@@ -1,3 +1,4 @@
+import { asMonth, type Month } from "../lib/month";
 import { round2 } from "../lib/number";
 
 export { round2 };
@@ -26,7 +27,7 @@ export function parseFloatSafe(value: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-export function monthFromISO(value: unknown): number | null {
+export function monthFromISO(value: unknown): Month | null {
   if (!value || typeof value !== "string") {
     return null;
   }
@@ -36,12 +37,7 @@ export function monthFromISO(value: unknown): number | null {
     return null;
   }
 
-  const month = Number(match[2]) - 1;
-  if (month < 0 || month > 11) {
-    return null;
-  }
-
-  return month;
+  return asMonth(Number(match[2]));
 }
 
 export function clamp(value: number, min: number, max: number): number {

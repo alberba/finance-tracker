@@ -511,7 +511,7 @@ describe('valoración de cartera', () => {
         {
           id: 'old-buy',
           date: '2024-01-01',
-          month: 0,
+          month: 1,
           type: 'investment',
           accountId: 'broker',
           category: 'Fondo',
@@ -563,7 +563,7 @@ describe('valoración de cartera', () => {
       draft.transactions.push({
         id: 'future-buy',
         date: '2026-07-11',
-        month: 6,
+        month: 7,
         type: 'investment',
         accountId: 'broker',
         category: 'Fondo',
@@ -595,7 +595,7 @@ describe('valoración de cartera', () => {
         {
           id: 'eth-buy',
           date: '2024-01-01',
-          month: 0,
+          month: 1,
           type: 'investment',
           accountId: 'broker',
           category: 'Crypto',
@@ -650,7 +650,7 @@ describe('valoración de cartera', () => {
         {
           id: 'aged-buy',
           date: '2024-01-01',
-          month: 0,
+          month: 1,
           type: 'investment',
           accountId: 'broker',
           category: 'ETF AGED',
@@ -703,7 +703,7 @@ describe('valoración de cartera', () => {
         {
           id: 'legacy-aged',
           date: '2024-01-01',
-          month: 0,
+          month: 1,
           type: 'investment',
           accountId: 'broker',
           category: 'ETF AGED',
@@ -773,7 +773,7 @@ describe('valoración de cartera', () => {
           {
             id: 'buy',
             date: '2024-01-01',
-            month: 0,
+            month: 1,
             type: 'investment',
             accountId: 'broker',
             category: 'Crypto',
@@ -786,7 +786,7 @@ describe('valoración de cartera', () => {
           {
             id: 'sell',
             date: '2024-01-02',
-            month: 0,
+            month: 1,
             type: 'investment',
             accountId: 'broker',
             category: 'Crypto',

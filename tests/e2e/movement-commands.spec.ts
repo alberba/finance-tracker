@@ -166,8 +166,8 @@ test('a movement counted in another month than its date keeps it after sync and 
     expect((await (await created).json()).results[0].status).toBe('applied')
 
     await tracker.reload()
-    // The ledger lists every month, so the row's own month is what must stay February (1).
-    await expect(tracker.transactionRow('Cena fin de enero')).toHaveAttribute('data-tx-month', '1')
+    // The ledger lists every month, so the row's own month is what must stay February (2).
+    await expect(tracker.transactionRow('Cena fin de enero')).toHaveAttribute('data-tx-month', '2')
   } finally {
     await context.close()
   }

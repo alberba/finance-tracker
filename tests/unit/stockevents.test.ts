@@ -15,7 +15,7 @@ import type { StockEventsSettings, Transaction } from '../../src/scripts/types'
 const buyMovement: Transaction = {
   id: 'tx-1',
   date: '2026-07-15',
-  month: 6,
+  month: 7,
   type: 'investment',
   accountId: 'broker',
   category: 'ETF',

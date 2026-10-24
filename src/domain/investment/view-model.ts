@@ -1,3 +1,4 @@
+import { ALL_MONTHS, atMonth, YEAR_START, type Month, type MonthOrStart } from '../../lib/month'
 import {
   computeContributionMetrics as computeContributionMetricsCore,
   matchesInvestmentAsset,
@@ -77,7 +78,7 @@ type PositionDetail = Pick<
 >
 
 /** Symbol, units, average buy price and last movement of an asset up to a month. */
-function buildPositionDetail(state: State, asset: Entity, month: number): PositionDetail {
+function buildPositionDetail(state: State, asset: Entity, month: Month): PositionDetail {
   const movements = state.transactions
     .filter(
       (tx) =>
@@ -116,7 +117,7 @@ function buildPositionDetail(state: State, asset: Entity, month: number): Positi
 
 export function buildInvestmentDashboardViewModel(
   state: State,
-  month: number,
+  month: Month,
   returnMode: ReturnMode,
 ): InvestmentDashboardViewModel {
   const investedCapital = computeInvestedCapital(state, month)
@@ -134,11 +135,11 @@ export function buildInvestmentDashboardViewModel(
     twrMetrics.length > 0 ? (twrMetrics[twrMetrics.length - 1].cumulativeReturn ?? 0) * 100 : 0
   const displayReturn = isTWR ? lastTWR : simpleReturn
 
-  const monthIndexes = Array.from({ length: month + 1 }, (_, i) => i)
-  const chartPoints = [-1, ...monthIndexes]
-  const chartLabels = ['01/01', ...monthIndexes.map((m) => MONTHS[m])]
+  const chartMonths = ALL_MONTHS.filter((m) => m <= month)
+  const chartPoints: MonthOrStart[] = [YEAR_START, ...chartMonths]
+  const chartLabels = ['01/01', ...chartMonths.map((m) => atMonth(MONTHS, m))]
 
-  const investedCapitalTotal = (targetMonth: number): number =>
+  const investedCapitalTotal = (targetMonth: MonthOrStart): number =>
     state.investmentAssets.reduce(
       (sum, asset) => sum + computeInvestedCapitalByAsset(state, asset.id, targetMonth),
       0,
@@ -149,7 +150,9 @@ export function buildInvestmentDashboardViewModel(
   )
   const portfolioInvestedCapital = chartPoints.map((m) => investedCapitalTotal(m))
   const portfolioPercentages = isTWR
-    ? chartPoints.map((m) => (m < 0 ? 0 : (twrByDate.get(toSnapshotDate(state.year, m)) ?? 0)))
+    ? chartPoints.map((m) =>
+        m === YEAR_START ? 0 : (twrByDate.get(toSnapshotDate(state.year, m)) ?? 0),
+      )
     : portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]))
 
   const valued = state.investmentAssets
@@ -288,8 +291,7 @@ export function summarizeInvestmentYear(state: State, year: number): InvestmentY
 }
 
 export interface InvestmentMonthGroup {
-  /** 0-based month. */
-  month: number
+  month: Month
   count: number
   /** Purchases (fees included) minus what sales brought in. */
   net: number

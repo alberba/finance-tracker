@@ -44,5 +44,5 @@ export async function syncSnapshotBalances(
 ): Promise<void> {
   if (isReadOnlyDemoActive()) return
   const balances = await buildSnapshotBalances(snapshot, currency)
-  await syncWealthSnapshot(year, snapshot.month + 1, balances)
+  await syncWealthSnapshot(year, snapshot.month, balances)
 }

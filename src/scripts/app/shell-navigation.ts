@@ -5,13 +5,14 @@ import {
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { pinia } from '../../stores/pinia'
+import type { Month } from '../../lib/month'
 import { useUiStore } from '../../stores/ui'
 
 const MOBILE_PRIMARY_SECTIONS: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
 
 interface DashboardNavigationUi {
   activeSection: SectionId
-  month: number
+  month: Month
 }
 
 interface DashboardNavigationElements {
