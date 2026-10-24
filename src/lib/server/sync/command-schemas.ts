@@ -240,6 +240,7 @@ export const entityCreateSchemas = {
     .object({
       legacyId: nullableString.optional(),
       key: z.string().min(1),
+      categoryId: nullableString.optional(),
       name: z.string().min(1),
       targetYear: z.number().int().nullable().optional(),
       targetAmount: z.number(),

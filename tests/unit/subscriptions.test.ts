@@ -44,6 +44,7 @@ function createState(subscription: Subscription): State {
     subscriptions: [subscription],
     snapshots: {},
     budget: { income: {}, expense: {}, saving: {}, investment: {} },
+    savingGoals: [],
     goals: {
       short: { name: '', targetYear: 2026, targetAmount: 0 },
       medium: { name: '', targetYear: 2026, targetAmount: 0 },

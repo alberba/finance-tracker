@@ -17,6 +17,7 @@ import {
   type PendingMovement,
   type PendingMovementStatus,
   type Quote,
+  type SavingGoal,
   type QuoteDataType,
   type QuoteStatus,
   type RecurringFrequency,
@@ -67,6 +68,7 @@ export const EMPTY_STATE_SEED = {
   snapshots: {},
   budget: { income: {}, expense: {}, saving: {}, investment: {} },
   goals: {},
+  savingGoals: [],
   contributions: [],
   instruments: [],
   quotes: {},
@@ -175,6 +177,7 @@ export function normalizeState(candidate: unknown): State {
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
+    savingGoals: normalizeSavingGoals(input?.savingGoals || base.savingGoals || []),
     contributions: normalizeContributions(input?.contributions || base.contributions || []),
     instruments: normalizeInstruments(input?.instruments || base.instruments || []),
     quotes: normalizeQuotes(input?.quotes || base.quotes || {}),
@@ -723,6 +726,24 @@ function normalizeBudget(budget: unknown): State['budget'] {
   })
 
   return safe
+}
+
+function normalizeSavingGoals(list: unknown): SavingGoal[] {
+  const items = Array.isArray(list) ? list : []
+  return items.flatMap((item) => {
+    const raw = asRecord(item)
+    const name = String(raw.name || '').trim()
+    const category = String(raw.category || '').trim()
+    if (!name || !category) return []
+    return [
+      {
+        id: String(raw.id || uid('saving-goal')),
+        name,
+        targetAmount: round2(Math.max(parseFloatSafe(raw.targetAmount, 0), 0)),
+        category,
+      },
+    ]
+  })
 }
 
 function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {

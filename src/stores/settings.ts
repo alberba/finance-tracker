@@ -291,6 +291,13 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   function removeCategory(key: CategoryKey, name: string): void {
+    if (key === 'savingCategories') {
+      const goal = financialStateStore.state.savingGoals.find((item) => item.category === name)
+      if (goal) {
+        showToast(`No se puede eliminar «${name}»: la usa el objetivo de ahorro «${goal.name}».`)
+        return
+      }
+    }
     financialStateStore.commitState((draft) => {
       draft[key] = draft[key].filter((item) => item !== name)
       delete draft.categoryEmojis[categoryEmojiKey(categoryKeyToType(key), name)]

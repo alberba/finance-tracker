@@ -13,6 +13,7 @@ import {
   budgetEntries,
   categories,
   contributionAllocations,
+  goals,
   pendingMovements,
   recurringRules,
   snapshotBalances,
@@ -316,6 +317,7 @@ export async function removeCategory(
     { table: recurringRules, column: recurringRules.categoryId },
     { table: subscriptions, column: subscriptions.categoryId },
     { table: budgetEntries, column: budgetEntries.categoryId },
+    { table: goals, column: goals.categoryId },
     { table: userInstruments, column: userInstruments.categoryId },
     { table: stockeventsSymbolMappings, column: stockeventsSymbolMappings.categoryId },
   ], id);

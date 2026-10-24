@@ -2,8 +2,8 @@
 
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { goals } from "../schema";
-import { type Db, clientIdentity, nowIso, versionGuard } from "./shared";
+import { categories, goals } from "../schema";
+import { type Db, RejectedCommandError, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type GoalRow = Omit<typeof goals.$inferSelect, "targetAmountMinor"> & {
   targetAmount: number;
@@ -14,6 +14,8 @@ export interface CreateGoalInput {
   id?: string;
   legacyId?: string | null;
   key: string;
+  /** The saving category a savings goal sums; absent on wealth and investment goals. */
+  categoryId?: string | null;
   name: string;
   targetYear?: number | null;
   targetAmount: number;
@@ -21,6 +23,7 @@ export interface CreateGoalInput {
 }
 
 export interface UpdateGoalInput {
+  categoryId?: string | null;
   name?: string;
   targetYear?: number | null;
   targetAmount?: number;
@@ -44,7 +47,23 @@ export async function get(db: Db, userId: string, id: string): Promise<GoalRow |
   return row ? toRow(row) : undefined;
 }
 
+/** A goal's category has to be one of the user's saving categories. */
+async function assertSavingCategory(db: Db, userId: string, categoryId: string | null | undefined) {
+  if (!categoryId) return;
+  const [category] = await db
+    .select({ kind: categories.kind })
+    .from(categories)
+    .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)));
+  if (!category) {
+    throw new RejectedCommandError("La categoría indicada no existe o no pertenece al usuario.");
+  }
+  if (category.kind !== "saving") {
+    throw new RejectedCommandError("Un objetivo de ahorro necesita una categoría de ahorro.");
+  }
+}
+
 export async function create(db: Db, userId: string, input: CreateGoalInput): Promise<GoalRow> {
+  await assertSavingCategory(db, userId, input.categoryId);
   const now = nowIso();
   const [row] = await db
     .insert(goals)
@@ -53,6 +72,7 @@ export async function create(db: Db, userId: string, input: CreateGoalInput): Pr
       userId,
       legacyId: input.legacyId ?? null,
       key: input.key,
+      categoryId: input.categoryId ?? null,
       name: input.name,
       targetYear: input.targetYear ?? null,
       targetAmountMinor: toMinorUnits(input.targetAmount, input.currency),
@@ -75,11 +95,13 @@ export async function update(
   if (!existing) {
     return undefined;
   }
+  await assertSavingCategory(db, userId, input.categoryId);
   const nextCurrency = input.currency ?? existing.currency;
   const nextTargetAmount = input.targetAmount ?? existing.targetAmount;
   const [row] = await db
     .update(goals)
     .set({
+      categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
       name: input.name ?? existing.name,
       targetYear: input.targetYear === undefined ? existing.targetYear : input.targetYear,
       targetAmountMinor: toMinorUnits(nextTargetAmount, nextCurrency),

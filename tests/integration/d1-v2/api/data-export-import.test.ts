@@ -46,7 +46,7 @@ function comparable(exported: Row): Row {
     for (const [key, field] of Object.entries(value as Row)) {
       if (VOLATILE_KEYS.has(key) || key === 'snapshotId' || key === 'contributionId') continue
       out[key] =
-        (['accountId', 'categoryId', 'recurringRuleId'].includes(key) ||
+        (['accountId', 'destinationAccountId', 'categoryId', 'recurringRuleId'].includes(key) ||
           (key === 'alias' && names.has(String(field)))) &&
         typeof field === 'string'
           ? `→${names.get(field) ?? '?'}`
@@ -189,6 +189,61 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     year: 2026,
     month: 4,
     amount: 50,
+    currency: 'EUR',
+  })
+  const savingCategory = await accountsRepository.createCategory(db, userId, {
+    name: 'Fondo de emergencia',
+    kind: 'saving',
+  })
+  const origin = await accountsRepository.create(db, userId, {
+    name: 'Corriente',
+    kind: 'cash',
+    currency: 'EUR',
+    openingBalance: 1000,
+  })
+  const destination = await accountsRepository.create(db, userId, {
+    name: 'Hucha',
+    kind: 'cash',
+    currency: 'EUR',
+    openingBalance: 0,
+  })
+  await transactionsRepository.create(db, userId, {
+    legacyId: 'tx-saving',
+    accountId: origin.id,
+    destinationAccountId: destination.id,
+    categoryId: savingCategory.id,
+    type: 'saving',
+    date: '2026-03-03',
+    description: 'Ahorro',
+    amount: 150,
+    currency: 'EUR',
+  })
+  const savingRule = await recurringRulesRepository.create(db, userId, {
+    name: 'Ahorro mensual',
+    type: 'saving',
+    accountId: origin.id,
+    destinationAccountId: destination.id,
+    categoryId: savingCategory.id,
+    amount: 100,
+    currency: 'EUR',
+    frequency: 'monthly',
+  })
+  await pendingMovementsRepository.create(db, userId, {
+    recurringRuleId: savingRule.id,
+    accountId: origin.id,
+    destinationAccountId: destination.id,
+    categoryId: savingCategory.id,
+    amount: 100,
+    currency: 'EUR',
+    dueDate: '2026-05-05',
+    type: 'saving',
+    description: 'Ahorro',
+  })
+  await goalsRepository.create(db, userId, {
+    key: 'saving:emergencia',
+    categoryId: savingCategory.id,
+    name: 'Colchón',
+    targetAmount: 3000,
     currency: 'EUR',
   })
   await goalsRepository.create(db, userId, {

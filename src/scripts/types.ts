@@ -32,6 +32,18 @@ export type CategoryKey =
 export type GoalKey =
   'short' | 'medium' | 'long' | 'investmentTotal' | 'investmentFunds' | 'investmentCrypto'
 
+/**
+ * A savings goal (objetivo de ahorro): its progress is the sum of the savings of its category,
+ * including the ones before it existed. Unlike the wealth goals it is created by the user.
+ */
+export interface SavingGoal {
+  id: string
+  name: string
+  targetAmount: number
+  /** Name of the saving category it sums. */
+  category: string
+}
+
 export interface Entity {
   id: string
   name: string
@@ -253,6 +265,7 @@ export interface State {
   snapshots: Record<string, SnapshotRow>
   budget: Record<BudgetType, Record<string, number[]>>
   goals: Record<GoalKey, Goal>
+  savingGoals: SavingGoal[]
   contributions: Contribution[]
   instruments: Instrument[]
   quotes: Record<string, Quote>

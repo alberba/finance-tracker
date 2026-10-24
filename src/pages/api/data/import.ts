@@ -338,11 +338,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         bump(imported, 'budgetEntries')
       }
 
-      // -- goals (no FK dependency) ------------------------------------------
+      // -- goals (FK: categoryId optional, set on a savings goal) -------------
       for (const row of asRows(body.goals)) {
+        const categoryId = remapOptionalId(categoryIdMap, row.categoryId)
+        if (categoryId === '__skip__') {
+          bump(skipped, 'goals')
+          continue
+        }
         await goalsRepository.create(tx, userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           key: String(row.key ?? ''),
+          categoryId: categoryId ?? null,
           name: String(row.name ?? ''),
           targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
           targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,

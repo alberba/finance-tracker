@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { useAccountRequirement } from '../../composables/useAccountRequirement'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -80,12 +80,18 @@ const previewDetail = computed(() =>
     .join(' · '),
 )
 
+let loadingMovement = false
+
 watch(
   () => form.type,
   () => {
-    // categoryOptions keeps the current category even when the new type lacks it, so check the type's own list.
+    // Against the new type's own list: `categoryOptions` keeps the chosen category even when
+    // it belongs to another type, so it would never ask for a replacement.
     const names = movementsStore.orderedCategories(form.type)
-    if (!names.includes(form.category)) form.category = names[0] ?? 'Sin categoría'
+    // Opening a movement fills its own category, even one that no longer exists.
+    if (!loadingMovement && !names.includes(form.category)) {
+      form.category = names[0] ?? 'Sin categoría'
+    }
     ensureDestination()
   },
 )
@@ -128,6 +134,10 @@ function openNew(): void {
 function openEdit(tx: Transaction): void {
   if (tx.remoteOperation) return
   editingId.value = tx.id
+  loadingMovement = true
+  void nextTick(() => {
+    loadingMovement = false
+  })
   form.type = tx.type
   form.amount = formatDecimalInput(Number(tx.amount || 0))
   form.description = tx.description || ''

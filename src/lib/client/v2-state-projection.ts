@@ -126,6 +126,7 @@ export function projectSyncV2State(
     snapshots: {},
     budget: { income: {}, expense: {}, saving: {}, investment: {} },
     goals: {},
+    savingGoals: [],
     contributions: [],
     instruments: [],
     quotes: {},
@@ -254,6 +255,19 @@ export function projectSyncV2State(
   }
 
   for (const goal of bootstrap.goals) {
+    // A goal tied to a saving category is an objetivo de ahorro, not one of the fixed slots.
+    if (goal.categoryId) {
+      const category = categories.get(String(goal.categoryId))
+      if (category) {
+        projected.savingGoals.push({
+          id: legacyId(goal),
+          name: String(goal.name || ''),
+          targetAmount: Number(goal.targetAmount || 0),
+          category,
+        })
+      }
+      continue
+    }
     const key = String(goal.key) as GoalKey
     if (!(key in projected.goals)) continue
     projected.goals[key] = {

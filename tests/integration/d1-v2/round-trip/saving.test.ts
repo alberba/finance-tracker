@@ -27,6 +27,17 @@ async function seed(trip: RoundTrip) {
   return { origin, destination, broker }
 }
 
+/** Lets the fire-and-forget enqueue of a store action finish before the outbox is drained. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
+
+/** The user creating the category in Configuración, which is what a goal needs first. */
+async function createSavingCategory(trip: RoundTrip, name: string) {
+  const { useSettingsStore } = await import('../../../../src/stores/settings')
+  useSettingsStore().addCategory('savingCategories', name)
+  await settled()
+  await trip.reload()
+}
+
 describe('round trip: ahorro', () => {
   let trip: RoundTrip
   let ids: { origin: string; destination: string; broker: string }
@@ -223,5 +234,78 @@ describe('round trip: ahorro', () => {
     await expect(
       accountsRepository.remove(trip.testDb.db as never, trip.userId, hucha.id),
     ).rejects.toThrow()
+  })
+
+  it('keeps a savings goal tied to its category and sums earlier savings', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    await addSaving(250)
+    await trip.reload()
+
+    expect(
+      useGoalsStore().addSavingGoal({
+        name: 'Colchón',
+        category: 'Fondo de emergencia',
+        targetAmount: 1000,
+      }),
+    ).toBe(true)
+
+    const reloaded = await trip.reload()
+    expect(reloaded.savingGoals).toMatchObject([
+      { name: 'Colchón', category: 'Fondo de emergencia', targetAmount: 1000 },
+    ])
+    const { buildSavingGoals } = await import('../../../../src/domain/goals/view-model')
+    expect(buildSavingGoals(reloaded)[0]).toMatchObject({ saved: 250, progress: 25 })
+  })
+
+  it('does not mix savings goals into the fixed wealth goals', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    await createSavingCategory(trip, 'Fondo de emergencia')
+    useGoalsStore().addSavingGoal({
+      name: 'Colchón',
+      category: 'Fondo de emergencia',
+      targetAmount: 1000,
+    })
+    await settled()
+    const reloaded = await trip.reload()
+    expect(Object.keys(reloaded.goals)).not.toContain('saving')
+    expect(reloaded.savingGoals).toHaveLength(1)
+  })
+
+  it('refuses a goal whose category is not a saving category on the server', async () => {
+    const goalsRepository = await import('../../../../src/db/repositories/goals')
+    const accountsRepository = await import('../../../../src/db/repositories/accounts')
+    const db = trip.testDb.db as never
+    const expense = await accountsRepository.createCategory(db, trip.userId, {
+      name: 'Comida',
+      kind: 'expense',
+    })
+
+    await expect(
+      goalsRepository.create(db, trip.userId, {
+        key: 'saving:x',
+        categoryId: expense.id,
+        name: 'No',
+        targetAmount: 10,
+        currency: 'EUR',
+      }),
+    ).rejects.toThrow(/categoría de ahorro/)
+  })
+
+  it('keeps a category from being removed while a savings goal uses it', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    const { useSettingsStore } = await import('../../../../src/stores/settings')
+    await createSavingCategory(trip, 'Fondo de emergencia')
+    useGoalsStore().addSavingGoal({
+      name: 'Colchón',
+      category: 'Fondo de emergencia',
+      targetAmount: 1000,
+    })
+    await settled()
+    await trip.reload()
+
+    useSettingsStore().removeCategory('savingCategories', 'Fondo de emergencia')
+
+    const reloaded = await trip.reload()
+    expect(reloaded.savingCategories).toContain('Fondo de emergencia')
   })
 })

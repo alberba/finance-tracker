@@ -4,6 +4,8 @@ import { computed, useTemplateRef } from 'vue'
 
 import GoalEditPanel from '../goals/GoalEditPanel.vue'
 import GoalLedger from '../goals/GoalLedger.vue'
+import SavingGoalPanel from '../goals/SavingGoalPanel.vue'
+import SavingGoalsBlock from '../goals/SavingGoalsBlock.vue'
 import { dueLabel, portfolioPaceSentence } from '../goals/goal-text'
 import AllocationBar from '../ui/AllocationBar.vue'
 import AppSection from '../ui/AppSection.vue'
@@ -25,6 +27,7 @@ const goalsStore = useGoalsStore()
 const { viewModel, month } = storeToRefs(goalsStore)
 const { formatMoney } = useMoneyFormatter()
 const panel = useTemplateRef<InstanceType<typeof GoalEditPanel>>('panel')
+const savingPanel = useTemplateRef<InstanceType<typeof SavingGoalPanel>>('savingPanel')
 
 const rows = computed(() => [...viewModel.value.net.rows, ...viewModel.value.investment.rows])
 // Mid-sentence ("a cierre de septiembre de 2026"), so the month stays lowercase.
@@ -106,6 +109,11 @@ const allocation = computed(() => {
   return { segments, text }
 })
 
+function editSaving(id: string): void {
+  const goal = viewModel.value.savingGoals.find((item) => item.id === id)
+  if (goal) savingPanel.value?.openEdit(goal)
+}
+
 function edit(key: GoalKey): void {
   panel.value?.openEdit(rowOf(key))
 }
@@ -180,9 +188,24 @@ function edit(key: GoalKey): void {
             <p>{{ allocation.text }}</p>
           </div>
         </NumberedBlock>
+
+        <NumberedBlock
+          number="03"
+          title="Ahorro"
+          title-id="goals-saving-title"
+          description="Metas que creas tú. Cada una suma los ahorros de su categoría, también los anteriores."
+        >
+          <SavingGoalsBlock
+            :rows="viewModel.savingGoals"
+            :format-money="formatMoney"
+            @add="savingPanel?.openNew()"
+            @edit="editSaving"
+          />
+        </NumberedBlock>
       </DocumentSurface>
     </div>
 
     <GoalEditPanel ref="panel" :month-name="monthName" />
+    <SavingGoalPanel ref="savingPanel" />
   </AppSection>
 </template>

@@ -342,6 +342,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       investmentFunds: { name: 'Fondos indexados', targetYear: year + 2, targetAmount: 20000 },
       investmentCrypto: { name: 'Criptomonedas', targetYear: year + 2, targetAmount: 4000 },
     },
+    savingGoals: [],
     contributions,
     instruments: [
       {
