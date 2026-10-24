@@ -308,4 +308,81 @@ describe('round trip: ahorro', () => {
     const reloaded = await trip.reload()
     expect(reloaded.savingCategories).toContain('Fondo de emergencia')
   })
+
+  it('keeps a savings goal edit and its deletion through sync', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    await createSavingCategory(trip, 'Fondo de emergencia')
+    expect(
+      useGoalsStore().addSavingGoal({
+        name: 'Colchón',
+        category: 'Fondo de emergencia',
+        targetAmount: 1000,
+      }),
+    ).toBe(true)
+    await settled()
+    const created = await trip.reload()
+    const id = created.savingGoals[0].id
+
+    useGoalsStore().updateSavingGoal(id, {
+      name: 'Colchón de dos meses',
+      category: 'Fondo de emergencia',
+      targetAmount: 2400,
+    })
+    await settled()
+    const edited = await trip.reload()
+    expect(edited.savingGoals).toMatchObject([
+      { name: 'Colchón de dos meses', category: 'Fondo de emergencia', targetAmount: 2400 },
+    ])
+
+    useGoalsStore().removeSavingGoal(id)
+    await settled()
+    const removed = await trip.reload()
+    expect(removed.savingGoals).toHaveLength(0)
+  })
+
+  it('refuses a saving rule or pending without a destination on the server', async () => {
+    const rulesRepository = await import('../../../../src/db/repositories/recurring-rules')
+    const pendingRepository = await import('../../../../src/db/repositories/pending-movements')
+    const accountsRepository = await import('../../../../src/db/repositories/accounts')
+    const db = trip.testDb.db as never
+    const rows = await accountsRepository.listByUser(db, trip.userId)
+    const origin = rows.find((row) => row.name === 'Corriente')!
+    const destination = rows.find((row) => row.name === 'Hucha')!
+
+    await expect(
+      rulesRepository.create(db, trip.userId, {
+        name: 'Ahorro sin destino',
+        type: 'saving',
+        accountId: origin.id,
+        amount: 100,
+        currency: 'EUR',
+        frequency: 'monthly',
+      }),
+    ).rejects.toThrow(/cuenta destino/)
+
+    const rule = await rulesRepository.create(db, trip.userId, {
+      name: 'Ahorro mensual',
+      type: 'saving',
+      accountId: origin.id,
+      destinationAccountId: destination.id,
+      amount: 100,
+      currency: 'EUR',
+      frequency: 'monthly',
+    })
+
+    await expect(
+      pendingRepository.create(db, trip.userId, {
+        recurringRuleId: rule.id,
+        type: 'saving',
+        accountId: origin.id,
+        amount: 100,
+        currency: 'EUR',
+        dueDate: '2026-10-01',
+      }),
+    ).rejects.toThrow(/cuenta destino/)
+
+    await expect(
+      rulesRepository.update(db, trip.userId, rule.id, { destinationAccountId: null }),
+    ).rejects.toThrow(/cuenta destino/)
+  })
 })
