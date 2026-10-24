@@ -9,10 +9,12 @@
  */
 
 import { and, eq } from 'drizzle-orm'
-import { lift } from '../database'
+import { Effect } from 'effect'
+import { Database, DatabaseError, query } from '../database'
 import { integrationCredentials } from '../schema'
-import { type Db, nowIso, versionGuard } from './shared'
+import { nowIso, versionGuard } from './shared'
 import {
+  DataEncryptionError,
   decryptValue,
   encryptValue,
   type DataEncryptionEnv,
@@ -43,195 +45,245 @@ export interface UpdateIntegrationCredentialInput {
   secret?: string
 }
 
-async function toPublicRow(
+function toPublicRow(
   env: DataEncryptionEnv,
   row: IntegrationCredentialTableRow,
-): Promise<IntegrationCredentialRow> {
-  const secret = await decryptValue(env, {
-    ciphertext: row.ciphertext,
-    keyVersion: row.keyVersion,
+): Effect.Effect<IntegrationCredentialRow, DataEncryptionError> {
+  return Effect.gen(function* () {
+    const secret = yield* decryptValue(env, {
+      ciphertext: row.ciphertext,
+      keyVersion: row.keyVersion,
+    })
+    return {
+      id: row.id,
+      userId: row.userId,
+      provider: row.provider,
+      secret,
+      keyVersion: row.keyVersion,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      version: row.version,
+    }
   })
-  return {
-    id: row.id,
-    userId: row.userId,
-    provider: row.provider,
-    secret,
-    keyVersion: row.keyVersion,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    version: row.version,
-  }
 }
 
-async function listByUserSql(
-  db: Db,
+export function listByUser(
   userId: string,
   env: DataEncryptionEnv,
-): Promise<IntegrationCredentialRow[]> {
-  const rows = await db
-    .select()
-    .from(integrationCredentials)
-    .where(eq(integrationCredentials.userId, userId))
-  return Promise.all(rows.map((row) => toPublicRow(env, row)))
+): Effect.Effect<IntegrationCredentialRow[], DatabaseError | DataEncryptionError, Database> {
+  return Effect.gen(function* () {
+    const rows = yield* query((db) =>
+      db.select().from(integrationCredentials).where(eq(integrationCredentials.userId, userId)),
+    )
+    return yield* Effect.all(
+      rows.map((row) => toPublicRow(env, row)),
+      { concurrency: 'unbounded' },
+    )
+  })
 }
 
-async function getSql(
-  db: Db,
+export function get(
   userId: string,
   id: string,
   env: DataEncryptionEnv,
-): Promise<IntegrationCredentialRow | undefined> {
-  const [row] = await db
-    .select()
-    .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
-  return row ? toPublicRow(env, row) : undefined
+): Effect.Effect<
+  IntegrationCredentialRow | undefined,
+  DatabaseError | DataEncryptionError,
+  Database
+> {
+  return Effect.gen(function* () {
+    const rows = yield* query((db) =>
+      db
+        .select()
+        .from(integrationCredentials)
+        .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId))),
+    )
+    const row = rows[0]
+    return row ? yield* toPublicRow(env, row) : undefined
+  })
 }
 
-async function getByProviderSql(
-  db: Db,
+export function getByProvider(
   userId: string,
   provider: string,
   env: DataEncryptionEnv,
-): Promise<IntegrationCredentialRow | undefined> {
-  const [row] = await db
-    .select()
-    .from(integrationCredentials)
-    .where(
-      and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)),
+): Effect.Effect<
+  IntegrationCredentialRow | undefined,
+  DatabaseError | DataEncryptionError,
+  Database
+> {
+  return Effect.gen(function* () {
+    const rows = yield* query((db) =>
+      db
+        .select()
+        .from(integrationCredentials)
+        .where(
+          and(
+            eq(integrationCredentials.userId, userId),
+            eq(integrationCredentials.provider, provider),
+          ),
+        ),
     )
-  return row ? toPublicRow(env, row) : undefined
+    const row = rows[0]
+    return row ? yield* toPublicRow(env, row) : undefined
+  })
 }
 
 /** Checks existence without decrypting or exposing credential material. */
-async function hasProviderSql(db: Db, userId: string, provider: string): Promise<boolean> {
-  const [row] = await db
-    .select({ id: integrationCredentials.id })
-    .from(integrationCredentials)
-    .where(
-      and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)),
-    )
-  return row !== undefined
+export function hasProvider(
+  userId: string,
+  provider: string,
+): Effect.Effect<boolean, DatabaseError, Database> {
+  return query((db) =>
+    db
+      .select({ id: integrationCredentials.id })
+      .from(integrationCredentials)
+      .where(
+        and(
+          eq(integrationCredentials.userId, userId),
+          eq(integrationCredentials.provider, provider),
+        ),
+      ),
+  ).pipe(Effect.map((rows) => rows.length > 0))
 }
 
-async function createSql(
-  db: Db,
+export function create(
   userId: string,
   input: CreateIntegrationCredentialInput,
   env: DataEncryptionEnv,
-): Promise<IntegrationCredentialRow> {
-  const now = nowIso()
-  const { ciphertext, keyVersion } = await encryptValue(env, input.secret)
-  const [row] = await db
-    .insert(integrationCredentials)
-    .values({
-      userId,
-      provider: input.provider,
-      ciphertext,
-      keyVersion,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning()
-  return toPublicRow(env, row)
+): Effect.Effect<IntegrationCredentialRow, DatabaseError | DataEncryptionError, Database> {
+  return Effect.gen(function* () {
+    const now = nowIso()
+    const { ciphertext, keyVersion } = yield* encryptValue(env, input.secret)
+    const rows = yield* query((db) =>
+      db
+        .insert(integrationCredentials)
+        .values({
+          userId,
+          provider: input.provider,
+          ciphertext,
+          keyVersion,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning(),
+    )
+    return yield* toPublicRow(env, rows[0])
+  })
 }
 
-async function updateSql(
-  db: Db,
+export function update(
   userId: string,
   id: string,
   input: UpdateIntegrationCredentialInput,
   env: DataEncryptionEnv,
   expectedVersion?: number,
-): Promise<IntegrationCredentialRow | undefined> {
-  const [existing] = await db
-    .select()
-    .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
-  if (!existing) {
-    return undefined
-  }
-  const next =
-    input.secret !== undefined
-      ? await encryptValue(env, input.secret)
-      : { ciphertext: existing.ciphertext, keyVersion: existing.keyVersion }
-  const [row] = await db
-    .update(integrationCredentials)
-    .set({
-      ciphertext: next.ciphertext,
-      keyVersion: next.keyVersion,
-      updatedAt: nowIso(),
-      version: existing.version + 1,
-    })
-    .where(
-      and(
-        eq(integrationCredentials.id, id),
-        eq(integrationCredentials.userId, userId),
-        versionGuard(integrationCredentials.version, expectedVersion),
-      ),
+): Effect.Effect<
+  IntegrationCredentialRow | undefined,
+  DatabaseError | DataEncryptionError,
+  Database
+> {
+  return Effect.gen(function* () {
+    const existingRows = yield* query((db) =>
+      db
+        .select()
+        .from(integrationCredentials)
+        .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId))),
     )
-    .returning()
-  return row ? toPublicRow(env, row) : undefined
+    const existing = existingRows[0]
+    if (!existing) {
+      return undefined
+    }
+    const next =
+      input.secret !== undefined
+        ? yield* encryptValue(env, input.secret)
+        : { ciphertext: existing.ciphertext, keyVersion: existing.keyVersion }
+    const rows = yield* query((db) =>
+      db
+        .update(integrationCredentials)
+        .set({
+          ciphertext: next.ciphertext,
+          keyVersion: next.keyVersion,
+          updatedAt: nowIso(),
+          version: existing.version + 1,
+        })
+        .where(
+          and(
+            eq(integrationCredentials.id, id),
+            eq(integrationCredentials.userId, userId),
+            versionGuard(integrationCredentials.version, expectedVersion),
+          ),
+        )
+        .returning(),
+    )
+    const row = rows[0]
+    return row ? yield* toPublicRow(env, row) : undefined
+  })
 }
 
-async function removeSql(
-  db: Db,
+export function remove(
   userId: string,
   id: string,
   expectedVersion?: number,
-): Promise<boolean> {
-  const [existing] = await db
-    .select()
-    .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
-  if (!existing) {
-    return false
-  }
-  const deleted = await db
-    .delete(integrationCredentials)
-    .where(
-      and(
-        eq(integrationCredentials.id, id),
-        eq(integrationCredentials.userId, userId),
-        versionGuard(integrationCredentials.version, expectedVersion),
-      ),
+): Effect.Effect<boolean, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const existingRows = yield* query((db) =>
+      db
+        .select()
+        .from(integrationCredentials)
+        .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId))),
     )
-    .returning({ id: integrationCredentials.id })
-  return deleted.length > 0
+    if (!existingRows[0]) {
+      return false
+    }
+    const deleted = yield* query((db) =>
+      db
+        .delete(integrationCredentials)
+        .where(
+          and(
+            eq(integrationCredentials.id, id),
+            eq(integrationCredentials.userId, userId),
+            versionGuard(integrationCredentials.version, expectedVersion),
+          ),
+        )
+        .returning({ id: integrationCredentials.id }),
+    )
+    return deleted.length > 0
+  })
 }
 
-async function bulkInsertSql(
-  db: Db,
+export function bulkInsert(
   userId: string,
   inputs: CreateIntegrationCredentialInput[],
   env: DataEncryptionEnv,
-): Promise<IntegrationCredentialRow[]> {
-  if (inputs.length === 0) {
-    return []
-  }
-  const now = nowIso()
-  const encrypted = await Promise.all(inputs.map((input) => encryptValue(env, input.secret)))
-  const rows = await db
-    .insert(integrationCredentials)
-    .values(
-      inputs.map((input, index) => ({
-        userId,
-        provider: input.provider,
-        ciphertext: encrypted[index].ciphertext,
-        keyVersion: encrypted[index].keyVersion,
-        createdAt: now,
-        updatedAt: now,
-      })),
+): Effect.Effect<IntegrationCredentialRow[], DatabaseError | DataEncryptionError, Database> {
+  return Effect.gen(function* () {
+    if (inputs.length === 0) {
+      return []
+    }
+    const now = nowIso()
+    const encrypted = yield* Effect.all(
+      inputs.map((input) => encryptValue(env, input.secret)),
+      { concurrency: 'unbounded' },
     )
-    .returning()
-  return Promise.all(rows.map((row) => toPublicRow(env, row)))
+    const rows = yield* query((db) =>
+      db
+        .insert(integrationCredentials)
+        .values(
+          inputs.map((input, index) => ({
+            userId,
+            provider: input.provider,
+            ciphertext: encrypted[index].ciphertext,
+            keyVersion: encrypted[index].keyVersion,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        )
+        .returning(),
+    )
+    return yield* Effect.all(
+      rows.map((row) => toPublicRow(env, row)),
+      { concurrency: 'unbounded' },
+    )
+  })
 }
-
-export const listByUser = lift(listByUserSql)
-export const get = lift(getSql)
-export const getByProvider = lift(getByProviderSql)
-export const hasProvider = lift(hasProviderSql)
-export const create = lift(createSql)
-export const update = lift(updateSql)
-export const remove = lift(removeSql)
-export const bulkInsert = lift(bulkInsertSql)
