@@ -263,7 +263,7 @@ export const useSyncStore = defineStore('sync', () => {
     detached = false
     userId.value = nextUserId
     email.value = options.email ?? null
-    runtime = createClientRuntime(nextUserId)
+    runtime = await createClientRuntime(nextUserId)
     initializing = (async () => {
       const cached = await run(
         Effect.gen(function* () {

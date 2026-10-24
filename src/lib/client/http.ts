@@ -8,7 +8,7 @@
  * are typed here: no network, and a body that is not JSON.
  */
 
-import { Context, Data, Effect, Layer } from 'effect'
+import { Context, Data, Effect } from 'effect'
 
 /** The request never produced a response (`fetch` rejected). */
 export class ClientNetworkError extends Data.TaggedError('ClientNetworkError')<{
@@ -23,9 +23,6 @@ export class ClientJsonError extends Data.TaggedError('ClientJsonError')<{
 export class ClientHttp extends Context.Service<ClientHttp, { readonly request: typeof fetch }>()(
   'finance/client/ClientHttp',
 ) {}
-
-export const clientHttpLayer = (request: typeof fetch = fetch): Layer.Layer<ClientHttp> =>
-  Layer.succeed(ClientHttp, { request })
 
 export const sendRequest = (
   input: string,

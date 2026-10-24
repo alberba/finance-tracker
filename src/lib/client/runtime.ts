@@ -6,50 +6,56 @@
  * the modules under `src/lib/client` return `Effect<A, E, R>` and never a
  * `Promise` across their own boundary.
  *
- * One `ManagedRuntime` per signed-in user owns the HTTP layer and the local
- * storage handles (cache + outbox) for the page's lifetime. Logout disposes
- * it, so both IndexedDB connections close with the runtime.
+ * One runtime per signed-in user owns the HTTP layer and the local storage
+ * handles (cache + outbox) for the page's lifetime. It is assembled with
+ * `Effect.provideService` instead of `ManagedRuntime` + `Layer` on purpose:
+ * the client only ever needs these two services, and keeping the layer
+ * machinery out of the bundle saves the startup budget (ADR-0006).
  */
 
-import { Effect, Layer, ManagedRuntime } from 'effect'
+import { Effect } from 'effect'
 
-import { ClientHttp, clientHttpLayer } from './http'
+import { ClientHttp } from './http'
 import { openIdbCache } from './idb-cache'
 import { openOutbox } from './outbox'
 import { ClientStorage } from './storage'
 
 export type ClientRuntimeServices = ClientHttp | ClientStorage
 
-const storageLayer = (userId: string) =>
-  Layer.effect(
-    ClientStorage,
-    Effect.gen(function* () {
-      const cache = yield* Effect.acquireRelease(openIdbCache(userId), (db) =>
-        Effect.sync(() => db.close()),
-      )
-      const outbox = yield* Effect.acquireRelease(openOutbox(userId), (db) =>
-        Effect.sync(() => db.close()),
-      )
-      return { cache, outbox }
-    }),
-  )
-
-export const clientLayer = (userId: string, request: typeof fetch = fetch) =>
-  Layer.mergeAll(clientHttpLayer(request), storageLayer(userId))
-
 export interface ClientRuntime {
   readonly run: <A, E>(effect: Effect.Effect<A, E, ClientRuntimeServices>) => Promise<A>
   readonly dispose: () => Promise<void>
 }
 
-export const createClientRuntime = (
+export const createClientRuntime = async (
   userId: string,
   request: typeof fetch = fetch,
-): ClientRuntime => {
-  const runtime = ManagedRuntime.make(clientLayer(userId, request))
+): Promise<ClientRuntime> => {
+  const cache = await Effect.runPromise(openIdbCache(userId))
+  let outbox: IDBDatabase
+  try {
+    outbox = await Effect.runPromise(openOutbox(userId))
+  } catch (error) {
+    cache.close()
+    throw error
+  }
+  const storage = { cache, outbox }
+  let disposed = false
+
   return {
-    run: (effect) => runtime.runPromise(effect),
-    dispose: () => runtime.dispose(),
+    run: (effect) =>
+      Effect.runPromise(
+        effect.pipe(
+          Effect.provideService(ClientStorage, storage),
+          Effect.provideService(ClientHttp, { request }),
+        ),
+      ),
+    dispose: async () => {
+      if (disposed) return
+      disposed = true
+      cache.close()
+      outbox.close()
+    },
   }
 }
 
@@ -62,5 +68,3 @@ export const runClientHttp = <A, E>(
   effect: Effect.Effect<A, E, ClientHttp>,
   request: typeof fetch = fetch,
 ): Promise<A> => Effect.runPromise(Effect.provideService(effect, ClientHttp, { request }))
-
-export { clientHttpLayer }
