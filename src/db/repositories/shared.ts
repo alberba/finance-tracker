@@ -173,19 +173,8 @@ export class RejectedCommandError extends Error {
 }
 
 /**
- * Cross-tenant FK-ownership guard (WP10 security fix).
- *
- * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,
- * `recurring_rules`, `pending_movements`, and `categoryId` on
- * `budget_entries` only reference `accounts.id`/`categories.id` *globally*
- * at the schema level — SQLite's `FOREIGN KEY` constraint just asserts the
- * row exists, not that it belongs to the same `user_id`. Without this
- * check, a `create`/`update` sync command could attach an entity to
- * *another* user's real account/category id (guessed, or replayed from a
- * `sync_changes`/export payload) and it would silently succeed. Every
- * repository write path that accepts an `accountId`/`categoryId` from
- * untrusted (client) input must call this first; bulk-insert paths used
- * only by the trusted migration tool (WP9) are exempt.
+ * A saving needs two cash accounts, and the destination cannot be the origin.
+ * Checks ownership as well, so a guessed id from another tenant is rejected.
  */
 export async function assertSavingAccounts(
   db: Db,
@@ -214,6 +203,21 @@ export async function assertSavingAccounts(
   }
 }
 
+/**
+ * Cross-tenant FK-ownership guard (WP10 security fix).
+ *
+ * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,
+ * `recurring_rules`, `pending_movements`, and `categoryId` on
+ * `budget_entries` only reference `accounts.id`/`categories.id` *globally*
+ * at the schema level — SQLite's `FOREIGN KEY` constraint just asserts the
+ * row exists, not that it belongs to the same `user_id`. Without this
+ * check, a `create`/`update` sync command could attach an entity to
+ * *another* user's real account/category id (guessed, or replayed from a
+ * `sync_changes`/export payload) and it would silently succeed. Every
+ * repository write path that accepts an `accountId`/`categoryId` from
+ * untrusted (client) input must call this first; bulk-insert paths used
+ * only by the trusted migration tool (WP9) are exempt.
+ */
 export async function assertOwnedReferences(
   db: Db,
   userId: string,

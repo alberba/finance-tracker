@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import { fromMinorUnits, toMinorUnits } from "../../lib/money";
 import { pendingMovements } from "../schema";
-import { type Db, assertOwnedReferences, assertSavingAccounts, clientIdentity, nowIso, versionGuard } from "./shared";
+import { type Db, RejectedCommandError, assertOwnedReferences, assertSavingAccounts, clientIdentity, nowIso, versionGuard } from "./shared";
 
 export type PendingMovementRow = Omit<
   typeof pendingMovements.$inferSelect,
@@ -121,7 +121,10 @@ export async function create(
     recurringRuleId: input.recurringRuleId,
   });
   const destinationAccountId = input.type === "saving" ? (input.destinationAccountId ?? null) : null;
-  if (destinationAccountId) {
+  if (input.type === "saving") {
+    if (!destinationAccountId) {
+      throw new RejectedCommandError("El ahorro necesita una cuenta destino.");
+    }
     await assertSavingAccounts(db, userId, { accountId: input.accountId, destinationAccountId });
   }
   const now = nowIso();
@@ -169,7 +172,10 @@ export async function update(
       : input.destinationAccountId === undefined
         ? existing.destinationAccountId
         : input.destinationAccountId;
-  if (nextDestination) {
+  if (nextType === "saving") {
+    if (!nextDestination) {
+      throw new RejectedCommandError("El ahorro necesita una cuenta destino.");
+    }
     await assertSavingAccounts(db, userId, { accountId: nextAccountId, destinationAccountId: nextDestination });
   }
   const [row] = await db
