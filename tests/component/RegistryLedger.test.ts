@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import RegistryLedger from '../../src/components/transactions/RegistryLedger.vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useUiStore } from '../../src/stores/ui'
+import type { Month } from '../../src/lib/month'
 import type { Transaction } from '../../src/scripts/types'
 
 describe('RegistryLedger', () => {
@@ -16,7 +17,7 @@ describe('RegistryLedger', () => {
     return {
       id: 'tx-1',
       date: '2026-10-05',
-      month: 9,
+      month: 10,
       type: 'expense',
       category: 'Vivienda',
       amount: 100,
@@ -26,7 +27,7 @@ describe('RegistryLedger', () => {
     }
   }
 
-  function setupTransactions(transactions: Transaction[], currentMonth = 9, year = 2026) {
+  function setupTransactions(transactions: Transaction[], currentMonth: Month = 10, year = 2026) {
     const financialStore = useFinancialStateStore()
     const uiStore = useUiStore()
 
@@ -66,9 +67,9 @@ describe('RegistryLedger', () => {
 
   it('solo muestra los movimientos del mes actual y pliega los anteriores', () => {
     setupTransactions([
-      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 9, description: 'Alquiler octubre' }),
-      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 8, description: 'Alquiler septiembre' }),
-      makeTx({ id: 'tx-ago', date: '2026-08-10', month: 7, description: 'Alquiler agosto' }),
+      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 10, description: 'Alquiler octubre' }),
+      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 9, description: 'Alquiler septiembre' }),
+      makeTx({ id: 'tx-ago', date: '2026-08-10', month: 8, description: 'Alquiler agosto' }),
     ])
 
     const wrapper = mount(RegistryLedger, {
@@ -88,8 +89,8 @@ describe('RegistryLedger', () => {
 
   it('al pulsar el botón muestra los meses anteriores', async () => {
     setupTransactions([
-      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 9, description: 'Alquiler octubre' }),
-      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 8, description: 'Alquiler septiembre' }),
+      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 10, description: 'Alquiler octubre' }),
+      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 9, description: 'Alquiler septiembre' }),
     ])
 
     const wrapper = mount(RegistryLedger, {
@@ -108,8 +109,8 @@ describe('RegistryLedger', () => {
 
   it('muestra todos los movimientos cuando hay filtros activos', () => {
     const { uiStore } = setupTransactions([
-      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 9, description: 'Supermercado oct' }),
-      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 8, description: 'Supermercado sep' }),
+      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 10, description: 'Supermercado oct' }),
+      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 9, description: 'Supermercado sep' }),
     ])
     uiStore.ui.txFilters.search = 'Supermercado'
 
@@ -126,10 +127,10 @@ describe('RegistryLedger', () => {
   it('muestra el último mes con movimientos si el mes seleccionado no tiene', () => {
     setupTransactions(
       [
-        makeTx({ id: 'tx-sep', date: '2026-09-12', month: 8, description: 'Nómina septiembre' }),
-        makeTx({ id: 'tx-ago', date: '2026-08-10', month: 7, description: 'Nómina agosto' }),
+        makeTx({ id: 'tx-sep', date: '2026-09-12', month: 9, description: 'Nómina septiembre' }),
+        makeTx({ id: 'tx-ago', date: '2026-08-10', month: 8, description: 'Nómina agosto' }),
       ],
-      9, // Octubre no tiene movimientos
+      10, // Octubre no tiene movimientos
     )
 
     const wrapper = mount(RegistryLedger, {

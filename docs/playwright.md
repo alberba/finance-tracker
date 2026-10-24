@@ -180,8 +180,8 @@ de sincronizar. No modifican datos ni cambian filtros de la interfaz:
 - `search_movements`: búsqueda por descripción o categoría, con filtros opcionales de año contable,
   mes y tipo; paginación mediante `offset` y `limit` (25 por defecto, máximo 100).
 
-Los parámetros de mes usan 1–12. Las celdas del resultado de `get_budget` conservan los índices
-0–11 del view-model. Las monedas no se convierten; la búsqueda devuelve la moneda de cada
+Los parámetros y los resultados usan meses de 1 a 12 (enero = 1), también en las celdas de
+`get_budget` (ADR 0006). Las monedas no se convierten; la búsqueda devuelve la moneda de cada
 movimiento y los totales siguen el comportamiento del registro.
 
 El navegador debe tener abierta la app con una sesión autenticada o el demo y soporte WebMCP

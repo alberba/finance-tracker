@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ALL_MONTHS, atMonth, monthIndex, type Month } from '../../lib/month'
 import { computed, ref } from 'vue'
 
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
@@ -37,8 +38,8 @@ const valid = computed(() => !needsCategory.value && !invalidAt.value.some(Boole
 
 // The figures follow what is typed; a field that does not parse keeps its saved amount.
 const planned = computed(() =>
-  values.value.map((value, month) =>
-    invalidAt.value[month] ? (row.value?.cells[month].planned ?? 0) : value,
+  values.value.map((value, slot) =>
+    invalidAt.value[slot] ? (row.value?.cells[slot].planned ?? 0) : value,
   ),
 )
 const figures = computed(() => {
@@ -46,7 +47,9 @@ const figures = computed(() => {
   const plannedTotal = planned.value.reduce((total, value) => total + value, 0)
   const diff = cells.reduce(
     (total, cell) =>
-      cell.status === 'closed' ? total + (cell.actual ?? 0) - planned.value[cell.month] : total,
+      cell.status === 'closed'
+        ? total + (cell.actual ?? 0) - atMonth(planned.value, cell.month)
+        : total,
     0,
   )
   const tone = toneOf(type.value, diff)
@@ -59,12 +62,12 @@ const figures = computed(() => {
 })
 const span = computed(() => deviationSpan(props.currentMonth))
 
-function label(month: number): string {
+function label(month: Month): string {
   return formatMonthName(month)
 }
 
-function reference(month: number): string {
-  const actual = row.value?.cells[month].actual
+function reference(month: Month): string {
+  const actual = row.value && atMonth(row.value.cells, month).actual
   return actual === null || actual === undefined ? 'sin movimientos' : `real ${formatMoney(actual)}`
 }
 
@@ -135,7 +138,7 @@ defineExpose({ openPlan })
           Importe por mes
         </legend>
         <div
-          v-for="(_, month) in inputs"
+          v-for="month in ALL_MONTHS"
           :key="month"
           class="border-line grid grid-cols-[4rem_minmax(0,1fr)_6.5rem] items-center gap-3.5 border-t py-1.5 sm:grid-cols-[8rem_minmax(0,1fr)_9.5rem]"
           :data-budget-plan-month="month"
@@ -144,19 +147,19 @@ defineExpose({ openPlan })
             <span class="sm:hidden">{{ label(month).slice(0, 3) }}</span>
             <span class="hidden sm:inline">{{ label(month) }}</span>
             <span
-              v-if="row?.cells[month].status === 'current'"
+              v-if="row && atMonth(row.cells, month).status === 'current'"
               class="text-primary font-mono text-[0.625rem] font-normal tracking-widest uppercase"
               >en curso</span
             >
           </span>
           <BaseInput
-            v-model="inputs[month]"
+            v-model="inputs[monthIndex(month)]"
             :label="`${label(month)}`"
             hide-label
             inputmode="decimal"
             suffix="€"
             class="[&_input]:font-display [&_input]:text-right"
-            :aria-invalid="invalidAt[month]"
+            :aria-invalid="atMonth(invalidAt, month)"
             :aria-describedby="`budget-plan-ref-${month}`"
           />
           <span :id="`budget-plan-ref-${month}`" class="text-text-muted text-right text-sm">

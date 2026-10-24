@@ -1,3 +1,4 @@
+import type { Month } from '../../lib/month'
 import type { Entity } from '../../scripts/types'
 
 export interface InvestmentBuckets {
@@ -9,8 +10,8 @@ type InvestmentAsset = Pick<Entity, 'id' | 'name'>
 
 export function getInvestmentBuckets(
   assets: readonly InvestmentAsset[],
-  month: number,
-  getInvestmentValue: (assetId: string, month: number) => number,
+  month: Month,
+  getInvestmentValue: (assetId: string, month: Month) => number,
 ): InvestmentBuckets {
   return {
     fundsValue: sumMatchingAssets(assets, /fond|index/i, month, getInvestmentValue),
@@ -21,8 +22,8 @@ export function getInvestmentBuckets(
 function sumMatchingAssets(
   assets: readonly InvestmentAsset[],
   namePattern: RegExp,
-  month: number,
-  getInvestmentValue: (assetId: string, month: number) => number,
+  month: Month,
+  getInvestmentValue: (assetId: string, month: Month) => number,
 ): number {
   return assets
     .filter((asset) => namePattern.test(asset.name))

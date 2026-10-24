@@ -134,13 +134,13 @@ test.describe('Investment charts E2E', () => {
     page,
   }) => {
     await tracker.openInvestment()
-    await page.locator('#investment-month').selectOption('2')
+    await page.locator('#investment-month').selectOption('3')
     await showPortfolioPercent(page)
     await openFirstPosition(page)
 
     const result = await page.evaluate(
       (state) => {
-        const month = 2
+        const month = 3
         const monthLabel = 'MARZO'
         const slug = (value: unknown) =>
           String(value || '')
@@ -160,7 +160,7 @@ test.describe('Investment charts E2E', () => {
           )
         }
         const getLatestSnapshotValue = (assetId: string, targetMonth: number) => {
-          for (let m = targetMonth; m >= 0; m -= 1) {
+          for (let m = targetMonth; m >= 1; m -= 1) {
             const snapshot = state.snapshots[String(m)]
             if (!snapshot || !snapshot.investments) {
               continue
@@ -179,7 +179,7 @@ test.describe('Investment charts E2E', () => {
           }
 
           const latestSnapshot = getLatestSnapshotValue(assetId, targetMonth)
-          let startMonth = -1
+          let startMonth = 0
           let value = Number(asset.openingBalance || 0)
 
           if (latestSnapshot) {
@@ -317,7 +317,7 @@ test.describe('Investment charts E2E', () => {
     page,
   }) => {
     await tracker.openInvestment()
-    await page.locator('#investment-month').selectOption('0')
+    await page.locator('#investment-month').selectOption('1')
     await showPortfolioPercent(page)
     await openFirstPosition(page)
 
@@ -373,7 +373,7 @@ test.describe('Investment charts E2E', () => {
     })
 
     // Seleccionar mes anterior
-    await page.locator('#investment-month').selectOption('0')
+    await page.locator('#investment-month').selectOption('1')
     await expect(page.locator('#investment-portfolio-chart')).toHaveAttribute(
       'data-chart-point-count',
       /\d+/,

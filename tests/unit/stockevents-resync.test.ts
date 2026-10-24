@@ -30,7 +30,7 @@ import { useStockEventsStore } from '../../src/stores/stockevents'
 const ethBuy: Transaction = {
   id: 'tx-eth-buy',
   date: '2026-07-15',
-  month: 6,
+  month: 7,
   type: 'investment',
   accountId: 'broker',
   category: 'Crypto',

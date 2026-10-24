@@ -77,7 +77,7 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(
       useMovementsStore().addTransaction({
         date: '2026-01-31',
-        month: 1,
+        month: 2,
         type: 'expense',
         accountId,
         category: 'Ocio',
@@ -87,12 +87,12 @@ describe('round trip: shared movement commands (#263)', () => {
     ).toBe(true)
     const created = await trip.reload()
     const id = created.transactions[0].id
-    expect(created.transactions[0]).toMatchObject({ date: '2026-01-31', month: 1 })
+    expect(created.transactions[0]).toMatchObject({ date: '2026-01-31', month: 2 })
 
     expect(
       useMovementsStore().saveEdit(id, {
         date: '2026-01-31',
-        month: 0,
+        month: 1,
         accountId,
         type: 'expense',
         category: 'Ocio',
@@ -101,15 +101,15 @@ describe('round trip: shared movement commands (#263)', () => {
       }),
     ).toBe(true)
     const afterEdit = await trip.reload()
-    expect(afterEdit.transactions[0]).toMatchObject({ month: 0 })
+    expect(afterEdit.transactions[0]).toMatchObject({ month: 1 })
     expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBeNull()
   })
 
-  it('maps the app month (0-11) to the stored month (1-12) and back for December (#337)', async () => {
+  it('keeps December (12) apart from the date month on the way to D1 and back (#337)', async () => {
     expect(
       useMovementsStore().addTransaction({
         date: '2026-11-30',
-        month: 11,
+        month: 12,
         type: 'expense',
         accountId,
         category: 'Ocio',
@@ -118,7 +118,7 @@ describe('round trip: shared movement commands (#263)', () => {
       }),
     ).toBe(true)
     const reloaded = await trip.reload()
-    expect(reloaded.transactions[0]).toMatchObject({ month: 11 })
+    expect(reloaded.transactions[0]).toMatchObject({ month: 12 })
     expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBe(12)
   })
 
@@ -264,7 +264,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it('keeps an investment without an operation and its own currency after reload', async () => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type: 'investment',
       accountId,
       category: 'Acciones',
@@ -294,7 +294,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it('does not invent an operation when an expense becomes an investment', async () => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -531,7 +531,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it.each(['income', 'expense'] as const)('edits an ordinary %s', async (type) => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type,
       accountId,
       category: type === 'income' ? 'Nómina' : 'Ocio',
@@ -559,7 +559,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it.each(['income', 'expense'] as const)('creates an ordinary %s', async (type) => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type,
       accountId,
       category: type === 'income' ? 'Nómina' : 'Ocio',
@@ -584,7 +584,7 @@ describe('round trip: shared movement commands (#263)', () => {
       } else {
         useMovementsStore().addTransaction({
           date: '2026-09-12',
-          month: 8,
+          month: 9,
           type,
           accountId,
           category: type === 'income' ? 'Nómina' : 'Ocio',

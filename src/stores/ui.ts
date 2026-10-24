@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
 
+import { monthFromDate, type Month } from '../lib/month'
 import type { UiState } from '../scripts/app/ui-state'
 import type { SectionId } from '../scripts/types'
 
-function currentMonth(): number {
-  return Math.min(new Date().getMonth(), 11)
+function currentMonth(): Month {
+  return monthFromDate(new Date())
 }
 
 function createDefaultUiState(): UiState {
@@ -55,7 +56,7 @@ export const useUiStore = defineStore('ui', () => {
     ui.activeSection = sectionId
   }
 
-  function setDashboardMonth(month: number): void {
+  function setDashboardMonth(month: Month): void {
     ui.month = month
   }
 

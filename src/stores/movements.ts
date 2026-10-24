@@ -1,3 +1,4 @@
+import { ALL_MONTHS, monthIndex, type Month } from '../lib/month'
 import { defineStore } from 'pinia'
 
 import { computed, watch } from 'vue'
@@ -50,7 +51,7 @@ async function buildSubscriptionData(subscription: Subscription, currency: strin
 
 export interface NewTransactionInput {
   date: string
-  month: number
+  month: Month
   type: TransactionType
   accountId: string
   category: string
@@ -61,7 +62,7 @@ export interface NewTransactionInput {
 export interface EditedTransactionInput {
   date: string
   /** The month it counts in; defaults to the month of the date. */
-  month?: number
+  month?: Month
   accountId: string
   type: string
   category: string
@@ -96,8 +97,8 @@ function currentYear(): number {
   return Number(todayISO().slice(0, 4))
 }
 
-function todayMonth(): number {
-  return monthFromISO(todayISO()) ?? 0
+function todayMonth(): Month {
+  return monthFromISO(todayISO()) ?? 1
 }
 
 export const useMovementsStore = defineStore('movements', () => {
@@ -184,16 +185,16 @@ export const useMovementsStore = defineStore('movements', () => {
     return getOrderedCategoriesForType(financialStateStore.state, type)
   }
 
-  function setMonth(month: number): void {
+  function setMonth(month: Month): void {
     ui.txFilterMonth = month
   }
 
   /** Moves the band one month back or forward, across the turn of the year. */
   function stepMonth(delta: -1 | 1): void {
-    const index = ui.txYear * 12 + ui.txFilterMonth + delta
+    const index = ui.txYear * 12 + monthIndex(ui.txFilterMonth) + delta
     const year = Math.floor(index / 12)
     if (year !== ui.txYear) setYear(year)
-    ui.txFilterMonth = index - year * 12
+    ui.txFilterMonth = ALL_MONTHS[index - year * 12]
   }
 
   /** Shows another year, starting at its latest month with movements. */
@@ -210,7 +211,7 @@ export const useMovementsStore = defineStore('movements', () => {
       { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
       ui.txSort,
     ).map((group) => group.month)
-    ui.txFilterMonth = months[0] ?? 11
+    ui.txFilterMonth = months[0] ?? 12
   }
 
   function toggleSort(column: TxSortColumn): void {

@@ -77,6 +77,7 @@
  *   intentionally not routed through the sync command outbox.
  */
 
+import type { Month } from '../month'
 import { useSyncStore } from '../../stores/sync'
 import type { SyncEntityType } from '../server/sync/command-schemas'
 import { isReadOnlyDemoActive } from './demo-source'
@@ -543,7 +544,7 @@ export async function syncGoalUpsert(key: string, data: JsonRecord): Promise<voi
 export async function syncBudgetEntry(
   categoryId: string,
   year: number,
-  month: number,
+  month: Month,
   amount: number,
   currency: string,
 ): Promise<void> {
@@ -562,7 +563,7 @@ export async function syncBudgetEntry(
  */
 export async function syncWealthSnapshot(
   year: number,
-  month: number,
+  month: Month,
   balances: unknown,
 ): Promise<void> {
   await syncUpsertByKey(

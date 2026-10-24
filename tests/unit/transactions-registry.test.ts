@@ -8,6 +8,7 @@ import {
   registryYears,
   type RegistryFilters,
 } from '../../src/domain/transactions/registry'
+import type { Month } from '../../src/lib/month'
 import type { Transaction, TransactionType } from '../../src/scripts/types'
 
 function tx(
@@ -20,7 +21,7 @@ function tx(
   return {
     id,
     date,
-    month: Number(date.slice(5, 7)) - 1,
+    month: Number(date.slice(5, 7)) as Month,
     type,
     accountId: 'bbva',
     category: 'Varios',
@@ -32,15 +33,15 @@ function tx(
 
 describe('accountingYear', () => {
   it('is the year of the date when the movement counts in the month of its date', () => {
-    expect(accountingYear({ date: '2026-09-27', month: 8 })).toBe(2026)
+    expect(accountingYear({ date: '2026-09-27', month: 9 })).toBe(2026)
   })
 
   it('moves to the next year when a late-December movement counts in January', () => {
-    expect(accountingYear({ date: '2025-12-28', month: 0 })).toBe(2026)
+    expect(accountingYear({ date: '2025-12-28', month: 1 })).toBe(2026)
   })
 
   it('moves to the previous year when an early-January movement counts in December', () => {
-    expect(accountingYear({ date: '2026-01-02', month: 11 })).toBe(2025)
+    expect(accountingYear({ date: '2026-01-02', month: 12 })).toBe(2025)
   })
 })
 
@@ -55,7 +56,7 @@ describe('monthTotals', () => {
       tx('otro-ano', '2025-09-10', 'income', 999),
     ]
 
-    expect(monthTotals(transactions, 2026, 8)).toEqual({
+    expect(monthTotals(transactions, 2026, 9)).toEqual({
       income: 2450,
       expense: 898.17,
       investment: 300,
@@ -88,8 +89,8 @@ describe('buildMonthGroups', () => {
     const groups = buildMonthGroups(transactions, 2026, NO_FILTERS, NEWEST_FIRST)
 
     expect(groups.map((group) => [group.month, group.count, group.net])).toEqual([
-      [8, 3, 2085.68],
-      [7, 2, 1600],
+      [9, 3, 2085.68],
+      [8, 2, 1600],
     ])
     expect(groups[0].rows.map((row) => row.id)).toEqual(['mercadona', 'vwce', 'nomina-sep'])
   })
@@ -136,7 +137,7 @@ describe('registryYears', () => {
   it('lists every year with movements plus the current one, newest first', () => {
     const transactions = [
       tx('a', '2024-03-01', 'expense', 10),
-      tx('b', '2025-12-28', 'income', 10, { month: 0 }),
+      tx('b', '2025-12-28', 'income', 10, { month: 1 }),
       tx('c', '2024-05-01', 'expense', 10),
     ]
 
@@ -154,7 +155,7 @@ describe('categoryBreakdown', () => {
       tx('agosto', '2026-08-02', 'expense', 70, { category: 'Supermercado' }),
     ]
 
-    expect(categoryBreakdown(transactions, 2026, 8, 'expense')).toEqual([
+    expect(categoryBreakdown(transactions, 2026, 9, 'expense')).toEqual([
       { category: 'Hogar', amount: 900, share: 90 },
       { category: 'Supermercado', amount: 100, share: 10 },
     ])

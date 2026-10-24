@@ -11,9 +11,11 @@ import { wipeEncryptionKey } from "./crypto";
 
 const LEGACY_STORAGE_KEYS = [
   "finance-tracker-state-v1",
+  "finance-tracker-state-v2",
   "finance-tracker-server-version-v1",
   "finance-tracker-pending-v1",
   "finance-tracker-state-v1::demo",
+  "finance-tracker-state-v2::demo",
   "finance-tracker-server-version-v1::demo",
   "finance-tracker-pending-v1::demo",
 ];

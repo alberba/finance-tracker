@@ -465,7 +465,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     const transaction: Transaction = {
       id: transactionId,
       date: occurrenceDate,
-      month: monthFromISO(occurrenceDate) ?? 0,
+      month: monthFromISO(occurrenceDate) ?? 1,
       type,
       accountId,
       category,

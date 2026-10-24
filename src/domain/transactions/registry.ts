@@ -1,3 +1,4 @@
+import type { Month } from '../../lib/month'
 import { parseDecimal, round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
 import type { Transaction, TransactionType } from '../../scripts/types'
@@ -14,7 +15,7 @@ export function accountingYear(tx: Dated): number | null {
   const match = String(tx.date).match(/^(\d{4})-(\d{2})/)
   if (!match) return null
   const year = Number(match[1])
-  const dateMonth = Number(match[2]) - 1
+  const dateMonth = Number(match[2])
   const shift = Number(tx.month) - dateMonth
   if (shift < -6) return year + 1
   if (shift > 6) return year - 1
@@ -29,12 +30,12 @@ export interface MonthTotals {
   net: number
 }
 
-function inMonth(tx: Transaction, year: number, month: number): boolean {
+function inMonth(tx: Transaction, year: number, month: Month): boolean {
   return Number(tx.month) === month && accountingYear(tx) === year
 }
 
 /** What came in, went out and was invested in one month of a year. */
-export function monthTotals(transactions: Transaction[], year: number, month: number): MonthTotals {
+export function monthTotals(transactions: Transaction[], year: number, month: Month): MonthTotals {
   const totals = { income: 0, expense: 0, investment: 0 }
   transactions.forEach((tx) => {
     if (inMonth(tx, year, month)) totals[tx.type] += Number(tx.amount || 0)
@@ -57,7 +58,7 @@ export interface RegistryFilters {
 }
 
 export interface MonthGroup {
-  month: number
+  month: Month
   count: number
   /** Net of the movements shown: income minus expenses and investment. */
   net: number
@@ -111,10 +112,10 @@ export function buildMonthGroups(
   sort: TransactionSort,
 ): MonthGroup[] {
   const matches = matcher(filters)
-  const byMonth = new Map<number, Transaction[]>()
+  const byMonth = new Map<Month, Transaction[]>()
   transactions.forEach((tx) => {
     if (accountingYear(tx) !== year || !matches(tx)) return
-    const month = Number(tx.month)
+    const month = tx.month
     byMonth.set(month, [...(byMonth.get(month) ?? []), tx])
   })
   return Array.from(byMonth, ([month, rows]) => ({
@@ -146,7 +147,7 @@ export interface CategoryShare {
 export function categoryBreakdown(
   transactions: Transaction[],
   year: number,
-  month: number,
+  month: Month,
   type: TransactionType,
 ): CategoryShare[] {
   const byCategory = new Map<string, number>()

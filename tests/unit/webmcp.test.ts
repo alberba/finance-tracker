@@ -10,7 +10,7 @@ function movement(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: 'expense',
     date: '2026-01-02',
-    month: 0,
+    month: 1,
     type: 'expense',
     category: 'Comida',
     description: 'Compra semanal',
@@ -75,7 +75,7 @@ describe('WebMCP finance queries', () => {
 
   it('uses the accounting year at the December/January boundary for search and totals', async () => {
     const { state, call } = await setup()
-    state.transactions = [movement({ date: '2025-12-28', type: 'income', month: 0, amount: 2000 })]
+    state.transactions = [movement({ date: '2025-12-28', type: 'income', month: 1, amount: 2000 })]
     expect(await call('search_movements', { year: 2026, month: 1 })).toMatchObject({ total: 1 })
     expect(await call('search_movements', { year: 2025 })).toMatchObject({ total: 0 })
     expect(await call('get_month_totals', { year: 2026, month: 1 })).toEqual({

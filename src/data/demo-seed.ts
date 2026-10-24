@@ -1,3 +1,4 @@
+import { ALL_MONTHS, monthFromDate, type Month } from '../lib/month'
 import type {
   Contribution,
   Entity,
@@ -27,8 +28,8 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-function iso(year: number, month: number, day: number): string {
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+function iso(year: number, month: Month, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 function addDays(date: Date, days: number): Date {
@@ -38,7 +39,7 @@ function addDays(date: Date, days: number): Date {
 }
 
 function toISODate(date: Date): string {
-  return iso(date.getFullYear(), date.getMonth(), date.getDate())
+  return iso(date.getFullYear(), monthFromDate(date), date.getDate())
 }
 
 export function buildDemoSeed(now: Date = new Date()): State {
@@ -76,7 +77,8 @@ export function buildDemoSeed(now: Date = new Date()): State {
   const groceryStores = ['Supermercado Norte', 'Mercado Central', 'Hiper Ahorro']
   const leisureItems = ['Cena con amigos', 'Cine', 'Concierto', 'Escapada fin de semana', 'Libros']
 
-  for (let month = 0; month <= currentMonth; month += 1) {
+  for (let slot = 0; slot <= currentMonth; slot += 1) {
+    const month = ALL_MONTHS[slot]
     pushTx({
       date: iso(year, month, 1),
       month,
@@ -138,7 +140,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       })
     }
 
-    if (month % 3 === 1) {
+    if (slot % 3 === 1) {
       pushTx({
         date: iso(year, month, 17),
         month,
@@ -161,12 +163,12 @@ export function buildDemoSeed(now: Date = new Date()): State {
       symbol: 'SWDA',
       instrumentId: 'fondo-msci-world',
       side: 'buy',
-      unitPrice: round2(92 + month * 0.8 + random() * 2),
-      units: round2(300 / (92 + month * 0.8)),
+      unitPrice: round2(92 + slot * 0.8 + random() * 2),
+      units: round2(300 / (92 + slot * 0.8)),
       declared: true,
     })
 
-    if (month % 2 === 0) {
+    if (slot % 2 === 0) {
       pushTx({
         date: iso(year, month, 15),
         month,
@@ -184,8 +186,8 @@ export function buildDemoSeed(now: Date = new Date()): State {
   }
 
   pushTx({
-    date: iso(year, Math.min(4, currentMonth), 22),
-    month: Math.min(4, currentMonth),
+    date: iso(year, ALL_MONTHS[Math.min(4, currentMonth)], 22),
+    month: ALL_MONTHS[Math.min(4, currentMonth)],
     type: 'income',
     accountId: 'cuenta-corriente',
     category: 'Extra',
@@ -194,36 +196,38 @@ export function buildDemoSeed(now: Date = new Date()): State {
   })
 
   const snapshots: Record<string, SnapshotRow> = {}
-  for (let month = 0; month < currentMonth; month += 1) {
+  for (let slot = 0; slot < currentMonth; slot += 1) {
+    const month = ALL_MONTHS[slot]
     snapshots[String(month)] = {
       month,
       accounts: {
-        'cuenta-corriente': round2(1850 + (month + 1) * 130 + between(-60, 60)),
-        'cuenta-ahorro': round2(9500 + (month + 1) * 150),
-        efectivo: round2(120 - month * 4),
+        'cuenta-corriente': round2(1850 + month * 130 + between(-60, 60)),
+        'cuenta-ahorro': round2(9500 + month * 150),
+        efectivo: round2(120 - slot * 4),
       },
       investments: {
-        'fondos-indexados': round2(14200 + (month + 1) * 340 + between(-120, 180)),
+        'fondos-indexados': round2(14200 + month * 340 + between(-120, 180)),
         criptomonedas: round2(1650 + between(-140, 190)),
       },
       liabilities: {
-        'prestamo-coche': round2(Math.max(0, 5400 - (month + 1) * 185)),
+        'prestamo-coche': round2(Math.max(0, 5400 - month * 185)),
       },
     }
   }
 
   const contributions: Contribution[] = []
-  for (let month = 0; month <= currentMonth; month += 1) {
+  for (let slot = 0; slot <= currentMonth; slot += 1) {
+    const month = ALL_MONTHS[slot]
     const date = iso(year, month, 3)
     if (date > today) {
       break
     }
     contributions.push({
-      id: `demo-contrib-${String(month + 1).padStart(2, '0')}`,
+      id: `demo-contrib-${String(month).padStart(2, '0')}`,
       date,
       amount: 300,
       portfolioDate: date,
-      portfolioValue: round2(15850 + month * 345 + between(-110, 160)),
+      portfolioValue: round2(15850 + slot * 345 + between(-110, 160)),
       flow: 300,
       flowAllocations: [{ accountId: 'cuenta-corriente', amount: 300 }],
       flowSource: 'allocations',
@@ -239,7 +243,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       accountId: 'cuenta-corriente',
       category: 'Suscripciones',
       frequency: 'monthly',
-      startDate: iso(year, 0, 8),
+      startDate: iso(year, 1, 8),
       nextChargeDate: toISODate(addDays(now, 8)),
       active: true,
     },
@@ -250,7 +254,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       accountId: 'cuenta-corriente',
       category: 'Suscripciones',
       frequency: 'monthly',
-      startDate: iso(year, 0, 15),
+      startDate: iso(year, 1, 15),
       nextChargeDate: toISODate(addDays(now, 15)),
       active: true,
     },
@@ -261,7 +265,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       accountId: 'cuenta-corriente',
       category: 'Suscripciones',
       frequency: 'monthly',
-      startDate: iso(year, 0, 20),
+      startDate: iso(year, 1, 20),
       nextChargeDate: toISODate(addDays(now, 20)),
       active: true,
     },
@@ -269,19 +273,15 @@ export function buildDemoSeed(now: Date = new Date()): State {
 
   const budgetMonths = (value: number): number[] => Array.from({ length: 12 }, () => value)
 
-  const nextMonthFirst = currentMonth === 11 ? iso(year + 1, 0, 1) : iso(year, currentMonth + 1, 1)
+  const nextMonthFirst = toISODate(new Date(year, currentMonth + 1, 1))
   // El día 1 del mes la "última ejecución" del alquiler (día 2) aún no ocurrió.
   const rentExecuted = now.getDate() >= 2
   const rentLastExecution = rentExecuted
-    ? iso(year, currentMonth, 2)
-    : currentMonth === 0
-      ? iso(year - 1, 11, 2)
-      : iso(year, currentMonth - 1, 2)
+    ? toISODate(new Date(year, currentMonth, 2))
+    : toISODate(new Date(year, currentMonth - 1, 2))
   const rentNextOccurrence = rentExecuted
-    ? currentMonth === 11
-      ? iso(year + 1, 0, 2)
-      : iso(year, currentMonth + 1, 2)
-    : iso(year, currentMonth, 2)
+    ? toISODate(new Date(year, currentMonth + 1, 2))
+    : toISODate(new Date(year, currentMonth, 2))
 
   return {
     meta: {
@@ -403,10 +403,10 @@ export function buildDemoSeed(now: Date = new Date()): State {
         amount: 2350,
         frequency: 'monthly',
         interval: 1,
-        startDate: iso(year, 0, 1),
+        startDate: iso(year, 1, 1),
         endDate: null,
         active: true,
-        lastExecutionDate: iso(year, currentMonth, 1),
+        lastExecutionDate: toISODate(new Date(year, currentMonth, 1)),
         nextOccurrenceDate: nextMonthFirst,
       },
       {
@@ -418,7 +418,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
         amount: 875,
         frequency: 'monthly',
         interval: 1,
-        startDate: iso(year, 0, 2),
+        startDate: iso(year, 1, 2),
         endDate: null,
         active: true,
         lastExecutionDate: rentLastExecution,

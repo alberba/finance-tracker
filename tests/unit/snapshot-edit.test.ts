@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 
 import { useSnapshotEdit, type SnapshotCommitEdit } from '../../src/composables/useSnapshotEdit'
 import { buildWealthViewModel } from '../../src/domain/wealth/view-model'
+import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 
 /** Banco opens at 1.000 and has 1.200 saved for February. */
@@ -17,14 +18,14 @@ function initialState(): State {
     liabilities: [{ id: 'car', name: 'Coche', openingBalance: 500 }],
     transactions: [],
     snapshots: {
-      '1': { month: 1, accounts: { bank: 1200 }, investments: {}, liabilities: {} },
+      '2': { month: 2, accounts: { bank: 1200 }, investments: {}, liabilities: {} },
     },
   } as unknown as State
 }
 
 function setup() {
   const state = ref(initialState())
-  const month = ref(1)
+  const month = ref<Month>(2)
   const commits: SnapshotCommitEdit[][] = []
   const groups = computed(() => buildWealthViewModel(state.value, month.value).groups)
   const edit = useSnapshotEdit({
@@ -118,7 +119,7 @@ describe('useSnapshotEdit', () => {
     edit.set('accounts', 'bank', '1500')
 
     const next = initialState()
-    next.snapshots['1'].accounts = { bank: 1250, cash: 60 }
+    next.snapshots['2'].accounts = { bank: 1250, cash: 60 }
     state.value = next
     await nextTick()
 
@@ -134,12 +135,12 @@ describe('useSnapshotEdit', () => {
     const { state, month, edit } = setup()
     edit.set('accounts', 'bank', '1500')
 
-    month.value = 2
+    month.value = 3
     await nextTick()
     expect(edit.field('accounts', 'bank')?.text).toBe('')
     expect(edit.changes.value).toBe(0)
 
-    month.value = 1
+    month.value = 2
     await nextTick()
     edit.set('accounts', 'bank', '1500')
     state.value = { ...state.value, year: 2021 }

@@ -56,6 +56,11 @@ El importe presupuestado para una combinación de categoría, año y mes. Su ide
 tres datos.
 _Avoid_: entrada de presupuesto, budget entry
 
+**Mes**:
+El mes del calendario como número de 1 (enero) a 12 (diciembre), igual en el cliente, los comandos
+y la base de datos. Un mes de 0 a 11 es un error.
+_Avoid_: índice de mes, mes 0-based
+
 **Snapshot de patrimonio**:
 La foto de todos los saldos en un mes concreto de un año concreto. Su identidad es (año, mes);
 sin los saldos no es un snapshot.

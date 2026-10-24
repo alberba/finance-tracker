@@ -1,3 +1,4 @@
+import type { Month } from '../../lib/month'
 import {
   computeInvestmentValue,
   getWealthByMonth,
@@ -101,7 +102,7 @@ export function goalSlot(key: GoalKey): string {
   return SLOTS[key].slot
 }
 
-function buildCurrentMap(state: State, month: number): Record<GoalKey, number> {
+function buildCurrentMap(state: State, month: Month): Record<GoalKey, number> {
   const wealth = getWealthByMonth(
     month,
     state.accounts as Entity[],
@@ -197,7 +198,7 @@ function investmentPace(rows: GoalRowViewModel[]): GoalPace {
   return totalRate > 0 && total ? { rate: totalRate, by: [total.key] } : { rate: 0, by: [] }
 }
 
-export function buildGoalsViewModel(state: State, month: number, now = new Date()): GoalsViewModel {
+export function buildGoalsViewModel(state: State, month: Month, now = new Date()): GoalsViewModel {
   const currentMap = buildCurrentMap(state, month)
   const measured = ORDER.map((key) => ({
     group: SLOTS[key].group,
@@ -248,7 +249,7 @@ export interface GoalEditPreview {
 /** What a draft of one goal would show, to read it before saving. */
 export function previewGoalEdit(
   state: State,
-  month: number,
+  month: Month,
   key: GoalKey,
   draft: Goal,
   now = new Date(),

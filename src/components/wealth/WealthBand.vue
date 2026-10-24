@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import type { SnapshotTotals, WealthMonthViewModel } from '../../domain/wealth/view-model'
 import { splitDecimals } from '../../lib/format'
+import type { Month } from '../../lib/month'
 import { GROUP_SWATCH } from './group-swatch'
 
 // The ink band of Patrimonio: the snapshot total of the chosen month with its
@@ -16,7 +17,7 @@ const props = defineProps<{
   formatMoney: (value: number) => string
 }>()
 
-const month = defineModel<number>('month', { required: true })
+const month = defineModel<Month>('month', { required: true })
 
 const parts = computed(() => splitDecimals(props.formatMoney(props.totals.net)))
 const facts = computed(() => [

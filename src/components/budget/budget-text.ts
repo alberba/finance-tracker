@@ -1,3 +1,4 @@
+import type { Month } from '../../lib/month'
 import { formatMonthName, formatWholeAmount } from '../../lib/format'
 import type { BudgetType } from '../../scripts/types'
 
@@ -21,13 +22,13 @@ export const PAST_LABEL: Record<BudgetType, string> = {
   investment: 'Invertido',
 }
 
-/** "septiembre" from a 0-based month index. */
-export function monthName(month: number): string {
+/** "septiembre" from a month. */
+export function monthName(month: Month): string {
   return formatMonthName(month).toLowerCase()
 }
 
-/** "Sep" from a 0-based month index. */
-export function shortMonth(month: number): string {
+/** "Sep" from a month. */
+export function shortMonth(month: Month): string {
   const name = monthName(month)
   return name ? `${name.charAt(0).toUpperCase()}${name.slice(1, 3)}` : ''
 }
@@ -43,8 +44,8 @@ export function formatSignedWhole(value: number): string {
  * with `long`), or none without closed months.
  */
 export function deviationSpan(currentMonth: number, { long = false } = {}): string {
-  if (currentMonth <= 0) return ''
-  if (currentMonth >= 12) return 'en el año'
-  const name = monthName(currentMonth - 1)
+  if (currentMonth <= 1) return ''
+  if (currentMonth > 12) return 'en el año'
+  const name = monthName((currentMonth - 1) as Month)
   return `hasta ${long ? name : `${name.slice(0, 3)}.`}`
 }

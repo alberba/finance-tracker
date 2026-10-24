@@ -1,3 +1,4 @@
+import { ALL_MONTHS, monthFromDate, type Month } from '../../lib/month'
 import {
   computeAccountBalance,
   computeInvestmentValue,
@@ -9,7 +10,7 @@ import {
 } from '../../lib/finance-core'
 import { formatMonthName } from '../../lib/format'
 import { round2 } from '../../lib/number'
-import { MONTHS, type SnapshotKind, type State } from '../../scripts/types'
+import type { SnapshotKind, State } from '../../scripts/types'
 
 export interface SnapshotRowViewModel {
   id: string
@@ -28,7 +29,7 @@ export interface SnapshotGroupViewModel {
 }
 
 export interface WealthMonthViewModel {
-  month: number
+  month: Month
   /** "Feb" */
   label: string
   /** "febrero" */
@@ -52,7 +53,7 @@ export interface WealthHistoryRow {
 export interface WealthViewModel {
   groups: SnapshotGroupViewModel[]
   months: WealthMonthViewModel[]
-  history: { months: number[]; rows: WealthHistoryRow[] }
+  history: { months: Month[]; rows: WealthHistoryRow[] }
 }
 
 export type SnapshotTotals = Record<SnapshotKind, number> & { net: number }
@@ -92,12 +93,9 @@ export function formatSnapshotInput(value: number | null): string {
   return value === null ? '' : String(value).replace('.', ',')
 }
 
-function visibleMonthLimit(year: number): number {
+function visibleMonthLimit(year: number): Month {
   const now = new Date()
-  if (year === now.getFullYear()) {
-    return Math.min(now.getMonth(), MONTHS.length - 1)
-  }
-  return MONTHS.length - 1
+  return year === now.getFullYear() ? monthFromDate(now) : 12
 }
 
 function hasSnapshot(snapshot: Snapshot | undefined): boolean {
@@ -105,7 +103,7 @@ function hasSnapshot(snapshot: Snapshot | undefined): boolean {
   return GROUPS.some(({ kind }) => Object.keys(snapshot[kind] ?? {}).length > 0)
 }
 
-export function buildWealthViewModel(state: State, month: number): WealthViewModel {
+export function buildWealthViewModel(state: State, month: Month): WealthViewModel {
   const accounts = state.accounts as Entity[]
   const investmentAssets = state.investmentAssets as Entity[]
   const liabilities = state.liabilities as Entity[]
@@ -119,7 +117,7 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
   }
   const balanceWith = (
     from: Record<string, Snapshot>,
-  ): Record<SnapshotKind, (id: string, month: number) => number> => ({
+  ): Record<SnapshotKind, (id: string, month: Month) => number> => ({
     accounts: (id, m) => computeAccountBalance(id, m, accounts, transactions, from),
     investments: (id, m) => computeInvestmentValue(id, m, investmentAssets, transactions, from),
     liabilities: (id, m) => computeLiabilityValue(id, m, liabilities, from),
@@ -145,14 +143,14 @@ export function buildWealthViewModel(state: State, month: number): WealthViewMod
   }))
 
   const limit = visibleMonthLimit(state.year)
-  const months: WealthMonthViewModel[] = MONTHS.map((_, index) => {
-    const name = formatMonthName(index)
+  const months: WealthMonthViewModel[] = ALL_MONTHS.map((entryMonth) => {
+    const name = formatMonthName(entryMonth)
     return {
-      month: index,
+      month: entryMonth,
       label: name.slice(0, 3),
       name: name.toLowerCase(),
-      saved: hasSnapshot(snapshots[String(index)]),
-      available: index <= limit,
+      saved: hasSnapshot(snapshots[String(entryMonth)]),
+      available: entryMonth <= limit,
     }
   })
 

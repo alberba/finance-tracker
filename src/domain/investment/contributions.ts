@@ -1,3 +1,4 @@
+import { asMonth, type Month } from '../../lib/month'
 import {
   computeAccountBalance,
   computeContributionMetrics as computeContributionMetricsCore,
@@ -79,8 +80,8 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
   const rowsByDate = new Map<string, Contribution>()
 
   Object.entries(state.snapshots || {}).forEach(([monthKey, snapshot]) => {
-    const month = parseIntSafe(monthKey, -1)
-    if (!Number.isInteger(month) || month < 0 || month > 11) {
+    const month = asMonth(parseIntSafe(monthKey, 0))
+    if (!month) {
       return
     }
     const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds)
@@ -94,7 +95,7 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
     const derived = deriveContributionFlow(existing || {})
     const flow = round2(derived.flow)
     const row: Contribution = {
-      id: existing?.id || `contrib-snapshot-${state.year}-${month + 1}`,
+      id: existing?.id || `contrib-snapshot-${state.year}-${month}`,
       date,
       amount: round2(parseFloatSafe(existing?.amount, flow)),
       portfolioDate: date,
@@ -167,7 +168,7 @@ export interface WorkflowSnapshotState {
 
 export function buildWorkflowSnapshotState(
   state: State,
-  month: number,
+  month: Month,
   date: string,
 ): WorkflowSnapshotState {
   const { matched: liquidityAccounts, missing } = findLiquidityTargets(
@@ -272,7 +273,7 @@ export function computeWorkflowWarnings(
 
 export interface ContributionSaveInput {
   date: string
-  month: number
+  month: Month
   snapshotInputs: SnapshotInputValue[]
   allocations: AllocationInputValue[]
   warnings: string[]

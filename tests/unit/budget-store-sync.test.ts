@@ -71,7 +71,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     })
 
     const budgetStore = useBudgetStore()
-    budgetStore.updateBudgetValue('expense', 'Ocio', 0, 100)
+    budgetStore.updateBudgetValue('expense', 'Ocio', 1, 100)
 
     const outboxDb = await openOutbox(USER_ID)
     let created: OutboxEntry['command'] | undefined
@@ -120,7 +120,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
       cacheDb2.close()
     }
 
-    budgetStore.updateBudgetValue('expense', 'Ocio', 0, 250)
+    budgetStore.updateBudgetValue('expense', 'Ocio', 1, 250)
 
     const outboxDb2 = await openOutbox(USER_ID)
     try {

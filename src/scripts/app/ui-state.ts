@@ -6,15 +6,16 @@ import type {
   SortDirection,
   TxSortColumn,
 } from '../types'
+import type { Month } from '../../lib/month'
 import type { RegistryFilters } from '../../domain/transactions/registry'
 
 export interface UiState {
   activeSection: SectionId
-  month: number
+  month: Month
   /** Year the Movimientos registry shows. */
   txYear: number
   /** Month of that year the ink band shows. */
-  txFilterMonth: number
+  txFilterMonth: Month
   txSort: {
     column: TxSortColumn
     direction: SortDirection
@@ -22,8 +23,8 @@ export interface UiState {
   txSelectedIds: string[]
   txFilters: RegistryFilters
   txTab: TransactionsSubTab
-  snapshotMonth: number
-  investmentMonth: number
+  snapshotMonth: Month
+  investmentMonth: Month
   wealthCalcTargetId: string
   wealthCalcTargetName: string
   investmentTab: InvestmentSubTab
@@ -32,7 +33,7 @@ export interface UiState {
   investmentOnlyUndeclared: boolean
   investmentReturnMode: 'simple' | 'twr'
   contributionWorkflowStep: 1 | 2
-  contributionWorkflowMonth: number
+  contributionWorkflowMonth: Month
   contributionWorkflowDate: string
   contributionWorkflowAmount: number
   contributionCalcTargetKind: SnapshotKind | ''

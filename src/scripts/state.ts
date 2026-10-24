@@ -1,4 +1,5 @@
 import { remoteOperationSchema } from '../lib/bitvavo-types'
+import { asMonth } from '../lib/month'
 import { FINANCE_TRACKER_SEED } from '../data/seed'
 import { FINANCE_TRACKER_DEMO_SEED } from '../data/demo-seed'
 import { isDemoMode } from './demo-mode'
@@ -28,23 +29,15 @@ import {
   type Transaction,
   isSubscriptionFrequency,
 } from './types'
-import {
-  clamp,
-  monthFromISO,
-  parseFloatSafe,
-  parseIntSafe,
-  round2,
-  slug,
-  todayISO,
-  uid,
-} from './utils'
+import { monthFromISO, parseFloatSafe, parseIntSafe, round2, slug, todayISO, uid } from './utils'
 import {
   deriveContributionFlow,
   deriveDefaultLiquidityAccountIds,
   sanitizeFlowAllocations,
 } from './contribution-workflow'
 
-export const STORAGE_KEY = 'finance-tracker-state-v1'
+// v2: the month went from 0-11 to 1-12 (ADR 0006); a v1 demo blob is discarded, not migrated.
+export const STORAGE_KEY = 'finance-tracker-state-v2'
 
 export const EMPTY_STATE_SEED = {
   meta: {
@@ -539,11 +532,8 @@ function normalizeTransactions(list: unknown): Transaction[] {
       const safe: Transaction = {
         id: String(rawItem.id || uid('tx')),
         date: String(rawItem.date || todayISO()),
-        month: clamp(
-          parseIntSafe(rawItem.month, monthFromISO(String(rawItem.date || '')) ?? 0),
-          0,
-          11,
-        ),
+        month:
+          asMonth(parseIntSafe(rawItem.month, 0)) ?? monthFromISO(String(rawItem.date || '')) ?? 1,
         type,
         accountId: String(rawItem.accountId || ''),
         category: String(rawItem.category || 'Sin categoría'),
@@ -676,7 +666,8 @@ function normalizeSnapshots(input: unknown): Record<string, SnapshotRow> {
   const output: Record<string, SnapshotRow> = {}
 
   Object.entries(rawInput).forEach(([monthKey, snapshotRaw]) => {
-    const month = clamp(parseIntSafe(monthKey, 0), 0, 11)
+    const month = asMonth(parseIntSafe(monthKey, 0))
+    if (!month) return
     const snapshot = (snapshotRaw || {}) as Partial<SnapshotRow>
     output[String(month)] = {
       month,

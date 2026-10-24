@@ -1,3 +1,11 @@
+import {
+  ALL_MONTHS,
+  asMonth,
+  atMonth,
+  monthFromDate,
+  monthIndex,
+  type Month,
+} from '../../lib/month'
 import type { Tone } from '../../components/ui/tone'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import { MONTHS, type BudgetType, type State } from '../../scripts/types'
@@ -11,7 +19,7 @@ export type BudgetRange = 3 | 6 | 12
 export type BudgetMonthStatus = 'closed' | 'current' | 'planned'
 
 export interface BudgetCell {
-  month: number
+  month: Month
   status: BudgetMonthStatus
   planned: number
   /** What was recorded; null for a month still to come. */
@@ -47,7 +55,7 @@ export interface BudgetTypeViewModel {
 
 export interface BudgetViewModel {
   year: number
-  /** Index of the month in progress: 12 for a past year, -1 for a future one. */
+  /** The month in progress (1-12): 13 for a past year, 0 for a future one. */
   currentMonth: number
   types: Record<BudgetType, BudgetTypeViewModel>
 }
@@ -55,12 +63,12 @@ export interface BudgetViewModel {
 export const BUDGET_TYPES: BudgetType[] = ['expense', 'income', 'investment']
 
 function currentMonthOf(year: number, now: Date): number {
-  if (year < now.getFullYear()) return MONTHS.length
-  if (year > now.getFullYear()) return -1
-  return now.getMonth()
+  if (year < now.getFullYear()) return MONTHS.length + 1
+  if (year > now.getFullYear()) return 0
+  return monthFromDate(now)
 }
 
-export function statusOf(month: number, current: number): BudgetMonthStatus {
+export function statusOf(month: Month, current: number): BudgetMonthStatus {
   if (month < current) return 'closed'
   return month === current ? 'current' : 'planned'
 }
@@ -76,10 +84,10 @@ function monthlyActuals(state: State, type: BudgetType): Map<string, number[]> {
   const actuals = new Map<string, number[]>()
   for (const transaction of state.transactions) {
     if (transaction.type !== type) continue
-    const month = Number(transaction.month)
-    if (!(month >= 0 && month < MONTHS.length)) continue
+    const month = asMonth(Number(transaction.month))
+    if (!month) continue
     const row = actuals.get(transaction.category) ?? Array<number>(MONTHS.length).fill(0)
-    row[month] += Number(transaction.amount || 0)
+    row[monthIndex(month)] += Number(transaction.amount || 0)
     actuals.set(transaction.category, row)
   }
   return actuals
@@ -91,14 +99,15 @@ function buildLine(
   planned: number[],
   actual: number[],
 ): BudgetLine {
-  const cells = MONTHS.map((_, month): BudgetCell => {
+  const cells = ALL_MONTHS.map((month): BudgetCell => {
     const status = statusOf(month, current)
-    const diff = status === 'closed' ? round2(actual[month] - planned[month]) : null
+    const diff =
+      status === 'closed' ? round2(atMonth(actual, month) - atMonth(planned, month)) : null
     return {
       month,
       status,
-      planned: round2(planned[month]),
-      actual: status === 'planned' ? null : round2(actual[month]),
+      planned: round2(atMonth(planned, month)),
+      actual: status === 'planned' ? null : round2(atMonth(actual, month)),
       diff,
       tone: diff === null ? null : toneOf(type, diff),
     }
@@ -117,7 +126,9 @@ function buildType(state: State, type: BudgetType, current: number): BudgetTypeV
   const actuals = monthlyActuals(state, type)
   const empty = Array<number>(MONTHS.length).fill(0)
   const rows = getCategoriesForType(state, type).map((category): BudgetRow => {
-    const planned = MONTHS.map((_, month) => Number(state.budget[type]?.[category]?.[month] || 0))
+    const planned = ALL_MONTHS.map((month) =>
+      Number(state.budget[type]?.[category]?.[monthIndex(month)] || 0),
+    )
     return {
       category,
       label: decorateCategoryLabel(type, category, state.categoryEmojis),
@@ -125,7 +136,9 @@ function buildType(state: State, type: BudgetType, current: number): BudgetTypeV
     }
   })
   const sum = (pick: (cell: BudgetCell) => number) =>
-    MONTHS.map((_, month) => rows.reduce((total, row) => total + pick(row.cells[month]), 0))
+    ALL_MONTHS.map((month) =>
+      rows.reduce((total, row) => total + pick(atMonth(row.cells, month)), 0),
+    )
   const totals = buildLine(
     type,
     current,
@@ -155,17 +168,17 @@ export function buildBudgetViewModel(state: State, now = new Date()): BudgetView
 }
 
 /** First month of a window: the month before the current one, the current one and what follows. */
-export function defaultWindowStart(range: BudgetRange, currentMonth: number): number {
+export function defaultWindowStart(range: BudgetRange, currentMonth: number): Month {
   return clampStart(currentMonth + 2 - range, range)
 }
 
 /** Slides the window one month back (-1) or forward (1), inside the year. */
-export function moveWindow(start: number, range: BudgetRange, direction: -1 | 1): number {
+export function moveWindow(start: Month, range: BudgetRange, direction: -1 | 1): Month {
   return clampStart(start + direction, range)
 }
 
-function clampStart(start: number, range: BudgetRange): number {
-  return Math.max(0, Math.min(MONTHS.length - range, start))
+function clampStart(start: number, range: BudgetRange): Month {
+  return Math.max(1, Math.min(MONTHS.length + 1 - range, start)) as Month
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildWealthViewModel, parseSnapshotInput } from '../../src/domain/wealth/view-model'
+import { monthIndex, type Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 
 /** The slice of the state the wealth view reads. */
@@ -15,7 +16,7 @@ function state(): State {
     liabilities: [{ id: 'car', name: 'Coche', openingBalance: 500 }],
     transactions: [],
     snapshots: {
-      '1': { month: 1, accounts: { bank: 1200 }, investments: {}, liabilities: {} },
+      '2': { month: 2, accounts: { bank: 1200 }, investments: {}, liabilities: {} },
     },
   } as unknown as State
 }
@@ -44,7 +45,7 @@ describe('parseSnapshotInput', () => {
 
 describe('buildWealthViewModel', () => {
   it('groups the snapshot rows into liquidity, investment and debt', () => {
-    const vm = buildWealthViewModel(state(), 1)
+    const vm = buildWealthViewModel(state(), 2)
 
     expect(vm.groups.map((group) => [group.kind, group.title, group.rows.length])).toEqual([
       ['accounts', 'Liquidez', 2],
@@ -62,7 +63,7 @@ describe('buildWealthViewModel', () => {
   })
 
   it('marks the months with a saved snapshot and the ones still to come', () => {
-    const vm = buildWealthViewModel(state(), 1)
+    const vm = buildWealthViewModel(state(), 2)
 
     expect(vm.months).toHaveLength(12)
     expect(vm.months[1]).toMatchObject({ label: 'Feb', name: 'febrero', saved: true })
@@ -74,16 +75,16 @@ describe('buildWealthViewModel', () => {
   it('keeps future months of the current year out of reach', () => {
     const current = state()
     current.year = new Date().getFullYear()
-    const vm = buildWealthViewModel(current, 0)
-    const thisMonth = new Date().getMonth()
+    const vm = buildWealthViewModel(current, 1)
+    const thisMonth = new Date().getMonth() + 1
 
-    expect(vm.months[thisMonth].available).toBe(true)
-    expect(vm.months.filter((month) => month.available)).toHaveLength(thisMonth + 1)
-    expect(vm.history.months).toEqual(Array.from({ length: thisMonth + 1 }, (_, i) => i))
+    expect(vm.months[monthIndex(thisMonth as Month)].available).toBe(true)
+    expect(vm.months.filter((month) => month.available)).toHaveLength(thisMonth)
+    expect(vm.history.months).toEqual(Array.from({ length: thisMonth }, (_, i) => i + 1))
   })
 
   it('builds the history matrix with group subtotals, items and a total', () => {
-    const vm = buildWealthViewModel(state(), 1)
+    const vm = buildWealthViewModel(state(), 2)
     const rows = vm.history.rows
 
     expect(rows.map((row) => [row.kind, row.label])).toEqual([
@@ -96,7 +97,7 @@ describe('buildWealthViewModel', () => {
       ['item', 'Coche'],
       ['total', 'Total'],
     ])
-    const february = vm.history.months.indexOf(1)
+    const february = vm.history.months.indexOf(2)
     expect(rows[1].values[february]).toBe(1200)
     expect(rows[0].values[february]).toBe(1250)
     // Debt reads negative so the column adds up to the total.
