@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { loadMarketQuote, type MarketDataEnv } from '../../../lib/server/market-data'
 import { createJsonResponse } from '../../../lib/server/json-response'
-import { runHttp } from '../../../lib/server/http'
+import { runServer } from '../../../lib/server/runtime'
+import { getDb } from '../../../db/client'
 import type { Instrument, Quote } from '../../../scripts/types'
 import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 
@@ -30,7 +31,8 @@ export const POST: APIRoute = async ({ request, locals }) =>
           async (instrument) =>
             [
               instrument.id,
-              await runHttp(
+              await runServer(
+                getDb(locals),
                 loadMarketQuote({ instrument, fallback: fallbackQuotes[instrument.id] }, env),
               ),
             ] as const,

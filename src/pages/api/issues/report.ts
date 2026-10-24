@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { getRuntimeEnvFromLocals } from "../../../lib/server/cloudflare-env";
 import { reportApiRouteFailure } from "../../../lib/server/error-tracking";
 import { createIssueFromWebReport } from "../../../lib/server/github-issues";
-import { runHttp } from "../../../lib/server/http";
+import { runHttp } from "../../../lib/server/runtime";
 import { parseIssueReportPayload } from "../../../lib/server/issue-report-schema";
 import { requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
 

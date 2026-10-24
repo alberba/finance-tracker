@@ -4,7 +4,8 @@ import {
   type StockEventsTransactionPayload,
 } from '../../../lib/server/stockevents'
 import { errorResponse, json, readApiKey } from './_helpers'
-import { runHttp } from '../../../lib/server/http'
+import { runServer } from '../../../lib/server/runtime'
+import { getDb } from '../../../db/client'
 import { withApiErrorHandling } from '../../../lib/server/api-auth'
 
 interface TransactionsBody {
@@ -20,7 +21,12 @@ export const POST: APIRoute = async ({ request, locals }) =>
     if (!payload) return json({ error: 'Transacción inválida para Stock Events' }, 400)
     try {
       return json(
-        { transaction: await runHttp(createStockEventsTransaction(apiKey, payload)) },
+        {
+          transaction: await runServer(
+            getDb(locals),
+            createStockEventsTransaction(apiKey, payload),
+          ),
+        },
         201,
       )
     } catch (error) {

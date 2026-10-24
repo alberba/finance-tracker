@@ -10,7 +10,7 @@ import { getDb } from '../../db/client'
 import { applySyncBatch } from '../../lib/server/sync/apply-command'
 import { syncBatchSchema } from '../../lib/server/sync/command-schemas'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../lib/server/api-auth'
-import { runWithDb } from '../../db/database'
+import { runServer } from '../../lib/server/runtime'
 
 export const POST: APIRoute = async ({ request, locals }) =>
   withApiErrorHandling('/api/sync', async () => {
@@ -29,7 +29,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
     }
 
     const db = getDb(locals)
-    const batchResult = await runWithDb(db, applySyncBatch(principal.userId, parsed.data.commands))
+    const batchResult = await runServer(db, applySyncBatch(principal.userId, parsed.data.commands))
 
     const hasConflict = batchResult.results.some((result) => result.status === 'conflict')
 
