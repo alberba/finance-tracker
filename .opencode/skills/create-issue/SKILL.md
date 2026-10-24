@@ -21,9 +21,9 @@ Explorar el código en solo lectura hasta localizar el componente y las referenc
 
 Seguir el template, con sus campos y prefijo de título; sin template, `## Descripción` y `## Notas técnicas`. Los datos desconocidos quedan pendientes; los criterios de aceptación salen del comportamiento pedido.
 
-Preparar las issues nuevas para `ready-for-agent` según [Preparación para agentes](references/ready-for-agent.md): reporte en el cuerpo, brief en un comentario. Resolver con contexto y código lo posible; reunir solo las preguntas que bloqueen la implementación.
+Preparar las issues nuevas para `ready-for-agent` según [Preparación para agentes](references/ready-for-agent.md): reporte en el cuerpo, brief en un comentario. Resolver con contexto y código lo posible; escribir las decisiones que bloqueen la implementación como preguntas concretas en `## Decisiones pendientes` del cuerpo.
 
-Labels: aplicar la taxonomía documentada del repo con sus nombres exactos y ejes obligatorios (partner, módulo…), y proponer prioridad por convención e impacto. Crear un label ausente solo si la convención lo exige o el usuario lo autoriza. Lo obligatorio que falte o no pueda hacerse queda pendiente.
+Labels: aplicar la taxonomía documentada del repo con sus nombres exactos y ejes obligatorios (partner, módulo…), y proponer prioridad por convención e impacto. Crear un label ausente solo si la convención lo exige o el usuario lo autoriza. Lo obligatorio que falte o no pueda hacerse queda pendiente. Al reclasificar una issue, sustituir el tipo y el estado de triage anteriores que ya no correspondan, conservando los demás labels.
 
 En las `feature` que cambien la apariencia de la interfaz (layout, estilos, tipografía, iconos o animaciones), añadir el label `ui-change` además del tipo. Usar el equivalente documentado del repo si existe; si falta, crear `ui-change` como parte de esta convención. Un cambio de lógica sin efecto en la apariencia conserva sus labels habituales.
 
