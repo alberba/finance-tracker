@@ -32,8 +32,8 @@ async function handle(locals: App.Locals, work: (context: { db: ReturnType<typeo
   })
 }
 export const GET: APIRoute = async ({ locals }) => handle(locals, async ({ db, userId }) => {
-  const connection = await repository.getConnection(db, userId)
-  const instruments = (await repository.listInstruments(db, userId)).map(instrument => ({ id: instrument.id, symbol: instrument.symbol, name: instrument.name }))
+  const connection = await runWithDb(db, repository.getConnection(userId))
+  const instruments = (await runWithDb(db, repository.listInstruments(userId))).map(instrument => ({ id: instrument.id, symbol: instrument.symbol, name: instrument.name }))
   const destinations = (await runWithDb(db, accounts.listByUser(userId))).filter(account => account.currency === 'EUR' && account.kind !== 'liability' && !account.isArchived).map(account => ({ id: account.id, name: account.name }))
   return jsonResponse({ configured: Boolean(connection), destinations, instruments, connection: connection ? { accountId: connection.accountId, startDate: connection.startDate, timeZone: connection.timeZone, cursor: connection.cursor } : null }, 200)
 })
@@ -46,6 +46,6 @@ export const POST: APIRoute = async ({ locals, request }) => handle(locals, asyn
   switch (action.action) {
     case 'preview': return jsonResponse(await previewBitvavo(db, userId, env, bitvavoHttpForRequest(request, requirePrincipal(locals), env)), 200)
     case 'confirm': return jsonResponse(await confirmBitvavo(db, userId, action.previewId, action.resolutions), 200)
-    case 'linkInstrument': await repository.linkInstrument(db, userId, action.transactionId, action.instrumentId); return jsonResponse({ linked: true }, 200)
+    case 'linkInstrument': await runWithDb(db, repository.linkInstrument(userId, action.transactionId, action.instrumentId)); return jsonResponse({ linked: true }, 200)
   }
 })
