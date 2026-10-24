@@ -30,8 +30,12 @@ export const sendRequest = (
 ): Effect.Effect<Response, ClientNetworkError, ClientHttp> =>
   Effect.gen(function* () {
     const http = yield* ClientHttp
+    // Call the request as a free function: invoking it as `http.request(...)`
+    // makes the service object its `this`, and the browser's `fetch` rejects
+    // that with an "Illegal invocation" TypeError.
+    const request = http.request
     return yield* Effect.tryPromise({
-      try: () => http.request(input, init),
+      try: () => request(input, init),
       catch: (cause) => new ClientNetworkError({ cause }),
     })
   })
