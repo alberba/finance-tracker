@@ -96,7 +96,7 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
       },
     ]);
     expect(stale.results[0].status).toBe("conflict");
-    expect(await accountsRepository.listTwrLiquidityAccountsByUser(testDb.db, userId)).toHaveLength(0);
+    expect(await runWithDb(testDb.db, accountsRepository.listTwrLiquidityAccountsByUser(userId))).toHaveLength(0);
 
     const fresh = await applySyncBatch(testDb.db, userId, [
       {
@@ -107,7 +107,7 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
       },
     ]);
     expect(fresh.results[0].status).toBe("applied");
-    expect(await accountsRepository.listTwrLiquidityAccountsByUser(testDb.db, userId)).toMatchObject([
+    expect(await runWithDb(testDb.db, accountsRepository.listTwrLiquidityAccountsByUser(userId))).toMatchObject([
       { accountId: account.id },
     ]);
   });

@@ -43,7 +43,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
   ] = await Promise.all([
     contributionsRepository.listByUser(db, userId),
     wealthRepository.listByUser(db, userId),
-    marketRepository.listUserInstrumentsByUser(db, userId),
+    runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
@@ -53,9 +53,9 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     runWithDb(db, budgetEntriesRepository.listByUser(userId)),
     runWithDb(db, goalsRepository.listByUser(userId)),
     transactionsRepository.listByUser(db, userId),
-    accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
-    accountsRepository.listCategoriesByUser(db, userId),
-    accountsRepository.listByUser(db, userId),
+    runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
+    runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
+    runWithDb(db, accountsRepository.listByUser(userId)),
   ])
 
   for (const contribution of contributions) {
@@ -77,7 +77,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await wealthRepository.remove(db, userId, snapshot.id)
   }
   for (const userInstrument of userInstruments) {
-    await marketRepository.removeUserInstrument(db, userId, userInstrument.id)
+    await runWithDb(db, marketRepository.removeUserInstrument(userId, userInstrument.id))
   }
   for (const mapping of stockeventsSymbolMappings) {
     await runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, mapping.id))
@@ -107,13 +107,13 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await transactionsRepository.remove(db, userId, transaction.id)
   }
   for (const twrAccount of twrLiquidityAccounts) {
-    await accountsRepository.removeTwrLiquidityAccount(db, userId, twrAccount.id)
+    await runWithDb(db, accountsRepository.removeTwrLiquidityAccount(userId, twrAccount.id))
   }
   for (const account of accounts) {
-    await accountsRepository.remove(db, userId, account.id)
+    await runWithDb(db, accountsRepository.remove(userId, account.id))
   }
   for (const category of categories) {
-    await accountsRepository.removeCategory(db, userId, category.id)
+    await runWithDb(db, accountsRepository.removeCategory(userId, category.id))
   }
 
   await runWithDb(db, userSettingsRepository.remove(userId))

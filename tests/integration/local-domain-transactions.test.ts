@@ -66,20 +66,20 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
   'rolls back %s after a late write failure and preserves the other user',
   async (operation) => {
     const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await accountsRepository.create(db, 'other', {
+    await runWithDb(db, accountsRepository.create('other', {
       name: 'Other account',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 50,
-    })
+    }))
     if (operation !== 'initialize') {
       await initialize(context('/api/state/initialize'))
-      const account = await accountsRepository.create(db, 'owner', {
+      const account = await runWithDb(db, accountsRepository.create('owner', {
         name: 'Original account',
         kind: 'cash',
         currency: 'EUR',
         openingBalance: 25,
-      })
+      }))
       await transactionsRepository.create(db, 'owner', {
         accountId: account.id,
         type: 'investment',
@@ -90,7 +90,7 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
       })
     }
     const before = await exported()
-    const otherBefore = await accountsRepository.listByUser(db, 'other')
+    const otherBefore = await runWithDb(db, accountsRepository.listByUser('other'))
     // A real SQLite failure after earlier writes, without mocking a repository.
     const failureTable =
       operation === 'initialize'
@@ -119,7 +119,7 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
       }),
     )
     expect(await exported()).toEqual(before)
-    expect(await accountsRepository.listByUser(db, 'other')).toEqual(otherBefore)
+    expect(await runWithDb(db, accountsRepository.listByUser('other'))).toEqual(otherBefore)
   },
 )
 
@@ -169,7 +169,7 @@ it('rolls back a command including changes, cursor and result while retaining it
       data: { name: 'Rollback account', kind: 'cash', currency: 'EUR', openingBalance: 0 },
     }),
   ).rejects.toThrow()
-  expect(await accountsRepository.listByUser(db, 'owner')).toEqual([])
+  expect(await runWithDb(db, accountsRepository.listByUser('owner'))).toEqual([])
   expect(await db.select().from(schema.syncChanges)).toEqual([])
   expect(await db.select().from(schema.auditEvents)).toEqual([])
   expect(await runWithDb(db, syncRepository.getRevision('owner'))).toBeUndefined()
@@ -191,7 +191,7 @@ it('applies the same command concurrently only once through the production bindi
     applyOneCommand(db, 'owner', command),
   ])
   expect(outcomes.filter((outcome) => !outcome.replayed)).toHaveLength(1)
-  expect(await accountsRepository.listByUser(db, 'owner')).toHaveLength(1)
+  expect(await runWithDb(db, accountsRepository.listByUser('owner'))).toHaveLength(1)
   expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 1 })
   expect(await applyOneCommand(db, 'owner', command)).toMatchObject({
     status: 'applied',
@@ -205,7 +205,7 @@ it('initializes a concurrent request only once', async () => {
     initialize(context('/api/state/initialize')),
   ])
   expect(responses.map((response) => response.status).sort()).toEqual([200, 201])
-  expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toEqual([])
+  expect(await runWithDb(db, accountsRepository.listCategoriesByUser('owner'))).toEqual([])
   expect(await db.select().from(schema.userSettings)).toHaveLength(1)
   expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 0 })
 })
@@ -236,7 +236,7 @@ it('recovers a failed command after its lease expires and replays the committed 
     status: 'applied',
     replayed: true,
   })
-  expect(await accountsRepository.listByUser(db, 'owner')).toHaveLength(1)
+  expect(await runWithDb(db, accountsRepository.listByUser('owner'))).toHaveLength(1)
   expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 1 })
   expect(await db.select().from(schema.syncChanges)).toHaveLength(1)
   expect(await db.select().from(schema.auditEvents)).toHaveLength(1)
@@ -247,12 +247,12 @@ it('recovers a failed command after its lease expires and replays the committed 
 })
 
 it('rolls back the investment operation and movement with sync metadata on a finalization failure', async () => {
-  const account = await accountsRepository.create(db, 'owner', {
+  const account = await runWithDb(db, accountsRepository.create('owner', {
     name: 'Broker',
     kind: 'investment',
     currency: 'EUR',
     openingBalance: 0,
-  })
+  }))
   sqlite.exec(`CREATE TRIGGER fail_result BEFORE UPDATE OF result ON sync_commands
     BEGIN SELECT RAISE(ABORT, 'injected result failure'); END`)
   await expect(
@@ -329,8 +329,8 @@ it('preserves another user importing concurrently while the first import rolls b
     }),
   )
   expect((await successful).status).toBe(200)
-  expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toEqual([])
-  expect(await accountsRepository.listByUser(db, 'other')).toMatchObject([
+  expect(await runWithDb(db, accountsRepository.listCategoriesByUser('owner'))).toEqual([])
+  expect(await runWithDb(db, accountsRepository.listByUser('other'))).toMatchObject([
     { name: 'Surviving account' },
   ])
 })

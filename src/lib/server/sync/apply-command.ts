@@ -111,10 +111,10 @@ async function findByLegacyId(
   let rows: VersionedRow[] = []
   switch (entityType) {
     case 'account':
-      rows = (await accountsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, accountsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'category':
-      rows = (await accountsRepository.listCategoriesByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, accountsRepository.listCategoriesByUser(userId))) as VersionedRow[]
       break
     case 'subscription':
       rows = (await runWithDb(db, subscriptionsRepository.listByUser(userId))) as VersionedRow[]
@@ -163,9 +163,9 @@ async function loadForMutation(
 ): Promise<VersionedRow | undefined> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, accountsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'category':
-      return (await accountsRepository.getCategory(db, userId, entityId)) as
+      return (await runWithDb(db, accountsRepository.getCategory(userId, entityId))) as
         VersionedRow | undefined
     case 'transaction': {
       const row = await transactionsRepository.get(db, userId, entityId)
@@ -185,7 +185,7 @@ async function loadForMutation(
     case 'contribution':
       return (await contributionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
     case 'userInstrument':
-      return (await marketRepository.getUserInstrument(db, userId, entityId)) as
+      return (await runWithDb(db, marketRepository.getUserInstrument(userId, entityId))) as
         VersionedRow | undefined
     case 'wealthSnapshot':
       return (await wealthRepository.get(db, userId, entityId)) as VersionedRow | undefined
@@ -234,9 +234,9 @@ async function createEntity(
 ): Promise<VersionedRow> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, accountsRepository.create(userId, data))) as VersionedRow
     case 'category':
-      return (await accountsRepository.createCategory(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, accountsRepository.createCategory(userId, data))) as VersionedRow
     case 'transaction':
       return (await transactionsRepository.create(db, userId, data)) as VersionedRow
     case 'subscription':
@@ -264,7 +264,7 @@ async function createEntity(
       return { ...row, allocations: allocationRows } as VersionedRow
     }
     case 'userInstrument':
-      return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, marketRepository.createUserInstrument(userId, data))) as VersionedRow
     case 'stockeventsMapping':
       return (await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
         id: typeof data.id === 'string' ? data.id : undefined,
@@ -327,16 +327,13 @@ async function updateEntity(
 ): Promise<VersionedRow | undefined> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.update(db, userId, entityId, patch, expectedVersion)) as
+      return (await runWithDb(db, accountsRepository.update(userId, entityId, patch, expectedVersion))) as
         VersionedRow | undefined
     case 'category':
-      return (await accountsRepository.updateCategory(
-        db,
-        userId,
+      return (await runWithDb(db, accountsRepository.updateCategory(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'transaction': {
       const row = await transactionsRepository.update(db, userId, entityId, patch, expectedVersion)
       if (!row) return undefined
@@ -392,13 +389,10 @@ async function updateEntity(
       return { ...row, allocations: allocationRows } as VersionedRow
     }
     case 'userInstrument':
-      return (await marketRepository.updateUserInstrument(
-        db,
-        userId,
+      return (await runWithDb(db, marketRepository.updateUserInstrument(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'stockeventsMapping':
       return (await runWithDb(db, stockeventsSymbolMappingsRepository.update(userId,
         entityId,
@@ -451,9 +445,9 @@ async function removeEntity(
 ): Promise<boolean> {
   switch (entityType) {
     case 'account':
-      return accountsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, accountsRepository.remove(userId, entityId, expectedVersion))
     case 'category':
-      return accountsRepository.removeCategory(db, userId, entityId, expectedVersion)
+      return runWithDb(db, accountsRepository.removeCategory(userId, entityId, expectedVersion))
     case 'transaction':
       return transactionsRepository.remove(db, userId, entityId, expectedVersion)
     case 'subscription':
@@ -469,7 +463,7 @@ async function removeEntity(
     case 'contribution':
       return contributionsRepository.remove(db, userId, entityId, expectedVersion)
     case 'userInstrument':
-      return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion)
+      return runWithDb(db, marketRepository.removeUserInstrument(userId, entityId, expectedVersion))
     case 'stockeventsMapping':
       return runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion))
     case 'stockeventsCashEntry':
@@ -608,7 +602,7 @@ async function performMutation(
             }
       }
       const twrLiquidityAccounts = twrLiquidityAccountIds
-        ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
+        ? await runWithDb(db, accountsRepository.replaceTwrLiquidityAccounts(userId, twrLiquidityAccountIds))
         : undefined
       const cashMappings = stockeventsCashMappings
         ? await runWithDb(db, stockeventsCashMappingsRepository.replaceMappings(userId,

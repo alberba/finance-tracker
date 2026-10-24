@@ -6,18 +6,19 @@ import { seedUser } from '../repositories/fixtures'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useSettingsStore } from '../../../../src/stores/settings'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { runWithDb } from '../../../../src/db/database'
 
 describe('configuración de cotizaciones persistente', () => {
   let trip: RoundTrip
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await accountsRepository.create(db, userId, {
+      await runWithDb(db, accountsRepository.create(userId, {
         legacyId: 'crypto',
         name: 'Crypto',
         kind: 'investment',
         currency: 'EUR',
         openingBalance: 0,
-      })
+      }))
     })
   })
   afterEach(() => trip.cleanup())
@@ -73,9 +74,9 @@ describe('configuración de cotizaciones persistente', () => {
 
   it('no permite asignar la cotización a una cuenta de otro usuario', async () => {
     const other = await seedUser(trip.testDb.db, 'other-quote-user@example.com')
-    const account = (await accountsRepository.listByUser(trip.testDb.db, trip.userId))[0]
+    const account = (await runWithDb(trip.testDb.db, accountsRepository.listByUser(trip.userId)))[0]
     await expect(
-      marketRepository.createUserInstrument(trip.testDb.db, other.id, {
+      runWithDb(trip.testDb.db, marketRepository.createUserInstrument(other.id, {
         instrumentId: 'unmaterialized',
         alias: account.id,
         quoteConfig: {
@@ -86,9 +87,9 @@ describe('configuración de cotizaciones persistente', () => {
           currency: 'EUR',
           active: true,
         },
-      }),
+      })),
     ).rejects.toThrow()
-    expect(await marketRepository.listUserInstrumentsByUser(trip.testDb.db, other.id)).toEqual([])
+    expect(await runWithDb(trip.testDb.db, marketRepository.listUserInstrumentsByUser(other.id))).toEqual([])
   })
 
   it('elimina también la configuración al borrar su agrupación', async () => {

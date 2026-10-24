@@ -41,11 +41,8 @@ export const POST: APIRoute = async ({ locals }) =>
         onboardingMovementCompleted: previousSettings?.onboardingMovementCompleted === 1,
         onboardingCompleted: previousSettings?.onboardingCompleted === 1,
       }))
-      const categories = await accountsRepository.bulkInsertCategories(
-        tx,
-        userId,
-        DEFAULT_CATEGORIES,
-      )
+      const categories = await runWithDb(tx, accountsRepository.bulkInsertCategories(userId,
+        DEFAULT_CATEGORIES,))
       const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
       await runWithDb(tx, syncRepository.createChange(userId, {
         revision,

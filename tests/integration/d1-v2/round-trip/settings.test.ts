@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: cuentas, activos y pasivos", () => {
   let trip: RoundTrip;
@@ -33,13 +34,13 @@ describe("round trip: cuentas, activos y pasivos", () => {
     trip = await startRoundTrip(async (db, userId) => {
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
       // A row as the v1 migration writes it.
-      await accountsRepository.create(db, userId, {
+      await runWithDb(db, accountsRepository.create(userId, {
         name: "Santander",
         kind: "cash",
         currency: "EUR",
         openingBalance: 31.09,
         legacyId: "santander",
-      });
+      }));
     });
     await trip.reload();
 
@@ -101,7 +102,7 @@ describe("round trip: cuentas, activos y pasivos", () => {
     trip = await startRoundTrip(async (db, userId) => {
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
       for (const [name, legacyId, openingBalance] of [["Revolut", "revolut", 285.67], ["Santander", "santander", 31.09]] as const) {
-        await accountsRepository.create(db, userId, { name, kind: "cash", currency: "EUR", openingBalance, legacyId });
+        await runWithDb(db, accountsRepository.create(userId, { name, kind: "cash", currency: "EUR", openingBalance, legacyId }));
       }
     });
     await trip.reload();

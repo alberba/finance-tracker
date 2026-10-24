@@ -146,13 +146,13 @@ describe("round trip: borrar avisa en vez de fallar", () => {
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
       const recurringRulesRepository = await import("../../../../src/db/repositories/recurring-rules");
       const pendingMovementsRepository = await import("../../../../src/db/repositories/pending-movements");
-      const account = await accountsRepository.create(db, userId, {
+      const account = await runWithDb(db, accountsRepository.create(userId, {
         name: "Revolut",
         kind: "cash",
         currency: "EUR",
         openingBalance: 0,
         legacyId: "revolut",
-      });
+      }));
       const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
         name: "Aportación mensual VWCE",
         type: "investment",

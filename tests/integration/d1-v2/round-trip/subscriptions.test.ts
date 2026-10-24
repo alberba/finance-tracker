@@ -119,18 +119,18 @@ describe("round trip: subscriptions", () => {
     const { useMovementsStore } = await import("../../../../src/stores/movements");
     const accountsRepository = await import("../../../../src/db/repositories/accounts");
 
-    await accountsRepository.create(trip.testDb.db, trip.userId, {
+    await runWithDb(trip.testDb.db, accountsRepository.create(trip.userId, {
       legacyId: "revolut",
       name: "Revolut",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
-    await accountsRepository.createCategory(trip.testDb.db, trip.userId, {
+    }));
+    await runWithDb(trip.testDb.db, accountsRepository.createCategory(trip.userId, {
       legacyId: "expense:Ocio",
       name: "Ocio",
       kind: "expense",
-    });
+    }));
     await trip.reload();
 
     const currentFinancialState = useFinancialStateStore();
@@ -160,13 +160,13 @@ describe("round trip: subscriptions", () => {
       trip = await startRoundTrip(async (db, userId) => {
         const accounts = await import('../../../../src/db/repositories/accounts')
         const subscriptions = await import('../../../../src/db/repositories/subscriptions')
-        const account = await accounts.create(db, userId, {
+        const account = await runWithDb(db, accounts.create(userId, {
           legacyId: 'legacy-account',
           name: 'Cuenta',
           kind: 'cash',
           currency: 'EUR',
           openingBalance: 0,
-        })
+        }))
         await runWithDb(db, subscriptions.create(userId, {
           legacyId: 'legacy-todoist',
           name: 'Todoist',

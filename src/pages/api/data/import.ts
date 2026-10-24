@@ -31,6 +31,7 @@ import * as pendingMovementsRepository from '../../../db/repositories/pending-mo
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
 import { runWithDb } from '../../../db/database'
+import type { Db } from '../../../db/repositories/shared'
 import * as wealthRepository from '../../../db/repositories/wealth'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
@@ -129,13 +130,13 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- categories (no FK dependency) --------------------------------
       for (const row of asRows(body.categories)) {
-        const created = await accountsRepository.createCategory(tx, userId, {
+        const created = await runWithDb(tx, accountsRepository.createCategory(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           kind: String(row.kind ?? ''),
           sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : 0,
           emoji: optionalString(row.emoji),
-        })
+        }))
         if (typeof row.id === 'string') {
           categoryIdMap.set(row.id, created.id)
         }
@@ -144,14 +145,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- accounts (no FK dependency) ------------------------------------
       for (const row of asRows(body.accounts)) {
-        const created = await accountsRepository.create(tx, userId, {
+        const created = await runWithDb(tx, accountsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           kind: String(row.kind ?? ''),
           currency: String(row.currency ?? 'EUR'),
           openingBalance: typeof row.openingBalance === 'number' ? row.openingBalance : 0,
           isArchived: Boolean(row.isArchived),
-        })
+        }))
         if (typeof row.id === 'string') {
           accountIdMap.set(row.id, created.id)
         }
@@ -165,11 +166,11 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'twrLiquidityAccounts')
           continue
         }
-        await accountsRepository.createTwrLiquidityAccount(tx, userId, {
+        await runWithDb(tx, accountsRepository.createTwrLiquidityAccount(userId, {
           legacyId: optionalString(row.legacyId),
           accountId,
           name: String(row.name ?? ''),
-        })
+        }))
         bump(imported, 'twrLiquidityAccounts')
       }
 
@@ -425,7 +426,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        const instrument = await marketRepository.getInstrument(tx, row.instrumentId)
+        const instrument = await runWithDb(tx, marketRepository.getInstrument(row.instrumentId))
         const configuration = quoteConfigurationSchema.safeParse(row.quoteConfig)
         if (!instrument && !configuration.success) {
           bump(skipped, 'userInstruments')
@@ -436,12 +437,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        await marketRepository.createUserInstrument(tx, userId, {
+        await runWithDb(tx, marketRepository.createUserInstrument(userId, {
           instrumentId: row.instrumentId,
           categoryId: categoryId ?? null,
           alias: typeof row.alias === 'string' ? (accountIdMap.get(row.alias) ?? row.alias) : null,
           ...(configuration.success ? { quoteConfig: configuration.data } : {}),
-        })
+        }))
         bump(imported, 'userInstruments')
       }
 
@@ -567,7 +568,7 @@ function optionalFlag(value: unknown): boolean | undefined {
  * may not have: then the symbol alone is kept, as for an untracked ticker.
  */
 async function importOperation(
-  tx: Parameters<typeof marketRepository.getInstrument>[0],
+  tx: Db,
   value: unknown,
 ): Promise<MovementOperationInput | null> {
   if (!isObject(value) || typeof value.side !== 'string') {
@@ -575,7 +576,7 @@ async function importOperation(
   }
   const instrument =
     typeof value.instrumentId === 'string'
-      ? await marketRepository.getInstrument(tx, value.instrumentId)
+      ? await runWithDb(tx, marketRepository.getInstrument(value.instrumentId))
       : undefined
   return {
     instrumentId: instrument?.id ?? null,

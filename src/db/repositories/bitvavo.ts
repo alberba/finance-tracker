@@ -20,6 +20,7 @@ import {
 } from './shared'
 import * as transactionRepository from './transactions'
 import * as market from './market'
+import { runWithDb } from '../database'
 import type { BitvavoPreview, RemoteOperation } from '../../lib/bitvavo-types'
 
 export async function getConnection(db: Db, userId: string) {
@@ -149,10 +150,10 @@ async function atomic(
 }
 
 export async function listInstruments(db: Db, userId: string) {
-  const links = await market.listUserInstrumentsByUser(db, userId)
-  return market.listInstrumentsByIds(
+  const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
+  return runWithDb(
     db,
-    links.map((link) => link.instrumentId),
+    market.listInstrumentsByIds(links.map((link) => link.instrumentId)),
   )
 }
 
@@ -264,7 +265,7 @@ export async function linkInstrument(
   const movement = await transactionRepository.get(db, userId, transactionId)
   if (!movement?.remoteOperation)
     throw new RejectedCommandError('Movimiento Bitvavo no encontrado.')
-  const links = await market.listUserInstrumentsByUser(db, userId)
+  const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
   if (!links.some((link) => link.instrumentId === instrumentId))
     throw new RejectedCommandError('Instrumento no disponible para este usuario.')
   const detail = await transactionRepository.getTradeDetailByTransaction(db, userId, transactionId)

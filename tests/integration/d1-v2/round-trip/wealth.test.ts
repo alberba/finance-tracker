@@ -7,6 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: patrimonio", () => {
   let trip: RoundTrip;
@@ -72,7 +73,7 @@ describe("round trip: patrimonio", () => {
   it("reads the snapshot of the state's year, not another year's, for the same month (§4.6)", async () => {
     const accountsRepository = await import("../../../../src/db/repositories/accounts");
     const wealthRepository = await import("../../../../src/db/repositories/wealth");
-    const [account] = await accountsRepository.listByUser(trip.testDb.db, trip.userId);
+    const [account] = await runWithDb(trip.testDb.db, accountsRepository.listByUser(trip.userId));
     if (!account) throw new Error("missing account fixture");
 
     // The previous year's row is written *after* this year's, so a projection

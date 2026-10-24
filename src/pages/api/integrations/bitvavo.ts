@@ -9,6 +9,7 @@ import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 import { configureBitvavo, previewBitvavo, confirmBitvavo, connectionSchema } from '../../../lib/server/bitvavo/import'
 import { InvalidCredential, RateLimit, NonEuroOperation } from '../../../lib/server/bitvavo/client'
+import { runWithDb } from '../../../db/database'
 
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('preview') }).strict(),
@@ -33,7 +34,7 @@ async function handle(locals: App.Locals, work: (context: { db: ReturnType<typeo
 export const GET: APIRoute = async ({ locals }) => handle(locals, async ({ db, userId }) => {
   const connection = await repository.getConnection(db, userId)
   const instruments = (await repository.listInstruments(db, userId)).map(instrument => ({ id: instrument.id, symbol: instrument.symbol, name: instrument.name }))
-  const destinations = (await accounts.listByUser(db, userId)).filter(account => account.currency === 'EUR' && account.kind !== 'liability' && !account.isArchived).map(account => ({ id: account.id, name: account.name }))
+  const destinations = (await runWithDb(db, accounts.listByUser(userId))).filter(account => account.currency === 'EUR' && account.kind !== 'liability' && !account.isArchived).map(account => ({ id: account.id, name: account.name }))
   return jsonResponse({ configured: Boolean(connection), destinations, instruments, connection: connection ? { accountId: connection.accountId, startDate: connection.startDate, timeZone: connection.timeZone, cursor: connection.cursor } : null }, 200)
 })
 export const PUT: APIRoute = async ({ locals, request }) => handle(locals, async ({ db, userId, env }) => {

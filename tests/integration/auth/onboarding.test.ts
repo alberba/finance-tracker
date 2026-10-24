@@ -32,13 +32,13 @@ describe('authentication provisions only newly created financial users', () => {
     const id = 'new-auth-user'
     await verifiedUser(id, 'new-auth@example.com')
     await admitVerifiedUser(database.db as unknown as Db, id)
-    const categories = await accountsRepository.listCategoriesByUser(database.db, id)
+    const categories = await runWithDb(database.db, accountsRepository.listCategoriesByUser(id))
     expect(categories).toHaveLength(10)
     expect((await runWithDb(database.db, userSettingsRepository.get(id)))?.onboardingPresented).toBe(0)
-    expect(await accountsRepository.listByUser(database.db, id)).toEqual([])
+    expect(await runWithDb(database.db, accountsRepository.listByUser(id))).toEqual([])
     await runWithDb(database.db, userSettingsRepository.update(id, { onboardingCompleted: true }))
     await admitVerifiedUser(database.db as unknown as Db, id)
-    expect(await accountsRepository.listCategoriesByUser(database.db, id)).toEqual(categories)
+    expect(await runWithDb(database.db, accountsRepository.listCategoriesByUser(id))).toEqual(categories)
     expect((await runWithDb(database.db, userSettingsRepository.get(id)))?.onboardingCompleted).toBe(1)
   })
 
@@ -47,7 +47,7 @@ describe('authentication provisions only newly created financial users', () => {
     await verifiedUser(user.id, user.email)
     await admitVerifiedUser(database.db as unknown as Db, user.id)
     expect(await runWithDb(database.db, userSettingsRepository.get(user.id))).toBeUndefined()
-    expect(await accountsRepository.listCategoriesByUser(database.db, user.id)).toEqual([])
+    expect(await runWithDb(database.db, accountsRepository.listCategoriesByUser(user.id))).toEqual([])
   })
 
   it('provisions settings and default categories for a new loopback identity', async () => {
@@ -59,7 +59,7 @@ describe('authentication provisions only newly created financial users', () => {
     expect((await runWithDb(database.db, userSettingsRepository.get(principal.userId)))?.onboardingPresented).toBe(
       0,
     )
-    expect(await accountsRepository.listCategoriesByUser(database.db, principal.userId)).toHaveLength(
+    expect(await runWithDb(database.db, accountsRepository.listCategoriesByUser(principal.userId))).toHaveLength(
       10,
     )
   })
