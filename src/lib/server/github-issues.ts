@@ -1,4 +1,9 @@
 import type { RuntimeEnv } from './cloudflare-env'
+import {
+  uploadIssueAttachment,
+  type AttachmentUploader,
+  type AttachmentUploadResult,
+} from './issue-attachments'
 import type { IssueReportPayload } from './issue-report-schema'
 
 export interface CreatedIssue {
@@ -8,6 +13,14 @@ export interface CreatedIssue {
 
 export interface GithubIssueClient {
   fetch: typeof fetch
+  /** Subidor de adjuntos. Por defecto, el que habla con la API real de GitHub. */
+  uploadAttachment?: AttachmentUploader
+}
+
+/** Resultado de subir un adjunto, con el nombre que se muestra en la issue. */
+export interface AttachmentOutcome {
+  name: string
+  result: AttachmentUploadResult
 }
 
 /**
@@ -53,7 +66,25 @@ export function getGithubIssueType(type: IssueReportPayload['type']): GithubIssu
   return canonicalReportType(type) === 'bug' ? 'Bug' : 'Feature'
 }
 
-export function buildIssueBody(payload: IssueReportPayload, reporter: IssueReporter): string {
+function attachmentLines(outcomes: AttachmentOutcome[]): string[] {
+  const lines = ['### Adjuntos']
+  for (const { name, result } of outcomes) {
+    // Los corchetes romperían la referencia Markdown; el nombre solo es alt text.
+    const alt = name.replace(/[[\]()]/g, '')
+    lines.push(
+      result.ok
+        ? `![${alt}](${result.url})`
+        : `- ${alt}: no se pudo subir a GitHub; el reporte se creó sin esta imagen.`,
+    )
+  }
+  return [...lines, '']
+}
+
+export function buildIssueBody(
+  payload: IssueReportPayload,
+  reporter: IssueReporter,
+  attachments: AttachmentOutcome[] = [],
+): string {
   const reportType = canonicalReportType(payload.type)
   const githubType = getGithubIssueType(payload.type)
   const lines = ['## Reporte desde la web', '', '### Resumen', payload.summary, '']
@@ -61,6 +92,10 @@ export function buildIssueBody(payload: IssueReportPayload, reporter: IssueRepor
   // Sin descripción no se escribe el encabezado: una sección vacía ensucia la issue.
   if (payload.description) {
     lines.push('### Problema o solicitud', payload.description, '')
+  }
+
+  if (attachments.length > 0) {
+    lines.push(...attachmentLines(attachments))
   }
 
   lines.push(
@@ -110,20 +145,49 @@ async function requestWithRetry(
   return lastResponse as Response
 }
 
+async function uploadAttachments(
+  attachments: NonNullable<IssueReportPayload['attachments']>,
+  uploader: AttachmentUploader,
+  context: Parameters<AttachmentUploader>[1],
+): Promise<AttachmentOutcome[]> {
+  const outcomes: AttachmentOutcome[] = []
+  for (const attachment of attachments) {
+    let result: AttachmentUploadResult
+    try {
+      result = await uploader(attachment, context)
+    } catch {
+      // El subidor no debería lanzar; si lo hace, el reporte sigue adelante.
+      result = { ok: false, error: 'Fallo inesperado al subir.' }
+    }
+    outcomes.push({ name: attachment.name, result })
+  }
+  return outcomes
+}
+
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   reporter: IssueReporter,
   env: RuntimeEnv,
-  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) },
+  client: GithubIssueClient = {
+    fetch: globalThis.fetch.bind(globalThis),
+    uploadAttachment: uploadIssueAttachment,
+  },
 ): Promise<CreatedIssue> {
   const token = requiredAnyEnv(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
   const owner = requiredEnv('GITHUB_OWNER', env)
   const repo = requiredEnv('GITHUB_REPO', env)
   const title = payload.summary.slice(0, 140)
   const labels = buildIssueLabels(payload.type)
+  // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
+  // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
+  const outcomes = await uploadAttachments(
+    payload.attachments ?? [],
+    client.uploadAttachment ?? uploadIssueAttachment,
+    { fetch: client.fetch, token, owner, repo },
+  )
   const baseRequestBody = {
     title,
-    body: buildIssueBody(payload, reporter),
+    body: buildIssueBody(payload, reporter, outcomes),
     labels,
   }
   const requestBody = {

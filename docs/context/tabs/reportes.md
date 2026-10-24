@@ -99,6 +99,10 @@ Campos esperados por backend:
 - `context.userAgent`: string
 - `context.pathname`: string
 - `context.timestamp`: string
+- `attachments?`: hasta 3 imágenes, cada una `{ name, contentType, data }` con `data` en base64.
+  Tipos admitidos: PNG, JPEG, WebP y GIF; máximo 2 MB decodificados por imagen. El servidor
+  comprueba el tipo por la cabecera real del fichero, no solo por el declarado. Los límites viven
+  en `src/domain/reports/issue-attachments.ts`, compartidos por el panel y el servidor.
 
 Campos retirados del contrato: `expectedResult`, `actualResult` y `stepsToReproduce`. Los
 clientes antiguos que los envíen siguen funcionando porque se ignoran.
@@ -118,6 +122,10 @@ Secciones que se escriben en el body:
 
 - `### Resumen`
 - `### Problema o solicitud`: solo si hay descripción, con el texto tal cual lo escribió la persona
+- `### Adjuntos`: solo si hay capturas. Cada imagen subida aparece como referencia de imagen Markdown con su nombre y la URL devuelta; si una
+  subida falla, la línea dice que ese adjunto no se pudo subir y la issue se crea igualmente.
+  Las imágenes se suben antes de crear la issue, al endpoint de adjuntos de usuario de GitHub
+  (`uploads.github.com/user-attachments/assets`) con el mismo token.
 - `### Contexto de ejecución`: tipo, sección, ruta, navegador y fecha cliente
 - `### Reportero`: nombre, email e identificador de la cuenta, tomados del principal autenticado
 

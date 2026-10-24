@@ -4,6 +4,13 @@ import { isDemoMode } from '../scripts/demo-mode'
 
 export type ReportType = 'bug' | 'feature' | 'enhancement'
 
+/** Imagen en base64 dentro del mismo JSON; el servidor vuelve a validarla. */
+export interface ReportAttachment {
+  name: string
+  contentType: string
+  data: string
+}
+
 export interface ReportPayload {
   type: ReportType
   summary: string
@@ -15,6 +22,8 @@ export interface ReportPayload {
     pathname: string
     timestamp: string
   }
+  /** Opcional: se omite del payload cuando no hay capturas. */
+  attachments?: ReportAttachment[]
 }
 
 interface ReportResponseOk {

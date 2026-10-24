@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue'
+import { onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
+import {
+  encodeBase64,
+  getAttachmentError,
+  ISSUE_ATTACHMENT_MAX_BYTES,
+  ISSUE_ATTACHMENT_MAX_COUNT,
+  ISSUE_ATTACHMENT_TYPES,
+} from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
+  type ReportAttachment,
   type ReportPayload,
   type ReportType,
 } from '../../services/issue-report-api'
@@ -32,6 +40,8 @@ const TYPE_OPTIONS: SegmentedOption<ReportType>[] = [
 ]
 
 const TEXTAREA = `${FIELD_CONTROL} resize-y py-2.5 text-base`
+const ATTACHMENT_ACCEPT = ISSUE_ATTACHMENT_TYPES.join(',')
+const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${ISSUE_ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB: PNG, JPEG, WebP o GIF.`
 
 const uiStore = useUiStore()
 const { getIssueReportContext } = useIssueReportContext()
@@ -42,14 +52,75 @@ const form = reactive({
   description: '',
 })
 
+interface DraftAttachment {
+  id: number
+  file: File
+  previewUrl: string
+}
+
+const attachments = shallowRef<DraftAttachment[]>([])
+let nextAttachmentId = 0
+
 const statusMessage = shallowRef('')
 const successStatus = shallowRef<SuccessStatus | null>(null)
 const submitting = shallowRef(false)
+
+function revokePreviews(items: DraftAttachment[]): void {
+  for (const item of items) URL.revokeObjectURL(item.previewUrl)
+}
+
+function clearAttachments(): void {
+  revokePreviews(attachments.value)
+  attachments.value = []
+}
+
+onBeforeUnmount(clearAttachments)
+
+function onAttachmentsPicked(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const picked = Array.from(input.files ?? [])
+  // Vaciar el input permite volver a elegir el mismo fichero tras quitarlo.
+  input.value = ''
+
+  for (const file of picked) {
+    const error = getAttachmentError(
+      { name: file.name, size: file.size, type: file.type },
+      attachments.value.length,
+    )
+    if (error) {
+      successStatus.value = null
+      statusMessage.value = error
+      return
+    }
+    attachments.value = [
+      ...attachments.value,
+      { id: nextAttachmentId++, file, previewUrl: URL.createObjectURL(file) },
+    ]
+  }
+  statusMessage.value = ''
+}
+
+function removeAttachment(id: number): void {
+  const removed = attachments.value.filter((item) => item.id === id)
+  revokePreviews(removed)
+  attachments.value = attachments.value.filter((item) => item.id !== id)
+}
+
+async function encodeAttachments(): Promise<ReportAttachment[]> {
+  return Promise.all(
+    attachments.value.map(async ({ file }) => ({
+      name: file.name,
+      contentType: file.type,
+      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
+    })),
+  )
+}
 
 function resetForm(): void {
   form.type = 'bug'
   form.summary = ''
   form.description = ''
+  clearAttachments()
 }
 
 async function onSubmit(): Promise<void> {
@@ -79,6 +150,9 @@ async function onSubmit(): Promise<void> {
   statusMessage.value = 'Creando reporte...'
 
   try {
+    if (attachments.value.length > 0) {
+      payload.attachments = await encodeAttachments()
+    }
     const result = await submitIssueReport(payload)
     if (!result.ok) {
       statusMessage.value = `No se pudo crear la issue: ${result.error}`
@@ -154,6 +228,41 @@ async function onSubmit(): Promise<void> {
             placeholder="Añade detalle si hace falta. El resumen puede bastar."
           ></textarea>
         </div>
+        <div :class="FIELD_LABEL">
+          <label for="issue-report-attachments">Capturas (opcional)</label>
+          <input
+            id="issue-report-attachments"
+            type="file"
+            name="attachments"
+            :accept="ATTACHMENT_ACCEPT"
+            multiple
+            class="text-text-muted file:bg-subtle file:text-text-main text-sm file:mr-3 file:rounded-md file:px-3 file:py-2"
+            @change="onAttachmentsPicked"
+          />
+          <p class="text-text-muted text-sm">{{ ATTACHMENT_LIMITS }}</p>
+        </div>
+        <ul
+          v-if="attachments.length > 0"
+          id="issue-report-attachment-list"
+          class="grid gap-2"
+          aria-label="Capturas adjuntas"
+        >
+          <li
+            v-for="item in attachments"
+            :key="item.id"
+            class="bg-subtle flex items-center gap-3 rounded-md p-2"
+          >
+            <img
+              :src="item.previewUrl"
+              :alt="`Vista previa de ${item.file.name}`"
+              class="size-14 shrink-0 rounded-md object-cover"
+            />
+            <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ item.file.name }}</span>
+            <BaseButton variant="ghost" @click="removeAttachment(item.id)">
+              Quitar {{ item.file.name }}
+            </BaseButton>
+          </li>
+        </ul>
       </fieldset>
 
       <p id="issue-report-notice" class="text-text-muted text-sm leading-relaxed">
