@@ -1,5 +1,5 @@
 /**
- * Zod schemas for `POST /api/sync` command payloads (WP4).
+ * Effect Schema schemas for `POST /api/sync` command payloads (WP4, fase 7).
  *
  * A sync command is one of five discriminated shapes (on the `action`
  * field): `create`, `update`, `remove` (each scoped to one of the
@@ -9,6 +9,12 @@
  * (a no-op command — useful for idempotency-replay tests without mutating
  * anything). `commandId` is the client-supplied id that becomes
  * `sync_commands.id`'s primary key, enforcing idempotent replay.
+ *
+ * This module used to import zod. It is shared by the client outbox and the
+ * server endpoints, so moving it to Effect Schema is what takes zod out of the
+ * client bundle (ADR-0006, fase 7). Objects reject excess properties through
+ * `safeParse` in `src/lib/schema.ts`, the behaviour the `.strict()` zod
+ * schemas provided.
  *
  * Deliberately out of scope (left for a later WP, see WP4 report):
  * `investment_trade_details` (a sub-entity of an aggregate root, not addressed
@@ -26,25 +32,39 @@
  * `enabled` flag and cash mappings travel inside `settingsUpdate`.
  */
 
-import { z } from 'zod'
+import { Schema } from 'effect'
+
+import { validator, type Validator } from '../../schema'
+
+const nullableString = Schema.NullOr(Schema.String)
+const nonEmpty = Schema.String.check(Schema.isMinLength(1))
+const optionalText = Schema.optional(nullableString)
+const optionalBoolean = Schema.optional(Schema.Boolean)
+const finite = Schema.Finite
+const nullableFinite = Schema.NullOr(finite)
+const isoDate = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/))
+const int = Schema.Int
+const intInRange = (minimum: number, maximum: number) =>
+  Schema.Int.check(Schema.isGreaterThanOrEqualTo(minimum), Schema.isLessThanOrEqualTo(maximum))
+const nonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
 /** Private quote source and holdings; shared catalog definitions remain immutable. */
-export const quoteConfigurationSchema = z
-  .object({
-    type: z.enum(['stock', 'etf', 'fund', 'crypto']),
-    symbol: z.string().trim().min(1).max(100),
-    quoteSymbol: z.string().trim().min(1).max(100).optional(),
-    market: z.string().max(100),
-    currency: z.string().regex(/^[A-Z]{3}$/),
-    provider: z.string().trim().min(1).max(50),
-    active: z.boolean(),
-    openingUnits: z.number().optional(),
-    holdingUnits: z.number().min(0).optional(),
-    holdingsAsOf: z.string().optional(),
-    holdingsUpdatedAt: z.string().optional(),
-    holdingsSource: z.literal('manual').optional(),
-  })
-  .strict()
+const quoteConfiguration = Schema.Struct({
+  type: Schema.Literals(['stock', 'etf', 'fund', 'crypto']),
+  symbol: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100)),
+  quoteSymbol: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(100))),
+  market: Schema.String.check(Schema.isMaxLength(100)),
+  currency: Schema.String.check(Schema.isPattern(/^[A-Z]{3}$/)),
+  provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(50)),
+  active: Schema.Boolean,
+  openingUnits: Schema.optional(finite),
+  holdingUnits: Schema.optional(finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  holdingsAsOf: Schema.optional(Schema.String),
+  holdingsUpdatedAt: Schema.optional(Schema.String),
+  holdingsSource: Schema.optional(Schema.Literal('manual')),
+})
+
+export const quoteConfigurationSchema = validator(quoteConfiguration)
 
 /**
  * Outcome of one command in `POST /api/sync`'s `results`, shared with the
@@ -84,22 +104,19 @@ export const SYNC_ENTITY_TYPES = [
 
 export type SyncEntityType = (typeof SYNC_ENTITY_TYPES)[number]
 
-const entityTypeSchema = z.enum(SYNC_ENTITY_TYPES)
-
-const nullableString = z.string().nullable()
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const entityTypeSchema = Schema.Literals(SYNC_ENTITY_TYPES)
 
 /** One account's balance nested inside a `wealthSnapshot` command — see the module doc comment. */
-const wealthSnapshotBalanceSchema = z.object({
-  accountId: z.string().min(1),
-  balance: z.number(),
-  currency: z.string().min(1),
+const wealthSnapshotBalance = Schema.Struct({
+  accountId: Schema.String.check(Schema.isMinLength(1)),
+  balance: finite,
+  currency: Schema.String.check(Schema.isMinLength(1)),
 })
 
 /** One account's share of a contribution's flow, nested inside a `contribution` command. */
-const contributionAllocationSchema = z.object({
+const contributionAllocation = Schema.Struct({
   accountId: nullableString,
-  amount: z.number(),
+  amount: finite,
 })
 
 /**
@@ -109,189 +126,165 @@ const contributionAllocationSchema = z.object({
  * investments.
  */
 const operationFields = {
-  symbol: nullableString.optional(),
-  side: nullableString.optional(),
-  units: z.number().nullable().optional(),
-  unitPrice: z.number().nullable().optional(),
-  fee: z.number().nullable().optional(),
-  time: nullableString.optional(),
+  symbol: optionalText,
+  side: optionalText,
+  units: Schema.optional(nullableFinite),
+  unitPrice: Schema.optional(nullableFinite),
+  fee: Schema.optional(nullableFinite),
+  time: optionalText,
 }
 
 /**
  * The same operation, as it travels nested inside a movement's command. The
  * movement's own `time` lives beside it on the movement, not in here.
  */
-const operationSchema = z.object({
-  symbol: nullableString.optional(),
-  instrumentId: nullableString.optional(),
-  side: z.string().min(1),
-  units: z.number(),
-  unitPrice: z.number(),
-  fee: z.number(),
-})
+export const transactionOperationSchema = validator(
+  Schema.Struct({
+    symbol: optionalText,
+    instrumentId: optionalText,
+    side: nonEmpty,
+    units: finite,
+    unitPrice: finite,
+    fee: finite,
+  }),
+)
 
 /** Create-payload shape per entity type, mirroring each repository's `Create*Input`. */
-export const entityCreateSchemas = {
-  account: z
-    .object({
-      legacyId: nullableString.optional(),
-      name: z.string().min(1),
-      kind: z.string().min(1),
-      currency: z.string().min(1),
-      openingBalance: z.number(),
-      isArchived: z.boolean().optional(),
-    })
-    .strict(),
-  category: z
-    .object({
-      legacyId: nullableString.optional(),
-      name: z.string().min(1),
-      kind: z.string().min(1),
-      sortOrder: z.number().int().optional(),
-      emoji: nullableString.optional(),
-    })
-    .strict(),
-  transaction: z
-    .object({
-      legacyId: nullableString.optional(),
-      accountId: z.string().min(1),
-      categoryId: nullableString.optional(),
-      type: z.string().min(1),
-      date: z.string().min(1),
-      description: nullableString.optional(),
-      amount: z.number(),
-      currency: z.string().min(1),
-      // `time` and `declared` are the movement's own, not the operation's: a
-      // gasto can carry an hour and be marked as declarado too (ADR 0002).
-      time: nullableString.optional(),
-      declared: z.boolean().optional(),
-      // 1-12; `null` counts the movement in the month of its date.
-      accountingMonth: z.number().int().min(1).max(12).nullable().optional(),
-      // Nested, so amount and operation are written in the same command and
-      // cannot drift apart. `null` says this movement has no operation.
-      operation: operationSchema.nullable().optional(),
-    })
-    .strict(),
-  subscription: z
-    .object({
-      legacyId: nullableString.optional(),
-      name: z.string().min(1),
-      categoryId: nullableString.optional(),
-      categoryName: z.string().min(1).optional(),
-      accountId: nullableString.optional(),
-      amount: z.number(),
-      currency: z.string().min(1),
-      startDate: isoDate,
-      nextChargeDate: isoDate,
-      frequency: z.string().min(1),
-      isActive: z.boolean().optional(),
-    })
-    .strict(),
-  recurringRule: z
-    .object({
-      legacyId: nullableString.optional(),
-      name: z.string().min(1),
-      type: z.string().min(1),
-      accountId: nullableString.optional(),
-      categoryId: nullableString.optional(),
-      amount: z.number(),
-      currency: z.string().min(1),
-      frequency: z.string().min(1),
-      interval: z.number().int().min(1).optional(),
-      startDate: nullableString.optional(),
-      endDate: nullableString.optional(),
-      lastExecutionDate: nullableString.optional(),
-      nextRunDate: nullableString.optional(),
-      ...operationFields,
-      status: z.string().optional(),
-    })
-    .strict(),
-  pendingMovement: z
-    .object({
-      legacyId: nullableString.optional(),
-      recurringRuleId: z.string().min(1),
-      accountId: nullableString.optional(),
-      categoryId: nullableString.optional(),
-      amount: z.number(),
-      currency: z.string().min(1),
-      dueDate: z.string().min(1),
-      type: nullableString.optional(),
-      description: nullableString.optional(),
-      ...operationFields,
-      transactionId: nullableString.optional(),
-      status: z.string().optional(),
-    })
-    .strict(),
-  budgetEntry: z
-    .object({
-      legacyId: nullableString.optional(),
-      categoryId: z.string().min(1),
-      year: z.number().int(),
-      month: z.number().int().min(1).max(12),
-      amount: z.number(),
-      currency: z.string().min(1),
-    })
-    .strict(),
-  goal: z
-    .object({
-      legacyId: nullableString.optional(),
-      key: z.string().min(1),
-      name: z.string().min(1),
-      targetYear: z.number().int().nullable().optional(),
-      targetAmount: z.number(),
-      currency: z.string().min(1),
-    })
-    .strict(),
-  contribution: z
-    .object({
-      legacyId: nullableString.optional(),
-      date: z.string().min(1),
-      amount: z.number(),
-      currency: z.string().min(1),
-      portfolioDate: nullableString.optional(),
-      portfolioValue: z.number().nullable().optional(),
-      flow: z.number().nullable().optional(),
-      allocations: z.array(contributionAllocationSchema).optional(),
-    })
-    .strict(),
-  userInstrument: z
-    .object({
-      instrumentId: z.string().min(1),
-      categoryId: nullableString.optional(),
-      alias: nullableString.optional(),
-      quoteConfig: quoteConfigurationSchema.optional(),
-    })
-    .strict(),
-  wealthSnapshot: z
-    .object({
-      legacyId: nullableString.optional(),
-      snapshotDate: z.string().min(1),
-      year: z.number().int(),
-      month: z.number().int().min(1).max(12),
-      balances: z.array(wealthSnapshotBalanceSchema).optional(),
-    })
-    .strict(),
-  stockeventsMapping: z
-    .object({
-      legacyId: nullableString.optional(),
-      categoryId: nullableString.optional(),
-      stockeventsSymbol: z.string().min(1),
-      sync: z.boolean().optional(),
-      watchlistId: nullableString.optional(),
-      hidden: z.boolean().optional(),
-    })
-    .strict(),
-  stockeventsCashEntry: z
-    .object({
-      legacyId: nullableString.optional(),
-      contributionDate: isoDate,
-      accountId: nullableString.optional(),
-      watchlistId: z.string().min(1),
-      syncedAmount: z.number(),
-      currency: z.string().min(1),
-    })
-    .strict(),
-} satisfies Record<SyncEntityType, z.ZodType>
+const entityCreateFields = {
+  account: {
+    legacyId: optionalText,
+    name: nonEmpty,
+    kind: nonEmpty,
+    currency: nonEmpty,
+    openingBalance: finite,
+    isArchived: optionalBoolean,
+  },
+  category: {
+    legacyId: optionalText,
+    name: nonEmpty,
+    kind: nonEmpty,
+    sortOrder: Schema.optional(int),
+    emoji: optionalText,
+  },
+  transaction: {
+    legacyId: optionalText,
+    accountId: nonEmpty,
+    categoryId: optionalText,
+    type: nonEmpty,
+    date: nonEmpty,
+    description: optionalText,
+    amount: finite,
+    currency: nonEmpty,
+    // `time` and `declared` are the movement's own, not the operation's: a
+    // gasto can carry an hour and be marked as declarado too (ADR 0002).
+    time: optionalText,
+    declared: optionalBoolean,
+    // 1-12; `null` counts the movement in the month of its date.
+    accountingMonth: Schema.optional(Schema.NullOr(intInRange(1, 12))),
+    // Nested, so amount and operation are written in the same command and
+    // cannot drift apart. `null` says this movement has no operation.
+    operation: Schema.optional(Schema.NullOr(transactionOperationSchema.schema)),
+  },
+  subscription: {
+    legacyId: optionalText,
+    name: nonEmpty,
+    categoryId: optionalText,
+    categoryName: Schema.optional(nonEmpty),
+    accountId: optionalText,
+    amount: finite,
+    currency: nonEmpty,
+    startDate: isoDate,
+    nextChargeDate: isoDate,
+    frequency: nonEmpty,
+    isActive: optionalBoolean,
+  },
+  recurringRule: {
+    legacyId: optionalText,
+    name: nonEmpty,
+    type: nonEmpty,
+    accountId: optionalText,
+    categoryId: optionalText,
+    amount: finite,
+    currency: nonEmpty,
+    frequency: nonEmpty,
+    interval: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+    startDate: optionalText,
+    endDate: optionalText,
+    lastExecutionDate: optionalText,
+    nextRunDate: optionalText,
+    ...operationFields,
+    status: Schema.optional(Schema.String),
+  },
+  pendingMovement: {
+    legacyId: optionalText,
+    recurringRuleId: nonEmpty,
+    accountId: optionalText,
+    categoryId: optionalText,
+    amount: finite,
+    currency: nonEmpty,
+    dueDate: nonEmpty,
+    type: optionalText,
+    description: optionalText,
+    ...operationFields,
+    transactionId: optionalText,
+    status: Schema.optional(Schema.String),
+  },
+  budgetEntry: {
+    legacyId: optionalText,
+    categoryId: nonEmpty,
+    year: int,
+    month: intInRange(1, 12),
+    amount: finite,
+    currency: nonEmpty,
+  },
+  goal: {
+    legacyId: optionalText,
+    key: nonEmpty,
+    name: nonEmpty,
+    targetYear: Schema.optional(Schema.NullOr(int)),
+    targetAmount: finite,
+    currency: nonEmpty,
+  },
+  contribution: {
+    legacyId: optionalText,
+    date: nonEmpty,
+    amount: finite,
+    currency: nonEmpty,
+    portfolioDate: optionalText,
+    portfolioValue: Schema.optional(nullableFinite),
+    flow: Schema.optional(nullableFinite),
+    allocations: Schema.optional(Schema.Array(contributionAllocation)),
+  },
+  userInstrument: {
+    instrumentId: nonEmpty,
+    categoryId: optionalText,
+    alias: optionalText,
+    quoteConfig: Schema.optional(quoteConfiguration),
+  },
+  wealthSnapshot: {
+    legacyId: optionalText,
+    snapshotDate: nonEmpty,
+    year: int,
+    month: intInRange(1, 12),
+    balances: Schema.optional(Schema.Array(wealthSnapshotBalance)),
+  },
+  stockeventsMapping: {
+    legacyId: optionalText,
+    categoryId: optionalText,
+    stockeventsSymbol: nonEmpty,
+    sync: optionalBoolean,
+    watchlistId: optionalText,
+    hidden: optionalBoolean,
+  },
+  stockeventsCashEntry: {
+    legacyId: optionalText,
+    contributionDate: isoDate,
+    accountId: optionalText,
+    watchlistId: nonEmpty,
+    syncedAmount: finite,
+    currency: nonEmpty,
+  },
+} satisfies Record<SyncEntityType, Schema.Struct.Fields>
 
 /**
  * What a `create` command may actually carry: the per-entity shape above plus
@@ -300,95 +293,129 @@ export const entityCreateSchemas = {
  * Kept apart from `entityCreateSchemas` on purpose — the update schemas below
  * derive from that map, and an entity's identity is not a patchable field.
  */
-const clientIdentityFields = { id: z.string().min(1).optional() }
+const clientIdentityFields = { id: Schema.optional(nonEmpty) }
 
-export const entityCreatePayloadSchemas = {
-  account: entityCreateSchemas.account.extend(clientIdentityFields),
-  category: entityCreateSchemas.category.extend(clientIdentityFields),
-  transaction: entityCreateSchemas.transaction.extend(clientIdentityFields),
-  subscription: entityCreateSchemas.subscription.extend(clientIdentityFields),
-  recurringRule: entityCreateSchemas.recurringRule.extend(clientIdentityFields),
-  pendingMovement: entityCreateSchemas.pendingMovement.extend(clientIdentityFields),
-  budgetEntry: entityCreateSchemas.budgetEntry.extend(clientIdentityFields),
-  goal: entityCreateSchemas.goal.extend(clientIdentityFields),
-  contribution: entityCreateSchemas.contribution.extend(clientIdentityFields),
-  userInstrument: entityCreateSchemas.userInstrument.extend(clientIdentityFields),
-  wealthSnapshot: entityCreateSchemas.wealthSnapshot.extend(clientIdentityFields),
-  stockeventsMapping: entityCreateSchemas.stockeventsMapping.extend(clientIdentityFields),
-  stockeventsCashEntry: entityCreateSchemas.stockeventsCashEntry.extend(clientIdentityFields),
-} satisfies Record<SyncEntityType, z.ZodType>
+type CreateFields = typeof entityCreateFields
+type PayloadFields = {
+  [K in keyof CreateFields]: CreateFields[K] & typeof clientIdentityFields
+}
+type PartialFields<F> = F extends Schema.Struct.Fields
+  ? { [P in keyof F]: Schema.optionalKey<F[P] extends Schema.Constraint ? F[P] : never> }
+  : never
+type UpdateFields = { [K in keyof CreateFields]: PartialFields<CreateFields[K]> }
+
+const payloadFields = Object.fromEntries(
+  Object.entries(entityCreateFields).map(([entityType, fields]) => [
+    entityType,
+    { ...fields, ...clientIdentityFields },
+  ]),
+) as PayloadFields
+
+const updateFields = {
+  ...Object.fromEntries(
+    Object.entries(entityCreateFields).map(([entityType, fields]) => [
+      entityType,
+      Object.fromEntries(
+        Object.entries(fields).map(([field, schema]) => [field, Schema.optionalKey(schema)]),
+      ),
+    ]),
+  ),
+  // These four entities accept a deliberately narrower patch than their
+  // create payload: identity and grouping live outside the editable fields.
+  budgetEntry: { amount: Schema.optional(finite), currency: Schema.optional(nonEmpty) },
+  userInstrument: {
+    categoryId: optionalText,
+    alias: optionalText,
+    quoteConfig: Schema.optional(quoteConfiguration),
+  },
+  stockeventsMapping: {
+    categoryId: optionalText,
+    stockeventsSymbol: Schema.optional(nonEmpty),
+    sync: optionalBoolean,
+    watchlistId: optionalText,
+    hidden: optionalBoolean,
+  },
+  stockeventsCashEntry: {
+    contributionDate: Schema.optional(isoDate),
+    accountId: optionalText,
+    watchlistId: Schema.optional(nonEmpty),
+    syncedAmount: Schema.optional(finite),
+    currency: Schema.optional(nonEmpty),
+  },
+} as unknown as UpdateFields
+
+type EntitySchema = Schema.Schema<Record<string, unknown>>
+
+const createSchemas = Object.fromEntries(
+  Object.entries(entityCreateFields).map(([entityType, fields]) => [
+    entityType,
+    Schema.Struct(fields),
+  ]),
+) as unknown as Record<SyncEntityType, EntitySchema>
+
+const payloadSchemas = Object.fromEntries(
+  Object.entries(payloadFields).map(([entityType, fields]) => [entityType, Schema.Struct(fields)]),
+) as unknown as Record<SyncEntityType, EntitySchema>
+
+const updateSchemas = Object.fromEntries(
+  Object.entries(updateFields).map(([entityType, fields]) => [entityType, Schema.Struct(fields)]),
+) as unknown as Record<SyncEntityType, EntitySchema>
+
+export const entityCreateSchemas: Record<
+  SyncEntityType,
+  Validator<Record<string, unknown>>
+> = Object.fromEntries(
+  Object.entries(createSchemas).map(([entityType, schema]) => [entityType, validator(schema)]),
+) as Record<SyncEntityType, Validator<Record<string, unknown>>>
+
+export const entityCreatePayloadSchemas: Record<
+  SyncEntityType,
+  Validator<Record<string, unknown>>
+> = Object.fromEntries(
+  Object.entries(payloadSchemas).map(([entityType, schema]) => [entityType, validator(schema)]),
+) as Record<SyncEntityType, Validator<Record<string, unknown>>>
 
 /** Update-payload (patch) shape per entity type — every field optional. */
-export const entityUpdateSchemas = {
-  account: entityCreateSchemas.account.partial(),
-  category: entityCreateSchemas.category.partial(),
-  transaction: entityCreateSchemas.transaction.partial(),
-  subscription: entityCreateSchemas.subscription.partial(),
-  recurringRule: entityCreateSchemas.recurringRule.partial(),
-  pendingMovement: entityCreateSchemas.pendingMovement.partial(),
-  budgetEntry: z
-    .object({
-      amount: z.number().optional(),
-      currency: z.string().min(1).optional(),
-    })
-    .strict(),
-  goal: entityCreateSchemas.goal.partial(),
-  contribution: entityCreateSchemas.contribution.partial(),
-  userInstrument: z
-    .object({
-      categoryId: nullableString.optional(),
-      alias: nullableString.optional(),
-      quoteConfig: quoteConfigurationSchema.optional(),
-    })
-    .strict(),
-  wealthSnapshot: entityCreateSchemas.wealthSnapshot.partial(),
-  stockeventsMapping: z
-    .object({
-      categoryId: nullableString.optional(),
-      stockeventsSymbol: z.string().min(1).optional(),
-      sync: z.boolean().optional(),
-      watchlistId: nullableString.optional(),
-      hidden: z.boolean().optional(),
-    })
-    .strict(),
-  stockeventsCashEntry: z
-    .object({
-      contributionDate: isoDate.optional(),
-      accountId: nullableString.optional(),
-      watchlistId: z.string().min(1).optional(),
-      syncedAmount: z.number().optional(),
-      currency: z.string().min(1).optional(),
-    })
-    .strict(),
-} satisfies Record<SyncEntityType, z.ZodType>
+export const entityUpdateSchemas: Record<
+  SyncEntityType,
+  Validator<Record<string, unknown>>
+> = Object.fromEntries(
+  Object.entries(updateSchemas).map(([entityType, schema]) => [entityType, validator(schema)]),
+) as Record<SyncEntityType, Validator<Record<string, unknown>>>
 
 const baseCommandFields = {
-  commandId: z.string().min(1),
+  commandId: nonEmpty,
 }
 
-export const createCommandSchema = z.object({
-  ...baseCommandFields,
-  action: z.literal('create'),
-  entityType: entityTypeSchema,
-  data: z.record(z.string(), z.unknown()),
-})
+export const createCommandSchema = validator(
+  Schema.Struct({
+    ...baseCommandFields,
+    action: Schema.Literal('create'),
+    entityType: entityTypeSchema,
+    data: Schema.Record(Schema.String, Schema.Unknown),
+  }),
+)
 
-export const updateCommandSchema = z.object({
-  ...baseCommandFields,
-  action: z.literal('update'),
-  entityType: entityTypeSchema,
-  entityId: z.string().min(1),
-  baseVersion: z.number().int().nonnegative(),
-  patch: z.record(z.string(), z.unknown()),
-})
+export const updateCommandSchema = validator(
+  Schema.Struct({
+    ...baseCommandFields,
+    action: Schema.Literal('update'),
+    entityType: entityTypeSchema,
+    entityId: nonEmpty,
+    baseVersion: nonNegativeInt,
+    patch: Schema.Record(Schema.String, Schema.Unknown),
+  }),
+)
 
-export const removeCommandSchema = z.object({
-  ...baseCommandFields,
-  action: z.literal('remove'),
-  entityType: entityTypeSchema,
-  entityId: z.string().min(1),
-  baseVersion: z.number().int().nonnegative(),
-})
+export const removeCommandSchema = validator(
+  Schema.Struct({
+    ...baseCommandFields,
+    action: Schema.Literal('remove'),
+    entityType: entityTypeSchema,
+    entityId: nonEmpty,
+    baseVersion: nonNegativeInt,
+  }),
+)
 
 /**
  * `user_settings` is a per-user singleton: addressed by `userId` alone, so
@@ -398,61 +425,71 @@ export const removeCommandSchema = z.object({
  * silently overwriting the other device's currency or theme (audit §6.4).
  * Optional because a client that has never seen the row still creates it.
  */
-export const settingsUpdateCommandSchema = z.object({
-  ...baseCommandFields,
-  action: z.literal('settingsUpdate'),
-  baseVersion: z.number().int().nonnegative().optional(),
-  patch: z.object({
-    onboardingPresented: z.boolean().optional(),
-    onboardingDismissed: z.boolean().optional(),
-    onboardingAccountCompleted: z.boolean().optional(),
-    onboardingMovementCompleted: z.boolean().optional(),
-    onboardingCompleted: z.boolean().optional(),
-    currency: z.string().min(1).optional(),
-    locale: nullableString.optional(),
-    theme: nullableString.optional(),
-    /** Server `account` ids — replaces the whole TWR liquidity selection. */
-    twrLiquidityAccountIds: z.array(z.string().min(1)).optional(),
-    /** Stock Events "sincronizar nuevos movimientos" flag. */
-    stockeventsEnabled: z.boolean().optional(),
-    /** Stock Events: buys/sells move the watchlist cash (`toCash`). */
-    stockeventsTradesToCash: z.boolean().optional(),
-    /**
-     * Whole Stock Events cash-mapping selection — replaces it. `accountId`
-     * is the server `account` id (`null` clears that row's mapping only
-     * when paired with an empty `watchlistId`; entries with an empty
-     * `watchlistId` remove the mapping).
-     */
-    stockeventsCashMappings: z
-      .array(
-        z.object({
-          accountId: nullableString,
-          watchlistId: z.string(),
-        }),
-      )
-      .optional(),
+export const settingsUpdateCommandSchema = validator(
+  Schema.Struct({
+    ...baseCommandFields,
+    action: Schema.Literal('settingsUpdate'),
+    baseVersion: Schema.optional(nonNegativeInt),
+    patch: Schema.Struct({
+      onboardingPresented: optionalBoolean,
+      onboardingDismissed: optionalBoolean,
+      onboardingAccountCompleted: optionalBoolean,
+      onboardingMovementCompleted: optionalBoolean,
+      onboardingCompleted: optionalBoolean,
+      currency: Schema.optional(nonEmpty),
+      locale: optionalText,
+      theme: optionalText,
+      /** Server `account` ids — replaces the whole TWR liquidity selection. */
+      twrLiquidityAccountIds: Schema.optional(Schema.Array(nonEmpty)),
+      /** Stock Events "sincronizar nuevos movimientos" flag. */
+      stockeventsEnabled: optionalBoolean,
+      /** Stock Events: buys/sells move the watchlist cash (`toCash`). */
+      stockeventsTradesToCash: optionalBoolean,
+      /**
+       * Whole Stock Events cash-mapping selection — replaces it. `accountId`
+       * is the server `account` id (`null` clears that row's mapping only
+       * when paired with an empty `watchlistId`; entries with an empty
+       * `watchlistId` remove the mapping).
+       */
+      stockeventsCashMappings: Schema.optional(
+        Schema.Array(
+          Schema.Struct({
+            accountId: nullableString,
+            watchlistId: Schema.String,
+          }),
+        ),
+      ),
+    }),
   }),
-})
+)
 
 /** No-op command: exercises idempotent replay without touching any table. */
-export const noopCommandSchema = z.object({
-  ...baseCommandFields,
-  action: z.literal('noop'),
-})
+export const noopCommandSchema = validator(
+  Schema.Struct({
+    ...baseCommandFields,
+    action: Schema.Literal('noop'),
+  }),
+)
 
-export const syncCommandSchema = z.discriminatedUnion('action', [
-  createCommandSchema,
-  updateCommandSchema,
-  removeCommandSchema,
-  settingsUpdateCommandSchema,
-  noopCommandSchema,
+const syncCommand = Schema.Union([
+  createCommandSchema.schema,
+  updateCommandSchema.schema,
+  removeCommandSchema.schema,
+  settingsUpdateCommandSchema.schema,
+  noopCommandSchema.schema,
 ])
 
-export type SyncCommandInput = z.infer<typeof syncCommandSchema>
+export const syncCommandSchema = validator(syncCommand)
+
+export type SyncCommandInput = Schema.Schema.Type<typeof syncCommand>
 
 /** `POST /api/sync` batches at most 5 commands per request (WP4 design decision). */
-export const syncBatchSchema = z.object({
-  commands: z.array(syncCommandSchema).min(1).max(5),
-})
+export const syncBatchSchema = validator(
+  Schema.Struct({
+    commands: Schema.Array(syncCommand).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
+  }),
+)
 
-export type SyncBatchInput = z.infer<typeof syncBatchSchema>
+export type SyncBatchInput = {
+  readonly commands: readonly SyncCommandInput[]
+}

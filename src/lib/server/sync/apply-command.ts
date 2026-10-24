@@ -507,7 +507,7 @@ function recordChange(
 
 function rejectInvalidPayload(
   entityType: SyncEntityType,
-  error: { issues: Array<{ path: PropertyKey[]; message: string }> },
+  error: { issues: ReadonlyArray<{ path: readonly PropertyKey[]; message: string }> },
 ): Omit<CommandOutcome, 'commandId' | 'replayed'> {
   const detail = error.issues
     .map((issue) => `${issue.path.map(String).join('.') || '(raíz)'}: ${issue.message}`)
@@ -611,13 +611,14 @@ function performMutation(
               }
         }
         const twrLiquidityAccounts = twrLiquidityAccountIds
-          ? yield* accountsRepository.replaceTwrLiquidityAccounts(userId, twrLiquidityAccountIds)
+          ? yield* accountsRepository.replaceTwrLiquidityAccounts(userId, [
+              ...twrLiquidityAccountIds,
+            ])
           : undefined
         const cashMappings = stockeventsCashMappings
-          ? yield* stockeventsCashMappingsRepository.replaceMappings(
-              userId,
-              stockeventsCashMappings,
-            )
+          ? yield* stockeventsCashMappingsRepository.replaceMappings(userId, [
+              ...stockeventsCashMappings,
+            ])
           : undefined
         const revision = yield* recordChange(
           userId,
@@ -642,7 +643,7 @@ function performMutation(
       case 'create': {
         const schema = entityCreatePayloadSchemas[command.entityType]
         const validation = schema.safeParse(command.data)
-        if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
+        if (!validation.success) return rejectInvalidPayload(command.entityType, validation)
         const parsed = validation.data
         // The client's own identity wins when it sent one: re-sending a `create`
         // is then a no-op instead of a duplicate, even under a fresh commandId
@@ -706,7 +707,7 @@ function performMutation(
         }
         const schema = entityUpdateSchemas[command.entityType]
         const validation = schema.safeParse(command.patch)
-        if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
+        if (!validation.success) return rejectInvalidPayload(command.entityType, validation)
         const parsed = validation.data
         const row = yield* updateEntity(
           userId,

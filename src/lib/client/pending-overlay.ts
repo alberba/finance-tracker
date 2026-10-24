@@ -15,7 +15,7 @@
  */
 
 import {
-  entityCreateSchemas,
+  transactionOperationSchema,
   type SyncCommandInput,
   type SyncEntityType,
 } from '../server/sync/command-schemas'
@@ -54,7 +54,7 @@ function overlayEntity(
     next.tradeDetail = null
     return next
   }
-  const operation = entityCreateSchemas.transaction.shape.operation.safeParse(data.operation)
+  const operation = transactionOperationSchema.safeParse(data.operation)
   if (operation.success && operation.data) {
     next.tradeDetail = {
       symbol: operation.data.symbol ?? null,
