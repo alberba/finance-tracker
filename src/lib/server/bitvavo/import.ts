@@ -64,7 +64,9 @@ export async function configureBitvavo(
     http,
   )
   const secret = JSON.stringify({ apiKey: config.apiKey, apiSecret: config.apiSecret })
-  const envelope = await encryptValue(env, secret)
+  // Transitional edge: the encryption effect has no dependencies, so the
+  // orchestration below runs it directly until this module is Effect itself.
+  const envelope = await Effect.runPromise(encryptValue(env, secret))
   const settings = {
     accountId: config.accountId,
     startDate: config.startDate,
