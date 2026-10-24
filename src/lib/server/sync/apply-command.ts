@@ -35,6 +35,7 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
+import { runWithDb } from '../../../db/database'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
 import * as wealthRepository from '../../../db/repositories/wealth'
@@ -102,7 +103,7 @@ async function findByLegacyId(
 ): Promise<VersionedRow | undefined> {
   if (typeof value !== 'string' || !value) return undefined
   if (entityType === 'transaction') {
-    const row = (await transactionsRepository.listByUser(db, userId)).find(
+    const row = (await runWithDb(db, transactionsRepository.listByUser(userId))).find(
       (candidate) => candidate.legacyId === value,
     )
     return row ? transactionWithTradeDetail(db, userId, row) : undefined
@@ -110,36 +111,36 @@ async function findByLegacyId(
   let rows: VersionedRow[] = []
   switch (entityType) {
     case 'account':
-      rows = (await accountsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, accountsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'category':
-      rows = (await accountsRepository.listCategoriesByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, accountsRepository.listCategoriesByUser(userId))) as VersionedRow[]
       break
     case 'subscription':
-      rows = (await subscriptionsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, subscriptionsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'recurringRule':
-      rows = (await recurringRulesRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, recurringRulesRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'pendingMovement':
-      rows = (await pendingMovementsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, pendingMovementsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'budgetEntry':
-      rows = (await budgetEntriesRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, budgetEntriesRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'goal':
-      rows = (await goalsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, goalsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'contribution':
-      rows = (await contributionsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, contributionsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'wealthSnapshot':
-      rows = (await wealthRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, wealthRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'userInstrument':
       return undefined
     case 'stockeventsMapping':
-      rows = (await stockeventsSymbolMappingsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'stockeventsCashEntry':
       return undefined
@@ -162,37 +163,37 @@ async function loadForMutation(
 ): Promise<VersionedRow | undefined> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, accountsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'category':
-      return (await accountsRepository.getCategory(db, userId, entityId)) as
+      return (await runWithDb(db, accountsRepository.getCategory(userId, entityId))) as
         VersionedRow | undefined
     case 'transaction': {
-      const row = await transactionsRepository.get(db, userId, entityId)
+      const row = await runWithDb(db, transactionsRepository.get(userId, entityId))
       return row ? transactionWithTradeDetail(db, userId, row) : undefined
     }
     case 'subscription':
-      return (await subscriptionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, subscriptionsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'recurringRule':
-      return (await recurringRulesRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, recurringRulesRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'pendingMovement':
-      return (await pendingMovementsRepository.get(db, userId, entityId)) as
+      return (await runWithDb(db, pendingMovementsRepository.get(userId, entityId))) as
         VersionedRow | undefined
     case 'budgetEntry':
-      return (await budgetEntriesRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, budgetEntriesRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'goal':
-      return (await goalsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, goalsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'contribution':
-      return (await contributionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, contributionsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'userInstrument':
-      return (await marketRepository.getUserInstrument(db, userId, entityId)) as
+      return (await runWithDb(db, marketRepository.getUserInstrument(userId, entityId))) as
         VersionedRow | undefined
     case 'wealthSnapshot':
-      return (await wealthRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, wealthRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.get(db, userId, entityId)) as
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.get(userId, entityId))) as
         VersionedRow | undefined
     case 'stockeventsCashEntry': {
-      const entries = await stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId)
+      const entries = await runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId))
       return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined
     }
   }
@@ -203,7 +204,7 @@ async function transactionWithTradeDetail(
   userId: string,
   row: VersionedRow,
 ): Promise<VersionedRow> {
-  const tradeDetail = await transactionsRepository.getTradeDetailByTransaction(db, userId, row.id)
+  const tradeDetail = await runWithDb(db, transactionsRepository.getTradeDetailByTransaction(userId, row.id))
   return { ...row, tradeDetail } as VersionedRow
 }
 
@@ -233,39 +234,36 @@ async function createEntity(
 ): Promise<VersionedRow> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, accountsRepository.create(userId, data))) as VersionedRow
     case 'category':
-      return (await accountsRepository.createCategory(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, accountsRepository.createCategory(userId, data))) as VersionedRow
     case 'transaction':
-      return (await transactionsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, transactionsRepository.create(userId, data))) as VersionedRow
     case 'subscription':
-      return (await subscriptionsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, subscriptionsRepository.create(userId, data))) as VersionedRow
     case 'recurringRule':
-      return (await recurringRulesRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, recurringRulesRepository.create(userId, data))) as VersionedRow
     case 'pendingMovement':
-      return (await pendingMovementsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, pendingMovementsRepository.create(userId, data))) as VersionedRow
     case 'budgetEntry':
-      return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, budgetEntriesRepository.create(userId, data))) as VersionedRow
     case 'goal':
-      return (await goalsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, goalsRepository.create(userId, data))) as VersionedRow
     case 'contribution': {
       const { allocations, ...contributionInput } =
         data as contributionsRepository.CreateContributionInput & ContributionAllocationsField
-      const row = await contributionsRepository.create(db, userId, contributionInput)
+      const row = await runWithDb(db, contributionsRepository.create(userId, contributionInput))
       const allocationRows = allocations?.length
-        ? await contributionsRepository.replaceAllocations(
-            db,
-            userId,
+        ? await runWithDb(db, contributionsRepository.replaceAllocations(userId,
             row.id,
-            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
-          )
+            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),))
         : []
       return { ...row, allocations: allocationRows } as VersionedRow
     }
     case 'userInstrument':
-      return (await marketRepository.createUserInstrument(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, marketRepository.createUserInstrument(userId, data))) as VersionedRow
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.create(db, userId, {
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
         id: typeof data.id === 'string' ? data.id : undefined,
         legacyId: data.legacyId ?? null,
         categoryId: data.categoryId ?? null,
@@ -274,33 +272,30 @@ async function createEntity(
         watchlistId:
           typeof data.watchlistId === 'string' && data.watchlistId ? data.watchlistId : null,
         hidden: data.hidden === true,
-      })) as VersionedRow
+      }))) as VersionedRow
     case 'stockeventsCashEntry': {
       const accountId = typeof data.accountId === 'string' && data.accountId ? data.accountId : null
       if (accountId) {
         await assertOwnedReferences(db, userId, { accountId })
       }
-      const duplicate = await stockeventsCashMappingsRepository.findEntry(
-        db,
-        userId,
+      const duplicate = await runWithDb(db, stockeventsCashMappingsRepository.findEntry(userId,
         String(data.contributionDate),
         accountId,
-        String(data.watchlistId),
-      )
+        String(data.watchlistId),))
       if (duplicate) {
         return {
           ...duplicate,
           syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
         } as VersionedRow
       }
-      const entry = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+      const entry = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
         id: typeof data.id === 'string' ? data.id : undefined,
         contributionDate: String(data.contributionDate),
         accountId,
         watchlistId: String(data.watchlistId),
         syncedAmount: Number(data.syncedAmount),
         currency: String(data.currency),
-      })
+      }))
       return {
         ...entry,
         syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency),
@@ -309,9 +304,9 @@ async function createEntity(
     case 'wealthSnapshot': {
       const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
         WealthSnapshotBalancesField
-      const row = await wealthRepository.create(db, userId, snapshotInput)
+      const row = await runWithDb(db, wealthRepository.create(userId, snapshotInput))
       const balanceRows = balances?.length
-        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
+        ? await runWithDb(db, wealthRepository.replaceBalances(userId, row.id, balances))
         : []
       return { ...row, balances: balanceRows } as VersionedRow
     }
@@ -329,94 +324,65 @@ async function updateEntity(
 ): Promise<VersionedRow | undefined> {
   switch (entityType) {
     case 'account':
-      return (await accountsRepository.update(db, userId, entityId, patch, expectedVersion)) as
+      return (await runWithDb(db, accountsRepository.update(userId, entityId, patch, expectedVersion))) as
         VersionedRow | undefined
     case 'category':
-      return (await accountsRepository.updateCategory(
-        db,
-        userId,
+      return (await runWithDb(db, accountsRepository.updateCategory(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'transaction': {
-      const row = await transactionsRepository.update(db, userId, entityId, patch, expectedVersion)
+      const row = await runWithDb(db, transactionsRepository.update(userId, entityId, patch, expectedVersion))
       if (!row) return undefined
-      const tradeDetail = await transactionsRepository.getTradeDetailByTransaction(
-        db,
-        userId,
-        row.id,
-      )
+      const tradeDetail = await runWithDb(db, transactionsRepository.getTradeDetailByTransaction(userId,
+        row.id,))
       return { ...row, tradeDetail } as VersionedRow
     }
     case 'subscription':
-      return (await subscriptionsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, subscriptionsRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'recurringRule':
-      return (await recurringRulesRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, recurringRulesRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'pendingMovement':
-      return (await pendingMovementsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, pendingMovementsRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'budgetEntry':
-      return (await budgetEntriesRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, budgetEntriesRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'goal':
-      return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as
+      return (await runWithDb(db, goalsRepository.update(userId, entityId, patch, expectedVersion))) as
         VersionedRow | undefined
     case 'contribution': {
       const { allocations, ...contributionPatch } =
         patch as contributionsRepository.UpdateContributionInput & ContributionAllocationsField
-      const row = await contributionsRepository.update(
-        db,
-        userId,
+      const row = await runWithDb(db, contributionsRepository.update(userId,
         entityId,
         contributionPatch,
-        expectedVersion,
-      )
+        expectedVersion,))
       if (!row) return undefined
       const allocationRows = allocations
-        ? await contributionsRepository.replaceAllocations(
-            db,
-            userId,
+        ? await runWithDb(db, contributionsRepository.replaceAllocations(userId,
             row.id,
-            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
-          )
-        : await contributionsRepository.listAllocationsByContribution(db, userId, row.id)
+            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),))
+        : await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId, row.id))
       return { ...row, allocations: allocationRows } as VersionedRow
     }
     case 'userInstrument':
-      return (await marketRepository.updateUserInstrument(
-        db,
-        userId,
+      return (await runWithDb(db, marketRepository.updateUserInstrument(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'stockeventsMapping':
-      return (await stockeventsSymbolMappingsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, stockeventsSymbolMappingsRepository.update(userId,
         entityId,
         {
           categoryId: patch.categoryId,
@@ -425,16 +391,15 @@ async function updateEntity(
           watchlistId: patch.watchlistId,
           hidden: patch.hidden,
         },
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'stockeventsCashEntry': {
-      const updated = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+      const updated = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
         contributionDate: String(patch.contributionDate),
         accountId: typeof patch.accountId === 'string' && patch.accountId ? patch.accountId : null,
         watchlistId: String(patch.watchlistId),
         syncedAmount: Number(patch.syncedAmount),
         currency: String(patch.currency),
-      })
+      }))
       return {
         ...updated,
         syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
@@ -443,17 +408,14 @@ async function updateEntity(
     case 'wealthSnapshot': {
       const { balances, ...snapshotPatch } =
         patch as Partial<wealthRepository.CreateWealthSnapshotInput> & WealthSnapshotBalancesField
-      const row = await wealthRepository.update(
-        db,
-        userId,
+      const row = await runWithDb(db, wealthRepository.update(userId,
         entityId,
         snapshotPatch,
-        expectedVersion,
-      )
+        expectedVersion,))
       if (!row) return undefined
       const balanceRows = balances
-        ? await wealthRepository.replaceBalances(db, userId, row.id, balances)
-        : await wealthRepository.listBalancesBySnapshot(db, userId, row.id)
+        ? await runWithDb(db, wealthRepository.replaceBalances(userId, row.id, balances))
+        : await runWithDb(db, wealthRepository.listBalancesBySnapshot(userId, row.id))
       return { ...row, balances: balanceRows } as VersionedRow
     }
   }
@@ -468,36 +430,33 @@ async function removeEntity(
 ): Promise<boolean> {
   switch (entityType) {
     case 'account':
-      return accountsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, accountsRepository.remove(userId, entityId, expectedVersion))
     case 'category':
-      return accountsRepository.removeCategory(db, userId, entityId, expectedVersion)
+      return runWithDb(db, accountsRepository.removeCategory(userId, entityId, expectedVersion))
     case 'transaction':
-      return transactionsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, transactionsRepository.remove(userId, entityId, expectedVersion))
     case 'subscription':
-      return subscriptionsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, subscriptionsRepository.remove(userId, entityId, expectedVersion))
     case 'recurringRule':
-      return recurringRulesRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, recurringRulesRepository.remove(userId, entityId, expectedVersion))
     case 'pendingMovement':
-      return pendingMovementsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, pendingMovementsRepository.remove(userId, entityId, expectedVersion))
     case 'budgetEntry':
-      return budgetEntriesRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, budgetEntriesRepository.remove(userId, entityId, expectedVersion))
     case 'goal':
-      return goalsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, goalsRepository.remove(userId, entityId, expectedVersion))
     case 'contribution':
-      return contributionsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, contributionsRepository.remove(userId, entityId, expectedVersion))
     case 'userInstrument':
-      return marketRepository.removeUserInstrument(db, userId, entityId, expectedVersion)
+      return runWithDb(db, marketRepository.removeUserInstrument(userId, entityId, expectedVersion))
     case 'stockeventsMapping':
-      return stockeventsSymbolMappingsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion))
     case 'stockeventsCashEntry':
-      return stockeventsCashMappingsRepository.removeSyncEntry(
-        db,
-        userId,
+      return runWithDb(db, stockeventsCashMappingsRepository.removeSyncEntry(userId,
         entityId,
-        expectedVersion,
-      )
+        expectedVersion,))
     case 'wealthSnapshot':
-      return wealthRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, wealthRepository.remove(userId, entityId, expectedVersion))
   }
 }
 
@@ -510,20 +469,20 @@ async function recordChange(
   changeType: 'create' | 'update' | 'remove',
   payload: unknown,
 ): Promise<number> {
-  const revisionRow = await syncRepository.bumpRevision(db, userId)
-  await syncRepository.createChange(db, userId, {
+  const revisionRow = await runWithDb(db, syncRepository.bumpRevision(userId))
+  await runWithDb(db, syncRepository.createChange(userId, {
     revision: revisionRow.revision,
     entityType,
     entityId,
     changeType,
     payload: payload === undefined ? null : JSON.stringify(payload),
-  })
-  await auditEventsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, auditEventsRepository.create(userId, {
     eventType: `sync.${changeType}`,
     entityType,
     entityId,
     metadata: null,
-  })
+  }))
   return revisionRow.revision
 }
 
@@ -580,7 +539,7 @@ async function performMutation(
           ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
           : {}),
       }
-      const existing = await userSettingsRepository.get(db, userId)
+      const existing = await runWithDb(db, userSettingsRepository.get(userId))
       // Same contract as `update`: a stale `baseVersion` is a replay when the
       // server already holds the patch, and a conflict otherwise (ADR 0003 —
       // the client rebases over `currentVersion` instead of freezing the
@@ -608,10 +567,10 @@ async function performMutation(
         }
       }
       const row = existing
-        ? await userSettingsRepository.update(db, userId, settingsPatch, command.baseVersion)
-        : await userSettingsRepository.create(db, userId, settingsPatch)
+        ? await runWithDb(db, userSettingsRepository.update(userId, settingsPatch, command.baseVersion))
+        : await runWithDb(db, userSettingsRepository.create(userId, settingsPatch))
       if (existing && !row) {
-        const current = await userSettingsRepository.get(db, userId)
+        const current = await runWithDb(db, userSettingsRepository.get(userId))
         return current
           ? {
               status: 'conflict',
@@ -628,14 +587,11 @@ async function performMutation(
             }
       }
       const twrLiquidityAccounts = twrLiquidityAccountIds
-        ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
+        ? await runWithDb(db, accountsRepository.replaceTwrLiquidityAccounts(userId, twrLiquidityAccountIds))
         : undefined
       const cashMappings = stockeventsCashMappings
-        ? await stockeventsCashMappingsRepository.replaceMappings(
-            db,
-            userId,
-            stockeventsCashMappings,
-          )
+        ? await runWithDb(db, stockeventsCashMappingsRepository.replaceMappings(userId,
+            stockeventsCashMappings,))
         : undefined
       const revision = await recordChange(
         db,
@@ -879,35 +835,32 @@ async function reserveCommand(
   userId: string,
   command: SyncCommandInput,
 ): Promise<CommandOutcome | null> {
-  const existing = await syncRepository.getCommand(db, userId, command.commandId)
+  const existing = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
   if (existing) {
     if (!existing.result) {
       const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS).toISOString()
-      const claimed = await syncRepository.claimStaleCommand(
-        db,
-        userId,
+      const claimed = await runWithDb(db, syncRepository.claimStaleCommand(userId,
         command.commandId,
         existing.createdAt,
-        staleBefore,
-      )
+        staleBefore,))
       if (claimed) return null
     }
     return replayStoredCommand(command.commandId, existing)
   }
   try {
-    await syncRepository.createCommand(db, userId, {
+    await runWithDb(db, syncRepository.createCommand(userId, {
       id: command.commandId,
       commandType: command.action,
       payload: JSON.stringify(command),
       status: 'processing',
       result: null,
-    })
+    }))
     return null
   } catch (error) {
     if (!isUniqueConstraintError(error)) {
       throw error
     }
-    const raced = await syncRepository.getCommand(db, userId, command.commandId)
+    const raced = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
     if (!raced) {
       throw error
     }
@@ -933,13 +886,10 @@ export async function applyOneCommand(
   try {
     return await runInTransaction(db, async (tx) => {
       const outcome = await performMutation(tx, userId, command)
-      await syncRepository.finalizeCommand(
-        tx,
-        userId,
+      await runWithDb(tx, syncRepository.finalizeCommand(userId,
         command.commandId,
         outcome.status,
-        JSON.stringify(outcome),
-      )
+        JSON.stringify(outcome),))
       return { commandId: command.commandId, replayed: false, ...outcome }
     })
   } catch (error) {
@@ -952,13 +902,10 @@ export async function applyOneCommand(
       ...('entityType' in command ? { entityType: command.entityType } : {}),
       message: error.message,
     }
-    await syncRepository.finalizeCommand(
-      db,
-      userId,
+    await runWithDb(db, syncRepository.finalizeCommand(userId,
       command.commandId,
       outcome.status,
-      JSON.stringify(outcome),
-    )
+      JSON.stringify(outcome),))
     return { commandId: command.commandId, replayed: false, ...outcome }
   }
 }
@@ -990,6 +937,6 @@ export async function applySyncBatch(
       break
     }
   }
-  const revisionRow = await syncRepository.ensureRevision(db, userId)
+  const revisionRow = await runWithDb(db, syncRepository.ensureRevision(userId))
   return { results, revision: revisionRow.revision, halted }
 }

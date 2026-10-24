@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { useRecurringStore } from '../../../../src/stores/recurring'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { runWithDb } from '../../../../src/db/database'
 
 describe('round trip: recurring rules and pending movements', () => {
   let trip: RoundTrip | undefined
@@ -17,19 +18,19 @@ describe('round trip: recurring rules and pending movements', () => {
       const accounts = await import('../../../../src/db/repositories/accounts')
       const rules = await import('../../../../src/db/repositories/recurring-rules')
       const pending = await import('../../../../src/db/repositories/pending-movements')
-      const account = await accounts.create(db, userId, {
+      const account = await runWithDb(db, accounts.create(userId, {
         name: 'Cuenta',
         kind: 'cash',
         currency: 'EUR',
         openingBalance: 0,
         legacyId: 'old-account',
-      })
-      const category = await accounts.createCategory(db, userId, {
+      }))
+      const category = await runWithDb(db, accounts.createCategory(userId, {
         name: 'Cuotas',
         kind: 'expense',
         legacyId: 'expense:Cuotas',
-      })
-      const rule = await rules.create(db, userId, {
+      }))
+      const rule = await runWithDb(db, rules.create(userId, {
         name: 'Cuota',
         type: 'expense',
         accountId: account.id,
@@ -41,8 +42,8 @@ describe('round trip: recurring rules and pending movements', () => {
         lastExecutionDate: '2026-09-01',
         nextRunDate: '2026-10-01',
         legacyId: 'old-rule',
-      })
-      await pending.create(db, userId, {
+      }))
+      await runWithDb(db, pending.create(userId, {
         recurringRuleId: rule.id,
         accountId: account.id,
         categoryId: category.id,
@@ -52,7 +53,7 @@ describe('round trip: recurring rules and pending movements', () => {
         type: 'expense',
         description: 'Cuota',
         legacyId: 'old-pending',
-      })
+      }))
       // The app constructs the recurring store before sync.init hydrates its state.
       useRecurringStore()
     })

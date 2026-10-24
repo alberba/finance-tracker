@@ -2,6 +2,7 @@ import * as accountsRepository from '../../db/repositories/accounts'
 import * as userSettingsRepository from '../../db/repositories/user-settings'
 import * as syncRepository from '../../db/repositories/sync'
 import type { Db } from '../../db/repositories/shared'
+import { runWithDb } from '../../db/database'
 
 export const INITIAL_CATEGORIES: Array<{ name: string; kind: string; sortOrder: number }> = [
   { name: 'Nómina', kind: 'income', sortOrder: 0 },
@@ -18,11 +19,11 @@ export const INITIAL_CATEGORIES: Array<{ name: string; kind: string; sortOrder: 
 
 /** Only for newly created financial users. The caller owns the transaction. */
 export async function initializeNewUser(db: Db, userId: string): Promise<void> {
-  if (await userSettingsRepository.get(db, userId)) return
-  const categories = await accountsRepository.listCategoriesByUser(db, userId)
-  await userSettingsRepository.create(db, userId)
+  if (await runWithDb(db, userSettingsRepository.get(userId))) return
+  const categories = await runWithDb(db, accountsRepository.listCategoriesByUser(userId))
+  await runWithDb(db, userSettingsRepository.create(userId))
   if (categories.length === 0) {
-    await accountsRepository.bulkInsertCategories(db, userId, INITIAL_CATEGORIES)
+    await runWithDb(db, accountsRepository.bulkInsertCategories(userId, INITIAL_CATEGORIES))
   }
-  await syncRepository.ensureRevision(db, userId)
+  await runWithDb(db, syncRepository.ensureRevision(userId))
 }

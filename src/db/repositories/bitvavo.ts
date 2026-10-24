@@ -20,16 +20,17 @@ import {
 } from './shared'
 import * as transactionRepository from './transactions'
 import * as market from './market'
+import { lift, runWithDb } from '../database'
 import type { BitvavoPreview, RemoteOperation } from '../../lib/bitvavo-types'
 
-export async function getConnection(db: Db, userId: string) {
+async function getConnectionSql(db: Db, userId: string) {
   const [row] = await db
     .select()
     .from(bitvavoConnections)
     .where(eq(bitvavoConnections.userId, userId))
   return row
 }
-export async function ensureConnection(
+async function ensureConnectionSql(
   db: Db,
   userId: string,
   input: { accountId: string; startDate: string; timeZone: string },
@@ -39,14 +40,14 @@ export async function ensureConnection(
     .values({ userId, ...input })
     .onConflictDoNothing()
 }
-export async function saveConnection(
+async function saveConnectionSql(
   db: Db,
   userId: string,
   input: { accountId: string; startDate: string; timeZone: string },
   envelope: EncryptedEnvelope,
   token: string,
 ) {
-  const existing = await getConnection(db, userId)
+  const existing = await getConnectionSql(db, userId)
   if (existing?.lockToken !== token)
     throw new RejectedCommandError('La reserva de Bitvavo ha caducado.')
   await assertOwnedReferences(db, userId, { accountId: input.accountId })
@@ -68,7 +69,7 @@ export async function saveConnection(
       }),
   ])
 }
-export async function acquire(db: Db, userId: string, token: string) {
+async function acquireSql(db: Db, userId: string, token: string) {
   const rows = await db
     .update(bitvavoConnections)
     .set({ lockToken: token, lockUntil: Date.now() + 600000 })
@@ -81,7 +82,7 @@ export async function acquire(db: Db, userId: string, token: string) {
     .returning()
   if (!rows.length) throw new RejectedCommandError('Ya hay una importación Bitvavo en curso.')
 }
-export async function renew(db: Db, userId: string, token: string) {
+async function renewSql(db: Db, userId: string, token: string) {
   const rows = await db
     .update(bitvavoConnections)
     .set({ lockUntil: Date.now() + 600000 })
@@ -90,36 +91,31 @@ export async function renew(db: Db, userId: string, token: string) {
   if (!rows.length)
     throw new RejectedCommandError('La reserva de Bitvavo ha caducado. Reintenta la importación.')
 }
-export async function release(db: Db, userId: string, token: string) {
+async function releaseSql(db: Db, userId: string, token: string) {
   await db
     .update(bitvavoConnections)
     .set({ lockToken: null, lockUntil: 0 })
     .where(and(eq(bitvavoConnections.userId, userId), eq(bitvavoConnections.lockToken, token)))
 }
-export async function savePreview(db: Db, userId: string, preview: BitvavoPreview) {
+async function savePreviewSql(db: Db, userId: string, preview: BitvavoPreview) {
   await db
     .insert(bitvavoPreviews)
     .values({ id: preview.id, userId, preview, createdAt: Date.now() })
 }
-export async function getPreview(db: Db, userId: string, id: string) {
+async function getPreviewSql(db: Db, userId: string, id: string) {
   const [row] = await db
     .select()
     .from(bitvavoPreviews)
     .where(and(eq(bitvavoPreviews.userId, userId), eq(bitvavoPreviews.id, id)))
   return row
 }
-export async function reservePreview(db: Db, userId: string, id: string, resolutions: string) {
+async function reservePreviewSql(db: Db, userId: string, id: string, resolutions: string) {
   await db
     .update(bitvavoPreviews)
     .set({ status: 'processing', resolutions })
     .where(and(eq(bitvavoPreviews.userId, userId), eq(bitvavoPreviews.id, id)))
 }
-export async function finishPreview(
-  db: Db,
-  userId: string,
-  preview: BitvavoPreview,
-  token: string,
-) {
+async function finishPreviewSql(db: Db, userId: string, preview: BitvavoPreview, token: string) {
   await atomic(db, [
     db
       .update(bitvavoConnections)
@@ -148,20 +144,17 @@ async function atomic(
   }
 }
 
-export async function listInstruments(db: Db, userId: string) {
-  const links = await market.listUserInstrumentsByUser(db, userId)
-  return market.listInstrumentsByIds(
-    db,
-    links.map((link) => link.instrumentId),
-  )
+async function listInstrumentsSql(db: Db, userId: string) {
+  const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
+  return runWithDb(db, market.listInstrumentsByIds(links.map((link) => link.instrumentId)))
 }
 
-export async function matchingInstruments(db: Db, userId: string, symbol: string) {
-  const instruments = await listInstruments(db, userId)
+async function matchingInstrumentsSql(db: Db, userId: string, symbol: string) {
+  const instruments = await listInstrumentsSql(db, userId)
   return instruments.filter((instrument) => instrument.normalizedSymbol === symbol)
 }
 
-export async function importOperation(
+async function importOperationSql(
   db: Db,
   userId: string,
   accountId: string,
@@ -175,11 +168,11 @@ export async function importOperation(
     .where(and(eq(transactions.userId, userId), eq(transactions.externalId, operation.externalId)))
   if (imported) return false
   const existing = transactionId
-    ? await transactionRepository.get(db, userId, transactionId)
+    ? await runWithDb(db, transactionRepository.get(userId, transactionId))
     : undefined
   if (transactionId && (!existing || existing.remoteOperation))
     throw new RejectedCommandError('El movimiento manual ya no está disponible.')
-  const matches = await matchingInstruments(db, userId, operation.symbol)
+  const matches = await matchingInstrumentsSql(db, userId, operation.symbol)
   const instrumentId = matches.length === 1 ? matches[0].id : null
   const id = existing?.id ?? `bitvavo:${userId}:${operation.externalId}`
   const amountMinor =
@@ -255,19 +248,22 @@ export async function importOperation(
   return true
 }
 
-export async function linkInstrument(
+async function linkInstrumentSql(
   db: Db,
   userId: string,
   transactionId: string,
   instrumentId: string,
 ) {
-  const movement = await transactionRepository.get(db, userId, transactionId)
+  const movement = await runWithDb(db, transactionRepository.get(userId, transactionId))
   if (!movement?.remoteOperation)
     throw new RejectedCommandError('Movimiento Bitvavo no encontrado.')
-  const links = await market.listUserInstrumentsByUser(db, userId)
+  const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
   if (!links.some((link) => link.instrumentId === instrumentId))
     throw new RejectedCommandError('Instrumento no disponible para este usuario.')
-  const detail = await transactionRepository.getTradeDetailByTransaction(db, userId, transactionId)
+  const detail = await runWithDb(
+    db,
+    transactionRepository.getTradeDetailByTransaction(userId, transactionId),
+  )
   if (!detail) throw new RejectedCommandError('Operación ausente.')
   const now = nowIso()
   await atomic(db, [
@@ -324,3 +320,18 @@ function transactionSyncStatements(
     }),
   ]
 }
+
+export const getConnection = lift(getConnectionSql)
+export const ensureConnection = lift(ensureConnectionSql)
+export const saveConnection = lift(saveConnectionSql)
+export const acquire = lift(acquireSql)
+export const renew = lift(renewSql)
+export const release = lift(releaseSql)
+export const savePreview = lift(savePreviewSql)
+export const getPreview = lift(getPreviewSql)
+export const reservePreview = lift(reservePreviewSql)
+export const finishPreview = lift(finishPreviewSql)
+export const listInstruments = lift(listInstrumentsSql)
+export const matchingInstruments = lift(matchingInstrumentsSql)
+export const importOperation = lift(importOperationSql)
+export const linkInstrument = lift(linkInstrumentSql)

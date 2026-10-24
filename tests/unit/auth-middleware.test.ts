@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 import type { AuthPrincipal } from '../../src/lib/server/auth/principal'
 
 const { getDb, createAuthentication, authenticatedPrincipal, resolvePrincipal } = vi.hoisted(
@@ -62,7 +63,7 @@ function setSession(user?: { id: string; emailVerified: boolean }, cookies: stri
 beforeEach(() => {
   vi.clearAllMocks()
   getDb.mockReturnValue({})
-  authenticatedPrincipal.mockResolvedValue(authenticated)
+  authenticatedPrincipal.mockReturnValue(Effect.succeed(authenticated))
   resolvePrincipal.mockResolvedValue({
     userId: 'test-user',
     email: 'tester@example.test',

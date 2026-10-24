@@ -31,6 +31,7 @@ import { listChangesSince } from '../../../../src/db/repositories/sync'
 import type { State } from '../../../../src/scripts/types'
 import { createTestDb, type TestDatabase } from '../setup'
 import type { Db } from '../../../../src/db/client'
+import { runWithDb } from '../../../../src/db/database'
 
 /**
  * The test database is better-sqlite3-backed, so it lacks D1's `batch`. No
@@ -121,7 +122,7 @@ export async function startRoundTrip(
       }
       if (url.startsWith('/api/changes')) {
         const since = Number(new URL(url, 'https://test.local').searchParams.get('since') ?? 0)
-        const changes = await listChangesSince(asServerDb(testDb.db), user.id, since)
+        const changes = await runWithDb(asServerDb(testDb.db), listChangesSince(user.id, since))
         return json({ revision: changes.at(-1)?.revision ?? since, changes })
       }
       if (url === '/api/sync') {

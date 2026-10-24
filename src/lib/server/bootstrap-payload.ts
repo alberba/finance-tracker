@@ -16,6 +16,7 @@ import * as recurringRulesRepository from '../../db/repositories/recurring-rules
 import * as pendingMovementsRepository from '../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../db/repositories/budget-entries'
 import * as goalsRepository from '../../db/repositories/goals'
+import { runWithDb } from '../../db/database'
 import * as wealthRepository from '../../db/repositories/wealth'
 import * as contributionsRepository from '../../db/repositories/contributions'
 import * as marketRepository from '../../db/repositories/market'
@@ -44,23 +45,23 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     stockeventsCashSyncEntries,
     revisionRow,
   ] = await Promise.all([
-    userSettingsRepository.get(db, userId),
-    accountsRepository.listByUser(db, userId),
-    accountsRepository.listCategoriesByUser(db, userId),
-    transactionsRepository.listByUser(db, userId),
-    subscriptionsRepository.listByUser(db, userId),
-    recurringRulesRepository.listByUser(db, userId),
-    pendingMovementsRepository.listByUser(db, userId),
-    budgetEntriesRepository.listByUser(db, userId),
-    goalsRepository.listByUser(db, userId),
-    wealthRepository.listByUser(db, userId),
-    contributionsRepository.listByUser(db, userId),
-    marketRepository.listUserInstrumentsByUser(db, userId),
-    accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
-    stockeventsSymbolMappingsRepository.listByUser(db, userId),
-    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-    stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
-    syncRepository.getRevision(db, userId),
+    runWithDb(db, userSettingsRepository.get(userId)),
+    runWithDb(db, accountsRepository.listByUser(userId)),
+    runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
+    runWithDb(db, transactionsRepository.listByUser(userId)),
+    runWithDb(db, subscriptionsRepository.listByUser(userId)),
+    runWithDb(db, recurringRulesRepository.listByUser(userId)),
+    runWithDb(db, pendingMovementsRepository.listByUser(userId)),
+    runWithDb(db, budgetEntriesRepository.listByUser(userId)),
+    runWithDb(db, goalsRepository.listByUser(userId)),
+    runWithDb(db, wealthRepository.listByUser(userId)),
+    runWithDb(db, contributionsRepository.listByUser(userId)),
+    runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
+    runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
+    runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
+    runWithDb(db, syncRepository.getRevision(userId)),
   ])
 
   const filteredTransactions =
@@ -74,21 +75,12 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
 
   const [balancesBySnapshot, allocationsByContribution, tradeDetailsByTransaction] =
     await Promise.all([
-      wealthRepository.listBalancesBySnapshots(
-        db,
-        userId,
-        filteredWealthSnapshots.map((snapshot) => snapshot.id),
-      ),
-      contributionsRepository.listAllocationsByContributions(
-        db,
-        userId,
-        contributions.map((contribution) => contribution.id),
-      ),
-      transactionsRepository.listTradeDetailsByTransactions(
-        db,
-        userId,
-        filteredTransactions.map((transaction) => transaction.id),
-      ),
+      runWithDb(db, wealthRepository.listBalancesBySnapshots(userId,
+        filteredWealthSnapshots.map((snapshot) => snapshot.id),)),
+      runWithDb(db, contributionsRepository.listAllocationsByContributions(userId,
+        contributions.map((contribution) => contribution.id),)),
+      runWithDb(db, transactionsRepository.listTradeDetailsByTransactions(userId,
+        filteredTransactions.map((transaction) => transaction.id),)),
     ])
 
   const wealthSnapshotsWithBalances = filteredWealthSnapshots.map((snapshot) => ({
@@ -108,8 +100,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
 
   const instrumentIds = userInstruments.map((userInstrument) => userInstrument.instrumentId)
   const [instrumentRows, quotesByInstrument] = await Promise.all([
-    marketRepository.listInstrumentsByIds(db, instrumentIds),
-    marketRepository.listQuotesByInstruments(db, instrumentIds),
+    runWithDb(db, marketRepository.listInstrumentsByIds(instrumentIds)),
+    runWithDb(db, marketRepository.listQuotesByInstruments(instrumentIds)),
   ])
   const instrumentsById = new Map(instrumentRows.map((instrument) => [instrument.id, instrument]))
   const instruments = userInstruments

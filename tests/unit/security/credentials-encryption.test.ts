@@ -9,6 +9,7 @@ import {
 import * as integrationCredentialsRepo from "../../../src/db/repositories/integration-credentials";
 import { createTestDb } from "../../integration/d1-v2/setup";
 import { seedUser } from "../../integration/d1-v2/repositories/fixtures";
+import { runWithDb } from '../../../src/db/database'
 
 const KEY_V1 = "jczGrUcJ9753I5noa+t5lM2U28P2WYQsgwABKiOwguQ=";
 const KEY_V2 = "JX8Y+UGqW+nn5hY5k1N3Cw+Dw9MInwL6F1fDbkTVRIw=";
@@ -117,12 +118,9 @@ describe("integration-credentials repository ciphertext at rest (WP12)", () => {
     const { db, sqlite, close } = createTestDb();
     try {
       const user = await seedUser(db);
-      const created = await integrationCredentialsRepo.create(
-        db,
-        user.id,
+      const created = await runWithDb(db, integrationCredentialsRepo.create(user.id,
         { provider: "stockevents", secret: PLAINTEXT },
-        env,
-      );
+        env,));
 
       const raw = sqlite
         .prepare("SELECT ciphertext, key_version FROM integration_credentials WHERE id = ?")
@@ -133,12 +131,9 @@ describe("integration-credentials repository ciphertext at rest (WP12)", () => {
       expect(raw.key_version).toBe(1);
 
       // Decrypted read path returns the original plaintext.
-      const fetched = await integrationCredentialsRepo.getByProvider(
-        db,
-        user.id,
+      const fetched = await runWithDb(db, integrationCredentialsRepo.getByProvider(user.id,
         "stockevents",
-        env,
-      );
+        env,));
       expect(fetched?.secret).toBe(PLAINTEXT);
     } finally {
       close();
@@ -149,25 +144,19 @@ describe("integration-credentials repository ciphertext at rest (WP12)", () => {
     const { db, sqlite, close } = createTestDb();
     try {
       const user = await seedUser(db);
-      const created = await integrationCredentialsRepo.create(
-        db,
-        user.id,
+      const created = await runWithDb(db, integrationCredentialsRepo.create(user.id,
         { provider: "stockevents", secret: PLAINTEXT },
-        env,
-      );
+        env,));
       const firstCiphertext = (
         sqlite
           .prepare("SELECT ciphertext FROM integration_credentials WHERE id = ?")
           .get(created.id) as { ciphertext: string }
       ).ciphertext;
 
-      const updated = await integrationCredentialsRepo.update(
-        db,
-        user.id,
+      const updated = await runWithDb(db, integrationCredentialsRepo.update(user.id,
         created.id,
         { secret: "rotated-secret" },
-        env,
-      );
+        env,));
       expect(updated?.secret).toBe("rotated-secret");
 
       const secondCiphertext = (

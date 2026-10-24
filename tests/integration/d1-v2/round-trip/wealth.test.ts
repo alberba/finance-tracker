@@ -7,6 +7,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: patrimonio", () => {
   let trip: RoundTrip;
@@ -72,34 +73,34 @@ describe("round trip: patrimonio", () => {
   it("reads the snapshot of the state's year, not another year's, for the same month (§4.6)", async () => {
     const accountsRepository = await import("../../../../src/db/repositories/accounts");
     const wealthRepository = await import("../../../../src/db/repositories/wealth");
-    const [account] = await accountsRepository.listByUser(trip.testDb.db, trip.userId);
+    const [account] = await runWithDb(trip.testDb.db, accountsRepository.listByUser(trip.userId));
     if (!account) throw new Error("missing account fixture");
 
     // The previous year's row is written *after* this year's, so a projection
     // that drops the year and keys by month alone would let it win the slot.
     const year = new Date().getFullYear();
-    const currentYear = await wealthRepository.create(trip.testDb.db, trip.userId, {
+    const currentYear = await runWithDb(trip.testDb.db, wealthRepository.create(trip.userId, {
       snapshotDate: `${year}-03-01`,
       year,
       month: 3,
-    });
-    await wealthRepository.createBalance(trip.testDb.db, trip.userId, {
+    }));
+    await runWithDb(trip.testDb.db, wealthRepository.createBalance(trip.userId, {
       snapshotId: currentYear.id,
       accountId: account.id,
       balance: 2000,
       currency: "EUR",
-    });
-    const previousYear = await wealthRepository.create(trip.testDb.db, trip.userId, {
+    }));
+    const previousYear = await runWithDb(trip.testDb.db, wealthRepository.create(trip.userId, {
       snapshotDate: `${year - 1}-03-01`,
       year: year - 1,
       month: 3,
-    });
-    await wealthRepository.createBalance(trip.testDb.db, trip.userId, {
+    }));
+    await runWithDb(trip.testDb.db, wealthRepository.createBalance(trip.userId, {
       snapshotId: previousYear.id,
       accountId: account.id,
       balance: 1000,
       currency: "EUR",
-    });
+    }));
 
     const reloaded = await trip.reload();
 
@@ -128,7 +129,7 @@ describe("round trip: patrimonio", () => {
     await trip.reload();
 
     const wealthRepository = await import("../../../../src/db/repositories/wealth");
-    const snapshots = await wealthRepository.listByUser(trip.testDb.db, trip.userId);
+    const snapshots = await runWithDb(trip.testDb.db, wealthRepository.listByUser(trip.userId));
     expect(snapshots.map((snapshot) => snapshot.year).sort()).toEqual([2025, 2026]);
   });
 });

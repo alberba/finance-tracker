@@ -14,6 +14,7 @@ import * as recurringRulesRepository from '../../db/repositories/recurring-rules
 import * as pendingMovementsRepository from '../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../db/repositories/budget-entries'
 import * as goalsRepository from '../../db/repositories/goals'
+import { runWithDb } from '../../db/database'
 import * as wealthRepository from '../../db/repositories/wealth'
 import * as contributionsRepository from '../../db/repositories/contributions'
 import * as marketRepository from '../../db/repositories/market'
@@ -40,81 +41,78 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     categories,
     accounts,
   ] = await Promise.all([
-    contributionsRepository.listByUser(db, userId),
-    wealthRepository.listByUser(db, userId),
-    marketRepository.listUserInstrumentsByUser(db, userId),
-    stockeventsSymbolMappingsRepository.listByUser(db, userId),
-    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-    stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
-    pendingMovementsRepository.listByUser(db, userId),
-    recurringRulesRepository.listByUser(db, userId),
-    subscriptionsRepository.listByUser(db, userId),
-    budgetEntriesRepository.listByUser(db, userId),
-    goalsRepository.listByUser(db, userId),
-    transactionsRepository.listByUser(db, userId),
-    accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
-    accountsRepository.listCategoriesByUser(db, userId),
-    accountsRepository.listByUser(db, userId),
+    runWithDb(db, contributionsRepository.listByUser(userId)),
+    runWithDb(db, wealthRepository.listByUser(userId)),
+    runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
+    runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
+    runWithDb(db, pendingMovementsRepository.listByUser(userId)),
+    runWithDb(db, recurringRulesRepository.listByUser(userId)),
+    runWithDb(db, subscriptionsRepository.listByUser(userId)),
+    runWithDb(db, budgetEntriesRepository.listByUser(userId)),
+    runWithDb(db, goalsRepository.listByUser(userId)),
+    runWithDb(db, transactionsRepository.listByUser(userId)),
+    runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
+    runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
+    runWithDb(db, accountsRepository.listByUser(userId)),
   ])
 
   for (const contribution of contributions) {
-    const allocations = await contributionsRepository.listAllocationsByContribution(
-      db,
-      userId,
-      contribution.id,
-    )
+    const allocations = await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId,
+      contribution.id,))
     for (const allocation of allocations) {
-      await contributionsRepository.removeAllocation(db, userId, allocation.id)
+      await runWithDb(db, contributionsRepository.removeAllocation(userId, allocation.id))
     }
-    await contributionsRepository.remove(db, userId, contribution.id)
+    await runWithDb(db, contributionsRepository.remove(userId, contribution.id))
   }
   for (const snapshot of wealthSnapshots) {
-    const balances = await wealthRepository.listBalancesBySnapshot(db, userId, snapshot.id)
+    const balances = await runWithDb(db, wealthRepository.listBalancesBySnapshot(userId, snapshot.id))
     for (const balance of balances) {
-      await wealthRepository.removeBalance(db, userId, balance.id)
+      await runWithDb(db, wealthRepository.removeBalance(userId, balance.id))
     }
-    await wealthRepository.remove(db, userId, snapshot.id)
+    await runWithDb(db, wealthRepository.remove(userId, snapshot.id))
   }
   for (const userInstrument of userInstruments) {
-    await marketRepository.removeUserInstrument(db, userId, userInstrument.id)
+    await runWithDb(db, marketRepository.removeUserInstrument(userId, userInstrument.id))
   }
   for (const mapping of stockeventsSymbolMappings) {
-    await stockeventsSymbolMappingsRepository.remove(db, userId, mapping.id)
+    await runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, mapping.id))
   }
   for (const mapping of stockeventsCashMappings) {
-    await stockeventsCashMappingsRepository.removeMapping(db, userId, mapping.id)
+    await runWithDb(db, stockeventsCashMappingsRepository.removeMapping(userId, mapping.id))
   }
   for (const entry of stockeventsCashSyncEntries) {
-    await stockeventsCashMappingsRepository.removeSyncEntry(db, userId, entry.id)
+    await runWithDb(db, stockeventsCashMappingsRepository.removeSyncEntry(userId, entry.id))
   }
   for (const pendingMovement of pendingMovements) {
-    await pendingMovementsRepository.remove(db, userId, pendingMovement.id)
+    await runWithDb(db, pendingMovementsRepository.remove(userId, pendingMovement.id))
   }
   for (const rule of recurringRules) {
-    await recurringRulesRepository.remove(db, userId, rule.id)
+    await runWithDb(db, recurringRulesRepository.remove(userId, rule.id))
   }
   for (const subscription of subscriptions) {
-    await subscriptionsRepository.remove(db, userId, subscription.id)
+    await runWithDb(db, subscriptionsRepository.remove(userId, subscription.id))
   }
   for (const entry of budgetEntries) {
-    await budgetEntriesRepository.remove(db, userId, entry.id)
+    await runWithDb(db, budgetEntriesRepository.remove(userId, entry.id))
   }
   for (const goal of goals) {
-    await goalsRepository.remove(db, userId, goal.id)
+    await runWithDb(db, goalsRepository.remove(userId, goal.id))
   }
   for (const transaction of transactions) {
-    await transactionsRepository.remove(db, userId, transaction.id)
+    await runWithDb(db, transactionsRepository.remove(userId, transaction.id))
   }
   for (const twrAccount of twrLiquidityAccounts) {
-    await accountsRepository.removeTwrLiquidityAccount(db, userId, twrAccount.id)
+    await runWithDb(db, accountsRepository.removeTwrLiquidityAccount(userId, twrAccount.id))
   }
   for (const account of accounts) {
-    await accountsRepository.remove(db, userId, account.id)
+    await runWithDb(db, accountsRepository.remove(userId, account.id))
   }
   for (const category of categories) {
-    await accountsRepository.removeCategory(db, userId, category.id)
+    await runWithDb(db, accountsRepository.removeCategory(userId, category.id))
   }
 
-  await userSettingsRepository.remove(db, userId)
+  await runWithDb(db, userSettingsRepository.remove(userId))
   // Keep the cursor monotonic: clients must accept the restored dataset as newer.
 }

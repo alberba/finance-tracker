@@ -7,6 +7,7 @@ import * as recurringRulesRepository from '../../../../src/db/repositories/recur
 import * as pendingMovementsRepository from '../../../../src/db/repositories/pending-movements'
 import * as subscriptionsRepository from '../../../../src/db/repositories/subscriptions'
 import * as budgetEntriesRepository from '../../../../src/db/repositories/budget-entries'
+import { runWithDb } from '../../../../src/db/database'
 import * as goalsRepository from '../../../../src/db/repositories/goals'
 import * as wealthRepository from '../../../../src/db/repositories/wealth'
 import * as contributionsRepository from '../../../../src/db/repositories/contributions'
@@ -59,30 +60,30 @@ function comparable(exported: Row): Row {
 
 /** One row in every collection the export carries, with the optional fields filled in. */
 async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<void> {
-  const account = await accountsRepository.create(db, userId, {
+  const account = await runWithDb(db, accountsRepository.create(userId, {
     name: 'Broker',
     kind: 'investment',
     currency: 'EUR',
     openingBalance: 100,
     isArchived: true,
-  })
-  const category = await accountsRepository.createCategory(db, userId, {
+  }))
+  const category = await runWithDb(db, accountsRepository.createCategory(userId, {
     name: 'Ocio',
     kind: 'expense',
     sortOrder: 3,
     emoji: '🎬',
-  })
-  await accountsRepository.createTwrLiquidityAccount(db, userId, {
+  }))
+  await runWithDb(db, accountsRepository.createTwrLiquidityAccount(userId, {
     accountId: account.id,
     name: 'Liquidez',
-  })
-  const instrument = await marketRepository.createInstrument(db, {
+  }))
+  const instrument = await runWithDb(db, marketRepository.createInstrument({
     symbol: 'VWCE',
     normalizedSymbol: 'VWCE',
     provider: 'test',
     currency: 'EUR',
-  })
-  await marketRepository.createUserInstrument(db, userId, {
+  }))
+  await runWithDb(db, marketRepository.createUserInstrument(userId, {
     instrumentId: instrument.id,
     categoryId: category.id,
     alias: account.id,
@@ -99,8 +100,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       holdingsAsOf: '2026-04-01',
       holdingsUpdatedAt: '2026-04-01T10:00:00Z',
     },
-  })
-  await transactionsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, transactionsRepository.create(userId, {
     legacyId: 'tx-1',
     accountId: account.id,
     categoryId: category.id,
@@ -133,8 +134,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       quantity: '2.5',
       unitPrice: '100',
     } as never,
-  })
-  await subscriptionsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, subscriptionsRepository.create(userId, {
     name: 'Cine',
     accountId: account.id,
     categoryId: category.id,
@@ -144,8 +145,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     nextChargeDate: '2026-04-01',
     frequency: 'monthly',
     isActive: false,
-  })
-  const rule = await recurringRulesRepository.create(db, userId, {
+  }))
+  const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
     name: 'Aporte mensual',
     type: 'investment',
     accountId: account.id,
@@ -165,8 +166,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     fee: 1,
     time: '10:00',
     status: 'paused',
-  })
-  await pendingMovementsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, pendingMovementsRepository.create(userId, {
     recurringRuleId: rule.id,
     accountId: account.id,
     categoryId: category.id,
@@ -183,65 +184,65 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     time: '10:00',
     transactionId: 'tx-1',
     status: 'confirmed',
-  })
-  await budgetEntriesRepository.create(db, userId, {
+  }))
+  await runWithDb(db, budgetEntriesRepository.create(userId, {
     categoryId: category.id,
     year: 2026,
     month: 4,
     amount: 50,
     currency: 'EUR',
-  })
-  await goalsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, goalsRepository.create(userId, {
     key: 'fire',
     name: 'Independencia',
     targetYear: 2040,
     targetAmount: 500000,
     currency: 'EUR',
-  })
-  const snapshot = await wealthRepository.create(db, userId, {
+  }))
+  const snapshot = await runWithDb(db, wealthRepository.create(userId, {
     snapshotDate: '2026-03-31',
     year: 2026,
     month: 3,
-  })
-  await wealthRepository.createBalance(db, userId, {
+  }))
+  await runWithDb(db, wealthRepository.createBalance(userId, {
     snapshotId: snapshot.id,
     accountId: account.id,
     balance: 1234.56,
     currency: 'EUR',
-  })
-  const contribution = await contributionsRepository.create(db, userId, {
+  }))
+  const contribution = await runWithDb(db, contributionsRepository.create(userId, {
     date: '2026-03-10',
     amount: 300,
     currency: 'EUR',
     portfolioDate: '2026-03-09',
     portfolioValue: 10000,
     flow: 300,
-  })
-  await contributionsRepository.createAllocation(db, userId, {
+  }))
+  await runWithDb(db, contributionsRepository.createAllocation(userId, {
     contributionId: contribution.id,
     accountId: account.id,
     amount: 300,
     currency: 'EUR',
-  })
-  await stockeventsSymbolMappingsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
     categoryId: category.id,
     stockeventsSymbol: 'VWCE.DE',
     sync: true,
     watchlistId: 'wl-1',
     hidden: true,
-  })
-  await stockeventsCashMappingsRepository.upsertMapping(db, userId, {
+  }))
+  await runWithDb(db, stockeventsCashMappingsRepository.upsertMapping(userId, {
     accountId: account.id,
     watchlistId: 'wl-1',
-  })
-  await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+  }))
+  await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
     contributionDate: '2026-03-10',
     accountId: account.id,
     watchlistId: 'wl-1',
     syncedAmount: 300,
     currency: 'EUR',
-  })
-  await userSettingsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, userSettingsRepository.create(userId, {
     onboardingPresented: true,
     onboardingDismissed: true,
     onboardingAccountCompleted: true,
@@ -252,7 +253,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     theme: 'dark',
     stockeventsEnabled: true,
     stockeventsTradesToCash: false,
-  })
+  }))
 }
 
 function postJson(url: string, body: unknown): Request {
@@ -291,12 +292,9 @@ describe('GET /api/data/export + POST /api/data/import', () => {
 
   it('never includes integration_credentials, even when the user has one configured', async () => {
     const testEnv = { DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }
-    await integrationCredentialsRepository.create(
-      testDb.db,
-      principal.userId,
+    await runWithDb(testDb.db, integrationCredentialsRepository.create(principal.userId,
       { provider: 'stockevents', secret: 'super-secret-plaintext-key' },
-      testEnv,
-    )
+      testEnv,))
 
     const { GET } = await import('../../../../src/pages/api/data/export')
     const response = await GET({ locals: { principal } } as never)
@@ -307,19 +305,19 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   })
 
   it('round-trips accounts/transactions through export → import with FK ids remapped', async () => {
-    const account = await accountsRepository.create(testDb.db, principal.userId, {
+    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: 'Cuenta origen',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 10,
-    })
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    }))
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: 'expense',
       date: '2024-01-01',
       amount: -5,
       currency: 'EUR',
-    })
+    }))
 
     const { GET: exportGET } = await import('../../../../src/pages/api/data/export')
     const exportResponse = await exportGET({ locals: { principal } } as never)
@@ -349,11 +347,11 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(importBody.imported.transactions).toBe(1)
     expect(importBody.skipped.transactions ?? 0).toBe(0)
 
-    const importedAccounts = await accountsRepository.listByUser(testDb.db, otherUser.id)
+    const importedAccounts = await runWithDb(testDb.db, accountsRepository.listByUser(otherUser.id))
     expect(importedAccounts).toHaveLength(1)
     expect(importedAccounts[0].id).not.toBe(account.id)
 
-    const importedTransactions = await transactionsRepository.listByUser(testDb.db, otherUser.id)
+    const importedTransactions = await runWithDb(testDb.db, transactionsRepository.listByUser(otherUser.id))
     expect(importedTransactions).toHaveLength(1)
     expect(importedTransactions[0].accountId).toBe(importedAccounts[0].id)
     expect(importedTransactions[0].amount).toBe(-5)
@@ -362,8 +360,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   it.each(['append', 'replace'])(
     'advances the sync cursor and requests a full refresh after %s import',
     async (mode) => {
-      await syncRepository.ensureRevision(testDb.db, principal.userId)
-      for (let i = 0; i < 3; i++) await syncRepository.bumpRevision(testDb.db, principal.userId)
+      await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
+      for (let i = 0; i < 3; i++) await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -372,10 +370,10 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await syncRepository.getRevision(testDb.db, principal.userId)).toMatchObject({
+      expect(await runWithDb(testDb.db, syncRepository.getRevision(principal.userId))).toMatchObject({
         revision: 4,
       })
-      expect(await syncRepository.listChangesSince(testDb.db, principal.userId, 3)).toMatchObject([
+      expect(await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 3))).toMatchObject([
         { revision: 4, entityType: 'reset' },
       ])
     },
@@ -384,13 +382,13 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   it.each(['append', 'replace'])(
     'preserves receiving user onboarding during %s import',
     async (mode) => {
-      await userSettingsRepository.create(testDb.db, principal.userId, {
+      await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
         onboardingPresented: true,
         onboardingDismissed: false,
         onboardingAccountCompleted: true,
         onboardingMovementCompleted: true,
         onboardingCompleted: true,
-      })
+      }))
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -408,7 +406,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await userSettingsRepository.get(testDb.db, principal.userId)).toMatchObject({
+      expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toMatchObject({
         currency: 'USD',
         onboardingPresented: 1,
         onboardingDismissed: 0,
@@ -420,7 +418,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   )
 
   it('preserves completed onboarding when replacement has no settings', async () => {
-    await userSettingsRepository.create(testDb.db, principal.userId, { onboardingCompleted: true })
+    await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, { onboardingCompleted: true }))
     const { POST } = await import('../../../../src/pages/api/data/import')
     const url = new URL('https://example.test/api/data/import?mode=replace')
     const response = await POST({
@@ -430,7 +428,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     } as never)
     expect(response.status).toBe(200)
     expect(
-      (await userSettingsRepository.get(testDb.db, principal.userId))?.onboardingCompleted,
+      (await runWithDb(testDb.db, userSettingsRepository.get(principal.userId)))?.onboardingCompleted,
     ).toBe(1)
   })
 
@@ -443,19 +441,19 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     // The target already has data of its own, which the restore must remove.
     const target = await seedUser(testDb.db, 'restore-target@example.com')
     const targetPrincipal: AuthPrincipal = { ...principal, userId: target.id, email: target.email }
-    const stale = await accountsRepository.create(testDb.db, target.id, {
+    const stale = await runWithDb(testDb.db, accountsRepository.create(target.id, {
       name: 'Cuenta vieja',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 0,
-    })
-    await transactionsRepository.create(testDb.db, target.id, {
+    }))
+    await runWithDb(testDb.db, transactionsRepository.create(target.id, {
       accountId: stale.id,
       type: 'expense',
       date: '2025-01-01',
       amount: -1,
       currency: 'EUR',
-    })
+    }))
 
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
     const importResponse = await importPOST({
@@ -474,12 +472,12 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   })
 
   it('without ?mode=replace the import adds to the existing rows', async () => {
-    await accountsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: 'Existente',
       kind: 'cash',
       currency: 'EUR',
       openingBalance: 0,
-    })
+    }))
     const { POST: importPOST } = await import('../../../../src/pages/api/data/import')
     const response = await importPOST({
       request: postJson('https://example.test/api/data/import', {
@@ -489,6 +487,6 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       url: new URL('https://example.test/api/data/import'),
     } as never)
     expect(response.status).toBe(200)
-    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(2)
+    expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toHaveLength(2)
   })
 })

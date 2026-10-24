@@ -5,6 +5,7 @@ import * as transactionsRepository from "../../../../src/db/repositories/transac
 import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedCategory, seedUser } from "../repositories/fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("sync commands that can never succeed are rejected, not retried (audit §2)", () => {
   let testDb: TestDatabase;
@@ -22,7 +23,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
   async function expectRejectedAndFinalized(commandId: string, results: Awaited<ReturnType<typeof applySyncBatch>>) {
     expect(results.results[0]).toMatchObject({ commandId, status: "rejected" });
     expect(results.results[0].message).toBeTruthy();
-    const row = await syncRepository.getCommand(testDb.db, userId, commandId);
+    const row = await runWithDb(testDb.db, syncRepository.getCommand(userId, commandId));
     expect(row?.status).toBe("rejected");
     expect(row?.result).not.toBeNull();
   }
@@ -43,7 +44,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
       data: { name: "Cuenta", kind: "cash", currency: "EUR", openingBalance: 0, notARealColumn: "x" },
     }]);
     await expectRejectedAndFinalized("unknown-field", result);
-    const accounts = await accountsRepository.listByUser(testDb.db, userId);
+    const accounts = await runWithDb(testDb.db, accountsRepository.listByUser(userId));
     expect(accounts).toHaveLength(0);
   });
 
@@ -73,12 +74,12 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
 
   it("removes an investment transaction together with its trade detail (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
-    const tx = await transactionsRepository.create(testDb.db, userId, {
+    const tx = await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, type: "investment", date: "2026-09-12", amount: 100, currency: "EUR",
-    });
-    await transactionsRepository.createTradeDetail(testDb.db, userId, {
+    }));
+    await runWithDb(testDb.db, transactionsRepository.createTradeDetail(userId, {
       transactionId: tx.id, side: "buy", quantity: "1", price: 100, fee: 0, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-investment", action: "remove", entityType: "transaction",
@@ -86,15 +87,15 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     expect(result.results[0].status).toBe("applied");
-    expect(await transactionsRepository.getTradeDetailByTransaction(testDb.db, userId, tx.id)).toBeUndefined();
+    expect(await runWithDb(testDb.db, transactionsRepository.getTradeDetailByTransaction(userId, tx.id))).toBeUndefined();
   });
 
   it("rejects removing a category still referenced by a transaction (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
     const category = await seedCategory(testDb.db, userId);
-    await transactionsRepository.create(testDb.db, userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, categoryId: category.id, type: "expense", date: "2026-09-12", amount: 5, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-used-category", action: "remove", entityType: "category",
@@ -102,14 +103,14 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     await expectRejectedAndFinalized("remove-used-category", result);
-    expect(await accountsRepository.getCategory(testDb.db, userId, category.id)).toBeDefined();
+    expect(await runWithDb(testDb.db, accountsRepository.getCategory(userId, category.id))).toBeDefined();
   });
 
   it("rejects removing an account still referenced by a transaction (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
-    await transactionsRepository.create(testDb.db, userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, type: "expense", date: "2026-09-12", amount: 5, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-used-account", action: "remove", entityType: "account",
@@ -117,7 +118,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     await expectRejectedAndFinalized("remove-used-account", result);
-    expect(await accountsRepository.get(testDb.db, userId, account.id)).toBeDefined();
+    expect(await runWithDb(testDb.db, accountsRepository.get(userId, account.id))).toBeDefined();
   });
 
   it("still removes an unreferenced category", async () => {

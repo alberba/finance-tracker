@@ -30,6 +30,8 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
+import { runWithDb } from '../../../db/database'
+import type { Db } from '../../../db/repositories/shared'
 import * as wealthRepository from '../../../db/repositories/wealth'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
@@ -99,7 +101,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
     }
 
     const summary: ImportSummary = await runInTransaction(db, async (tx) => {
-      const previousSettings = await userSettingsRepository.get(tx, userId)
+      const previousSettings = await runWithDb(tx, userSettingsRepository.get(userId))
       const onboarding = {
         onboardingPresented: previousSettings
           ? previousSettings.onboardingPresented === 1
@@ -128,13 +130,13 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- categories (no FK dependency) --------------------------------
       for (const row of asRows(body.categories)) {
-        const created = await accountsRepository.createCategory(tx, userId, {
+        const created = await runWithDb(tx, accountsRepository.createCategory(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           kind: String(row.kind ?? ''),
           sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : 0,
           emoji: optionalString(row.emoji),
-        })
+        }))
         if (typeof row.id === 'string') {
           categoryIdMap.set(row.id, created.id)
         }
@@ -143,14 +145,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- accounts (no FK dependency) ------------------------------------
       for (const row of asRows(body.accounts)) {
-        const created = await accountsRepository.create(tx, userId, {
+        const created = await runWithDb(tx, accountsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           kind: String(row.kind ?? ''),
           currency: String(row.currency ?? 'EUR'),
           openingBalance: typeof row.openingBalance === 'number' ? row.openingBalance : 0,
           isArchived: Boolean(row.isArchived),
-        })
+        }))
         if (typeof row.id === 'string') {
           accountIdMap.set(row.id, created.id)
         }
@@ -164,11 +166,11 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'twrLiquidityAccounts')
           continue
         }
-        await accountsRepository.createTwrLiquidityAccount(tx, userId, {
+        await runWithDb(tx, accountsRepository.createTwrLiquidityAccount(userId, {
           legacyId: optionalString(row.legacyId),
           accountId,
           name: String(row.name ?? ''),
-        })
+        }))
         bump(imported, 'twrLiquidityAccounts')
       }
 
@@ -184,7 +186,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'transactions')
           continue
         }
-        await transactionsRepository.create(tx, userId, {
+        await runWithDb(tx, transactionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           accountId,
           categoryId: categoryId ?? null,
@@ -206,7 +208,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           remoteOperation: isObject(row.remoteOperation)
             ? (row.remoteOperation as unknown as RemoteOperation)
             : null,
-        })
+        }))
         bump(imported, 'transactions')
       }
 
@@ -218,7 +220,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'subscriptions')
           continue
         }
-        await subscriptionsRepository.create(tx, userId, {
+        await runWithDb(tx, subscriptionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           accountId: accountId ?? null,
@@ -229,7 +231,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           nextChargeDate: typeof row.nextChargeDate === 'string' ? row.nextChargeDate : null,
           frequency: String(row.frequency ?? 'monthly'),
           isActive: row.isActive === undefined ? true : Boolean(row.isActive),
-        })
+        }))
         bump(imported, 'subscriptions')
       }
 
@@ -241,7 +243,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'recurringRules')
           continue
         }
-        const created = await recurringRulesRepository.create(tx, userId, {
+        const created = await runWithDb(tx, recurringRulesRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           type: String(row.type ?? ''),
@@ -262,7 +264,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           fee: optionalNumber(row.fee),
           time: optionalString(row.time),
           status: typeof row.status === 'string' ? row.status : undefined,
-        })
+        }))
         if (typeof row.id === 'string') {
           recurringRuleIdMap.set(row.id, created.id)
         }
@@ -282,7 +284,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'pendingMovements')
           continue
         }
-        await pendingMovementsRepository.create(tx, userId, {
+        await runWithDb(tx, pendingMovementsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           recurringRuleId,
           accountId: accountId ?? null,
@@ -302,7 +304,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           // import keeps, so it needs no remapping.
           transactionId: optionalString(row.transactionId),
           status: typeof row.status === 'string' ? row.status : undefined,
-        })
+        }))
         bump(imported, 'pendingMovements')
       }
 
@@ -313,38 +315,38 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'budgetEntries')
           continue
         }
-        await budgetEntriesRepository.create(tx, userId, {
+        await runWithDb(tx, budgetEntriesRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           categoryId,
           year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
           month: typeof row.month === 'number' ? row.month : 1,
           amount: typeof row.amount === 'number' ? row.amount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'budgetEntries')
       }
 
       // -- goals (no FK dependency) ------------------------------------------
       for (const row of asRows(body.goals)) {
-        await goalsRepository.create(tx, userId, {
+        await runWithDb(tx, goalsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           key: String(row.key ?? ''),
           name: String(row.name ?? ''),
           targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
           targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'goals')
       }
 
       // -- wealthSnapshots (+ balances, FK: accountId optional) --------------
       for (const row of asRows(body.wealthSnapshots)) {
-        const created = await wealthRepository.create(tx, userId, {
+        const created = await runWithDb(tx, wealthRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           snapshotDate: String(row.snapshotDate ?? ''),
           year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
           month: typeof row.month === 'number' ? row.month : 1,
-        })
+        }))
         if (typeof row.id === 'string') {
           wealthSnapshotIdMap.set(row.id, created.id)
         }
@@ -356,19 +358,19 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'snapshotBalances')
             continue
           }
-          await wealthRepository.createBalance(tx, userId, {
+          await runWithDb(tx, wealthRepository.createBalance(userId, {
             snapshotId: created.id,
             accountId: accountId ?? null,
             balance: typeof balance.balance === 'number' ? balance.balance : 0,
             currency: String(balance.currency ?? 'EUR'),
-          })
+          }))
           bump(imported, 'snapshotBalances')
         }
       }
 
       // -- contributions (+ allocations, FK: accountId optional) ------------
       for (const row of asRows(body.contributions)) {
-        const created = await contributionsRepository.create(tx, userId, {
+        const created = await runWithDb(tx, contributionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           date: String(row.date ?? ''),
           amount: typeof row.amount === 'number' ? row.amount : 0,
@@ -376,7 +378,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           portfolioDate: typeof row.portfolioDate === 'string' ? row.portfolioDate : null,
           portfolioValue: typeof row.portfolioValue === 'number' ? row.portfolioValue : null,
           flow: typeof row.flow === 'number' ? row.flow : null,
-        })
+        }))
         if (typeof row.id === 'string') {
           contributionIdMap.set(row.id, created.id)
         }
@@ -388,12 +390,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'contributionAllocations')
             continue
           }
-          await contributionsRepository.createAllocation(tx, userId, {
+          await runWithDb(tx, contributionsRepository.createAllocation(userId, {
             contributionId: created.id,
             accountId: accountId ?? null,
             amount: typeof allocation.amount === 'number' ? allocation.amount : 0,
             currency: String(allocation.currency ?? 'EUR'),
-          })
+          }))
           bump(imported, 'contributionAllocations')
         }
       }
@@ -404,7 +406,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        const instrument = await marketRepository.getInstrument(tx, row.instrumentId)
+        const instrument = await runWithDb(tx, marketRepository.getInstrument(row.instrumentId))
         const configuration = quoteConfigurationSchema.safeParse(row.quoteConfig)
         if (!instrument && !configuration.success) {
           bump(skipped, 'userInstruments')
@@ -415,12 +417,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        await marketRepository.createUserInstrument(tx, userId, {
+        await runWithDb(tx, marketRepository.createUserInstrument(userId, {
           instrumentId: row.instrumentId,
           categoryId: categoryId ?? null,
           alias: typeof row.alias === 'string' ? (accountIdMap.get(row.alias) ?? row.alias) : null,
           ...(configuration.success ? { quoteConfig: configuration.data } : {}),
-        })
+        }))
         bump(imported, 'userInstruments')
       }
 
@@ -431,14 +433,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsSymbolMappings')
           continue
         }
-        await stockeventsSymbolMappingsRepository.create(tx, userId, {
+        await runWithDb(tx, stockeventsSymbolMappingsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           categoryId: categoryId ?? null,
           stockeventsSymbol: String(row.stockeventsSymbol ?? ''),
           sync: row.sync === 1 || row.sync === true,
           watchlistId: typeof row.watchlistId === 'string' ? row.watchlistId : null,
           hidden: row.hidden === 1 || row.hidden === true,
-        })
+        }))
         bump(imported, 'stockeventsSymbolMappings')
       }
 
@@ -453,10 +455,10 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashMappings')
           continue
         }
-        await stockeventsCashMappingsRepository.upsertMapping(tx, userId, {
+        await runWithDb(tx, stockeventsCashMappingsRepository.upsertMapping(userId, {
           accountId: accountId ?? (typeof row.accountId === 'string' ? row.accountId : null),
           watchlistId: row.watchlistId,
-        })
+        }))
         bump(imported, 'stockeventsCashMappings')
       }
 
@@ -467,20 +469,20 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashSyncEntries')
           continue
         }
-        await stockeventsCashMappingsRepository.upsertSyncEntry(tx, userId, {
+        await runWithDb(tx, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
           contributionDate: String(row.contributionDate ?? ''),
           accountId: accountId ?? null,
           watchlistId: row.watchlistId,
           syncedAmount: typeof row.syncedAmount === 'number' ? row.syncedAmount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'stockeventsCashSyncEntries')
       }
 
       // -- settings (singleton) ----------------------------------------------
       if (body.settings && typeof body.settings === 'object') {
         const settingsRow = body.settings as Row
-        const existing = await userSettingsRepository.get(tx, userId)
+        const existing = await runWithDb(tx, userSettingsRepository.get(userId))
         const patch = {
           ...onboarding,
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
@@ -490,23 +492,23 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           stockeventsTradesToCash: optionalFlag(settingsRow.stockeventsTradesToCash),
         }
         if (existing) {
-          await userSettingsRepository.update(tx, userId, patch)
+          await runWithDb(tx, userSettingsRepository.update(userId, patch))
         } else {
-          await userSettingsRepository.create(tx, userId, patch)
+          await runWithDb(tx, userSettingsRepository.create(userId, patch))
         }
         bump(imported, 'settings')
       } else if (replace) {
-        await userSettingsRepository.create(tx, userId, onboarding)
+        await runWithDb(tx, userSettingsRepository.create(userId, onboarding))
       }
 
-      const { revision } = await syncRepository.bumpRevision(tx, userId)
-      await syncRepository.createChange(tx, userId, {
+      const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
+      await runWithDb(tx, syncRepository.createChange(userId, {
         revision,
         entityType: 'reset',
         entityId: userId,
         changeType: 'update',
         payload: null,
-      })
+      }))
 
       return { imported, skipped }
     })
@@ -546,7 +548,7 @@ function optionalFlag(value: unknown): boolean | undefined {
  * may not have: then the symbol alone is kept, as for an untracked ticker.
  */
 async function importOperation(
-  tx: Parameters<typeof marketRepository.getInstrument>[0],
+  tx: Db,
   value: unknown,
 ): Promise<MovementOperationInput | null> {
   if (!isObject(value) || typeof value.side !== 'string') {
@@ -554,7 +556,7 @@ async function importOperation(
   }
   const instrument =
     typeof value.instrumentId === 'string'
-      ? await marketRepository.getInstrument(tx, value.instrumentId)
+      ? await runWithDb(tx, marketRepository.getInstrument(value.instrumentId))
       : undefined
   return {
     instrumentId: instrument?.id ?? null,

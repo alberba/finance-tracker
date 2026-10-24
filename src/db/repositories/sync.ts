@@ -5,6 +5,7 @@
  */
 
 import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { lift } from '../database'
 import { syncChanges, syncCommands, userRevisions } from '../schema'
 import { nowIso, type Db } from './shared'
 
@@ -31,14 +32,14 @@ export interface CreateSyncChangeInput {
 
 // -- user_revisions -----------------------------------------------------------
 
-export async function getRevision(db: Db, userId: string): Promise<UserRevisionRow | undefined> {
+async function getRevisionSql(db: Db, userId: string): Promise<UserRevisionRow | undefined> {
   const [row] = await db.select().from(userRevisions).where(eq(userRevisions.userId, userId))
   return row
 }
 
 /** Creates the (userId → 0) cursor row if missing; a no-op if it already exists. */
-export async function ensureRevision(db: Db, userId: string): Promise<UserRevisionRow> {
-  const existing = await getRevision(db, userId)
+async function ensureRevisionSql(db: Db, userId: string): Promise<UserRevisionRow> {
+  const existing = await getRevisionSql(db, userId)
   if (existing) {
     return existing
   }
@@ -50,8 +51,8 @@ export async function ensureRevision(db: Db, userId: string): Promise<UserRevisi
 }
 
 /** Bumps the user's revision cursor by one and returns the new value. */
-export async function bumpRevision(db: Db, userId: string): Promise<UserRevisionRow> {
-  await ensureRevision(db, userId)
+async function bumpRevisionSql(db: Db, userId: string): Promise<UserRevisionRow> {
+  await ensureRevisionSql(db, userId)
   const [row] = await db
     .update(userRevisions)
     .set({ revision: sql`${userRevisions.revision} + 1`, updatedAt: nowIso() })
@@ -60,8 +61,8 @@ export async function bumpRevision(db: Db, userId: string): Promise<UserRevision
   return row
 }
 
-export async function removeRevision(db: Db, userId: string): Promise<boolean> {
-  const existing = await getRevision(db, userId)
+async function removeRevisionSql(db: Db, userId: string): Promise<boolean> {
+  const existing = await getRevisionSql(db, userId)
   if (!existing) {
     return false
   }
@@ -71,11 +72,11 @@ export async function removeRevision(db: Db, userId: string): Promise<boolean> {
 
 // -- sync_commands --------------------------------------------------------------
 
-export async function listCommandsByUser(db: Db, userId: string): Promise<SyncCommandRow[]> {
+async function listCommandsByUserSql(db: Db, userId: string): Promise<SyncCommandRow[]> {
   return db.select().from(syncCommands).where(eq(syncCommands.userId, userId))
 }
 
-export async function getCommand(
+async function getCommandSql(
   db: Db,
   userId: string,
   id: string,
@@ -93,7 +94,7 @@ export async function getCommand(
  * the table's primary key, so a duplicate insert throws a unique-constraint
  * error rather than silently overwriting.
  */
-export async function createCommand(
+async function createCommandSql(
   db: Db,
   userId: string,
   input: CreateSyncCommandInput,
@@ -113,7 +114,7 @@ export async function createCommand(
   return row
 }
 
-export async function finalizeCommand(
+async function finalizeCommandSql(
   db: Db,
   userId: string,
   id: string,
@@ -129,7 +130,7 @@ export async function finalizeCommand(
 }
 
 /** Atomically acquires a stale processing reservation for recovery. */
-export async function claimStaleCommand(
+async function claimStaleCommandSql(
   db: Db,
   userId: string,
   id: string,
@@ -153,8 +154,8 @@ export async function claimStaleCommand(
   return rows.length === 1
 }
 
-export async function remove(db: Db, userId: string, id: string): Promise<boolean> {
-  const existing = await getCommand(db, userId, id)
+async function removeSql(db: Db, userId: string, id: string): Promise<boolean> {
+  const existing = await getCommandSql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -164,12 +165,12 @@ export async function remove(db: Db, userId: string, id: string): Promise<boolea
 
 // -- sync_changes ---------------------------------------------------------------
 
-export async function listChangesByUser(db: Db, userId: string): Promise<SyncChangeRow[]> {
+async function listChangesByUserSql(db: Db, userId: string): Promise<SyncChangeRow[]> {
   return db.select().from(syncChanges).where(eq(syncChanges.userId, userId))
 }
 
 /** Walks `GET /api/changes?since` — every change with `revision > since`, for this user. */
-export async function listChangesSince(
+async function listChangesSinceSql(
   db: Db,
   userId: string,
   since: number,
@@ -180,7 +181,7 @@ export async function listChangesSince(
     .where(and(eq(syncChanges.userId, userId), gt(syncChanges.revision, since)))
 }
 
-export async function getChange(
+async function getChangeSql(
   db: Db,
   userId: string,
   id: string,
@@ -192,7 +193,7 @@ export async function getChange(
   return row
 }
 
-export async function createChange(
+async function createChangeSql(
   db: Db,
   userId: string,
   input: CreateSyncChangeInput,
@@ -212,7 +213,7 @@ export async function createChange(
   return row
 }
 
-export async function bulkInsertChanges(
+async function bulkInsertChangesSql(
   db: Db,
   userId: string,
   inputs: CreateSyncChangeInput[],
@@ -236,3 +237,19 @@ export async function bulkInsertChanges(
     )
     .returning()
 }
+
+export const getRevision = lift(getRevisionSql)
+export const ensureRevision = lift(ensureRevisionSql)
+export const bumpRevision = lift(bumpRevisionSql)
+export const removeRevision = lift(removeRevisionSql)
+export const listCommandsByUser = lift(listCommandsByUserSql)
+export const getCommand = lift(getCommandSql)
+export const createCommand = lift(createCommandSql)
+export const finalizeCommand = lift(finalizeCommandSql)
+export const claimStaleCommand = lift(claimStaleCommandSql)
+export const remove = lift(removeSql)
+export const listChangesByUser = lift(listChangesByUserSql)
+export const listChangesSince = lift(listChangesSinceSql)
+export const getChange = lift(getChangeSql)
+export const createChange = lift(createChangeSql)
+export const bulkInsertChanges = lift(bulkInsertChangesSql)

@@ -1,84 +1,85 @@
 /** `pending_movements` repository (WP6) — generated, not-yet-confirmed recurring occurrences. */
 
-import { and, eq } from "drizzle-orm";
-import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { pendingMovements } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
+import { fromMinorUnits, toMinorUnits } from '../../lib/money'
+import { pendingMovements } from '../schema'
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from './shared'
 
 export type PendingMovementRow = Omit<
   typeof pendingMovements.$inferSelect,
-  "amountMinor" | "unitPriceMinor" | "feeMinor" | "units"
+  'amountMinor' | 'unitPriceMinor' | 'feeMinor' | 'units'
 > & {
-  amount: number;
+  amount: number
   /** Operation fields — present only on an investment occurrence. */
-  units: number | null;
-  unitPrice: number | null;
-  fee: number | null;
-};
+  units: number | null
+  unitPrice: number | null
+  fee: number | null
+}
 
 export interface CreatePendingMovementInput {
   /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
-  id?: string;
-  legacyId?: string | null;
-  recurringRuleId: string;
-  accountId?: string | null;
-  categoryId?: string | null;
-  amount: number;
-  currency: string;
-  dueDate: string;
-  type?: string | null;
-  description?: string | null;
-  symbol?: string | null;
-  side?: string | null;
-  units?: number | null;
-  unitPrice?: number | null;
-  fee?: number | null;
-  time?: string | null;
-  transactionId?: string | null;
-  status?: string;
+  id?: string
+  legacyId?: string | null
+  recurringRuleId: string
+  accountId?: string | null
+  categoryId?: string | null
+  amount: number
+  currency: string
+  dueDate: string
+  type?: string | null
+  description?: string | null
+  symbol?: string | null
+  side?: string | null
+  units?: number | null
+  unitPrice?: number | null
+  fee?: number | null
+  time?: string | null
+  transactionId?: string | null
+  status?: string
 }
 
 export interface UpdatePendingMovementInput {
-  accountId?: string | null;
-  categoryId?: string | null;
-  amount?: number;
-  currency?: string;
-  dueDate?: string;
-  type?: string | null;
-  description?: string | null;
-  symbol?: string | null;
-  side?: string | null;
-  units?: number | null;
-  unitPrice?: number | null;
-  fee?: number | null;
-  time?: string | null;
-  transactionId?: string | null;
-  status?: string;
+  accountId?: string | null
+  categoryId?: string | null
+  amount?: number
+  currency?: string
+  dueDate?: string
+  type?: string | null
+  description?: string | null
+  symbol?: string | null
+  side?: string | null
+  units?: number | null
+  unitPrice?: number | null
+  fee?: number | null
+  time?: string | null
+  transactionId?: string | null
+  status?: string
 }
 
 function toRow(row: typeof pendingMovements.$inferSelect): PendingMovementRow {
-  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row;
+  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row
   return {
     ...rest,
     amount: fromMinorUnits(amountMinor, row.currency),
     units: units === null ? null : Number(units),
     unitPrice: unitPriceMinor === null ? null : fromMinorUnits(unitPriceMinor, row.currency),
     fee: feeMinor === null ? null : fromMinorUnits(feeMinor, row.currency),
-  };
+  }
 }
 
 /** The movement-template columns beyond amount/date, in write shape. */
 function templateValues(
   input: {
-    type?: string | null;
-    description?: string | null;
-    symbol?: string | null;
-    side?: string | null;
-    units?: number | null;
-    unitPrice?: number | null;
-    fee?: number | null;
-    time?: string | null;
-    transactionId?: string | null;
+    type?: string | null
+    description?: string | null
+    symbol?: string | null
+    side?: string | null
+    units?: number | null
+    unitPrice?: number | null
+    fee?: number | null
+    time?: string | null
+    transactionId?: string | null
   },
   currency: string,
 ) {
@@ -88,27 +89,31 @@ function templateValues(
     symbol: input.symbol ?? null,
     side: input.side ?? null,
     units: input.units === null || input.units === undefined ? null : String(input.units),
-    unitPriceMinor: input.unitPrice === null || input.unitPrice === undefined ? null : toMinorUnits(input.unitPrice, currency),
-    feeMinor: input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
+    unitPriceMinor:
+      input.unitPrice === null || input.unitPrice === undefined
+        ? null
+        : toMinorUnits(input.unitPrice, currency),
+    feeMinor:
+      input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
     time: input.time ?? null,
     transactionId: input.transactionId ?? null,
-  };
+  }
 }
 
-export async function listByUser(db: Db, userId: string): Promise<PendingMovementRow[]> {
-  const rows = await db.select().from(pendingMovements).where(eq(pendingMovements.userId, userId));
-  return rows.map(toRow);
+async function listByUserSql(db: Db, userId: string): Promise<PendingMovementRow[]> {
+  const rows = await db.select().from(pendingMovements).where(eq(pendingMovements.userId, userId))
+  return rows.map(toRow)
 }
 
-export async function get(db: Db, userId: string, id: string): Promise<PendingMovementRow | undefined> {
+async function getSql(db: Db, userId: string, id: string): Promise<PendingMovementRow | undefined> {
   const [row] = await db
     .select()
     .from(pendingMovements)
-    .where(and(eq(pendingMovements.id, id), eq(pendingMovements.userId, userId)));
-  return row ? toRow(row) : undefined;
+    .where(and(eq(pendingMovements.id, id), eq(pendingMovements.userId, userId)))
+  return row ? toRow(row) : undefined
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreatePendingMovementInput,
@@ -117,8 +122,8 @@ export async function create(
     accountId: input.accountId,
     categoryId: input.categoryId,
     recurringRuleId: input.recurringRuleId,
-  });
-  const now = nowIso();
+  })
+  const now = nowIso()
   const [row] = await db
     .insert(pendingMovements)
     .values({
@@ -132,28 +137,31 @@ export async function create(
       currency: input.currency,
       dueDate: input.dueDate,
       ...templateValues(input, input.currency),
-      status: input.status ?? "pending",
+      status: input.status ?? 'pending',
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return toRow(row);
+    .returning()
+  return toRow(row)
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdatePendingMovementInput,
   expectedVersion?: number,
 ): Promise<PendingMovementRow | undefined> {
-  const existing = await get(db, userId, id);
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return undefined;
+    return undefined
   }
-  await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
-  const nextCurrency = input.currency ?? existing.currency;
-  const nextAmount = input.amount ?? existing.amount;
+  await assertOwnedReferences(db, userId, {
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+  })
+  const nextCurrency = input.currency ?? existing.currency
+  const nextAmount = input.amount ?? existing.amount
   const [row] = await db
     .update(pendingMovements)
     .set({
@@ -172,7 +180,8 @@ export async function update(
           unitPrice: input.unitPrice === undefined ? existing.unitPrice : input.unitPrice,
           fee: input.fee === undefined ? existing.fee : input.fee,
           time: input.time === undefined ? existing.time : input.time,
-          transactionId: input.transactionId === undefined ? existing.transactionId : input.transactionId,
+          transactionId:
+            input.transactionId === undefined ? existing.transactionId : input.transactionId,
         },
         nextCurrency,
       ),
@@ -180,40 +189,49 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(pendingMovements.id, id),
-      eq(pendingMovements.userId, userId),
-      versionGuard(pendingMovements.version, expectedVersion),
-    ))
-    .returning();
-  return row ? toRow(row) : undefined;
+    .where(
+      and(
+        eq(pendingMovements.id, id),
+        eq(pendingMovements.userId, userId),
+        versionGuard(pendingMovements.version, expectedVersion),
+      ),
+    )
+    .returning()
+  return row ? toRow(row) : undefined
 }
 
-export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
-  const existing = await get(db, userId, id);
+async function removeSql(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
   const deleted = await db
     .delete(pendingMovements)
-    .where(and(
-      eq(pendingMovements.id, id),
-      eq(pendingMovements.userId, userId),
-      versionGuard(pendingMovements.version, expectedVersion),
-    ))
-    .returning({ id: pendingMovements.id });
-  return deleted.length > 0;
+    .where(
+      and(
+        eq(pendingMovements.id, id),
+        eq(pendingMovements.userId, userId),
+        versionGuard(pendingMovements.version, expectedVersion),
+      ),
+    )
+    .returning({ id: pendingMovements.id })
+  return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreatePendingMovementInput[],
 ): Promise<PendingMovementRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   const rows = await db
     .insert(pendingMovements)
     .values(
@@ -228,11 +246,18 @@ export async function bulkInsert(
         currency: input.currency,
         dueDate: input.dueDate,
         ...templateValues(input, input.currency),
-        status: input.status ?? "pending",
+        status: input.status ?? 'pending',
         createdAt: now,
         updatedAt: now,
       })),
     )
-    .returning();
-  return rows.map(toRow);
+    .returning()
+  return rows.map(toRow)
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)
