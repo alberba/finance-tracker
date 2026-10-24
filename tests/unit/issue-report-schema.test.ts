@@ -66,6 +66,18 @@ describe('issue report schema', () => {
     expect(parsed.description).toBe('')
   })
 
+  it('conserva los saltos de línea y tabuladores de la descripción tal cual', () => {
+    const parsed = parseIssueReportPayload({
+      type: 'bug',
+      summary: 'Descripción multilínea',
+      description: 'Línea uno\n\n- detalle\tcon tabulador\r\nlínea final',
+      section: 'reports',
+      context: {},
+    })
+
+    expect(parsed.description).toBe('Línea uno\n\n- detalle\tcon tabulador\nlínea final')
+  })
+
   it('sigue rechazando una descripción por encima de 8000 caracteres', () => {
     expect(() =>
       parseIssueReportPayload({

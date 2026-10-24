@@ -43,12 +43,24 @@ function sanitizeText(value: string): string {
   return removeControlCharacters(value).replace(/\r\n/g, '\n').trim()
 }
 
+// La descripción es texto libre: conserva saltos de línea y tabuladores, que
+// `removeControlCharacters` sí elimina para el resto de campos de una línea.
+function sanitizeMultilineText(value: string): string {
+  return Array.from(value.replace(/\r\n?/g, '\n'))
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint === 0x0a || codePoint === 0x09 || (codePoint > 0x1f && codePoint !== 0x7f)
+    })
+    .join('')
+    .trim()
+}
+
 export function parseIssueReportPayload(input: unknown): IssueReportPayload {
   const parsed = issueReportSchema.parse(input)
   return {
     ...parsed,
     summary: sanitizeText(parsed.summary),
-    description: sanitizeText(parsed.description),
+    description: sanitizeMultilineText(parsed.description),
     section: sanitizeText(parsed.section),
     context: {
       userAgent: sanitizeText(parsed.context.userAgent),

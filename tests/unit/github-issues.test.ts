@@ -4,7 +4,10 @@ import {
   createIssueFromWebReport,
   type IssueReporter,
 } from '../../src/lib/server/github-issues'
-import type { IssueReportPayload } from '../../src/lib/server/issue-report-schema'
+import {
+  parseIssueReportPayload,
+  type IssueReportPayload,
+} from '../../src/lib/server/issue-report-schema'
 
 const payload: IssueReportPayload = {
   type: 'bug',
@@ -296,6 +299,20 @@ describe('buildIssueBody', () => {
     const body = buildIssueBody({ ...payload, description }, reporter)
 
     expect(body).toContain(`### Problema o solicitud\n${description}\n`)
+  })
+
+  it('conserva los saltos de línea de la descripción de extremo a extremo', () => {
+    const parsed = parseIssueReportPayload({
+      type: 'bug',
+      summary: 'Filtro roto',
+      description: 'Paso 1\n\nPaso 2:\n- primero\n- segundo',
+      section: 'transactions',
+      context: {},
+    })
+
+    const body = buildIssueBody(parsed, reporter)
+
+    expect(body).toContain('### Problema o solicitud\nPaso 1\n\nPaso 2:\n- primero\n- segundo\n')
   })
 
   it('escribe nombre, email e identificador del reportero recibido', () => {
