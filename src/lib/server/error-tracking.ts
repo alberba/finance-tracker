@@ -78,7 +78,13 @@ export const reportReportSideFailure: ReportSideFailureReporter = (failure) => {
     Sentry.withScope((scope) => {
       scope.setTag('report.stage', failure.stage)
       scope.setTag('report.reason', failure.reason)
-      Sentry.captureMessage('Fallo auxiliar del reporte web', 'warning')
+      // Sin esto Sentry agrupa por la pila, que es la misma para todos los
+      // fallos auxiliares, y los mezcla en una sola issue.
+      scope.setFingerprint(['report-side-failure', failure.stage, failure.reason])
+      Sentry.captureMessage(
+        `Fallo auxiliar del reporte web (${failure.stage}: ${failure.reason})`,
+        'warning',
+      )
     })
   } catch {
     console.error('[api] No se pudo reportar a Sentry el fallo auxiliar del reporte.')
