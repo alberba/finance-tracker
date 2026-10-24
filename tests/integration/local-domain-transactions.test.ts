@@ -66,28 +66,37 @@ it.each(['initialize', 'reset', 'import', 'replace'] as const)(
   'rolls back %s after a late write failure and preserves the other user',
   async (operation) => {
     const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    await runWithDb(db, accountsRepository.create('other', {
-      name: 'Other account',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 50,
-    }))
-    if (operation !== 'initialize') {
-      await initialize(context('/api/state/initialize'))
-      const account = await runWithDb(db, accountsRepository.create('owner', {
-        name: 'Original account',
+    await runWithDb(
+      db,
+      accountsRepository.create('other', {
+        name: 'Other account',
         kind: 'cash',
         currency: 'EUR',
-        openingBalance: 25,
-      }))
-      await runWithDb(db, transactionsRepository.create('owner', {
-        accountId: account.id,
-        type: 'investment',
-        date: '2026-01-01',
-        amount: -10,
-        currency: 'EUR',
-        operation: { symbol: 'TEST', side: 'buy', units: 1, unitPrice: 10, fee: 0 },
-      }))
+        openingBalance: 50,
+      }),
+    )
+    if (operation !== 'initialize') {
+      await initialize(context('/api/state/initialize'))
+      const account = await runWithDb(
+        db,
+        accountsRepository.create('owner', {
+          name: 'Original account',
+          kind: 'cash',
+          currency: 'EUR',
+          openingBalance: 25,
+        }),
+      )
+      await runWithDb(
+        db,
+        transactionsRepository.create('owner', {
+          accountId: account.id,
+          type: 'investment',
+          date: '2026-01-01',
+          amount: -10,
+          currency: 'EUR',
+          operation: { symbol: 'TEST', side: 'buy', units: 1, unitPrice: 10, fee: 0 },
+        }),
+      )
     }
     const before = await exported()
     const otherBefore = await runWithDb(db, accountsRepository.listByUser('other'))
@@ -127,33 +136,45 @@ it('rolls back user provisioning when identity creation fails', async () => {
   sqlite.exec(`CREATE TRIGGER fail_identity BEFORE INSERT ON user_identities
     BEGIN SELECT RAISE(ABORT, 'injected identity failure'); END`)
   await expect(
-    resolvePrincipal(db, { provider: 'test', subject: 'new', email: 'new@example.test' }),
+    runWithDb(
+      db,
+      resolvePrincipal({ provider: 'test', subject: 'new', email: 'new@example.test' }),
+    ),
   ).rejects.toThrow()
   expect((await db.select().from(schema.users)).map((row) => row.id)).toEqual(['owner', 'other'])
   expect(await db.select().from(schema.userIdentities)).toEqual([])
 })
 
 it('reuses a test identity by provider subject without linking by email', async () => {
-  const first = await resolvePrincipal(db, {
-    provider: 'e2e-test-header',
-    subject: 'stable-subject',
-    email: 'new@example.test',
-  })
-  const repeated = await resolvePrincipal(db, {
-    provider: 'e2e-test-header',
-    subject: 'stable-subject',
-    email: 'changed@example.test',
-  })
+  const first = await runWithDb(
+    db,
+    resolvePrincipal({
+      provider: 'e2e-test-header',
+      subject: 'stable-subject',
+      email: 'new@example.test',
+    }),
+  )
+  const repeated = await runWithDb(
+    db,
+    resolvePrincipal({
+      provider: 'e2e-test-header',
+      subject: 'stable-subject',
+      email: 'changed@example.test',
+    }),
+  )
 
   expect(repeated.userId).toBe(first.userId)
   expect(await db.select().from(schema.userIdentities)).toHaveLength(1)
 
   await expect(
-    resolvePrincipal(db, {
-      provider: 'e2e-test-header',
-      subject: 'different-subject',
-      email: 'owner@example.test',
-    }),
+    runWithDb(
+      db,
+      resolvePrincipal({
+        provider: 'e2e-test-header',
+        subject: 'different-subject',
+        email: 'owner@example.test',
+      }),
+    ),
   ).rejects.toThrow()
   expect(await db.select().from(schema.userIdentities)).toHaveLength(1)
 })
@@ -247,12 +268,15 @@ it('recovers a failed command after its lease expires and replays the committed 
 })
 
 it('rolls back the investment operation and movement with sync metadata on a finalization failure', async () => {
-  const account = await runWithDb(db, accountsRepository.create('owner', {
-    name: 'Broker',
-    kind: 'investment',
-    currency: 'EUR',
-    openingBalance: 0,
-  }))
+  const account = await runWithDb(
+    db,
+    accountsRepository.create('owner', {
+      name: 'Broker',
+      kind: 'investment',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
   sqlite.exec(`CREATE TRIGGER fail_result BEFORE UPDATE OF result ON sync_commands
     BEGIN SELECT RAISE(ABORT, 'injected result failure'); END`)
   await expect(

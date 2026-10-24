@@ -7,8 +7,8 @@
  * execution point up to endpoints and middleware.
  */
 
-import { Context, Data, Effect } from 'effect'
-import type { Db } from './repositories/shared'
+import { Context, Data, Effect, Exit } from 'effect'
+import { runInTransaction, type Db } from './repositories/shared'
 
 export class DatabaseError extends Data.TaggedError('DatabaseError')<{ cause: unknown }> {}
 
@@ -29,6 +29,39 @@ export const lift =
   <Args extends unknown[], A>(fn: (db: Db, ...args: Args) => Promise<A>) =>
   (...args: Args): Effect.Effect<A, DatabaseError, Database> =>
     query((db) => fn(db, ...args))
+
+/**
+ * Runs an effect inside one database transaction over the current `Database`.
+ *
+ * The driver-level transaction is opened by `runInTransaction` (native SQLite)
+ * or skipped where the driver owns it (D1), so this keeps the exact behaviour
+ * the Promise-based callers had while letting the body stay in Effect.
+ */
+export const transaction = <A, E>(
+  effect: Effect.Effect<A, E, Database>,
+): Effect.Effect<A, E | DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const db = yield* Database
+    const exit = yield* Effect.promise(async () => {
+      try {
+        return await runInTransaction(db, async (tx) => {
+          const result = await Effect.runPromise(
+            Effect.exit(Effect.provideService(effect, Database, tx)),
+          )
+          // Throwing hands the failure back to the driver so it rolls back.
+          if (Exit.isFailure(result)) throw result
+          return result
+        })
+      } catch (thrown) {
+        if (Exit.isExit(thrown)) return thrown as Exit.Exit<A, E>
+        throw thrown
+      }
+    })
+    return yield* Exit.match(exit, {
+      onSuccess: (value) => Effect.succeed(value),
+      onFailure: (cause) => Effect.failCause(cause),
+    })
+  })
 
 /**
  * Transitional edge: runs a repository effect against `db` from Promise-based code.

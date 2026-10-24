@@ -118,7 +118,7 @@ export async function startRoundTrip(
         throw new TypeError('Failed to fetch')
       }
       if (url.startsWith('/api/bootstrap')) {
-        return json(await buildBootstrapPayload(asServerDb(testDb.db), user.id))
+        return json(await runWithDb(asServerDb(testDb.db), buildBootstrapPayload(user.id)))
       }
       if (url.startsWith('/api/changes')) {
         const since = Number(new URL(url, 'https://test.local').searchParams.get('since') ?? 0)

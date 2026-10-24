@@ -32,25 +32,33 @@ export const POST: APIRoute = async ({ locals }) =>
 
     const result = await runInTransaction(db, async (tx) => {
       const previousSettings = await runWithDb(tx, userSettingsRepository.get(userId))
-      await wipeUserData(tx, userId)
-      const settings = await runWithDb(tx, userSettingsRepository.create(userId, {
-        currency: 'EUR',
-        onboardingPresented: previousSettings?.onboardingPresented === 1,
-        onboardingDismissed: previousSettings?.onboardingDismissed === 1,
-        onboardingAccountCompleted: previousSettings?.onboardingAccountCompleted === 1,
-        onboardingMovementCompleted: previousSettings?.onboardingMovementCompleted === 1,
-        onboardingCompleted: previousSettings?.onboardingCompleted === 1,
-      }))
-      const categories = await runWithDb(tx, accountsRepository.bulkInsertCategories(userId,
-        DEFAULT_CATEGORIES,))
+      await runWithDb(tx, wipeUserData(userId))
+      const settings = await runWithDb(
+        tx,
+        userSettingsRepository.create(userId, {
+          currency: 'EUR',
+          onboardingPresented: previousSettings?.onboardingPresented === 1,
+          onboardingDismissed: previousSettings?.onboardingDismissed === 1,
+          onboardingAccountCompleted: previousSettings?.onboardingAccountCompleted === 1,
+          onboardingMovementCompleted: previousSettings?.onboardingMovementCompleted === 1,
+          onboardingCompleted: previousSettings?.onboardingCompleted === 1,
+        }),
+      )
+      const categories = await runWithDb(
+        tx,
+        accountsRepository.bulkInsertCategories(userId, DEFAULT_CATEGORIES),
+      )
       const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
-      await runWithDb(tx, syncRepository.createChange(userId, {
-        revision,
-        entityType: 'reset',
-        entityId: userId,
-        changeType: 'update',
-        payload: null,
-      }))
+      await runWithDb(
+        tx,
+        syncRepository.createChange(userId, {
+          revision,
+          entityType: 'reset',
+          entityId: userId,
+          changeType: 'update',
+          payload: null,
+        }),
+      )
       return { settings, categories }
     })
 
