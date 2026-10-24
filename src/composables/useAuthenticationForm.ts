@@ -2,7 +2,6 @@ import { useAuthenticationAction } from './useAuthenticationAction'
 import { computed, shallowRef, watch } from 'vue'
 import {
   authentication,
-  authenticationRequest,
   openFinanzas,
   requireAuthenticationResult,
 } from '../lib/client/authentication'
@@ -74,11 +73,18 @@ export function useAuthenticationForm(
         return
       }
       if (mode.value === 'recover') {
-        await authenticationRequest('/api/recover-access', {
-          email: email.value,
-          otp: otp.value,
-          password: password.value,
-        })
+        // Rare path: keep the Effect-backed request out of the login bundle.
+        const [{ authenticationRequest }, { runClientHttp }] = await Promise.all([
+          import('../lib/client/authentication-request'),
+          import('../lib/client/runtime'),
+        ])
+        await runClientHttp(
+          authenticationRequest('/api/recover-access', {
+            email: email.value,
+            otp: otp.value,
+            password: password.value,
+          }),
+        )
       } else if (mode.value === 'verify') {
         await requireAuthenticationResult(
           await authentication.emailOtp.verifyEmail({ email: email.value, otp: otp.value }),

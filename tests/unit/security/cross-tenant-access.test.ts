@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyOneCommand } from "../../../src/lib/server/sync/apply-command";
+import { runWithDb } from "../../../src/db/database";
 import * as accountsRepository from "../../../src/db/repositories/accounts";
 import * as transactionsRepository from "../../../src/db/repositories/transactions";
 import * as subscriptionsRepository from "../../../src/db/repositories/subscriptions";
@@ -39,25 +40,25 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const userA = await seedUser(db, "victim@example.com");
     const userB = await seedUser(db, "attacker@example.com");
 
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Cuenta de la víctima",
       kind: "cash",
       currency: "EUR",
       openingBalance: 1000,
-    });
+    }));
 
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
       commandId: "attack-update-1",
       action: "update",
       entityType: "account",
       entityId: accountA.id,
       baseVersion: accountA.version,
       data: { name: "Cuenta robada" },
-    } as never);
+    } as never));
 
     expect(outcome.status).toBe("not_found");
 
-    const untouched = await accountsRepository.get(db, userA.id, accountA.id);
+    const untouched = await runWithDb(db, accountsRepository.get(userA.id, accountA.id));
     expect(untouched?.name).toBe("Cuenta de la víctima");
   });
 
@@ -65,17 +66,17 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "victim2@example.com");
     const userB = await seedUser(db, "attacker2@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Cuenta A",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
-    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+    }));
+    const categoryA = await runWithDb(db, accountsRepository.createCategory(userA.id, {
       name: "Comida",
       kind: "expense",
-    });
-    const txA = await transactionsRepository.create(db, userA.id, {
+    }));
+    const txA = await runWithDb(db, transactionsRepository.create(userA.id, {
       accountId: accountA.id,
       categoryId: categoryA.id,
       type: "expense",
@@ -83,36 +84,36 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       description: "Compra",
       amount: -20,
       currency: "EUR",
-    });
+    }));
 
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
       commandId: "attack-remove-1",
       action: "remove",
       entityType: "transaction",
       entityId: txA.id,
       baseVersion: txA.version,
-    } as never);
+    } as never));
 
     expect(outcome.status).toBe("not_found");
-    expect(await transactionsRepository.get(db, userA.id, txA.id)).toBeDefined();
+    expect(await runWithDb(db, transactionsRepository.get(userA.id, txA.id))).toBeDefined();
   });
 
   it("does not leak user A's entity data into user B's create response by id guessing", async () => {
     const { db } = testDb;
     const userA = await seedUser(db, "victim3@example.com");
     const userB = await seedUser(db, "attacker3@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Secreta",
       kind: "cash",
       currency: "EUR",
       openingBalance: 500,
-    });
+    }));
 
     // Attacker guesses A's real account id as the parent for a transaction
     // they create in their own tenant — must fail (FK/ownership check),
     // never silently attach to A's account.
     await expect(
-      transactionsRepository.create(db, userB.id, {
+      runWithDb(db, transactionsRepository.create(userB.id, {
         accountId: accountA.id,
         categoryId: null,
         type: "expense",
@@ -120,7 +121,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
         description: "Fuga",
         amount: -1,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -128,15 +129,15 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "victim4@example.com");
     const userB = await seedUser(db, "attacker4@example.com");
-    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+    const categoryA = await runWithDb(db, accountsRepository.createCategory(userA.id, {
       name: "Categoría de A",
       kind: "expense",
-    });
+    }));
 
     // The repository-level guard throws `RejectedCommandError`, which
     // `apply-command` turns into a terminal `rejected` outcome — never a
     // silently B-owned row pointing at A's category.
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
         commandId: "attack-create-1",
         action: "create",
         entityType: "subscription",
@@ -147,30 +148,30 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
           currency: "EUR",
           frequency: "monthly",
         },
-      } as never)
+      } as never))
     expect(outcome.status).toBe("rejected");
-    expect(await subscriptionsRepository.listByUser(db, userB.id)).toHaveLength(0);
+    expect(await runWithDb(db, subscriptionsRepository.listByUser(userB.id))).toHaveLength(0);
   });
 
   it("repository-level guard: subscriptions.create rejects another user's accountId/categoryId directly", async () => {
     const { db } = testDb;
     const userA = await seedUser(db, "victim5@example.com");
     const userB = await seedUser(db, "attacker5@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Cuenta A",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
+    }));
 
     await expect(
-      subscriptionsRepository.create(db, userB.id, {
+      runWithDb(db, subscriptionsRepository.create(userB.id, {
         name: "Fuga",
         accountId: accountA.id,
         amount: 5,
         currency: "EUR",
         frequency: "monthly",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -178,19 +179,19 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "victim6@example.com");
     const userB = await seedUser(db, "attacker6@example.com");
-    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+    const categoryA = await runWithDb(db, accountsRepository.createCategory(userA.id, {
       name: "Categoría de A",
       kind: "expense",
-    });
+    }));
 
     await expect(
-      budgetEntriesRepository.create(db, userB.id, {
+      runWithDb(db, budgetEntriesRepository.create(userB.id, {
         categoryId: categoryA.id,
         year: 2026,
         month: 1,
         amount: 100,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -198,22 +199,22 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "market-victim@example.com");
     const userB = await seedUser(db, "market-attacker@example.com");
-    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+    const categoryA = await runWithDb(db, accountsRepository.createCategory(userA.id, {
       name: "Cartera privada",
       kind: "investment",
-    });
-    const instrument = await marketRepository.createInstrument(db, {
+    }));
+    const instrument = await runWithDb(db, marketRepository.createInstrument({
       symbol: "SEC",
       normalizedSymbol: "SEC",
       provider: "test",
       currency: "EUR",
-    });
+    }));
 
     await expect(
-      marketRepository.createUserInstrument(db, userB.id, {
+      runWithDb(db, marketRepository.createUserInstrument(userB.id, {
         instrumentId: instrument.id,
         categoryId: categoryA.id,
-      }),
+      })),
     ).rejects.toThrow(/categoría/i);
   });
 
@@ -221,25 +222,25 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "snapshot-victim@example.com");
     const userB = await seedUser(db, "snapshot-attacker@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Cuenta privada",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
-    const snapshotA = await wealthRepository.create(db, userA.id, {
+    }));
+    const snapshotA = await runWithDb(db, wealthRepository.create(userA.id, {
       snapshotDate: "2026-08-01",
       year: 2026,
       month: 7,
-    });
+    }));
 
     await expect(
-      wealthRepository.createBalance(db, userB.id, {
+      runWithDb(db, wealthRepository.createBalance(userB.id, {
         snapshotId: snapshotA.id,
         accountId: accountA.id,
         balance: 500,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -247,25 +248,25 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "contribution-victim@example.com");
     const userB = await seedUser(db, "contribution-attacker@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Broker privado",
       kind: "investment",
       currency: "EUR",
       openingBalance: 0,
-    });
-    const contributionA = await contributionsRepository.create(db, userA.id, {
+    }));
+    const contributionA = await runWithDb(db, contributionsRepository.create(userA.id, {
       date: "2026-08-01",
       amount: 100,
       currency: "EUR",
-    });
+    }));
 
     await expect(
-      contributionsRepository.createAllocation(db, userB.id, {
+      runWithDb(db, contributionsRepository.createAllocation(userB.id, {
         contributionId: contributionA.id,
         accountId: accountA.id,
         amount: 100,
         currency: "EUR",
-      }),
+      })),
     ).rejects.toThrow();
   });
 
@@ -273,18 +274,18 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "twr-victim@example.com");
     const userB = await seedUser(db, "twr-attacker@example.com");
-    const accountA = await accountsRepository.create(db, userA.id, {
+    const accountA = await runWithDb(db, accountsRepository.create(userA.id, {
       name: "Liquidez privada",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
+    }));
 
     await expect(
-      accountsRepository.createTwrLiquidityAccount(db, userB.id, {
+      runWithDb(db, accountsRepository.createTwrLiquidityAccount(userB.id, {
         accountId: accountA.id,
         name: "Referencia cruzada",
-      }),
+      })),
     ).rejects.toThrow(/cuenta/i);
   });
 
@@ -292,16 +293,16 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     const { db } = testDb;
     const userA = await seedUser(db, "stockevents-victim@example.com");
     const userB = await seedUser(db, "stockevents-attacker@example.com");
-    const categoryA = await accountsRepository.createCategory(db, userA.id, {
+    const categoryA = await runWithDb(db, accountsRepository.createCategory(userA.id, {
       name: "Inversión privada",
       kind: "investment",
-    });
+    }));
 
     await expect(
-      stockeventsSymbolMappingsRepository.create(db, userB.id, {
+      runWithDb(db, stockeventsSymbolMappingsRepository.create(userB.id, {
         categoryId: categoryA.id,
         stockeventsSymbol: "SECRET",
-      }),
+      })),
     ).rejects.toThrow(/categoría/i);
   });
 });

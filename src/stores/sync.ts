@@ -1,42 +1,50 @@
+import { Data, Effect } from 'effect'
 import { defineStore, getActivePinia } from 'pinia'
 import { onScopeDispose, shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useToast } from '../composables/useToast'
 import {
-  getAllEntities,
-  getCachedBootstrap,
-  getCachedSettings,
-  getRevision as getCachedRevision,
-  openIdbCache,
-  putEntities,
-  saveReadModel,
-  setCachedSettings,
-  type CachedEntity,
-} from '../lib/client/idb-cache'
-import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
-import { watchSyncConnection, withSyncLock } from '../lib/client/sync-connection'
-import { applyPendingCommands } from '../lib/client/pending-overlay'
-import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
-import { quoteSourceKey } from '../domain/investment/symbol-matching'
-import { useFinancialStateStore } from './financial-state'
-import {
   acknowledge,
-  amendPendingCreate,
   count as countOutbox,
   discard as discardOutboxEntry,
   enqueue,
   findPendingCreate,
   InvalidCommandError,
   listAll as listOutbox,
-  openOutbox,
   peekBatch,
   recordFailure,
+  amendPendingCreate,
   type OutboxCommandInput,
   type OutboxEntry,
   type PendingCreateMatch,
 } from '../lib/client/outbox'
+import {
+  getCachedBootstrap,
+  getCachedSettings,
+  getAllEntities,
+  getRevision as getCachedRevision,
+  putEntities,
+  saveReadModel,
+  setCachedSettings,
+  type CachedEntity,
+} from '../lib/client/idb-cache'
+import {
+  readJson,
+  sendRequest,
+  ClientJsonError,
+  type ClientHttp,
+  type ClientNetworkError,
+} from '../lib/client/http'
+import { createClientRuntime, type ClientRuntime } from '../lib/client/runtime'
+import { ClientStorage, type ClientStorageError } from '../lib/client/storage'
+import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
+import { watchSyncConnection, withSyncLock } from '../lib/client/sync-connection'
+import { applyPendingCommands } from '../lib/client/pending-overlay'
+import { projectSyncV2State, type SyncV2Bootstrap } from '../lib/client/v2-state-projection'
 import { wipeAllClientData } from '../lib/client/wipe'
+import { quoteSourceKey } from '../domain/investment/symbol-matching'
+import { useFinancialStateStore } from './financial-state'
 import { type CommandStatus, type SyncEntityType } from '../lib/server/sync/command-schemas'
 
 export type ConnectionState = 'online' | 'offline'
@@ -68,8 +76,19 @@ interface SyncCommandResult {
   message?: string
 }
 
+/** A sync step that could not name a storage or transport error of its own. */
+export class SyncError extends Data.TaggedError('SyncError')<{ readonly message: string }> {}
+
+/** Everything the sync engine needs, provided by the per-user client runtime. */
+type ClientServices = ClientHttp | ClientStorage
+type SyncEffect<A, E = never> = Effect.Effect<A, E, ClientServices>
+
+/** Errors any sync step can surface; every one of them is already a message for the UI. */
+type SyncFailure = SyncError | ClientStorageError | ClientNetworkError | ClientJsonError
+
 const RETRY_BASE_DELAY_MS = 1000
 const RETRY_MAX_DELAY_MS = 30_000
+
 export const useSyncStore = defineStore('sync', () => {
   // Late async renders must reach this store's own Pinia, not whichever is active by then.
   const ownPinia = getActivePinia()
@@ -87,8 +106,11 @@ export const useSyncStore = defineStore('sync', () => {
   const pendingCount = shallowRef(0)
   const lastError = shallowRef<string | null>(null)
 
-  let cacheDb: IDBDatabase | null = null
-  let outboxDb: IDBDatabase | null = null
+  /**
+   * The client runtime owns the IndexedDB handles (ADR-0006). Created on
+   * `init` for the signed-in user and disposed on logout.
+   */
+  let runtime: ClientRuntime | null = null
   let flushing = false
   // See `flush()`'s doc comment for why this exists.
   let flushAgainRequested = false
@@ -112,50 +134,68 @@ export const useSyncStore = defineStore('sync', () => {
   }
   onScopeDispose(stop)
 
-  async function renderReadModel(): Promise<void> {
-    if (!readModel || detached) return
-    const pending = outboxDb ? await listOutbox(outboxDb) : []
-    const projected = pending.length
-      ? applyPendingCommands(
-          readModel,
-          pending.map((entry) => entry.command),
-        )
-      : readModel
-    const financialStateStore = useFinancialStateStore(ownPinia)
-    const nextState = projectSyncV2State(projected, financialStateStore.year)
-    // Live prices are transient; a settings acknowledgement must not erase
-    // them. Carry them only while the source still identifies the same quote.
-    for (const instrument of nextState.instruments) {
-      const previous = financialStateStore.instruments.find((row) => row.id === instrument.id)
-      if (previous && quoteSourceKey(previous) === quoteSourceKey(instrument)) {
-        const quote = financialStateStore.quotes[instrument.id]
-        if (quote && !nextState.quotes[instrument.id]) nextState.quotes[instrument.id] = quote
-      }
-    }
-    financialStateStore.replaceState(nextState)
+  function isReady(): boolean {
+    return !detached && runtime !== null && userId.value !== null
   }
 
-  /** An unloaded page: stops every background read, send and render of this client. */
-  function detach(): void {
-    detached = true
-    stop()
+  /**
+   * Runs one internal effect at this store's edge (a Pinia action). The
+   * runtime is captured once so a logout during an in-flight step rejects
+   * instead of running against a disposed storage layer.
+   */
+  function run<A, E>(effect: SyncEffect<A, E>): Promise<A> {
+    const active = runtime
+    if (!active) {
+      return Promise.reject(new SyncError({ message: 'La sincronización no está iniciada.' }))
+    }
+    return active.run(effect)
   }
 
   function identityHeaders(): Record<string, string> {
     return userId.value ? { 'X-Finance-User-Id': userId.value } : {}
   }
 
-  function rejectExpiredSession(response: Response): void {
-    if (response.status === 401) {
-      detach()
-      throw new Error(
-        'Tu sesión ha terminado. Tus cambios pendientes están guardados; vuelve a entrar con el mismo usuario.',
-      )
-    }
+  function failSync(message: string): Effect.Effect<never, SyncError> {
+    return Effect.fail(new SyncError({ message }))
   }
 
-  function isReady(): boolean {
-    return !detached && cacheDb !== null && outboxDb !== null && userId.value !== null
+  function rejectExpiredSession(response: Response): Effect.Effect<void, SyncError> {
+    if (response.status !== 401) return Effect.void
+    detach()
+    return failSync(
+      'Tu sesión ha terminado. Tus cambios pendientes están guardados; vuelve a entrar con el mismo usuario.',
+    )
+  }
+
+  function renderReadModel(): SyncEffect<void, ClientStorageError> {
+    return Effect.gen(function* () {
+      if (!readModel || detached) return
+      const pending = yield* listOutbox()
+      const projected = pending.length
+        ? applyPendingCommands(
+            readModel,
+            pending.map((entry) => entry.command),
+          )
+        : readModel
+      const financialStateStore = useFinancialStateStore(ownPinia)
+      const nextState = projectSyncV2State(projected, financialStateStore.year)
+      // Live prices are transient; a settings acknowledgement must not erase
+      // them. Carry them only while the source still identifies the same quote.
+      for (const instrument of nextState.instruments) {
+        const previous = financialStateStore.instruments.find((row) => row.id === instrument.id)
+        if (previous && quoteSourceKey(previous) === quoteSourceKey(instrument)) {
+          const quote = financialStateStore.quotes[instrument.id]
+          if (quote && !nextState.quotes[instrument.id]) nextState.quotes[instrument.id] = quote
+        }
+      }
+      financialStateStore.replaceState(nextState)
+    })
+  }
+
+  /** An unloaded page: stops every background read, send and render of this client. */
+  function detach(): void {
+    detached = true
+    stop()
   }
 
   /** Coalesces reconnects, remote notices and local writes into one cycle. */
@@ -171,19 +211,17 @@ export const useSyncStore = defineStore('sync', () => {
         syncAgainRequested = false
         syncStatus.value = 'syncing'
         try {
-          if (!readModel || readModelStale) await bootstrapState()
-          await pullChanges()
-          await flush()
+          await run(syncCycle())
+          // A rejected command leaves a visible error on this cycle; the next
+          // successful one clears it instead of this same pass overwriting it.
           if ((syncStatus.value as SyncStatus) === 'error') break
-          await pullChanges()
           lastCheckedAt.value = Date.now()
           if (pendingCount.value === 0) {
             syncStatus.value = 'idle'
             lastError.value = null
           }
         } catch (error) {
-          lastError.value =
-            error instanceof Error ? error.message : 'No se pudieron descargar tus cambios.'
+          lastError.value = errorMessage(error, 'No se pudieron descargar tus cambios.')
           syncStatus.value = 'error'
           if (!readModel) useFinancialStateStore(ownPinia).failLoad(lastError.value)
           scheduleRetry()
@@ -198,6 +236,16 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  function syncCycle(): SyncEffect<void, SyncFailure> {
+    return Effect.gen(function* () {
+      if (!readModel || readModelStale) yield* bootstrapUnlocked()
+      yield* pullUnlocked()
+      yield* flushEffect()
+      if ((syncStatus.value as SyncStatus) === 'error') return
+      yield* pullUnlocked()
+    })
+  }
+
   function handleConnectionChange(next: ConnectionState): void {
     connection.value = next
     if (next === 'online') void syncNow()
@@ -209,19 +257,26 @@ export const useSyncStore = defineStore('sync', () => {
     if (userId.value === nextUserId && initializing) return initializing
     if (initialized && userId.value === nextUserId) return
     stop()
-    cacheDb?.close()
-    outboxDb?.close()
+    await runtime?.dispose()
     readModel = null
     initialized = false
+    detached = false
     userId.value = nextUserId
     email.value = options.email ?? null
+    runtime = await createClientRuntime(nextUserId)
     initializing = (async () => {
-      cacheDb = await openIdbCache(nextUserId)
-      outboxDb = await openOutbox(nextUserId)
-      readModel = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-      revision.value = readModel?.revision ?? (await getCachedRevision(cacheDb))
-      pendingCount.value = await countOutbox(outboxDb)
-      await renderReadModel()
+      const cached = await run(
+        Effect.gen(function* () {
+          const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
+          const cachedRevision = yield* getCachedRevision()
+          const pending = yield* countOutbox()
+          return { bootstrap, cachedRevision, pending }
+        }),
+      )
+      readModel = cached.bootstrap
+      revision.value = readModel?.revision ?? cached.cachedRevision
+      pendingCount.value = cached.pending
+      await run(renderReadModel())
       await syncNow({ full: true })
       initialized = true
       stopConnection = watchSyncConnection({
@@ -239,31 +294,33 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  function bootstrapState(): Promise<void> {
-    return userId.value ? withSyncLock(userId.value, bootstrapUnlocked) : Promise.resolve()
-  }
-
-  async function bootstrapUnlocked(): Promise<void> {
-    if (!cacheDb) return
-    const loadingUserId = userId.value
-    const loadingCacheDb = cacheDb
-    const response = await fetch('/api/bootstrap', { headers: identityHeaders() })
-    if (userId.value !== loadingUserId || cacheDb !== loadingCacheDb) return
-    rejectExpiredSession(response)
-    if (!response.ok)
-      throw new Error(`No se pudieron cargar tus datos (${response.status}). Reintentando…`)
-    const bootstrap = (await response.json()) as SyncV2Bootstrap
-    readModel = await saveReadModel(cacheDb, bootstrap)
-    readModelStale = false
-    revision.value = readModel.revision
-    await renderReadModel()
-    const recoveredSubscriptionIds = bootstrap.subscriptions
-      .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
-      .map((subscription) => String(subscription.legacyId || subscription.id))
-    if (bootstrap.subscriptions.length) {
-      const { useMovementsStore } = await import('./movements')
-      await useMovementsStore(ownPinia).refreshSubscriptions(recoveredSubscriptionIds)
-    }
+  function bootstrapUnlocked(): SyncEffect<void, SyncFailure> {
+    return Effect.gen(function* () {
+      const loadingUserId = userId.value
+      const loadingRuntime = runtime
+      const response = yield* sendRequest('/api/bootstrap', { headers: identityHeaders() })
+      if (userId.value !== loadingUserId || runtime !== loadingRuntime) return
+      yield* rejectExpiredSession(response)
+      if (!response.ok) {
+        return yield* failSync(
+          `No se pudieron cargar tus datos (${response.status}). Reintentando…`,
+        )
+      }
+      const bootstrap = (yield* readJson(response)) as SyncV2Bootstrap
+      readModel = yield* saveReadModel(bootstrap)
+      readModelStale = false
+      revision.value = readModel.revision
+      yield* renderReadModel()
+      const recoveredSubscriptionIds = bootstrap.subscriptions
+        .filter((subscription) => !subscription.startDate || !subscription.nextChargeDate)
+        .map((subscription) => String(subscription.legacyId || subscription.id))
+      if (bootstrap.subscriptions.length) {
+        const { useMovementsStore } = yield* Effect.promise(() => import('./movements'))
+        yield* Effect.promise(() =>
+          useMovementsStore(ownPinia).refreshSubscriptions(recoveredSubscriptionIds),
+        )
+      }
+    })
   }
 
   /**
@@ -288,6 +345,28 @@ export const useSyncStore = defineStore('sync', () => {
     showToast(`⚠️ ${message}`)
   }
 
+  /** Appends a command and refreshes the pending counter; never fails the caller. */
+  function appendCommand(command: OutboxCommandInput): SyncEffect<OutboxEntry | null> {
+    return Effect.gen(function* () {
+      const entry = yield* enqueue(command).pipe(
+        Effect.catchTag('InvalidCommandError', (error) =>
+          Effect.sync(() => {
+            surfaceEnqueueError(error)
+            return null
+          }),
+        ),
+        Effect.catchTag('ClientStorageError', (error) =>
+          Effect.sync(() => {
+            surfaceEnqueueError(error)
+            return null
+          }),
+        ),
+      )
+      pendingCount.value = yield* countOutbox().pipe(Effect.orElseSucceed(() => pendingCount.value))
+      return entry
+    })
+  }
+
   /** Validates and appends a command to the cola de comandos, then attempts an immediate flush. */
   async function enqueueCommand(command: OutboxCommandInput): Promise<OutboxEntry | null> {
     if (isReadOnlyDemoActive()) {
@@ -295,18 +374,11 @@ export const useSyncStore = defineStore('sync', () => {
       // per-user outbox or reach D1.
       return null
     }
-    if (!isReady() || !outboxDb) {
+    if (!isReady()) {
       return null
     }
-    let entry: OutboxEntry
-    try {
-      entry = await enqueue(outboxDb, command)
-    } catch (error) {
-      surfaceEnqueueError(error)
-      return null
-    }
-    pendingCount.value = await countOutbox(outboxDb)
-    void syncNow()
+    const entry = await run(appendCommand(command))
+    if (entry) void syncNow()
     return entry
   }
 
@@ -359,25 +431,27 @@ export const useSyncStore = defineStore('sync', () => {
     return null
   }
 
-  async function absorbConfirmed(changes: RemoteChange[]): Promise<void> {
-    if (!readModel || !cacheDb || changes.length === 0) return
-    try {
-      readModel = await saveReadModel(
-        cacheDb,
-        applyRemoteChanges(readModel, changes, readModel.revision),
-      )
-    } catch (error) {
-      // The next pull brings the same rows; until then a full read is the safe fallback.
-      console.warn('[sync] No se pudo incorporar un cambio confirmado', error)
-      readModelStale = true
-    }
+  function absorbConfirmed(changes: RemoteChange[]): SyncEffect<void, ClientStorageError> {
+    return Effect.gen(function* () {
+      if (!readModel || changes.length === 0) return
+      readModel = yield* saveReadModel(applyRemoteChanges(readModel, changes, readModel.revision))
+    }).pipe(
+      Effect.catchTag('ClientStorageError', (error) =>
+        Effect.sync(() => {
+          // The next pull brings the same rows; until then a full read is the safe fallback.
+          console.warn('[sync] No se pudo incorporar un cambio confirmado', error)
+          readModelStale = true
+        }),
+      ),
+    )
   }
 
-  async function applyResultToCache(entityType: SyncEntityType, entity: unknown): Promise<void> {
-    if (!cacheDb || entity === null || typeof entity !== 'object') {
-      return
-    }
-    await putEntities(cacheDb, entityType, [entity as CachedEntity])
+  function applyResultToCache(
+    entityType: SyncEntityType,
+    entity: unknown,
+  ): SyncEffect<void, ClientStorageError> {
+    if (entity === null || typeof entity !== 'object') return Effect.void
+    return putEntities(entityType, [entity as CachedEntity])
   }
 
   /**
@@ -403,62 +477,74 @@ export const useSyncStore = defineStore('sync', () => {
    * to `false`) honors it with one more real attempt.
    */
   async function flush(): Promise<void> {
-    if (!isReady() || !outboxDb) {
-      return
-    }
-    if (flushing) {
-      flushAgainRequested = true
-      return
-    }
-    if (connection.value === 'offline') {
-      return
-    }
-    flushing = true
-    try {
-      await withSyncLock(userId.value!, sendBatch)
-    } finally {
-      flushing = false
+    if (!isReady()) return
+    await run(flushEffect())
+  }
+
+  function flushEffect(): SyncEffect<void, SyncFailure> {
+    return Effect.gen(function* () {
+      if (!isReady()) return
+      if (flushing) {
+        flushAgainRequested = true
+        return
+      }
+      if (connection.value === 'offline') return
+      flushing = true
+      yield* withSyncLock(userId.value!, sendBatch()).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            flushing = false
+          }),
+        ),
+      )
       if (flushAgainRequested) {
         flushAgainRequested = false
-        void flush()
+        yield* flushEffect()
       }
-    }
+    })
   }
 
   /** Sends the outbox head; runs under the sync lock so no other client resends it. */
-  async function sendBatch(): Promise<void> {
-    if (!outboxDb) return
-    const sendingUserId = userId.value
-    const sendingOutboxDb = outboxDb
-    // Once the head has failed, send it alone so a failure is charged to
-    // the entry that caused it, not to whichever command led the batch.
-    const [head] = await peekBatch(outboxDb, 1)
-    const batch = head && head.attempts > 0 ? [head] : await peekBatch(outboxDb, 5)
-    if (batch.length === 0) {
-      return
-    }
+  function sendBatch(): SyncEffect<void, SyncFailure> {
+    return Effect.gen(function* () {
+      const sendingUserId = userId.value
+      const sendingRuntime = runtime
+      // Once the head has failed, send it alone so a failure is charged to
+      // the entry that caused it, not to whichever command led the batch.
+      const [head] = yield* peekBatch(1)
+      const batch = head && head.attempts > 0 ? [head] : yield* peekBatch(5)
+      if (batch.length === 0) return
 
-    if (userId.value !== sendingUserId || outboxDb !== sendingOutboxDb) return
-    syncStatus.value = 'syncing'
-    let reachedServer = false
-    try {
-      const response = await fetch('/api/sync', {
+      if (userId.value !== sendingUserId || runtime !== sendingRuntime) return
+      syncStatus.value = 'syncing'
+      const outcome = yield* sendRequest('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Finance-User-Id': sendingUserId! },
         body: JSON.stringify({ commands: batch.map((entry) => entry.command) }),
-      })
-      if (userId.value !== sendingUserId || outboxDb !== sendingOutboxDb) return
-      rejectExpiredSession(response)
-      reachedServer = true
+      }).pipe(
+        Effect.map((response) => ({ ok: true as const, response })),
+        Effect.catchTag('ClientNetworkError', () =>
+          Effect.succeed({ ok: false as const, message: 'Error de red' }),
+        ),
+      )
+      if (!outcome.ok) {
+        return yield* handleSendFailure(batch, outcome.message)
+      }
+      const response = outcome.response
+      if (userId.value !== sendingUserId || runtime !== sendingRuntime) return
+      yield* rejectExpiredSession(response)
 
       if (!response.ok && response.status !== 409) {
-        throw new Error(`El servidor respondió ${response.status}`)
+        return yield* handleSendFailure(batch, `El servidor respondió ${response.status}`, true)
       }
 
-      const body = (await response.json()) as {
-        results: SyncCommandResult[]
-        revision: number
-        halted: boolean
+      const body = (yield* readJson(response).pipe(
+        Effect.orElseSucceed(
+          () => null as { results: SyncCommandResult[]; revision: number; halted: boolean } | null,
+        ),
+      )) as { results: SyncCommandResult[]; revision: number; halted: boolean } | null
+      if (!body) {
+        return yield* handleSendFailure(batch, 'La respuesta de sincronización no es válida.')
       }
       const acked: number[] = []
       // ADR 0003: a same-user conflict is never worth a modal — it is
@@ -485,15 +571,15 @@ export const useSyncStore = defineStore('sync', () => {
           acked.push(entry.seq)
           const command = entry.command
           if (result.status === 'applied') confirmed.push(confirmedChange(command, result.entity))
-          if (result.entity !== undefined && cacheDb !== null) {
+          if (result.entity !== undefined) {
             if (command.action === 'settingsUpdate') {
               // Keeps this device's `user_settings.version` current, so the next
               // settings command sends the right `baseVersion` (audit §6.4).
               // `pullChanges` deliberately skips `userSettings` (it has no
               // object store), so nothing else refreshes it.
-              await setCachedSettings(cacheDb, result.entity)
+              yield* setCachedSettings(result.entity)
             } else if (command.action === 'create' || command.action === 'update') {
-              await applyResultToCache(command.entityType, result.entity)
+              yield* applyResultToCache(command.entityType, result.entity)
             }
           }
         } else if (result.status === 'conflict') {
@@ -540,9 +626,9 @@ export const useSyncStore = defineStore('sync', () => {
 
       // The read model takes the confirmed results before the outbox lets
       // them go, so no reload (even offline) can see neither of the two.
-      await absorbConfirmed(confirmed.filter((change) => change !== null))
-      await acknowledge(outboxDb, acked)
-      pendingCount.value = await countOutbox(outboxDb)
+      yield* absorbConfirmed(confirmed.filter((change) => change !== null))
+      yield* acknowledge(acked)
+      pendingCount.value = yield* countOutbox()
       // The cursor deliberately does NOT move here (audit §5.3). `body.revision`
       // is the user's *global* revision after this batch, which includes changes
       // other devices made and this one has never applied — adopting it would
@@ -553,7 +639,7 @@ export const useSyncStore = defineStore('sync', () => {
       syncStatus.value = lastDropMessage ? 'error' : 'idle'
 
       for (const retry of retries) {
-        await enqueueCommand(retry)
+        yield* appendCommand(retry)
       }
       // The discreet conflict notice goes first: if the same batch also had
       // a hard failure, that more actionable message is the one left on
@@ -570,61 +656,77 @@ export const useSyncStore = defineStore('sync', () => {
         scheduleRetry()
       } else {
         retryAttempt = 0
-        if (body.halted || (await countOutbox(outboxDb)) > 0) {
+        if (body.halted || (yield* countOutbox()) > 0) {
           flushAgainRequested = true
         }
       }
-    } catch (error) {
+    })
+  }
+
+  /**
+   * A failed send keeps the edit: the head entry records the attempt and the
+   * store retries with backoff. Shared by the transport and HTTP-status paths.
+   */
+  function handleSendFailure(
+    batch: OutboxEntry[],
+    message: string,
+    reachedServer = false,
+  ): SyncEffect<void> {
+    return Effect.gen(function* () {
       syncStatus.value = 'error'
-      const message = error instanceof Error ? error.message : 'Error de sincronización'
       lastError.value = message
       // A transient Worker failure cannot invalidate an accepted local edit.
-      if (reachedServer) await recordFailure(outboxDb, batch[0].seq, message)
+      if (reachedServer) {
+        yield* recordFailure(batch[0].seq, message).pipe(Effect.orElseSucceed(() => undefined))
+      }
       scheduleRetry()
-    }
+    })
   }
 
   /** Persists rows, projection and cursor in one IndexedDB transaction. */
   function pullChanges(): Promise<void> {
-    return userId.value ? withSyncLock(userId.value, pullUnlocked) : Promise.resolve()
+    return userId.value ? run(withSyncLock(userId.value, pullUnlocked())) : Promise.resolve()
   }
 
-  async function pullUnlocked(): Promise<void> {
-    if (!isReady() || !cacheDb || !readModel) return
-    let hasMore: boolean
-    do {
-      const response = await fetch(`/api/changes?since=${revision.value}`, {
-        headers: identityHeaders(),
-      })
-      rejectExpiredSession(response)
-      if (!response.ok)
-        throw new Error(`No se pudieron descargar tus cambios (${response.status}).`)
-      const body = (await response.json()) as {
-        revision: number
-        changes: RemoteChange[]
-        hasMore?: boolean
-        requiresBootstrap?: boolean
-      }
-      if (
-        body.requiresBootstrap ||
-        body.changes.some(
-          (change) => change.entityType === 'userInstrument' || change.entityType === 'reset',
-        )
-      ) {
-        await bootstrapUnlocked()
-        return
-      }
-      if (!Number.isSafeInteger(body.revision) || body.revision < revision.value) {
-        throw new Error('La revisión remota no es válida.')
-      }
-      if (body.changes.length || body.revision !== revision.value) {
-        const next = applyRemoteChanges(readModel, body.changes, body.revision)
-        readModel = await saveReadModel(cacheDb, next)
-        revision.value = readModel.revision
-        await renderReadModel()
-      }
-      hasMore = body.hasMore === true
-    } while (hasMore)
+  function pullUnlocked(): SyncEffect<void, SyncFailure> {
+    return Effect.gen(function* () {
+      if (!isReady() || !readModel) return
+      let hasMore: boolean
+      do {
+        const response = yield* sendRequest(`/api/changes?since=${revision.value}`, {
+          headers: identityHeaders(),
+        })
+        yield* rejectExpiredSession(response)
+        if (!response.ok) {
+          return yield* failSync(`No se pudieron descargar tus cambios (${response.status}).`)
+        }
+        const body = (yield* readJson(response)) as {
+          revision: number
+          changes: RemoteChange[]
+          hasMore?: boolean
+          requiresBootstrap?: boolean
+        }
+        if (
+          body.requiresBootstrap ||
+          body.changes.some(
+            (change) => change.entityType === 'userInstrument' || change.entityType === 'reset',
+          )
+        ) {
+          yield* bootstrapUnlocked()
+          return
+        }
+        if (!Number.isSafeInteger(body.revision) || body.revision < revision.value) {
+          return yield* failSync('La revisión remota no es válida.')
+        }
+        if (body.changes.length || body.revision !== revision.value) {
+          const next = applyRemoteChanges(readModel, body.changes, body.revision)
+          readModel = yield* saveReadModel(next)
+          revision.value = readModel.revision
+          yield* renderReadModel()
+        }
+        hasMore = body.hasMore === true
+      } while (hasMore)
+    })
   }
 
   /**
@@ -636,12 +738,14 @@ export const useSyncStore = defineStore('sync', () => {
    * reads as "create it".
    */
   async function getSettingsVersion(): Promise<number | null> {
-    if (!isReady() || !cacheDb) {
-      return null
-    }
-    const settings = await getCachedSettings<{ version?: unknown } | null>(cacheDb)
-    const version = settings?.version
-    return typeof version === 'number' ? version : null
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const settings = yield* getCachedSettings<{ version?: unknown } | null>()
+        const version = settings?.version
+        return typeof version === 'number' ? version : null
+      }),
+    )
   }
 
   /**
@@ -666,19 +770,17 @@ export const useSyncStore = defineStore('sync', () => {
     entityType: SyncEntityType,
     localId: string,
   ): Promise<{ entityId: string; version: number } | null> {
-    if (!isReady() || !cacheDb) {
-      return null
-    }
-    const entities = await getAllEntities(cacheDb, entityType)
-    const match =
-      entities.find((entity) => entity.id === localId) ??
-      entities.find((entity) => (entity as { legacyId?: unknown }).legacyId === localId)
-    if (!match) {
-      return null
-    }
-    const rawVersion = (match as { version?: unknown }).version
-    const version = typeof rawVersion === 'number' ? rawVersion : 0
-    return { entityId: match.id, version }
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const entities = yield* getAllEntities(entityType)
+        const match =
+          entities.find((entity) => entity.id === localId) ??
+          entities.find((entity) => (entity as { legacyId?: unknown }).legacyId === localId)
+        if (!match) return null
+        return { entityId: match.id, version: versionOf(match) }
+      }),
+    )
   }
 
   /**
@@ -692,42 +794,48 @@ export const useSyncStore = defineStore('sync', () => {
     entityType: SyncEntityType,
     matches: (entity: Record<string, unknown>) => boolean,
   ): Promise<{ entityId: string; version: number } | null> {
-    if (!isReady() || !cacheDb) {
-      return null
-    }
-    const entities = await getAllEntities(cacheDb, entityType)
-    const match = entities.find((entity) => matches(entity as Record<string, unknown>))
-    if (!match) {
-      return null
-    }
-    const rawVersion = (match as { version?: unknown }).version
-    const version = typeof rawVersion === 'number' ? rawVersion : 0
-    return { entityId: match.id, version }
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const entities = yield* getAllEntities(entityType)
+        const match = entities.find((entity) => matches(entity as Record<string, unknown>))
+        if (!match) return null
+        return { entityId: match.id, version: versionOf(match) }
+      }),
+    )
   }
 
   /** Global instruments live in the cached bootstrap, outside the per-entity sync collections. */
   async function getInstrumentId(localId: string): Promise<string | null> {
-    if (!isReady() || !cacheDb) return null
-    const bootstrap = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-    const configured = bootstrap?.userInstruments.find(
-      (row) => row.id === localId && row.quoteConfig,
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
+        const configured = bootstrap?.userInstruments.find(
+          (row) => row.id === localId && row.quoteConfig,
+        )
+        if (configured) return String(configured.instrumentId)
+        const instruments = bootstrap?.instruments ?? []
+        const instrument =
+          instruments.find((row) => row.id === localId) ??
+          instruments.find((row) => row.legacyId === localId)
+        return instrument?.id ?? null
+      }),
     )
-    if (configured) return String(configured.instrumentId)
-    const instruments = bootstrap?.instruments ?? []
-    const instrument =
-      instruments.find((row) => row.id === localId) ??
-      instruments.find((row) => row.legacyId === localId)
-    return instrument?.id ?? null
   }
 
   /** Resolves a legacy catalog identity to this user's tracking row. */
   async function getUserInstrumentId(localId: string): Promise<string | null> {
-    if (!isReady() || !cacheDb) return null
-    const bootstrap = await getCachedBootstrap<SyncV2Bootstrap>(cacheDb)
-    const instrument = bootstrap?.instruments?.find(
-      (row) => row.id === localId || row.legacyId === localId,
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
+        const instrument = bootstrap?.instruments?.find(
+          (row) => row.id === localId || row.legacyId === localId,
+        )
+        return instrument?.userInstrument.id ?? null
+      }),
     )
-    return instrument?.userInstrument.id ?? null
   }
 
   /**
@@ -743,15 +851,15 @@ export const useSyncStore = defineStore('sync', () => {
     entityType: SyncEntityType,
     matches: PendingCreateMatch,
   ): Promise<string | null> {
-    if (!outboxDb) {
-      return null
-    }
-    const pending = await findPendingCreate(outboxDb, entityType, matches)
-    if (!pending || pending.command.action !== 'create') {
-      return null
-    }
-    const id = (pending.command.data as { id?: unknown }).id
-    return typeof id === 'string' ? id : null
+    if (!isReady()) return null
+    return run(
+      Effect.gen(function* () {
+        const pending = yield* findPendingCreate(entityType, matches)
+        if (!pending || pending.command.action !== 'create') return null
+        const id = (pending.command.data as { id?: unknown }).id
+        return typeof id === 'string' ? id : null
+      }),
+    )
   }
 
   /**
@@ -774,19 +882,22 @@ export const useSyncStore = defineStore('sync', () => {
     matches: PendingCreateMatch,
     patch: Record<string, unknown>,
   ): Promise<boolean> {
-    if (!outboxDb) {
-      return false
-    }
-    const pending = await findPendingCreate(outboxDb, entityType, matches)
-    if (!pending) {
-      return false
-    }
-    try {
-      await amendPendingCreate(outboxDb, pending.seq, patch)
-    } catch (error) {
-      surfaceEnqueueError(error)
-    }
-    return true
+    if (!isReady()) return false
+    return run(
+      Effect.gen(function* () {
+        const pending = yield* findPendingCreate(entityType, matches)
+        if (!pending) return false
+        yield* amendPendingCreate(pending.seq, patch).pipe(
+          Effect.catchTag('InvalidCommandError', (error) =>
+            Effect.sync(() => surfaceEnqueueError(error)),
+          ),
+          Effect.catchTag('ClientStorageError', (error) =>
+            Effect.sync(() => surfaceEnqueueError(error)),
+          ),
+        )
+        return true
+      }),
+    )
   }
 
   /**
@@ -798,21 +909,21 @@ export const useSyncStore = defineStore('sync', () => {
     entityType: SyncEntityType,
     matches: PendingCreateMatch,
   ): Promise<boolean> {
-    if (!outboxDb) {
-      return false
-    }
-    const pending = await findPendingCreate(outboxDb, entityType, matches)
-    if (!pending) {
-      return false
-    }
-    await discardOutboxEntry(outboxDb, pending.seq)
-    pendingCount.value = await countOutbox(outboxDb)
-    return true
+    if (!isReady()) return false
+    return run(
+      Effect.gen(function* () {
+        const pending = yield* findPendingCreate(entityType, matches)
+        if (!pending) return false
+        yield* discardOutboxEntry(pending.seq)
+        pendingCount.value = yield* countOutbox()
+        return true
+      }),
+    )
   }
 
   async function prepareLogout(): Promise<void> {
     await syncNow()
-    if (outboxDb) pendingCount.value = await countOutbox(outboxDb)
+    if (isReady()) pendingCount.value = await run(countOutbox())
     if (pendingCount.value > 0) {
       throw new Error(
         'No se pudieron sincronizar todos los cambios. Puedes quedarte o descartarlos y salir.',
@@ -825,14 +936,17 @@ export const useSyncStore = defineStore('sync', () => {
     if (!options.discardPending) await prepareLogout()
     stop()
     readModel = null
-    cacheDb?.close()
-    outboxDb?.close()
-    cacheDb = null
-    outboxDb = null
-    if (userId.value) {
-      await wipeAllClientData(userId.value)
+    const leavingUserId = userId.value
+    const leavingRuntime = runtime
+    runtime = null
+    // Close this page's connections before deleting the databases: an open
+    // connection would block the deletion.
+    await leavingRuntime?.dispose()
+    if (leavingUserId) {
+      await Effect.runPromise(wipeAllClientData(leavingUserId))
     }
     initialized = false
+    detached = false
     userId.value = null
     email.value = null
     revision.value = 0
@@ -869,3 +983,17 @@ export const useSyncStore = defineStore('sync', () => {
     cancelPendingCreate,
   }
 })
+
+function versionOf(entity: CachedEntity): number {
+  const raw = (entity as { version?: unknown }).version
+  return typeof raw === 'number' ? raw : 0
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}

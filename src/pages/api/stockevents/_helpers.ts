@@ -4,6 +4,7 @@ import { getDb } from '../../../db/client'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 import { integrationCredentialsRepository } from '../../../db/repositories'
 import { requirePrincipal } from '../../../lib/server/api-auth'
+import { runServer } from '../../../lib/server/runtime'
 
 export const json = createJsonResponse('no-store')
 
@@ -13,11 +14,9 @@ export async function readApiKey(locals: App.Locals): Promise<string> {
   const principal = requirePrincipal(locals)
   const db = getDb(locals)
   const env = getRuntimeEnvFromLocals(locals)
-  const credential = await integrationCredentialsRepository.getByProvider(
+  const credential = await runServer(
     db,
-    principal.userId,
-    STOCKEVENTS_PROVIDER,
-    env,
+    integrationCredentialsRepository.getByProvider(principal.userId, STOCKEVENTS_PROVIDER, env),
   )
   return credential?.secret ?? ''
 }

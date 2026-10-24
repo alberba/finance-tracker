@@ -10,6 +10,7 @@ import {
   registrationAdministration,
 } from '../../../src/db/repositories/authentication'
 import { authRole } from '../../../src/db/schema/authentication'
+import { runWithDb } from '../../../src/db/database'
 
 let sqlite: Database.Database | undefined
 afterEach(() => sqlite?.close())
@@ -43,7 +44,7 @@ INSERT INTO user_identities(id,user_id,provider,subject,email,created_at) VALUES
   await auth.api.sendVerificationOTP({ body: { email: 'owner@example.com', type: 'sign-in' } })
   const login = await auth.api.signInEmailOTP({ body: { email: 'owner@example.com', otp } })
   expect(login.user.id).toBe('existing-owner')
-  expect(await authenticatedPrincipal(db, login.user.id)).toEqual({
+  expect(await runWithDb(db, authenticatedPrincipal(login.user.id))).toEqual({
     userId: 'existing-owner',
     email: 'owner@example.com',
     name: login.user.name,
@@ -51,5 +52,5 @@ INSERT INTO user_identities(id,user_id,provider,subject,email,created_at) VALUES
     subject: 'existing-owner',
     isAdmin: true,
   })
-  expect((await registrationAdministration(db)).invitations).toEqual([])
+  expect((await runWithDb(db, registrationAdministration())).invitations).toEqual([])
 })

@@ -1,3 +1,5 @@
+import { Effect, Exit } from 'effect'
+
 interface SyncConnectionCallbacks {
   changed: () => void
   online: () => void
@@ -37,20 +39,42 @@ export function describeCheckAge(ms: number): string {
 const localLocks = new Map<string, Promise<unknown>>()
 
 /**
- * Runs `task` while no other tab (or client in this page) touches the same
+ * Runs an effect while no other tab (or client in this page) touches the same
  * user's outbox and read model: concurrent flushes would resend a command and
  * a bootstrap taken mid-flush would render without it.
+ *
+ * The browser's Web Locks API only speaks `Promise`, so this adapter is the
+ * one bridge between both worlds: it captures the Effect context, hands the
+ * whole program to the lock holder, and replays the `Exit` back into the
+ * typed channel — no error is lost or widened.
  */
-export function withSyncLock<T>(userId: string, task: () => Promise<T>): Promise<T> {
-  const name = `finance-tracker-sync:${userId}`
-  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
-  if (locks) return locks.request(name, task) as Promise<T>
-  const previous = localLocks.get(name) ?? Promise.resolve()
-  const run = previous.then(task, task)
-  const settled = run.catch(() => {})
-  localLocks.set(name, settled)
-  void settled.then(() => {
-    if (localLocks.get(name) === settled) localLocks.delete(name)
+export const withSyncLock = <A, E, R>(
+  userId: string,
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E, R> =>
+  Effect.gen(function* () {
+    const context = yield* Effect.context<R>()
+    const name = `finance-tracker-sync:${userId}`
+    const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+    const program = () =>
+      Effect.runPromiseExit(Effect.provideContext(effect, context)) as Promise<Exit.Exit<A, E>>
+
+    let exit: Exit.Exit<A, E>
+    if (locks) {
+      exit = (yield* Effect.promise(() => locks.request(name, program))) as Exit.Exit<A, E>
+    } else {
+      const previous = localLocks.get(name) ?? Promise.resolve()
+      const run = previous.then(program, program)
+      const settled = run.catch(() => {})
+      localLocks.set(name, settled)
+      void settled.then(() => {
+        if (localLocks.get(name) === settled) localLocks.delete(name)
+      })
+      exit = yield* Effect.promise(() => run)
+    }
+
+    return yield* Exit.match(exit, {
+      onSuccess: (value) => Effect.succeed(value),
+      onFailure: (cause) => Effect.failCause(cause),
+    })
   })
-  return run
-}

@@ -1,16 +1,16 @@
 import { and, eq } from 'drizzle-orm'
-import type { Db } from '../client'
+import { lift, runWithDb } from '../database'
 import { authAdmission, authInvitation, authPolicy, authRole, authUser, users } from '../schema'
 import type { AuthPrincipal } from '../../lib/server/auth/principal'
 import { initializeNewUser } from '../../lib/server/initialize-new-user'
-import { runInTransaction } from './shared'
+import { runInTransaction, type Db } from './shared'
 
 export async function hashAuthenticationToken(token: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export async function registrationInvitation(db: Db, token?: string): Promise<string | null> {
+async function registrationInvitationSql(db: Db, token?: string): Promise<string | null> {
   if (token) {
     const [invitation] = await db
       .select()
@@ -33,7 +33,7 @@ export async function registrationInvitation(db: Db, token?: string): Promise<st
 }
 
 /** The migration trigger commits admission, financial identity and place consumption in one statement. */
-export async function admitVerifiedUser(db: Db, id: string): Promise<void> {
+async function admitVerifiedUserSql(db: Db, id: string): Promise<void> {
   await runInTransaction(db, async (tx) => {
     const [existing] = await tx
       .select()
@@ -52,11 +52,11 @@ export async function admitVerifiedUser(db: Db, id: string): Promise<void> {
       .insert(authAdmission)
       .values({ userId: id, invitationId: user.invitationId, createdAt: new Date() })
       .onConflictDoNothing()
-    if (!financialUser) await initializeNewUser(tx, id)
+    if (!financialUser) await runWithDb(tx, initializeNewUser(id))
   })
 }
 
-export async function authenticatedPrincipal(db: Db, id: string): Promise<AuthPrincipal | null> {
+async function authenticatedPrincipalSql(db: Db, id: string): Promise<AuthPrincipal | null> {
   const [row] = await db
     .select({ id: users.id, email: users.email, name: authUser.name })
     .from(authAdmission)
@@ -76,7 +76,7 @@ export async function authenticatedPrincipal(db: Db, id: string): Promise<AuthPr
   }
 }
 
-export async function createInvitation(db: Db, userId: string, maxUses = 5, days = 7) {
+async function createInvitationSql(db: Db, userId: string, maxUses = 5, days = 7) {
   if (
     !Number.isInteger(maxUses) ||
     maxUses < 1 ||
@@ -102,7 +102,7 @@ export async function createInvitation(db: Db, userId: string, maxUses = 5, days
   return { id, token }
 }
 
-export async function registrationAdministration(db: Db) {
+async function registrationAdministrationSql(db: Db) {
   const [policy] = await db.select().from(authPolicy).where(eq(authPolicy.id, 'registration'))
   const invitations = await db
     .select({
@@ -116,19 +116,19 @@ export async function registrationAdministration(db: Db) {
   return { publicRegistration: policy?.publicRegistration ?? false, invitations }
 }
 
-export async function updateRegistrationPolicy(db: Db, publicRegistration: boolean) {
+async function updateRegistrationPolicySql(db: Db, publicRegistration: boolean) {
   await db.update(authPolicy).set({ publicRegistration }).where(eq(authPolicy.id, 'registration'))
 }
-export async function revokeInvitation(db: Db, id: string) {
+async function revokeInvitationSql(db: Db, id: string) {
   await db.update(authInvitation).set({ revoked: true }).where(eq(authInvitation.id, id))
 }
-export async function grantAdministrator(db: Db, userId: string) {
-  const principal = await authenticatedPrincipal(db, userId)
+async function grantAdministratorSql(db: Db, userId: string) {
+  const principal = await authenticatedPrincipalSql(db, userId)
   if (!principal) throw new Error('El usuario debe haber completado su registro.')
   await db.insert(authRole).values({ userId, role: 'admin' }).onConflictDoNothing()
 }
 
-export async function assertNewFinancialEmail(db: Db, email: string): Promise<void> {
+async function assertNewFinancialEmailSql(db: Db, email: string): Promise<void> {
   const [existing] = await db
     .select({ id: users.id })
     .from(users)
@@ -139,3 +139,13 @@ export async function assertNewFinancialEmail(db: Db, email: string): Promise<vo
       'Hay datos existentes para este correo. Completa la migración de tu identidad antes de registrarte.',
     )
 }
+
+export const registrationInvitation = lift(registrationInvitationSql)
+export const admitVerifiedUser = lift(admitVerifiedUserSql)
+export const authenticatedPrincipal = lift(authenticatedPrincipalSql)
+export const createInvitation = lift(createInvitationSql)
+export const registrationAdministration = lift(registrationAdministrationSql)
+export const updateRegistrationPolicy = lift(updateRegistrationPolicySql)
+export const revokeInvitation = lift(revokeInvitationSql)
+export const grantAdministrator = lift(grantAdministratorSql)
+export const assertNewFinancialEmail = lift(assertNewFinancialEmailSql)

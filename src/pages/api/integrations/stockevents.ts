@@ -8,6 +8,7 @@ import {
   withApiErrorHandling,
 } from "../../../lib/server/api-auth";
 import { getRuntimeEnvFromLocals } from "../../../lib/server/cloudflare-env";
+import { runServer } from '../../../lib/server/runtime'
 
 const PROVIDER = "stockevents";
 const MAX_API_KEY_LENGTH = 512;
@@ -16,12 +17,9 @@ async function getCredential(locals: App.Locals) {
   const principal = requirePrincipal(locals);
   const db = getDb(locals);
   const env = getRuntimeEnvFromLocals(locals);
-  const credential = await integrationCredentialsRepository.getByProvider(
-    db,
-    principal.userId,
+  const credential = await runServer(db, integrationCredentialsRepository.getByProvider(principal.userId,
     PROVIDER,
-    env,
-  );
+    env,));
   return { credential, db, env, userId: principal.userId };
 }
 
@@ -46,29 +44,23 @@ export const PUT: APIRoute = async ({ request, locals }) =>
       // (audit §6.1). When that happens the intent is still "this key is now
       // the key", so it is re-read and retried once rather than surfaced as an
       // error the user can do nothing about.
-      const updated = await integrationCredentialsRepository.update(
-        db,
-        userId,
+      const updated = await runServer(db, integrationCredentialsRepository.update(userId,
         credential.id,
         { secret: apiKey },
         env,
-        credential.version,
-      );
+        credential.version,));
       if (!updated) {
-        const current = await integrationCredentialsRepository.get(db, userId, credential.id, env);
+        const current = await runServer(db, integrationCredentialsRepository.get(userId, credential.id, env));
         if (current) {
-          await integrationCredentialsRepository.update(
-            db,
-            userId,
+          await runServer(db, integrationCredentialsRepository.update(userId,
             current.id,
             { secret: apiKey },
             env,
-            current.version,
-          );
+            current.version,));
         }
       }
     } else {
-      await integrationCredentialsRepository.create(db, userId, { provider: PROVIDER, secret: apiKey }, env);
+      await runServer(db, integrationCredentialsRepository.create(userId, { provider: PROVIDER, secret: apiKey }, env));
     }
     return jsonResponse({ configured: true }, 200);
   });
@@ -77,7 +69,7 @@ export const DELETE: APIRoute = async ({ locals }) =>
   withApiErrorHandling("/api/integrations/stockevents", async () => {
     const { credential, db, userId } = await getCredential(locals);
     if (credential) {
-      await integrationCredentialsRepository.remove(db, userId, credential.id);
+      await runServer(db, integrationCredentialsRepository.remove(userId, credential.id));
     }
     return jsonResponse({ configured: false }, 200);
   });

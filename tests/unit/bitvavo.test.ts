@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import fixture from './fixtures/bitvavo-real-sanitized.json'
+import { Effect } from 'effect'
 import { fetchBitvavoHistory, InvalidCredential } from '../../src/lib/server/bitvavo/client'
+import { Http } from '../../src/lib/server/http'
+
+const history = (
+  credentials: { apiKey: string; apiSecret: string },
+  range: { from: number; to: number; timeZone: string; startDate?: string },
+  request: typeof fetch,
+) =>
+  Effect.runPromise(
+    Effect.provideService(fetchBitvavoHistory(credentials, range), Http, { request }),
+  )
 
 const credentials = { apiKey: 'test-key', apiSecret: 'test-secret' }
 const range = { from: 0, to: 1700000000000, timeZone: 'Europe/Madrid' }
@@ -15,7 +26,7 @@ describe('Bitvavo account history', () => {
         totalPages: 1,
       }),
     )
-    const result = await fetchBitvavoHistory(credentials, range, http)
+    const result = await history(credentials, range, http)
     expect(result.operations[0]).toMatchObject({
       externalId: 'example-1',
       quantity: '0.00008878285',
@@ -33,7 +44,7 @@ describe('Bitvavo account history', () => {
     const http = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('test-secret', { status: 401 }))
-    await expect(fetchBitvavoHistory(credentials, range, http)).rejects.toBeInstanceOf(
+    await expect(history(credentials, range, http)).rejects.toBeInstanceOf(
       InvalidCredential,
     )
     expect(http).toHaveBeenCalledTimes(1)
@@ -47,7 +58,7 @@ describe('Bitvavo account history', () => {
       .mockResolvedValueOnce(
         Response.json({ items: fixture.transactions, currentPage: 1, totalPages: 1 }),
       )
-    const result = fetchBitvavoHistory(credentials, range, http)
+    const result = history(credentials, range, http)
     await vi.waitFor(() => expect(http).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(0)
     await vi.advanceTimersByTimeAsync(1900)
@@ -80,7 +91,7 @@ describe('Bitvavo account history', () => {
         totalPages: 1,
       }),
     )
-    const result = await fetchBitvavoHistory(credentials, range, http)
+    const result = await history(credentials, range, http)
     expect(result.incompatible).toEqual([{ externalId: operation.transactionId, reason }])
   })
 
@@ -92,7 +103,7 @@ describe('Bitvavo account history', () => {
         totalPages: 1,
       }),
     )
-    await expect(fetchBitvavoHistory(credentials, range, http)).rejects.toThrow('repetidas')
+    await expect(history(credentials, range, http)).rejects.toThrow('repetidas')
   })
 
   it('excludes incompatible operations before the configured local start date', async () => {
@@ -104,6 +115,6 @@ describe('Bitvavo account history', () => {
       }),
     )
     const localRange = { ...range, startDate: '2020-01-02' }
-    expect((await fetchBitvavoHistory(credentials, localRange, http)).incompatible).toEqual([])
+    expect((await history(credentials, localRange, http)).incompatible).toEqual([])
   })
 })

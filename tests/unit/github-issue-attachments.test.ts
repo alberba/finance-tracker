@@ -1,9 +1,15 @@
+import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
 import {
   uploadIssueAttachment,
   type AttachmentUploadContext,
 } from '../../src/lib/server/issue-attachments'
-import { createIssueFromWebReport, type IssueReporter } from '../../src/lib/server/github-issues'
+import {
+  createIssueFromWebReport as createIssueFromWebReportEffect,
+  type GithubIssueClient,
+  type IssueReporter,
+} from '../../src/lib/server/github-issues'
+import { Http } from '../../src/lib/server/http'
 import {
   parseIssueReportPayload,
   type IssueReportPayload,
@@ -111,6 +117,21 @@ describe('uploadIssueAttachment', () => {
     expect(fakeFetch).not.toHaveBeenCalled()
   })
 })
+
+/** El test es el borde: ejecuta el efecto con un `fetch` falso como capa Http. */
+function createIssueFromWebReport(
+  payload: IssueReportPayload,
+  reporter: IssueReporter,
+  env: Record<string, string>,
+  client: { fetch: typeof fetch } & GithubIssueClient,
+): Promise<{ number: number; url: string; duplicate?: boolean }> {
+  const { fetch: request, ...rest } = client
+  return Effect.runPromise(
+    Effect.provideService(createIssueFromWebReportEffect(payload, reporter, env, rest), Http, {
+      request,
+    }),
+  )
+}
 
 describe('createIssueFromWebReport con adjuntos', () => {
   it('escribe la sección «Adjuntos» con una referencia por imagen subida', async () => {

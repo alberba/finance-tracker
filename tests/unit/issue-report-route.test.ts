@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 
 // Se mockean el cliente de GitHub (para forzar el fallo controlado) y el
 // tracking (para que el SDK real de Sentry nunca se importe): acá solo se
@@ -55,7 +56,7 @@ beforeEach(() => {
 describe('POST /api/issues/report con el cliente de GitHub caído', () => {
   it('respondiendo 500 sigue reportando el fallo como error de ruta', async () => {
     const error = new Error('GitHub respondió 502')
-    githubIssues.createIssueFromWebReport.mockRejectedValue(error)
+    githubIssues.createIssueFromWebReport.mockReturnValue(Effect.fail(error))
 
     const response = await POST(makeContext())
 
@@ -73,10 +74,12 @@ describe('POST /api/issues/report con el cliente de GitHub caído', () => {
 
 describe('POST /api/issues/report con el cliente de GitHub sano', () => {
   it('crea la issue sin reportar nada', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 654,
-      url: 'https://github.com/alberba/finance-tracker/issues/654',
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 654,
+        url: 'https://github.com/alberba/finance-tracker/issues/654',
+      }),
+    )
 
     const response = await POST(makeContext())
 
@@ -96,10 +99,12 @@ describe('POST /api/issues/report y el reportero', () => {
   })
 
   it('pasa al servicio el reportero del principal, ignorando el del payload', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 1,
-      url: 'https://github.com/alberba/finance-tracker/issues/1',
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 1,
+        url: 'https://github.com/alberba/finance-tracker/issues/1',
+      }),
+    )
     const spoofed = {
       ...PAYLOAD,
       reporter: { userId: 'otro', email: 'otro@example.com', name: 'Otro' },
@@ -147,11 +152,13 @@ describe('POST /api/issues/report con un payload inválido', () => {
 
 describe('POST /api/issues/report con una duplicada', () => {
   it('devuelve el enlace existente con 200 y duplicate, sin afirmar creación', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 9,
-      url: 'https://github.com/org/repo/issues/9',
-      duplicate: true,
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 9,
+        url: 'https://github.com/org/repo/issues/9',
+        duplicate: true,
+      }),
+    )
     const response = await POST(makeContext())
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({

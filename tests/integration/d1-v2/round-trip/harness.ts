@@ -31,6 +31,7 @@ import { listChangesSince } from '../../../../src/db/repositories/sync'
 import type { State } from '../../../../src/scripts/types'
 import { createTestDb, type TestDatabase } from '../setup'
 import type { Db } from '../../../../src/db/client'
+import { runWithDb } from '../../../../src/db/database'
 
 /**
  * The test database is better-sqlite3-backed, so it lacks D1's `batch`. No
@@ -117,16 +118,16 @@ export async function startRoundTrip(
         throw new TypeError('Failed to fetch')
       }
       if (url.startsWith('/api/bootstrap')) {
-        return json(await buildBootstrapPayload(asServerDb(testDb.db), user.id))
+        return json(await runWithDb(asServerDb(testDb.db), buildBootstrapPayload(user.id)))
       }
       if (url.startsWith('/api/changes')) {
         const since = Number(new URL(url, 'https://test.local').searchParams.get('since') ?? 0)
-        const changes = await listChangesSince(asServerDb(testDb.db), user.id, since)
+        const changes = await runWithDb(asServerDb(testDb.db), listChangesSince(user.id, since))
         return json({ revision: changes.at(-1)?.revision ?? since, changes })
       }
       if (url === '/api/sync') {
         const { commands } = JSON.parse(String(init?.body))
-        return json(await applySyncBatch(asServerDb(testDb.db), user.id, commands))
+        return json(await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands)))
       }
       throw new Error(`unexpected fetch ${url}`)
     }),
@@ -142,8 +143,8 @@ export async function startRoundTrip(
 
   /** Waits until the outbox stops changing and, when online, has drained. */
   async function quiesce(): Promise<void> {
-    const { count: countOutbox, openOutbox } = await import('../../../../src/lib/client/outbox')
-    const db = await openOutbox(user.id)
+    const { count: countOutbox, openStorage } = await import('../../../helpers/client-storage')
+    const db = await openStorage(user.id)
     try {
       let last = -1
       let stable = 0
@@ -177,8 +178,8 @@ export async function startRoundTrip(
     userId: user.id,
     testDb,
     pending: async () => {
-      const { listAll, openOutbox } = await import('../../../../src/lib/client/outbox')
-      const db = await openOutbox(user.id)
+      const { listAll, openStorage } = await import('../../../helpers/client-storage')
+      const db = await openStorage(user.id)
       try {
         return await listAll(db)
       } finally {
@@ -193,7 +194,7 @@ export async function startRoundTrip(
       offline = next
     },
     asOtherDevice: async (commands) => {
-      await applySyncBatch(asServerDb(testDb.db), user.id, commands as never)
+      await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands as never))
     },
     reloadOffline: async () => {
       await quiesce()

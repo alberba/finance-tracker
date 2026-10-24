@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
 import { fetchBackup, restoreBackup } from '../lib/client/data-backup'
+import { runClientHttp } from '../lib/client/runtime'
 import { initializeFreshState } from '../lib/client/state-initialize'
 import { isDemoMode } from '../scripts/demo-mode'
 import { useFinancialStateStore } from './financial-state'
@@ -31,7 +32,7 @@ export const useDataStore = defineStore('data', () => {
 
   async function exportJson(): Promise<void> {
     if (backsUpServerData) {
-      const result = await fetchBackup()
+      const result = await runClientHttp(fetchBackup())
       if (!result.ok) {
         showToast(`No se pudo exportar: ${result.error}`)
         return
@@ -101,7 +102,7 @@ export const useDataStore = defineStore('data', () => {
       showToast('Hay cambios sin sincronizar. Conéctate y vuelve a intentarlo.')
       return
     }
-    const result = await restoreBackup(await file.text())
+    const result = await runClientHttp(restoreBackup(await file.text()))
     if (!result.ok) {
       showToast(`No se pudo importar: ${result.error}`)
       return
@@ -121,7 +122,7 @@ export const useDataStore = defineStore('data', () => {
     if (!canStartFresh) {
       return
     }
-    const result = await initializeFreshState()
+    const result = await runClientHttp(initializeFreshState())
     if (!result.ok) {
       showToast(result.error ?? 'No se pudo crear el espacio nuevo.')
       return

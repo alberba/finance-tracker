@@ -65,6 +65,13 @@ it('blocks confirmation until every possible duplicate has an explicit resolutio
   vi.stubGlobal('fetch', http)
   const wrapper = mount(BitvavoImportPanel, { global: { plugins: [pinia] }, props: { open: true } })
   await flushPromises()
+  // The panel loads its adapter on demand; wait for the action to render
+  // before clicking it, or a slow CI worker finds no button yet.
+  await vi.waitFor(() => {
+    expect(
+      wrapper.findAll('button').some((button) => button.text() === 'Preparar vista previa'),
+    ).toBe(true)
+  })
   const prepare = wrapper
     .findAll('button')
     .find((button) => button.text() === 'Preparar vista previa')!

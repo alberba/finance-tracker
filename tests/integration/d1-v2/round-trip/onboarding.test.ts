@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { syncSettingsUpdate } from '../../../../src/lib/client/command-mapping'
 import * as settingsRepository from '../../../../src/db/repositories/user-settings'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { runWithDb } from '../../../../src/db/database'
 
 const progress = {
   onboardingPresented: true,
@@ -30,7 +31,7 @@ describe('onboarding settings round trip', () => {
     expect(await trip.reload()).toMatchObject(progress)
     await syncSettingsUpdate({ currency: 'USD' })
     expect(await trip.reload()).toMatchObject({ ...progress, currency: 'USD' })
-    expect(await settingsRepository.get(trip.testDb.db, trip.userId)).toMatchObject(
+    expect(await runWithDb(trip.testDb.db, settingsRepository.get(trip.userId))).toMatchObject(
       Object.fromEntries(Object.keys(progress).map((key) => [key, 1])),
     )
   })
@@ -49,14 +50,14 @@ describe('onboarding settings round trip', () => {
     await syncSettingsUpdate(progress)
     await trip.reload()
     const { applySyncBatch } = await import('../../../../src/lib/server/sync/apply-command')
-    const result = await applySyncBatch(trip.testDb.db, trip.userId, [
+    const result = await runWithDb(trip.testDb.db, applySyncBatch(trip.userId, [
       {
         commandId: 'onboarding-replay',
         action: 'settingsUpdate',
         baseVersion: 0,
         patch: progress,
       },
-    ])
+    ]))
     expect(result.results[0].status).toBe('noop')
   })
 })

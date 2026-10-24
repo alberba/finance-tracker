@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as userSettingsRepo from "../../../../src/db/repositories/user-settings";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("user-settings repository", () => {
   let testDb: TestDatabase;
@@ -18,24 +19,24 @@ describe("user-settings repository", () => {
     const { db } = testDb;
     const user = await seedUser(db);
 
-    const created = await userSettingsRepo.create(db, user.id, { currency: "USD", theme: "dark" });
+    const created = await runWithDb(db, userSettingsRepo.create(user.id, { currency: "USD", theme: "dark" }));
     expect(created.currency).toBe("USD");
 
-    const found = await userSettingsRepo.get(db, user.id);
+    const found = await runWithDb(db, userSettingsRepo.get(user.id));
     expect(found?.theme).toBe("dark");
 
-    const updated = await userSettingsRepo.update(db, user.id, { theme: "light" });
+    const updated = await runWithDb(db, userSettingsRepo.update(user.id, { theme: "light" }));
     expect(updated?.theme).toBe("light");
     expect(updated?.version).toBe(2);
 
-    const removed = await userSettingsRepo.remove(db, user.id);
+    const removed = await runWithDb(db, userSettingsRepo.remove(user.id));
     expect(removed).toBe(true);
-    expect(await userSettingsRepo.get(db, user.id)).toBeUndefined();
+    expect(await runWithDb(db, userSettingsRepo.get(user.id))).toBeUndefined();
   });
 
   it("rejects creating settings for a non-existent user (FK violation)", async () => {
     const { db } = testDb;
-    await expect(userSettingsRepo.create(db, "does-not-exist", {})).rejects.toThrow(
+    await expect(runWithDb(db, userSettingsRepo.create("does-not-exist", {}))).rejects.toThrow(
       /FOREIGN KEY constraint failed/i,
     );
   });
@@ -44,21 +45,21 @@ describe("user-settings repository", () => {
     const { db } = testDb;
     const userA = await seedUser(db);
     const userB = await seedUser(db);
-    await userSettingsRepo.create(db, userA.id, { currency: "EUR" });
+    await runWithDb(db, userSettingsRepo.create(userA.id, { currency: "EUR" }));
 
-    expect(await userSettingsRepo.get(db, userB.id)).toBeUndefined();
-    expect(await userSettingsRepo.update(db, userB.id, { currency: "USD" })).toBeUndefined();
-    expect(await userSettingsRepo.remove(db, userB.id)).toBe(false);
+    expect(await runWithDb(db, userSettingsRepo.get(userB.id))).toBeUndefined();
+    expect(await runWithDb(db, userSettingsRepo.update(userB.id, { currency: "USD" }))).toBeUndefined();
+    expect(await runWithDb(db, userSettingsRepo.remove(userB.id))).toBe(false);
   });
 
   it("rejects updates and deletes based on a stale version", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
-    const created = await userSettingsRepo.create(db, user.id);
+    const created = await runWithDb(db, userSettingsRepo.create(user.id));
 
-    expect(await userSettingsRepo.update(db, user.id, { currency: "USD" }, created.version + 1))
+    expect(await runWithDb(db, userSettingsRepo.update(user.id, { currency: "USD" }, created.version + 1)))
       .toBeUndefined();
-    expect(await userSettingsRepo.remove(db, user.id, created.version + 1)).toBe(false);
-    expect(await userSettingsRepo.get(db, user.id)).toMatchObject({ currency: "EUR", version: 1 });
+    expect(await runWithDb(db, userSettingsRepo.remove(user.id, created.version + 1))).toBe(false);
+    expect(await runWithDb(db, userSettingsRepo.get(user.id))).toMatchObject({ currency: "EUR", version: 1 });
   });
 });

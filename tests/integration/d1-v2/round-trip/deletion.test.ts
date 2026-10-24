@@ -9,6 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 async function seedAccountAndCategory(trip: RoundTrip) {
   const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
@@ -67,7 +68,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
 
     const transactionsRepository = await import("../../../../src/db/repositories/transactions");
     expect(
-      await transactionsRepository.getTradeDetailByTransaction(trip.testDb.db, trip.userId, movementId),
+      await runWithDb(trip.testDb.db, transactionsRepository.getTradeDetailByTransaction(trip.userId, movementId)),
     ).toBeUndefined();
   });
 
@@ -145,14 +146,14 @@ describe("round trip: borrar avisa en vez de fallar", () => {
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
       const recurringRulesRepository = await import("../../../../src/db/repositories/recurring-rules");
       const pendingMovementsRepository = await import("../../../../src/db/repositories/pending-movements");
-      const account = await accountsRepository.create(db, userId, {
+      const account = await runWithDb(db, accountsRepository.create(userId, {
         name: "Revolut",
         kind: "cash",
         currency: "EUR",
         openingBalance: 0,
         legacyId: "revolut",
-      });
-      const rule = await recurringRulesRepository.create(db, userId, {
+      }));
+      const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
         name: "Aportación mensual VWCE",
         type: "investment",
         accountId: account.id,
@@ -160,14 +161,14 @@ describe("round trip: borrar avisa en vez de fallar", () => {
         currency: "EUR",
         frequency: "monthly",
         legacyId: "rule-1",
-      });
-      await pendingMovementsRepository.create(db, userId, {
+      }));
+      await runWithDb(db, pendingMovementsRepository.create(userId, {
         recurringRuleId: rule.id,
         accountId: account.id,
         amount: 200,
         currency: "EUR",
         dueDate: "2026-10-01",
-      });
+      }));
     });
 
     const withRule = await trip.reload();

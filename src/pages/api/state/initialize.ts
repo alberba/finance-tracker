@@ -11,6 +11,7 @@ import * as userSettingsRepository from '../../../db/repositories/user-settings'
 import * as syncRepository from '../../../db/repositories/sync'
 import { runInTransaction } from '../../../db/repositories/shared'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
+import { runServer } from '../../../lib/server/runtime'
 
 export const POST: APIRoute = async ({ request, locals }) =>
   withApiErrorHandling('/api/state/initialize', async () => {
@@ -29,16 +30,16 @@ export const POST: APIRoute = async ({ request, locals }) =>
     }
 
     const result = await runInTransaction(db, async (tx) => {
-      const existingSettings = await userSettingsRepository.get(tx, userId)
+      const existingSettings = await runServer(tx, userSettingsRepository.get(userId))
       if (existingSettings) {
-        await syncRepository.ensureRevision(tx, userId)
+        await runServer(tx, syncRepository.ensureRevision(userId))
         return { alreadyInitialized: true, settings: existingSettings }
       }
-      const settings = await userSettingsRepository.create(tx, userId, {
+      const settings = await runServer(tx, userSettingsRepository.create(userId, {
         currency: requestedCurrency ?? 'EUR',
-      })
-      const categories = await accountsRepository.listCategoriesByUser(tx, userId)
-      await syncRepository.ensureRevision(tx, userId)
+      }))
+      const categories = await runServer(tx, accountsRepository.listCategoriesByUser(userId))
+      await runServer(tx, syncRepository.ensureRevision(userId))
       return { alreadyInitialized: false, settings, categories }
     })
 

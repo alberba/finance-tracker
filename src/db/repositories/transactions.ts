@@ -8,6 +8,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm'
+import { lift } from '../database'
 import { fromMinorUnits, toMinorUnits } from '../../lib/money'
 import type { RemoteOperation } from '../../lib/bitvavo-types'
 import { investmentTradeDetails, transactions } from '../schema'
@@ -89,12 +90,12 @@ function toTransactionRow(row: typeof transactions.$inferSelect): TransactionRow
   return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) }
 }
 
-export async function listByUser(db: Db, userId: string): Promise<TransactionRow[]> {
+async function listByUserSql(db: Db, userId: string): Promise<TransactionRow[]> {
   const rows = await db.select().from(transactions).where(eq(transactions.userId, userId))
   return rows.map(toTransactionRow)
 }
 
-export async function get(db: Db, userId: string, id: string): Promise<TransactionRow | undefined> {
+async function getSql(db: Db, userId: string, id: string): Promise<TransactionRow | undefined> {
   const [row] = await db
     .select()
     .from(transactions)
@@ -102,7 +103,7 @@ export async function get(db: Db, userId: string, id: string): Promise<Transacti
   return row ? toTransactionRow(row) : undefined
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateTransactionInput,
@@ -146,14 +147,14 @@ export async function create(
   return toTransactionRow(row)
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdateTransactionInput,
   expectedVersion?: number,
 ): Promise<TransactionRow | undefined> {
-  const existing = await get(db, userId, id)
+  const existing = await getSql(db, userId, id)
   if (!existing) {
     return undefined
   }
@@ -221,13 +222,13 @@ export async function update(
   return toTransactionRow(row)
 }
 
-export async function remove(
+async function removeSql(
   db: Db,
   userId: string,
   id: string,
   expectedVersion?: number,
 ): Promise<boolean> {
-  const existing = await get(db, userId, id)
+  const existing = await getSql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -252,7 +253,7 @@ export async function remove(
   return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateTransactionInput[],
@@ -306,7 +307,7 @@ function toInvestmentTradeDetailRow(
   }
 }
 
-export async function getTradeDetailByTransaction(
+async function getTradeDetailByTransactionSql(
   db: Db,
   userId: string,
   transactionId: string,
@@ -329,7 +330,7 @@ export async function getTradeDetailByTransaction(
  * instead of one query per transaction. Each transaction has at most one
  * trade detail, so the map is keyed one-to-one.
  */
-export async function listTradeDetailsByTransactions(
+async function listTradeDetailsByTransactionsSql(
   db: Db,
   userId: string,
   transactionIds: string[],
@@ -359,7 +360,7 @@ export async function listTradeDetailsByTransactions(
   return byTransaction
 }
 
-export async function createTradeDetail(
+async function createTradeDetailSql(
   db: Db,
   userId: string,
   input: CreateInvestmentTradeDetailInput,
@@ -402,19 +403,19 @@ async function writeOperation(
   // drops it, even when the caller said nothing: otherwise the movement would
   // keep títulos and precio it no longer has any meaning for.
   if (type !== 'investment') {
-    const stale = await getTradeDetailByTransaction(db, userId, transactionId)
+    const stale = await getTradeDetailByTransactionSql(db, userId, transactionId)
     if (stale) {
-      await removeTradeDetail(db, userId, stale.id)
+      await removeTradeDetailSql(db, userId, stale.id)
     }
     return
   }
   if (operation === undefined) {
     return
   }
-  const existing = await getTradeDetailByTransaction(db, userId, transactionId)
+  const existing = await getTradeDetailByTransactionSql(db, userId, transactionId)
   if (!operation) {
     if (existing) {
-      await removeTradeDetail(db, userId, existing.id)
+      await removeTradeDetailSql(db, userId, existing.id)
     }
     return
   }
@@ -445,7 +446,7 @@ async function writeOperation(
   })
 }
 
-export async function removeTradeDetail(db: Db, userId: string, id: string): Promise<boolean> {
+async function removeTradeDetailSql(db: Db, userId: string, id: string): Promise<boolean> {
   const [row] = await db
     .select()
     .from(investmentTradeDetails)
@@ -458,3 +459,14 @@ export async function removeTradeDetail(db: Db, userId: string, id: string): Pro
     .where(and(eq(investmentTradeDetails.id, id), eq(investmentTradeDetails.userId, userId)))
   return true
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)
+export const getTradeDetailByTransaction = lift(getTradeDetailByTransactionSql)
+export const listTradeDetailsByTransactions = lift(listTradeDetailsByTransactionsSql)
+export const createTradeDetail = lift(createTradeDetailSql)
+export const removeTradeDetail = lift(removeTradeDetailSql)

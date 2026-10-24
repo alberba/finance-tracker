@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("round trip: subscriptions", () => {
   let trip: RoundTrip;
@@ -52,7 +53,7 @@ describe("round trip: subscriptions", () => {
     // The write half works: the row really is in D1. Everything that follows
     // is about reading it back (audit §3.1).
     const stored = await import("../../../../src/db/repositories/subscriptions").then((repo) =>
-      repo.listByUser(trip.testDb.db, trip.userId),
+      runWithDb(trip.testDb.db, repo.listByUser(trip.userId)),
     );
     expect(stored).toHaveLength(1);
     expect(stored[0].name).toBe("Netflix");
@@ -118,18 +119,18 @@ describe("round trip: subscriptions", () => {
     const { useMovementsStore } = await import("../../../../src/stores/movements");
     const accountsRepository = await import("../../../../src/db/repositories/accounts");
 
-    await accountsRepository.create(trip.testDb.db, trip.userId, {
+    await runWithDb(trip.testDb.db, accountsRepository.create(trip.userId, {
       legacyId: "revolut",
       name: "Revolut",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
-    await accountsRepository.createCategory(trip.testDb.db, trip.userId, {
+    }));
+    await runWithDb(trip.testDb.db, accountsRepository.createCategory(trip.userId, {
       legacyId: "expense:Ocio",
       name: "Ocio",
       kind: "expense",
-    });
+    }));
     await trip.reload();
 
     const currentFinancialState = useFinancialStateStore();
@@ -159,14 +160,14 @@ describe("round trip: subscriptions", () => {
       trip = await startRoundTrip(async (db, userId) => {
         const accounts = await import('../../../../src/db/repositories/accounts')
         const subscriptions = await import('../../../../src/db/repositories/subscriptions')
-        const account = await accounts.create(db, userId, {
+        const account = await runWithDb(db, accounts.create(userId, {
           legacyId: 'legacy-account',
           name: 'Cuenta',
           kind: 'cash',
           currency: 'EUR',
           openingBalance: 0,
-        })
-        await subscriptions.create(db, userId, {
+        }))
+        await runWithDb(db, subscriptions.create(userId, {
           legacyId: 'legacy-todoist',
           name: 'Todoist',
           accountId: account.id,
@@ -175,13 +176,13 @@ describe("round trip: subscriptions", () => {
           frequency: 'yearly',
           startDate: '2025-09-12',
           nextChargeDate,
-        })
+        }))
       })
 
       await trip.reload()
       const subscriptionsRepository = await import('../../../../src/db/repositories/subscriptions')
       expect(
-        (await subscriptionsRepository.listByUser(trip.testDb.db, trip.userId))[0].nextChargeDate,
+        (await runWithDb(trip.testDb.db, subscriptionsRepository.listByUser(trip.userId)))[0].nextChargeDate,
       ).toBe('2026-09-12')
       vi.setSystemTime('2026-09-13T10:00:00Z')
       const reloaded = await trip.reload()
@@ -194,7 +195,7 @@ describe("round trip: subscriptions", () => {
       const secondReload = await trip.reload()
       expect(secondReload.transactions).toHaveLength(1)
       const transactionsRepository = await import('../../../../src/db/repositories/transactions')
-      expect(await transactionsRepository.listByUser(trip.testDb.db, trip.userId)).toHaveLength(1)
+      expect(await runWithDb(trip.testDb.db, transactionsRepository.listByUser(trip.userId))).toHaveLength(1)
     },
   )
 
@@ -202,13 +203,13 @@ describe("round trip: subscriptions", () => {
     const subscriptionsRepository = await import(
       "../../../../src/db/repositories/subscriptions"
     );
-    const created = await subscriptionsRepository.create(trip.testDb.db, trip.userId, {
+    const created = await runWithDb(trip.testDb.db, subscriptionsRepository.create(trip.userId, {
       legacyId: "legacy-netflix",
       name: "Netflix",
       amount: 13.99,
       currency: "EUR",
       frequency: "monthly",
-    });
+    }));
     trip.testDb.sqlite
       .prepare(
         "UPDATE subscriptions SET billing_day = 31, start_date = NULL, next_charge_date = NULL, created_at = ? WHERE id = ?",

@@ -33,6 +33,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
+import { runWithDb } from '../src/db/database'
 import { usersRepository } from '../src/db/repositories'
 import { openLocalV2Db } from './lib/local-v2-db'
 import {
@@ -153,7 +154,7 @@ export async function runRepairCli(argv: string[]): Promise<{
     let userId = requestedUserId
     if (!userId) {
       const email = requestedEmail!
-      const user = await usersRepository.getByEmail(db, email)
+      const user = await runWithDb(db, usersRepository.getByEmail(email))
       if (!user) {
         throw new Error(
           `No se encontró ningún usuario con el email '${email}'. Pasa --user-id o --email explícitamente.`,

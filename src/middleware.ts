@@ -14,6 +14,7 @@ import {
   rejectUnsafeApiMutation,
   requiresAuthentication,
 } from './lib/server/request-security'
+import { runServer } from './lib/server/runtime'
 
 /** Test-only principal injection; requires TEST_AUTH_ENABLED and a loopback origin. */
 export const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
@@ -67,11 +68,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (testEmail) {
       let testPrincipal: AuthPrincipal | undefined
       try {
-        testPrincipal = await resolvePrincipal(getDb(context.locals), {
-          provider: TEST_AUTH_PROVIDER,
-          subject: testEmail,
-          email: testEmail,
-        })
+        testPrincipal = await runServer(
+          getDb(context.locals),
+          resolvePrincipal({
+            provider: TEST_AUTH_PROVIDER,
+            subject: testEmail,
+            email: testEmail,
+          }),
+        )
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'No se pudo resolver el principal de prueba.'
@@ -103,7 +107,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
       user?: { id: string; emailVerified: boolean }
     } | null
     if (session?.user?.emailVerified) {
-      context.locals.principal = (await authenticatedPrincipal(db, session.user.id)) ?? undefined
+      context.locals.principal =
+        (await runServer(db, authenticatedPrincipal(session.user.id))) ?? undefined
     }
     if (
       !context.locals.principal &&

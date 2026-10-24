@@ -11,6 +11,7 @@
  */
 
 import { and, eq, inArray } from 'drizzle-orm'
+import { lift } from '../database'
 import { fromMinorUnits, toMinorUnits } from '../../lib/money'
 import { marketInstruments, marketQuotes, userInstruments } from '../schema'
 import type { InstrumentQuoteConfig } from '../../scripts/types'
@@ -68,11 +69,11 @@ function toQuoteRow(row: typeof marketQuotes.$inferSelect): MarketQuoteRow {
 
 // -- market_instruments (global) ------------------------------------------------
 
-export async function listInstruments(db: Db): Promise<MarketInstrumentRow[]> {
+async function listInstrumentsSql(db: Db): Promise<MarketInstrumentRow[]> {
   return db.select().from(marketInstruments)
 }
 
-export async function getInstrument(db: Db, id: string): Promise<MarketInstrumentRow | undefined> {
+async function getInstrumentSql(db: Db, id: string): Promise<MarketInstrumentRow | undefined> {
   const [row] = await db.select().from(marketInstruments).where(eq(marketInstruments.id, id))
   return row
 }
@@ -82,7 +83,7 @@ export async function getInstrument(db: Db, id: string): Promise<MarketInstrumen
  * §5.1): one query for every tracked instrument instead of one query per
  * instrument.
  */
-export async function listInstrumentsByIds(db: Db, ids: string[]): Promise<MarketInstrumentRow[]> {
+async function listInstrumentsByIdsSql(db: Db, ids: string[]): Promise<MarketInstrumentRow[]> {
   if (ids.length === 0) {
     return []
   }
@@ -95,7 +96,7 @@ export async function listInstrumentsByIds(db: Db, ids: string[]): Promise<Marke
   return rows
 }
 
-export async function getInstrumentBySymbol(
+async function getInstrumentBySymbolSql(
   db: Db,
   provider: string,
   normalizedSymbol: string,
@@ -112,7 +113,7 @@ export async function getInstrumentBySymbol(
   return row
 }
 
-export async function createInstrument(
+async function createInstrumentSql(
   db: Db,
   input: CreateMarketInstrumentInput,
 ): Promise<MarketInstrumentRow> {
@@ -134,8 +135,8 @@ export async function createInstrument(
   return row
 }
 
-export async function removeInstrument(db: Db, id: string): Promise<boolean> {
-  const existing = await getInstrument(db, id)
+async function removeInstrumentSql(db: Db, id: string): Promise<boolean> {
+  const existing = await getInstrumentSql(db, id)
   if (!existing) {
     return false
   }
@@ -143,7 +144,7 @@ export async function removeInstrument(db: Db, id: string): Promise<boolean> {
   return true
 }
 
-export async function bulkInsertInstruments(
+async function bulkInsertInstrumentsSql(
   db: Db,
   inputs: CreateMarketInstrumentInput[],
 ): Promise<MarketInstrumentRow[]> {
@@ -171,10 +172,7 @@ export async function bulkInsertInstruments(
 
 // -- market_quotes (global) ------------------------------------------------------
 
-export async function listQuotesByInstrument(
-  db: Db,
-  instrumentId: string,
-): Promise<MarketQuoteRow[]> {
+async function listQuotesByInstrumentSql(db: Db, instrumentId: string): Promise<MarketQuoteRow[]> {
   const rows = await db
     .select()
     .from(marketQuotes)
@@ -187,7 +185,7 @@ export async function listQuotesByInstrument(
  * (audit §5.1): one query for every tracked instrument's quotes instead of
  * one query per instrument.
  */
-export async function listQuotesByInstruments(
+async function listQuotesByInstrumentsSql(
   db: Db,
   instrumentIds: string[],
 ): Promise<Map<string, MarketQuoteRow[]>> {
@@ -213,12 +211,12 @@ export async function listQuotesByInstruments(
   return byInstrument
 }
 
-export async function getQuote(db: Db, id: string): Promise<MarketQuoteRow | undefined> {
+async function getQuoteSql(db: Db, id: string): Promise<MarketQuoteRow | undefined> {
   const [row] = await db.select().from(marketQuotes).where(eq(marketQuotes.id, id))
   return row ? toQuoteRow(row) : undefined
 }
 
-export async function createQuote(db: Db, input: CreateMarketQuoteInput): Promise<MarketQuoteRow> {
+async function createQuoteSql(db: Db, input: CreateMarketQuoteInput): Promise<MarketQuoteRow> {
   const [row] = await db
     .insert(marketQuotes)
     .values({
@@ -232,8 +230,8 @@ export async function createQuote(db: Db, input: CreateMarketQuoteInput): Promis
   return toQuoteRow(row)
 }
 
-export async function removeQuote(db: Db, id: string): Promise<boolean> {
-  const existing = await getQuote(db, id)
+async function removeQuoteSql(db: Db, id: string): Promise<boolean> {
+  const existing = await getQuoteSql(db, id)
   if (!existing) {
     return false
   }
@@ -241,7 +239,7 @@ export async function removeQuote(db: Db, id: string): Promise<boolean> {
   return true
 }
 
-export async function bulkInsertQuotes(
+async function bulkInsertQuotesSql(
   db: Db,
   inputs: CreateMarketQuoteInput[],
 ): Promise<MarketQuoteRow[]> {
@@ -266,14 +264,11 @@ export async function bulkInsertQuotes(
 
 // -- user_instruments (per-user) --------------------------------------------------
 
-export async function listUserInstrumentsByUser(
-  db: Db,
-  userId: string,
-): Promise<UserInstrumentRow[]> {
+async function listUserInstrumentsByUserSql(db: Db, userId: string): Promise<UserInstrumentRow[]> {
   return db.select().from(userInstruments).where(eq(userInstruments.userId, userId))
 }
 
-export async function getUserInstrument(
+async function getUserInstrumentSql(
   db: Db,
   userId: string,
   id: string,
@@ -285,7 +280,7 @@ export async function getUserInstrument(
   return row
 }
 
-export async function createUserInstrument(
+async function createUserInstrumentSql(
   db: Db,
   userId: string,
   input: CreateUserInstrumentInput,
@@ -315,14 +310,14 @@ export async function createUserInstrument(
   return row
 }
 
-export async function updateUserInstrument(
+async function updateUserInstrumentSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdateUserInstrumentInput,
   expectedVersion?: number,
 ): Promise<UserInstrumentRow | undefined> {
-  const existing = await getUserInstrument(db, userId, id)
+  const existing = await getUserInstrumentSql(db, userId, id)
   if (!existing) {
     return undefined
   }
@@ -352,13 +347,13 @@ export async function updateUserInstrument(
   return row
 }
 
-export async function removeUserInstrument(
+async function removeUserInstrumentSql(
   db: Db,
   userId: string,
   id: string,
   expectedVersion?: number,
 ): Promise<boolean> {
-  const existing = await getUserInstrument(db, userId, id)
+  const existing = await getUserInstrumentSql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -375,7 +370,7 @@ export async function removeUserInstrument(
   return deleted.length > 0
 }
 
-export async function bulkInsertUserInstruments(
+async function bulkInsertUserInstrumentsSql(
   db: Db,
   userId: string,
   inputs: CreateUserInstrumentInput[],
@@ -385,7 +380,7 @@ export async function bulkInsertUserInstruments(
   }
   if (inputs.some((input) => input.quoteConfig)) {
     const rows: UserInstrumentRow[] = []
-    for (const input of inputs) rows.push(await createUserInstrument(db, userId, input))
+    for (const input of inputs) rows.push(await createUserInstrumentSql(db, userId, input))
     return rows
   }
   const now = nowIso()
@@ -424,7 +419,27 @@ async function materializeQuoteInstrument(db: Db, config: InstrumentQuoteConfig)
     .onConflictDoNothing({
       target: [marketInstruments.provider, marketInstruments.normalizedSymbol],
     })
-  const instrument = await getInstrumentBySymbol(db, config.provider, symbol)
+  const instrument = await getInstrumentBySymbolSql(db, config.provider, symbol)
   if (!instrument) throw new Error('No se pudo crear el instrumento de cotización.')
   return instrument.id
 }
+
+export const listInstruments = lift(listInstrumentsSql)
+export const getInstrument = lift(getInstrumentSql)
+export const listInstrumentsByIds = lift(listInstrumentsByIdsSql)
+export const getInstrumentBySymbol = lift(getInstrumentBySymbolSql)
+export const createInstrument = lift(createInstrumentSql)
+export const removeInstrument = lift(removeInstrumentSql)
+export const bulkInsertInstruments = lift(bulkInsertInstrumentsSql)
+export const listQuotesByInstrument = lift(listQuotesByInstrumentSql)
+export const listQuotesByInstruments = lift(listQuotesByInstrumentsSql)
+export const getQuote = lift(getQuoteSql)
+export const createQuote = lift(createQuoteSql)
+export const removeQuote = lift(removeQuoteSql)
+export const bulkInsertQuotes = lift(bulkInsertQuotesSql)
+export const listUserInstrumentsByUser = lift(listUserInstrumentsByUserSql)
+export const getUserInstrument = lift(getUserInstrumentSql)
+export const createUserInstrument = lift(createUserInstrumentSql)
+export const updateUserInstrument = lift(updateUserInstrumentSql)
+export const removeUserInstrument = lift(removeUserInstrumentSql)
+export const bulkInsertUserInstruments = lift(bulkInsertUserInstrumentsSql)

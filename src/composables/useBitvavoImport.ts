@@ -1,5 +1,7 @@
 import { computed, reactive, shallowRef } from 'vue'
 import type { BitvavoPreview } from '../lib/bitvavo-types'
+import { runClientHttp } from '../lib/client/runtime'
+import { requestBitvavo } from '../lib/client/bitvavo-api'
 import { useSyncStore } from '../stores/sync'
 
 export function useBitvavoImport() {
@@ -27,16 +29,11 @@ export function useBitvavoImport() {
       ),
   )
 
-  async function request(body?: object, method = 'POST') {
-    const response = await fetch('/api/integrations/bitvavo', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    })
-    const result = await response.json()
-    if (!response.ok)
-      throw new Error(result.error || 'No se pudo completar la operación con Bitvavo.')
-    return result
+  function request<T = Record<string, unknown>>(
+    body?: object,
+    method: 'GET' | 'POST' | 'PUT' = 'POST',
+  ): Promise<T> {
+    return runClientHttp(requestBitvavo<T>(body, method))
   }
   async function perform(work: () => Promise<void>) {
     if (busy.value) return
@@ -54,7 +51,11 @@ export function useBitvavoImport() {
   }
   async function load() {
     await perform(async () => {
-      const result = await request(undefined, 'GET')
+      const result = await request<{
+        configured: boolean
+        destinations?: Array<{ id: string; name: string }>
+        connection?: { accountId: string; startDate: string; timeZone: string }
+      }>(undefined, 'GET')
       configured.value = result.configured
       destinations.value = result.destinations || []
       if (result.connection)
@@ -79,7 +80,7 @@ export function useBitvavoImport() {
   async function generatePreview() {
     await perform(async () => {
       await sync.flush()
-      const result = await request({ action: 'preview' })
+      const result = await request<BitvavoPreview>({ action: 'preview' })
       for (const key of Object.keys(resolutions)) delete resolutions[key]
       preview.value = result
     })
@@ -87,7 +88,7 @@ export function useBitvavoImport() {
   async function confirm() {
     if (!preview.value || !canConfirm.value) return
     await perform(async () => {
-      const result = await request({
+      const result = await request<{ imported: number }>({
         action: 'confirm',
         previewId: preview.value!.id,
         resolutions: Object.entries(resolutions).map(([externalId, choice]) => ({

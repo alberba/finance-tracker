@@ -15,6 +15,7 @@ import * as recurringRulesRepository from "../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from "../../../db/repositories/pending-movements";
 import * as budgetEntriesRepository from "../../../db/repositories/budget-entries";
 import * as goalsRepository from "../../../db/repositories/goals";
+import { runServer } from '../../../lib/server/runtime';
 import * as wealthRepository from "../../../db/repositories/wealth";
 import * as contributionsRepository from "../../../db/repositories/contributions";
 import * as marketRepository from "../../../db/repositories/market";
@@ -48,29 +49,26 @@ export const GET: APIRoute = async ({ locals }) =>
       stockeventsCashMappings,
       stockeventsCashSyncEntries,
     ] = await Promise.all([
-      userSettingsRepository.get(db, userId),
-      accountsRepository.listByUser(db, userId),
-      accountsRepository.listCategoriesByUser(db, userId),
-      accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
-      transactionsRepository.listByUser(db, userId),
-      subscriptionsRepository.listByUser(db, userId),
-      recurringRulesRepository.listByUser(db, userId),
-      pendingMovementsRepository.listByUser(db, userId),
-      budgetEntriesRepository.listByUser(db, userId),
-      goalsRepository.listByUser(db, userId),
-      wealthRepository.listByUser(db, userId),
-      contributionsRepository.listByUser(db, userId),
-      marketRepository.listUserInstrumentsByUser(db, userId),
-      stockeventsSymbolMappingsRepository.listByUser(db, userId),
-      stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-      stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+      runServer(db, userSettingsRepository.get(userId)),
+      runServer(db, accountsRepository.listByUser(userId)),
+      runServer(db, accountsRepository.listCategoriesByUser(userId)),
+      runServer(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
+      runServer(db, transactionsRepository.listByUser(userId)),
+      runServer(db, subscriptionsRepository.listByUser(userId)),
+      runServer(db, recurringRulesRepository.listByUser(userId)),
+      runServer(db, pendingMovementsRepository.listByUser(userId)),
+      runServer(db, budgetEntriesRepository.listByUser(userId)),
+      runServer(db, goalsRepository.listByUser(userId)),
+      runServer(db, wealthRepository.listByUser(userId)),
+      runServer(db, contributionsRepository.listByUser(userId)),
+      runServer(db, marketRepository.listUserInstrumentsByUser(userId)),
+      runServer(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
+      runServer(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+      runServer(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
     ]);
 
-    const tradeDetails = await transactionsRepository.listTradeDetailsByTransactions(
-      db,
-      userId,
-      transactions.map((transaction) => transaction.id),
-    );
+    const tradeDetails = await runServer(db, transactionsRepository.listTradeDetailsByTransactions(userId,
+      transactions.map((transaction) => transaction.id),));
     // The operation travels inside its movement (ADR 0002), in the same shape
     // the import hands back to `transactionsRepository.create`.
     const transactionsWithOperations = transactions.map((transaction) => {
@@ -93,18 +91,15 @@ export const GET: APIRoute = async ({ locals }) =>
     const wealthSnapshotsWithBalances = await Promise.all(
       wealthSnapshots.map(async (snapshot) => ({
         ...snapshot,
-        balances: await wealthRepository.listBalancesBySnapshot(db, userId, snapshot.id),
+        balances: await runServer(db, wealthRepository.listBalancesBySnapshot(userId, snapshot.id)),
       })),
     );
 
     const contributionsWithAllocations = await Promise.all(
       contributions.map(async (contribution) => ({
         ...contribution,
-        allocations: await contributionsRepository.listAllocationsByContribution(
-          db,
-          userId,
-          contribution.id,
-        ),
+        allocations: await runServer(db, contributionsRepository.listAllocationsByContribution(userId,
+          contribution.id,)),
       })),
     );
 

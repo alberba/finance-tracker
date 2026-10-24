@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 import type { AuthPrincipal } from '../../src/lib/server/auth/principal'
 
 const { getDb, createAuthentication, authenticatedPrincipal, resolvePrincipal } = vi.hoisted(
@@ -62,13 +63,15 @@ function setSession(user?: { id: string; emailVerified: boolean }, cookies: stri
 beforeEach(() => {
   vi.clearAllMocks()
   getDb.mockReturnValue({})
-  authenticatedPrincipal.mockResolvedValue(authenticated)
-  resolvePrincipal.mockResolvedValue({
-    userId: 'test-user',
-    email: 'tester@example.test',
-    provider: TEST_AUTH_PROVIDER,
-    subject: 'tester@example.test',
-  })
+  authenticatedPrincipal.mockReturnValue(Effect.succeed(authenticated))
+  resolvePrincipal.mockReturnValue(
+    Effect.succeed({
+      userId: 'test-user',
+      email: 'tester@example.test',
+      provider: TEST_AUTH_PROVIDER,
+      subject: 'tester@example.test',
+    }),
+  )
   setSession()
 })
 
@@ -136,14 +139,11 @@ describe('authentication middleware', () => {
 
     await onRequest(context, next)
 
-    expect(resolvePrincipal).toHaveBeenCalledWith(
-      {},
-      {
-        provider: TEST_AUTH_PROVIDER,
-        subject: 'tester@example.test',
-        email: 'tester@example.test',
-      },
-    )
+    expect(resolvePrincipal).toHaveBeenCalledWith({
+      provider: TEST_AUTH_PROVIDER,
+      subject: 'tester@example.test',
+      email: 'tester@example.test',
+    })
     expect((context.locals as App.Locals).principal).toMatchObject({ userId: 'test-user' })
     expect(next).toHaveBeenCalledOnce()
   })

@@ -1,5 +1,5 @@
 import { onMounted, shallowRef } from 'vue'
-import { authenticationRequest } from '../lib/client/authentication'
+import { runClientHttp } from '../lib/client/runtime'
 import { useAuthenticationAction } from './useAuthenticationAction'
 export function useInvitationSettings() {
   interface Registration {
@@ -19,22 +19,29 @@ export function useInvitationSettings() {
   const administratorId = shallowRef('')
   const { busy, error, run } = useAuthenticationAction()
   async function load() {
-    registration.value = await authenticationRequest<Registration>('/api/admin/registration')
+    const { authenticationRequest } = await import('../lib/client/authentication-request')
+    registration.value = await runClientHttp(
+      authenticationRequest<Registration>('/api/admin/registration'),
+    )
   }
   function create() {
     return run(async () => {
-      const invitation = await authenticationRequest<{ url: string }>('/api/admin/registration', {
-        action: 'create',
-        maxUses: maxUses.value,
-        days: days.value,
-      })
+      const { authenticationRequest } = await import('../lib/client/authentication-request')
+      const invitation = await runClientHttp(
+        authenticationRequest<{ url: string }>('/api/admin/registration', {
+          action: 'create',
+          maxUses: maxUses.value,
+          days: days.value,
+        }),
+      )
       link.value = invitation.url
       await load()
     })
   }
   function update(body: unknown) {
     return run(async () => {
-      await authenticationRequest('/api/admin/registration', body)
+      const { authenticationRequest } = await import('../lib/client/authentication-request')
+      await runClientHttp(authenticationRequest('/api/admin/registration', body))
       await load()
     })
   }

@@ -7,6 +7,7 @@ import {
   quoteSourceKey,
 } from '../domain/investment/symbol-matching'
 import { fetchMarketQuotes } from '../services/market-api'
+import { runClientHttp } from '../lib/client/runtime'
 import type { Instrument, InstrumentType } from '../scripts/types'
 import { todayISO } from '../scripts/utils'
 import { newId } from '../lib/client/ids'
@@ -281,7 +282,7 @@ export const useMarketStore = defineStore('market', () => {
       const sources = new Map(
         requested.map((instrument) => [instrument.id, quoteSourceKey(instrument)]),
       )
-      const response = await fetchMarketQuotes(requested, quotes.value)
+      const response = await runClientHttp(fetchMarketQuotes(requested, quotes.value))
       const current = new Map(
         instruments.value.map((instrument) => [instrument.id, quoteSourceKey(instrument)]),
       )

@@ -1,13 +1,25 @@
 <script setup lang="ts">
-import { shallowRef } from 'vue'
+import { nextTick, shallowRef, watch } from 'vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
-import BitvavoImportPanel from './BitvavoImportPanel.vue'
+import { defineAsyncComponent } from 'vue'
+
+// Only needed when the Bitvavo panel opens: keep its adapter out of startup.
+const BitvavoImportPanel = defineAsyncComponent(() => import('./BitvavoImportPanel.vue'))
 import StockEventsPanel from './StockEventsPanel.vue'
 
 defineProps<{ isActive: boolean }>()
 
 const stockEventsOpen = shallowRef(false)
 const bitvavoOpen = shallowRef(false)
+const bitvavoLauncher = shallowRef<HTMLElement | null>(null)
+
+// The panel is mounted on demand, so it unmounts before its own close handler
+// can restore focus; the launcher is refocused from here instead.
+watch(bitvavoOpen, async (open) => {
+  if (open) return
+  await nextTick()
+  bitvavoLauncher.value?.focus()
+})
 const providers = [
   {
     id: 'stockevents',
@@ -33,7 +45,9 @@ const providers = [
 
 function openProvider(event: MouseEvent, open: () => void): void {
   // WebKit doesn't focus buttons on pointer clicks. SidePanel needs the
-  // launcher focused before opening so it can restore it when closing.
+  // launcher focused before opening so it can restore it when closing; the
+  // Bitvavo panel also remembers it because it mounts on demand.
+  bitvavoLauncher.value = event.currentTarget as HTMLElement
   ;(event.currentTarget as HTMLButtonElement).focus()
   open()
 }
@@ -87,6 +101,6 @@ function openProvider(event: MouseEvent, open: () => void): void {
       </ul>
     </section>
     <StockEventsPanel v-model:open="stockEventsOpen" />
-    <BitvavoImportPanel v-model:open="bitvavoOpen" />
+    <BitvavoImportPanel v-if="bitvavoOpen" v-model:open="bitvavoOpen" />
   </section>
 </template>

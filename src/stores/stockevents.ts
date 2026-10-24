@@ -8,6 +8,7 @@ import {
   findSyncedMapping,
   resolveStockEventsSymbol,
 } from '../domain/stockevents/transaction-payload'
+import { runClientHttp } from '../lib/client/runtime'
 import {
   checkStockEventsSymbols,
   createStockEventsTransaction,
@@ -162,7 +163,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     credentialInitialization = (async () => {
       connectionError.value = ''
       try {
-        credentialConfigured.value = await fetchStockEventsCredentialStatus()
+        credentialConfigured.value = await runClientHttp(fetchStockEventsCredentialStatus())
         credentialStatusLoaded = true
         if (settings.value.apiKey) {
           financialStateStore.patchState((draft) => {
@@ -185,7 +186,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     isSavingCredential.value = true
     connectionError.value = ''
     try {
-      credentialConfigured.value = await saveStockEventsCredential(value)
+      credentialConfigured.value = await runClientHttp(saveStockEventsCredential(value))
       credentialStatusLoaded = true
       financialStateStore.patchState((draft) => {
         draft.stockEvents.apiKey = ''
@@ -308,7 +309,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     isLoadingWatchlists.value = true
     connectionError.value = ''
     try {
-      watchlists.value = await fetchStockEventsWatchlists()
+      watchlists.value = await runClientHttp(fetchStockEventsWatchlists())
     } catch (error) {
       watchlists.value = []
       connectionError.value =
@@ -332,7 +333,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     isChecking.value = true
     connectionError.value = ''
     try {
-      const results = await checkStockEventsSymbols(checks)
+      const results = await runClientHttp(checkStockEventsSymbols(checks))
       // Results keep the request order, so index them back to the local symbol
       // (the checked ticker may be a per-symbol override).
       checkResults.value = Object.fromEntries(
@@ -398,7 +399,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
       return 'skipped'
     }
     try {
-      await createStockEventsTransaction(payload)
+      await runClientHttp(createStockEventsTransaction(payload))
       showToast(`Movimiento de ${payload.symbol} sincronizado con Stock Events.`)
       return 'synced'
     } catch (error) {
@@ -447,7 +448,7 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
     if (!requests.length) return
 
     const results = await Promise.allSettled(
-      requests.map((request) => createStockEventsTransaction(request.payload)),
+      requests.map((request) => runClientHttp(createStockEventsTransaction(request.payload))),
     )
     const fulfilled = results.flatMap((result, index) => {
       if (result.status !== 'fulfilled') return []

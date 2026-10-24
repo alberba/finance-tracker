@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { Effect } from 'effect'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -15,6 +16,7 @@ import {
   checkStockEventsSymbols,
   fetchStockEventsCredentialStatus,
 } from '../../src/services/stockevents-api'
+import { ApiClientError } from '../../src/lib/client/api-error'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useInvestmentStore } from '../../src/stores/investment'
 import { useStockEventsStore } from '../../src/stores/stockevents'
@@ -85,13 +87,15 @@ beforeEach(() => {
   setActivePinia(createPinia())
   document.body.innerHTML = '<div id="toast"></div>'
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  vi.mocked(fetchStockEventsCredentialStatus).mockResolvedValue(true)
-  vi.mocked(createStockEventsTransaction).mockResolvedValue({
-    id: 'se-tx-1',
-    watchlistId: 'wl-1',
-    symbol: 'ETH',
-  })
-  vi.mocked(checkStockEventsSymbols).mockResolvedValue([])
+  vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(true))
+  vi.mocked(createStockEventsTransaction).mockReturnValue(
+    Effect.succeed({
+      id: 'se-tx-1',
+      watchlistId: 'wl-1',
+      symbol: 'ETH',
+    }),
+  )
+  vi.mocked(checkStockEventsSymbols).mockReturnValue(Effect.succeed([]))
 })
 
 afterEach(() => {
@@ -115,7 +119,7 @@ describe('stockEvents syncMovement — skip warning', () => {
 
   it('se mantiene en silencio cuando no hay conexión con Stock Events', async () => {
     seedState([btcBuy])
-    vi.mocked(fetchStockEventsCredentialStatus).mockResolvedValue(false)
+    vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(false))
     const store = useStockEventsStore()
     await store.initializeCredential()
     expect(store.isConnected).toBe(false)
@@ -178,7 +182,15 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
 
   it('devuelve failed cuando Stock Events rechaza la petición', async () => {
     seedState([ethBuy])
-    vi.mocked(createStockEventsTransaction).mockRejectedValue(new Error('límite alcanzado'))
+    vi.mocked(createStockEventsTransaction).mockReturnValue(
+      Effect.fail(
+        new ApiClientError('api-error', {
+          endpoint: '/api/stockevents/transactions',
+          fallbackMessage: 'No se pudo sincronizar con Stock Events',
+          serverMessage: 'límite alcanzado',
+        }),
+      ),
+    )
     const store = useStockEventsStore()
     await store.initializeCredential()
 
@@ -222,7 +234,7 @@ describe('investment store — reenvío manual', () => {
 
   it('pide activar la conexión cuando el reenvío queda en skipped sin conexión', async () => {
     seedState([btcBuy])
-    vi.mocked(fetchStockEventsCredentialStatus).mockResolvedValue(false)
+    vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(false))
     const store = useStockEventsStore()
     await store.initializeCredential()
     expect(store.isConnected).toBe(false)

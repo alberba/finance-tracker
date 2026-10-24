@@ -1,6 +1,8 @@
 import { computed, shallowRef } from 'vue'
 import { useSyncStore } from '../stores/sync'
 import { resolveEntityId } from '../lib/client/command-mapping'
+import { runClientHttp } from '../lib/client/runtime'
+import { requestBitvavo } from '../lib/client/bitvavo-api'
 import type { Transaction } from '../scripts/types'
 
 export function useBitvavoMovementDetails(transaction: () => Transaction) {
@@ -21,9 +23,13 @@ export function useBitvavoMovementDetails(transaction: () => Transaction) {
     open.value = true
     error.value = ''
     try {
-      const response = await fetch('/api/integrations/bitvavo')
-      if (!response.ok) throw new Error('No se pudieron cargar los instrumentos.')
-      instruments.value = (await response.json()).instruments
+      const body = await runClientHttp(
+        requestBitvavo<{ instruments: Array<{ id: string; symbol: string; name: string | null }> }>(
+          undefined,
+          'GET',
+        ),
+      )
+      instruments.value = body.instruments
     } catch (failure) {
       error.value =
         failure instanceof Error ? failure.message : 'No se pudieron cargar los instrumentos.'
@@ -37,16 +43,13 @@ export function useBitvavoMovementDetails(transaction: () => Transaction) {
       // Instruments use their own catalog identity in the server bootstrap.
       const instrument = instruments.value.find((item) => item.id === instrumentId.value)
       if (!transactionId || !instrument) throw new Error('Selecciona un instrumento disponible.')
-      const response = await fetch('/api/integrations/bitvavo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await runClientHttp(
+        requestBitvavo({
           action: 'linkInstrument',
           transactionId,
           instrumentId: instrument.id,
         }),
-      })
-      if (!response.ok) throw new Error((await response.json()).error || 'No se pudo vincular.')
+      )
       await sync.refreshFromServer()
       open.value = false
     } catch (failure) {

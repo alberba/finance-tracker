@@ -7,6 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { runWithDb } from '../../../../src/db/database'
 import { startRoundTrip, type RoundTrip } from './harness'
 
 async function seed(trip: RoundTrip) {
@@ -228,11 +229,11 @@ describe('round trip: ahorro', () => {
     await addSaving()
     await trip.reload()
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
-    const rows = await accountsRepository.listByUser(trip.testDb.db as never, trip.userId)
+    const rows = await runWithDb(trip.testDb.db as never, accountsRepository.listByUser(trip.userId))
     const hucha = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
-      accountsRepository.remove(trip.testDb.db as never, trip.userId, hucha.id),
+      runWithDb(trip.testDb.db as never, accountsRepository.remove(trip.userId, hucha.id)),
     ).rejects.toThrow()
   })
 
@@ -275,19 +276,19 @@ describe('round trip: ahorro', () => {
     const goalsRepository = await import('../../../../src/db/repositories/goals')
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
     const db = trip.testDb.db as never
-    const expense = await accountsRepository.createCategory(db, trip.userId, {
+    const expense = await runWithDb(db, accountsRepository.createCategory(trip.userId, {
       name: 'Comida',
       kind: 'expense',
-    })
+    }))
 
     await expect(
-      goalsRepository.create(db, trip.userId, {
+      runWithDb(db, goalsRepository.create(trip.userId, {
         key: 'saving:x',
         categoryId: expense.id,
         name: 'No',
         targetAmount: 10,
         currency: 'EUR',
-      }),
+      })),
     ).rejects.toThrow(/categoría de ahorro/)
   })
 
@@ -345,22 +346,22 @@ describe('round trip: ahorro', () => {
     const pendingRepository = await import('../../../../src/db/repositories/pending-movements')
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
     const db = trip.testDb.db as never
-    const rows = await accountsRepository.listByUser(db, trip.userId)
+    const rows = await runWithDb(db, accountsRepository.listByUser(trip.userId))
     const origin = rows.find((row) => row.name === 'Corriente')!
     const destination = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
-      rulesRepository.create(db, trip.userId, {
+      runWithDb(db, rulesRepository.create(trip.userId, {
         name: 'Ahorro sin destino',
         type: 'saving',
         accountId: origin.id,
         amount: 100,
         currency: 'EUR',
         frequency: 'monthly',
-      }),
+      })),
     ).rejects.toThrow(/cuenta destino/)
 
-    const rule = await rulesRepository.create(db, trip.userId, {
+    const rule = await runWithDb(db, rulesRepository.create(trip.userId, {
       name: 'Ahorro mensual',
       type: 'saving',
       accountId: origin.id,
@@ -368,21 +369,21 @@ describe('round trip: ahorro', () => {
       amount: 100,
       currency: 'EUR',
       frequency: 'monthly',
-    })
+    }))
 
     await expect(
-      pendingRepository.create(db, trip.userId, {
+      runWithDb(db, pendingRepository.create(trip.userId, {
         recurringRuleId: rule.id,
         type: 'saving',
         accountId: origin.id,
         amount: 100,
         currency: 'EUR',
         dueDate: '2026-10-01',
-      }),
+      })),
     ).rejects.toThrow(/cuenta destino/)
 
     await expect(
-      rulesRepository.update(db, trip.userId, rule.id, { destinationAccountId: null }),
+      runWithDb(db, rulesRepository.update(trip.userId, rule.id, { destinationAccountId: null })),
     ).rejects.toThrow(/cuenta destino/)
   })
 })

@@ -1,5 +1,7 @@
 # Effect entra solo en las integraciones de servidor, detrás de una frontera Promise
 
+> Reemplazado por [ADR-0006](0006-effect-de-punta-a-punta.md).
+
 Cada cliente de un proveedor externo (`stockevents.ts`, `market-data.ts`, `github-issues.ts`)
 reinventa timeout, abort, clasificación de errores, reintento y caché, y lee las respuestas con
 `as` sin validarlas. La integración Bitvavo (#190/#191) pide todo eso a la vez: rate limits con

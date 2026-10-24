@@ -4,6 +4,7 @@ import * as accountsRepository from "../../../../src/db/repositories/accounts";
 import * as transactionsRepository from "../../../../src/db/repositories/transactions";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 let currentDb: TestDatabase["db"];
 vi.mock("../../../../src/db/client", () => ({
@@ -50,30 +51,30 @@ describe("GET /api/bootstrap", () => {
     expect(body.accounts).toEqual([]);
     expect(body.settings).toBeNull();
     // Confirm nothing was seeded server-side (fixes Contradiction #8).
-    expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([]);
+    expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([]);
   });
 
   it("filters transactions/budgetEntries/wealthSnapshots by ?year", async () => {
-    const account = await accountsRepository.create(testDb.db, principal.userId, {
+    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: "Cuenta",
       kind: "cash",
       currency: "EUR",
       openingBalance: 0,
-    });
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    }));
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: "expense",
       date: "2024-05-01",
       amount: -10,
       currency: "EUR",
-    });
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    }));
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: "expense",
       date: "2025-05-01",
       amount: -20,
       currency: "EUR",
-    });
+    }));
 
     const { GET } = await import("../../../../src/pages/api/bootstrap");
     const response = await GET({

@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js'
-import { Context, Data, Duration, Effect, Layer, Schedule, Schema } from 'effect'
+import { Data, Duration, Effect, Schedule, Schema } from 'effect'
 import type { RemoteOperation } from '../../bitvavo-types'
+import { Http } from '../http'
 
 export class InvalidCredential extends Data.TaggedError('InvalidCredential')<{ message: string }> {}
 export class RateLimit extends Data.TaggedError('RateLimit')<{
@@ -12,9 +13,8 @@ export class ProviderError extends Data.TaggedError('ProviderError')<{
   retryable: boolean
 }> {}
 export class NonEuroOperation extends Data.TaggedError('NonEuroOperation')<{ message: string }> {}
-type ClientError = InvalidCredential | RateLimit | ProviderError
+export type ClientError = InvalidCredential | RateLimit | ProviderError
 
-class Http extends Context.Service<Http, { request: typeof fetch }>()('finance/bitvavo/Http') {}
 const Exact = Decimal.clone({ precision: 100 })
 const decimal = Schema.String.check(Schema.isPattern(/^\d+(?:\.\d+)?$/), Schema.isMaxLength(40))
 const transaction = Schema.Struct({
@@ -202,12 +202,15 @@ function readOperation(input: unknown, range: HistoryRange): RemoteOperation {
   }
 }
 
-export async function fetchBitvavoHistory(
+export function fetchBitvavoHistory(
   credentials: BitvavoCredentials,
   range: HistoryRange,
-  request: typeof fetch = fetch,
-) {
-  const program = Effect.gen(function* () {
+): Effect.Effect<
+  { operations: RemoteOperation[]; incompatible: { externalId: string; reason: string }[] },
+  ClientError,
+  Http
+> {
+  return Effect.gen(function* () {
     const operations: RemoteOperation[] = []
     const incompatible: { externalId: string; reason: string }[] = []
     const seen = new Set<string>()
@@ -280,5 +283,4 @@ export async function fetchBitvavoHistory(
     }
     return yield* new ProviderError({ message: 'Historial demasiado grande.', retryable: false })
   })
-  return Effect.runPromise(program.pipe(Effect.provide(Layer.succeed(Http, { request }))))
 }
