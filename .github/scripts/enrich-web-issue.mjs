@@ -37,15 +37,33 @@ export function splitReportBody(body) {
     : { report: body.slice(0, start).trim(), preserved: body.slice(start).trim() }
 }
 
+function analysisError(
+  code,
+  message = 'El análisis debe terminar, cargar la skill y leer el código antes de publicar.',
+) {
+  return Object.assign(new Error(message), { code })
+}
+
 export function parseAgentPlan(events) {
   let text = ''
   let completed = false
   let loadedSkill = false
   let readCode = false
   for (const line of events.split('\n').filter(Boolean)) {
-    const event = JSON.parse(line)
-    if (event.type === 'error') throw new Error('OpenCode no pudo completar el análisis.')
-    // Intermediate text is discarded when the agent starts another tool iteration.
+    let event
+    try {
+      event = JSON.parse(line)
+    } catch {
+      throw analysisError('OPENCODE_EVENTS_JSON')
+    }
+    if (event.type === 'error') {
+      const status = event.error?.data?.statusCode
+      throw analysisError(
+        Number.isInteger(status) && status >= 400 && status <= 599
+          ? `OPENCODE_HTTP_${status}`
+          : 'OPENCODE_PROVIDER',
+      )
+    }
     if (event.type === 'step_start') {
       text = ''
       completed = false
@@ -61,11 +79,18 @@ export function parseAgentPlan(events) {
     }
     if (event.type === 'text') text += event.part?.text ?? ''
   }
-  if (!completed || !loadedSkill || !readCode)
-    throw new Error(
-      'El análisis debe terminar, cargar la skill y leer el código antes de publicar.',
-    )
-  return planSchema.parse(JSON.parse(text.trim()))
+  if (!completed) throw analysisError('OPENCODE_INCOMPLETE')
+  if (!loadedSkill) throw analysisError('OPENCODE_SKILL')
+  if (!readCode) throw analysisError('OPENCODE_CODE_READ')
+  let result
+  try {
+    result = JSON.parse(text.trim())
+  } catch {
+    throw analysisError(text.trim().startsWith('```') ? 'OPENCODE_JSON_FENCED' : 'OPENCODE_JSON')
+  }
+  const parsed = planSchema.safeParse(result)
+  if (!parsed.success) throw analysisError('OPENCODE_PLAN')
+  return parsed.data
 }
 
 /** Only numbers actually retrieved by the workflow become GitHub references. */
@@ -352,8 +377,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.argv[2] === 'analyze') {
       const failure = error && typeof error === 'object' ? error : {}
       const stderr = String(failure.stderr ?? '')
+      const responseCode =
+        /^OPENCODE_(EVENTS_JSON|HTTP_[45]\d{2}|PROVIDER|INCOMPLETE|SKILL|CODE_READ|JSON_FENCED|JSON|PLAN)$/.test(
+          String(failure.code),
+        )
+          ? String(failure.code).toLowerCase().replaceAll('_', '-')
+          : null
       const reason =
-        failure.code === 'ENOENT'
+        responseCode ??
+        (failure.code === 'ENOENT'
           ? 'opencode-not-found'
           : failure.code === 'ETIMEDOUT'
             ? 'opencode-timeout'
@@ -361,7 +393,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
               ? 'opencode-attachment'
               : Number.isInteger(failure.status)
                 ? `opencode-exit-${failure.status}`
-                : 'opencode-response'
+                : 'opencode-response')
       console.error(`[issue-enrichment] analyze: ${reason}.`)
     }
     // CLI errors and agent output can contain report text: keep workflow logs generic.
