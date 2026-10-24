@@ -1,6 +1,10 @@
 import type { RuntimeEnv } from './cloudflare-env'
 import { reportReportSideFailure, type ReportSideFailureReporter } from './error-tracking'
-import { enrichIssueReport, type IssueEnricher } from './issue-enricher'
+import {
+  checkIssueDuplicate,
+  type IssueDuplicateChecker,
+  type IssueDuplicateResult,
+} from './issue-duplicate-checker'
 import {
   uploadIssueAttachment,
   type AttachmentUploadContext,
@@ -12,14 +16,15 @@ import type { IssueReportPayload } from './issue-report-schema'
 export interface CreatedIssue {
   number: number
   url: string
+  duplicate?: boolean
 }
 
 export interface GithubIssueClient {
   fetch: typeof fetch
   /** Subidor de adjuntos. Por defecto, el que habla con la API real de GitHub. */
   uploadAttachment?: AttachmentUploader
-  /** Análisis opcional del reporte. Por defecto, el enriquecedor de DeepSeek vía OpenCode Go. */
-  enrich?: IssueEnricher
+  /** Comprobación semántica previa; la redacción se ejecuta en GitHub Actions. */
+  checkDuplicate?: IssueDuplicateChecker
   /** Aviso de los fallos auxiliares (subidas). Por defecto, Sentry; los tests inyectan un stub. */
   reportFailure?: ReportSideFailureReporter
 }
@@ -124,7 +129,6 @@ function attachmentLines(outcomes: AttachmentOutcome[]): string[] {
 export function buildIssueBody(
   payload: IssueReportPayload,
   reporter: IssueReporter,
-  analysis?: string | null,
   attachments: AttachmentOutcome[] = [],
 ): string {
   const reportType = canonicalReportType(payload.type)
@@ -156,24 +160,13 @@ export function buildIssueBody(
     `- Identificador: ${reporter.userId}`,
   )
 
-  // Sección aditiva y separada: el texto del usuario queda intacto por encima.
-  if (analysis) {
-    lines.push(
-      '',
-      '## Análisis generado automáticamente',
-      '> Generado con DeepSeek V4.1 Flash a partir del reporte. No es texto del usuario.',
-      '',
-      analysis,
-    )
-  }
-
   return lines.join('\n').trim()
 }
 
 export function buildIssueLabels(type: IssueReportPayload['type']): string[] {
   // Keep labels short and compatible with GitHub's default labels. The
   // structured issue type is sent separately in the request body.
-  return ['source:web-report', 'status:triage', canonicalReportType(type)]
+  return ['source:web-report', 'needs-triage', canonicalReportType(type)]
 }
 
 async function requestWithRetry(
@@ -230,18 +223,18 @@ async function uploadAttachments(
 }
 
 /**
- * El enriquecimiento nunca bloquea el reporte: si algo falla, la issue se crea
- * sin análisis. Los enriquecedores ya registran sus fallos; este catch cubre
- * solo un enriquecedor que lance pese al contrato.
+ * La comprobación de duplicadas nunca bloquea el reporte: si algo falla, la issue se crea
+ * con el texto original. Los comprobadores ya registran sus fallos; este catch cubre
+ * solo un comprobador que lance pese al contrato.
  */
-async function enrichReport(
+async function findDuplicate(
   payload: IssueReportPayload,
   env: RuntimeEnv,
-  enrich: IssueEnricher,
+  checkDuplicate: IssueDuplicateChecker,
   reportFailure: ReportSideFailureReporter,
-): Promise<string | null> {
+): Promise<IssueDuplicateResult | null> {
   try {
-    return await enrich(
+    return await checkDuplicate(
       {
         type: canonicalReportType(payload.type),
         summary: payload.summary,
@@ -252,8 +245,8 @@ async function enrichReport(
       env,
     )
   } catch {
-    console.error('[github] El análisis del reporte se omitió por un fallo inesperado.')
-    reportFailure({ stage: 'enrich', reason: 'unexpected' })
+    console.error('[github] La comprobación de duplicadas se omitió por un fallo inesperado.')
+    reportFailure({ stage: 'duplicate', reason: 'unexpected' })
     return null
   }
 }
@@ -269,13 +262,17 @@ export async function createIssueFromWebReport(
   const repo = requiredEnv('GITHUB_REPO', env)
   const headers = githubHeaders(token)
   const uploadAttachment = client.uploadAttachment ?? uploadIssueAttachment
-  const enrich = client.enrich ?? enrichIssueReport
+  const checkDuplicate = client.checkDuplicate ?? checkIssueDuplicate
   const title = payload.summary.slice(0, 140)
   const labels = buildIssueLabels(payload.type)
   // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
   // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
   // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
   const reportFailure = client.reportFailure ?? reportReportSideFailure
+  const duplicate = await findDuplicate(payload, env, checkDuplicate, reportFailure)
+  if (duplicate) {
+    return { ...duplicate, duplicate: true }
+  }
   const outcomes = await uploadAttachments(
     payload.attachments ?? [],
     uploadAttachment,
@@ -286,10 +283,9 @@ export async function createIssueFromWebReport(
     },
     reportFailure,
   )
-  const analysis = await enrichReport(payload, env, enrich, reportFailure)
   const baseRequestBody = {
     title,
-    body: buildIssueBody(payload, reporter, analysis, outcomes),
+    body: buildIssueBody(payload, reporter, outcomes),
     labels,
   }
   const requestBody = {

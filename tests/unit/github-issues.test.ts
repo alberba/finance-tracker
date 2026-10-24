@@ -70,7 +70,7 @@ describe('github issues service', () => {
     const [, init] = fakeFetch.mock.calls[0]
     const body = JSON.parse(String(init?.body || '{}'))
     expect(body.labels).toEqual(
-      expect.arrayContaining(['source:web-report', 'status:triage', 'bug']),
+      expect.arrayContaining(['source:web-report', 'needs-triage', 'bug']),
     )
     expect(body.labels).not.toContain('type:bug')
     expect(body.type).toBe('Bug')
@@ -364,7 +364,7 @@ describe('createIssueFromWebReport con reportero', () => {
   })
 })
 
-describe('enriquecimiento del reporte', () => {
+describe('comprobación de duplicadas previa al reporte', () => {
   const env = { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' }
   const createdResponse = () =>
     new Response(JSON.stringify({ number: 21, html_url: 'https://x/issues/21' }), { status: 201 })
@@ -395,46 +395,43 @@ describe('enriquecimiento del reporte', () => {
 
   it('sin análisis el cuerpo es idéntico al de siempre', () => {
     expect(buildIssueBody(payload, reporter)).toBe(baselineBody)
-    expect(buildIssueBody(payload, reporter, null)).toBe(baselineBody)
+    expect(buildIssueBody(payload, reporter, [])).toBe(baselineBody)
   })
 
-  it('añade el análisis en una sección propia sin tocar el texto del usuario', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
-    const enrich = vi.fn(async () => '**Problema**: el guardado no persiste.')
-
-    await createIssueFromWebReport(payload, reporter, env, {
-      fetch: fakeFetch as unknown as typeof fetch,
-      enrich,
-    })
-
-    expect(enrich).toHaveBeenCalledExactlyOnceWith(
+  it('devuelve una duplicada sin crear issues, comentarios ni subir adjuntos', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    const uploadAttachment = vi.fn()
+    const duplicate = { number: 9, url: 'https://github.com/org/repo/issues/9' }
+    const result = await createIssueFromWebReport(
       {
-        type: 'bug',
-        summary: payload.summary,
-        description: payload.description,
-        section: 'transactions',
-        pathname: '/movimientos',
+        ...payload,
+        attachments: [
+          {
+            name: 'captura.png',
+            contentType: 'image/png',
+            bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+          },
+        ],
       },
+      reporter,
       env,
+      {
+        fetch,
+        uploadAttachment,
+        checkDuplicate: async () => duplicate,
+      },
     )
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
-    expect(body.title).toBe(payload.summary)
-    expect(body.body).toContain('## Análisis generado automáticamente')
-    expect(body.body).toContain('**Problema**: el guardado no persiste.')
-    expect(body.body).toContain(
-      '### Problema o solicitud\nAl pulsar guardar, no se persiste en servidor.\n',
-    )
-    expect(body.body.indexOf('## Análisis generado')).toBeGreaterThan(
-      body.body.indexOf('### Reportero'),
-    )
+    expect(result).toEqual({ ...duplicate, duplicate: true })
+    expect(fetch).not.toHaveBeenCalled()
+    expect(uploadAttachment).not.toHaveBeenCalled()
   })
 
-  it('si el enriquecedor no devuelve nada, crea la issue con el cuerpo de siempre', async () => {
+  it('si el comprobador no devuelve nada, crea la issue con el cuerpo de siempre', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
 
     const result = await createIssueFromWebReport(payload, reporter, env, {
       fetch: fakeFetch as unknown as typeof fetch,
-      enrich: async () => null,
+      checkDuplicate: async () => null,
     })
 
     expect(result.number).toBe(21)
@@ -442,36 +439,36 @@ describe('enriquecimiento del reporte', () => {
     expect(body.body).toBe(baselineBody)
   })
 
-  it('si el enriquecedor lanza, la issue se crea igual', async () => {
+  it('si el comprobador lanza, la issue se crea igual', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = await createIssueFromWebReport(payload, reporter, env, {
       fetch: fakeFetch as unknown as typeof fetch,
-      enrich: async () => {
+      checkDuplicate: async () => {
         throw new Error('boom')
       },
     })
 
     expect(result.number).toBe(21)
     expect(consoleError).toHaveBeenCalledExactlyOnceWith(
-      '[github] El análisis del reporte se omitió por un fallo inesperado.',
+      '[github] La comprobación de duplicadas se omitió por un fallo inesperado.',
     )
     consoleError.mockRestore()
   })
 
-  it('no consulta el enriquecedor si falta la configuración de GitHub', async () => {
-    const enrich = vi.fn(async () => 'análisis')
+  it('no consulta el comprobador si falta la configuración de GitHub', async () => {
+    const checkDuplicate = vi.fn(async () => null)
 
     await expect(
       createIssueFromWebReport(
         payload,
         reporter,
         { GITHUB_ISSUE_TOKEN: 'token', GITHUB_REPO: 'repo' },
-        { fetch: vi.fn<typeof fetch>(), enrich },
+        { fetch: vi.fn<typeof fetch>(), checkDuplicate },
       ),
     ).rejects.toThrow(/GITHUB_OWNER/)
-    expect(enrich).not.toHaveBeenCalled()
+    expect(checkDuplicate).not.toHaveBeenCalled()
   })
 
   it('sin clave del proveedor el valor por defecto no hace red y solo llama a GitHub', async () => {

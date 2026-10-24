@@ -30,6 +30,7 @@ interface ReportResponseOk {
   ok: true
   issueNumber: number
   issueUrl: string
+  duplicate?: boolean
 }
 
 interface ReportResponseError {

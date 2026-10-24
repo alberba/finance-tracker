@@ -203,31 +203,66 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
 1. Desde la sección **Reportes** puedes enviar un reporte (`error` o `mejora`).
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
-   - `status:triage`
+   - `needs-triage`
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Si hay clave de OpenCode Go, la issue incluye una sección «Análisis generado
-   automáticamente» (DeepSeek V4.1 Flash) separada del texto del usuario. El análisis
-   tiene un plazo de 8 segundos; si falla o expira, la issue se crea sin él y el fallo
-   queda registrado una vez en el log del servidor.
+4. Antes de crear, la API puede comprobar duplicadas con DeepSeek: busca por palabras del
+   reporte en issues abiertas y cerradas y compara hasta 20 candidatas. Una coincidencia con el
+   mismo problema y alcance en una issue abierta devuelve su enlace sin crear otra ni subir
+   adjuntos. La búsqueda tarda como máximo 3 segundos y el modelo tiene un plazo de 8 segundos.
+   Sin clave, sin candidatas o ante un fallo, se crea el reporte original.
+5. Al abrirse una issue con `source:web-report`, **Analyze web report** ejecuta OpenCode con
+   DeepSeek V4.1 Flash en GitHub Actions. Carga la skill personal `create-issue`, lee el código
+   del checkout y las convenciones del repo, y compara hasta 10 candidatas con sus comentarios
+   (hasta 10 comentarios por candidata). La búsqueda es limitada y sus fallos o truncamientos
+   quedan en el contexto del análisis; las cerradas pueden ser recurrencias.
+6. El agente prepara el cuerpo principal y un Agent Brief. El script valida el JSON y que se haya
+   cargado la skill y leído código antes de publicar. Reemplaza el cuerpo sin añadir un campo de
+   enriquecimiento, conserva adjuntos y metadatos, publica el brief como comentario enlazado y
+   verifica el resultado. Una edición humana detectada durante el análisis impide sustituir el cuerpo.
+   Si el agente decide que es duplicada de una candidata abierta, la cierra con el motivo nativo
+   `duplicate` y el `duplicate_issue_id` de la principal, conservando cuerpo y adjuntos. Verifica
+   después `state: CLOSED`, `stateReason: DUPLICATE` y `duplicateOf` mediante GraphQL. No usa
+   texto en la descripción ni labels como sustituto del cierre nativo. Las cerradas se mantienen
+   como posibles recurrencias y las coincidencias dudosas solo como relacionadas. No aplica
+   `ready-for-agent`; añade `ui-change` si una feature cambia la apariencia. Un fallo previo a
+   publicar deja el reporte original disponible.
+
+La skill está versionada en `.opencode/skills/create-issue/`, con una copia del `SKILL.md` personal
+y sus referencias de preparación y adjuntos. Para adoptar cambios de la skill personal, actualiza
+esa copia. El agente usa `.opencode/agents/issue-enricher.md` y la configuración restringida de
+`.github/opencode-issue-enricher.json`: lectura y búsqueda, sin shell, escritura ni subagentes.
+El token de GitHub solo está disponible en los pasos de consulta y publicación; los datos de cuenta
+se conservan fuera del contexto que se entrega al agente. El código del repositorio sí se envía al
+proveedor al leerlo durante el análisis.
 
 ### Variables y secrets requeridos
 
 En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
 
-- `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`
+- `GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`: token personal o de una GitHub App con acceso de escritura
+  a issues. La creación debe generar el evento `issues.opened`; un `GITHUB_TOKEN` de otro workflow
+  no dispara este workflow automáticamente.
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
+- `OPENCODE_GO_API_KEY` (opcional): habilita la comprobación semántica previa de duplicadas.
 
-Opcional:
+En GitHub → Settings → Secrets and variables → Actions:
 
-- `OPENCODE_GO_API_KEY`: clave de OpenCode Go para el análisis del reporte. Ausente, el
-  enriquecimiento queda desactivado y no afecta al resto del flujo.
+- `OPENCODE_GO_API_KEY`: clave de OpenCode Go usada por el agente con DeepSeek. Es independiente
+  de la variable homónima del servidor: hay que configurarla también como secret de Actions.
+- El token para publicar lo proporciona GitHub con `issues: write`; no requiere otro secret.
+
+El workflow tiene que estar en la rama por defecto para recibir `issues.opened`. Para reintentar un
+fallo o procesar un reporte anterior, ejecuta **Analyze web report** con `issue_number` desde Actions,
+o `gh workflow run enrich-web-issue.yml --repo alberba/finance-tracker -f issue_number=123`.
+Los reintentos reutilizan el brief del bot; si ya se publicó el cuerpo, omiten el análisis.
+La versión de OpenCode está fijada en el workflow; cada análisis tiene hasta 25 pasos y 8 minutos.
 
 ### Labels recomendadas en GitHub
 
-- `source:web-report`, `status:triage`
+- `source:web-report`, `needs-triage`
 - `bug`, `feature`
 - `priority:low`, `priority:med`, `priority:high`
 - `area:frontend`, `area:backend`, `area:infra`, `area:data`

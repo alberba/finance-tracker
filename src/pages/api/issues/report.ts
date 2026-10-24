@@ -70,8 +70,9 @@ export const POST: APIRoute = async ({ request, locals }) =>
           ok: true,
           issueNumber: created.number,
           issueUrl: created.url,
+          ...(created.duplicate ? { duplicate: true } : {}),
         },
-        201,
+        created.duplicate ? 200 : 201,
       )
     } catch (error) {
       if (error instanceof ZodError) {

@@ -30,10 +30,10 @@ describe('reportReportSideFailure', () => {
   it('manda un evento con mensaje fijo y solo la fase y el motivo como tags', async () => {
     const { reportReportSideFailure } = await loadTracking()
 
-    reportReportSideFailure({ stage: 'enrich', reason: 'http-401' })
+    reportReportSideFailure({ stage: 'duplicate', reason: 'http-401' })
 
     expect(setTag.mock.calls).toEqual([
-      ['report.stage', 'enrich'],
+      ['report.stage', 'duplicate'],
       ['report.reason', 'http-401'],
     ])
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)

@@ -144,3 +144,21 @@ describe('POST /api/issues/report con un payload inválido', () => {
     expect(githubIssues.createIssueFromWebReport).not.toHaveBeenCalled()
   })
 })
+
+describe('POST /api/issues/report con una duplicada', () => {
+  it('devuelve el enlace existente con 200 y duplicate, sin afirmar creación', async () => {
+    githubIssues.createIssueFromWebReport.mockResolvedValue({
+      number: 9,
+      url: 'https://github.com/org/repo/issues/9',
+      duplicate: true,
+    })
+    const response = await POST(makeContext())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      ok: true,
+      issueNumber: 9,
+      issueUrl: 'https://github.com/org/repo/issues/9',
+      duplicate: true,
+    })
+  })
+})

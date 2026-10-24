@@ -40,7 +40,9 @@ Identificadores clave en UI:
 - `src/lib/server/issue-report-schema.ts`
 - `src/lib/server/github-issues.ts`
 - `src/lib/server/issue-attachments.ts`: sube los adjuntos a `uploads.github.com`
-- `src/lib/server/issue-enricher.ts`: análisis opcional con DeepSeek vía OpenCode Go
+- `src/lib/server/issue-duplicate-checker.ts`: comprobación semántica previa con DeepSeek
+- `.github/workflows/enrich-web-issue.yml`: análisis asíncrono con OpenCode
+- `.github/scripts/enrich-web-issue.mjs`: contexto, validación y publicación del análisis
 - `src/lib/server/cloudflare-env.ts`
 
 ### Dominio compartido
@@ -59,7 +61,8 @@ Identificadores clave en UI:
 - `tests/unit/issue-attachments.test.ts`: reglas de adjuntos (dominio y esquema)
 - `tests/unit/github-issues.test.ts`
 - `tests/unit/github-issue-attachments.test.ts`: subida de adjuntos y lectura del id del repositorio
-- `tests/unit/issue-enricher.test.ts`: forma del análisis, plazo, errores y clave ausente
+- `tests/unit/issue-duplicate-checker.test.ts`: duplicadas, plazo, errores y clave ausente
+- `tests/unit/enrich-web-issue.test.ts`: JSON del agente, metadatos, publicación y reintentos
 
 ### Documentación/utilidades relacionadas
 
@@ -93,7 +96,8 @@ en repositorio público y el estado del envío). En móvil lo abre la hoja «Má
 6. `github-issues.ts` crea la issue contra GitHub API. El reportero (`userId`, `email`, `name`) sale
    siempre del principal autenticado que resuelve la ruta, nunca del payload.
 7. La UI muestra:
-   - éxito simple: `Reporte creado: #...`
+   - issue nueva: `Reporte creado: #...`
+   - duplicada abierta: `Este reporte ya existe: #...`, con enlace y sin otra publicación
    - error: `No se pudo crear la issue: ...`
 
 ## Defaults y comportamiento actual
@@ -124,13 +128,45 @@ clientes antiguos que los envíen siguen funcionando porque se ignoran.
 Labels base:
 
 - `source:web-report`
-- `status:triage`
+- `needs-triage`
 - `bug` o `feature`
 
 El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
 Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
 
-Secciones que se escriben en el body:
+La API conserva el reporte original y comprueba duplicadas antes de crear cuando tiene
+`OPENCODE_GO_API_KEY`: consulta hasta 20 candidatas abiertas y cerradas y pide una decisión breve
+a DeepSeek. Solo una coincidencia del mismo problema y alcance con una abierta devuelve su enlace
+sin crear otra issue ni subir adjuntos (`200`, `duplicate: true`). Se descartan números inventados
+y candidatas con cuerpo truncado. La búsqueda tiene un plazo de 3 s; el modelo, de 8 s. Sin clave
+o ante fallos se crea igualmente el reporte. La comprobación es limitada y puede omitir coincidencias.
+
+Después de crear, el workflow **Analyze web report** ejecuta OpenCode con DeepSeek en un checkout.
+Carga `.opencode/skills/create-issue/SKILL.md`, explora el código y lee hasta 10 candidatas con hasta
+10 comentarios por candidata. Prepara el cuerpo según el template (sin template: `## Descripción`
+y `## Notas técnicas`) y un Agent Brief con hechos contrastados, hipótesis y pendientes. Las
+referencias a cerradas se interpretan como posibles recurrencias. La decisión `duplicate` del
+agente contiene el número de una candidata abierta y un motivo contrastado. El script revalida
+la candidata y cierra el reporte con `state: closed`, `state_reason: duplicate` y
+`duplicate_issue_id` (id de base de datos de la principal, no su número). Es el cierre nativo de
+GitHub; no se sustituye por texto en la descripción ni por un label. Verifica la relación con
+GraphQL (`state`, `stateReason`, `duplicateOf`); ante dudas o contexto insuficiente no cierra.
+
+El script de publicación exige JSON válido, carga de la skill, lectura de código y fin del análisis.
+Conserva el bloque de adjuntos y los metadatos del reporte, que no se pasan al agente; reemplaza
+el cuerpo, publica el brief enlazado y verifica el resultado. Los reintentos reutilizan el comentario
+del bot y omiten issues ya enriquecidas. Si detecta una edición humana antes de sustituir el cuerpo,
+interrumpe la publicación. Los reportes no duplicados siguen en `needs-triage`, con `ui-change` en features visuales.
+El seguimiento de reportes de #340 debe detectar `CLOSED` + `DUPLICATE` y leer `duplicateOf`
+para mostrar «Cerrado como duplicado de #N», conservando la identidad y el hilo del reporte
+original. Debe respetar reaperturas y cambios manuales posteriores consultando el estado nativo
+actual, sin inferirlo de comentarios, labels ni cierres como completado o no planificado.
+
+El secret de Actions `OPENCODE_GO_API_KEY` se configura aparte del entorno del servidor. El workflow
+necesita estar en la rama por defecto; se puede reintentar con `workflow_dispatch` e `issue_number`.
+La configuración, los permisos y los límites están documentados en [Reportes web](../../../README.md#reportes-web).
+
+Secciones del cuerpo inicial que publica la API:
 
 - `### Resumen`
 - `### Problema o solicitud`: solo si hay descripción, con el texto tal cual lo escribió la persona
