@@ -196,15 +196,16 @@ async function analyze() {
     'opencode',
     [
       'run',
+      'Aplica la skill create-issue al reporte adjunto: analiza el código del checkout y devuelve el JSON del agente issue-enricher.',
       '--agent',
       'issue-enricher',
       '--model',
       'opencode-go/deepseek-v4.1-flash',
       '--format',
       'json',
+      // --file es variádico: el mensaje debe ir antes para que no se interprete como ruta.
       '--file',
       resolve(contextDir, 'context.json'),
-      'Aplica la skill create-issue al reporte adjunto: analiza el código del checkout y devuelve el JSON del agente issue-enricher.',
     ],
     {
       env,
@@ -346,7 +347,23 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const command = { prepare, analyze, publish }[process.argv[2]]
     if (!command) throw new Error('Usa prepare, analyze o publish.')
     await command()
-  } catch {
+  } catch (error) {
+    // Only fixed categories leave the process: stderr may contain report text or credentials.
+    if (process.argv[2] === 'analyze') {
+      const failure = error && typeof error === 'object' ? error : {}
+      const stderr = String(failure.stderr ?? '')
+      const reason =
+        failure.code === 'ENOENT'
+          ? 'opencode-not-found'
+          : failure.code === 'ETIMEDOUT'
+            ? 'opencode-timeout'
+            : stderr.includes('File not found:')
+              ? 'opencode-attachment'
+              : Number.isInteger(failure.status)
+                ? `opencode-exit-${failure.status}`
+                : 'opencode-response'
+      console.error(`[issue-enrichment] analyze: ${reason}.`)
+    }
     // CLI errors and agent output can contain report text: keep workflow logs generic.
     console.error(
       'No se pudo completar el enriquecimiento. La issue sigue disponible; revisa el paso fallido antes de reintentar.',
