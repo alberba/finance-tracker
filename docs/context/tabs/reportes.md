@@ -58,8 +58,8 @@ Identificadores clave en UI:
 ## Composición
 
 No es una sección propia: `FinanceWorkspace.vue` monta `GlobalReportLauncher`, que abre
-`IssueReportPanel` (panel lateral con tipo, resumen, descripción y el detalle opcional, y el estado
-del envío). En móvil lo abre la hoja «Más».
+`IssueReportPanel` (panel lateral con tipo, resumen, descripción opcional, el aviso de publicación
+en repositorio público y el estado del envío). En móvil lo abre la hoja «Más».
 
 ## Flujo técnico
 
@@ -73,10 +73,13 @@ del envío). En móvil lo abre la hoja «Más».
    - `context.userAgent`
    - `context.pathname`
    - `context.timestamp`
-   - campos opcionales de reproducción/esperado/actual
+   - `description` solo si la persona escribió algo
 4. El frontend hace `POST` a `/api/issues/report`.
-5. `issue-report-schema.ts` valida y normaliza el payload.
-6. `github-issues.ts` crea la issue contra GitHub API.
+5. `issue-report-schema.ts` valida y normaliza el payload. Los campos retirados
+   (`expectedResult`, `actualResult`, `stepsToReproduce`) y cualquier dato de reportero que traiga
+   el payload se descartan.
+6. `github-issues.ts` crea la issue contra GitHub API. El reportero (`userId`, `email`, `name`) sale
+   siempre del principal autenticado que resuelve la ruta, nunca del payload.
 7. La UI muestra:
    - éxito simple: `Reporte creado: #...`
    - error: `No se pudo crear la issue: ...`
@@ -91,14 +94,14 @@ Campos esperados por backend:
 
 - `type`: `"bug"` | `"feature"` (`"enhancement"` se acepta como alias antiguo)
 - `summary`: string, 5-140
-- `description`: string, 12-8000
+- `description?`: string, opcional y sin mínimo; máximo 8000 (sin descripción el backend deja `""`)
 - `section`: string
 - `context.userAgent`: string
 - `context.pathname`: string
 - `context.timestamp`: string
-- `stepsToReproduce?`
-- `expectedResult?`
-- `actualResult?`
+
+Campos retirados del contrato: `expectedResult`, `actualResult` y `stepsToReproduce`. Los
+clientes antiguos que los envíen siguen funcionando porque se ignoran.
 
 ## Labels y cuerpo de la issue
 
@@ -111,16 +114,15 @@ Labels base:
 El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
 Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
 
-Metadatos que se escriben en el body:
+Secciones que se escriben en el body:
 
-- tipo
-- sección
-- ruta
-- navegador
-- fecha cliente
-- pasos para reproducir
-- resultado esperado
-- resultado actual
+- `### Resumen`
+- `### Problema o solicitud`: solo si hay descripción, con el texto tal cual lo escribió la persona
+- `### Contexto de ejecución`: tipo, sección, ruta, navegador y fecha cliente
+- `### Reportero`: nombre, email e identificador de la cuenta, tomados del principal autenticado
+
+El formulario avisa, antes de enviar, de que el reporte se publica en un repositorio público con
+esos datos de cuenta.
 
 ## Issue #29: revisión relevante para esta pestaña
 

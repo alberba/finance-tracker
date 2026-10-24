@@ -11,6 +11,8 @@ export type Queryable = Db
 export interface AuthPrincipal {
   userId: string
   email: string | null
+  /** Nombre de la cuenta (`auth_user.name`). Ausente en identidades de prueba. */
+  name?: string | null
   provider: string
   subject: string
   isAdmin?: boolean

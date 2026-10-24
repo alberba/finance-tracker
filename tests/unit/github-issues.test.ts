@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createIssueFromWebReport } from '../../src/lib/server/github-issues'
-import type { IssueReportPayload } from '../../src/lib/server/issue-report-schema'
+import {
+  buildIssueBody,
+  createIssueFromWebReport,
+  type IssueReporter,
+} from '../../src/lib/server/github-issues'
+import {
+  parseIssueReportPayload,
+  type IssueReportPayload,
+} from '../../src/lib/server/issue-report-schema'
 
 const payload: IssueReportPayload = {
   type: 'bug',
@@ -12,6 +19,12 @@ const payload: IssueReportPayload = {
     pathname: '/movimientos',
     timestamp: '2026-02-23T10:00:00.000Z',
   },
+}
+
+const reporter: IssueReporter = {
+  userId: 'user-42',
+  email: 'ana@example.com',
+  name: 'ana',
 }
 
 /** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
@@ -42,6 +55,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -83,6 +97,7 @@ describe('github issues service', () => {
         ...payload,
         type: 'feature',
       },
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -110,6 +125,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -138,6 +154,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -157,6 +174,7 @@ describe('github issues service', () => {
     await expect(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -179,6 +197,7 @@ describe('github issues service', () => {
     const error = await captureError(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -201,6 +220,7 @@ describe('github issues service', () => {
     const error = await captureError(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -232,6 +252,7 @@ describe('github issues service', () => {
 
     await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_TOKEN: 'fallback-token',
         GITHUB_OWNER: 'org',
@@ -252,6 +273,7 @@ describe('github issues service', () => {
     await expect(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
@@ -260,5 +282,84 @@ describe('github issues service', () => {
       ),
     ).rejects.toThrow(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/)
     expect(fakeFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildIssueBody', () => {
+  it('omite por completo la sección «Problema o solicitud» cuando no hay descripción', () => {
+    const body = buildIssueBody({ ...payload, description: '' }, reporter)
+
+    expect(body).not.toContain('Problema o solicitud')
+    expect(body).toContain('### Resumen')
+    expect(body).toContain(payload.summary)
+  })
+
+  it('incluye la descripción tal cual la escribió la persona usuaria', () => {
+    const description = 'Línea uno\n\n- detalle con *markdown* sin tocar'
+    const body = buildIssueBody({ ...payload, description }, reporter)
+
+    expect(body).toContain(`### Problema o solicitud\n${description}\n`)
+  })
+
+  it('conserva los saltos de línea de la descripción de extremo a extremo', () => {
+    const parsed = parseIssueReportPayload({
+      type: 'bug',
+      summary: 'Filtro roto',
+      description: 'Paso 1\n\nPaso 2:\n- primero\n- segundo',
+      section: 'transactions',
+      context: {},
+    })
+
+    const body = buildIssueBody(parsed, reporter)
+
+    expect(body).toContain('### Problema o solicitud\nPaso 1\n\nPaso 2:\n- primero\n- segundo\n')
+  })
+
+  it('escribe nombre, email e identificador del reportero recibido', () => {
+    const body = buildIssueBody(payload, reporter)
+
+    expect(body).toContain('### Reportero')
+    expect(body).toContain('- Nombre: ana')
+    expect(body).toContain('- Email: ana@example.com')
+    expect(body).toContain('- Identificador: user-42')
+  })
+
+  it('marca con n/a los datos del reportero que falten', () => {
+    const body = buildIssueBody(payload, { userId: 'user-7', email: null, name: null })
+
+    expect(body).toContain('- Nombre: n/a')
+    expect(body).toContain('- Email: n/a')
+    expect(body).toContain('- Identificador: user-7')
+  })
+
+  it('no escribe los campos retirados del formulario', () => {
+    const body = buildIssueBody(payload, reporter)
+
+    expect(body).not.toContain('Resultado esperado')
+    expect(body).not.toContain('Resultado actual')
+    expect(body).not.toContain('Pasos para reproducir')
+  })
+})
+
+describe('createIssueFromWebReport con reportero', () => {
+  it('envía el reportero en el cuerpo y omite la descripción vacía', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify({ number: 3, html_url: 'https://x/issues/3' }), {
+          status: 201,
+        }),
+    )
+
+    await createIssueFromWebReport(
+      { ...payload, description: '' },
+      reporter,
+      { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' },
+      { fetch: fakeFetch as unknown as typeof fetch },
+    )
+
+    const [, init] = fakeFetch.mock.calls[0]
+    const body = JSON.parse(String(init?.body || '{}'))
+    expect(body.body).toContain('- Email: ana@example.com')
+    expect(body.body).not.toContain('Problema o solicitud')
   })
 })

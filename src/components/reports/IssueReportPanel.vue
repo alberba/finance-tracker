@@ -40,8 +40,6 @@ const form = reactive({
   type: 'bug' as ReportType,
   summary: '',
   description: '',
-  expectedResult: '',
-  actualResult: '',
 })
 
 const statusMessage = shallowRef('')
@@ -52,15 +50,13 @@ function resetForm(): void {
   form.type = 'bug'
   form.summary = ''
   form.description = ''
-  form.expectedResult = ''
-  form.actualResult = ''
 }
 
 async function onSubmit(): Promise<void> {
   const summary = normalizeText(form.summary)
   const description = normalizeText(form.description)
 
-  const validationError = getValidationError(summary, description)
+  const validationError = getValidationError(summary)
   if (validationError) {
     successStatus.value = null
     statusMessage.value = validationError
@@ -72,11 +68,10 @@ async function onSubmit(): Promise<void> {
     // form submissions use the shorter GitHub-facing `feature` value.
     type: form.type === 'bug' ? 'bug' : 'feature',
     summary,
-    description,
+    // Sin descripción no se envía el campo: el servidor la deja vacía.
+    description: description || undefined,
     section: uiStore.ui.activeSection,
     context: getIssueReportContext(),
-    expectedResult: normalizeText(form.expectedResult) || undefined,
-    actualResult: normalizeText(form.actualResult) || undefined,
   }
 
   submitting.value = true
@@ -148,46 +143,23 @@ async function onSubmit(): Promise<void> {
           placeholder="Ej. El filtro de movimientos no guarda el valor"
         />
         <div :class="FIELD_LABEL">
-          <label for="issue-report-description">Descripción</label>
+          <label for="issue-report-description">Descripción (opcional)</label>
           <textarea
             id="issue-report-description"
             v-model="form.description"
             :class="TEXTAREA"
             name="description"
-            minlength="12"
             maxlength="8000"
-            required
             rows="4"
-            placeholder="Describe el error o mejora con el mayor detalle posible."
+            placeholder="Añade detalle si hace falta. El resumen puede bastar."
           ></textarea>
         </div>
       </fieldset>
 
-      <fieldset class="grid gap-3.5 sm:grid-cols-2">
-        <PanelSectionTitle>Detalle (opcional)</PanelSectionTitle>
-        <div :class="FIELD_LABEL">
-          <label for="issue-report-expected">Resultado esperado</label>
-          <textarea
-            id="issue-report-expected"
-            v-model="form.expectedResult"
-            :class="TEXTAREA"
-            name="expectedResult"
-            maxlength="4000"
-            rows="3"
-          ></textarea>
-        </div>
-        <div :class="FIELD_LABEL">
-          <label for="issue-report-actual">Resultado actual</label>
-          <textarea
-            id="issue-report-actual"
-            v-model="form.actualResult"
-            :class="TEXTAREA"
-            name="actualResult"
-            maxlength="4000"
-            rows="3"
-          ></textarea>
-        </div>
-      </fieldset>
+      <p id="issue-report-notice" class="text-text-muted text-sm leading-relaxed">
+        Este reporte se publica en un repositorio público, junto con tu nombre, tu email y el
+        identificador de tu cuenta. No escribas datos que no quieras compartir.
+      </p>
     </form>
 
     <p

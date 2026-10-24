@@ -46,6 +46,7 @@ INSERT INTO user_identities(id,user_id,provider,subject,email,created_at) VALUES
   expect(await authenticatedPrincipal(db, login.user.id)).toEqual({
     userId: 'existing-owner',
     email: 'owner@example.com',
+    name: login.user.name,
     provider: 'better-auth',
     subject: 'existing-owner',
     isAdmin: true,

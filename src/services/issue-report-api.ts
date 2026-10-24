@@ -7,16 +7,14 @@ export type ReportType = 'bug' | 'feature' | 'enhancement'
 export interface ReportPayload {
   type: ReportType
   summary: string
-  description: string
+  /** Opcional: se omite del payload cuando la persona no escribe nada. */
+  description?: string
   section: string
   context: {
     userAgent: string
     pathname: string
     timestamp: string
   }
-  stepsToReproduce?: string
-  expectedResult?: string
-  actualResult?: string
 }
 
 interface ReportResponseOk {
