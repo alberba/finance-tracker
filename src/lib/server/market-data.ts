@@ -1,5 +1,7 @@
+import { Cause, Data, Deferred, Effect } from 'effect'
 import type { Instrument, Quote, QuoteDataType, QuoteProvider } from '../../scripts/types'
 import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
+import { Http } from './http'
 import { yahooFinance, YahooFinanceHttpError } from './yahoo-finance'
 
 export interface MarketDataEnv {
@@ -20,7 +22,7 @@ const DEFAULT_TIMEOUT_MS = 5_000
 const DEFAULT_PROVIDER: QuoteProvider = 'yahoo'
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000
 const memoryCache = new Map<string, { expiresAt: number; quote: Quote }>()
-const inFlightQuotes = new Map<string, Promise<Quote>>()
+const inFlightQuotes = new Map<string, Deferred.Deferred<Quote>>()
 const rateLimitedQuotes = new Map<string, number>()
 
 interface ProviderQuote {
@@ -28,106 +30,121 @@ interface ProviderQuote {
   raw: unknown
 }
 
-class MarketProviderError extends Error {
-  constructor(
-    readonly status: number,
-    readonly retryAfterMs: number | null,
-  ) {
-    super(`Proveedor de mercado respondió ${status}`)
-    this.name = 'MarketProviderError'
-  }
-}
+/** A provider answered with a non-2xx status. */
+export class MarketProviderError extends Data.TaggedError('MarketProviderError')<{
+  message: string
+  status: number
+  retryAfterMs: number | null
+}> {}
+
+/** The provider failed before answering (parse, timeout, unknown source). */
+export class MarketQuoteError extends Data.TaggedError('MarketQuoteError')<{
+  message: string
+}> {}
+
+type MarketFailure = MarketProviderError | MarketQuoteError
 
 interface EdgeCache {
   match(request: Request): Promise<Response | undefined>
   put(request: Request, response: Response): Promise<void>
 }
 
-export async function loadMarketQuote(
+export function loadMarketQuote(
   request: MarketQuoteRequest,
   env: MarketDataEnv,
-  fetchImpl: typeof fetch = fetch,
-): Promise<Quote> {
-  if (typeof request.instrument.quoteSymbol === 'string' && request.instrument.quoteSymbol.trim()) {
-    request = {
-      ...request,
-      instrument: {
-        ...request.instrument,
-        symbol: request.instrument.quoteSymbol.trim().toUpperCase(),
-      },
+): Effect.Effect<Quote, never, Http> {
+  return Effect.gen(function* () {
+    if (
+      typeof request.instrument.quoteSymbol === 'string' &&
+      request.instrument.quoteSymbol.trim()
+    ) {
+      request = {
+        ...request,
+        instrument: {
+          ...request.instrument,
+          symbol: request.instrument.quoteSymbol.trim().toUpperCase(),
+        },
+      }
     }
-  }
-  const cacheKey = buildCacheKey(request.instrument)
-  const cached = memoryCache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) return cached.quote
+    const cacheKey = buildCacheKey(request.instrument)
+    const cached = memoryCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) return cached.quote
 
-  const rateLimitUntil = rateLimitedQuotes.get(cacheKey)
-  if (rateLimitUntil && rateLimitUntil > Date.now()) {
-    return buildFallbackQuote(request.instrument, request.fallback)
-  }
-  if (rateLimitUntil) rateLimitedQuotes.delete(cacheKey)
+    const rateLimitUntil = rateLimitedQuotes.get(cacheKey)
+    if (rateLimitUntil && rateLimitUntil > Date.now()) {
+      return buildFallbackQuote(request.instrument, request.fallback)
+    }
+    if (rateLimitUntil) rateLimitedQuotes.delete(cacheKey)
 
-  const pending =
-    inFlightQuotes.get(cacheKey) || createQuoteLoad(cacheKey, request.instrument, env, fetchImpl)
-  try {
-    return await pending
-  } catch (error) {
-    rememberRateLimit(cacheKey, error)
-    return buildFallbackQuote(request.instrument, request.fallback)
-  } finally {
-    if (inFlightQuotes.get(cacheKey) === pending) inFlightQuotes.delete(cacheKey)
-  }
+    const pending = inFlightQuotes.get(cacheKey)
+    if (pending) return yield* Deferred.await(pending)
+
+    const deferred = yield* Deferred.make<Quote>()
+    inFlightQuotes.set(cacheKey, deferred)
+
+    return yield* Effect.gen(function* () {
+      const result = yield* loadAndCacheQuote(cacheKey, request.instrument, env).pipe(
+        Effect.map((quote) => ({ quote })),
+        Effect.catchCause((cause) => {
+          rememberRateLimit(cacheKey, Cause.squash(cause))
+          return Effect.succeed({ quote: buildFallbackQuote(request.instrument, request.fallback) })
+        }),
+      )
+      yield* Deferred.succeed(deferred, result.quote)
+      return result.quote
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (inFlightQuotes.get(cacheKey) === deferred) inFlightQuotes.delete(cacheKey)
+        }),
+      ),
+    )
+  })
 }
 
-function createQuoteLoad(
+function loadAndCacheQuote(
   cacheKey: string,
   instrument: Instrument,
   env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<Quote> {
-  const pending = loadAndCacheQuote(cacheKey, instrument, env, fetchImpl)
-  inFlightQuotes.set(cacheKey, pending)
-  return pending
+): Effect.Effect<Quote, MarketFailure, Http> {
+  return Effect.gen(function* () {
+    const edgeCached = yield* readEdgeCache(cacheKey)
+    if (edgeCached) {
+      memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote: edgeCached })
+      return edgeCached
+    }
+
+    const { provider, raw } = yield* fetchProviderQuote(instrument, env)
+    const quote = normalizeProviderQuote(instrument, raw, env, provider)
+    memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote })
+    yield* writeEdgeCache(cacheKey, quote, readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120))
+    return quote
+  })
 }
 
-async function loadAndCacheQuote(
-  cacheKey: string,
+function fetchProviderQuote(
   instrument: Instrument,
   env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<Quote> {
-  const edgeCached = await readEdgeCache(cacheKey)
-  if (edgeCached) {
-    memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote: edgeCached })
-    return edgeCached
-  }
-
-  const providerQuote = await fetchProviderQuote(instrument, env, fetchImpl)
-  const quote = normalizeProviderQuote(instrument, providerQuote.raw, env, providerQuote.provider)
-  memoryCache.set(cacheKey, { expiresAt: cacheExpiry(env), quote })
-  await writeEdgeCache(cacheKey, quote, readNumber(env.MARKET_QUOTE_CACHE_SECONDS, 120))
-  return quote
-}
-
-async function fetchProviderQuote(
-  instrument: Instrument,
-  env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<ProviderQuote> {
-  const provider = resolveProvider(instrument, env)
-  try {
-    return {
-      provider,
-      raw: await fetchProviderQuoteFrom(provider, instrument, env, fetchImpl),
-    }
-  } catch (error) {
-    const fallbackProvider = resolveFallbackProvider(provider, env)
-    if (!fallbackProvider || !shouldUseProviderFallback(provider, error)) throw error
-    return {
-      provider: fallbackProvider,
-      raw: await fetchProviderQuoteFrom(fallbackProvider, instrument, env, fetchImpl),
-    }
-  }
+): Effect.Effect<ProviderQuote, MarketFailure, Http> {
+  return Effect.gen(function* () {
+    const provider = resolveProvider(instrument, env)
+    const fromProvider = (name: string): Effect.Effect<ProviderQuote, MarketFailure, Http> =>
+      fetchProviderQuoteFrom(name, instrument, env).pipe(
+        Effect.map((raw) => ({ provider: name, raw })),
+      )
+    return yield* fromProvider(provider).pipe(
+      Effect.catchIf(
+        (error: MarketFailure) => Boolean(error),
+        (error) => {
+          const fallbackProvider = resolveFallbackProvider(provider, env)
+          if (!fallbackProvider || !shouldUseProviderFallback(provider, error)) {
+            return Effect.fail(error)
+          }
+          return fromProvider(fallbackProvider)
+        },
+      ),
+    )
+  })
 }
 
 function resolveProvider(instrument: Instrument, env: MarketDataEnv): string {
@@ -156,59 +173,78 @@ function shouldUseProviderFallback(provider: string, error: unknown): boolean {
   return error.status === 429 || error.status >= 500
 }
 
-async function fetchProviderQuoteFrom(
+function fetchProviderQuoteFrom(
   provider: string,
   instrument: Instrument,
   env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<unknown> {
-  if (provider === 'yahoo') return yahooFinance.quote(yahooQuoteSymbol(instrument))
-  if (provider === 'coingecko') return fetchCoinGecko(instrument, env, fetchImpl)
-  if (provider === 'twelve-data') return fetchTwelveData(instrument, env, fetchImpl)
-  throw new Error(`Proveedor de cotizaciones desconocido: ${provider}`)
-}
-
-async function fetchTwelveData(
-  instrument: Instrument,
-  env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<unknown> {
-  if (!env.TWELVE_DATA_API_KEY) throw new Error('TWELVE_DATA_API_KEY no configurada')
-  const params = new URLSearchParams({
-    symbol:
-      instrument.type === 'crypto'
-        ? `${instrument.symbol}/${instrument.currency || 'USD'}`
-        : instrument.symbol,
-  })
-  if (instrument.market) params.set('exchange', instrument.market)
-  return fetchJsonWithTimeout(`https://api.twelvedata.com/quote?${params.toString()}`, fetchImpl, {
-    Authorization: `apikey ${env.TWELVE_DATA_API_KEY}`,
-  })
-}
-
-async function fetchCoinGecko(
-  instrument: Instrument,
-  env: MarketDataEnv,
-  fetchImpl: typeof fetch,
-): Promise<unknown> {
-  if (!env.COINGECKO_API_KEY) throw new Error('COINGECKO_API_KEY no configurada')
-  const params = new URLSearchParams({
-    vs_currencies: (instrument.currency || 'usd').toLowerCase(),
-    include_24hr_change: 'true',
-    include_last_updated_at: 'true',
-  })
-  const coinId = resolveCoinGeckoId(instrument)
-  if (coinId) params.set('ids', coinId)
-  else params.set('symbols', instrument.symbol.toLowerCase())
-  const plan = String(env.COINGECKO_API_PLAN || 'demo').toLowerCase()
-  const isPro = plan === 'pro'
-  const headers = {
-    [isPro ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key']: env.COINGECKO_API_KEY,
+): Effect.Effect<unknown, MarketFailure, Http> {
+  if (provider === 'yahoo') {
+    return Effect.tryPromise({
+      try: () => yahooFinance.quote(yahooQuoteSymbol(instrument)),
+      catch: (error) =>
+        error instanceof YahooFinanceHttpError
+          ? new MarketProviderError({
+              message: `Yahoo Finance respondió ${error.status}`,
+              status: error.status,
+              retryAfterMs: error.retryAfterMs,
+            })
+          : new MarketQuoteError({ message: 'No se pudo consultar Yahoo Finance.' }),
+    })
   }
-  const baseUrl = isPro
-    ? 'https://pro-api.coingecko.com/api/v3'
-    : 'https://api.coingecko.com/api/v3'
-  return fetchJsonWithTimeout(`${baseUrl}/simple/price?${params.toString()}`, fetchImpl, headers)
+  if (provider === 'coingecko') return fetchCoinGecko(instrument, env)
+  if (provider === 'twelve-data') return fetchTwelveData(instrument, env)
+  return Effect.fail(
+    new MarketQuoteError({ message: `Proveedor de cotizaciones desconocido: ${provider}` }),
+  )
+}
+
+function fetchTwelveData(
+  instrument: Instrument,
+  env: MarketDataEnv,
+): Effect.Effect<unknown, MarketFailure, Http> {
+  return Effect.gen(function* () {
+    if (!env.TWELVE_DATA_API_KEY) {
+      return yield* new MarketQuoteError({ message: 'TWELVE_DATA_API_KEY no configurada' })
+    }
+    const params = new URLSearchParams({
+      symbol:
+        instrument.type === 'crypto'
+          ? `${instrument.symbol}/${instrument.currency || 'USD'}`
+          : instrument.symbol,
+    })
+    if (instrument.market) params.set('exchange', instrument.market)
+    return yield* fetchJsonWithTimeout(`https://api.twelvedata.com/quote?${params.toString()}`, {
+      Authorization: `apikey ${env.TWELVE_DATA_API_KEY}`,
+    })
+  })
+}
+
+function fetchCoinGecko(
+  instrument: Instrument,
+  env: MarketDataEnv,
+): Effect.Effect<unknown, MarketFailure, Http> {
+  return Effect.gen(function* () {
+    if (!env.COINGECKO_API_KEY) {
+      return yield* new MarketQuoteError({ message: 'COINGECKO_API_KEY no configurada' })
+    }
+    const params = new URLSearchParams({
+      vs_currencies: (instrument.currency || 'usd').toLowerCase(),
+      include_24hr_change: 'true',
+      include_last_updated_at: 'true',
+    })
+    const coinId = resolveCoinGeckoId(instrument)
+    if (coinId) params.set('ids', coinId)
+    else params.set('symbols', instrument.symbol.toLowerCase())
+    const plan = String(env.COINGECKO_API_PLAN || 'demo').toLowerCase()
+    const isPro = plan === 'pro'
+    const headers = {
+      [isPro ? 'x-cg-pro-api-key' : 'x-cg-demo-api-key']: env.COINGECKO_API_KEY,
+    }
+    const baseUrl = isPro
+      ? 'https://pro-api.coingecko.com/api/v3'
+      : 'https://api.coingecko.com/api/v3'
+    return yield* fetchJsonWithTimeout(`${baseUrl}/simple/price?${params.toString()}`, headers)
+  })
 }
 
 function normalizeProviderQuote(
@@ -356,20 +392,36 @@ function buildFallbackQuote(instrument: Instrument, fallback?: Quote | null): Qu
   }
 }
 
-async function fetchJsonWithTimeout(
+function fetchJsonWithTimeout(
   url: string,
-  fetchImpl: typeof fetch,
   headers?: Record<string, string>,
-): Promise<unknown> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
-  try {
-    const response = await fetchImpl(url, { signal: controller.signal, headers })
-    if (!response.ok) throw new MarketProviderError(response.status, readRetryAfterMs(response))
-    return response.json()
-  } finally {
-    clearTimeout(timeout)
-  }
+): Effect.Effect<unknown, MarketFailure, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* Effect.tryPromise({
+      try: (signal) => http.request(url, { signal, headers }),
+      catch: () => new MarketQuoteError({ message: 'No se pudo contactar con el proveedor.' }),
+    }).pipe(
+      Effect.timeout(`${DEFAULT_TIMEOUT_MS} millis`),
+      Effect.catchTag('TimeoutError', () =>
+        Effect.fail(
+          new MarketQuoteError({ message: 'El proveedor agotó el tiempo de respuesta.' }),
+        ),
+      ),
+    )
+    if (!response.ok) {
+      return yield* new MarketProviderError({
+        message: `Proveedor de mercado respondió ${response.status}`,
+        status: response.status,
+        retryAfterMs: readRetryAfterMs(response),
+      })
+    }
+    return yield* Effect.promise(() =>
+      response.json().catch(() => {
+        throw new MarketQuoteError({ message: 'Respuesta inválida del proveedor.' })
+      }),
+    )
+  })
 }
 
 function cacheExpiry(env: MarketDataEnv): number {
@@ -409,39 +461,41 @@ function buildCacheKey(instrument: Instrument): string {
   ].join(':')
 }
 
-async function readEdgeCache(cacheKey: string): Promise<Quote | null> {
+function readEdgeCache(cacheKey: string): Effect.Effect<Quote | null> {
   const cache = getEdgeCache()
-  if (!cache) return null
-  try {
-    const response = await cache.match(cacheRequest(cacheKey))
-    if (!response) return null
-    const value = (await response.json()) as Quote
-    return value?.instrumentId ? value : null
-  } catch {
-    return null
-  }
+  if (!cache) return Effect.succeed(null)
+  return Effect.tryPromise({
+    try: async () => {
+      const response = await cache.match(cacheRequest(cacheKey))
+      if (!response) return null
+      const value = (await response.json()) as Quote
+      return value?.instrumentId ? value : null
+    },
+    catch: () => null,
+  }).pipe(Effect.catchCause(() => Effect.succeed(null)))
 }
 
-async function writeEdgeCache(
+function writeEdgeCache(
   cacheKey: string,
   quote: Quote,
   maxAgeSeconds: number,
-): Promise<void> {
+): Effect.Effect<void> {
   const cache = getEdgeCache()
-  if (!cache) return
-  try {
-    await cache.put(
-      cacheRequest(cacheKey),
-      new Response(JSON.stringify(quote), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': `max-age=${maxAgeSeconds}`,
-        },
-      }),
-    )
-  } catch {
-    return
-  }
+  if (!cache) return Effect.void
+  return Effect.tryPromise({
+    try: async () => {
+      await cache.put(
+        cacheRequest(cacheKey),
+        new Response(JSON.stringify(quote), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': `max-age=${maxAgeSeconds}`,
+          },
+        }),
+      )
+    },
+    catch: () => undefined,
+  }).pipe(Effect.ignore)
 }
 
 function getEdgeCache(): EdgeCache | null {

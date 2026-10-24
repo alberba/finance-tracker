@@ -6,9 +6,24 @@ vi.mock('../../src/lib/server/yahoo-finance', async (importOriginal) => ({
   yahooFinance: { quote: quoteMock },
 }))
 
-import { loadMarketQuote } from '../../src/lib/server/market-data'
+import { Effect } from 'effect'
+import {
+  loadMarketQuote,
+  type MarketDataEnv,
+  type MarketQuoteRequest,
+} from '../../src/lib/server/market-data'
+import { Http } from '../../src/lib/server/http'
 import { YahooFinanceHttpError } from '../../src/lib/server/yahoo-finance'
 import type { Instrument, Quote } from '../../src/scripts/types'
+
+const loadQuote = (
+  request: MarketQuoteRequest,
+  env: MarketDataEnv,
+  request_ = fetch as typeof fetch,
+): Promise<Quote> =>
+  Effect.runPromise(
+    Effect.provideService(loadMarketQuote(request, env), Http, { request: request_ }),
+  )
 
 const instrument: Instrument = {
   id: 'asset-vwce',
@@ -37,11 +52,7 @@ describe('adaptador de mercado server-side', () => {
         { status: 200 },
       ),
     )
-    const quote = await loadMarketQuote(
-      { instrument },
-      { TWELVE_DATA_API_KEY: 'secret' },
-      fetchMock,
-    )
+    const quote = await loadQuote({ instrument }, { TWELVE_DATA_API_KEY: 'secret' }, fetchMock)
     expect(quote).toMatchObject({
       instrumentId: 'asset-vwce',
       price: 125.5,
@@ -71,7 +82,7 @@ describe('adaptador de mercado server-side', () => {
       changePercent: 0.84,
     }
     const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new Error('timeout'))
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       { instrument: { ...instrument, id: 'asset-vwce-fallback', symbol: 'FALLBACK' }, fallback },
       {},
       fetchMock,
@@ -88,7 +99,7 @@ describe('adaptador de mercado server-side', () => {
         { status: 200 },
       ),
     )
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -124,7 +135,7 @@ describe('adaptador de mercado server-side', () => {
         regularMarketPrice: ticker === 'BTC' ? 36.03 : 73_000,
         regularMarketTime: new Date(),
       }))
-      const quote = await loadMarketQuote(
+      const quote = await loadQuote(
         {
           instrument: {
             ...instrument,
@@ -158,12 +169,12 @@ describe('adaptador de mercado server-side', () => {
       quoteSymbol: 'BTC-EUR',
       provider: 'yahoo',
     }
-    expect(await loadMarketQuote({ instrument: visible }, {})).toMatchObject({
+    expect(await loadQuote({ instrument: visible }, {})).toMatchObject({
       currency: 'EUR',
       price: 73_000,
     })
     expect(
-      await loadMarketQuote({ instrument: { ...visible, quoteSymbol: 'BTC-USD' } }, {}),
+      await loadQuote({ instrument: { ...visible, quoteSymbol: 'BTC-USD' } }, {}),
     ).toMatchObject({ currency: 'USD', price: 80_000 })
     expect(quoteMock.mock.calls.map(([symbol]) => symbol)).toEqual(['BTC-EUR', 'BTC-USD'])
     expect(visible.symbol).toBe('BTC')
@@ -176,7 +187,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketPrice: 36.03,
       regularMarketTime: new Date(),
     })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -199,7 +210,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketPreviousClose: 9.312,
     })
 
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -229,7 +240,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketTime: new Date(),
       currency: 'EUR',
     })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -249,7 +260,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketTime: new Date(),
       exchangeDataDelayedBy: 15,
     })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -265,7 +276,7 @@ describe('adaptador de mercado server-side', () => {
   })
 
   it('rechaza un proveedor desconocido en lugar de cotizar desde otra fuente', async () => {
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -285,7 +296,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketTime: marketTime,
       currency: 'EUR',
     })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -313,7 +324,7 @@ describe('adaptador de mercado server-side', () => {
         { status: 200 },
       ),
     )
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -340,7 +351,7 @@ describe('adaptador de mercado server-side', () => {
 
   it('no inventa una fecha actual si Yahoo no devuelve hora de mercado', async () => {
     quoteMock.mockResolvedValue({ regularMarketPrice: 10 })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -363,7 +374,7 @@ describe('adaptador de mercado server-side', () => {
       regularMarketPreviousClose: 2000,
       regularMarketTime: new Date(),
     })
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -384,7 +395,7 @@ describe('adaptador de mercado server-side', () => {
 
   it('devuelve unavailable si Yahoo no encuentra el símbolo o no devuelve precio', async () => {
     quoteMock.mockResolvedValue(undefined)
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -410,7 +421,7 @@ describe('adaptador de mercado server-side', () => {
       ),
     )
 
-    const quote = await loadMarketQuote(
+    const quote = await loadQuote(
       {
         instrument: {
           ...instrument,
@@ -451,8 +462,8 @@ describe('adaptador de mercado server-side', () => {
       },
     }
 
-    const first = loadMarketQuote(request, {})
-    const second = loadMarketQuote(request, {})
+    const first = loadQuote(request, {})
+    const second = loadQuote(request, {})
 
     await Promise.resolve()
     expect(quoteMock).toHaveBeenCalledTimes(1)
@@ -475,8 +486,8 @@ describe('adaptador de mercado server-side', () => {
       },
     }
 
-    await loadMarketQuote(request, {})
-    await loadMarketQuote(request, {})
+    await loadQuote(request, {})
+    await loadQuote(request, {})
 
     expect(quoteMock).toHaveBeenCalledTimes(1)
   })
