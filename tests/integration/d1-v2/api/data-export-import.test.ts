@@ -231,17 +231,17 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     watchlistId: 'wl-1',
     hidden: true,
   }))
-  await stockeventsCashMappingsRepository.upsertMapping(db, userId, {
+  await runWithDb(db, stockeventsCashMappingsRepository.upsertMapping(userId, {
     accountId: account.id,
     watchlistId: 'wl-1',
-  })
-  await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+  }))
+  await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
     contributionDate: '2026-03-10',
     accountId: account.id,
     watchlistId: 'wl-1',
     syncedAmount: 300,
     currency: 'EUR',
-  })
+  }))
   await runWithDb(db, userSettingsRepository.create(userId, {
     onboardingPresented: true,
     onboardingDismissed: true,
@@ -292,12 +292,9 @@ describe('GET /api/data/export + POST /api/data/import', () => {
 
   it('never includes integration_credentials, even when the user has one configured', async () => {
     const testEnv = { DATA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64') }
-    await integrationCredentialsRepository.create(
-      testDb.db,
-      principal.userId,
+    await runWithDb(testDb.db, integrationCredentialsRepository.create(principal.userId,
       { provider: 'stockevents', secret: 'super-secret-plaintext-key' },
-      testEnv,
-    )
+      testEnv,))
 
     const { GET } = await import('../../../../src/pages/api/data/export')
     const response = await GET({ locals: { principal } } as never)

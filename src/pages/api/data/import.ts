@@ -454,10 +454,10 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashMappings')
           continue
         }
-        await stockeventsCashMappingsRepository.upsertMapping(tx, userId, {
+        await runWithDb(tx, stockeventsCashMappingsRepository.upsertMapping(userId, {
           accountId: accountId ?? (typeof row.accountId === 'string' ? row.accountId : null),
           watchlistId: row.watchlistId,
-        })
+        }))
         bump(imported, 'stockeventsCashMappings')
       }
 
@@ -468,13 +468,13 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashSyncEntries')
           continue
         }
-        await stockeventsCashMappingsRepository.upsertSyncEntry(tx, userId, {
+        await runWithDb(tx, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
           contributionDate: String(row.contributionDate ?? ''),
           accountId: accountId ?? null,
           watchlistId: row.watchlistId,
           syncedAmount: typeof row.syncedAmount === 'number' ? row.syncedAmount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'stockeventsCashSyncEntries')
       }
 

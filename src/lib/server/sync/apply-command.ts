@@ -193,7 +193,7 @@ async function loadForMutation(
       return (await runWithDb(db, stockeventsSymbolMappingsRepository.get(userId, entityId))) as
         VersionedRow | undefined
     case 'stockeventsCashEntry': {
-      const entries = await stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId)
+      const entries = await runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId))
       return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined
     }
   }
@@ -281,27 +281,24 @@ async function createEntity(
       if (accountId) {
         await assertOwnedReferences(db, userId, { accountId })
       }
-      const duplicate = await stockeventsCashMappingsRepository.findEntry(
-        db,
-        userId,
+      const duplicate = await runWithDb(db, stockeventsCashMappingsRepository.findEntry(userId,
         String(data.contributionDate),
         accountId,
-        String(data.watchlistId),
-      )
+        String(data.watchlistId),))
       if (duplicate) {
         return {
           ...duplicate,
           syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
         } as VersionedRow
       }
-      const entry = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+      const entry = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
         id: typeof data.id === 'string' ? data.id : undefined,
         contributionDate: String(data.contributionDate),
         accountId,
         watchlistId: String(data.watchlistId),
         syncedAmount: Number(data.syncedAmount),
         currency: String(data.currency),
-      })
+      }))
       return {
         ...entry,
         syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency),
@@ -414,13 +411,13 @@ async function updateEntity(
         },
         expectedVersion,))) as VersionedRow | undefined
     case 'stockeventsCashEntry': {
-      const updated = await stockeventsCashMappingsRepository.upsertSyncEntry(db, userId, {
+      const updated = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
         contributionDate: String(patch.contributionDate),
         accountId: typeof patch.accountId === 'string' && patch.accountId ? patch.accountId : null,
         watchlistId: String(patch.watchlistId),
         syncedAmount: Number(patch.syncedAmount),
         currency: String(patch.currency),
-      })
+      }))
       return {
         ...updated,
         syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
@@ -476,12 +473,9 @@ async function removeEntity(
     case 'stockeventsMapping':
       return runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion))
     case 'stockeventsCashEntry':
-      return stockeventsCashMappingsRepository.removeSyncEntry(
-        db,
-        userId,
+      return runWithDb(db, stockeventsCashMappingsRepository.removeSyncEntry(userId,
         entityId,
-        expectedVersion,
-      )
+        expectedVersion,))
     case 'wealthSnapshot':
       return wealthRepository.remove(db, userId, entityId, expectedVersion)
   }
@@ -617,11 +611,8 @@ async function performMutation(
         ? await accountsRepository.replaceTwrLiquidityAccounts(db, userId, twrLiquidityAccountIds)
         : undefined
       const cashMappings = stockeventsCashMappings
-        ? await stockeventsCashMappingsRepository.replaceMappings(
-            db,
-            userId,
-            stockeventsCashMappings,
-          )
+        ? await runWithDb(db, stockeventsCashMappingsRepository.replaceMappings(userId,
+            stockeventsCashMappings,))
         : undefined
       const revision = await recordChange(
         db,

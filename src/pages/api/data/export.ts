@@ -63,8 +63,8 @@ export const GET: APIRoute = async ({ locals }) =>
       contributionsRepository.listByUser(db, userId),
       marketRepository.listUserInstrumentsByUser(db, userId),
       runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
-      stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-      stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+      runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+      runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
     ]);
 
     const tradeDetails = await transactionsRepository.listTradeDetailsByTransactions(

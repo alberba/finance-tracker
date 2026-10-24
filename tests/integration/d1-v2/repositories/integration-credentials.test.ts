@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as integrationCredentialsRepo from "../../../../src/db/repositories/integration-credentials";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 const env = { DATA_ENCRYPTION_KEY: "jczGrUcJ9753I5noa+t5lM2U28P2WYQsgwABKiOwguQ=" };
 
@@ -20,12 +21,9 @@ describe("integration-credentials repository", () => {
     const { db, sqlite } = testDb;
     const user = await seedUser(db);
 
-    const created = await integrationCredentialsRepo.create(
-      db,
-      user.id,
+    const created = await runWithDb(db, integrationCredentialsRepo.create(user.id,
       { provider: "stockevents", secret: "sk-live-plaintext" },
-      env,
-    );
+      env,));
     expect(created.keyVersion).toBe(1);
     expect(created.secret).toBe("sk-live-plaintext");
 
@@ -35,36 +33,27 @@ describe("integration-credentials repository", () => {
       .get(created.id) as { ciphertext: string };
     expect(raw.ciphertext).not.toContain("sk-live-plaintext");
 
-    const byProvider = await integrationCredentialsRepo.getByProvider(
-      db,
-      user.id,
+    const byProvider = await runWithDb(db, integrationCredentialsRepo.getByProvider(user.id,
       "stockevents",
-      env,
-    );
+      env,));
     expect(byProvider?.id).toBe(created.id);
     expect(byProvider?.secret).toBe("sk-live-plaintext");
 
-    const updated = await integrationCredentialsRepo.update(
-      db,
-      user.id,
+    const updated = await runWithDb(db, integrationCredentialsRepo.update(user.id,
       created.id,
       { secret: "sk-live-rotated" },
-      env,
-    );
+      env,));
     expect(updated?.secret).toBe("sk-live-rotated");
 
-    expect(await integrationCredentialsRepo.remove(db, user.id, created.id)).toBe(true);
+    expect(await runWithDb(db, integrationCredentialsRepo.remove(user.id, created.id))).toBe(true);
   });
 
   it("rejects creating a credential for a non-existent user (FK violation)", async () => {
     const { db } = testDb;
     await expect(
-      integrationCredentialsRepo.create(
-        db,
-        "does-not-exist",
+      runWithDb(db, integrationCredentialsRepo.create("does-not-exist",
         { provider: "stockevents", secret: "x" },
-        env,
-      ),
+        env,)),
     ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
   });
 
@@ -72,44 +61,35 @@ describe("integration-credentials repository", () => {
     const { db } = testDb;
     const userA = await seedUser(db);
     const userB = await seedUser(db);
-    const created = await integrationCredentialsRepo.create(
-      db,
-      userA.id,
+    const created = await runWithDb(db, integrationCredentialsRepo.create(userA.id,
       { provider: "stockevents", secret: "secret" },
-      env,
-    );
+      env,));
 
-    expect(await integrationCredentialsRepo.get(db, userB.id, created.id, env)).toBeUndefined();
+    expect(await runWithDb(db, integrationCredentialsRepo.get(userB.id, created.id, env))).toBeUndefined();
     expect(
-      await integrationCredentialsRepo.getByProvider(db, userB.id, "stockevents", env),
+      await runWithDb(db, integrationCredentialsRepo.getByProvider(userB.id, "stockevents", env)),
     ).toBeUndefined();
-    expect(await integrationCredentialsRepo.listByUser(db, userB.id, env)).toHaveLength(0);
+    expect(await runWithDb(db, integrationCredentialsRepo.listByUser(userB.id, env))).toHaveLength(0);
   });
 
   it("rejects updates and deletes based on a stale version", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
-    const created = await integrationCredentialsRepo.create(
-      db,
-      user.id,
+    const created = await runWithDb(db, integrationCredentialsRepo.create(user.id,
       { provider: "stockevents", secret: "original" },
-      env,
-    );
+      env,));
 
     expect(
-      await integrationCredentialsRepo.update(
-        db,
-        user.id,
+      await runWithDb(db, integrationCredentialsRepo.update(user.id,
         created.id,
         { secret: "stale" },
         env,
-        created.version + 1,
-      ),
+        created.version + 1,)),
     ).toBeUndefined();
     expect(
-      await integrationCredentialsRepo.remove(db, user.id, created.id, created.version + 1),
+      await runWithDb(db, integrationCredentialsRepo.remove(user.id, created.id, created.version + 1)),
     ).toBe(false);
-    expect(await integrationCredentialsRepo.get(db, user.id, created.id, env)).toMatchObject({
+    expect(await runWithDb(db, integrationCredentialsRepo.get(user.id, created.id, env))).toMatchObject({
       secret: "original",
       version: 1,
     });
