@@ -9,6 +9,7 @@
  */
 
 import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
 import { users, userIdentities } from '../schema'
 import { normalizeEmail, nowIso, type Db } from './shared'
 
@@ -30,12 +31,12 @@ export interface CreateUserIdentityInput {
   email?: string | null
 }
 
-export async function get(db: Db, id: string): Promise<UserRow | undefined> {
+async function getSql(db: Db, id: string): Promise<UserRow | undefined> {
   const [row] = await db.select().from(users).where(eq(users.id, id))
   return row
 }
 
-export async function getByEmail(db: Db, email: string): Promise<UserRow | undefined> {
+async function getByEmailSql(db: Db, email: string): Promise<UserRow | undefined> {
   const [row] = await db
     .select()
     .from(users)
@@ -43,7 +44,7 @@ export async function getByEmail(db: Db, email: string): Promise<UserRow | undef
   return row
 }
 
-export async function create(db: Db, input: CreateUserInput): Promise<UserRow> {
+async function createSql(db: Db, input: CreateUserInput): Promise<UserRow> {
   const now = nowIso()
   const [row] = await db
     .insert(users)
@@ -57,12 +58,8 @@ export async function create(db: Db, input: CreateUserInput): Promise<UserRow> {
   return row
 }
 
-export async function update(
-  db: Db,
-  id: string,
-  input: UpdateUserInput,
-): Promise<UserRow | undefined> {
-  const existing = await get(db, id)
+async function updateSql(db: Db, id: string, input: UpdateUserInput): Promise<UserRow | undefined> {
+  const existing = await getSql(db, id)
   if (!existing) {
     return undefined
   }
@@ -77,8 +74,8 @@ export async function update(
   return row
 }
 
-export async function remove(db: Db, id: string): Promise<boolean> {
-  const existing = await get(db, id)
+async function removeSql(db: Db, id: string): Promise<boolean> {
+  const existing = await getSql(db, id)
   if (!existing) {
     return false
   }
@@ -86,7 +83,7 @@ export async function remove(db: Db, id: string): Promise<boolean> {
   return true
 }
 
-export async function bulkInsert(db: Db, inputs: CreateUserInput[]): Promise<UserRow[]> {
+async function bulkInsertSql(db: Db, inputs: CreateUserInput[]): Promise<UserRow[]> {
   if (inputs.length === 0) {
     return []
   }
@@ -106,11 +103,11 @@ export async function bulkInsert(db: Db, inputs: CreateUserInput[]): Promise<Use
 
 // -- user_identities --------------------------------------------------------
 
-export async function listIdentitiesByUser(db: Db, userId: string): Promise<UserIdentityRow[]> {
+async function listIdentitiesByUserSql(db: Db, userId: string): Promise<UserIdentityRow[]> {
   return db.select().from(userIdentities).where(eq(userIdentities.userId, userId))
 }
 
-export async function getIdentity(
+async function getIdentitySql(
   db: Db,
   userId: string,
   id: string,
@@ -123,7 +120,7 @@ export async function getIdentity(
 }
 
 /** Global lookup by `(provider, subject)` — used by WP3 before a `userId` is known. */
-export async function getIdentityByProviderSubject(
+async function getIdentityByProviderSubjectSql(
   db: Db,
   provider: string,
   subject: string,
@@ -135,7 +132,7 @@ export async function getIdentityByProviderSubject(
   return row
 }
 
-export async function createIdentity(
+async function createIdentitySql(
   db: Db,
   userId: string,
   input: CreateUserIdentityInput,
@@ -153,8 +150,8 @@ export async function createIdentity(
   return row
 }
 
-export async function removeIdentity(db: Db, userId: string, id: string): Promise<boolean> {
-  const existing = await getIdentity(db, userId, id)
+async function removeIdentitySql(db: Db, userId: string, id: string): Promise<boolean> {
+  const existing = await getIdentitySql(db, userId, id)
   if (!existing) {
     return false
   }
@@ -163,3 +160,15 @@ export async function removeIdentity(db: Db, userId: string, id: string): Promis
     .where(and(eq(userIdentities.id, id), eq(userIdentities.userId, userId)))
   return true
 }
+
+export const get = lift(getSql)
+export const getByEmail = lift(getByEmailSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)
+export const listIdentitiesByUser = lift(listIdentitiesByUserSql)
+export const getIdentity = lift(getIdentitySql)
+export const getIdentityByProviderSubject = lift(getIdentityByProviderSubjectSql)
+export const createIdentity = lift(createIdentitySql)
+export const removeIdentity = lift(removeIdentitySql)

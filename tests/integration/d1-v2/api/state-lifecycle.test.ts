@@ -161,8 +161,8 @@ describe('POST /api/state/reset', () => {
 
   it("wipes the user's private data and re-seeds defaults", async () => {
     const syncRepository = await import('../../../../src/db/repositories/sync')
-    await syncRepository.ensureRevision(testDb.db, principal.userId)
-    await syncRepository.bumpRevision(testDb.db, principal.userId)
+    await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
+    await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
     await accountsRepository.create(testDb.db, principal.userId, {
       name: 'Cuenta a borrar',
       kind: 'cash',
@@ -185,10 +185,10 @@ describe('POST /api/state/reset', () => {
     expect(body.settings.currency).toBe('EUR')
     expect(body.settings.onboardingCompleted).toBe(1)
     expect(body.settings.onboardingPresented).toBe(1)
-    expect(await syncRepository.getRevision(testDb.db, principal.userId)).toMatchObject({
+    expect(await runWithDb(testDb.db, syncRepository.getRevision(principal.userId))).toMatchObject({
       revision: 2,
     })
-    expect(await syncRepository.listChangesSince(testDb.db, principal.userId, 1)).toMatchObject([
+    expect(await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 1))).toMatchObject([
       { revision: 2, entityType: 'reset' },
     ])
 

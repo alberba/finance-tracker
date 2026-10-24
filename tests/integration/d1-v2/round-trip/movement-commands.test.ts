@@ -13,6 +13,7 @@ import { useRecurringStore } from '../../../../src/stores/recurring'
 import { useSettingsStore } from '../../../../src/stores/settings'
 import { useUiStore } from '../../../../src/stores/ui'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { runWithDb } from '../../../../src/db/database'
 
 const accountId = 'movement-account'
 const investmentInput = {
@@ -126,7 +127,7 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
     const first = await trip.reload()
     const id = first.transactions[0].id
-    const changes = await listChangesSince(trip.testDb.db as unknown as Db, trip.userId, 0)
+    const changes = await runWithDb(trip.testDb.db as unknown as Db, listChangesSince(trip.userId, 0))
     const createPayload = changes
       .filter((change) => change.entityType === 'transaction' && change.entityId === id)
       .flatMap((change) => (change.payload ? [JSON.parse(change.payload)] : []))

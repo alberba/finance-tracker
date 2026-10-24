@@ -61,7 +61,7 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
-    syncRepository.getRevision(db, userId),
+    runWithDb(db, syncRepository.getRevision(userId)),
   ])
 
   const filteredTransactions =

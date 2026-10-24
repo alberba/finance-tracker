@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createTestDb, type TestDatabase } from '../setup'
 import * as usersRepository from '../../../../src/db/repositories/users'
+import { runWithDb } from '../../../../src/db/database'
 
 describe('email casing', () => {
   let testDb: TestDatabase
@@ -26,14 +27,14 @@ describe('email casing', () => {
   })
 
   it('stores users.email normalized', async () => {
-    const user = await usersRepository.create(db, {
+    const user = await runWithDb(db, usersRepository.create({
       email: '  Owner@Example.COM ',
-    })
+    }))
     expect(user.email).toBe('owner@example.com')
   })
 
   it('finds a user regardless of the casing used to look it up', async () => {
-    await usersRepository.create(db, { email: 'owner@example.com' })
+    await runWithDb(db, usersRepository.create({ email: 'owner@example.com' }))
 
     for (const variant of [
       'owner@example.com',
@@ -41,7 +42,7 @@ describe('email casing', () => {
       'OWNER@EXAMPLE.COM',
       '  owner@example.com  ',
     ]) {
-      const found = await usersRepository.getByEmail(db, variant)
+      const found = await runWithDb(db, usersRepository.getByEmail(variant))
       expect(found, `lookup failed for ${JSON.stringify(variant)}`).toBeDefined()
       expect(found?.email).toBe('owner@example.com')
     }

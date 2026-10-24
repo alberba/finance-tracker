@@ -10,6 +10,7 @@ import type { APIRoute } from "astro";
 import { getDb } from "../../db/client";
 import * as syncRepository from "../../db/repositories/sync";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../lib/server/api-auth";
+import { runWithDb } from '../../db/database'
 
 function parseSince(url: URL): number | "invalid" {
   const raw = url.searchParams.get("since") ?? url.searchParams.get("cursor") ?? "0";
@@ -31,8 +32,8 @@ export const GET: APIRoute = async ({ request, locals }) =>
 
     const db = getDb(locals);
     const [changes, revisionRow] = await Promise.all([
-      syncRepository.listChangesSince(db, principal.userId, since),
-      syncRepository.getRevision(db, principal.userId),
+      runWithDb(db, syncRepository.listChangesSince(principal.userId, since)),
+      runWithDb(db, syncRepository.getRevision(principal.userId)),
     ]);
 
     return jsonResponse(
