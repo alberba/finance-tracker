@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { resolve, join, delimiter } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   composeEnrichedBody,
@@ -285,5 +289,75 @@ describe('cierre nativo como duplicada', () => {
     expect(() =>
       parseAgentPlan(events({ ...duplicatePlan, duplicate: { number: 7, reason: '' } })),
     ).toThrow()
+  })
+})
+
+function runAnalysisWithCli(source: string) {
+  const folder = mkdtempSync(join(tmpdir(), 'issue enrichment-'))
+  try {
+    const bin = join(folder, 'bin')
+    const context = join(folder, '.scratch', 'issue-enrichment')
+    const privateDir = join(folder, 'private', 'issue-enrichment')
+    mkdirSync(bin, { recursive: true })
+    mkdirSync(context, { recursive: true })
+    mkdirSync(privateDir, { recursive: true })
+    writeFileSync(join(context, 'context.json'), JSON.stringify({ report: 'Datos sintéticos' }))
+    writeFileSync(join(bin, 'opencode'), `#!/usr/bin/env node\n${source}`, { mode: 0o755 })
+    const result = spawnSync(
+      process.execPath,
+      [resolve('.github/scripts/enrich-web-issue.mjs'), 'analyze'],
+      {
+        cwd: folder,
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          RUNNER_TEMP: join(folder, 'private'),
+          PATH: `${bin}${delimiter}${process.env.PATH}`,
+        },
+      },
+    )
+    return {
+      result,
+      plan:
+        result.status === 0
+          ? JSON.parse(readFileSync(join(privateDir, 'plan.json'), 'utf8'))
+          : null,
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
+}
+
+describe('invocación de OpenCode desde el script de Actions', () => {
+  it('envía el prompt como mensaje y deja solo archivos tras la opción variádica --file', () => {
+    // Contrato de OpenCode 1.19.4: --file consume todos los argumentos siguientes.
+    const { result, plan: savedPlan } = runAnalysisWithCli(`
+const fs = require('node:fs')
+const args = process.argv.slice(2)
+const files = args.slice(args.indexOf('--file') + 1)
+for (const file of files) {
+  if (!fs.existsSync(file)) {
+    process.stderr.write('File not found: ' + file)
+    process.exit(1)
+  }
+}
+process.stdout.write(${JSON.stringify(events(plan))})
+`)
+    expect(result.status, result.stderr).toBe(0)
+    expect(savedPlan).toEqual(plan)
+  })
+
+  it.each([
+    ['File not found: PRIVATE_MARKER', 'opencode-attachment'],
+    ['upstream error PRIVATE_MARKER', 'opencode-exit-1'],
+  ])('clasifica el fallo del CLI sin exponer stderr: %s', (stderr, reason) => {
+    const { result, plan: savedPlan } = runAnalysisWithCli(
+      `process.stderr.write(${JSON.stringify(stderr)}); process.exit(1)`,
+    )
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(`[issue-enrichment] analyze: ${reason}.`)
+    expect(result.stderr).not.toContain('PRIVATE_MARKER')
+    expect(savedPlan).toBeNull()
   })
 })
