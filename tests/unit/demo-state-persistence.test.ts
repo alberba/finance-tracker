@@ -32,8 +32,8 @@ describe('persistencia del modo demo', () => {
 
     persistState(state)
 
-    expect(localStorage.getItem('finance-tracker-state-v1')).toBeNull()
-    expect(JSON.parse(localStorage.getItem('finance-tracker-state-v1::demo') ?? 'null')).toEqual(
+    expect(localStorage.getItem('finance-tracker-state-v2')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('finance-tracker-state-v2::demo') ?? 'null')).toEqual(
       state,
     )
     expect(fetch).not.toHaveBeenCalled()
@@ -41,7 +41,7 @@ describe('persistencia del modo demo', () => {
 
   it('no hidrata una sesión autenticada desde el blob local', () => {
     vi.mocked(isDemoMode).mockReturnValue(false)
-    localStorage.setItem('finance-tracker-state-v1', JSON.stringify({ year: 1999 }))
+    localStorage.setItem('finance-tracker-state-v2', JSON.stringify({ year: 1999 }))
 
     expect(loadPersistedState()).toBeNull()
     expect(fetch).not.toHaveBeenCalled()

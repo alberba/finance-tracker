@@ -24,6 +24,11 @@ El identificador derivado de los datos v1 que permite reconocer una fila ya migr
 sentido para filas que vienen de v1; las entidades nuevas se identifican por su propio id.
 _Avoid_: legacyId como identidad general
 
+**Mes contable**:
+El mes en el que cuenta un movimiento ("Cuenta en el mes"). Por defecto es el de su fecha; si el
+usuario elige otro se persiste con el movimiento y sobrevive a la sincronización.
+_Avoid_: mes del movimiento, mes de imputación
+
 **Operación**:
 La compra o venta que da contenido a un movimiento de inversión: símbolo, títulos, precio
 unitario y comisión. Viaja siempre dentro del comando del movimiento, nunca por separado.
@@ -50,6 +55,11 @@ _Avoid_: versión, revisión (a secas)
 El importe presupuestado para una combinación de categoría, año y mes. Su identidad son esos
 tres datos.
 _Avoid_: entrada de presupuesto, budget entry
+
+**Mes**:
+El mes del calendario como número de 1 (enero) a 12 (diciembre), igual en el cliente, los comandos
+y la base de datos. Un mes de 0 a 11 es un error.
+_Avoid_: índice de mes, mes 0-based
 
 **Snapshot de patrimonio**:
 La foto de todos los saldos en un mes concreto de un año concreto. Su identidad es (año, mes);

@@ -105,7 +105,7 @@ describe('useWelcome', () => {
           category: 'Nómina',
           accountId: 'bank',
           date: '2026-01-01',
-          month: 0,
+          month: 1,
           description: '',
         },
       ]
@@ -134,7 +134,7 @@ describe('useWelcome', () => {
           category: 'Nómina',
           accountId: 'bank',
           date: '2026-01-01',
-          month: 0,
+          month: 1,
           description: '',
         },
       ]

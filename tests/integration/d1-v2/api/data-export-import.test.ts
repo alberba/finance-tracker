@@ -111,6 +111,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     currency: 'EUR',
     time: '09:30',
     declared: true,
+    accountingMonth: 4,
     operation: {
       instrumentId: instrument.id,
       symbol: 'VWCE',

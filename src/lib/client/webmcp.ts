@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { buildBudgetViewModel } from '../../domain/budget/view-model'
+import type { Month } from '../month'
 import { accountingYear, monthTotals } from '../../domain/transactions/registry'
 import { TRANSACTION_TYPES, type State } from '../../scripts/types'
 
@@ -69,7 +70,7 @@ export async function registerFinanceTools(
   const tools = [
     tool(
       'get_budget',
-      'Read the budget for the configured budget year, with planned amounts and actuals. Month indexes in the result are zero-based. Amounts use the configured currency without conversion.',
+      'Read the budget for the configured budget year, with planned amounts and actuals. Months in the result are 1-12 (January = 1). Amounts use the configured currency without conversion.',
       z.object({}).strict(),
       (_, state) => ({ currency: state.currency, ...buildBudgetViewModel(state) }),
       true,
@@ -82,7 +83,7 @@ export async function registerFinanceTools(
         year,
         month,
         currency: state.currency,
-        ...monthTotals(state.transactions, year, month - 1),
+        ...monthTotals(state.transactions, year, month as Month),
       }),
     ),
     tool(
@@ -95,7 +96,7 @@ export async function registerFinanceTools(
           .filter(
             (movement) =>
               (year === undefined || accountingYear(movement) === year) &&
-              (month === undefined || movement.month === month - 1) &&
+              (month === undefined || movement.month === month) &&
               (type === undefined || movement.type === type) &&
               [movement.description, movement.category].some((text) =>
                 text.toLocaleLowerCase('es').includes(term),
@@ -109,7 +110,7 @@ export async function registerFinanceTools(
             id: movement.id,
             date: movement.date,
             accountingYear: accountingYear(movement),
-            month: movement.month + 1,
+            month: movement.month,
             type: movement.type,
             category: movement.category,
             description: movement.description,

@@ -1,4 +1,5 @@
 import type { Transaction } from '../../scripts/types'
+import { monthFromISO } from '../../scripts/utils'
 import { useSyncStore } from '../../stores/sync'
 import { resolveEntityId, resolveOrCreateCategoryId, syncListDiff } from './command-mapping'
 
@@ -32,6 +33,9 @@ async function buildMovementData(movement: Transaction, currency: string) {
     currency: movement.movementCurrency || currency,
     time: movement.time ?? null,
     declared: Boolean(movement.declared),
+    // Only a month other than the date's is stored; otherwise it follows the date.
+    accountingMonth:
+      movement.month === monthFromISO(movement.date) ? null : movement.month,
     ...(operation === undefined ? {} : { operation }),
   }
 }

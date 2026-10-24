@@ -5,6 +5,7 @@ import {
   groupInvestmentMovementsByMonth,
   summarizeInvestmentYear,
 } from '../../src/domain/investment/view-model'
+import type { Month } from '../../src/lib/month'
 import { normalizeState } from '../../src/scripts/state'
 import type { State } from '../../src/scripts/types'
 
@@ -20,7 +21,7 @@ function movement(
     id,
     date,
     time: '10:00',
-    month: Number(date.slice(5, 7)) - 1,
+    month: Number(date.slice(5, 7)) as Month,
     type: 'investment',
     accountId: 'broker',
     category: 'Fondos',
@@ -82,7 +83,7 @@ describe('groupInvestmentMovementsByMonth', () => {
   it('groups the rows by month, newest month first', () => {
     const groups = groupInvestmentMovementsByMonth(rows)
 
-    expect(groups.map((group) => group.month)).toEqual([6, 5])
+    expect(groups.map((group) => group.month)).toEqual([7, 6])
     expect(groups.map((group) => group.count)).toEqual([2, 2])
     expect(groups[0].rows.map((row) => row.tx.id)).toEqual(['a', 'b'])
   })

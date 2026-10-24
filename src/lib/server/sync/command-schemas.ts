@@ -165,6 +165,8 @@ export const entityCreateSchemas = {
       // gasto can carry an hour and be marked as declarado too (ADR 0002).
       time: nullableString.optional(),
       declared: z.boolean().optional(),
+      // 1-12; `null` counts the movement in the month of its date.
+      accountingMonth: z.number().int().min(1).max(12).nullable().optional(),
       // Nested, so amount and operation are written in the same command and
       // cannot drift apart. `null` says this movement has no operation.
       operation: operationSchema.nullable().optional(),

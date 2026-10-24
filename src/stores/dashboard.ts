@@ -1,7 +1,7 @@
+import { asMonth, type Month } from '../lib/month'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
-import { MONTHS } from '../scripts/types'
 import type { DashboardHeroRange } from '../domain/dashboard/view-model'
 import { buildDashboardViewModelFromState } from '../domain/dashboard/view-model'
 import { isSectionId } from '../scripts/types'
@@ -32,9 +32,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     })
   }
 
-  function changeMonth(month: number): void {
-    const parsedMonth = parseIntSafe(month, uiStore.ui.month)
-    uiStore.setDashboardMonth(MONTHS[parsedMonth] ? parsedMonth : 0)
+  function changeMonth(month: Month): void {
+    uiStore.setDashboardMonth(asMonth(parseIntSafe(month, uiStore.ui.month)) ?? 1)
   }
 
   function changeRange(range: DashboardHeroRange): void {

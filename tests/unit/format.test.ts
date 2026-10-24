@@ -22,6 +22,7 @@ import {
   MINUS,
   splitDecimals,
 } from '../../src/lib/format'
+import type { Month } from '../../src/lib/month'
 
 const NBSP = ' '
 
@@ -195,22 +196,23 @@ describe('formatDayMonth', () => {
 
 describe('formatMonthName', () => {
   it('da el mes con mayúscula inicial, sin año', () => {
-    expect(formatMonthName(8)).toBe('Septiembre')
+    expect(formatMonthName(9)).toBe('Septiembre')
   })
 
   it('devuelve una cadena vacía si el mes no existe', () => {
-    expect(formatMonthName(12)).toBe('')
+    // `Month` solo admite 1-12; el cast mantiene cubierta la guarda de runtime.
+    expect(formatMonthName(13 as Month)).toBe('')
   })
 })
 
 describe('formatMonthYear', () => {
   it('da el mes con mayúscula inicial y el año', () => {
-    expect(formatMonthYear(6, 2026)).toBe('Julio 2026')
-    expect(formatMonthYear(0, 2025)).toBe('Enero 2025')
+    expect(formatMonthYear(7, 2026)).toBe('Julio 2026')
+    expect(formatMonthYear(1, 2025)).toBe('Enero 2025')
   })
 
   it('devuelve solo el año si el mes no existe', () => {
-    expect(formatMonthYear(12, 2026)).toBe('2026')
+    expect(formatMonthYear(13 as Month, 2026)).toBe('2026')
   })
 })
 

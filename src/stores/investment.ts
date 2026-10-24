@@ -1,3 +1,4 @@
+import type { Month } from '../lib/month'
 import { defineStore } from 'pinia'
 
 import { computed } from 'vue'
@@ -170,7 +171,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     ui.investmentReturnMode = mode
   }
 
-  function setMonth(month: number): void {
+  function setMonth(month: Month): void {
     ui.investmentMonth = month
   }
 
@@ -414,7 +415,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     showToast('Aporte manual eliminado.')
   }
 
-  function buildWorkflowState(month: number, date: string) {
+  function buildWorkflowState(month: Month, date: string) {
     return buildWorkflowSnapshotState(financialStateStore.state, month, date)
   }
 
@@ -435,7 +436,7 @@ export const useInvestmentStore = defineStore('investment', () => {
 
   function saveContribution(
     date: string,
-    month: number,
+    month: Month,
     snapshotInputs: SnapshotInputValue[],
     allocations: AllocationInputValue[],
     warnings: string[],

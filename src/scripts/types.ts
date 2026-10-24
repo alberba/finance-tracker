@@ -1,3 +1,5 @@
+import type { Month } from '../lib/month'
+
 export const TRANSACTION_TYPES = ['income', 'expense', 'investment'] as const
 export type TransactionType = (typeof TRANSACTION_TYPES)[number]
 export const SUBSCRIPTION_FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const
@@ -39,7 +41,7 @@ export interface Transaction {
   remoteOperation?: import('../lib/bitvavo-types').RemoteOperation
   id: string
   date: string
-  month: number
+  month: Month
   type: TransactionType
   accountId: string
   category: string
@@ -152,7 +154,7 @@ export interface PendingMovement {
 }
 
 export interface SnapshotRow {
-  month: number
+  month: Month
   accounts: Record<string, number>
   investments: Record<string, number>
   liabilities: Record<string, number>

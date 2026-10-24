@@ -1,3 +1,4 @@
+import { ALL_MONTHS, asMonth, atMonth, monthIndex, type Month } from '../../lib/month'
 import {
   MONTHS,
   type BudgetType,
@@ -137,7 +138,7 @@ export interface DashboardViewModel {
   year: number
   yearOptions: number[]
   currency: string
-  month: number
+  month: Month
   monthName: string
   monthStatus: string
   months: DashboardMonthOption[]
@@ -180,14 +181,14 @@ export function buildDashboardViewModelFromState({
   today = todayISO(),
 }: {
   state: State
-  month: number
+  month: Month
   heroRange: DashboardHeroRange
   today?: string
 }): DashboardViewModel {
-  const safeMonth = MONTHS[month] ? month : 0
+  const safeMonth = asMonth(month) ?? ALL_MONTHS[0]
   const formatMoney: Money = (value) => formatMoneyIn(value, state.currency || 'EUR')
-  const monthTotals = MONTHS.map((_, target) => getCoreMonthTotals(state.transactions, target))
-  const wealthByMonth = (target: number): Wealth =>
+  const monthTotals = ALL_MONTHS.map((target) => getCoreMonthTotals(state.transactions, target))
+  const wealthByMonth = (target: Month): Wealth =>
     getCoreWealthByMonth(
       target,
       state.accounts,
@@ -196,7 +197,7 @@ export function buildDashboardViewModelFromState({
       state.transactions,
       state.snapshots,
     )
-  const nets = MONTHS.map((_, target) => wealthByMonth(target).net)
+  const nets = ALL_MONTHS.map((target) => wealthByMonth(target).net)
   const series = (kind: DashboardKpiKind) => monthTotals.map((totals) => round2(totals[kind]))
 
   return {
@@ -206,7 +207,7 @@ export function buildDashboardViewModelFromState({
     month: safeMonth,
     monthName: formatMonthName(safeMonth),
     monthStatus: buildMonthStatus(safeMonth, state.year, today),
-    months: MONTHS.map((_, value) => ({ value, label: formatMonthName(value) })),
+    months: ALL_MONTHS.map((value) => ({ value, label: formatMonthName(value) })),
     ranges: RANGE_OPTIONS,
     netWorth: buildNetWorthBand(nets, safeMonth, state.currency || 'EUR'),
     netWorthChart: buildNetWorthChart(
@@ -218,7 +219,7 @@ export function buildDashboardViewModelFromState({
     kpis: (['income', 'expense', 'investment'] as const).map((kind) =>
       buildKpi(kind, series(kind), safeMonth, formatMoney),
     ),
-    incomeSplit: buildIncomeSplit(monthTotals[safeMonth], formatMoney),
+    incomeSplit: buildIncomeSplit(atMonth(monthTotals, safeMonth), formatMoney),
     topExpenses: buildTopExpenses(state, safeMonth, formatMoney),
     wealthSplit: buildWealthSplit(state, safeMonth, wealthByMonth(safeMonth), formatMoney),
     recentTransactions: buildRecentTransactions(state, formatMoney),
@@ -230,23 +231,27 @@ export function buildDashboardViewModelFromState({
 export function buildKpi(
   kind: DashboardKpiKind,
   totals: number[],
-  month: number,
+  month: Month,
   formatMoney: Money,
 ): DashboardKpi {
-  const current = totals[month] ?? 0
-  const previous = month > 0 ? (totals[month - 1] ?? 0) : null
-  const window = totals.slice(Math.max(0, month - KPI_BAR_MONTHS + 1), month + 1)
+  const slot = monthIndex(month)
+  const current = totals[slot] ?? 0
+  const previous = month > 1 ? (totals[slot - 1] ?? 0) : null
+  const window = totals.slice(Math.max(0, slot - KPI_BAR_MONTHS + 1), slot + 1)
   const highest = Math.max(...window, 0)
-  const firstMonth = month - window.length + 1
+  const firstSlot = slot - window.length + 1
 
   return {
     kind,
     label: KPI_LABEL[kind],
     value: formatMoney(current),
-    previous: previous === null ? null : `${formatMonthName(month - 1)}: ${formatMoney(previous)}`,
+    previous:
+      previous === null
+        ? null
+        : `${formatMonthName(ALL_MONTHS[slot - 1])}: ${formatMoney(previous)}`,
     change: previous ? buildChange(current, previous, KPI_GOOD_WHEN_UP[kind]) : null,
     bars: window.map((value, index) => ({
-      month: formatMonthName(firstMonth + index),
+      month: formatMonthName(ALL_MONTHS[firstSlot + index]),
       value: formatMoney(value),
       height: highest > 0 ? round2((value / highest) * 100) : 0,
       current: index === window.length - 1,
@@ -309,12 +314,13 @@ export function buildIncomeSplit(
 /** Net worth of the month, its change against the previous month and since January. */
 export function buildNetWorthBand(
   nets: number[],
-  month: number,
+  month: Month,
   currency: string,
 ): DashboardNetWorthBand {
-  const current = nets[month] ?? 0
-  const previous = month > 0 ? (nets[month - 1] ?? 0) : null
-  const january = month > 0 ? (nets[0] ?? 0) : null
+  const slot = monthIndex(month)
+  const current = nets[slot] ?? 0
+  const previous = month > 1 ? (nets[slot - 1] ?? 0) : null
+  const january = month > 1 ? (nets[0] ?? 0) : null
   const change = (from: number) => {
     const amount = round2(current - from)
     return {
@@ -330,7 +336,7 @@ export function buildNetWorthBand(
     value: formatMoneyIn(current, currency),
     monthChange: monthChange && {
       ...monthChange,
-      against: formatMonthName(month - 1).toLowerCase(),
+      against: formatMonthName(ALL_MONTHS[slot - 1]).toLowerCase(),
     },
     yearChange: yearChange && {
       label: `${yearChange.amount} · ${yearChange.share}`,
@@ -340,13 +346,13 @@ export function buildNetWorthBand(
 }
 
 /** "Mes en curso · día 28 de 30" for the current month; closed or upcoming otherwise. */
-export function buildMonthStatus(month: number, year: number, today: string): string {
+export function buildMonthStatus(month: Month, year: number, today: string): string {
   const todayYear = Number(today.slice(0, 4))
-  const todayMonth = Number(today.slice(5, 7)) - 1
+  const todayMonth = Number(today.slice(5, 7))
   const order = year * 12 + month - (todayYear * 12 + todayMonth)
   if (order < 0) return 'Mes cerrado'
   if (order > 0) return 'Mes por empezar'
-  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   return `Mes en curso · día ${Number(today.slice(8, 10))} de ${daysInMonth}`
 }
 
@@ -372,29 +378,27 @@ function addYear(years: Set<number>, value: string): void {
   }
 }
 
-function getLatestDataMonth(state: State, fallbackMonth: number): number {
-  let latest = -1
-  const consider = (month: number | null) => {
-    if (month !== null && Number.isInteger(month) && month >= 0 && month < MONTHS.length) {
-      latest = Math.max(latest, month)
-    }
+function getLatestDataMonth(state: State, fallbackMonth: Month): Month {
+  let latest: Month | null = null
+  const consider = (month: Month | null) => {
+    if (month !== null && (latest === null || month > latest)) latest = month
   }
 
-  state.transactions.forEach((item) => consider(Number(item.month)))
-  Object.keys(state.snapshots || {}).forEach((monthKey) => consider(Number(monthKey)))
+  state.transactions.forEach((item) => consider(asMonth(Number(item.month))))
+  Object.keys(state.snapshots || {}).forEach((monthKey) => consider(asMonth(Number(monthKey))))
   state.contributions.forEach((entry) => consider(monthFromISO(entry.portfolioDate || entry.date)))
 
-  return latest >= 0 ? latest : fallbackMonth
+  return latest ?? fallbackMonth
 }
 
 function buildNetWorthChart(
   nets: number[],
-  latestDataMonth: number,
+  latestDataMonth: Month,
   heroRange: DashboardHeroRange,
   formatMoney: Money,
 ): DashboardLineChart {
-  const fullMonths = MONTHS.slice(0, latestDataMonth + 1)
-  const fullNets = nets.slice(0, latestDataMonth + 1)
+  const fullMonths = MONTHS.slice(0, monthIndex(latestDataMonth) + 1)
+  const fullNets = nets.slice(0, monthIndex(latestDataMonth) + 1)
   const rangeCount: Record<DashboardHeroRange, number> = { '1m': 2, '6m': 6, '1a': 12 }
   const start = Math.max(0, fullNets.length - Math.max(2, rangeCount[heroRange]))
   const values = fullNets.slice(start)
@@ -405,7 +409,7 @@ function buildNetWorthChart(
   }
 }
 
-function buildTopExpenses(state: State, month: number, formatMoney: Money): DashboardTopExpenses {
+function buildTopExpenses(state: State, month: Month, formatMoney: Money): DashboardTopExpenses {
   const actuals = getCoreCategoryActuals(
     state.transactions,
     'expense',
@@ -441,7 +445,7 @@ function buildTopExpenses(state: State, month: number, formatMoney: Money): Dash
 
 function buildWealthSplit(
   state: State,
-  month: number,
+  month: Month,
   wealth: Wealth,
   formatMoney: Money,
 ): DashboardWealthSplit {
@@ -507,7 +511,7 @@ function buildRecentTransactions(state: State, formatMoney: Money): DashboardRec
     })
 }
 
-function buildGoals(state: State, month: number, formatMoney: Money): DashboardGoals {
+function buildGoals(state: State, month: Month, formatMoney: Money): DashboardGoals {
   const goals = buildGoalsViewModel(state, month).net.rows.filter(
     (item) => SAVINGS_GOALS.includes(item.key) && item.defined,
   )

@@ -31,7 +31,7 @@ function monthOptionLabel(monthLabel: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
-const MONTH_INDEX: Record<string, number> = Object.fromEntries(
+const MONTH_NUMBER: Record<string, number> = Object.fromEntries(
   [
     'enero',
     'febrero',
@@ -45,7 +45,7 @@ const MONTH_INDEX: Record<string, number> = Object.fromEntries(
     'octubre',
     'noviembre',
     'diciembre',
-  ].map((name, index) => [name, index]),
+  ].map((name, index) => [name, index + 1]),
 )
 
 export class FinanceTrackerPage {
@@ -564,15 +564,15 @@ export class FinanceTrackerPage {
     if ((await yearSelect.inputValue()) !== String(year)) {
       await yearSelect.selectOption(String(year))
     }
-    const target = MONTH_INDEX[monthLabel.toLowerCase()]
+    const target = MONTH_NUMBER[monthLabel.toLowerCase()]
     const title = this.transactionsSection.locator('#tx-month-title')
     for (let step = 0; step < 24; step += 1) {
       const text = ((await title.textContent()) ?? '').toLowerCase()
-      const current = Object.keys(MONTH_INDEX).find((name) => text.includes(` ${name} `))
+      const current = Object.keys(MONTH_NUMBER).find((name) => text.includes(` ${name} `))
       if (current === undefined) {
         throw new Error(`No se pudo leer el mes de la franja: ${text}`)
       }
-      const delta = target - MONTH_INDEX[current]
+      const delta = target - MONTH_NUMBER[current]
       if (delta === 0) {
         break
       }
@@ -751,7 +751,7 @@ export class FinanceTrackerPage {
 
   /** Picks a month in the band's month strip ("MARZO" or "marzo"). */
   async selectWealthMonth(monthLabel: string) {
-    const month = MONTH_INDEX[monthLabel.toLowerCase()]
+    const month = MONTH_NUMBER[monthLabel.toLowerCase()]
     await this.wealthSection.locator(`[data-wealth-months] [data-month="${month}"]`).click()
   }
 

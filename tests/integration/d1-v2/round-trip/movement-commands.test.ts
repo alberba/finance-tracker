@@ -5,6 +5,7 @@ import * as market from '../../../../src/db/repositories/market'
 import { listChangesSince } from '../../../../src/db/repositories/sync'
 import type { Db } from '../../../../src/db/client'
 import type { RemoteOperation } from '../../../../src/lib/bitvavo-types'
+import { transactions } from '../../../../src/db/schema'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMovementsStore } from '../../../../src/stores/movements'
@@ -71,6 +72,55 @@ describe('round trip: shared movement commands (#263)', () => {
   })
 
   afterEach(() => trip.cleanup())
+
+  it('keeps the accounting month chosen apart from the date after sync and reload (#337)', async () => {
+    expect(
+      useMovementsStore().addTransaction({
+        date: '2026-01-31',
+        month: 2,
+        type: 'expense',
+        accountId,
+        category: 'Ocio',
+        description: 'Cena',
+        amount: 40,
+      }),
+    ).toBe(true)
+    const created = await trip.reload()
+    const id = created.transactions[0].id
+    expect(created.transactions[0]).toMatchObject({ date: '2026-01-31', month: 2 })
+
+    expect(
+      useMovementsStore().saveEdit(id, {
+        date: '2026-01-31',
+        month: 1,
+        accountId,
+        type: 'expense',
+        category: 'Ocio',
+        description: 'Cena',
+        amount: '40',
+      }),
+    ).toBe(true)
+    const afterEdit = await trip.reload()
+    expect(afterEdit.transactions[0]).toMatchObject({ month: 1 })
+    expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBeNull()
+  })
+
+  it('keeps December (12) apart from the date month on the way to D1 and back (#337)', async () => {
+    expect(
+      useMovementsStore().addTransaction({
+        date: '2026-11-30',
+        month: 12,
+        type: 'expense',
+        accountId,
+        category: 'Ocio',
+        description: 'Regalo',
+        amount: 20,
+      }),
+    ).toBe(true)
+    const reloaded = await trip.reload()
+    expect(reloaded.transactions[0]).toMatchObject({ month: 12 })
+    expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBe(12)
+  })
 
   it('keeps the operation, own currency, time and declaration when edited from Movimientos', async () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
@@ -214,7 +264,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it('keeps an investment without an operation and its own currency after reload', async () => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type: 'investment',
       accountId,
       category: 'Acciones',
@@ -244,7 +294,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it('does not invent an operation when an expense becomes an investment', async () => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -481,7 +531,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it.each(['income', 'expense'] as const)('edits an ordinary %s', async (type) => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type,
       accountId,
       category: type === 'income' ? 'Nómina' : 'Ocio',
@@ -509,7 +559,7 @@ describe('round trip: shared movement commands (#263)', () => {
   it.each(['income', 'expense'] as const)('creates an ordinary %s', async (type) => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
-      month: 8,
+      month: 9,
       type,
       accountId,
       category: type === 'income' ? 'Nómina' : 'Ocio',
@@ -534,7 +584,7 @@ describe('round trip: shared movement commands (#263)', () => {
       } else {
         useMovementsStore().addTransaction({
           date: '2026-09-12',
-          month: 8,
+          month: 9,
           type,
           accountId,
           category: type === 'income' ? 'Nómina' : 'Ocio',

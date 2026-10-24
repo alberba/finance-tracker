@@ -5,6 +5,7 @@ import type { State } from '../../src/scripts/types'
 import { projectSyncV2State } from '../../src/lib/client/v2-state-projection'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { categoryEmojiKey } from '../../src/scripts/category-emoji'
+import { monthFromISO } from '../../src/scripts/utils'
 
 const require = createRequire(import.meta.url)
 const seed = normalizeState(require('../../src/data/seed.json'))
@@ -65,9 +66,9 @@ function buildSeedExport(seed: State) {
   const wealthSnapshots = Object.values(seed.snapshots).map((snapshot) => ({
     id: `seed-snapshot-${snapshot.month}`,
     legacyId: null,
-    snapshotDate: `${seed.year}-${String(snapshot.month + 1).padStart(2, '0')}-01`,
+    snapshotDate: `${seed.year}-${String(snapshot.month).padStart(2, '0')}-01`,
     year: seed.year,
-    month: snapshot.month + 1,
+    month: snapshot.month,
     balances: Object.entries({
       ...snapshot.accounts,
       ...snapshot.investments,
@@ -109,6 +110,8 @@ function buildSeedExport(seed: State) {
         currency,
         declared: transaction.declared,
         time: transaction.time,
+        accountingMonth:
+          monthFromISO(transaction.date) === transaction.month ? null : transaction.month,
         remoteOperation: transaction.remoteOperation,
         operation: transaction.side
           ? {

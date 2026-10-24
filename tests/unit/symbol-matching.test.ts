@@ -26,7 +26,7 @@ describe('símbolos de cripto y pares de cotización Yahoo', () => {
     const buy: Transaction = {
       id: 'buy-bitcoin',
       date: '2026-07-01',
-      month: 6,
+      month: 7,
       type: 'investment',
       accountId: 'broker',
       category: 'Crypto',

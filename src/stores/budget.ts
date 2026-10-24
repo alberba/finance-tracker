@@ -1,3 +1,4 @@
+import { ALL_MONTHS, atMonth, monthIndex, type Month } from '../lib/month'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 
@@ -39,7 +40,7 @@ export const useBudgetStore = defineStore('budget', () => {
     return row
   }
 
-  function syncMonths(type: BudgetType, category: string, amounts: Map<number, number>): void {
+  function syncMonths(type: BudgetType, category: string, amounts: Map<Month, number>): void {
     if (!amounts.size) return
     const year = financialStateStore.year
     const currency = financialStateStore.currency
@@ -55,7 +56,7 @@ export const useBudgetStore = defineStore('budget', () => {
       // (ADR 0001; audit §4.4 — a year-less key let a same-month edit in
       // another year resolve to last year's row).
       for (const [month, amount] of amounts) {
-        await syncBudgetEntry(categoryId, year, month + 1, amount, currency)
+        await syncBudgetEntry(categoryId, year, month, amount, currency)
       }
     })()
   }
@@ -63,27 +64,27 @@ export const useBudgetStore = defineStore('budget', () => {
   function updateBudgetValue(
     type: BudgetType,
     category: string,
-    month: number,
+    month: Month,
     value: number,
   ): void {
     const amount = round2(value)
     financialStateStore.commitState((draft) => {
-      ensureRow(draft, type, category)[month] = amount
+      ensureRow(draft, type, category)[monthIndex(month)] = amount
     })
     syncMonths(type, category, new Map([[month, amount]]))
   }
 
   /** The twelve months of a category at once: one commit, a sync per month that changed. */
   function saveBudgetPlan(type: BudgetType, category: string, plan: readonly number[]): void {
-    const changed = new Map<number, number>()
+    const changed = new Map<Month, number>()
     financialStateStore.commitState((draft) => {
       const row = ensureRow(draft, type, category)
-      plan.slice(0, 12).forEach((value, month) => {
-        const amount = round2(value)
-        if (row[month] === amount) return
-        row[month] = amount
+      for (const month of ALL_MONTHS) {
+        const amount = round2(atMonth(plan, month) ?? 0)
+        if (row[monthIndex(month)] === amount) continue
+        row[monthIndex(month)] = amount
         changed.set(month, amount)
-      })
+      }
     })
     syncMonths(type, category, changed)
     showToast(`Plan de ${category} guardado.`)

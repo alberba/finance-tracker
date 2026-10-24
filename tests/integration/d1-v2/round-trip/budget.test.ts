@@ -32,7 +32,7 @@ describe("round trip: presupuesto y categorías", () => {
 
     it("does not duplicate a migrated category when it is first referenced (§4.7)", async () => {
       const { useBudgetStore } = await import("../../../../src/stores/budget");
-      useBudgetStore().updateBudgetValue("expense", "Comida", 0, 300);
+      useBudgetStore().updateBudgetValue("expense", "Comida", 1, 300);
       await trip.reload();
 
       const accountsRepository = await import("../../../../src/db/repositories/accounts");
@@ -42,7 +42,7 @@ describe("round trip: presupuesto y categorías", () => {
 
     it("keeps the first budget edit of a cell (§4.7)", async () => {
       const { useBudgetStore } = await import("../../../../src/stores/budget");
-      useBudgetStore().updateBudgetValue("expense", "Comida", 0, 300);
+      useBudgetStore().updateBudgetValue("expense", "Comida", 1, 300);
 
       const reloaded = await trip.reload();
 
@@ -62,9 +62,9 @@ describe("round trip: presupuesto y categorías", () => {
     it("reads a budget amount back in the month the user typed it in (§4.5)", async () => {
       const { useBudgetStore } = await import("../../../../src/stores/budget");
       // Enero — index 0 in the UI's 12-slot array.
-      useBudgetStore().updateBudgetValue("expense", "Ocio", 0, 120);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 1, 120);
       await trip.reload();
-      useBudgetStore().updateBudgetValue("expense", "Ocio", 0, 120);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 1, 120);
 
       const reloaded = await trip.reload();
 
@@ -74,9 +74,9 @@ describe("round trip: presupuesto y categorías", () => {
 
     it("does not lose December (§4.5)", async () => {
       const { useBudgetStore } = await import("../../../../src/stores/budget");
-      useBudgetStore().updateBudgetValue("expense", "Ocio", 11, 500);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 12, 500);
       await trip.reload();
-      useBudgetStore().updateBudgetValue("expense", "Ocio", 11, 500);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 12, 500);
 
       const reloaded = await trip.reload();
 
@@ -92,13 +92,13 @@ describe("round trip: presupuesto y categorías", () => {
       financialState.commitState((draft) => {
         draft.year = 2025;
       });
-      budget.updateBudgetValue("expense", "Ocio", 0, 100);
+      budget.updateBudgetValue("expense", "Ocio", 1, 100);
       await trip.reload();
 
       useFinancialStateStore().commitState((draft) => {
         draft.year = 2026;
       });
-      useBudgetStore().updateBudgetValue("expense", "Ocio", 0, 250);
+      useBudgetStore().updateBudgetValue("expense", "Ocio", 1, 250);
       await trip.reload();
 
       const budgetEntriesRepository = await import("../../../../src/db/repositories/budget-entries");
@@ -117,8 +117,8 @@ describe("round trip: presupuesto y categorías", () => {
 
       // Neither call awaits the other — this is what filling in January then
       // February looks like before either edit's category-create has synced.
-      budget.updateBudgetValue("expense", "Ocio", 0, 120);
-      budget.updateBudgetValue("expense", "Ocio", 1, 80);
+      budget.updateBudgetValue("expense", "Ocio", 1, 120);
+      budget.updateBudgetValue("expense", "Ocio", 2, 80);
 
       const reloaded = await trip.reload();
 

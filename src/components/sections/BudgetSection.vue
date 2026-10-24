@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { atMonth, type Month } from '../../lib/month'
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { storeToRefs } from 'pinia'
 import { computed, ref, useTemplateRef } from 'vue'
@@ -41,7 +42,7 @@ const strip = computed<FigureStripItem[]>(() => {
   const { year, currentMonth } = viewModel.value
   const share = totals.plannedTotal ? (totals.actualTotal / totals.plannedTotal) * 100 : 0
   const diff = totals.diffToDate
-  const closed = currentMonth > 0
+  const closed = currentMonth > 1
   return [
     {
       label: `Presupuestado en ${year}`,
@@ -72,10 +73,10 @@ const strip = computed<FigureStripItem[]>(() => {
   ]
 })
 
-function updateCell(category: string, month: number, value: number): void {
+function updateCell(category: string, month: Month, value: number): void {
   if (needsCategories.value) return
   const row = view.value.rows.find((candidate) => candidate.category === category)
-  if (row && Math.abs(row.cells[month].planned - value) < 0.005) return
+  if (row && Math.abs(atMonth(row.cells, month).planned - value) < 0.005) return
   budgetStore.updateBudgetValue(active.value, category, month, value)
 }
 

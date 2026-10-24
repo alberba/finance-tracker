@@ -12,6 +12,7 @@ import { TYPE_LABEL, TYPE_OPTIONS, categorySelectOptions } from './transaction-t
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useToast } from '../../composables/useToast'
 import { formatDayMonth, formatMonthName } from '../../lib/format'
+import { ALL_MONTHS, monthFromDate } from '../../lib/month'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import { signedAmount } from '../../domain/transactions/registry'
 import { formatDecimalInput, parseDecimal } from '../../lib/number'
@@ -37,11 +38,11 @@ const form = reactive({
   category: '',
   accountId: '',
   date: '',
-  month: 0,
+  month: monthFromDate(new Date()),
 })
 
 const isEditing = computed(() => editingId.value !== null)
-const monthOptions = Array.from({ length: 12 }, (_, month) => ({
+const monthOptions = ALL_MONTHS.map((month) => ({
   value: month,
   label: formatMonthName(month),
 }))
@@ -70,9 +71,9 @@ const previewDetail = computed(() =>
 watch(
   () => form.type,
   () => {
-    if (!categoryOptions.value.some((option) => option.value === form.category)) {
-      form.category = categoryOptions.value[0]?.value ?? ''
-    }
+    // categoryOptions keeps the current category even when the new type lacks it, so check the type's own list.
+    const names = movementsStore.orderedCategories(form.type)
+    if (!names.includes(form.category)) form.category = names[0] ?? 'Sin categoría'
   },
 )
 
@@ -110,7 +111,7 @@ function openEdit(tx: Transaction): void {
   form.category = tx.category || ''
   form.accountId = tx.accountId
   form.date = tx.date
-  form.month = Number(tx.month)
+  form.month = tx.month
   open.value = true
 }
 

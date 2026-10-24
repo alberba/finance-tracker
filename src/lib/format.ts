@@ -4,6 +4,8 @@
  * Pure functions: the currency comes in as an argument, never from a store.
  */
 
+import { monthIndex, type Month } from './month'
+
 /** Typographic minus sign, used for losses instead of the hyphen. */
 export const MINUS = '−'
 const NBSP = ' '
@@ -251,14 +253,14 @@ export function formatTime(instant: string, timeZone?: string): string {
   return parts ? `${parts.hour}:${parts.minute}` : MISSING
 }
 
-/** "Julio" from a 0-based month index; empty when there is no such month. */
-export function formatMonthName(month: number): string {
-  const name = MONTH_NAMES[month]
+/** "Julio" from a month (1-12); empty when there is no such month. */
+export function formatMonthName(month: Month): string {
+  const name = MONTH_NAMES[monthIndex(month)]
   return name ? `${name.charAt(0).toUpperCase()}${name.slice(1)}` : ''
 }
 
-/** "Julio 2026" from a 0-based month index. */
-export function formatMonthYear(month: number, year: number): string {
+/** "Julio 2026" from a month (1-12). */
+export function formatMonthYear(month: Month, year: number): string {
   const name = formatMonthName(month)
   return name ? `${name} ${year}` : String(year)
 }

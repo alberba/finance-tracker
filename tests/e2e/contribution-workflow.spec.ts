@@ -50,7 +50,7 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.waitForSync()
     const saved = await readScenarioState(page)
     const fundId = saved.investmentAssets.find((asset) => asset.name === 'Fondos Indexados')!.id
-    expect(saved.snapshots['0'].investments[fundId]).toBe(12000)
+    expect(saved.snapshots['1'].investments[fundId]).toBe(12000)
   })
 
   test('reparto completo guarda flow derivado por asignaciones', async ({ tracker, page }) => {
@@ -110,7 +110,7 @@ test.describe('recorrido guiado de aportes', () => {
 
     const accounts = await page.evaluate(
       (state) => {
-        return state.snapshots?.['3']?.accounts || null
+        return state.snapshots?.['4']?.accounts || null
       },
       await readScenarioState(page),
     )

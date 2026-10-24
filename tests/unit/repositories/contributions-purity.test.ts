@@ -18,7 +18,7 @@ describe("applyContributionSave purity", () => {
 
     const result = applyContributionSave(draft, {
       date: "2026-01-31",
-      month: 0,
+      month: 1,
       snapshotInputs: [{ kind: "investments", id: "inv-1", value: "1000" }],
       allocations: [{ accountId: "acc-1", amount: 100 }],
       warnings: [],
@@ -35,13 +35,13 @@ describe("applyContributionSave purity", () => {
 
   it("does not mutate the draft argument on a failed save (no investment snapshot)", () => {
     const draft = normalizeState({
-      snapshots: { "0": { month: 0, accounts: {}, investments: {}, liabilities: {} } },
+      snapshots: { "1": { month: 1, accounts: {}, investments: {}, liabilities: {} } },
     });
     const before = JSON.parse(JSON.stringify(draft));
 
     const result = applyContributionSave(draft, {
       date: "2026-01-31",
-      month: 0,
+      month: 1,
       snapshotInputs: [],
       allocations: [],
       warnings: [],

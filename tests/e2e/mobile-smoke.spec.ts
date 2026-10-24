@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures'
+import { monthFromDate } from '../../src/lib/month'
 import { editScenarioState } from './seed-sync-v2'
 
 test.describe('Mobile smoke', () => {
@@ -7,12 +8,12 @@ test.describe('Mobile smoke', () => {
     { tag: '@smoke' },
     async ({ page, tracker }) => {
       await page.goto('/patrimonio')
-      const currentMonthIndex = new Date().getMonth()
+      const currentMonth = monthFromDate(new Date())
       await editScenarioState(page, (state) => {
-        const snapshot = state.snapshots[String(currentMonthIndex)]
-        state.snapshots[String(currentMonthIndex)] = {
+        const snapshot = state.snapshots[String(currentMonth)]
+        state.snapshots[String(currentMonth)] = {
           ...snapshot,
-          month: currentMonthIndex,
+          month: currentMonth,
           accounts: { ...snapshot?.accounts, revolut: 9_999_999_999.99 },
         }
       })

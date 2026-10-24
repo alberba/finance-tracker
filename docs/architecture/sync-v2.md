@@ -17,6 +17,9 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    - Incluye la operación anidada solo con compra/venta explícita y títulos/precio finitos presentes.
      Una operación insuficiente se omite para conservar la previa en D1 o en un alta aún en cola. Cambiar a un tipo distinto
      de inversión envía `null`, eliminando solo la operación.
+   - Envía `accountingMonth` (1-12) solo cuando el mes elegido difiere del de la fecha; si no,
+     `null` y el mes sigue a la fecha. Es ya el mismo número que `Transaction.month` (ADR 0006):
+     la proyección (`projectSyncV2State`) lo copia tal cual y, si es `null`, lo deriva de `date`.
    - Para operaciones importadas de Bitvavo, emite únicamente declarado y descripción. Los stores
      mantienen las restricciones de edición y borrado.
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).

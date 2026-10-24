@@ -25,8 +25,17 @@ describe('projectSyncV2State', () => {
     expect(state.accounts).toEqual([{ id: 'local-account', name: 'Cuenta', openingBalance: 250 }])
     expect(state.incomeCategories).toEqual(['Nómina'])
     expect(state.transactions).toEqual([expect.objectContaining({
-      id: 'local-transaction', accountId: 'local-account', category: 'Nómina', month: 0,
+      id: 'local-transaction', accountId: 'local-account', category: 'Nómina', month: 1,
     })])
+  })
+
+  it('counts a movement in its persisted accounting month, else in the month of its date', () => {
+    const b = bootstrap()
+    b.transactions[0] = { ...b.transactions[0], date: '2026-01-31', accountingMonth: 2 }
+
+    expect(projectSyncV2State(b).transactions[0].month).toBe(2)
+    b.transactions[0] = { ...b.transactions[0], accountingMonth: null }
+    expect(projectSyncV2State(b).transactions[0].month).toBe(1)
   })
 
   it('projects pending movements including investment operation fields and investment accounts', () => {

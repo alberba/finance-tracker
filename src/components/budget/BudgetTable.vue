@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ALL_MONTHS, atMonth, monthIndex, type Month } from '../../lib/month'
 import { computed, reactive, ref, watch } from 'vue'
 
 import IconButton from '../ui/IconButton.vue'
@@ -44,7 +45,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   plan: [category: string]
-  update: [category: string, month: number, value: number]
+  update: [category: string, month: Month, value: number]
 }>()
 
 const { formatMoney, formatSignedMoney } = useMoneyFormatter()
@@ -63,11 +64,13 @@ watch(rangeValue, () => {
   start.value = defaultWindowStart(range.value, props.currentMonth)
 })
 
-const months = computed(() => Array.from({ length: range.value }, (_, i) => start.value + i))
+const months = computed(() =>
+  ALL_MONTHS.slice(monthIndex(start.value), monthIndex(start.value) + range.value),
+)
 const bars = computed(() => range.value < 12)
 const windowLabel = computed(() =>
   bars.value
-    ? `${shortMonth(start.value)} – ${shortMonth(start.value + range.value - 1)} ${props.year}`
+    ? `${shortMonth(months.value[0])} – ${shortMonth(months.value[range.value - 1])} ${props.year}`
     : `Todo ${props.year}`,
 )
 const span = computed(() => deviationSpan(props.currentMonth))
@@ -78,7 +81,7 @@ const desktop = useMediaQuery('(min-width: 640px)')
 // default window, so it is the current month until the arrows slide it.
 const focusMonth = computed(() => {
   const offset = props.currentMonth - defaultWindowStart(range.value, props.currentMonth)
-  return Math.max(start.value, Math.min(start.value + range.value - 1, start.value + offset))
+  return months.value[Math.max(0, Math.min(range.value - 1, offset))]
 })
 
 const columns = computed<LedgerColumn<BudgetRow>[]>(() => [
@@ -106,7 +109,7 @@ function signed(value: number): string {
 
 const invalid = reactive(new Set<string>())
 
-function onInput(category: string, month: number, event: Event): void {
+function onInput(category: string, month: Month, event: Event): void {
   const target = event.target as HTMLInputElement
   const value = parseDecimal(target.value)
   const key = `${category}|${month}`
@@ -121,7 +124,12 @@ function onInput(category: string, month: number, event: Event): void {
 /** The largest amount of a row in the visible months, with a little headroom. */
 function rowScale(cells: BudgetCell[]): number {
   return (
-    Math.max(0, ...months.value.map((m) => Math.max(cells[m].planned, cells[m].actual ?? 0))) * 1.12
+    Math.max(
+      0,
+      ...months.value.map((m) =>
+        Math.max(atMonth(cells, m).planned, atMonth(cells, m).actual ?? 0),
+      ),
+    ) * 1.12
   )
 }
 
@@ -166,7 +174,7 @@ function overClass(cell: BudgetCell): string {
   return props.view.type === 'income' ? 'bg-gain' : 'bg-loss'
 }
 
-function inputLabel(category: string, month: number): string {
+function inputLabel(category: string, month: Month): string {
   return `Presupuesto de ${category} en ${monthName(month)}`
 }
 </script>
@@ -207,13 +215,13 @@ function inputLabel(category: string, month: number): string {
           <IconButton
             label="Meses anteriores"
             icon="chevron-left"
-            :disabled="start === 0"
+            :disabled="start === 1"
             @click="start = moveWindow(start, range, -1)"
           />
           <IconButton
             label="Meses siguientes"
             icon="chevron-right"
-            :disabled="start + range >= 12"
+            :disabled="start + range > 12"
             @click="start = moveWindow(start, range, 1)"
           />
         </template>
@@ -294,13 +302,16 @@ function inputLabel(category: string, month: number): string {
       </template>
 
       <template v-for="month in months" :key="month" #[`cell-month-${month}`]="{ row }">
-        <div v-if="bars" class="grid gap-2.5 py-2" :title="cellTitle(row.cells[month])">
+        <div v-if="bars" class="grid gap-2.5 py-2" :title="cellTitle(atMonth(row.cells, month))">
           <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <span
               class="font-display font-medium tracking-tight tabular-nums"
-              :class="[actualClass(row.cells[month]), range === 3 ? 'sm:text-xl' : 'sm:text-base']"
+              :class="[
+                actualClass(atMonth(row.cells, month)),
+                range === 3 ? 'sm:text-xl' : 'sm:text-base',
+              ]"
             >
-              {{ actualText(row.cells[month]) }}
+              {{ actualText(atMonth(row.cells, month)) }}
             </span>
             <span
               v-if="desktop"
@@ -310,7 +321,7 @@ function inputLabel(category: string, month: number): string {
               de
               <LedgerInput
                 :label="inputLabel(row.category, month)"
-                :value="formatDecimalInput(row.cells[month].planned)"
+                :value="formatDecimalInput(atMonth(row.cells, month).planned)"
                 :aria-invalid="invalid.has(`${row.category}|${month}`)"
                 class="-mr-2 text-sm"
                 data-budget-cell
@@ -320,46 +331,50 @@ function inputLabel(category: string, month: number): string {
               />
             </span>
             <span v-else class="text-text-muted font-display text-xs tabular-nums">
-              de {{ formatWholeAmount(row.cells[month].planned) }}
+              de {{ formatWholeAmount(atMonth(row.cells, month).planned) }}
             </span>
           </div>
           <span class="bg-track relative flex h-2 rounded-xs" aria-hidden="true">
             <span
               class="h-full rounded-l-xs"
-              :class="row.cells[month].status === 'current' ? 'bg-text-muted' : 'bg-text-main/75'"
-              :style="{ width: `${barsByRow.get(row.category)![month].fill}%` }"
+              :class="
+                atMonth(row.cells, month).status === 'current' ? 'bg-text-muted' : 'bg-text-main/75'
+              "
+              :style="{ width: `${atMonth(barsByRow.get(row.category)!, month).fill}%` }"
             ></span>
             <span
               class="h-full"
-              :class="overClass(row.cells[month])"
-              :style="{ width: `${barsByRow.get(row.category)![month].over}%` }"
+              :class="overClass(atMonth(row.cells, month))"
+              :style="{ width: `${atMonth(barsByRow.get(row.category)!, month).over}%` }"
             ></span>
             <span
               class="bg-text-main absolute -top-1 -bottom-1 -ml-px w-0.5"
-              :style="{ left: `${barsByRow.get(row.category)![month].plan}%` }"
+              :style="{ left: `${atMonth(barsByRow.get(row.category)!, month).plan}%` }"
             ></span>
           </span>
           <span
             class="font-display min-h-4 text-xs tabular-nums"
-            :class="toneClass(row.cells[month].tone)"
+            :class="toneClass(atMonth(row.cells, month).tone)"
           >
-            {{ deviationText(row.cells[month]) }}
+            {{ deviationText(atMonth(row.cells, month)) }}
           </span>
         </div>
 
-        <div v-else class="grid justify-items-end" :title="cellTitle(row.cells[month])">
+        <div v-else class="grid justify-items-end" :title="cellTitle(atMonth(row.cells, month))">
           <span
             class="font-display text-sm font-medium tracking-tight tabular-nums"
-            :class="actualClass(row.cells[month])"
+            :class="actualClass(atMonth(row.cells, month))"
           >
             {{
-              row.cells[month].actual === null ? '—' : formatWholeAmount(row.cells[month].actual!)
+              atMonth(row.cells, month).actual === null
+                ? '—'
+                : formatWholeAmount(atMonth(row.cells, month).actual!)
             }}
           </span>
           <LedgerInput
             v-if="desktop"
             :label="inputLabel(row.category, month)"
-            :value="formatDecimalInput(row.cells[month].planned)"
+            :value="formatDecimalInput(atMonth(row.cells, month).planned)"
             :aria-invalid="invalid.has(`${row.category}|${month}`)"
             class="text-text-muted -mr-2 text-xs"
             data-budget-cell
@@ -368,7 +383,7 @@ function inputLabel(category: string, month: number): string {
             @change="onInput(row.category, month, $event)"
           />
           <span v-else class="text-text-muted font-display text-xs tabular-nums">
-            {{ formatWholeAmount(row.cells[month].planned) }}
+            {{ formatWholeAmount(atMonth(row.cells, month).planned) }}
           </span>
         </div>
       </template>
@@ -405,20 +420,20 @@ function inputLabel(category: string, month: number): string {
           class="font-display block font-bold tabular-nums"
           :class="[
             bars ? 'text-base' : 'text-sm',
-            bars ? 'text-text-main' : actualClass(view.totals.cells[month]),
+            bars ? 'text-text-main' : actualClass(atMonth(view.totals.cells, month)),
           ]"
         >
-          {{ actualText(view.totals.cells[month]) }}
+          {{ actualText(atMonth(view.totals.cells, month)) }}
         </span>
         <span class="text-text-muted font-display block text-xs tabular-nums">
-          {{ bars ? 'de ' : '' }}{{ amount(view.totals.cells[month].planned) }}
+          {{ bars ? 'de ' : '' }}{{ amount(atMonth(view.totals.cells, month).planned) }}
         </span>
         <span
           v-if="bars"
           class="font-display block min-h-4 text-xs tabular-nums"
-          :class="toneClass(view.totals.cells[month].tone)"
+          :class="toneClass(atMonth(view.totals.cells, month).tone)"
         >
-          {{ deviationText(view.totals.cells[month]) }}
+          {{ deviationText(atMonth(view.totals.cells, month)) }}
         </span>
       </template>
 

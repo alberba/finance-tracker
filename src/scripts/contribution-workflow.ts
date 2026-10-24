@@ -1,3 +1,4 @@
+import type { Month } from '../lib/month'
 import type { Contribution, Entity } from "./types";
 import { parseFloatSafe, round2 } from "./utils";
 
@@ -188,7 +189,7 @@ export function deriveContributionFlow(contribution: Partial<Contribution>): {
   };
 }
 
-export function toSnapshotDate(year: number, month: number): string {
-  const day = new Date(year, month + 1, 0).getDate();
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+export function toSnapshotDate(year: number, month: Month): string {
+  const day = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }

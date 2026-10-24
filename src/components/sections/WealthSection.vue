@@ -16,6 +16,7 @@ import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useSnapshotEdit } from '../../composables/useSnapshotEdit'
 import { useToast } from '../../composables/useToast'
 import { formatSnapshotInput, type SnapshotRowViewModel } from '../../domain/wealth/view-model'
+import { atMonth, type Month } from '../../lib/month'
 import type { SnapshotKind } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useWealthStore } from '../../stores/wealth'
@@ -37,15 +38,16 @@ const { totals, changes } = edit
 
 const month = computed({
   get: () => snapshotMonth.value,
-  set: (value: number) => wealthStore.setMonth(value),
+  set: (value: Month) => wealthStore.setMonth(value),
 })
-const monthName = computed(() => viewModel.value.months[snapshotMonth.value]?.name ?? '')
+const monthName = computed(() => atMonth(viewModel.value.months, snapshotMonth.value).name)
 const needsAccount = computed(() =>
   viewModel.value.groups.every((group) => group.rows.length === 0),
 )
 const status = computed(() => {
   if (changes.value > 0) return { saved: false, text: 'Con cambios sin guardar' }
-  if (viewModel.value.months[snapshotMonth.value]?.saved) return { saved: true, text: 'Guardado' }
+  if (atMonth(viewModel.value.months, snapshotMonth.value).saved)
+    return { saved: true, text: 'Guardado' }
   return { saved: false, text: 'Sin guardar: es el saldo calculado' }
 })
 

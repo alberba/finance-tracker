@@ -34,7 +34,7 @@ const transactions: Transaction[] = [
   {
     id: "tx-1",
     date: "2026-01-05",
-    month: 0,
+    month: 1,
     type: "income",
     accountId: "revolut",
     category: "Nómina",
@@ -43,7 +43,7 @@ const transactions: Transaction[] = [
   {
     id: "tx-2",
     date: "2026-01-06",
-    month: 0,
+    month: 1,
     type: "expense",
     accountId: "revolut",
     category: "Comida",
@@ -52,7 +52,7 @@ const transactions: Transaction[] = [
   {
     id: "tx-3",
     date: "2026-01-10",
-    month: 0,
+    month: 1,
     type: "investment",
     accountId: "revolut",
     category: "Fondos Indexados",
@@ -61,7 +61,7 @@ const transactions: Transaction[] = [
   {
     id: "tx-4",
     date: "2026-02-05",
-    month: 1,
+    month: 2,
     type: "expense",
     accountId: "santander",
     category: "Comida",
@@ -70,7 +70,7 @@ const transactions: Transaction[] = [
   {
     id: "tx-5",
     date: "2026-02-07",
-    month: 1,
+    month: 2,
     type: "investment",
     accountId: "santander",
     category: "Crypto",
@@ -79,8 +79,8 @@ const transactions: Transaction[] = [
 ];
 
 const snapshots: Record<string, Snapshot> = {
-  "1": {
-    month: 1,
+  "2": {
+    month: 2,
     accounts: { revolut: 1800 },
     investments: { "fondos-indexados": 2800 },
     liabilities: { hipoteca: 89000 },
@@ -94,20 +94,20 @@ describe("finance-core helpers", () => {
   });
 
   it("resuelve snapshots y coincidencias de activos desde los helpers compartidos", () => {
-    expect(getSnapshotValue(snapshots, "accounts", 1, "revolut")).toBe(1800);
-    expect(getSnapshotValue(snapshots, "accounts", 0, "revolut")).toBeNull();
+    expect(getSnapshotValue(snapshots, "accounts", 2, "revolut")).toBe(1800);
+    expect(getSnapshotValue(snapshots, "accounts", 1, "revolut")).toBeNull();
     expect(matchesInvestmentAsset("Fondos Indexados", investments[0])).toBe(true);
     expect(matchesInvestmentAsset("fondos-indexados", investments[0])).toBe(true);
     expect(matchesInvestmentAsset("Crypto", investments[0])).toBe(false);
   });
 
   it("calcula totales mensuales por tipo", () => {
-    const totals = getMonthTotals(transactions, 0);
+    const totals = getMonthTotals(transactions, 1);
     expect(totals).toEqual({ income: 2000, expense: 250, investment: 500 });
   });
 
   it("calcula reales por categoría", () => {
-    const actuals = getCategoryActuals(transactions, "expense", 0, [
+    const actuals = getCategoryActuals(transactions, "expense", 1, [
       "Comida",
       "Transporte",
     ]);
@@ -117,7 +117,7 @@ describe("finance-core helpers", () => {
   it("calcula saldo de cuenta considerando snapshot previo", () => {
     const revolutMonth0 = computeAccountBalance(
       "revolut",
-      0,
+      1,
       accounts,
       transactions,
       snapshots,
@@ -126,7 +126,7 @@ describe("finance-core helpers", () => {
 
     const revolutMonth1 = computeAccountBalance(
       "revolut",
-      1,
+      2,
       accounts,
       transactions,
       snapshots,
@@ -137,7 +137,7 @@ describe("finance-core helpers", () => {
   it("calcula valor de inversión por categoría y snapshot", () => {
     const fundsMonth0 = computeInvestmentValue(
       "fondos-indexados",
-      0,
+      1,
       investments,
       transactions,
       snapshots,
@@ -146,7 +146,7 @@ describe("finance-core helpers", () => {
 
     const fundsMonth1 = computeInvestmentValue(
       "fondos-indexados",
-      1,
+      2,
       investments,
       transactions,
       snapshots,
@@ -155,7 +155,7 @@ describe("finance-core helpers", () => {
 
     const cryptoMonth1 = computeInvestmentValue(
       "crypto",
-      1,
+      2,
       investments,
       transactions,
       snapshots,
@@ -181,7 +181,7 @@ describe("finance-core helpers", () => {
   it("calcula pasivos usando snapshot cuando existe", () => {
     const liabilityMonth0 = computeLiabilityValue(
       "hipoteca",
-      0,
+      1,
       liabilities,
       snapshots,
     );
@@ -189,7 +189,7 @@ describe("finance-core helpers", () => {
 
     const liabilityMonth1 = computeLiabilityValue(
       "hipoteca",
-      1,
+      2,
       liabilities,
       snapshots,
     );
@@ -198,7 +198,7 @@ describe("finance-core helpers", () => {
 
   it("calcula patrimonio neto mensual", () => {
     const wealthMonth1 = getWealthByMonth(
-      1,
+      2,
       accounts,
       investments,
       liabilities,

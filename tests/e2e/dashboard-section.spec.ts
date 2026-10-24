@@ -55,8 +55,8 @@ test.describe('Dashboard section', () => {
     await expect(dashboard.locator('#year-display')).toBeEnabled()
     await dashboard.locator('#year-display').selectOption('2027')
 
-    await dashboard.locator('#dashboard-month').selectOption('0')
-    await expect(dashboard.locator('#dashboard-month')).toHaveValue('0')
+    await dashboard.locator('#dashboard-month').selectOption('1')
+    await expect(dashboard.locator('#dashboard-month')).toHaveValue('1')
     await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
     await expect(dashboard.locator('#kpi-income')).toHaveText('2.001,00 €')
 
@@ -80,7 +80,7 @@ test.describe('Dashboard section', () => {
       await tracker.openDashboard()
       const dashboard = tracker.dashboardSection
       const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
-      await month.selectOption('3')
+      await month.selectOption('4')
       const kpi = dashboard.locator(`[data-kpi="${kind}"]`)
       const figure = kpi.locator(`#kpi-${kind}`)
       const bars = kpi.getByRole('button')
@@ -106,13 +106,13 @@ test.describe('Dashboard section', () => {
     await tracker.openDashboard()
     const dashboard = tracker.dashboardSection
     const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
-    await month.selectOption('3')
+    await month.selectOption('4')
     const kpi = dashboard.locator('[data-kpi="investment"]')
     await page.mouse.move(0, 0)
     await kpi.getByRole('button').nth(0).hover()
     await expect(kpi.locator('#kpi-investment')).toHaveText('250,00 €')
 
-    await month.selectOption('4')
+    await month.selectOption('5')
     await expect(kpi.locator('#kpi-investment')).toHaveText('0,00 €')
   })
 
@@ -120,7 +120,7 @@ test.describe('Dashboard section', () => {
     test.beforeEach(async ({ page, tracker }) => {
       await tracker.openDashboard()
       const dashboard = tracker.dashboardSection
-      await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
+      await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('4')
       await page.mouse.move(0, 0)
       await dashboard.locator('[data-kpi="income"]').getByRole('button').nth(0).hover()
     })
@@ -139,7 +139,7 @@ test.describe('Dashboard section', () => {
 
     test('mantiene el periodo seleccionado', async ({ tracker }) => {
       const dashboard = tracker.dashboardSection
-      await expect(dashboard.getByRole('combobox', { name: 'Mes', exact: true })).toHaveValue('3')
+      await expect(dashboard.getByRole('combobox', { name: 'Mes', exact: true })).toHaveValue('4')
       await expect(dashboard.getByRole('combobox', { name: 'Año', exact: true })).toHaveValue(
         '2026',
       )
@@ -248,14 +248,14 @@ test('conserva el periodo y navega desde tarjetas con atrás y adelante en demo'
   await page.goto('/dashboard?demo=1')
   await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
   const dashboard = tracker.dashboardSection
-  await dashboard.locator('#dashboard-month').selectOption('0')
+  await dashboard.locator('#dashboard-month').selectOption('1')
   await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
   await dashboard.getByRole('button', { name: 'Ver todos', exact: true }).click()
   await expect(page).toHaveURL(/\/movimientos$/)
   await expect(tracker.transactionsSection).toBeVisible()
   await page.goBack()
   await expect(dashboard).toBeVisible()
-  await expect(dashboard.locator('#dashboard-month')).toHaveValue('0')
+  await expect(dashboard.locator('#dashboard-month')).toHaveValue('1')
   await page.goForward()
   await expect(tracker.transactionsSection).toBeVisible()
   await expect(page.locator('[data-nav-item][data-section=transactions]:visible')).toHaveAttribute(

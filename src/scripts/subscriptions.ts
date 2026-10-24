@@ -99,7 +99,7 @@ export function materializeDueSubscriptions(state: State, today: string): DueSub
         state.transactions.push({
           id: uid('tx'),
           date: chargeDate,
-          month: monthFromISO(chargeDate) ?? 0,
+          month: monthFromISO(chargeDate) ?? 1,
           type: 'expense',
           accountId: subscription.accountId,
           category: subscription.category,
