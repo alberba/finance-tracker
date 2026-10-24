@@ -21,12 +21,9 @@
  * "repositories are the sole caller of Drizzle" design decision.
  */
 
-import {
-  assertOwnedReferences,
-  RejectedCommandError,
-  runInTransaction,
-  type Db,
-} from '../../../db/repositories/shared'
+import { assertOwnedReferences, RejectedCommandError } from '../../../db/repositories/shared'
+import { Cause, Effect, Exit } from 'effect'
+import { Database, DatabaseError, query, transaction } from '../../../db/database'
 import { fromMinorUnits } from '../../../lib/money'
 import * as accountsRepository from '../../../db/repositories/accounts'
 import * as transactionsRepository from '../../../db/repositories/transactions'
@@ -35,7 +32,6 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
-import { runWithDb } from '../../../db/database'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
 import * as wealthRepository from '../../../db/repositories/wealth'
@@ -95,57 +91,58 @@ interface ContributionAllocationsField {
  * row already there instead of duplicating it. Everything created from now on
  * is found by its own `id` instead (`findByClientId`).
  */
-async function findByLegacyId(
-  db: Db,
+function findByLegacyId(
   userId: string,
   entityType: SyncEntityType,
   value: unknown,
-): Promise<VersionedRow | undefined> {
-  if (typeof value !== 'string' || !value) return undefined
-  if (entityType === 'transaction') {
-    const row = (await runWithDb(db, transactionsRepository.listByUser(userId))).find(
-      (candidate) => candidate.legacyId === value,
-    )
-    return row ? transactionWithTradeDetail(db, userId, row) : undefined
-  }
-  let rows: VersionedRow[] = []
-  switch (entityType) {
-    case 'account':
-      rows = (await runWithDb(db, accountsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'category':
-      rows = (await runWithDb(db, accountsRepository.listCategoriesByUser(userId))) as VersionedRow[]
-      break
-    case 'subscription':
-      rows = (await runWithDb(db, subscriptionsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'recurringRule':
-      rows = (await runWithDb(db, recurringRulesRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'pendingMovement':
-      rows = (await runWithDb(db, pendingMovementsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'budgetEntry':
-      rows = (await runWithDb(db, budgetEntriesRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'goal':
-      rows = (await runWithDb(db, goalsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'contribution':
-      rows = (await runWithDb(db, contributionsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'wealthSnapshot':
-      rows = (await runWithDb(db, wealthRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'userInstrument':
-      return undefined
-    case 'stockeventsMapping':
-      rows = (await runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId))) as VersionedRow[]
-      break
-    case 'stockeventsCashEntry':
-      return undefined
-  }
-  return rows.find((row) => row.legacyId === value)
+): Effect.Effect<VersionedRow | undefined, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    if (typeof value !== 'string' || !value) return undefined
+    if (entityType === 'transaction') {
+      const row = (yield* transactionsRepository.listByUser(userId)).find(
+        (candidate) => candidate.legacyId === value,
+      )
+      return row ? yield* transactionWithTradeDetail(userId, row) : undefined
+    }
+    let rows: VersionedRow[] = []
+    switch (entityType) {
+      case 'account':
+        rows = (yield* accountsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'category':
+        rows = (yield* accountsRepository.listCategoriesByUser(userId)) as VersionedRow[]
+        break
+      case 'subscription':
+        rows = (yield* subscriptionsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'recurringRule':
+        rows = (yield* recurringRulesRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'pendingMovement':
+        rows = (yield* pendingMovementsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'budgetEntry':
+        rows = (yield* budgetEntriesRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'goal':
+        rows = (yield* goalsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'contribution':
+        rows = (yield* contributionsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'wealthSnapshot':
+        rows = (yield* wealthRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'userInstrument':
+        return undefined
+      case 'stockeventsMapping':
+        rows = (yield* stockeventsSymbolMappingsRepository.listByUser(userId)) as VersionedRow[]
+        break
+      case 'stockeventsCashEntry':
+        return undefined
+    }
+    return rows.find((row) => row.legacyId === value)
+  })
 }
 
 function includesPatch(row: VersionedRow, patch: Record<string, unknown>): boolean {
@@ -155,57 +152,57 @@ function includesPatch(row: VersionedRow, patch: Record<string, unknown>): boole
 }
 
 /** Looks up + version-checks an entity, returning its current row (or a not-found/conflict signal). */
-async function loadForMutation(
-  db: Db,
+function loadForMutation(
   userId: string,
   entityType: SyncEntityType,
   entityId: string,
-): Promise<VersionedRow | undefined> {
-  switch (entityType) {
-    case 'account':
-      return (await runWithDb(db, accountsRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'category':
-      return (await runWithDb(db, accountsRepository.getCategory(userId, entityId))) as
-        VersionedRow | undefined
-    case 'transaction': {
-      const row = await runWithDb(db, transactionsRepository.get(userId, entityId))
-      return row ? transactionWithTradeDetail(db, userId, row) : undefined
+): Effect.Effect<VersionedRow | undefined, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    switch (entityType) {
+      case 'account':
+        return (yield* accountsRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'category':
+        return (yield* accountsRepository.getCategory(userId, entityId)) as VersionedRow | undefined
+      case 'transaction': {
+        const row = yield* transactionsRepository.get(userId, entityId)
+        return row ? yield* transactionWithTradeDetail(userId, row) : undefined
+      }
+      case 'subscription':
+        return (yield* subscriptionsRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'recurringRule':
+        return (yield* recurringRulesRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'pendingMovement':
+        return (yield* pendingMovementsRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'budgetEntry':
+        return (yield* budgetEntriesRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'goal':
+        return (yield* goalsRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'contribution':
+        return (yield* contributionsRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'userInstrument':
+        return (yield* marketRepository.getUserInstrument(userId, entityId)) as
+          VersionedRow | undefined
+      case 'wealthSnapshot':
+        return (yield* wealthRepository.get(userId, entityId)) as VersionedRow | undefined
+      case 'stockeventsMapping':
+        return (yield* stockeventsSymbolMappingsRepository.get(userId, entityId)) as
+          VersionedRow | undefined
+      case 'stockeventsCashEntry': {
+        const entries = yield* stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)
+        return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined
+      }
     }
-    case 'subscription':
-      return (await runWithDb(db, subscriptionsRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'recurringRule':
-      return (await runWithDb(db, recurringRulesRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'pendingMovement':
-      return (await runWithDb(db, pendingMovementsRepository.get(userId, entityId))) as
-        VersionedRow | undefined
-    case 'budgetEntry':
-      return (await runWithDb(db, budgetEntriesRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'goal':
-      return (await runWithDb(db, goalsRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'contribution':
-      return (await runWithDb(db, contributionsRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'userInstrument':
-      return (await runWithDb(db, marketRepository.getUserInstrument(userId, entityId))) as
-        VersionedRow | undefined
-    case 'wealthSnapshot':
-      return (await runWithDb(db, wealthRepository.get(userId, entityId))) as VersionedRow | undefined
-    case 'stockeventsMapping':
-      return (await runWithDb(db, stockeventsSymbolMappingsRepository.get(userId, entityId))) as
-        VersionedRow | undefined
-    case 'stockeventsCashEntry': {
-      const entries = await runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId))
-      return entries.find((entry) => entry.id === entityId) as VersionedRow | undefined
-    }
-  }
+  })
 }
 
-async function transactionWithTradeDetail(
-  db: Db,
+function transactionWithTradeDetail(
   userId: string,
   row: VersionedRow,
-): Promise<VersionedRow> {
-  const tradeDetail = await runWithDb(db, transactionsRepository.getTradeDetailByTransaction(userId, row.id))
-  return { ...row, tradeDetail } as VersionedRow
+): Effect.Effect<VersionedRow, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const tradeDetail = yield* transactionsRepository.getTradeDetailByTransaction(userId, row.id)
+    return { ...row, tradeDetail } as VersionedRow
+  })
 }
 
 /**
@@ -215,275 +212,297 @@ async function transactionWithTradeDetail(
  * addressable by that id from its very first `create`, with no table of
  * equivalences and no waiting for an ack.
  */
-async function findByClientId(
-  db: Db,
+function findByClientId(
   userId: string,
   entityType: SyncEntityType,
   id: unknown,
-): Promise<VersionedRow | undefined> {
-  if (typeof id !== 'string' || !id) return undefined
-  return loadForMutation(db, userId, entityType, id)
+): Effect.Effect<VersionedRow | undefined, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    if (typeof id !== 'string' || !id) return undefined
+    return yield* loadForMutation(userId, entityType, id)
+  })
 }
 
-async function createEntity(
-  db: Db,
+function createEntity(
   userId: string,
   entityType: SyncEntityType,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each entity's repository input type differs; validated by `entityCreatePayloadSchemas` before this is called.
   data: any,
-): Promise<VersionedRow> {
-  switch (entityType) {
-    case 'account':
-      return (await runWithDb(db, accountsRepository.create(userId, data))) as VersionedRow
-    case 'category':
-      return (await runWithDb(db, accountsRepository.createCategory(userId, data))) as VersionedRow
-    case 'transaction':
-      return (await runWithDb(db, transactionsRepository.create(userId, data))) as VersionedRow
-    case 'subscription':
-      return (await runWithDb(db, subscriptionsRepository.create(userId, data))) as VersionedRow
-    case 'recurringRule':
-      return (await runWithDb(db, recurringRulesRepository.create(userId, data))) as VersionedRow
-    case 'pendingMovement':
-      return (await runWithDb(db, pendingMovementsRepository.create(userId, data))) as VersionedRow
-    case 'budgetEntry':
-      return (await runWithDb(db, budgetEntriesRepository.create(userId, data))) as VersionedRow
-    case 'goal':
-      return (await runWithDb(db, goalsRepository.create(userId, data))) as VersionedRow
-    case 'contribution': {
-      const { allocations, ...contributionInput } =
-        data as contributionsRepository.CreateContributionInput & ContributionAllocationsField
-      const row = await runWithDb(db, contributionsRepository.create(userId, contributionInput))
-      const allocationRows = allocations?.length
-        ? await runWithDb(db, contributionsRepository.replaceAllocations(userId,
-            row.id,
-            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),))
-        : []
-      return { ...row, allocations: allocationRows } as VersionedRow
-    }
-    case 'userInstrument':
-      return (await runWithDb(db, marketRepository.createUserInstrument(userId, data))) as VersionedRow
-    case 'stockeventsMapping':
-      return (await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
-        id: typeof data.id === 'string' ? data.id : undefined,
-        legacyId: data.legacyId ?? null,
-        categoryId: data.categoryId ?? null,
-        stockeventsSymbol: String(data.stockeventsSymbol),
-        sync: data.sync === true,
-        watchlistId:
-          typeof data.watchlistId === 'string' && data.watchlistId ? data.watchlistId : null,
-        hidden: data.hidden === true,
-      }))) as VersionedRow
-    case 'stockeventsCashEntry': {
-      const accountId = typeof data.accountId === 'string' && data.accountId ? data.accountId : null
-      if (accountId) {
-        await assertOwnedReferences(db, userId, { accountId })
+): Effect.Effect<VersionedRow, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    switch (entityType) {
+      case 'account':
+        return (yield* accountsRepository.create(userId, data)) as VersionedRow
+      case 'category':
+        return (yield* accountsRepository.createCategory(userId, data)) as VersionedRow
+      case 'transaction':
+        return (yield* transactionsRepository.create(userId, data)) as VersionedRow
+      case 'subscription':
+        return (yield* subscriptionsRepository.create(userId, data)) as VersionedRow
+      case 'recurringRule':
+        return (yield* recurringRulesRepository.create(userId, data)) as VersionedRow
+      case 'pendingMovement':
+        return (yield* pendingMovementsRepository.create(userId, data)) as VersionedRow
+      case 'budgetEntry':
+        return (yield* budgetEntriesRepository.create(userId, data)) as VersionedRow
+      case 'goal':
+        return (yield* goalsRepository.create(userId, data)) as VersionedRow
+      case 'contribution': {
+        const { allocations, ...contributionInput } =
+          data as contributionsRepository.CreateContributionInput & ContributionAllocationsField
+        const row = yield* contributionsRepository.create(userId, contributionInput)
+        const allocationRows = allocations?.length
+          ? yield* contributionsRepository.replaceAllocations(
+              userId,
+              row.id,
+              allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+            )
+          : []
+        return { ...row, allocations: allocationRows } as VersionedRow
       }
-      const duplicate = await runWithDb(db, stockeventsCashMappingsRepository.findEntry(userId,
-        String(data.contributionDate),
-        accountId,
-        String(data.watchlistId),))
-      if (duplicate) {
+      case 'userInstrument':
+        return (yield* marketRepository.createUserInstrument(userId, data)) as VersionedRow
+      case 'stockeventsMapping':
+        return (yield* stockeventsSymbolMappingsRepository.create(userId, {
+          id: typeof data.id === 'string' ? data.id : undefined,
+          legacyId: data.legacyId ?? null,
+          categoryId: data.categoryId ?? null,
+          stockeventsSymbol: String(data.stockeventsSymbol),
+          sync: data.sync === true,
+          watchlistId:
+            typeof data.watchlistId === 'string' && data.watchlistId ? data.watchlistId : null,
+          hidden: data.hidden === true,
+        })) as VersionedRow
+      case 'stockeventsCashEntry': {
+        const accountId =
+          typeof data.accountId === 'string' && data.accountId ? data.accountId : null
+        if (accountId) {
+          yield* query((tx) => assertOwnedReferences(tx, userId, { accountId }))
+        }
+        const duplicate = yield* stockeventsCashMappingsRepository.findEntry(
+          userId,
+          String(data.contributionDate),
+          accountId,
+          String(data.watchlistId),
+        )
+        if (duplicate) {
+          return {
+            ...duplicate,
+            syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
+          } as VersionedRow
+        }
+        const entry = yield* stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
+          id: typeof data.id === 'string' ? data.id : undefined,
+          contributionDate: String(data.contributionDate),
+          accountId,
+          watchlistId: String(data.watchlistId),
+          syncedAmount: Number(data.syncedAmount),
+          currency: String(data.currency),
+        })
         return {
-          ...duplicate,
-          syncedAmount: fromMinorUnits(duplicate.syncedAmountMinor, duplicate.currency),
+          ...entry,
+          syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency),
         } as VersionedRow
       }
-      const entry = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
-        id: typeof data.id === 'string' ? data.id : undefined,
-        contributionDate: String(data.contributionDate),
-        accountId,
-        watchlistId: String(data.watchlistId),
-        syncedAmount: Number(data.syncedAmount),
-        currency: String(data.currency),
-      }))
-      return {
-        ...entry,
-        syncedAmount: fromMinorUnits(entry.syncedAmountMinor, entry.currency),
-      } as VersionedRow
+      case 'wealthSnapshot': {
+        const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
+          WealthSnapshotBalancesField
+        const row = yield* wealthRepository.create(userId, snapshotInput)
+        const balanceRows = balances?.length
+          ? yield* wealthRepository.replaceBalances(userId, row.id, balances)
+          : []
+        return { ...row, balances: balanceRows } as VersionedRow
+      }
     }
-    case 'wealthSnapshot': {
-      const { balances, ...snapshotInput } = data as wealthRepository.CreateWealthSnapshotInput &
-        WealthSnapshotBalancesField
-      const row = await runWithDb(db, wealthRepository.create(userId, snapshotInput))
-      const balanceRows = balances?.length
-        ? await runWithDb(db, wealthRepository.replaceBalances(userId, row.id, balances))
-        : []
-      return { ...row, balances: balanceRows } as VersionedRow
-    }
-  }
+  })
 }
 
-async function updateEntity(
-  db: Db,
+function updateEntity(
   userId: string,
   entityType: SyncEntityType,
   entityId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see createEntity
   patch: any,
   expectedVersion: number,
-): Promise<VersionedRow | undefined> {
-  switch (entityType) {
-    case 'account':
-      return (await runWithDb(db, accountsRepository.update(userId, entityId, patch, expectedVersion))) as
-        VersionedRow | undefined
-    case 'category':
-      return (await runWithDb(db, accountsRepository.updateCategory(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'transaction': {
-      const row = await runWithDb(db, transactionsRepository.update(userId, entityId, patch, expectedVersion))
-      if (!row) return undefined
-      const tradeDetail = await runWithDb(db, transactionsRepository.getTradeDetailByTransaction(userId,
-        row.id,))
-      return { ...row, tradeDetail } as VersionedRow
+): Effect.Effect<VersionedRow | undefined, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    switch (entityType) {
+      case 'account':
+        return (yield* accountsRepository.update(userId, entityId, patch, expectedVersion)) as
+          VersionedRow | undefined
+      case 'category':
+        return (yield* accountsRepository.updateCategory(
+          userId,
+          entityId,
+          patch,
+          expectedVersion,
+        )) as VersionedRow | undefined
+      case 'transaction': {
+        const row = yield* transactionsRepository.update(userId, entityId, patch, expectedVersion)
+        if (!row) return undefined
+        const tradeDetail = yield* transactionsRepository.getTradeDetailByTransaction(
+          userId,
+          row.id,
+        )
+        return { ...row, tradeDetail } as VersionedRow
+      }
+      case 'subscription':
+        return (yield* subscriptionsRepository.update(userId, entityId, patch, expectedVersion)) as
+          VersionedRow | undefined
+      case 'recurringRule':
+        return (yield* recurringRulesRepository.update(
+          userId,
+          entityId,
+          patch,
+          expectedVersion,
+        )) as VersionedRow | undefined
+      case 'pendingMovement':
+        return (yield* pendingMovementsRepository.update(
+          userId,
+          entityId,
+          patch,
+          expectedVersion,
+        )) as VersionedRow | undefined
+      case 'budgetEntry':
+        return (yield* budgetEntriesRepository.update(userId, entityId, patch, expectedVersion)) as
+          VersionedRow | undefined
+      case 'goal':
+        return (yield* goalsRepository.update(userId, entityId, patch, expectedVersion)) as
+          VersionedRow | undefined
+      case 'contribution': {
+        const { allocations, ...contributionPatch } =
+          patch as contributionsRepository.UpdateContributionInput & ContributionAllocationsField
+        const row = yield* contributionsRepository.update(
+          userId,
+          entityId,
+          contributionPatch,
+          expectedVersion,
+        )
+        if (!row) return undefined
+        const allocationRows = allocations
+          ? yield* contributionsRepository.replaceAllocations(
+              userId,
+              row.id,
+              allocations.map((allocation) => ({ ...allocation, currency: row.currency })),
+            )
+          : yield* contributionsRepository.listAllocationsByContribution(userId, row.id)
+        return { ...row, allocations: allocationRows } as VersionedRow
+      }
+      case 'userInstrument':
+        return (yield* marketRepository.updateUserInstrument(
+          userId,
+          entityId,
+          patch,
+          expectedVersion,
+        )) as VersionedRow | undefined
+      case 'stockeventsMapping':
+        return (yield* stockeventsSymbolMappingsRepository.update(
+          userId,
+          entityId,
+          {
+            categoryId: patch.categoryId,
+            stockeventsSymbol: patch.stockeventsSymbol,
+            sync: patch.sync,
+            watchlistId: patch.watchlistId,
+            hidden: patch.hidden,
+          },
+          expectedVersion,
+        )) as VersionedRow | undefined
+      case 'stockeventsCashEntry': {
+        const updated = yield* stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
+          contributionDate: String(patch.contributionDate),
+          accountId:
+            typeof patch.accountId === 'string' && patch.accountId ? patch.accountId : null,
+          watchlistId: String(patch.watchlistId),
+          syncedAmount: Number(patch.syncedAmount),
+          currency: String(patch.currency),
+        })
+        return {
+          ...updated,
+          syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
+        } as VersionedRow | undefined
+      }
+      case 'wealthSnapshot': {
+        const { balances, ...snapshotPatch } =
+          patch as Partial<wealthRepository.CreateWealthSnapshotInput> & WealthSnapshotBalancesField
+        const row = yield* wealthRepository.update(userId, entityId, snapshotPatch, expectedVersion)
+        if (!row) return undefined
+        const balanceRows = balances
+          ? yield* wealthRepository.replaceBalances(userId, row.id, balances)
+          : yield* wealthRepository.listBalancesBySnapshot(userId, row.id)
+        return { ...row, balances: balanceRows } as VersionedRow
+      }
     }
-    case 'subscription':
-      return (await runWithDb(db, subscriptionsRepository.update(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'recurringRule':
-      return (await runWithDb(db, recurringRulesRepository.update(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'pendingMovement':
-      return (await runWithDb(db, pendingMovementsRepository.update(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'budgetEntry':
-      return (await runWithDb(db, budgetEntriesRepository.update(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'goal':
-      return (await runWithDb(db, goalsRepository.update(userId, entityId, patch, expectedVersion))) as
-        VersionedRow | undefined
-    case 'contribution': {
-      const { allocations, ...contributionPatch } =
-        patch as contributionsRepository.UpdateContributionInput & ContributionAllocationsField
-      const row = await runWithDb(db, contributionsRepository.update(userId,
-        entityId,
-        contributionPatch,
-        expectedVersion,))
-      if (!row) return undefined
-      const allocationRows = allocations
-        ? await runWithDb(db, contributionsRepository.replaceAllocations(userId,
-            row.id,
-            allocations.map((allocation) => ({ ...allocation, currency: row.currency })),))
-        : await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId, row.id))
-      return { ...row, allocations: allocationRows } as VersionedRow
-    }
-    case 'userInstrument':
-      return (await runWithDb(db, marketRepository.updateUserInstrument(userId,
-        entityId,
-        patch,
-        expectedVersion,))) as VersionedRow | undefined
-    case 'stockeventsMapping':
-      return (await runWithDb(db, stockeventsSymbolMappingsRepository.update(userId,
-        entityId,
-        {
-          categoryId: patch.categoryId,
-          stockeventsSymbol: patch.stockeventsSymbol,
-          sync: patch.sync,
-          watchlistId: patch.watchlistId,
-          hidden: patch.hidden,
-        },
-        expectedVersion,))) as VersionedRow | undefined
-    case 'stockeventsCashEntry': {
-      const updated = await runWithDb(db, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
-        contributionDate: String(patch.contributionDate),
-        accountId: typeof patch.accountId === 'string' && patch.accountId ? patch.accountId : null,
-        watchlistId: String(patch.watchlistId),
-        syncedAmount: Number(patch.syncedAmount),
-        currency: String(patch.currency),
-      }))
-      return {
-        ...updated,
-        syncedAmount: fromMinorUnits(updated.syncedAmountMinor, updated.currency),
-      } as VersionedRow | undefined
-    }
-    case 'wealthSnapshot': {
-      const { balances, ...snapshotPatch } =
-        patch as Partial<wealthRepository.CreateWealthSnapshotInput> & WealthSnapshotBalancesField
-      const row = await runWithDb(db, wealthRepository.update(userId,
-        entityId,
-        snapshotPatch,
-        expectedVersion,))
-      if (!row) return undefined
-      const balanceRows = balances
-        ? await runWithDb(db, wealthRepository.replaceBalances(userId, row.id, balances))
-        : await runWithDb(db, wealthRepository.listBalancesBySnapshot(userId, row.id))
-      return { ...row, balances: balanceRows } as VersionedRow
-    }
-  }
+  })
 }
 
-async function removeEntity(
-  db: Db,
+function removeEntity(
   userId: string,
   entityType: SyncEntityType,
   entityId: string,
   expectedVersion: number,
-): Promise<boolean> {
-  switch (entityType) {
-    case 'account':
-      return runWithDb(db, accountsRepository.remove(userId, entityId, expectedVersion))
-    case 'category':
-      return runWithDb(db, accountsRepository.removeCategory(userId, entityId, expectedVersion))
-    case 'transaction':
-      return runWithDb(db, transactionsRepository.remove(userId, entityId, expectedVersion))
-    case 'subscription':
-      return runWithDb(db, subscriptionsRepository.remove(userId, entityId, expectedVersion))
-    case 'recurringRule':
-      return runWithDb(db, recurringRulesRepository.remove(userId, entityId, expectedVersion))
-    case 'pendingMovement':
-      return runWithDb(db, pendingMovementsRepository.remove(userId, entityId, expectedVersion))
-    case 'budgetEntry':
-      return runWithDb(db, budgetEntriesRepository.remove(userId, entityId, expectedVersion))
-    case 'goal':
-      return runWithDb(db, goalsRepository.remove(userId, entityId, expectedVersion))
-    case 'contribution':
-      return runWithDb(db, contributionsRepository.remove(userId, entityId, expectedVersion))
-    case 'userInstrument':
-      return runWithDb(db, marketRepository.removeUserInstrument(userId, entityId, expectedVersion))
-    case 'stockeventsMapping':
-      return runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion))
-    case 'stockeventsCashEntry':
-      return runWithDb(db, stockeventsCashMappingsRepository.removeSyncEntry(userId,
-        entityId,
-        expectedVersion,))
-    case 'wealthSnapshot':
-      return runWithDb(db, wealthRepository.remove(userId, entityId, expectedVersion))
-  }
+): Effect.Effect<boolean, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    switch (entityType) {
+      case 'account':
+        return yield* accountsRepository.remove(userId, entityId, expectedVersion)
+      case 'category':
+        return yield* accountsRepository.removeCategory(userId, entityId, expectedVersion)
+      case 'transaction':
+        return yield* transactionsRepository.remove(userId, entityId, expectedVersion)
+      case 'subscription':
+        return yield* subscriptionsRepository.remove(userId, entityId, expectedVersion)
+      case 'recurringRule':
+        return yield* recurringRulesRepository.remove(userId, entityId, expectedVersion)
+      case 'pendingMovement':
+        return yield* pendingMovementsRepository.remove(userId, entityId, expectedVersion)
+      case 'budgetEntry':
+        return yield* budgetEntriesRepository.remove(userId, entityId, expectedVersion)
+      case 'goal':
+        return yield* goalsRepository.remove(userId, entityId, expectedVersion)
+      case 'contribution':
+        return yield* contributionsRepository.remove(userId, entityId, expectedVersion)
+      case 'userInstrument':
+        return yield* marketRepository.removeUserInstrument(userId, entityId, expectedVersion)
+      case 'stockeventsMapping':
+        return yield* stockeventsSymbolMappingsRepository.remove(userId, entityId, expectedVersion)
+      case 'stockeventsCashEntry':
+        return yield* stockeventsCashMappingsRepository.removeSyncEntry(
+          userId,
+          entityId,
+          expectedVersion,
+        )
+      case 'wealthSnapshot':
+        return yield* wealthRepository.remove(userId, entityId, expectedVersion)
+    }
+  })
 }
 
 /** Records the change/audit trail and bumps the revision cursor for a successful mutation. */
-async function recordChange(
-  db: Db,
+function recordChange(
   userId: string,
   entityType: SyncEntityType | 'userSettings',
   entityId: string,
   changeType: 'create' | 'update' | 'remove',
   payload: unknown,
-): Promise<number> {
-  const revisionRow = await runWithDb(db, syncRepository.bumpRevision(userId))
-  await runWithDb(db, syncRepository.createChange(userId, {
-    revision: revisionRow.revision,
-    entityType,
-    entityId,
-    changeType,
-    payload: payload === undefined ? null : JSON.stringify(payload),
-  }))
-  await runWithDb(db, auditEventsRepository.create(userId, {
-    eventType: `sync.${changeType}`,
-    entityType,
-    entityId,
-    metadata: null,
-  }))
-  return revisionRow.revision
+): Effect.Effect<number, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const revisionRow = yield* syncRepository.bumpRevision(userId)
+    yield* syncRepository.createChange(userId, {
+      revision: revisionRow.revision,
+      entityType,
+      entityId,
+      changeType,
+      payload: payload === undefined ? null : JSON.stringify(payload),
+    })
+    yield* auditEventsRepository.create(userId, {
+      eventType: `sync.${changeType}`,
+      entityType,
+      entityId,
+      metadata: null,
+    })
+    return revisionRow.revision
+  })
 }
 
 function rejectInvalidPayload(
@@ -501,290 +520,292 @@ function rejectInvalidPayload(
 }
 
 /** Runs the actual mutation for one command inside an already-open transaction. */
-async function performMutation(
-  db: Db,
+function performMutation(
   userId: string,
   command: SyncCommandInput,
-): Promise<Omit<CommandOutcome, 'commandId' | 'replayed'>> {
-  switch (command.action) {
-    case 'noop':
-      return { status: 'noop' }
+): Effect.Effect<Omit<CommandOutcome, 'commandId' | 'replayed'>, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    switch (command.action) {
+      case 'noop':
+        return { status: 'noop' }
 
-    case 'settingsUpdate': {
-      const { twrLiquidityAccountIds, stockeventsCashMappings, ...settingsPatch } = command.patch
-      // The row stores the flag as `0`/`1`; the patch carries a boolean, so
-      // replay detection must compare like with like.
-      const settingsPatchForCompare = {
-        ...settingsPatch,
-        ...(typeof settingsPatch.onboardingPresented === 'boolean'
-          ? { onboardingPresented: settingsPatch.onboardingPresented ? 1 : 0 }
-          : {}),
-        ...(typeof settingsPatch.onboardingDismissed === 'boolean'
-          ? { onboardingDismissed: settingsPatch.onboardingDismissed ? 1 : 0 }
-          : {}),
-        ...(typeof settingsPatch.onboardingAccountCompleted === 'boolean'
-          ? { onboardingAccountCompleted: settingsPatch.onboardingAccountCompleted ? 1 : 0 }
-          : {}),
-        ...(typeof settingsPatch.onboardingMovementCompleted === 'boolean'
-          ? { onboardingMovementCompleted: settingsPatch.onboardingMovementCompleted ? 1 : 0 }
-          : {}),
-        ...(typeof settingsPatch.onboardingCompleted === 'boolean'
-          ? { onboardingCompleted: settingsPatch.onboardingCompleted ? 1 : 0 }
-          : {}),
+      case 'settingsUpdate': {
+        const { twrLiquidityAccountIds, stockeventsCashMappings, ...settingsPatch } = command.patch
+        // The row stores the flag as `0`/`1`; the patch carries a boolean, so
+        // replay detection must compare like with like.
+        const settingsPatchForCompare = {
+          ...settingsPatch,
+          ...(typeof settingsPatch.onboardingPresented === 'boolean'
+            ? { onboardingPresented: settingsPatch.onboardingPresented ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.onboardingDismissed === 'boolean'
+            ? { onboardingDismissed: settingsPatch.onboardingDismissed ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.onboardingAccountCompleted === 'boolean'
+            ? { onboardingAccountCompleted: settingsPatch.onboardingAccountCompleted ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.onboardingMovementCompleted === 'boolean'
+            ? { onboardingMovementCompleted: settingsPatch.onboardingMovementCompleted ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.onboardingCompleted === 'boolean'
+            ? { onboardingCompleted: settingsPatch.onboardingCompleted ? 1 : 0 }
+            : {}),
 
-        ...(typeof settingsPatch.stockeventsEnabled === 'boolean'
-          ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
-          : {}),
-        ...(typeof settingsPatch.stockeventsTradesToCash === 'boolean'
-          ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
-          : {}),
-      }
-      const existing = await runWithDb(db, userSettingsRepository.get(userId))
-      // Same contract as `update`: a stale `baseVersion` is a replay when the
-      // server already holds the patch, and a conflict otherwise (ADR 0003 —
-      // the client rebases over `currentVersion` instead of freezing the
-      // queue). `settingsPatch` is empty when the command only replaces the
-      // TWR liquidity selection, and an empty patch is trivially "already
-      // held", so that case must not be read as a replay: replacing the
-      // selection is a write of its own.
-      if (
-        existing &&
-        command.baseVersion !== undefined &&
-        existing.version !== command.baseVersion
-      ) {
-        if (
-          Object.keys(settingsPatch).length > 0 &&
-          includesPatch(existing as unknown as VersionedRow, settingsPatchForCompare)
-        ) {
-          return { status: 'noop', entityType: 'userSettings', entityId: userId, entity: existing }
+          ...(typeof settingsPatch.stockeventsEnabled === 'boolean'
+            ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.stockeventsTradesToCash === 'boolean'
+            ? { stockeventsTradesToCash: settingsPatch.stockeventsTradesToCash ? 1 : 0 }
+            : {}),
         }
+        const existing = yield* userSettingsRepository.get(userId)
+        // Same contract as `update`: a stale `baseVersion` is a replay when the
+        // server already holds the patch, and a conflict otherwise (ADR 0003 —
+        // the client rebases over `currentVersion` instead of freezing the
+        // queue). `settingsPatch` is empty when the command only replaces the
+        // TWR liquidity selection, and an empty patch is trivially "already
+        // held", so that case must not be read as a replay: replacing the
+        // selection is a write of its own.
+        if (
+          existing &&
+          command.baseVersion !== undefined &&
+          existing.version !== command.baseVersion
+        ) {
+          if (
+            Object.keys(settingsPatch).length > 0 &&
+            includesPatch(existing as unknown as VersionedRow, settingsPatchForCompare)
+          ) {
+            return {
+              status: 'noop',
+              entityType: 'userSettings',
+              entityId: userId,
+              entity: existing,
+            }
+          }
+          return {
+            status: 'conflict',
+            entityType: 'userSettings',
+            entityId: userId,
+            currentVersion: existing.version,
+            message: 'La versión base no coincide con la versión actual del servidor.',
+          }
+        }
+        const row = existing
+          ? yield* userSettingsRepository.update(userId, settingsPatch, command.baseVersion)
+          : yield* userSettingsRepository.create(userId, settingsPatch)
+        if (existing && !row) {
+          const current = yield* userSettingsRepository.get(userId)
+          return current
+            ? {
+                status: 'conflict',
+                entityType: 'userSettings',
+                entityId: userId,
+                currentVersion: current.version,
+                message: 'Los ajustes cambiaron mientras se aplicaba el comando.',
+              }
+            : {
+                status: 'not_found',
+                entityType: 'userSettings',
+                entityId: userId,
+                message: 'Ajustes no encontrados.',
+              }
+        }
+        const twrLiquidityAccounts = twrLiquidityAccountIds
+          ? yield* accountsRepository.replaceTwrLiquidityAccounts(userId, twrLiquidityAccountIds)
+          : undefined
+        const cashMappings = stockeventsCashMappings
+          ? yield* stockeventsCashMappingsRepository.replaceMappings(
+              userId,
+              stockeventsCashMappings,
+            )
+          : undefined
+        const revision = yield* recordChange(
+          userId,
+          'userSettings',
+          userId,
+          'update',
+          command.patch,
+        )
         return {
-          status: 'conflict',
+          status: 'applied',
           entityType: 'userSettings',
           entityId: userId,
-          currentVersion: existing.version,
-          message: 'La versión base no coincide con la versión actual del servidor.',
+          entity: {
+            ...row,
+            ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
+            ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
+          },
+          revision,
         }
       }
-      const row = existing
-        ? await runWithDb(db, userSettingsRepository.update(userId, settingsPatch, command.baseVersion))
-        : await runWithDb(db, userSettingsRepository.create(userId, settingsPatch))
-      if (existing && !row) {
-        const current = await runWithDb(db, userSettingsRepository.get(userId))
-        return current
-          ? {
-              status: 'conflict',
-              entityType: 'userSettings',
-              entityId: userId,
-              currentVersion: current.version,
-              message: 'Los ajustes cambiaron mientras se aplicaba el comando.',
-            }
-          : {
-              status: 'not_found',
-              entityType: 'userSettings',
-              entityId: userId,
-              message: 'Ajustes no encontrados.',
-            }
-      }
-      const twrLiquidityAccounts = twrLiquidityAccountIds
-        ? await runWithDb(db, accountsRepository.replaceTwrLiquidityAccounts(userId, twrLiquidityAccountIds))
-        : undefined
-      const cashMappings = stockeventsCashMappings
-        ? await runWithDb(db, stockeventsCashMappingsRepository.replaceMappings(userId,
-            stockeventsCashMappings,))
-        : undefined
-      const revision = await recordChange(
-        db,
-        userId,
-        'userSettings',
-        userId,
-        'update',
-        command.patch,
-      )
-      return {
-        status: 'applied',
-        entityType: 'userSettings',
-        entityId: userId,
-        entity: {
-          ...row,
-          ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
-          ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
-        },
-        revision,
-      }
-    }
 
-    case 'create': {
-      const schema = entityCreatePayloadSchemas[command.entityType]
-      const validation = schema.safeParse(command.data)
-      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
-      const parsed = validation.data
-      // The client's own identity wins when it sent one: re-sending a `create`
-      // is then a no-op instead of a duplicate, even under a fresh commandId
-      // that `sync_commands`'s replay guard no longer recognises. Falling back
-      // to the derived identifier keeps the rows migrated from v1 reconcilable.
-      const existing =
-        (await findByClientId(db, userId, command.entityType, (parsed as { id?: unknown }).id)) ??
-        (await findByLegacyId(
-          db,
-          userId,
-          command.entityType,
-          (parsed as { legacyId?: unknown }).legacyId,
-        ))
-      if (existing)
-        return {
-          status: 'noop',
-          entityType: command.entityType,
-          entityId: existing.id,
-          entity: existing,
-        }
-      const created = await createEntity(db, userId, command.entityType, parsed)
-      const row =
-        command.entityType === 'transaction'
-          ? await transactionWithTradeDetail(db, userId, created)
-          : created
-      const revision = await recordChange(db, userId, command.entityType, row.id, 'create', row)
-      return {
-        status: 'applied',
-        entityType: command.entityType,
-        entityId: row.id,
-        entity: row,
-        revision,
-      }
-    }
-
-    case 'update': {
-      const existing = await loadForMutation(db, userId, command.entityType, command.entityId)
-      if (!existing) {
-        return {
-          status: 'not_found',
-          entityType: command.entityType,
-          entityId: command.entityId,
-          message: 'Entidad no encontrada.',
-        }
-      }
-      if (existing.version !== command.baseVersion) {
-        if (includesPatch(existing, command.patch)) {
+      case 'create': {
+        const schema = entityCreatePayloadSchemas[command.entityType]
+        const validation = schema.safeParse(command.data)
+        if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
+        const parsed = validation.data
+        // The client's own identity wins when it sent one: re-sending a `create`
+        // is then a no-op instead of a duplicate, even under a fresh commandId
+        // that `sync_commands`'s replay guard no longer recognises. Falling back
+        // to the derived identifier keeps the rows migrated from v1 reconcilable.
+        const existing =
+          (yield* findByClientId(userId, command.entityType, (parsed as { id?: unknown }).id)) ??
+          (yield* findByLegacyId(
+            userId,
+            command.entityType,
+            (parsed as { legacyId?: unknown }).legacyId,
+          ))
+        if (existing)
           return {
             status: 'noop',
             entityType: command.entityType,
             entityId: existing.id,
             entity: existing,
           }
-        }
+        const created = yield* createEntity(userId, command.entityType, parsed)
+        const row =
+          command.entityType === 'transaction'
+            ? yield* transactionWithTradeDetail(userId, created)
+            : created
+        const revision = yield* recordChange(userId, command.entityType, row.id, 'create', row)
         return {
-          status: 'conflict',
+          status: 'applied',
           entityType: command.entityType,
-          entityId: command.entityId,
-          currentVersion: existing.version,
-          message: 'La versión base no coincide con la versión actual del servidor.',
+          entityId: row.id,
+          entity: row,
+          revision,
         }
       }
-      const schema = entityUpdateSchemas[command.entityType]
-      const validation = schema.safeParse(command.patch)
-      if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
-      const parsed = validation.data
-      const row = await updateEntity(
-        db,
-        userId,
-        command.entityType,
-        command.entityId,
-        parsed,
-        command.baseVersion,
-      )
-      if (!row) {
-        const current = await loadForMutation(db, userId, command.entityType, command.entityId)
-        return current
-          ? {
-              status: 'conflict',
-              entityType: command.entityType,
-              entityId: command.entityId,
-              currentVersion: current.version,
-              message: 'La entidad cambió mientras se aplicaba el comando.',
-            }
-          : {
-              status: 'not_found',
-              entityType: command.entityType,
-              entityId: command.entityId,
-              message: 'Entidad no encontrada.',
-            }
-      }
-      const revision = await recordChange(
-        db,
-        userId,
-        command.entityType,
-        command.entityId,
-        'update',
-        row,
-      )
-      return {
-        status: 'applied',
-        entityType: command.entityType,
-        entityId: command.entityId,
-        entity: row,
-        revision,
-      }
-    }
 
-    case 'remove': {
-      const existing = await loadForMutation(db, userId, command.entityType, command.entityId)
-      if (!existing) {
+      case 'update': {
+        const existing = yield* loadForMutation(userId, command.entityType, command.entityId)
+        if (!existing) {
+          return {
+            status: 'not_found',
+            entityType: command.entityType,
+            entityId: command.entityId,
+            message: 'Entidad no encontrada.',
+          }
+        }
+        if (existing.version !== command.baseVersion) {
+          if (includesPatch(existing, command.patch)) {
+            return {
+              status: 'noop',
+              entityType: command.entityType,
+              entityId: existing.id,
+              entity: existing,
+            }
+          }
+          return {
+            status: 'conflict',
+            entityType: command.entityType,
+            entityId: command.entityId,
+            currentVersion: existing.version,
+            message: 'La versión base no coincide con la versión actual del servidor.',
+          }
+        }
+        const schema = entityUpdateSchemas[command.entityType]
+        const validation = schema.safeParse(command.patch)
+        if (!validation.success) return rejectInvalidPayload(command.entityType, validation.error)
+        const parsed = validation.data
+        const row = yield* updateEntity(
+          userId,
+          command.entityType,
+          command.entityId,
+          parsed,
+          command.baseVersion,
+        )
+        if (!row) {
+          const current = yield* loadForMutation(userId, command.entityType, command.entityId)
+          return current
+            ? {
+                status: 'conflict',
+                entityType: command.entityType,
+                entityId: command.entityId,
+                currentVersion: current.version,
+                message: 'La entidad cambió mientras se aplicaba el comando.',
+              }
+            : {
+                status: 'not_found',
+                entityType: command.entityType,
+                entityId: command.entityId,
+                message: 'Entidad no encontrada.',
+              }
+        }
+        const revision = yield* recordChange(
+          userId,
+          command.entityType,
+          command.entityId,
+          'update',
+          row,
+        )
         return {
-          status: 'not_found',
+          status: 'applied',
           entityType: command.entityType,
           entityId: command.entityId,
-          message: 'Entidad no encontrada.',
+          entity: row,
+          revision,
         }
       }
-      if (existing.version !== command.baseVersion) {
+
+      case 'remove': {
+        const existing = yield* loadForMutation(userId, command.entityType, command.entityId)
+        if (!existing) {
+          return {
+            status: 'not_found',
+            entityType: command.entityType,
+            entityId: command.entityId,
+            message: 'Entidad no encontrada.',
+          }
+        }
+        if (existing.version !== command.baseVersion) {
+          return {
+            status: 'conflict',
+            entityType: command.entityType,
+            entityId: command.entityId,
+            currentVersion: existing.version,
+            message: 'La versión base no coincide con la versión actual del servidor.',
+          }
+        }
+        const removed = yield* removeEntity(
+          userId,
+          command.entityType,
+          command.entityId,
+          command.baseVersion,
+        )
+        if (!removed) {
+          const current = yield* loadForMutation(userId, command.entityType, command.entityId)
+          return current
+            ? {
+                status: 'conflict',
+                entityType: command.entityType,
+                entityId: command.entityId,
+                currentVersion: current.version,
+                message: 'La entidad cambió mientras se aplicaba el comando.',
+              }
+            : {
+                status: 'not_found',
+                entityType: command.entityType,
+                entityId: command.entityId,
+                message: 'Entidad no encontrada.',
+              }
+        }
+        const revision = yield* recordChange(
+          userId,
+          command.entityType,
+          command.entityId,
+          'remove',
+          null,
+        )
         return {
-          status: 'conflict',
+          status: 'applied',
           entityType: command.entityType,
           entityId: command.entityId,
-          currentVersion: existing.version,
-          message: 'La versión base no coincide con la versión actual del servidor.',
+          revision,
         }
-      }
-      const removed = await removeEntity(
-        db,
-        userId,
-        command.entityType,
-        command.entityId,
-        command.baseVersion,
-      )
-      if (!removed) {
-        const current = await loadForMutation(db, userId, command.entityType, command.entityId)
-        return current
-          ? {
-              status: 'conflict',
-              entityType: command.entityType,
-              entityId: command.entityId,
-              currentVersion: current.version,
-              message: 'La entidad cambió mientras se aplicaba el comando.',
-            }
-          : {
-              status: 'not_found',
-              entityType: command.entityType,
-              entityId: command.entityId,
-              message: 'Entidad no encontrada.',
-            }
-      }
-      const revision = await recordChange(
-        db,
-        userId,
-        command.entityType,
-        command.entityId,
-        'remove',
-        null,
-      )
-      return {
-        status: 'applied',
-        entityType: command.entityType,
-        entityId: command.entityId,
-        revision,
       }
     }
-  }
+  })
 }
 
 /**
@@ -809,6 +830,18 @@ export function isUniqueConstraintError(error: unknown): boolean {
   return false
 }
 
+/** Finds a `RejectedCommandError` behind the DatabaseError wrapping the driver call. */
+function rejectedCommandMessage(error: unknown): string | null {
+  let current: unknown = error
+  const seen = new Set<unknown>()
+  while (current !== null && current !== undefined && !seen.has(current)) {
+    seen.add(current)
+    if (current instanceof RejectedCommandError) return current.message
+    current = current instanceof Error ? current.cause : undefined
+  }
+  return null
+}
+
 function replayStoredCommand(
   commandId: string,
   command: syncRepository.SyncCommandRow,
@@ -830,42 +863,49 @@ function replayStoredCommand(
   }
 }
 
-async function reserveCommand(
-  db: Db,
+function reserveCommand(
   userId: string,
   command: SyncCommandInput,
-): Promise<CommandOutcome | null> {
-  const existing = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
-  if (existing) {
-    if (!existing.result) {
-      const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS).toISOString()
-      const claimed = await runWithDb(db, syncRepository.claimStaleCommand(userId,
-        command.commandId,
-        existing.createdAt,
-        staleBefore,))
-      if (claimed) return null
+): Effect.Effect<CommandOutcome | null, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const existing = yield* syncRepository.getCommand(userId, command.commandId)
+    if (existing) {
+      if (!existing.result) {
+        const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS).toISOString()
+        const claimed = yield* syncRepository.claimStaleCommand(
+          userId,
+          command.commandId,
+          existing.createdAt,
+          staleBefore,
+        )
+        if (claimed) return null
+      }
+      return replayStoredCommand(command.commandId, existing)
     }
-    return replayStoredCommand(command.commandId, existing)
-  }
-  try {
-    await runWithDb(db, syncRepository.createCommand(userId, {
-      id: command.commandId,
-      commandType: command.action,
-      payload: JSON.stringify(command),
-      status: 'processing',
-      result: null,
-    }))
-    return null
-  } catch (error) {
-    if (!isUniqueConstraintError(error)) {
-      throw error
+
+    const created = yield* Effect.exit(
+      syncRepository.createCommand(userId, {
+        id: command.commandId,
+        commandType: command.action,
+        payload: JSON.stringify(command),
+        status: 'processing',
+        result: null,
+      }),
+    )
+    if (Exit.isSuccess(created)) return null
+
+    // A concurrent replay of the same commandId wins the primary-key race:
+    // return its stored outcome instead of failing the request.
+    const failure = Cause.squash(created.cause)
+    if (!(failure instanceof DatabaseError) || !isUniqueConstraintError(failure.cause)) {
+      return yield* Effect.failCause(created.cause)
     }
-    const raced = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
+    const raced = yield* syncRepository.getCommand(userId, command.commandId)
     if (!raced) {
-      throw error
+      return yield* Effect.failCause(created.cause)
     }
     return replayStoredCommand(command.commandId, raced)
-  }
+  })
 }
 
 /**
@@ -873,41 +913,54 @@ async function reserveCommand(
  * `sync_commands`'s primary key. Never throws for expected outcomes
  * (conflict/not_found/noop) — only for genuine infra failures.
  */
-export async function applyOneCommand(
-  db: Db,
+export function applyOneCommand(
   userId: string,
   command: SyncCommandInput,
-): Promise<CommandOutcome> {
-  const replay = await reserveCommand(db, userId, command)
-  if (replay) {
-    return replay
-  }
+): Effect.Effect<CommandOutcome, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const replay = yield* reserveCommand(userId, command)
+    if (replay) {
+      return replay
+    }
 
-  try {
-    return await runInTransaction(db, async (tx) => {
-      const outcome = await performMutation(tx, userId, command)
-      await runWithDb(tx, syncRepository.finalizeCommand(userId,
-        command.commandId,
-        outcome.status,
-        JSON.stringify(outcome),))
-      return { commandId: command.commandId, replayed: false, ...outcome }
-    })
-  } catch (error) {
-    if (!(error instanceof RejectedCommandError)) throw error
+    const exit = yield* Effect.exit(
+      transaction(
+        Effect.gen(function* () {
+          const outcome = yield* performMutation(userId, command)
+          yield* syncRepository.finalizeCommand(
+            userId,
+            command.commandId,
+            outcome.status,
+            JSON.stringify(outcome),
+          )
+          return outcome
+        }),
+      ),
+    )
+    if (Exit.isSuccess(exit)) {
+      return { commandId: command.commandId, replayed: false, ...exit.value }
+    }
+
+    const message = rejectedCommandMessage(Cause.squash(exit.cause))
+    if (message === null) {
+      return yield* Effect.failCause(exit.cause)
+    }
     // Finalize with the outer handle (the SQLite transaction was rolled
     // back; D1 has none) so the reservation never stays `processing` and a
     // replay returns the rejection. Guards throw before any write.
     const outcome: Omit<CommandOutcome, 'commandId' | 'replayed'> = {
       status: 'rejected',
       ...('entityType' in command ? { entityType: command.entityType } : {}),
-      message: error.message,
+      message,
     }
-    await runWithDb(db, syncRepository.finalizeCommand(userId,
+    yield* syncRepository.finalizeCommand(
+      userId,
       command.commandId,
       outcome.status,
-      JSON.stringify(outcome),))
+      JSON.stringify(outcome),
+    )
     return { commandId: command.commandId, replayed: false, ...outcome }
-  }
+  })
 }
 
 export interface SyncBatchResult {
@@ -922,21 +975,22 @@ export interface SyncBatchResult {
  * the client must resolve the conflict before any later command in the
  * batch is considered).
  */
-export async function applySyncBatch(
-  db: Db,
+export function applySyncBatch(
   userId: string,
   commands: SyncCommandInput[],
-): Promise<SyncBatchResult> {
-  const results: CommandOutcome[] = []
-  let halted = false
-  for (const command of commands) {
-    const outcome = await applyOneCommand(db, userId, command)
-    results.push(outcome)
-    if (haltsBatch(outcome.status)) {
-      halted = true
-      break
+): Effect.Effect<SyncBatchResult, DatabaseError, Database> {
+  return Effect.gen(function* () {
+    const results: CommandOutcome[] = []
+    let halted = false
+    for (const command of commands) {
+      const outcome = yield* applyOneCommand(userId, command)
+      results.push(outcome)
+      if (haltsBatch(outcome.status)) {
+        halted = true
+        break
+      }
     }
-  }
-  const revisionRow = await runWithDb(db, syncRepository.ensureRevision(userId))
-  return { results, revision: revisionRow.revision, halted }
+    const revisionRow = yield* syncRepository.ensureRevision(userId)
+    return { results, revision: revisionRow.revision, halted }
+  })
 }

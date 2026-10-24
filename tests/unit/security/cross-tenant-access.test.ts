@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyOneCommand } from "../../../src/lib/server/sync/apply-command";
+import { runWithDb } from "../../../src/db/database";
 import * as accountsRepository from "../../../src/db/repositories/accounts";
 import * as transactionsRepository from "../../../src/db/repositories/transactions";
 import * as subscriptionsRepository from "../../../src/db/repositories/subscriptions";
@@ -10,7 +11,6 @@ import * as stockeventsSymbolMappingsRepository from "../../../src/db/repositori
 import * as wealthRepository from "../../../src/db/repositories/wealth";
 import { createTestDb, type TestDatabase } from "../../integration/d1-v2/setup";
 import { seedUser } from "../../integration/d1-v2/repositories/fixtures";
-import { runWithDb } from '../../../src/db/database'
 
 /**
  * WP10 security suite — "no cross-account access by ID guessing".
@@ -47,14 +47,14 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       openingBalance: 1000,
     }));
 
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
       commandId: "attack-update-1",
       action: "update",
       entityType: "account",
       entityId: accountA.id,
       baseVersion: accountA.version,
       data: { name: "Cuenta robada" },
-    } as never);
+    } as never));
 
     expect(outcome.status).toBe("not_found");
 
@@ -86,13 +86,13 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
       currency: "EUR",
     }));
 
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
       commandId: "attack-remove-1",
       action: "remove",
       entityType: "transaction",
       entityId: txA.id,
       baseVersion: txA.version,
-    } as never);
+    } as never));
 
     expect(outcome.status).toBe("not_found");
     expect(await runWithDb(db, transactionsRepository.get(userA.id, txA.id))).toBeDefined();
@@ -137,7 +137,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     // The repository-level guard throws `RejectedCommandError`, which
     // `apply-command` turns into a terminal `rejected` outcome — never a
     // silently B-owned row pointing at A's category.
-    const outcome = await applyOneCommand(db, userB.id, {
+    const outcome = await runWithDb(db, applyOneCommand(userB.id, {
         commandId: "attack-create-1",
         action: "create",
         entityType: "subscription",
@@ -148,7 +148,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
           currency: "EUR",
           frequency: "monthly",
         },
-      } as never)
+      } as never))
     expect(outcome.status).toBe("rejected");
     expect(await runWithDb(db, subscriptionsRepository.listByUser(userB.id))).toHaveLength(0);
   });

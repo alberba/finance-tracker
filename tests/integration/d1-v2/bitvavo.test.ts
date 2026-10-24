@@ -170,7 +170,7 @@ it('automatically links a unique symbol belonging to the user', async () => {
 it('synchronizes declaration changes without losing the remote operation', async () => {
   const { user, bootstrap } = await importedUser()
   const purchase = bootstrap.transactions[0]
-  const updated = await applySyncBatch(testDb.db, user.id, [
+  const updated = await runWithDb(testDb.db, applySyncBatch(user.id, [
     {
       commandId: 'declare',
       action: 'update',
@@ -179,7 +179,7 @@ it('synchronizes declaration changes without losing the remote operation', async
       baseVersion: purchase.version,
       patch: { declared: true },
     },
-  ])
+  ]))
   expect(updated.results[0]).toMatchObject({
     status: 'applied',
     entity: { declared: true, tradeDetail: { quantity: '0.00008878285' } },
@@ -189,7 +189,7 @@ it('synchronizes declaration changes without losing the remote operation', async
 it('rejects synchronized changes to remote financial fields', async () => {
   const { user, bootstrap } = await importedUser()
   const purchase = bootstrap.transactions[0]
-  const rejected = await applySyncBatch(testDb.db, user.id, [
+  const rejected = await runWithDb(testDb.db, applySyncBatch(user.id, [
     {
       commandId: 'change-financial',
       action: 'update',
@@ -198,7 +198,7 @@ it('rejects synchronized changes to remote financial fields', async () => {
       baseVersion: purchase.version,
       patch: { amount: 100 },
     },
-  ])
+  ]))
   expect(rejected.results[0].status).toBe('rejected')
 })
 

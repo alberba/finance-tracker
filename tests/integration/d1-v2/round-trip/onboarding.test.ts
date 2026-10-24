@@ -50,14 +50,14 @@ describe('onboarding settings round trip', () => {
     await syncSettingsUpdate(progress)
     await trip.reload()
     const { applySyncBatch } = await import('../../../../src/lib/server/sync/apply-command')
-    const result = await applySyncBatch(trip.testDb.db, trip.userId, [
+    const result = await runWithDb(trip.testDb.db, applySyncBatch(trip.userId, [
       {
         commandId: 'onboarding-replay',
         action: 'settingsUpdate',
         baseVersion: 0,
         patch: progress,
       },
-    ])
+    ]))
     expect(result.results[0].status).toBe('noop')
   })
 })
