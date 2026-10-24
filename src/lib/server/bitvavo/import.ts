@@ -10,6 +10,7 @@ import * as transactions from '../../../db/repositories/transactions'
 import { encryptValue, type DataEncryptionEnv } from '../crypto/data-encryption'
 import type { BitvavoPreview, DuplicateResolution } from '../../bitvavo-types'
 import { fetchBitvavoHistory, type BitvavoCredentials } from './client'
+import { runWithDb } from '../../../db/database'
 
 export class ImportError extends Data.TaggedError('ImportError')<{ message: string }> {}
 export const connectionSchema = z
@@ -86,7 +87,7 @@ export async function previewBitvavo(
   http: typeof fetch = fetch,
 ): Promise<BitvavoPreview> {
   const config = await repository.getConnection(db, userId)
-  const credential = await credentials.getByProvider(db, userId, 'bitvavo', env)
+  const credential = await runWithDb(db, credentials.getByProvider(userId, 'bitvavo', env))
   if (!config || !credential) throw new RejectedCommandError('Conecta Bitvavo primero.')
   const secret: BitvavoCredentials = connectionSchema
     .pick({ apiKey: true, apiSecret: true })

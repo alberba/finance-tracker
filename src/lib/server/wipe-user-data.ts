@@ -45,8 +45,8 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     wealthRepository.listByUser(db, userId),
     marketRepository.listUserInstrumentsByUser(db, userId),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
-    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-    stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+    runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
     runWithDb(db, pendingMovementsRepository.listByUser(userId)),
     runWithDb(db, recurringRulesRepository.listByUser(userId)),
     runWithDb(db, subscriptionsRepository.listByUser(userId)),
@@ -83,10 +83,10 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await runWithDb(db, stockeventsSymbolMappingsRepository.remove(userId, mapping.id))
   }
   for (const mapping of stockeventsCashMappings) {
-    await stockeventsCashMappingsRepository.removeMapping(db, userId, mapping.id)
+    await runWithDb(db, stockeventsCashMappingsRepository.removeMapping(userId, mapping.id))
   }
   for (const entry of stockeventsCashSyncEntries) {
-    await stockeventsCashMappingsRepository.removeSyncEntry(db, userId, entry.id)
+    await runWithDb(db, stockeventsCashMappingsRepository.removeSyncEntry(userId, entry.id))
   }
   for (const pendingMovement of pendingMovements) {
     await runWithDb(db, pendingMovementsRepository.remove(userId, pendingMovement.id))

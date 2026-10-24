@@ -8,38 +8,39 @@
  * reads/writes the `ciphertext` column directly.
  */
 
-import { and, eq } from "drizzle-orm";
-import { integrationCredentials } from "../schema";
-import { type Db, nowIso, versionGuard } from "./shared";
+import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
+import { integrationCredentials } from '../schema'
+import { type Db, nowIso, versionGuard } from './shared'
 import {
   decryptValue,
   encryptValue,
   type DataEncryptionEnv,
-} from "../../lib/server/crypto/data-encryption";
+} from '../../lib/server/crypto/data-encryption'
 
-type IntegrationCredentialTableRow = typeof integrationCredentials.$inferSelect;
+type IntegrationCredentialTableRow = typeof integrationCredentials.$inferSelect
 
 /** Public shape: `secret` is always the decrypted plaintext, never ciphertext. */
 export interface IntegrationCredentialRow {
-  id: string;
-  userId: string;
-  provider: string;
-  secret: string;
-  keyVersion: number;
-  createdAt: string;
-  updatedAt: string;
-  version: number;
+  id: string
+  userId: string
+  provider: string
+  secret: string
+  keyVersion: number
+  createdAt: string
+  updatedAt: string
+  version: number
 }
 
 export interface CreateIntegrationCredentialInput {
-  provider: string;
+  provider: string
   /** Plaintext secret (e.g. the Stock Events API key) — encrypted before storage. */
-  secret: string;
+  secret: string
 }
 
 export interface UpdateIntegrationCredentialInput {
   /** Plaintext secret — re-encrypted (and `keyVersion` refreshed) on update. */
-  secret?: string;
+  secret?: string
 }
 
 async function toPublicRow(
@@ -49,7 +50,7 @@ async function toPublicRow(
   const secret = await decryptValue(env, {
     ciphertext: row.ciphertext,
     keyVersion: row.keyVersion,
-  });
+  })
   return {
     id: row.id,
     userId: row.userId,
@@ -59,10 +60,10 @@ async function toPublicRow(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     version: row.version,
-  };
+  }
 }
 
-export async function listByUser(
+async function listByUserSql(
   db: Db,
   userId: string,
   env: DataEncryptionEnv,
@@ -70,11 +71,11 @@ export async function listByUser(
   const rows = await db
     .select()
     .from(integrationCredentials)
-    .where(eq(integrationCredentials.userId, userId));
-  return Promise.all(rows.map((row) => toPublicRow(env, row)));
+    .where(eq(integrationCredentials.userId, userId))
+  return Promise.all(rows.map((row) => toPublicRow(env, row)))
 }
 
-export async function get(
+async function getSql(
   db: Db,
   userId: string,
   id: string,
@@ -83,11 +84,11 @@ export async function get(
   const [row] = await db
     .select()
     .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)));
-  return row ? toPublicRow(env, row) : undefined;
+    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
+  return row ? toPublicRow(env, row) : undefined
 }
 
-export async function getByProvider(
+async function getByProviderSql(
   db: Db,
   userId: string,
   provider: string,
@@ -96,27 +97,31 @@ export async function getByProvider(
   const [row] = await db
     .select()
     .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)));
-  return row ? toPublicRow(env, row) : undefined;
+    .where(
+      and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)),
+    )
+  return row ? toPublicRow(env, row) : undefined
 }
 
 /** Checks existence without decrypting or exposing credential material. */
-export async function hasProvider(db: Db, userId: string, provider: string): Promise<boolean> {
+async function hasProviderSql(db: Db, userId: string, provider: string): Promise<boolean> {
   const [row] = await db
     .select({ id: integrationCredentials.id })
     .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)));
-  return row !== undefined;
+    .where(
+      and(eq(integrationCredentials.userId, userId), eq(integrationCredentials.provider, provider)),
+    )
+  return row !== undefined
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateIntegrationCredentialInput,
   env: DataEncryptionEnv,
 ): Promise<IntegrationCredentialRow> {
-  const now = nowIso();
-  const { ciphertext, keyVersion } = await encryptValue(env, input.secret);
+  const now = nowIso()
+  const { ciphertext, keyVersion } = await encryptValue(env, input.secret)
   const [row] = await db
     .insert(integrationCredentials)
     .values({
@@ -127,11 +132,11 @@ export async function create(
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return toPublicRow(env, row);
+    .returning()
+  return toPublicRow(env, row)
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
@@ -142,14 +147,14 @@ export async function update(
   const [existing] = await db
     .select()
     .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)));
+    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
   if (!existing) {
-    return undefined;
+    return undefined
   }
   const next =
     input.secret !== undefined
       ? await encryptValue(env, input.secret)
-      : { ciphertext: existing.ciphertext, keyVersion: existing.keyVersion };
+      : { ciphertext: existing.ciphertext, keyVersion: existing.keyVersion }
   const [row] = await db
     .update(integrationCredentials)
     .set({
@@ -158,16 +163,18 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(integrationCredentials.id, id),
-      eq(integrationCredentials.userId, userId),
-      versionGuard(integrationCredentials.version, expectedVersion),
-    ))
-    .returning();
-  return row ? toPublicRow(env, row) : undefined;
+    .where(
+      and(
+        eq(integrationCredentials.id, id),
+        eq(integrationCredentials.userId, userId),
+        versionGuard(integrationCredentials.version, expectedVersion),
+      ),
+    )
+    .returning()
+  return row ? toPublicRow(env, row) : undefined
 }
 
-export async function remove(
+async function removeSql(
   db: Db,
   userId: string,
   id: string,
@@ -176,32 +183,34 @@ export async function remove(
   const [existing] = await db
     .select()
     .from(integrationCredentials)
-    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)));
+    .where(and(eq(integrationCredentials.id, id), eq(integrationCredentials.userId, userId)))
   if (!existing) {
-    return false;
+    return false
   }
   const deleted = await db
     .delete(integrationCredentials)
-    .where(and(
-      eq(integrationCredentials.id, id),
-      eq(integrationCredentials.userId, userId),
-      versionGuard(integrationCredentials.version, expectedVersion),
-    ))
-    .returning({ id: integrationCredentials.id });
-  return deleted.length > 0;
+    .where(
+      and(
+        eq(integrationCredentials.id, id),
+        eq(integrationCredentials.userId, userId),
+        versionGuard(integrationCredentials.version, expectedVersion),
+      ),
+    )
+    .returning({ id: integrationCredentials.id })
+  return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateIntegrationCredentialInput[],
   env: DataEncryptionEnv,
 ): Promise<IntegrationCredentialRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
-  const encrypted = await Promise.all(inputs.map((input) => encryptValue(env, input.secret)));
+  const now = nowIso()
+  const encrypted = await Promise.all(inputs.map((input) => encryptValue(env, input.secret)))
   const rows = await db
     .insert(integrationCredentials)
     .values(
@@ -214,6 +223,15 @@ export async function bulkInsert(
         updatedAt: now,
       })),
     )
-    .returning();
-  return Promise.all(rows.map((row) => toPublicRow(env, row)));
+    .returning()
+  return Promise.all(rows.map((row) => toPublicRow(env, row)))
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const getByProvider = lift(getByProviderSql)
+export const hasProvider = lift(hasProviderSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)

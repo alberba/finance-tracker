@@ -4,6 +4,7 @@ import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
 import * as integrationCredentialsRepository from "../../../../src/db/repositories/integration-credentials";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 const ENCRYPTION_KEY = "jczGrUcJ9753I5noa+t5lM2U28P2WYQsgwABKiOwguQ=";
 let currentDb: TestDatabase["db"];
@@ -102,12 +103,9 @@ describe("/api/integrations/stockevents", () => {
     const rotated = await PUT({ request: request("PUT", "se_second"), locals: locals(owner) } as never);
     expect(rotated.status).toBe(200);
 
-    const stored = await integrationCredentialsRepository.getByProvider(
-      testDb.db,
-      owner.userId,
+    const stored = await runWithDb(testDb.db, integrationCredentialsRepository.getByProvider(owner.userId,
       "stockevents",
-      { DATA_ENCRYPTION_KEY: ENCRYPTION_KEY },
-    );
+      { DATA_ENCRYPTION_KEY: ENCRYPTION_KEY },));
     expect(stored?.secret).toBe("se_second");
     expect(stored?.version).toBe(3);
   });

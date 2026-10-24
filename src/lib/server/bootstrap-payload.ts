@@ -59,8 +59,8 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     marketRepository.listUserInstrumentsByUser(db, userId),
     accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
-    stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
-    stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
+    runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
+    runWithDb(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
     syncRepository.getRevision(db, userId),
   ])
 
