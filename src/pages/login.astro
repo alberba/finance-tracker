@@ -1,4 +1,5 @@
 ---
+import { runWithDb } from '../db/database'
 import AccessForm from '../components/auth/AccessForm.vue'
 import '../styles/global.css'
 import { getRuntimeEnv } from '../lib/server/cloudflare-env'
@@ -23,7 +24,7 @@ const initialError = Astro.url.searchParams.has('error')
   : undefined
 if (invitation) {
   try {
-    await registrationInvitation(getDb(Astro.locals), invitation)
+    await runWithDb(getDb(Astro.locals), registrationInvitation(invitation))
     Astro.cookies.set('finance-invitation', invitation, {
       httpOnly: true,
       sameSite: 'lax',

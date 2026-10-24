@@ -14,6 +14,7 @@ import {
   rejectUnsafeApiMutation,
   requiresAuthentication,
 } from './lib/server/request-security'
+import { runWithDb } from './db/database'
 
 /** Test-only principal injection; requires TEST_AUTH_ENABLED and a loopback origin. */
 export const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
@@ -103,7 +104,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       user?: { id: string; emailVerified: boolean }
     } | null
     if (session?.user?.emailVerified) {
-      context.locals.principal = (await authenticatedPrincipal(db, session.user.id)) ?? undefined
+      context.locals.principal = (await runWithDb(db, authenticatedPrincipal(session.user.id))) ?? undefined
     }
     if (
       !context.locals.principal &&

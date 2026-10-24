@@ -13,6 +13,7 @@ import {
   registrationInvitation,
 } from '../../../db/repositories/authentication'
 import type { RuntimeEnv } from '../cloudflare-env'
+import { runWithDb } from '../../../db/database'
 
 export interface AuthenticationEmail {
   email: string
@@ -196,7 +197,7 @@ export function createAuthentication(
           afterVerification: async ({ user, verification }) => {
             if (
               !verification.registrationInfo?.userVerified ||
-              !(await authenticatedPrincipal(db, user.id))
+              !(await runWithDb(db, authenticatedPrincipal(user.id)))
             ) {
               throw new APIError('FORBIDDEN', {
                 message:
@@ -221,8 +222,8 @@ export function createAuthentication(
           before: async (user, context) => {
             const token = invitationToken(context?.headers)
             try {
-              await assertNewFinancialEmail(db, user.email)
-              const invitationId = await registrationInvitation(db, token)
+              await runWithDb(db, assertNewFinancialEmail(user.email))
+              const invitationId = await runWithDb(db, registrationInvitation(token))
               return { data: { ...user, email: user.email.trim().toLowerCase(), invitationId } }
             } catch (error) {
               throw new APIError('FORBIDDEN', {
@@ -235,7 +236,7 @@ export function createAuthentication(
           after: async (user) => {
             if (user.emailVerified) {
               try {
-                await admitVerifiedUser(db, user.id)
+                await runWithDb(db, admitVerifiedUser(user.id))
               } catch {
                 throw new APIError('FORBIDDEN', {
                   message: 'La invitación ya no está disponible. Solicita otra.',
@@ -263,14 +264,14 @@ export function createAuthentication(
                 if (!admission) {
                   const token = invitationToken(context?.headers)
                   if (token) {
-                    const invitationId = await registrationInvitation(db, token)
+                    const invitationId = await runWithDb(db, registrationInvitation(token))
                     await db
                       .update(schema.authUser)
                       .set({ invitationId })
                       .where(eq(schema.authUser.id, session.userId))
                   }
                 }
-                await admitVerifiedUser(db, session.userId)
+                await runWithDb(db, admitVerifiedUser(session.userId))
               } catch {
                 throw new APIError('FORBIDDEN', {
                   message: 'La invitación ya no está disponible. Solicita otra.',

@@ -9,6 +9,7 @@ import {
   registrationAdministration,
   updateRegistrationPolicy,
 } from '../../../src/db/repositories/authentication'
+import { runWithDb } from '../../../src/db/database'
 
 let database: TestDatabase
 let auth: ReturnType<typeof createAuthentication>
@@ -112,29 +113,29 @@ async function oauth(provider: string, cookie = '', linking = false) {
 }
 for (const provider of ['google', 'github']) {
   it(`admits a verified ${provider} registration through the invitation boundary`, async () => {
-    const { token } = await createInvitation(database.db as unknown as Db, 'administrator', 1)
+    const { token } = await runWithDb(database.db as unknown as Db, createInvitation('administrator', 1))
     const { response, cookie } = await oauth(provider, `finance-invitation=${token}`)
     expect(response.headers.get('location')).toBe('/')
     const session = await auth.api.getSession({ headers: new Headers({ cookie }) })
     expect(
-      await authenticatedPrincipal(database.db as unknown as Db, session!.user.id),
+      await runWithDb(database.db as unknown as Db, authenticatedPrincipal(session!.user.id)),
     ).toMatchObject({ email })
     expect(
-      (await registrationAdministration(database.db as unknown as Db)).invitations[0].uses,
+      (await runWithDb(database.db as unknown as Db, registrationAdministration())).invitations[0].uses,
     ).toBe(1)
   })
   it(`does not grant private access for an unverified ${provider} email`, async () => {
     verified = false
-    await updateRegistrationPolicy(database.db as unknown as Db, true)
+    await runWithDb(database.db as unknown as Db, updateRegistrationPolicy(true))
     const { cookie } = await oauth(provider)
     const session = await auth.api.getSession({ headers: new Headers({ cookie }) })
     expect(session?.user.emailVerified).toBe(false)
-    expect(await authenticatedPrincipal(database.db as unknown as Db, session!.user.id)).toBeNull()
+    expect(await runWithDb(database.db as unknown as Db, authenticatedPrincipal(session!.user.id))).toBeNull()
   })
 }
 it('rejects implicit matching-email linking and allows deliberate verified linking', async () => {
   const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-  await updateRegistrationPolicy(database.db as unknown as Db, true)
+  await runWithDb(database.db as unknown as Db, updateRegistrationPolicy(true))
   await post('/email-otp/send-verification-otp', { email, type: 'sign-in' })
   const login = await post('/sign-in/email-otp', { email, otp: code })
   const identity = (await login.json()).user.id
@@ -153,7 +154,7 @@ it('rejects implicit matching-email linking and allows deliberate verified linki
 
 it('does not link an unverified provider even when the user deliberately requests it', async () => {
   const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-  await updateRegistrationPolicy(database.db as unknown as Db, true)
+  await runWithDb(database.db as unknown as Db, updateRegistrationPolicy(true))
   await post('/email-otp/send-verification-otp', { email, type: 'sign-in' })
   const login = await post('/sign-in/email-otp', { email, otp: code })
   verified = false
@@ -165,7 +166,7 @@ it('does not link an unverified provider even when the user deliberately request
 
 it('external provider failure leaves the invitation available for retry', async () => {
   const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-  const { token } = await createInvitation(database.db as unknown as Db, 'administrator', 1)
+  const { token } = await runWithDb(database.db as unknown as Db, createInvitation('administrator', 1))
   const externalFetch = globalThis.fetch
   vi.stubGlobal('fetch', async () =>
     Response.json({ error: 'temporarily_unavailable' }, { status: 503 }),
@@ -176,13 +177,13 @@ it('external provider failure leaves the invitation available for retry', async 
   expect(loggedError.mock.calls[0].map(String).join(' ')).toContain(
     'GitHub OAuth token exchange failed',
   )
-  expect((await registrationAdministration(database.db as unknown as Db)).invitations[0].uses).toBe(
+  expect((await runWithDb(database.db as unknown as Db, registrationAdministration())).invitations[0].uses).toBe(
     0,
   )
   vi.stubGlobal('fetch', externalFetch)
   const retried = await oauth('github', `finance-invitation=${token}`)
   expect(retried.response.headers.get('location')).toBe('/')
-  expect((await registrationAdministration(database.db as unknown as Db)).invitations[0].uses).toBe(
+  expect((await runWithDb(database.db as unknown as Db, registrationAdministration())).invitations[0].uses).toBe(
     1,
   )
 })
