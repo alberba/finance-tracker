@@ -1,6 +1,6 @@
 # Finance Tracker
 
-Gestor de finanzas personales multiusuario. Los datos viven en SQLite (modelo relacional, *sync v2*; D1 en el destino Cloudflare)
+Gestor de finanzas personales multiusuario. Los datos viven en SQLite (modelo relacional, _sync v2_; D1 en el destino Cloudflare)
 y el cliente trabaja offline-first contra una cola de comandos.
 
 ## Language
