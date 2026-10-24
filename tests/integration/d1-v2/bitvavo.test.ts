@@ -64,7 +64,7 @@ it('isolates an import preview from another user', async () => {
 it('rejects deletion of a remote financial operation', async () => {
   const { user, bootstrap } = await importedUser()
   await expect(
-    transactions.remove(testDb.db, user.id, bootstrap.transactions[0].id),
+    runWithDb(testDb.db, transactions.remove(user.id, bootstrap.transactions[0].id)),
   ).rejects.toThrow('Bitvavo')
 })
 
@@ -94,7 +94,7 @@ async function configuredUser() {
 
 it('requires explicit duplicate resolution and links the chosen manual movement', async () => {
   const { user, account } = await configuredUser()
-  const manual = await transactions.create(testDb.db, user.id, {
+  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
     accountId: account.id,
     type: 'investment',
     date: '2020-01-01',
@@ -102,11 +102,11 @@ it('requires explicit duplicate resolution and links the chosen manual movement'
     currency: 'EUR',
     declared: true,
     operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
-  })
+  }))
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   expect(preview.operations[0].candidates.map((candidate) => candidate.id)).toEqual([manual.id])
   await expect(confirmBitvavo(testDb.db, user.id, preview.id, [])).rejects.toThrow('duplicados')
-  expect(await transactions.listByUser(testDb.db, user.id)).toHaveLength(1)
+  expect(await runWithDb(testDb.db, transactions.listByUser(user.id))).toHaveLength(1)
   await confirmBitvavo(testDb.db, user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },
   ])
@@ -189,7 +189,7 @@ it('rejects synchronized changes to remote financial fields', async () => {
 
 it('offers historical sales calculated with gross plus fee as explicit duplicate candidates', async () => {
   const { user, account } = await configuredUser()
-  const manual = await transactions.create(testDb.db, user.id, {
+  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
     accountId: account.id,
     type: 'investment',
     date: '2020-01-01',
@@ -202,7 +202,7 @@ it('offers historical sales calculated with gross plus fee as explicit duplicate
       unitPrice: 116958.69300942,
       fee: 0.15,
     },
-  })
+  }))
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   expect(preview.operations.find((op) => op.side === 'sell')?.candidates.map((c) => c.id)).toEqual([
     manual.id,
@@ -211,7 +211,7 @@ it('offers historical sales calculated with gross plus fee as explicit duplicate
 
 it('preserves a local description when linking an explicit manual duplicate', async () => {
   const { user, account } = await configuredUser()
-  const manual = await transactions.create(testDb.db, user.id, {
+  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
     accountId: account.id,
     type: 'investment',
     date: '2020-01-01',
@@ -219,12 +219,12 @@ it('preserves a local description when linking an explicit manual duplicate', as
     currency: 'EUR',
     description: 'My purchase notes',
     operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
-  })
+  }))
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },
   ])
-  expect((await transactions.get(testDb.db, user.id, manual.id))?.description).toBe(
+  expect((await runWithDb(testDb.db, transactions.get(user.id, manual.id)))?.description).toBe(
     'My purchase notes',
   )
 })

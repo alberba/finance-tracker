@@ -151,10 +151,7 @@ async function atomic(
 
 export async function listInstruments(db: Db, userId: string) {
   const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
-  return runWithDb(
-    db,
-    market.listInstrumentsByIds(links.map((link) => link.instrumentId)),
-  )
+  return runWithDb(db, market.listInstrumentsByIds(links.map((link) => link.instrumentId)))
 }
 
 export async function matchingInstruments(db: Db, userId: string, symbol: string) {
@@ -176,7 +173,7 @@ export async function importOperation(
     .where(and(eq(transactions.userId, userId), eq(transactions.externalId, operation.externalId)))
   if (imported) return false
   const existing = transactionId
-    ? await transactionRepository.get(db, userId, transactionId)
+    ? await runWithDb(db, transactionRepository.get(userId, transactionId))
     : undefined
   if (transactionId && (!existing || existing.remoteOperation))
     throw new RejectedCommandError('El movimiento manual ya no está disponible.')
@@ -262,13 +259,16 @@ export async function linkInstrument(
   transactionId: string,
   instrumentId: string,
 ) {
-  const movement = await transactionRepository.get(db, userId, transactionId)
+  const movement = await runWithDb(db, transactionRepository.get(userId, transactionId))
   if (!movement?.remoteOperation)
     throw new RejectedCommandError('Movimiento Bitvavo no encontrado.')
   const links = await runWithDb(db, market.listUserInstrumentsByUser(userId))
   if (!links.some((link) => link.instrumentId === instrumentId))
     throw new RejectedCommandError('Instrumento no disponible para este usuario.')
-  const detail = await transactionRepository.getTradeDetailByTransaction(db, userId, transactionId)
+  const detail = await runWithDb(
+    db,
+    transactionRepository.getTradeDetailByTransaction(userId, transactionId),
+  )
   if (!detail) throw new RejectedCommandError('Operación ausente.')
   const now = nowIso()
   await atomic(db, [

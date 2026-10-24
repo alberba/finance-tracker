@@ -61,20 +61,20 @@ describe("GET /api/bootstrap", () => {
       currency: "EUR",
       openingBalance: 0,
     }));
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: "expense",
       date: "2024-05-01",
       amount: -10,
       currency: "EUR",
-    });
-    await transactionsRepository.create(testDb.db, principal.userId, {
+    }));
+    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: "expense",
       date: "2025-05-01",
       amount: -20,
       currency: "EUR",
-    });
+    }));
 
     const { GET } = await import("../../../../src/pages/api/bootstrap");
     const response = await GET({

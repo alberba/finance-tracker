@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as transactionsRepo from "../../../../src/db/repositories/transactions";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 /**
  * FINANCE-TRACKER-7: the batch loaders used to pass every id of a dataset to a
@@ -29,7 +30,7 @@ describe("repository batch chunking", () => {
     const created: transactionsRepo.TransactionRow[] = [];
     for (let index = 0; index < 130; index += 1) {
       created.push(
-        await transactionsRepo.create(db, user.id, {
+        await runWithDb(db, transactionsRepo.create(user.id, {
           accountId: account.id,
           type: "investment",
           date: "2026-01-31",
@@ -42,15 +43,12 @@ describe("repository batch chunking", () => {
             unitPrice: 10 + index,
             fee: index,
           },
-        }),
+        })),
       );
     }
 
-    const details = await transactionsRepo.listTradeDetailsByTransactions(
-      db,
-      user.id,
-      created.map((transaction) => transaction.id),
-    );
+    const details = await runWithDb(db, transactionsRepo.listTradeDetailsByTransactions(user.id,
+      created.map((transaction) => transaction.id),));
 
     expect(details).toHaveLength(130);
     for (const [index, transaction] of created.entries()) {
@@ -72,27 +70,27 @@ describe("repository batch chunking", () => {
     const account = await seedAccount(db, user.id);
     const otherAccount = await seedAccount(db, other.id);
 
-    const mine = await transactionsRepo.create(db, user.id, {
+    const mine = await runWithDb(db, transactionsRepo.create(user.id, {
       accountId: account.id,
       type: "investment",
       date: "2026-01-31",
       amount: 100,
       currency: "EUR",
       operation: { symbol: "MINE", side: "buy", units: 1, unitPrice: 10, fee: 0 },
-    });
-    const theirs = await transactionsRepo.create(db, other.id, {
+    }));
+    const theirs = await runWithDb(db, transactionsRepo.create(other.id, {
       accountId: otherAccount.id,
       type: "investment",
       date: "2026-01-31",
       amount: 100,
       currency: "EUR",
       operation: { symbol: "THEIRS", side: "buy", units: 1, unitPrice: 10, fee: 0 },
-    });
+    }));
 
-    const details = await transactionsRepo.listTradeDetailsByTransactions(db, user.id, [
+    const details = await runWithDb(db, transactionsRepo.listTradeDetailsByTransactions(user.id, [
       mine.id,
       theirs.id,
-    ]);
+    ]));
 
     expect([...details.keys()]).toEqual([mine.id]);
     expect(details.get(mine.id)?.symbol).toBe("MINE");

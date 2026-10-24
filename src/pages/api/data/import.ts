@@ -186,7 +186,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'transactions')
           continue
         }
-        await transactionsRepository.create(tx, userId, {
+        await runWithDb(tx, transactionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           accountId,
           categoryId: categoryId ?? null,
@@ -208,7 +208,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           remoteOperation: isObject(row.remoteOperation)
             ? (row.remoteOperation as unknown as RemoteOperation)
             : null,
-        })
+        }))
         bump(imported, 'transactions')
       }
 
@@ -341,12 +341,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- wealthSnapshots (+ balances, FK: accountId optional) --------------
       for (const row of asRows(body.wealthSnapshots)) {
-        const created = await wealthRepository.create(tx, userId, {
+        const created = await runWithDb(tx, wealthRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           snapshotDate: String(row.snapshotDate ?? ''),
           year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
           month: typeof row.month === 'number' ? row.month : 1,
-        })
+        }))
         if (typeof row.id === 'string') {
           wealthSnapshotIdMap.set(row.id, created.id)
         }
@@ -358,19 +358,19 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'snapshotBalances')
             continue
           }
-          await wealthRepository.createBalance(tx, userId, {
+          await runWithDb(tx, wealthRepository.createBalance(userId, {
             snapshotId: created.id,
             accountId: accountId ?? null,
             balance: typeof balance.balance === 'number' ? balance.balance : 0,
             currency: String(balance.currency ?? 'EUR'),
-          })
+          }))
           bump(imported, 'snapshotBalances')
         }
       }
 
       // -- contributions (+ allocations, FK: accountId optional) ------------
       for (const row of asRows(body.contributions)) {
-        const created = await contributionsRepository.create(tx, userId, {
+        const created = await runWithDb(tx, contributionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           date: String(row.date ?? ''),
           amount: typeof row.amount === 'number' ? row.amount : 0,
@@ -378,7 +378,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           portfolioDate: typeof row.portfolioDate === 'string' ? row.portfolioDate : null,
           portfolioValue: typeof row.portfolioValue === 'number' ? row.portfolioValue : null,
           flow: typeof row.flow === 'number' ? row.flow : null,
-        })
+        }))
         if (typeof row.id === 'string') {
           contributionIdMap.set(row.id, created.id)
         }
@@ -390,12 +390,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'contributionAllocations')
             continue
           }
-          await contributionsRepository.createAllocation(tx, userId, {
+          await runWithDb(tx, contributionsRepository.createAllocation(userId, {
             contributionId: created.id,
             accountId: accountId ?? null,
             amount: typeof allocation.amount === 'number' ? allocation.amount : 0,
             currency: String(allocation.currency ?? 'EUR'),
-          })
+          }))
           bump(imported, 'contributionAllocations')
         }
       }

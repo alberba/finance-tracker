@@ -74,12 +74,12 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
 
   it("removes an investment transaction together with its trade detail (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
-    const tx = await transactionsRepository.create(testDb.db, userId, {
+    const tx = await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, type: "investment", date: "2026-09-12", amount: 100, currency: "EUR",
-    });
-    await transactionsRepository.createTradeDetail(testDb.db, userId, {
+    }));
+    await runWithDb(testDb.db, transactionsRepository.createTradeDetail(userId, {
       transactionId: tx.id, side: "buy", quantity: "1", price: 100, fee: 0, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-investment", action: "remove", entityType: "transaction",
@@ -87,15 +87,15 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]);
 
     expect(result.results[0].status).toBe("applied");
-    expect(await transactionsRepository.getTradeDetailByTransaction(testDb.db, userId, tx.id)).toBeUndefined();
+    expect(await runWithDb(testDb.db, transactionsRepository.getTradeDetailByTransaction(userId, tx.id))).toBeUndefined();
   });
 
   it("rejects removing a category still referenced by a transaction (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
     const category = await seedCategory(testDb.db, userId);
-    await transactionsRepository.create(testDb.db, userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, categoryId: category.id, type: "expense", date: "2026-09-12", amount: 5, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-used-category", action: "remove", entityType: "category",
@@ -108,9 +108,9 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
 
   it("rejects removing an account still referenced by a transaction (§2.6)", async () => {
     const account = await seedAccount(testDb.db, userId);
-    await transactionsRepository.create(testDb.db, userId, {
+    await runWithDb(testDb.db, transactionsRepository.create(userId, {
       accountId: account.id, type: "expense", date: "2026-09-12", amount: 5, currency: "EUR",
-    });
+    }));
 
     const result = await applySyncBatch(testDb.db, userId, [{
       commandId: "remove-used-account", action: "remove", entityType: "account",

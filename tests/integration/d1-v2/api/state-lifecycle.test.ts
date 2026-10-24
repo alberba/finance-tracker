@@ -212,21 +212,21 @@ describe('POST /api/state/reset', () => {
     }))
 
     // A part of a transaction: its investment operation.
-    const investmentTx = await transactionsRepository.create(testDb.db, principal.userId, {
+    const investmentTx = await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
       accountId: account.id,
       type: 'investment',
       date: '2026-09-01',
       amount: 100,
       currency: 'EUR',
-    })
-    await transactionsRepository.createTradeDetail(testDb.db, principal.userId, {
+    }))
+    await runWithDb(testDb.db, transactionsRepository.createTradeDetail(principal.userId, {
       transactionId: investmentTx.id,
       side: 'buy',
       quantity: '1',
       price: 100,
       fee: 1,
       currency: 'EUR',
-    })
+    }))
 
     // A part of a recurring rule: its generated (not-yet-confirmed) occurrence.
     const rule = await runWithDb(testDb.db, recurringRulesRepository.create(principal.userId, {
@@ -246,30 +246,30 @@ describe('POST /api/state/reset', () => {
     }))
 
     // A part of a wealth snapshot: its per-account balance.
-    const snapshot = await wealthRepository.create(testDb.db, principal.userId, {
+    const snapshot = await runWithDb(testDb.db, wealthRepository.create(principal.userId, {
       snapshotDate: '2026-09-30',
       year: 2026,
       month: 9,
-    })
-    await wealthRepository.createBalance(testDb.db, principal.userId, {
+    }))
+    await runWithDb(testDb.db, wealthRepository.createBalance(principal.userId, {
       snapshotId: snapshot.id,
       accountId: account.id,
       balance: 42,
       currency: 'EUR',
-    })
+    }))
 
     // A part of a contribution: its per-account allocation.
-    const contribution = await contributionsRepository.create(testDb.db, principal.userId, {
+    const contribution = await runWithDb(testDb.db, contributionsRepository.create(principal.userId, {
       date: '2026-09-01',
       amount: 200,
       currency: 'EUR',
-    })
-    await contributionsRepository.createAllocation(testDb.db, principal.userId, {
+    }))
+    await runWithDb(testDb.db, contributionsRepository.createAllocation(principal.userId, {
       contributionId: contribution.id,
       accountId: account.id,
       amount: 200,
       currency: 'EUR',
-    })
+    }))
 
     const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({
@@ -279,27 +279,21 @@ describe('POST /api/state/reset', () => {
 
     expect(response.status).toBe(200)
     expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, transactionsRepository.listByUser(principal.userId))).toEqual([])
     expect(await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId))).toEqual([])
     expect(await runWithDb(testDb.db, pendingMovementsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await wealthRepository.listByUser(testDb.db, principal.userId)).toEqual([])
-    expect(await contributionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, wealthRepository.listByUser(principal.userId))).toEqual([])
+    expect(await runWithDb(testDb.db, contributionsRepository.listByUser(principal.userId))).toEqual([])
     expect(
-      await transactionsRepository.getTradeDetailByTransaction(
-        testDb.db,
-        principal.userId,
-        investmentTx.id,
-      ),
+      await runWithDb(testDb.db, transactionsRepository.getTradeDetailByTransaction(principal.userId,
+        investmentTx.id,)),
     ).toBeUndefined()
     expect(
-      await wealthRepository.listBalancesBySnapshot(testDb.db, principal.userId, snapshot.id),
+      await runWithDb(testDb.db, wealthRepository.listBalancesBySnapshot(principal.userId, snapshot.id)),
     ).toEqual([])
     expect(
-      await contributionsRepository.listAllocationsByContribution(
-        testDb.db,
-        principal.userId,
-        contribution.id,
-      ),
+      await runWithDb(testDb.db, contributionsRepository.listAllocationsByContribution(principal.userId,
+        contribution.id,)),
     ).toEqual([])
   })
 })

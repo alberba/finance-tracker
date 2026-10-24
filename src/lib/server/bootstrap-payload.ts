@@ -48,14 +48,14 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
     runWithDb(db, userSettingsRepository.get(userId)),
     runWithDb(db, accountsRepository.listByUser(userId)),
     runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
-    transactionsRepository.listByUser(db, userId),
+    runWithDb(db, transactionsRepository.listByUser(userId)),
     runWithDb(db, subscriptionsRepository.listByUser(userId)),
     runWithDb(db, recurringRulesRepository.listByUser(userId)),
     runWithDb(db, pendingMovementsRepository.listByUser(userId)),
     runWithDb(db, budgetEntriesRepository.listByUser(userId)),
     runWithDb(db, goalsRepository.listByUser(userId)),
-    wealthRepository.listByUser(db, userId),
-    contributionsRepository.listByUser(db, userId),
+    runWithDb(db, wealthRepository.listByUser(userId)),
+    runWithDb(db, contributionsRepository.listByUser(userId)),
     runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
     runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
@@ -75,21 +75,12 @@ export async function buildBootstrapPayload(db: Db, userId: string, year?: numbe
 
   const [balancesBySnapshot, allocationsByContribution, tradeDetailsByTransaction] =
     await Promise.all([
-      wealthRepository.listBalancesBySnapshots(
-        db,
-        userId,
-        filteredWealthSnapshots.map((snapshot) => snapshot.id),
-      ),
-      contributionsRepository.listAllocationsByContributions(
-        db,
-        userId,
-        contributions.map((contribution) => contribution.id),
-      ),
-      transactionsRepository.listTradeDetailsByTransactions(
-        db,
-        userId,
-        filteredTransactions.map((transaction) => transaction.id),
-      ),
+      runWithDb(db, wealthRepository.listBalancesBySnapshots(userId,
+        filteredWealthSnapshots.map((snapshot) => snapshot.id),)),
+      runWithDb(db, contributionsRepository.listAllocationsByContributions(userId,
+        contributions.map((contribution) => contribution.id),)),
+      runWithDb(db, transactionsRepository.listTradeDetailsByTransactions(userId,
+        filteredTransactions.map((transaction) => transaction.id),)),
     ])
 
   const wealthSnapshotsWithBalances = filteredWealthSnapshots.map((snapshot) => ({

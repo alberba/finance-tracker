@@ -41,8 +41,8 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     categories,
     accounts,
   ] = await Promise.all([
-    contributionsRepository.listByUser(db, userId),
-    wealthRepository.listByUser(db, userId),
+    runWithDb(db, contributionsRepository.listByUser(userId)),
+    runWithDb(db, wealthRepository.listByUser(userId)),
     runWithDb(db, marketRepository.listUserInstrumentsByUser(userId)),
     runWithDb(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
     runWithDb(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
@@ -52,29 +52,26 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     runWithDb(db, subscriptionsRepository.listByUser(userId)),
     runWithDb(db, budgetEntriesRepository.listByUser(userId)),
     runWithDb(db, goalsRepository.listByUser(userId)),
-    transactionsRepository.listByUser(db, userId),
+    runWithDb(db, transactionsRepository.listByUser(userId)),
     runWithDb(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
     runWithDb(db, accountsRepository.listCategoriesByUser(userId)),
     runWithDb(db, accountsRepository.listByUser(userId)),
   ])
 
   for (const contribution of contributions) {
-    const allocations = await contributionsRepository.listAllocationsByContribution(
-      db,
-      userId,
-      contribution.id,
-    )
+    const allocations = await runWithDb(db, contributionsRepository.listAllocationsByContribution(userId,
+      contribution.id,))
     for (const allocation of allocations) {
-      await contributionsRepository.removeAllocation(db, userId, allocation.id)
+      await runWithDb(db, contributionsRepository.removeAllocation(userId, allocation.id))
     }
-    await contributionsRepository.remove(db, userId, contribution.id)
+    await runWithDb(db, contributionsRepository.remove(userId, contribution.id))
   }
   for (const snapshot of wealthSnapshots) {
-    const balances = await wealthRepository.listBalancesBySnapshot(db, userId, snapshot.id)
+    const balances = await runWithDb(db, wealthRepository.listBalancesBySnapshot(userId, snapshot.id))
     for (const balance of balances) {
-      await wealthRepository.removeBalance(db, userId, balance.id)
+      await runWithDb(db, wealthRepository.removeBalance(userId, balance.id))
     }
-    await wealthRepository.remove(db, userId, snapshot.id)
+    await runWithDb(db, wealthRepository.remove(userId, snapshot.id))
   }
   for (const userInstrument of userInstruments) {
     await runWithDb(db, marketRepository.removeUserInstrument(userId, userInstrument.id))
@@ -104,7 +101,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await runWithDb(db, goalsRepository.remove(userId, goal.id))
   }
   for (const transaction of transactions) {
-    await transactionsRepository.remove(db, userId, transaction.id)
+    await runWithDb(db, transactionsRepository.remove(userId, transaction.id))
   }
   for (const twrAccount of twrLiquidityAccounts) {
     await runWithDb(db, accountsRepository.removeTwrLiquidityAccount(userId, twrAccount.id))

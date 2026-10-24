@@ -78,13 +78,13 @@ describe("accounts repository", () => {
       currency: "EUR",
       openingBalance: 0,
     }));
-    await transactionsRepo.create(db, user.id, {
+    await runWithDb(db, transactionsRepo.create(user.id, {
       accountId: account.id,
       type: "expense",
       date: "2026-01-15",
       amount: 10,
       currency: "EUR",
-    });
+    }));
 
     await expect(runWithDb(db, accountsRepo.remove(user.id, account.id))).rejects.toThrow(
       /tiene movimientos u otros datos asociados/i,
@@ -139,14 +139,14 @@ describe("accounts repository", () => {
         openingBalance: 0,
       }));
       const category = await runWithDb(db, accountsRepo.createCategory(user.id, { name: "Ocio", kind: "expense" }));
-      await transactionsRepo.create(db, user.id, {
+      await runWithDb(db, transactionsRepo.create(user.id, {
         accountId: account.id,
         categoryId: category.id,
         type: "expense",
         date: "2026-01-15",
         amount: 10,
         currency: "EUR",
-      });
+      }));
 
       await expect(runWithDb(db, accountsRepo.removeCategory(user.id, category.id))).rejects.toThrow(
         /está en uso/i,

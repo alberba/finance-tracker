@@ -7,50 +7,58 @@
  * `amountMinor`, just without their own separate currency column.
  */
 
-import { and, eq, inArray } from "drizzle-orm";
-import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { contributionAllocations, contributions } from "../schema";
-import { type Db, assertOwnedReferences, chunkIds, clientIdentity, nowIso, versionGuard } from "./shared";
+import { and, eq, inArray } from 'drizzle-orm'
+import { lift } from '../database'
+import { fromMinorUnits, toMinorUnits } from '../../lib/money'
+import { contributionAllocations, contributions } from '../schema'
+import {
+  type Db,
+  assertOwnedReferences,
+  chunkIds,
+  clientIdentity,
+  nowIso,
+  versionGuard,
+} from './shared'
 
 export type ContributionRow = Omit<
   typeof contributions.$inferSelect,
-  "amountMinor" | "portfolioValueMinor" | "flowMinor"
+  'amountMinor' | 'portfolioValueMinor' | 'flowMinor'
 > & {
-  amount: number;
-  portfolioValue: number | null;
-  flow: number | null;
-};
+  amount: number
+  portfolioValue: number | null
+  flow: number | null
+}
 export type ContributionAllocationRow = Omit<
   typeof contributionAllocations.$inferSelect,
-  "amountMinor"
-> & { amount: number };
+  'amountMinor'
+> & { amount: number }
 
 export interface CreateContributionInput {
   /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
-  id?: string;
-  legacyId?: string | null;
-  date: string;
-  amount: number;
-  currency: string;
-  portfolioDate?: string | null;
-  portfolioValue?: number | null;
-  flow?: number | null;
+  id?: string
+  legacyId?: string | null
+  date: string
+  amount: number
+  currency: string
+  portfolioDate?: string | null
+  portfolioValue?: number | null
+  flow?: number | null
 }
 
 export interface UpdateContributionInput {
-  date?: string;
-  amount?: number;
-  currency?: string;
-  portfolioDate?: string | null;
-  portfolioValue?: number | null;
-  flow?: number | null;
+  date?: string
+  amount?: number
+  currency?: string
+  portfolioDate?: string | null
+  portfolioValue?: number | null
+  flow?: number | null
 }
 
 export interface CreateContributionAllocationInput {
-  contributionId: string;
-  accountId?: string | null;
-  amount: number;
-  currency: string;
+  contributionId: string
+  accountId?: string | null
+  amount: number
+  currency: string
 }
 
 function toRow(row: typeof contributions.$inferSelect): ContributionRow {
@@ -58,36 +66,40 @@ function toRow(row: typeof contributions.$inferSelect): ContributionRow {
     ...row,
     amount: fromMinorUnits(row.amountMinor, row.currency),
     portfolioValue:
-      row.portfolioValueMinor === null ? null : fromMinorUnits(row.portfolioValueMinor, row.currency),
+      row.portfolioValueMinor === null
+        ? null
+        : fromMinorUnits(row.portfolioValueMinor, row.currency),
     flow: row.flowMinor === null ? null : fromMinorUnits(row.flowMinor, row.currency),
-  };
+  }
 }
 
-function toAllocationRow(row: typeof contributionAllocations.$inferSelect): ContributionAllocationRow {
-  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) };
+function toAllocationRow(
+  row: typeof contributionAllocations.$inferSelect,
+): ContributionAllocationRow {
+  return { ...row, amount: fromMinorUnits(row.amountMinor, row.currency) }
 }
 
 // -- contributions ----------------------------------------------------------
 
-export async function listByUser(db: Db, userId: string): Promise<ContributionRow[]> {
-  const rows = await db.select().from(contributions).where(eq(contributions.userId, userId));
-  return rows.map(toRow);
+async function listByUserSql(db: Db, userId: string): Promise<ContributionRow[]> {
+  const rows = await db.select().from(contributions).where(eq(contributions.userId, userId))
+  return rows.map(toRow)
 }
 
-export async function get(db: Db, userId: string, id: string): Promise<ContributionRow | undefined> {
+async function getSql(db: Db, userId: string, id: string): Promise<ContributionRow | undefined> {
   const [row] = await db
     .select()
     .from(contributions)
-    .where(and(eq(contributions.id, id), eq(contributions.userId, userId)));
-  return row ? toRow(row) : undefined;
+    .where(and(eq(contributions.id, id), eq(contributions.userId, userId)))
+  return row ? toRow(row) : undefined
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateContributionInput,
 ): Promise<ContributionRow> {
-  const now = nowIso();
+  const now = nowIso()
   const [row] = await db
     .insert(contributions)
     .values({
@@ -104,70 +116,83 @@ export async function create(
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return toRow(row);
+    .returning()
+  return toRow(row)
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdateContributionInput,
   expectedVersion?: number,
 ): Promise<ContributionRow | undefined> {
-  const existing = await get(db, userId, id);
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return undefined;
+    return undefined
   }
-  const nextCurrency = input.currency ?? existing.currency;
-  const nextAmount = input.amount ?? existing.amount;
+  const nextCurrency = input.currency ?? existing.currency
+  const nextAmount = input.amount ?? existing.amount
   const nextPortfolioValue =
-    input.portfolioValue !== undefined ? input.portfolioValue : existing.portfolioValue;
-  const nextFlow = input.flow !== undefined ? input.flow : existing.flow;
+    input.portfolioValue !== undefined ? input.portfolioValue : existing.portfolioValue
+  const nextFlow = input.flow !== undefined ? input.flow : existing.flow
   const [row] = await db
     .update(contributions)
     .set({
       date: input.date ?? existing.date,
       amountMinor: toMinorUnits(nextAmount, nextCurrency),
       currency: nextCurrency,
-      portfolioDate: input.portfolioDate === undefined ? existing.portfolioDate : input.portfolioDate,
+      portfolioDate:
+        input.portfolioDate === undefined ? existing.portfolioDate : input.portfolioDate,
       portfolioValueMinor:
         nextPortfolioValue == null ? null : toMinorUnits(nextPortfolioValue, nextCurrency),
       flowMinor: nextFlow == null ? null : toMinorUnits(nextFlow, nextCurrency),
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(contributions.id, id),
-      eq(contributions.userId, userId),
-      versionGuard(contributions.version, expectedVersion),
-    ))
-    .returning();
-  return row ? toRow(row) : undefined;
+    .where(
+      and(
+        eq(contributions.id, id),
+        eq(contributions.userId, userId),
+        versionGuard(contributions.version, expectedVersion),
+      ),
+    )
+    .returning()
+  return row ? toRow(row) : undefined
 }
 
-export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
-  const existing = await get(db, userId, id);
+async function removeSql(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
-  const deleted = await db.delete(contributions).where(and(
-    eq(contributions.id, id),
-    eq(contributions.userId, userId),
-    versionGuard(contributions.version, expectedVersion),
-  )).returning({ id: contributions.id });
-  return deleted.length > 0;
+  const deleted = await db
+    .delete(contributions)
+    .where(
+      and(
+        eq(contributions.id, id),
+        eq(contributions.userId, userId),
+        versionGuard(contributions.version, expectedVersion),
+      ),
+    )
+    .returning({ id: contributions.id })
+  return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateContributionInput[],
 ): Promise<ContributionRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   const rows = await db
     .insert(contributions)
     .values(
@@ -186,13 +211,13 @@ export async function bulkInsert(
         updatedAt: now,
       })),
     )
-    .returning();
-  return rows.map(toRow);
+    .returning()
+  return rows.map(toRow)
 }
 
 // -- contribution_allocations -------------------------------------------------
 
-export async function listAllocationsByContribution(
+async function listAllocationsByContributionSql(
   db: Db,
   userId: string,
   contributionId: string,
@@ -205,8 +230,8 @@ export async function listAllocationsByContribution(
         eq(contributionAllocations.userId, userId),
         eq(contributionAllocations.contributionId, contributionId),
       ),
-    );
-  return rows.map(toAllocationRow);
+    )
+  return rows.map(toAllocationRow)
 }
 
 /**
@@ -214,16 +239,16 @@ export async function listAllocationsByContribution(
  * assembly (audit §5.1): one query for every contribution's allocations
  * instead of one query per contribution.
  */
-export async function listAllocationsByContributions(
+async function listAllocationsByContributionsSql(
   db: Db,
   userId: string,
   contributionIds: string[],
 ): Promise<Map<string, ContributionAllocationRow[]>> {
-  const byContribution = new Map<string, ContributionAllocationRow[]>();
+  const byContribution = new Map<string, ContributionAllocationRow[]>()
   if (contributionIds.length === 0) {
-    return byContribution;
+    return byContribution
   }
-  const rows: (typeof contributionAllocations.$inferSelect)[] = [];
+  const rows: (typeof contributionAllocations.$inferSelect)[] = []
   for (const chunk of chunkIds(contributionIds)) {
     rows.push(
       ...(await db
@@ -235,21 +260,21 @@ export async function listAllocationsByContributions(
             inArray(contributionAllocations.contributionId, chunk),
           ),
         )),
-    );
+    )
   }
   for (const row of rows) {
-    const allocation = toAllocationRow(row);
-    const existing = byContribution.get(allocation.contributionId);
+    const allocation = toAllocationRow(row)
+    const existing = byContribution.get(allocation.contributionId)
     if (existing) {
-      existing.push(allocation);
+      existing.push(allocation)
     } else {
-      byContribution.set(allocation.contributionId, [allocation]);
+      byContribution.set(allocation.contributionId, [allocation])
     }
   }
-  return byContribution;
+  return byContribution
 }
 
-export async function getAllocation(
+async function getAllocationSql(
   db: Db,
   userId: string,
   id: string,
@@ -257,11 +282,11 @@ export async function getAllocation(
   const [row] = await db
     .select()
     .from(contributionAllocations)
-    .where(and(eq(contributionAllocations.id, id), eq(contributionAllocations.userId, userId)));
-  return row ? toAllocationRow(row) : undefined;
+    .where(and(eq(contributionAllocations.id, id), eq(contributionAllocations.userId, userId)))
+  return row ? toAllocationRow(row) : undefined
 }
 
-export async function createAllocation(
+async function createAllocationSql(
   db: Db,
   userId: string,
   input: CreateContributionAllocationInput,
@@ -269,7 +294,7 @@ export async function createAllocation(
   await assertOwnedReferences(db, userId, {
     contributionId: input.contributionId,
     accountId: input.accountId,
-  });
+  })
   const [row] = await db
     .insert(contributionAllocations)
     .values({
@@ -280,36 +305,36 @@ export async function createAllocation(
       currency: input.currency,
       createdAt: nowIso(),
     })
-    .returning();
-  return toAllocationRow(row);
+    .returning()
+  return toAllocationRow(row)
 }
 
-export async function removeAllocation(db: Db, userId: string, id: string): Promise<boolean> {
-  const existing = await getAllocation(db, userId, id);
+async function removeAllocationSql(db: Db, userId: string, id: string): Promise<boolean> {
+  const existing = await getAllocationSql(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
   await db
     .delete(contributionAllocations)
-    .where(and(eq(contributionAllocations.id, id), eq(contributionAllocations.userId, userId)));
-  return true;
+    .where(and(eq(contributionAllocations.id, id), eq(contributionAllocations.userId, userId)))
+  return true
 }
 
-export async function bulkInsertAllocations(
+async function bulkInsertAllocationsSql(
   db: Db,
   userId: string,
   inputs: CreateContributionAllocationInput[],
 ): Promise<ContributionAllocationRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
   for (const input of inputs) {
     await assertOwnedReferences(db, userId, {
       contributionId: input.contributionId,
       accountId: input.accountId,
-    });
+    })
   }
-  const now = nowIso();
+  const now = nowIso()
   const rows = await db
     .insert(contributionAllocations)
     .values(
@@ -322,16 +347,16 @@ export async function bulkInsertAllocations(
         createdAt: now,
       })),
     )
-    .returning();
-  return rows.map(toAllocationRow);
+    .returning()
+  return rows.map(toAllocationRow)
 }
 
 /** Replaces how a contribution's flow splits across accounts, atomically with the contribution. */
-export async function replaceAllocations(
+async function replaceAllocationsSql(
   db: Db,
   userId: string,
   contributionId: string,
-  inputs: Omit<CreateContributionAllocationInput, "contributionId">[],
+  inputs: Omit<CreateContributionAllocationInput, 'contributionId'>[],
 ): Promise<ContributionAllocationRow[]> {
   await db
     .delete(contributionAllocations)
@@ -340,6 +365,24 @@ export async function replaceAllocations(
         eq(contributionAllocations.userId, userId),
         eq(contributionAllocations.contributionId, contributionId),
       ),
-    );
-  return bulkInsertAllocations(db, userId, inputs.map((input) => ({ ...input, contributionId })));
+    )
+  return bulkInsertAllocationsSql(
+    db,
+    userId,
+    inputs.map((input) => ({ ...input, contributionId })),
+  )
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)
+export const listAllocationsByContribution = lift(listAllocationsByContributionSql)
+export const listAllocationsByContributions = lift(listAllocationsByContributionsSql)
+export const getAllocation = lift(getAllocationSql)
+export const createAllocation = lift(createAllocationSql)
+export const removeAllocation = lift(removeAllocationSql)
+export const bulkInsertAllocations = lift(bulkInsertAllocationsSql)
+export const replaceAllocations = lift(replaceAllocationsSql)

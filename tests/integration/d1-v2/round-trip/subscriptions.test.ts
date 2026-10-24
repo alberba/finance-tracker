@@ -195,7 +195,7 @@ describe("round trip: subscriptions", () => {
       const secondReload = await trip.reload()
       expect(secondReload.transactions).toHaveLength(1)
       const transactionsRepository = await import('../../../../src/db/repositories/transactions')
-      expect(await transactionsRepository.listByUser(trip.testDb.db, trip.userId)).toHaveLength(1)
+      expect(await runWithDb(trip.testDb.db, transactionsRepository.listByUser(trip.userId))).toHaveLength(1)
     },
   )
 
