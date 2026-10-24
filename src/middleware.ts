@@ -68,11 +68,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (testEmail) {
       let testPrincipal: AuthPrincipal | undefined
       try {
-        testPrincipal = await resolvePrincipal(getDb(context.locals), {
-          provider: TEST_AUTH_PROVIDER,
-          subject: testEmail,
-          email: testEmail,
-        })
+        testPrincipal = await runWithDb(
+          getDb(context.locals),
+          resolvePrincipal({
+            provider: TEST_AUTH_PROVIDER,
+            subject: testEmail,
+            email: testEmail,
+          }),
+        )
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'No se pudo resolver el principal de prueba.'
@@ -104,7 +107,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
       user?: { id: string; emailVerified: boolean }
     } | null
     if (session?.user?.emailVerified) {
-      context.locals.principal = (await runWithDb(db, authenticatedPrincipal(session.user.id))) ?? undefined
+      context.locals.principal =
+        (await runWithDb(db, authenticatedPrincipal(session.user.id))) ?? undefined
     }
     if (
       !context.locals.principal &&

@@ -51,10 +51,13 @@ describe('POST /api/state/initialize', () => {
   it('automatically provisions a new principal and initialize never duplicates categories', async () => {
     const { resolvePrincipal } = await import('../../../../src/lib/server/auth/principal')
     const input = { provider: 'cf-access', subject: 'new-user', email: 'new-user@example.com' }
-    principal = await resolvePrincipal(testDb.db, input)
+    principal = await runWithDb(testDb.db, resolvePrincipal(input))
     const settings = await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))
     expect(settings?.currency).toBe('EUR')
-    const categories = await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))
+    const categories = await runWithDb(
+      testDb.db,
+      accountsRepository.listCategoriesByUser(principal.userId),
+    )
     expect(categories.map((row) => [row.name, row.kind, row.sortOrder])).toEqual([
       ['Nómina', 'income', 0],
       ['Otros ingresos', 'income', 1],
@@ -68,7 +71,7 @@ describe('POST /api/state/initialize', () => {
       ['Inversión', 'investment', 0],
     ])
     expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await resolvePrincipal(testDb.db, input)).toEqual(principal)
+    expect(await runWithDb(testDb.db, resolvePrincipal(input))).toEqual(principal)
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     const response = await POST({
       request: postJson('https://example.test/api/state/initialize'),
@@ -76,31 +79,41 @@ describe('POST /api/state/initialize', () => {
     } as never)
     expect(response.status).toBe(200)
     expect((await response.json()).alreadyInitialized).toBe(true)
-    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual(
-      categories,
+    expect(
+      await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId)),
+    ).toEqual(categories)
+    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(
+      settings,
     )
-    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
   })
 
   it('does not add suggestions or change preferences for an existing user', async () => {
-    const settings = await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
-      currency: 'USD',
-      onboardingCompleted: true,
-    }))
-    const category = await runWithDb(testDb.db, accountsRepository.createCategory(principal.userId, {
-      name: 'Personal',
-      kind: 'expense',
-      sortOrder: 0,
-    }))
+    const settings = await runWithDb(
+      testDb.db,
+      userSettingsRepository.create(principal.userId, {
+        currency: 'USD',
+        onboardingCompleted: true,
+      }),
+    )
+    const category = await runWithDb(
+      testDb.db,
+      accountsRepository.createCategory(principal.userId, {
+        name: 'Personal',
+        kind: 'expense',
+        sortOrder: 0,
+      }),
+    )
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     await POST({
       request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
     } as never)
-    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([
-      category,
-    ])
-    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(settings)
+    expect(
+      await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId)),
+    ).toEqual([category])
+    expect(await runWithDb(testDb.db, userSettingsRepository.get(principal.userId))).toEqual(
+      settings,
+    )
   })
 
   it('does not add suggestions to an existing empty user with absent settings', async () => {
@@ -110,23 +123,28 @@ describe('POST /api/state/initialize', () => {
       locals: { principal },
     } as never)
     expect(response.status).toBe(201)
-    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([])
+    expect(
+      await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId)),
+    ).toEqual([])
   })
 
   it('preserves pre-existing categories even when settings have not been created', async () => {
-    const category = await runWithDb(testDb.db, accountsRepository.createCategory(principal.userId, {
-      name: 'Personal',
-      kind: 'expense',
-      sortOrder: 0,
-    }))
+    const category = await runWithDb(
+      testDb.db,
+      accountsRepository.createCategory(principal.userId, {
+        name: 'Personal',
+        kind: 'expense',
+        sortOrder: 0,
+      }),
+    )
     const { POST } = await import('../../../../src/pages/api/state/initialize')
     await POST({
       request: postJson('https://example.test/api/state/initialize'),
       locals: { principal },
     } as never)
-    expect(await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId))).toEqual([
-      category,
-    ])
+    expect(
+      await runWithDb(testDb.db, accountsRepository.listCategoriesByUser(principal.userId)),
+    ).toEqual([category])
   })
 })
 
@@ -163,17 +181,23 @@ describe('POST /api/state/reset', () => {
     const syncRepository = await import('../../../../src/db/repositories/sync')
     await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
     await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
-    await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
-      name: 'Cuenta a borrar',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 42,
-    }))
-    await runWithDb(testDb.db, userSettingsRepository.create(principal.userId, {
-      currency: 'USD',
-      onboardingCompleted: true,
-      onboardingPresented: true,
-    }))
+    await runWithDb(
+      testDb.db,
+      accountsRepository.create(principal.userId, {
+        name: 'Cuenta a borrar',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 42,
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      userSettingsRepository.create(principal.userId, {
+        currency: 'USD',
+        onboardingCompleted: true,
+        onboardingPresented: true,
+      }),
+    )
 
     const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({
@@ -188,9 +212,9 @@ describe('POST /api/state/reset', () => {
     expect(await runWithDb(testDb.db, syncRepository.getRevision(principal.userId))).toMatchObject({
       revision: 2,
     })
-    expect(await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 1))).toMatchObject([
-      { revision: 2, entityType: 'reset' },
-    ])
+    expect(
+      await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 1)),
+    ).toMatchObject([{ revision: 2, entityType: 'reset' }])
 
     const accounts = await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))
     expect(accounts).toEqual([])
@@ -204,72 +228,99 @@ describe('POST /api/state/reset', () => {
     const wealthRepository = await import('../../../../src/db/repositories/wealth')
     const contributionsRepository = await import('../../../../src/db/repositories/contributions')
 
-    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
-      name: 'Cuenta a borrar',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 42,
-    }))
+    const account = await runWithDb(
+      testDb.db,
+      accountsRepository.create(principal.userId, {
+        name: 'Cuenta a borrar',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 42,
+      }),
+    )
 
     // A part of a transaction: its investment operation.
-    const investmentTx = await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
-      accountId: account.id,
-      type: 'investment',
-      date: '2026-09-01',
-      amount: 100,
-      currency: 'EUR',
-    }))
-    await runWithDb(testDb.db, transactionsRepository.createTradeDetail(principal.userId, {
-      transactionId: investmentTx.id,
-      side: 'buy',
-      quantity: '1',
-      price: 100,
-      fee: 1,
-      currency: 'EUR',
-    }))
+    const investmentTx = await runWithDb(
+      testDb.db,
+      transactionsRepository.create(principal.userId, {
+        accountId: account.id,
+        type: 'investment',
+        date: '2026-09-01',
+        amount: 100,
+        currency: 'EUR',
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      transactionsRepository.createTradeDetail(principal.userId, {
+        transactionId: investmentTx.id,
+        side: 'buy',
+        quantity: '1',
+        price: 100,
+        fee: 1,
+        currency: 'EUR',
+      }),
+    )
 
     // A part of a recurring rule: its generated (not-yet-confirmed) occurrence.
-    const rule = await runWithDb(testDb.db, recurringRulesRepository.create(principal.userId, {
-      name: 'Aportación',
-      type: 'investment',
-      accountId: account.id,
-      amount: 200,
-      currency: 'EUR',
-      frequency: 'monthly',
-    }))
-    await runWithDb(testDb.db, pendingMovementsRepository.create(principal.userId, {
-      recurringRuleId: rule.id,
-      accountId: account.id,
-      amount: 200,
-      currency: 'EUR',
-      dueDate: '2026-10-01',
-    }))
+    const rule = await runWithDb(
+      testDb.db,
+      recurringRulesRepository.create(principal.userId, {
+        name: 'Aportación',
+        type: 'investment',
+        accountId: account.id,
+        amount: 200,
+        currency: 'EUR',
+        frequency: 'monthly',
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      pendingMovementsRepository.create(principal.userId, {
+        recurringRuleId: rule.id,
+        accountId: account.id,
+        amount: 200,
+        currency: 'EUR',
+        dueDate: '2026-10-01',
+      }),
+    )
 
     // A part of a wealth snapshot: its per-account balance.
-    const snapshot = await runWithDb(testDb.db, wealthRepository.create(principal.userId, {
-      snapshotDate: '2026-09-30',
-      year: 2026,
-      month: 9,
-    }))
-    await runWithDb(testDb.db, wealthRepository.createBalance(principal.userId, {
-      snapshotId: snapshot.id,
-      accountId: account.id,
-      balance: 42,
-      currency: 'EUR',
-    }))
+    const snapshot = await runWithDb(
+      testDb.db,
+      wealthRepository.create(principal.userId, {
+        snapshotDate: '2026-09-30',
+        year: 2026,
+        month: 9,
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      wealthRepository.createBalance(principal.userId, {
+        snapshotId: snapshot.id,
+        accountId: account.id,
+        balance: 42,
+        currency: 'EUR',
+      }),
+    )
 
     // A part of a contribution: its per-account allocation.
-    const contribution = await runWithDb(testDb.db, contributionsRepository.create(principal.userId, {
-      date: '2026-09-01',
-      amount: 200,
-      currency: 'EUR',
-    }))
-    await runWithDb(testDb.db, contributionsRepository.createAllocation(principal.userId, {
-      contributionId: contribution.id,
-      accountId: account.id,
-      amount: 200,
-      currency: 'EUR',
-    }))
+    const contribution = await runWithDb(
+      testDb.db,
+      contributionsRepository.create(principal.userId, {
+        date: '2026-09-01',
+        amount: 200,
+        currency: 'EUR',
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      contributionsRepository.createAllocation(principal.userId, {
+        contributionId: contribution.id,
+        accountId: account.id,
+        amount: 200,
+        currency: 'EUR',
+      }),
+    )
 
     const { POST } = await import('../../../../src/pages/api/state/reset')
     const response = await POST({
@@ -279,21 +330,36 @@ describe('POST /api/state/reset', () => {
 
     expect(response.status).toBe(200)
     expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await runWithDb(testDb.db, transactionsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId))).toEqual([])
-    expect(await runWithDb(testDb.db, pendingMovementsRepository.listByUser(principal.userId))).toEqual([])
-    expect(await runWithDb(testDb.db, wealthRepository.listByUser(principal.userId))).toEqual([])
-    expect(await runWithDb(testDb.db, contributionsRepository.listByUser(principal.userId))).toEqual([])
+    expect(await runWithDb(testDb.db, transactionsRepository.listByUser(principal.userId))).toEqual(
+      [],
+    )
     expect(
-      await runWithDb(testDb.db, transactionsRepository.getTradeDetailByTransaction(principal.userId,
-        investmentTx.id,)),
-    ).toBeUndefined()
-    expect(
-      await runWithDb(testDb.db, wealthRepository.listBalancesBySnapshot(principal.userId, snapshot.id)),
+      await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId)),
     ).toEqual([])
     expect(
-      await runWithDb(testDb.db, contributionsRepository.listAllocationsByContribution(principal.userId,
-        contribution.id,)),
+      await runWithDb(testDb.db, pendingMovementsRepository.listByUser(principal.userId)),
+    ).toEqual([])
+    expect(await runWithDb(testDb.db, wealthRepository.listByUser(principal.userId))).toEqual([])
+    expect(
+      await runWithDb(testDb.db, contributionsRepository.listByUser(principal.userId)),
+    ).toEqual([])
+    expect(
+      await runWithDb(
+        testDb.db,
+        transactionsRepository.getTradeDetailByTransaction(principal.userId, investmentTx.id),
+      ),
+    ).toBeUndefined()
+    expect(
+      await runWithDb(
+        testDb.db,
+        wealthRepository.listBalancesBySnapshot(principal.userId, snapshot.id),
+      ),
+    ).toEqual([])
+    expect(
+      await runWithDb(
+        testDb.db,
+        contributionsRepository.listAllocationsByContribution(principal.userId, contribution.id),
+      ),
     ).toEqual([])
   })
 })

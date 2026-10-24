@@ -120,7 +120,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           : optionalFlag((body.settings as Row | undefined)?.onboardingCompleted),
       }
       if (replace) {
-        await wipeUserData(tx, userId)
+        await runWithDb(tx, wipeUserData(userId))
       }
       const categoryIdMap = new Map<string, string>()
       const accountIdMap = new Map<string, string>()
@@ -130,13 +130,16 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- categories (no FK dependency) --------------------------------
       for (const row of asRows(body.categories)) {
-        const created = await runWithDb(tx, accountsRepository.createCategory(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          name: String(row.name ?? ''),
-          kind: String(row.kind ?? ''),
-          sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : 0,
-          emoji: optionalString(row.emoji),
-        }))
+        const created = await runWithDb(
+          tx,
+          accountsRepository.createCategory(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            name: String(row.name ?? ''),
+            kind: String(row.kind ?? ''),
+            sortOrder: typeof row.sortOrder === 'number' ? row.sortOrder : 0,
+            emoji: optionalString(row.emoji),
+          }),
+        )
         if (typeof row.id === 'string') {
           categoryIdMap.set(row.id, created.id)
         }
@@ -145,14 +148,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- accounts (no FK dependency) ------------------------------------
       for (const row of asRows(body.accounts)) {
-        const created = await runWithDb(tx, accountsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          name: String(row.name ?? ''),
-          kind: String(row.kind ?? ''),
-          currency: String(row.currency ?? 'EUR'),
-          openingBalance: typeof row.openingBalance === 'number' ? row.openingBalance : 0,
-          isArchived: Boolean(row.isArchived),
-        }))
+        const created = await runWithDb(
+          tx,
+          accountsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            name: String(row.name ?? ''),
+            kind: String(row.kind ?? ''),
+            currency: String(row.currency ?? 'EUR'),
+            openingBalance: typeof row.openingBalance === 'number' ? row.openingBalance : 0,
+            isArchived: Boolean(row.isArchived),
+          }),
+        )
         if (typeof row.id === 'string') {
           accountIdMap.set(row.id, created.id)
         }
@@ -166,11 +172,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'twrLiquidityAccounts')
           continue
         }
-        await runWithDb(tx, accountsRepository.createTwrLiquidityAccount(userId, {
-          legacyId: optionalString(row.legacyId),
-          accountId,
-          name: String(row.name ?? ''),
-        }))
+        await runWithDb(
+          tx,
+          accountsRepository.createTwrLiquidityAccount(userId, {
+            legacyId: optionalString(row.legacyId),
+            accountId,
+            name: String(row.name ?? ''),
+          }),
+        )
         bump(imported, 'twrLiquidityAccounts')
       }
 
@@ -187,30 +196,33 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'transactions')
           continue
         }
-        await runWithDb(tx, transactionsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          accountId,
-          destinationAccountId: destinationAccountId ?? null,
-          categoryId: categoryId ?? null,
-          type: String(row.type ?? ''),
-          date: String(row.date ?? ''),
-          description: typeof row.description === 'string' ? row.description : null,
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-          time: optionalString(row.time),
-          declared: Boolean(row.declared),
-          accountingMonth:
-            Number.isInteger(row.accountingMonth) &&
-            (row.accountingMonth as number) >= 1 &&
-            (row.accountingMonth as number) <= 12
-              ? (row.accountingMonth as number)
+        await runWithDb(
+          tx,
+          transactionsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            accountId,
+            destinationAccountId: destinationAccountId ?? null,
+            categoryId: categoryId ?? null,
+            type: String(row.type ?? ''),
+            date: String(row.date ?? ''),
+            description: typeof row.description === 'string' ? row.description : null,
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+            time: optionalString(row.time),
+            declared: Boolean(row.declared),
+            accountingMonth:
+              Number.isInteger(row.accountingMonth) &&
+              (row.accountingMonth as number) >= 1 &&
+              (row.accountingMonth as number) <= 12
+                ? (row.accountingMonth as number)
+                : null,
+            operation: await importOperation(tx, row.operation),
+            externalId: optionalString(row.externalId),
+            remoteOperation: isObject(row.remoteOperation)
+              ? (row.remoteOperation as unknown as RemoteOperation)
               : null,
-          operation: await importOperation(tx, row.operation),
-          externalId: optionalString(row.externalId),
-          remoteOperation: isObject(row.remoteOperation)
-            ? (row.remoteOperation as unknown as RemoteOperation)
-            : null,
-        }))
+          }),
+        )
         bump(imported, 'transactions')
       }
 
@@ -222,18 +234,21 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'subscriptions')
           continue
         }
-        await runWithDb(tx, subscriptionsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          name: String(row.name ?? ''),
-          accountId: accountId ?? null,
-          categoryId: categoryId ?? null,
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-          startDate: typeof row.startDate === 'string' ? row.startDate : null,
-          nextChargeDate: typeof row.nextChargeDate === 'string' ? row.nextChargeDate : null,
-          frequency: String(row.frequency ?? 'monthly'),
-          isActive: row.isActive === undefined ? true : Boolean(row.isActive),
-        }))
+        await runWithDb(
+          tx,
+          subscriptionsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            name: String(row.name ?? ''),
+            accountId: accountId ?? null,
+            categoryId: categoryId ?? null,
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+            startDate: typeof row.startDate === 'string' ? row.startDate : null,
+            nextChargeDate: typeof row.nextChargeDate === 'string' ? row.nextChargeDate : null,
+            frequency: String(row.frequency ?? 'monthly'),
+            isActive: row.isActive === undefined ? true : Boolean(row.isActive),
+          }),
+        )
         bump(imported, 'subscriptions')
       }
 
@@ -250,29 +265,32 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'recurringRules')
           continue
         }
-        const created = await runWithDb(tx, recurringRulesRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          name: String(row.name ?? ''),
-          type: String(row.type ?? ''),
-          accountId: accountId ?? null,
-          destinationAccountId: destinationAccountId ?? null,
-          categoryId: categoryId ?? null,
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-          frequency: String(row.frequency ?? 'monthly'),
-          interval: typeof row.interval === 'number' ? row.interval : undefined,
-          startDate: optionalString(row.startDate),
-          endDate: optionalString(row.endDate),
-          lastExecutionDate: optionalString(row.lastExecutionDate),
-          nextRunDate: optionalString(row.nextRunDate),
-          symbol: optionalString(row.symbol),
-          side: optionalString(row.side),
-          units: optionalNumber(row.units),
-          unitPrice: optionalNumber(row.unitPrice),
-          fee: optionalNumber(row.fee),
-          time: optionalString(row.time),
-          status: typeof row.status === 'string' ? row.status : undefined,
-        }))
+        const created = await runWithDb(
+          tx,
+          recurringRulesRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            name: String(row.name ?? ''),
+            type: String(row.type ?? ''),
+            accountId: accountId ?? null,
+            destinationAccountId: destinationAccountId ?? null,
+            categoryId: categoryId ?? null,
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+            frequency: String(row.frequency ?? 'monthly'),
+            interval: typeof row.interval === 'number' ? row.interval : undefined,
+            startDate: optionalString(row.startDate),
+            endDate: optionalString(row.endDate),
+            lastExecutionDate: optionalString(row.lastExecutionDate),
+            nextRunDate: optionalString(row.nextRunDate),
+            symbol: optionalString(row.symbol),
+            side: optionalString(row.side),
+            units: optionalNumber(row.units),
+            unitPrice: optionalNumber(row.unitPrice),
+            fee: optionalNumber(row.fee),
+            time: optionalString(row.time),
+            status: typeof row.status === 'string' ? row.status : undefined,
+          }),
+        )
         if (typeof row.id === 'string') {
           recurringRuleIdMap.set(row.id, created.id)
         }
@@ -297,28 +315,31 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'pendingMovements')
           continue
         }
-        await runWithDb(tx, pendingMovementsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          recurringRuleId,
-          accountId: accountId ?? null,
-          destinationAccountId: destinationAccountId ?? null,
-          categoryId: categoryId ?? null,
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-          dueDate: String(row.dueDate ?? ''),
-          type: optionalString(row.type),
-          description: optionalString(row.description),
-          symbol: optionalString(row.symbol),
-          side: optionalString(row.side),
-          units: optionalNumber(row.units),
-          unitPrice: optionalNumber(row.unitPrice),
-          fee: optionalNumber(row.fee),
-          time: optionalString(row.time),
-          // The client's own movement id (`transactions.legacy_id`), which the
-          // import keeps, so it needs no remapping.
-          transactionId: optionalString(row.transactionId),
-          status: typeof row.status === 'string' ? row.status : undefined,
-        }))
+        await runWithDb(
+          tx,
+          pendingMovementsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            recurringRuleId,
+            accountId: accountId ?? null,
+            destinationAccountId: destinationAccountId ?? null,
+            categoryId: categoryId ?? null,
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+            dueDate: String(row.dueDate ?? ''),
+            type: optionalString(row.type),
+            description: optionalString(row.description),
+            symbol: optionalString(row.symbol),
+            side: optionalString(row.side),
+            units: optionalNumber(row.units),
+            unitPrice: optionalNumber(row.unitPrice),
+            fee: optionalNumber(row.fee),
+            time: optionalString(row.time),
+            // The client's own movement id (`transactions.legacy_id`), which the
+            // import keeps, so it needs no remapping.
+            transactionId: optionalString(row.transactionId),
+            status: typeof row.status === 'string' ? row.status : undefined,
+          }),
+        )
         bump(imported, 'pendingMovements')
       }
 
@@ -329,14 +350,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'budgetEntries')
           continue
         }
-        await runWithDb(tx, budgetEntriesRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          categoryId,
-          year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
-          month: typeof row.month === 'number' ? row.month : 1,
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-        }))
+        await runWithDb(
+          tx,
+          budgetEntriesRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            categoryId,
+            year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
+            month: typeof row.month === 'number' ? row.month : 1,
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+          }),
+        )
         bump(imported, 'budgetEntries')
       }
 
@@ -347,26 +371,32 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'goals')
           continue
         }
-        await runWithDb(tx, goalsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          key: String(row.key ?? ''),
-          categoryId: categoryId ?? null,
-          name: String(row.name ?? ''),
-          targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
-          targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
-          currency: String(row.currency ?? 'EUR'),
-        }))
+        await runWithDb(
+          tx,
+          goalsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            key: String(row.key ?? ''),
+            categoryId: categoryId ?? null,
+            name: String(row.name ?? ''),
+            targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
+            targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
+            currency: String(row.currency ?? 'EUR'),
+          }),
+        )
         bump(imported, 'goals')
       }
 
       // -- wealthSnapshots (+ balances, FK: accountId optional) --------------
       for (const row of asRows(body.wealthSnapshots)) {
-        const created = await runWithDb(tx, wealthRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          snapshotDate: String(row.snapshotDate ?? ''),
-          year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
-          month: typeof row.month === 'number' ? row.month : 1,
-        }))
+        const created = await runWithDb(
+          tx,
+          wealthRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            snapshotDate: String(row.snapshotDate ?? ''),
+            year: typeof row.year === 'number' ? row.year : new Date().getFullYear(),
+            month: typeof row.month === 'number' ? row.month : 1,
+          }),
+        )
         if (typeof row.id === 'string') {
           wealthSnapshotIdMap.set(row.id, created.id)
         }
@@ -378,27 +408,33 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'snapshotBalances')
             continue
           }
-          await runWithDb(tx, wealthRepository.createBalance(userId, {
-            snapshotId: created.id,
-            accountId: accountId ?? null,
-            balance: typeof balance.balance === 'number' ? balance.balance : 0,
-            currency: String(balance.currency ?? 'EUR'),
-          }))
+          await runWithDb(
+            tx,
+            wealthRepository.createBalance(userId, {
+              snapshotId: created.id,
+              accountId: accountId ?? null,
+              balance: typeof balance.balance === 'number' ? balance.balance : 0,
+              currency: String(balance.currency ?? 'EUR'),
+            }),
+          )
           bump(imported, 'snapshotBalances')
         }
       }
 
       // -- contributions (+ allocations, FK: accountId optional) ------------
       for (const row of asRows(body.contributions)) {
-        const created = await runWithDb(tx, contributionsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          date: String(row.date ?? ''),
-          amount: typeof row.amount === 'number' ? row.amount : 0,
-          currency: String(row.currency ?? 'EUR'),
-          portfolioDate: typeof row.portfolioDate === 'string' ? row.portfolioDate : null,
-          portfolioValue: typeof row.portfolioValue === 'number' ? row.portfolioValue : null,
-          flow: typeof row.flow === 'number' ? row.flow : null,
-        }))
+        const created = await runWithDb(
+          tx,
+          contributionsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            date: String(row.date ?? ''),
+            amount: typeof row.amount === 'number' ? row.amount : 0,
+            currency: String(row.currency ?? 'EUR'),
+            portfolioDate: typeof row.portfolioDate === 'string' ? row.portfolioDate : null,
+            portfolioValue: typeof row.portfolioValue === 'number' ? row.portfolioValue : null,
+            flow: typeof row.flow === 'number' ? row.flow : null,
+          }),
+        )
         if (typeof row.id === 'string') {
           contributionIdMap.set(row.id, created.id)
         }
@@ -410,12 +446,15 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'contributionAllocations')
             continue
           }
-          await runWithDb(tx, contributionsRepository.createAllocation(userId, {
-            contributionId: created.id,
-            accountId: accountId ?? null,
-            amount: typeof allocation.amount === 'number' ? allocation.amount : 0,
-            currency: String(allocation.currency ?? 'EUR'),
-          }))
+          await runWithDb(
+            tx,
+            contributionsRepository.createAllocation(userId, {
+              contributionId: created.id,
+              accountId: accountId ?? null,
+              amount: typeof allocation.amount === 'number' ? allocation.amount : 0,
+              currency: String(allocation.currency ?? 'EUR'),
+            }),
+          )
           bump(imported, 'contributionAllocations')
         }
       }
@@ -437,12 +476,16 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        await runWithDb(tx, marketRepository.createUserInstrument(userId, {
-          instrumentId: row.instrumentId,
-          categoryId: categoryId ?? null,
-          alias: typeof row.alias === 'string' ? (accountIdMap.get(row.alias) ?? row.alias) : null,
-          ...(configuration.success ? { quoteConfig: configuration.data } : {}),
-        }))
+        await runWithDb(
+          tx,
+          marketRepository.createUserInstrument(userId, {
+            instrumentId: row.instrumentId,
+            categoryId: categoryId ?? null,
+            alias:
+              typeof row.alias === 'string' ? (accountIdMap.get(row.alias) ?? row.alias) : null,
+            ...(configuration.success ? { quoteConfig: configuration.data } : {}),
+          }),
+        )
         bump(imported, 'userInstruments')
       }
 
@@ -453,14 +496,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsSymbolMappings')
           continue
         }
-        await runWithDb(tx, stockeventsSymbolMappingsRepository.create(userId, {
-          legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
-          categoryId: categoryId ?? null,
-          stockeventsSymbol: String(row.stockeventsSymbol ?? ''),
-          sync: row.sync === 1 || row.sync === true,
-          watchlistId: typeof row.watchlistId === 'string' ? row.watchlistId : null,
-          hidden: row.hidden === 1 || row.hidden === true,
-        }))
+        await runWithDb(
+          tx,
+          stockeventsSymbolMappingsRepository.create(userId, {
+            legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
+            categoryId: categoryId ?? null,
+            stockeventsSymbol: String(row.stockeventsSymbol ?? ''),
+            sync: row.sync === 1 || row.sync === true,
+            watchlistId: typeof row.watchlistId === 'string' ? row.watchlistId : null,
+            hidden: row.hidden === 1 || row.hidden === true,
+          }),
+        )
         bump(imported, 'stockeventsSymbolMappings')
       }
 
@@ -475,10 +521,13 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashMappings')
           continue
         }
-        await runWithDb(tx, stockeventsCashMappingsRepository.upsertMapping(userId, {
-          accountId: accountId ?? (typeof row.accountId === 'string' ? row.accountId : null),
-          watchlistId: row.watchlistId,
-        }))
+        await runWithDb(
+          tx,
+          stockeventsCashMappingsRepository.upsertMapping(userId, {
+            accountId: accountId ?? (typeof row.accountId === 'string' ? row.accountId : null),
+            watchlistId: row.watchlistId,
+          }),
+        )
         bump(imported, 'stockeventsCashMappings')
       }
 
@@ -489,13 +538,16 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashSyncEntries')
           continue
         }
-        await runWithDb(tx, stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
-          contributionDate: String(row.contributionDate ?? ''),
-          accountId: accountId ?? null,
-          watchlistId: row.watchlistId,
-          syncedAmount: typeof row.syncedAmount === 'number' ? row.syncedAmount : 0,
-          currency: String(row.currency ?? 'EUR'),
-        }))
+        await runWithDb(
+          tx,
+          stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
+            contributionDate: String(row.contributionDate ?? ''),
+            accountId: accountId ?? null,
+            watchlistId: row.watchlistId,
+            syncedAmount: typeof row.syncedAmount === 'number' ? row.syncedAmount : 0,
+            currency: String(row.currency ?? 'EUR'),
+          }),
+        )
         bump(imported, 'stockeventsCashSyncEntries')
       }
 
@@ -522,13 +574,16 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
       }
 
       const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
-      await runWithDb(tx, syncRepository.createChange(userId, {
-        revision,
-        entityType: 'reset',
-        entityId: userId,
-        changeType: 'update',
-        payload: null,
-      }))
+      await runWithDb(
+        tx,
+        syncRepository.createChange(userId, {
+          revision,
+          entityType: 'reset',
+          entityId: userId,
+          changeType: 'update',
+          payload: null,
+        }),
+      )
 
       return { imported, skipped }
     })
@@ -567,10 +622,7 @@ function optionalFlag(value: unknown): boolean | undefined {
  * the global instrument catalogue, which a restore into another deployment
  * may not have: then the symbol alone is kept, as for an untracked ticker.
  */
-async function importOperation(
-  tx: Db,
-  value: unknown,
-): Promise<MovementOperationInput | null> {
+async function importOperation(tx: Db, value: unknown): Promise<MovementOperationInput | null> {
   if (!isObject(value) || typeof value.side !== 'string') {
     return null
   }
