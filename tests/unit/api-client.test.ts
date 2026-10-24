@@ -8,14 +8,22 @@ import {
   SESSION_EXPIRED_MESSAGE,
   apiEndpointPath,
 } from '../../src/lib/client/api-error'
-import { requestApiJson } from '../../src/lib/client/api-client'
+import {
+  requestApiJson as requestApiJsonEffect,
+  type ApiRequestInit,
+} from '../../src/lib/client/api-client'
 import { reportApiErrorToSentry } from '../../src/lib/client/error-reporting'
+import { runClientHttp } from '../../src/lib/client/runtime'
+
+/** El efecto se ejecuta en el borde, igual que hace un manejador de Vue. */
+function requestApiJson<T>(endpoint: string, init: ApiRequestInit): Promise<T> {
+  return runClientHttp(requestApiJsonEffect<T>(endpoint, init))
+}
 
 const sentry = vi.hoisted(() => ({ captureException: vi.fn(), withScope: vi.fn() }))
 
 vi.mock('../../src/lib/client/error-reporting', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../src/lib/client/error-reporting')>()
+  const actual = await importOriginal<typeof import('../../src/lib/client/error-reporting')>()
   // Espía que delega en la implementación real: el embudo queda aislado, pero
   // el caso de telemetría caída ejerce la pieza de verdad.
   return { reportApiErrorToSentry: vi.fn(actual.reportApiErrorToSentry) }

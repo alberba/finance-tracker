@@ -1,5 +1,6 @@
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia, type Pinia } from 'pinia'
+import { Effect } from 'effect'
 
 import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,7 @@ import { useLiveQuotes } from '../../src/composables/useLiveQuotes'
 import { fetchMarketQuotes } from '../../src/services/market-api'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useMarketStore } from '../../src/stores/market'
+import type { Quote } from '../../src/scripts/types'
 
 vi.mock('../../src/services/market-api', () => ({ fetchMarketQuotes: vi.fn() }))
 
@@ -28,7 +30,7 @@ describe('actualización automática de cotizaciones', () => {
     vi.setSystemTime(new Date('2026-10-18T12:00:00Z'))
     pinia = createPinia()
     setActivePinia(pinia)
-    vi.mocked(fetchMarketQuotes).mockResolvedValue({})
+    vi.mocked(fetchMarketQuotes).mockReturnValue(Effect.succeed({}))
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     useFinancialStateStore().commitState((state) => {
@@ -89,29 +91,33 @@ describe('actualización automática de cotizaciones', () => {
   })
 
   it('conserva el símbolo visible y descarta la respuesta del ticker anterior al cambiar la consulta', async () => {
-    let finishOld!: (value: Awaited<ReturnType<typeof fetchMarketQuotes>>) => void
+    let finishOld!: (value: Record<string, Quote>) => void
     vi.mocked(fetchMarketQuotes)
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishOld = resolve
-          }),
+      .mockReturnValueOnce(
+        Effect.promise(
+          () =>
+            new Promise((resolve) => {
+              finishOld = resolve
+            }),
+        ),
       )
-      .mockResolvedValueOnce({
-        vwce: {
-          instrumentId: 'vwce',
-          price: 125,
-          currency: 'EUR',
-          timestamp: new Date().toISOString(),
-          fetchedAt: new Date().toISOString(),
-          dataType: 'unknown',
-          source: 'yahoo',
-          status: 'fresh',
-          isStale: false,
-          previousClose: null,
-          changePercent: null,
-        },
-      })
+      .mockReturnValueOnce(
+        Effect.succeed({
+          vwce: {
+            instrumentId: 'vwce',
+            price: 125,
+            currency: 'EUR',
+            timestamp: new Date().toISOString(),
+            fetchedAt: new Date().toISOString(),
+            dataType: 'unknown',
+            source: 'yahoo',
+            status: 'fresh',
+            isStale: false,
+            previousClose: null,
+            changePercent: null,
+          },
+        }),
+      )
     views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     const state = useFinancialStateStore()
     state.commitState((draft) => {
@@ -145,21 +151,23 @@ describe('actualización automática de cotizaciones', () => {
       draft.instruments[0].type = 'crypto'
       draft.instruments[0].symbol = 'BTC'
     })
-    vi.mocked(fetchMarketQuotes).mockResolvedValue({
-      vwce: {
-        instrumentId: 'vwce',
-        price: 73_000,
-        currency: 'EUR',
-        timestamp: new Date().toISOString(),
-        fetchedAt: new Date().toISOString(),
-        dataType: 'unknown',
-        source: 'yahoo',
-        status: 'fresh',
-        isStale: false,
-        previousClose: null,
-        changePercent: null,
-      },
-    })
+    vi.mocked(fetchMarketQuotes).mockReturnValue(
+      Effect.succeed({
+        vwce: {
+          instrumentId: 'vwce',
+          price: 73_000,
+          currency: 'EUR',
+          timestamp: new Date().toISOString(),
+          fetchedAt: new Date().toISOString(),
+          dataType: 'unknown',
+          source: 'yahoo',
+          status: 'fresh',
+          isStale: false,
+          previousClose: null,
+          changePercent: null,
+        },
+      }),
+    )
     views.push(mount(QuoteView, { global: { plugins: [pinia] } }))
     await vi.advanceTimersByTimeAsync(0)
     useMarketStore().configureInstrumentSymbols('vwce', 'BTC', 'BTC-EUR')

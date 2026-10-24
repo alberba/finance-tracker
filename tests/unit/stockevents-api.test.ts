@@ -6,13 +6,21 @@ vi.mock('../../src/scripts/demo-mode', () => ({
 
 import type { StockEventsTransactionPayload } from '../../src/domain/stockevents/transaction-payload'
 import { ApiClientError, OFFLINE_MESSAGE } from '../../src/lib/client/api-error'
-import {
-  checkStockEventsSymbols,
-  createStockEventsTransaction,
-  fetchStockEventsCredentialStatus,
-  fetchStockEventsWatchlists,
-  saveStockEventsCredential,
-} from '../../src/services/stockevents-api'
+import { runClientHttp } from '../../src/lib/client/runtime'
+import * as stockeventsApi from '../../src/services/stockevents-api'
+
+// Los efectos se ejecutan en el borde, igual que hace la acción de Pinia.
+const fetchStockEventsCredentialStatus = () =>
+  runClientHttp(stockeventsApi.fetchStockEventsCredentialStatus())
+const saveStockEventsCredential = (apiKey: string) =>
+  runClientHttp(stockeventsApi.saveStockEventsCredential(apiKey))
+const fetchStockEventsWatchlists = () => runClientHttp(stockeventsApi.fetchStockEventsWatchlists())
+const checkStockEventsSymbols = (
+  checks: Parameters<typeof stockeventsApi.checkStockEventsSymbols>[0],
+) => runClientHttp(stockeventsApi.checkStockEventsSymbols(checks))
+const createStockEventsTransaction = (
+  transaction: Parameters<typeof stockeventsApi.createStockEventsTransaction>[0],
+) => runClientHttp(stockeventsApi.createStockEventsTransaction(transaction))
 
 const transaction: StockEventsTransactionPayload = {
   watchlistId: 'wl-1',

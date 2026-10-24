@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -46,7 +47,7 @@ describe('useDataStore — JSON backup on sync v2', () => {
   })
 
   it('exports the server backup, not the in-memory state', async () => {
-    vi.mocked(fetchBackup).mockResolvedValue({ ok: true, value: '{}' })
+    vi.mocked(fetchBackup).mockReturnValue(Effect.succeed({ ok: true, value: '{}' }))
     const { click } = stubDom()
 
     await useDataStore().exportJson()
@@ -56,7 +57,7 @@ describe('useDataStore — JSON backup on sync v2', () => {
   })
 
   it('does not download anything when the export fails', async () => {
-    vi.mocked(fetchBackup).mockResolvedValue({ ok: false, error: '500' })
+    vi.mocked(fetchBackup).mockReturnValue(Effect.succeed({ ok: false, error: '500' }))
     const { click } = stubDom()
 
     await useDataStore().exportJson()
@@ -65,7 +66,7 @@ describe('useDataStore — JSON backup on sync v2', () => {
   })
 
   it('restores the file on the server after flushing the queue, then reloads', async () => {
-    vi.mocked(restoreBackup).mockResolvedValue({ ok: true, value: { skipped: 0 } })
+    vi.mocked(restoreBackup).mockReturnValue(Effect.succeed({ ok: true, value: { skipped: 0 } }))
     const { reload } = stubDom()
 
     await useDataStore().importJson(backupFile)
@@ -86,7 +87,7 @@ describe('useDataStore — JSON backup on sync v2', () => {
   })
 
   it('does not reload when the server rejects the file', async () => {
-    vi.mocked(restoreBackup).mockResolvedValue({ ok: false, error: 'no' })
+    vi.mocked(restoreBackup).mockReturnValue(Effect.succeed({ ok: false, error: 'no' }))
     const { reload } = stubDom()
 
     await useDataStore().importJson(backupFile)

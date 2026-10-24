@@ -9,12 +9,18 @@ import {
   OFFLINE_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
 } from '../../src/lib/client/api-error'
+import { runClientHttp } from '../../src/lib/client/runtime'
 import {
   ISSUE_REPORT_ENDPOINT,
   type ReportResponse,
   type ReportPayload,
-  submitIssueReport,
+  submitIssueReport as submitIssueReportEffect,
 } from '../../src/services/issue-report-api'
+
+/** El efecto se ejecuta en el borde, igual que el manejador del panel. */
+function submitIssueReport(payload: ReportPayload): Promise<ReportResponse> {
+  return runClientHttp(submitIssueReportEffect(payload))
+}
 
 const FALLBACK_MESSAGE = 'No se pudo crear la issue.'
 
