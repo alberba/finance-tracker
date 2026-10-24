@@ -70,13 +70,13 @@ export async function configureBitvavo(
     startDate: config.startDate,
     timeZone: config.timeZone,
   }
-  await repository.ensureConnection(db, userId, settings)
+  await runWithDb(db, repository.ensureConnection(userId, settings))
   const token = crypto.randomUUID()
-  await repository.acquire(db, userId, token)
+  await runWithDb(db, repository.acquire(userId, token))
   try {
-    await repository.saveConnection(db, userId, settings, envelope, token)
+    await runWithDb(db, repository.saveConnection(userId, settings, envelope, token))
   } finally {
-    await repository.release(db, userId, token)
+    await runWithDb(db, repository.release(userId, token))
   }
 }
 
@@ -86,7 +86,7 @@ export async function previewBitvavo(
   env: DataEncryptionEnv,
   http: typeof fetch = fetch,
 ): Promise<BitvavoPreview> {
-  const config = await repository.getConnection(db, userId)
+  const config = await runWithDb(db, repository.getConnection(userId))
   const credential = await runWithDb(db, credentials.getByProvider(userId, 'bitvavo', env))
   if (!config || !credential) throw new RejectedCommandError('Conecta Bitvavo primero.')
   const secret: BitvavoCredentials = connectionSchema
@@ -138,7 +138,7 @@ export async function previewBitvavo(
           .map((m) => ({ id: m.id, description: m.description || '', date: m.date })),
       })),
   }
-  await repository.savePreview(db, userId, preview)
+  await runWithDb(db, repository.savePreview(userId, preview))
   return preview
 }
 
@@ -148,8 +148,8 @@ export async function confirmBitvavo(
   previewId: string,
   resolutions: DuplicateResolution[],
 ) {
-  const stored = await repository.getPreview(db, userId, previewId)
-  const connection = await repository.getConnection(db, userId)
+  const stored = await runWithDb(db, repository.getPreview(userId, previewId))
+  const connection = await runWithDb(db, repository.getConnection(userId))
   if (!stored || !connection) throw new RejectedCommandError('Vista previa no encontrada.')
   if (stored.status === 'complete') return { imported: 0 }
   const preview = stored.preview
@@ -191,11 +191,11 @@ export async function confirmBitvavo(
   if (stored.resolutions && stored.resolutions !== serialized)
     throw new RejectedCommandError('Reanuda con las mismas resoluciones.')
   const token = crypto.randomUUID()
-  await repository.acquire(db, userId, token)
+  await runWithDb(db, repository.acquire(userId, token))
   try {
-    const current = await repository.getPreview(db, userId, previewId)
+    const current = await runWithDb(db, repository.getPreview(userId, previewId))
     if (current?.status === 'complete') return { imported: 0 }
-    const active = await repository.getConnection(db, userId)
+    const active = await runWithDb(db, repository.getConnection(userId))
     if (active?.version !== preview.connectionVersion)
       throw new RejectedCommandError('La configuración cambió: genera otra vista previa.')
     if (current?.resolutions && current.resolutions !== serialized)
@@ -205,28 +205,25 @@ export async function confirmBitvavo(
       throw new RejectedCommandError('La cuenta de destino ya no está disponible en EUR.')
     return await Effect.runPromise(
       Effect.gen(function* () {
-        yield* databaseCall(() => repository.reservePreview(db, userId, previewId, serialized))
+        yield* databaseCall(() => runWithDb(db, repository.reservePreview(userId, previewId, serialized)))
         let imported = 0
         for (const operation of preview.operations) {
-          yield* databaseCall(() => repository.renew(db, userId, token))
+          yield* databaseCall(() => runWithDb(db, repository.renew(userId, token)))
           if (
             yield* databaseCall(() =>
-              repository.importOperation(
-                db,
-                userId,
+              runWithDb(db, repository.importOperation(userId,
                 preview.accountId,
                 operation,
-                choices.get(operation.externalId) ?? null,
-              ),
+                choices.get(operation.externalId) ?? null,)),
             )
           )
             imported++
         }
-        yield* databaseCall(() => repository.finishPreview(db, userId, preview, token))
+        yield* databaseCall(() => runWithDb(db, repository.finishPreview(userId, preview, token)))
         return { imported }
       }),
     )
   } finally {
-    await repository.release(db, userId, token)
+    await runWithDb(db, repository.release(userId, token))
   }
 }

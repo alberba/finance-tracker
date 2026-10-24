@@ -627,7 +627,7 @@ describe('round trip: imported movement protections (#263)', () => {
         currency: 'EUR',
         openingBalance: 0,
       }))
-      await importOperation(db, userId, accountId, remoteOperation, null)
+      await runWithDb(db, importOperation(userId, accountId, remoteOperation, null))
     })
   })
   afterEach(() => trip.cleanup())
