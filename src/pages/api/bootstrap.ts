@@ -17,7 +17,7 @@
 import type { APIRoute } from 'astro'
 import { getDb } from '../../db/client'
 import { buildBootstrapPayload } from '../../lib/server/bootstrap-payload'
-import { runWithDb } from '../../db/database'
+import { runServer } from '../../lib/server/runtime'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../lib/server/api-auth'
 
 function parseYear(raw: string | null): number | undefined | 'invalid' {
@@ -40,6 +40,6 @@ export const GET: APIRoute = async ({ request, locals }) =>
       return jsonResponse({ error: "Parámetro 'year' inválido." }, 400)
     }
 
-    const payload = await runWithDb(getDb(locals), buildBootstrapPayload(principal.userId, year))
+    const payload = await runServer(getDb(locals), buildBootstrapPayload(principal.userId, year))
     return jsonResponse(payload, 200)
   })
