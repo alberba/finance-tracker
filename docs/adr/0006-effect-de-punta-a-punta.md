@@ -54,6 +54,17 @@ registra en su commit.
 Cada fase va en su propio PR apilado, con typecheck y tests dirigidos; el conjunto completo y el
 E2E smoke solo al final de cada PR.
 
+## Medición previa a la fase 5
+
+`pnpm benchmark:performance` sobre el build de producción (`pnpm build` y `astro preview`) con la
+red simulada del script (CPU 4×, 10 Mbps, 40 ms) y 7 iteraciones, mediana: **835,32 KB de JS
+transferido** en 36 peticiones, `appReady` 1.162 ms, LCP 780 ms. Es la línea base del cliente
+antes de tocar stores, outbox y composables; el presupuesto de 200,29 KB sigue siendo el ancla
+del ADR y se compara contra esta medición al cerrar la fase 5.
+
+Nota de operación: `astro preview` escucha en `localhost` (IPv6), así que la medición se lanza con
+`BENCHMARK_BASE_URL=http://localhost:4322`. Con `127.0.0.1` no conecta.
+
 ## Presupuesto y salida
 
 Tras las fases 5 y 7 se vuelve a medir y se anota el delta aquí. Presupuesto propuesto: el JS de
