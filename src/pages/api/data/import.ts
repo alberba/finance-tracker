@@ -195,7 +195,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           currency: String(row.currency ?? 'EUR'),
           time: optionalString(row.time),
           declared: Boolean(row.declared),
-          accountingMonth: optionalNumber(row.accountingMonth),
+          accountingMonth:
+            Number.isInteger(row.accountingMonth) &&
+            (row.accountingMonth as number) >= 1 &&
+            (row.accountingMonth as number) <= 12
+              ? (row.accountingMonth as number)
+              : null,
           operation: await importOperation(tx, row.operation),
           externalId: optionalString(row.externalId),
           remoteOperation: isObject(row.remoteOperation)

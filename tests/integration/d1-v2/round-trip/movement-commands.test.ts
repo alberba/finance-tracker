@@ -5,6 +5,7 @@ import * as market from '../../../../src/db/repositories/market'
 import { listChangesSince } from '../../../../src/db/repositories/sync'
 import type { Db } from '../../../../src/db/client'
 import type { RemoteOperation } from '../../../../src/lib/bitvavo-types'
+import { transactions } from '../../../../src/db/schema'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMovementsStore } from '../../../../src/stores/movements'
@@ -101,6 +102,24 @@ describe('round trip: shared movement commands (#263)', () => {
     ).toBe(true)
     const afterEdit = await trip.reload()
     expect(afterEdit.transactions[0]).toMatchObject({ month: 0 })
+    expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBeNull()
+  })
+
+  it('maps the app month (0-11) to the stored month (1-12) and back for December (#337)', async () => {
+    expect(
+      useMovementsStore().addTransaction({
+        date: '2026-11-30',
+        month: 11,
+        type: 'expense',
+        accountId,
+        category: 'Ocio',
+        description: 'Regalo',
+        amount: 20,
+      }),
+    ).toBe(true)
+    const reloaded = await trip.reload()
+    expect(reloaded.transactions[0]).toMatchObject({ month: 11 })
+    expect((await trip.testDb.db.select().from(transactions))[0].accountingMonth).toBe(12)
   })
 
   it('keeps the operation, own currency, time and declaration when edited from Movimientos', async () => {
