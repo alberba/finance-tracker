@@ -91,14 +91,16 @@ function txDone(tx: IDBTransaction): Promise<void> {
   })
 }
 
-function formatIssues(issues: { path: PropertyKey[]; message: string }[]): string {
+function formatIssues(
+  issues: readonly { path: readonly PropertyKey[]; message: string }[],
+): string {
   return issues
     .map((issue) => `${issue.path.map(String).join('.') || '(raíz)'}: ${issue.message}`)
     .join('; ')
 }
 
 interface InvalidCommandFields {
-  readonly issues: { path: PropertyKey[]; message: string }[]
+  readonly issues: readonly { path: readonly PropertyKey[]; message: string }[]
   readonly message: string
 }
 
@@ -171,7 +173,7 @@ export const enqueue = (
     const withId = { ...command, commandId: command.commandId ?? generateCommandId() }
     const parsed = syncCommandSchema.safeParse(withId)
     if (!parsed.success) {
-      return yield* Effect.fail(new InvalidCommandError(parsed.error.issues))
+      return yield* Effect.fail(new InvalidCommandError(parsed.issues))
     }
 
     if (parsed.data.action === 'create') {
@@ -179,12 +181,12 @@ export const enqueue = (
         parsed.data.data,
       )
       if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.error.issues))
+        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
       }
     } else if (parsed.data.action === 'update') {
       const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch)
       if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.error.issues))
+        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
       }
     }
 
@@ -323,7 +325,7 @@ export const amendPendingCreate = (
       const entityCheck =
         entityCreatePayloadSchemas[existing.command.entityType].safeParse(mergedData)
       if (!entityCheck.success) {
-        throw new InvalidCommandError(entityCheck.error.issues)
+        throw new InvalidCommandError(entityCheck.issues)
       }
       store.put({
         ...existing,

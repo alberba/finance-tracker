@@ -1,4 +1,7 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+
+import { validator } from './schema'
+
 export interface RemoteOperation {
   provider: 'bitvavo'
   externalId: string
@@ -35,18 +38,25 @@ export interface DuplicateResolution {
   transactionId: string | null
 }
 
-export const remoteOperationSchema = z.object({
-  provider: z.literal('bitvavo'),
-  externalId: z.string(),
-  executedAt: z.iso.datetime(),
-  timeZone: z.string(),
-  date: z.iso.date(),
-  time: z.string(),
-  side: z.enum(['buy', 'sell']),
-  symbol: z.string(),
-  quantity: z.string(),
-  unitPrice: z.string(),
-  fee: z.string(),
-  cashAmount: z.string(),
-  currency: z.literal('EUR'),
-}) satisfies z.ZodType<RemoteOperation>
+export const remoteOperationSchema = validator(
+  Schema.Struct({
+    provider: Schema.Literal('bitvavo'),
+    externalId: Schema.String,
+    executedAt: Schema.String.check(
+      Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/),
+    ),
+    timeZone: Schema.String,
+    date: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/)),
+    time: Schema.String,
+    side: Schema.Literals(['buy', 'sell']),
+    symbol: Schema.String,
+    quantity: Schema.String,
+    unitPrice: Schema.String,
+    fee: Schema.String,
+    cashAmount: Schema.String,
+    currency: Schema.Literal('EUR'),
+  }),
+  // The stored row also carries the preview's `alreadyImported`/`candidates`;
+  // the projection only reads the operation fields, as zod's default did.
+  { onExcessProperty: 'ignore' },
+)

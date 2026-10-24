@@ -25,11 +25,14 @@ export const POST: APIRoute = async ({ request, locals }) =>
 
     const parsed = syncBatchSchema.safeParse(body)
     if (!parsed.success) {
-      return jsonResponse({ error: 'Payload de sync inválido.', issues: parsed.error.issues }, 400)
+      return jsonResponse({ error: 'Payload de sync inválido.', issues: parsed.issues }, 400)
     }
 
     const db = getDb(locals)
-    const batchResult = await runServer(db, applySyncBatch(principal.userId, parsed.data.commands))
+    const batchResult = await runServer(
+      db,
+      applySyncBatch(principal.userId, [...parsed.data.commands]),
+    )
 
     const hasConflict = batchResult.results.some((result) => result.status === 'conflict')
 
