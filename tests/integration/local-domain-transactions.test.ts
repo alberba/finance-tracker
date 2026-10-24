@@ -15,6 +15,7 @@ import { POST as reset } from '../../src/pages/api/state/reset'
 import { POST as importData } from '../../src/pages/api/data/import'
 import { GET as exportData } from '../../src/pages/api/data/export'
 import type { Db } from '../../src/db/client'
+import { runWithDb } from '../../src/db/database'
 
 let sqlite: Database.Database
 let db: Db
@@ -171,8 +172,8 @@ it('rolls back a command including changes, cursor and result while retaining it
   expect(await accountsRepository.listByUser(db, 'owner')).toEqual([])
   expect(await db.select().from(schema.syncChanges)).toEqual([])
   expect(await db.select().from(schema.auditEvents)).toEqual([])
-  expect(await syncRepository.getRevision(db, 'owner')).toBeUndefined()
-  expect(await syncRepository.getCommand(db, 'owner', 'failed-command')).toMatchObject({
+  expect(await runWithDb(db, syncRepository.getRevision('owner'))).toBeUndefined()
+  expect(await runWithDb(db, syncRepository.getCommand('owner', 'failed-command'))).toMatchObject({
     status: 'processing',
     result: null,
   })
@@ -191,7 +192,7 @@ it('applies the same command concurrently only once through the production bindi
   ])
   expect(outcomes.filter((outcome) => !outcome.replayed)).toHaveLength(1)
   expect(await accountsRepository.listByUser(db, 'owner')).toHaveLength(1)
-  expect(await syncRepository.getRevision(db, 'owner')).toMatchObject({ revision: 1 })
+  expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 1 })
   expect(await applyOneCommand(db, 'owner', command)).toMatchObject({
     status: 'applied',
     replayed: true,
@@ -206,7 +207,7 @@ it('initializes a concurrent request only once', async () => {
   expect(responses.map((response) => response.status).sort()).toEqual([200, 201])
   expect(await accountsRepository.listCategoriesByUser(db, 'owner')).toEqual([])
   expect(await db.select().from(schema.userSettings)).toHaveLength(1)
-  expect(await syncRepository.getRevision(db, 'owner')).toMatchObject({ revision: 0 })
+  expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 0 })
 })
 
 it('recovers a failed command after its lease expires and replays the committed result', async () => {
@@ -236,10 +237,10 @@ it('recovers a failed command after its lease expires and replays the committed 
     replayed: true,
   })
   expect(await accountsRepository.listByUser(db, 'owner')).toHaveLength(1)
-  expect(await syncRepository.getRevision(db, 'owner')).toMatchObject({ revision: 1 })
+  expect(await runWithDb(db, syncRepository.getRevision('owner'))).toMatchObject({ revision: 1 })
   expect(await db.select().from(schema.syncChanges)).toHaveLength(1)
   expect(await db.select().from(schema.auditEvents)).toHaveLength(1)
-  expect(await syncRepository.getCommand(db, 'owner', command.commandId)).toMatchObject({
+  expect(await runWithDb(db, syncRepository.getCommand('owner', command.commandId))).toMatchObject({
     status: 'applied',
     result: expect.any(String),
   })
@@ -272,7 +273,7 @@ it('rolls back the investment operation and movement with sync metadata on a fin
   expect(await db.select().from(schema.transactions)).toEqual([])
   expect(await db.select().from(schema.investmentTradeDetails)).toEqual([])
   expect(await db.select().from(schema.syncChanges)).toEqual([])
-  expect(await syncRepository.getRevision(db, 'owner')).toBeUndefined()
+  expect(await runWithDb(db, syncRepository.getRevision('owner'))).toBeUndefined()
 })
 
 it('preserves another user importing concurrently while the first import rolls back', async () => {

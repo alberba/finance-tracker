@@ -360,8 +360,8 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   it.each(['append', 'replace'])(
     'advances the sync cursor and requests a full refresh after %s import',
     async (mode) => {
-      await syncRepository.ensureRevision(testDb.db, principal.userId)
-      for (let i = 0; i < 3; i++) await syncRepository.bumpRevision(testDb.db, principal.userId)
+      await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
+      for (let i = 0; i < 3; i++) await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
       const { POST } = await import('../../../../src/pages/api/data/import')
       const url = new URL(`https://example.test/api/data/import?mode=${mode}`)
       const response = await POST({
@@ -370,10 +370,10 @@ describe('GET /api/data/export + POST /api/data/import', () => {
         url,
       } as never)
       expect(response.status).toBe(200)
-      expect(await syncRepository.getRevision(testDb.db, principal.userId)).toMatchObject({
+      expect(await runWithDb(testDb.db, syncRepository.getRevision(principal.userId))).toMatchObject({
         revision: 4,
       })
-      expect(await syncRepository.listChangesSince(testDb.db, principal.userId, 3)).toMatchObject([
+      expect(await runWithDb(testDb.db, syncRepository.listChangesSince(principal.userId, 3))).toMatchObject([
         { revision: 4, entityType: 'reset' },
       ])
     },

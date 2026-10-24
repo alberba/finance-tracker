@@ -5,6 +5,7 @@ import * as transactionsRepository from "../../../../src/db/repositories/transac
 import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedCategory, seedUser } from "../repositories/fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("sync commands that can never succeed are rejected, not retried (audit §2)", () => {
   let testDb: TestDatabase;
@@ -22,7 +23,7 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
   async function expectRejectedAndFinalized(commandId: string, results: Awaited<ReturnType<typeof applySyncBatch>>) {
     expect(results.results[0]).toMatchObject({ commandId, status: "rejected" });
     expect(results.results[0].message).toBeTruthy();
-    const row = await syncRepository.getCommand(testDb.db, userId, commandId);
+    const row = await runWithDb(testDb.db, syncRepository.getCommand(userId, commandId));
     expect(row?.status).toBe("rejected");
     expect(row?.result).not.toBeNull();
   }

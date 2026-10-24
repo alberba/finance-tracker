@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as syncRepo from "../../../../src/db/repositories/sync";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 describe("sync repository", () => {
   let testDb: TestDatabase;
@@ -19,19 +20,19 @@ describe("sync repository", () => {
       const { db } = testDb;
       const user = await seedUser(db);
 
-      const ensured = await syncRepo.ensureRevision(db, user.id);
+      const ensured = await runWithDb(db, syncRepo.ensureRevision(user.id));
       expect(ensured.revision).toBe(0);
 
-      const bumped = await syncRepo.bumpRevision(db, user.id);
+      const bumped = await runWithDb(db, syncRepo.bumpRevision(user.id));
       expect(bumped.revision).toBe(1);
 
-      expect(await syncRepo.getRevision(db, user.id)).toMatchObject({ revision: 1 });
-      expect(await syncRepo.removeRevision(db, user.id)).toBe(true);
+      expect(await runWithDb(db, syncRepo.getRevision(user.id))).toMatchObject({ revision: 1 });
+      expect(await runWithDb(db, syncRepo.removeRevision(user.id))).toBe(true);
     });
 
     it("rejects a revision cursor for a non-existent user (FK violation)", async () => {
       const { db } = testDb;
-      await expect(syncRepo.ensureRevision(db, "does-not-exist")).rejects.toThrow(
+      await expect(runWithDb(db, syncRepo.ensureRevision("does-not-exist"))).rejects.toThrow(
         /FOREIGN KEY constraint failed/i,
       );
     });
@@ -40,9 +41,9 @@ describe("sync repository", () => {
       const { db } = testDb;
       const userA = await seedUser(db);
       const userB = await seedUser(db);
-      await syncRepo.bumpRevision(db, userA.id);
+      await runWithDb(db, syncRepo.bumpRevision(userA.id));
 
-      expect(await syncRepo.getRevision(db, userB.id)).toBeUndefined();
+      expect(await runWithDb(db, syncRepo.getRevision(userB.id))).toBeUndefined();
     });
   });
 
@@ -51,26 +52,26 @@ describe("sync repository", () => {
       const { db } = testDb;
       const user = await seedUser(db);
 
-      const created = await syncRepo.createCommand(db, user.id, {
+      const created = await runWithDb(db, syncRepo.createCommand(user.id, {
         id: "cmd-1",
         commandType: "transaction.create",
         payload: "{}",
-      });
+      }));
       expect(created.id).toBe("cmd-1");
 
-      expect(await syncRepo.getCommand(db, user.id, "cmd-1")).toMatchObject({ commandType: "transaction.create" });
+      expect(await runWithDb(db, syncRepo.getCommand(user.id, "cmd-1"))).toMatchObject({ commandType: "transaction.create" });
 
       await expect(
-        syncRepo.createCommand(db, user.id, { id: "cmd-1", commandType: "transaction.create", payload: "{}" }),
+        runWithDb(db, syncRepo.createCommand(user.id, { id: "cmd-1", commandType: "transaction.create", payload: "{}" })),
       ).rejects.toThrow();
 
-      expect(await syncRepo.remove(db, user.id, "cmd-1")).toBe(true);
+      expect(await runWithDb(db, syncRepo.remove(user.id, "cmd-1"))).toBe(true);
     });
 
     it("rejects creating a command for a non-existent user (FK violation)", async () => {
       const { db } = testDb;
       await expect(
-        syncRepo.createCommand(db, "does-not-exist", { id: "cmd-1", commandType: "x", payload: "{}" }),
+        runWithDb(db, syncRepo.createCommand("does-not-exist", { id: "cmd-1", commandType: "x", payload: "{}" })),
       ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
     });
 
@@ -78,10 +79,10 @@ describe("sync repository", () => {
       const { db } = testDb;
       const userA = await seedUser(db);
       const userB = await seedUser(db);
-      await syncRepo.createCommand(db, userA.id, { id: "cmd-a", commandType: "x", payload: "{}" });
+      await runWithDb(db, syncRepo.createCommand(userA.id, { id: "cmd-a", commandType: "x", payload: "{}" }));
 
-      expect(await syncRepo.getCommand(db, userB.id, "cmd-a")).toBeUndefined();
-      expect(await syncRepo.listCommandsByUser(db, userB.id)).toHaveLength(0);
+      expect(await runWithDb(db, syncRepo.getCommand(userB.id, "cmd-a"))).toBeUndefined();
+      expect(await runWithDb(db, syncRepo.listCommandsByUser(userB.id))).toHaveLength(0);
     });
   });
 
@@ -90,32 +91,32 @@ describe("sync repository", () => {
       const { db } = testDb;
       const user = await seedUser(db);
 
-      await syncRepo.createChange(db, user.id, {
+      await runWithDb(db, syncRepo.createChange(user.id, {
         revision: 1,
         entityType: "transaction",
         entityId: "t1",
         changeType: "created",
-      });
-      await syncRepo.createChange(db, user.id, {
+      }));
+      await runWithDb(db, syncRepo.createChange(user.id, {
         revision: 2,
         entityType: "transaction",
         entityId: "t2",
         changeType: "created",
-      });
+      }));
 
-      expect(await syncRepo.listChangesByUser(db, user.id)).toHaveLength(2);
-      expect(await syncRepo.listChangesSince(db, user.id, 1)).toHaveLength(1);
+      expect(await runWithDb(db, syncRepo.listChangesByUser(user.id))).toHaveLength(2);
+      expect(await runWithDb(db, syncRepo.listChangesSince(user.id, 1))).toHaveLength(1);
     });
 
     it("rejects creating a change for a non-existent user (FK violation)", async () => {
       const { db } = testDb;
       await expect(
-        syncRepo.createChange(db, "does-not-exist", {
+        runWithDb(db, syncRepo.createChange("does-not-exist", {
           revision: 1,
           entityType: "transaction",
           entityId: "t1",
           changeType: "created",
-        }),
+        })),
       ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
     });
 
@@ -123,14 +124,14 @@ describe("sync repository", () => {
       const { db } = testDb;
       const userA = await seedUser(db);
       const userB = await seedUser(db);
-      await syncRepo.createChange(db, userA.id, {
+      await runWithDb(db, syncRepo.createChange(userA.id, {
         revision: 1,
         entityType: "transaction",
         entityId: "t1",
         changeType: "created",
-      });
+      }));
 
-      expect(await syncRepo.listChangesByUser(db, userB.id)).toHaveLength(0);
+      expect(await runWithDb(db, syncRepo.listChangesByUser(userB.id))).toHaveLength(0);
     });
   });
 });

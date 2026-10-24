@@ -490,14 +490,14 @@ async function recordChange(
   changeType: 'create' | 'update' | 'remove',
   payload: unknown,
 ): Promise<number> {
-  const revisionRow = await syncRepository.bumpRevision(db, userId)
-  await syncRepository.createChange(db, userId, {
+  const revisionRow = await runWithDb(db, syncRepository.bumpRevision(userId))
+  await runWithDb(db, syncRepository.createChange(userId, {
     revision: revisionRow.revision,
     entityType,
     entityId,
     changeType,
     payload: payload === undefined ? null : JSON.stringify(payload),
-  })
+  }))
   await runWithDb(db, auditEventsRepository.create(userId, {
     eventType: `sync.${changeType}`,
     entityType,
@@ -856,35 +856,32 @@ async function reserveCommand(
   userId: string,
   command: SyncCommandInput,
 ): Promise<CommandOutcome | null> {
-  const existing = await syncRepository.getCommand(db, userId, command.commandId)
+  const existing = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
   if (existing) {
     if (!existing.result) {
       const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS).toISOString()
-      const claimed = await syncRepository.claimStaleCommand(
-        db,
-        userId,
+      const claimed = await runWithDb(db, syncRepository.claimStaleCommand(userId,
         command.commandId,
         existing.createdAt,
-        staleBefore,
-      )
+        staleBefore,))
       if (claimed) return null
     }
     return replayStoredCommand(command.commandId, existing)
   }
   try {
-    await syncRepository.createCommand(db, userId, {
+    await runWithDb(db, syncRepository.createCommand(userId, {
       id: command.commandId,
       commandType: command.action,
       payload: JSON.stringify(command),
       status: 'processing',
       result: null,
-    })
+    }))
     return null
   } catch (error) {
     if (!isUniqueConstraintError(error)) {
       throw error
     }
-    const raced = await syncRepository.getCommand(db, userId, command.commandId)
+    const raced = await runWithDb(db, syncRepository.getCommand(userId, command.commandId))
     if (!raced) {
       throw error
     }
@@ -910,13 +907,10 @@ export async function applyOneCommand(
   try {
     return await runInTransaction(db, async (tx) => {
       const outcome = await performMutation(tx, userId, command)
-      await syncRepository.finalizeCommand(
-        tx,
-        userId,
+      await runWithDb(tx, syncRepository.finalizeCommand(userId,
         command.commandId,
         outcome.status,
-        JSON.stringify(outcome),
-      )
+        JSON.stringify(outcome),))
       return { commandId: command.commandId, replayed: false, ...outcome }
     })
   } catch (error) {
@@ -929,13 +923,10 @@ export async function applyOneCommand(
       ...('entityType' in command ? { entityType: command.entityType } : {}),
       message: error.message,
     }
-    await syncRepository.finalizeCommand(
-      db,
-      userId,
+    await runWithDb(db, syncRepository.finalizeCommand(userId,
       command.commandId,
       outcome.status,
-      JSON.stringify(outcome),
-    )
+      JSON.stringify(outcome),))
     return { commandId: command.commandId, replayed: false, ...outcome }
   }
 }
@@ -967,6 +958,6 @@ export async function applySyncBatch(
       break
     }
   }
-  const revisionRow = await syncRepository.ensureRevision(db, userId)
+  const revisionRow = await runWithDb(db, syncRepository.ensureRevision(userId))
   return { results, revision: revisionRow.revision, halted }
 }

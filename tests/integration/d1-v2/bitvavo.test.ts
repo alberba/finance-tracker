@@ -15,6 +15,7 @@ import * as sync from '../../../src/db/repositories/sync'
 import * as market from '../../../src/db/repositories/market'
 import { applySyncBatch } from '../../../src/lib/server/sync/apply-command'
 import { projectSyncV2State } from '../../../src/lib/client/v2-state-projection'
+import { runWithDb } from '../../../src/db/database'
 
 let testDb: TestDatabase
 const env = { DATA_ENCRYPTION_KEY: btoa('a'.repeat(32)) }
@@ -55,7 +56,7 @@ it('does not expose credentials in the synchronized bootstrap', async () => {
 
 it('isolates an import preview from another user', async () => {
   const { preview } = await importedUser()
-  const stranger = await users.create(testDb.db, { email: 'stranger@example.com' })
+  const stranger = await runWithDb(testDb.db, users.create({ email: 'stranger@example.com' }))
   await expect(confirmBitvavo(testDb.db, stranger.id, preview.id, [])).rejects.toThrow()
   expect((await buildBootstrapPayload(testDb.db, stranger.id)).transactions).toEqual([])
 })
@@ -68,7 +69,7 @@ it('rejects deletion of a remote financial operation', async () => {
 })
 
 async function configuredUser() {
-  const user = await users.create(testDb.db, { email: 'owner@example.com' })
+  const user = await runWithDb(testDb.db, users.create({ email: 'owner@example.com' }))
   const account = await accounts.create(testDb.db, user.id, {
     name: 'Bitvavo',
     kind: 'cash',
@@ -130,7 +131,7 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
   expect((await buildBootstrapPayload(testDb.db, user.id)).transactions).toHaveLength(2)
   expect((await bitvavo.getConnection(testDb.db, user.id))?.cursor).toBe(preview.to)
-  const changes = await sync.listChangesSince(testDb.db, user.id, 0)
+  const changes = await runWithDb(testDb.db, sync.listChangesSince(user.id, 0))
   expect(changes).toHaveLength(2)
   expect(JSON.parse(changes[1].payload!).remoteOperation.fee).toBe('0.14748650471')
 })

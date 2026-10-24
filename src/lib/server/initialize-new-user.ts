@@ -25,5 +25,5 @@ export async function initializeNewUser(db: Db, userId: string): Promise<void> {
   if (categories.length === 0) {
     await accountsRepository.bulkInsertCategories(db, userId, INITIAL_CATEGORIES)
   }
-  await syncRepository.ensureRevision(db, userId)
+  await runWithDb(db, syncRepository.ensureRevision(userId))
 }

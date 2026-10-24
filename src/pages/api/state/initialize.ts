@@ -32,14 +32,14 @@ export const POST: APIRoute = async ({ request, locals }) =>
     const result = await runInTransaction(db, async (tx) => {
       const existingSettings = await runWithDb(tx, userSettingsRepository.get(userId))
       if (existingSettings) {
-        await syncRepository.ensureRevision(tx, userId)
+        await runWithDb(tx, syncRepository.ensureRevision(userId))
         return { alreadyInitialized: true, settings: existingSettings }
       }
       const settings = await runWithDb(tx, userSettingsRepository.create(userId, {
         currency: requestedCurrency ?? 'EUR',
       }))
       const categories = await accountsRepository.listCategoriesByUser(tx, userId)
-      await syncRepository.ensureRevision(tx, userId)
+      await runWithDb(tx, syncRepository.ensureRevision(userId))
       return { alreadyInitialized: false, settings, categories }
     })
 

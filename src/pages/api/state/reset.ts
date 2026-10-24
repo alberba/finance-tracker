@@ -46,14 +46,14 @@ export const POST: APIRoute = async ({ locals }) =>
         userId,
         DEFAULT_CATEGORIES,
       )
-      const { revision } = await syncRepository.bumpRevision(tx, userId)
-      await syncRepository.createChange(tx, userId, {
+      const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
+      await runWithDb(tx, syncRepository.createChange(userId, {
         revision,
         entityType: 'reset',
         entityId: userId,
         changeType: 'update',
         payload: null,
-      })
+      }))
       return { settings, categories }
     })
 

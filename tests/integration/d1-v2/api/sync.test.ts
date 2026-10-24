@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { applyOneCommand } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
+import { runWithDb } from '../../../../src/db/database'
+import { Effect } from "effect";
 
 let currentDb: TestDatabase["db"];
 vi.mock("../../../../src/db/client", () => ({
@@ -132,10 +134,10 @@ describe("POST /api/sync", () => {
     await accountsRepository.create(testDb.db, principal.userId, {
       legacyId, name: "Ya aplicada", kind: "cash", currency: "EUR", openingBalance: 25,
     });
-    await syncRepository.createCommand(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, syncRepository.createCommand(principal.userId, {
       id: commandId, commandType: "create", status: "processing", result: null,
       payload: JSON.stringify({ commandId }),
-    });
+    }));
     await testDb.db.update(syncCommands)
       .set({ createdAt: "2000-01-01T00:00:00.000Z" })
       .where(eq(syncCommands.id, commandId));
@@ -147,16 +149,16 @@ describe("POST /api/sync", () => {
 
     expect(outcome.status).toBe("noop");
     expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(1);
-    expect((await syncRepository.getCommand(testDb.db, principal.userId, commandId))?.result).not.toBeNull();
+    expect((await runWithDb(testDb.db, syncRepository.getCommand(principal.userId, commandId)))?.result).not.toBeNull();
   });
 
   it("answers a command still inside its processing lease with in_progress and halts the batch, not a 500 (issue #202)", async () => {
     const { POST } = await import("../../../../src/pages/api/sync");
     const commandId = "still-processing";
-    await syncRepository.createCommand(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, syncRepository.createCommand(principal.userId, {
       id: commandId, commandType: "create", status: "processing", result: null,
       payload: JSON.stringify({ commandId }),
-    });
+    }));
 
     const response = await POST({
       request: postJson("https://example.test/api/sync", {
@@ -174,18 +176,18 @@ describe("POST /api/sync", () => {
     expect(body.results).toHaveLength(1);
     expect(body.results[0]).toMatchObject({ commandId, status: "in_progress" });
     expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toHaveLength(0);
-    expect((await syncRepository.getCommand(testDb.db, principal.userId, commandId))?.result).toBeNull();
+    expect((await runWithDb(testDb.db, syncRepository.getCommand(principal.userId, commandId)))?.result).toBeNull();
   });
 
   it("answers in_progress when a racing request reserves the command first (unique-violation branch, issue #202)", async () => {
     const commandId = "raced-reservation";
-    await syncRepository.createCommand(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, syncRepository.createCommand(principal.userId, {
       id: commandId, commandType: "noop", status: "processing", result: null,
       payload: JSON.stringify({ commandId }),
-    });
+    }));
     // The first lookup misses, as if the other request inserted the row
     // right after it: the insert then hits the unique constraint.
-    const spy = vi.spyOn(syncRepository, "getCommand").mockResolvedValueOnce(undefined);
+    const spy = vi.spyOn(syncRepository, "getCommand").mockReturnValueOnce(Effect.succeed(undefined));
 
     try {
       const outcome = await applyOneCommand(testDb.db, principal.userId, { commandId, action: "noop" });
