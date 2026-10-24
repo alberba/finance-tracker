@@ -9,6 +9,7 @@ import { GET as sessionRoute } from '../../../src/pages/api/session'
 import { POST as proofRoute } from '../../../src/pages/api/authentication-proof'
 import { consumeAuthenticationProof } from '../../../src/lib/server/auth/new-authentication'
 import { GET as administrationRoute } from '../../../src/pages/api/admin/registration'
+import { runWithDb } from '../../../src/db/database'
 
 let database: TestDatabase
 vi.mock('../../../src/db/client', () => ({ getDb: () => database.db }))
@@ -32,7 +33,7 @@ vi.mock('resend', () => ({
 }))
 beforeEach(async () => {
   database = createTestDb()
-  await updateRegistrationPolicy(database.db as unknown as Db, true)
+  await runWithDb(database.db as unknown as Db, updateRegistrationPolicy(true))
   auth = createAuthentication(database.db as unknown as Db, env, async ({ text }) => {
     code = text.match(/\b\d{6}\b/)![0]
   })
