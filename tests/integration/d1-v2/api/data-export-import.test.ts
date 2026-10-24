@@ -7,6 +7,7 @@ import * as recurringRulesRepository from '../../../../src/db/repositories/recur
 import * as pendingMovementsRepository from '../../../../src/db/repositories/pending-movements'
 import * as subscriptionsRepository from '../../../../src/db/repositories/subscriptions'
 import * as budgetEntriesRepository from '../../../../src/db/repositories/budget-entries'
+import { runWithDb } from '../../../../src/db/database'
 import * as goalsRepository from '../../../../src/db/repositories/goals'
 import * as wealthRepository from '../../../../src/db/repositories/wealth'
 import * as contributionsRepository from '../../../../src/db/repositories/contributions'
@@ -191,13 +192,13 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     amount: 50,
     currency: 'EUR',
   })
-  await goalsRepository.create(db, userId, {
+  await runWithDb(db, goalsRepository.create(userId, {
     key: 'fire',
     name: 'Independencia',
     targetYear: 2040,
     targetAmount: 500000,
     currency: 'EUR',
-  })
+  }))
   const snapshot = await wealthRepository.create(db, userId, {
     snapshotDate: '2026-03-31',
     year: 2026,

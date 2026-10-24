@@ -35,6 +35,7 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
+import { runWithDb } from '../../../db/database'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
 import * as wealthRepository from '../../../db/repositories/wealth'
@@ -128,7 +129,7 @@ async function findByLegacyId(
       rows = (await budgetEntriesRepository.listByUser(db, userId)) as VersionedRow[]
       break
     case 'goal':
-      rows = (await goalsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, goalsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'contribution':
       rows = (await contributionsRepository.listByUser(db, userId)) as VersionedRow[]
@@ -180,7 +181,7 @@ async function loadForMutation(
     case 'budgetEntry':
       return (await budgetEntriesRepository.get(db, userId, entityId)) as VersionedRow | undefined
     case 'goal':
-      return (await goalsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, goalsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'contribution':
       return (await contributionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
     case 'userInstrument':
@@ -247,7 +248,7 @@ async function createEntity(
     case 'budgetEntry':
       return (await budgetEntriesRepository.create(db, userId, data)) as VersionedRow
     case 'goal':
-      return (await goalsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, goalsRepository.create(userId, data))) as VersionedRow
     case 'contribution': {
       const { allocations, ...contributionInput } =
         data as contributionsRepository.CreateContributionInput & ContributionAllocationsField
@@ -382,7 +383,7 @@ async function updateEntity(
         expectedVersion,
       )) as VersionedRow | undefined
     case 'goal':
-      return (await goalsRepository.update(db, userId, entityId, patch, expectedVersion)) as
+      return (await runWithDb(db, goalsRepository.update(userId, entityId, patch, expectedVersion))) as
         VersionedRow | undefined
     case 'contribution': {
       const { allocations, ...contributionPatch } =
@@ -482,7 +483,7 @@ async function removeEntity(
     case 'budgetEntry':
       return budgetEntriesRepository.remove(db, userId, entityId, expectedVersion)
     case 'goal':
-      return goalsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, goalsRepository.remove(userId, entityId, expectedVersion))
     case 'contribution':
       return contributionsRepository.remove(db, userId, entityId, expectedVersion)
     case 'userInstrument':

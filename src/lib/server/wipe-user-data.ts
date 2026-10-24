@@ -14,6 +14,7 @@ import * as recurringRulesRepository from '../../db/repositories/recurring-rules
 import * as pendingMovementsRepository from '../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../db/repositories/budget-entries'
 import * as goalsRepository from '../../db/repositories/goals'
+import { runWithDb } from '../../db/database'
 import * as wealthRepository from '../../db/repositories/wealth'
 import * as contributionsRepository from '../../db/repositories/contributions'
 import * as marketRepository from '../../db/repositories/market'
@@ -50,7 +51,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     recurringRulesRepository.listByUser(db, userId),
     subscriptionsRepository.listByUser(db, userId),
     budgetEntriesRepository.listByUser(db, userId),
-    goalsRepository.listByUser(db, userId),
+    runWithDb(db, goalsRepository.listByUser(userId)),
     transactionsRepository.listByUser(db, userId),
     accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
     accountsRepository.listCategoriesByUser(db, userId),
@@ -100,7 +101,7 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await budgetEntriesRepository.remove(db, userId, entry.id)
   }
   for (const goal of goals) {
-    await goalsRepository.remove(db, userId, goal.id)
+    await runWithDb(db, goalsRepository.remove(userId, goal.id))
   }
   for (const transaction of transactions) {
     await transactionsRepository.remove(db, userId, transaction.id)

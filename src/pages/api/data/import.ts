@@ -30,6 +30,7 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
+import { runWithDb } from '../../../db/database'
 import * as wealthRepository from '../../../db/repositories/wealth'
 import * as contributionsRepository from '../../../db/repositories/contributions'
 import * as marketRepository from '../../../db/repositories/market'
@@ -326,14 +327,14 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- goals (no FK dependency) ------------------------------------------
       for (const row of asRows(body.goals)) {
-        await goalsRepository.create(tx, userId, {
+        await runWithDb(tx, goalsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           key: String(row.key ?? ''),
           name: String(row.name ?? ''),
           targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
           targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
           currency: String(row.currency ?? 'EUR'),
-        })
+        }))
         bump(imported, 'goals')
       }
 
