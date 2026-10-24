@@ -16,7 +16,7 @@ const movementsStore = useMovementsStore()
 const ui = useUiStore().ui
 const filters = ui.txFilters
 
-const CHIP_TYPES: TransactionType[] = ['income', 'expense', 'investment']
+const CHIP_TYPES: TransactionType[] = ['income', 'expense', 'saving', 'investment']
 const showMore = ref(false)
 
 const yearOptions = computed(() =>

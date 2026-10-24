@@ -11,6 +11,7 @@ defineEmits<{ navigate: [target: string] }>()
 const AVATAR: Record<BudgetType, string> = {
   income: 'bg-income/12 text-gain',
   expense: 'bg-expense/12 text-loss',
+  saving: 'bg-saving/12 text-saving',
   investment: 'bg-invest/12 text-invest',
 }
 </script>

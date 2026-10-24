@@ -6,7 +6,6 @@ import BaseButton from '../ui/BaseButton.vue'
 import PillTag from '../ui/PillTag.vue'
 import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { signedAmount } from '../../domain/transactions/registry'
 import { formatDayMonth, formatDueLabel } from '../../lib/format'
 import { todayISO } from '../../scripts/utils'
 import { useRecurringStore } from '../../stores/recurring'
@@ -14,7 +13,7 @@ import { useRecurringStore } from '../../stores/recurring'
 // 03 · POR HACER: the open pending movements as cards to confirm or skip.
 // Editing and cancelling stay in the Movimientos registry.
 const recurringStore = useRecurringStore()
-const { formatSignedMoney } = useMoneyFormatter()
+const { formatMovementAmount } = useMoneyFormatter()
 const pending = computed(() => recurringStore.openPendingMovements)
 </script>
 
@@ -49,7 +48,7 @@ const pending = computed(() => recurringStore.openPendingMovements)
             class="font-display shrink-0 font-medium tabular-nums"
             :class="item.type === 'income' ? TONE_TEXT.gain : 'text-text-main'"
           >
-            {{ formatSignedMoney(signedAmount(item)) }}
+            {{ formatMovementAmount(item) }}
           </span>
         </div>
         <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">

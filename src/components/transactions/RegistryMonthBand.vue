@@ -22,6 +22,7 @@ const totals = computed(() => movementsStore.bandTotals)
 const facts = computed(() => [
   { label: 'Ingresos', value: formatMoney(totals.value.income), valueId: 'tx-total-income' },
   { label: 'Gastos', value: formatMoney(totals.value.expense), valueId: 'tx-total-expense' },
+  { label: 'Ahorrado', value: formatMoney(totals.value.saving), valueId: 'tx-total-saving' },
   {
     label: 'Invertido',
     value: formatMoney(totals.value.investment),

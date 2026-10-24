@@ -515,7 +515,8 @@ function buildRecentTransactions(state: State, formatMoney: Money): DashboardRec
         description,
         category: transaction.category || 'Sin categoría',
         initial: description.charAt(0).toUpperCase(),
-        amount: `${transaction.type === 'income' ? '+' : '−'}${formatMoney(Math.abs(transaction.amount))}`,
+        // A saving moves money between accounts: no sign.
+        amount: `${transaction.type === 'income' ? '+' : transaction.type === 'saving' ? '' : '−'}${formatMoney(Math.abs(transaction.amount))}`,
         tone: transaction.type,
       }
     })

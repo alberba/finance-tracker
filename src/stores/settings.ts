@@ -47,10 +47,7 @@ function buildAccountData(key: EntityKey, currency: string) {
   }
 }
 
-const CATEGORY_KIND_BY_KEY: Record<
-  CategoryKey,
-  'income' | 'expense' | 'saving' | 'investment'
-> = {
+const CATEGORY_KIND_BY_KEY: Record<CategoryKey, 'income' | 'expense' | 'saving' | 'investment'> = {
   incomeCategories: 'income',
   expenseCategories: 'expense',
   savingCategories: 'saving',
@@ -181,7 +178,52 @@ export const useSettingsStore = defineStore('settings', () => {
     return true
   }
 
+  /** What keeps an account as the destination of savings, in words; empty when nothing does. */
+  function savingDestinationUse(accountId: string): string {
+    const state = financialStateStore.state
+    const uses = [
+      [
+        state.transactions.filter(
+          (tx) => tx.type === 'saving' && tx.destinationAccountId === accountId,
+        ).length,
+        'ahorro',
+        'ahorros',
+      ],
+      [
+        state.recurringRules.filter(
+          (rule) => rule.type === 'saving' && rule.destinationAccountId === accountId,
+        ).length,
+        'regla recurrente de ahorro',
+        'reglas recurrentes de ahorro',
+      ],
+      [
+        state.pendingMovements.filter(
+          (item) =>
+            item.type === 'saving' &&
+            item.status === 'pending' &&
+            item.destinationAccountId === accountId,
+        ).length,
+        'pendiente de ahorro',
+        'pendientes de ahorro',
+      ],
+    ] as const
+    return uses
+      .filter(([count]) => count > 0)
+      .map(([count, one, many]) => `${count} ${count === 1 ? one : many}`)
+      .join(', ')
+  }
+
   function removeEntity(key: EntityKey, id: string): void {
+    if (key === 'accounts') {
+      const use = savingDestinationUse(id)
+      if (use) {
+        const name = financialStateStore.state.accounts.find((item) => item.id === id)?.name
+        showToast(
+          `No se puede eliminar${name ? ` «${name}»` : ''}: es la cuenta destino de ${use}.`,
+        )
+        return
+      }
+    }
     const before = financialStateStore.state[key]
     const quoteIds =
       key === 'investmentAssets'

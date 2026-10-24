@@ -13,6 +13,7 @@ export const INITIAL_CATEGORIES: Array<{ name: string; kind: string; sortOrder: 
   { name: 'Salud', kind: 'expense', sortOrder: 4 },
   { name: 'Ocio', kind: 'expense', sortOrder: 5 },
   { name: 'Otros gastos', kind: 'expense', sortOrder: 6 },
+  { name: 'Fondo de emergencia', kind: 'saving', sortOrder: 0 },
   { name: 'Inversión', kind: 'investment', sortOrder: 0 },
 ]
 

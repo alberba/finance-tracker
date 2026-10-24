@@ -60,7 +60,12 @@ const KIND_FILL: Record<DashboardKpiKind, string> = {
   expense: 'bg-expense',
   investment: 'bg-invest',
 }
-const SPLIT_FILL = { expense: 'bg-expense', investment: 'bg-invest', unspent: 'bg-income/30' }
+const SPLIT_FILL = {
+  expense: 'bg-expense',
+  saving: 'bg-saving',
+  investment: 'bg-invest',
+  unspent: 'bg-income/30',
+}
 const CHIP: Record<DashboardTone, string> = {
   good: 'bg-gain/10 text-gain',
   bad: 'bg-loss/10 text-loss',

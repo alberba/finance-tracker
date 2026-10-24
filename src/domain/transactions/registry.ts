@@ -90,7 +90,12 @@ function matcher(filters: RegistryFilters): (tx: Transaction) => boolean {
   return (tx) => {
     const amount = Number(tx.amount || 0)
     if (filters.types.length && !filters.types.includes(tx.type)) return false
-    if (filters.accountIds.length && !filters.accountIds.includes(tx.accountId)) return false
+    if (
+      filters.accountIds.length &&
+      !filters.accountIds.includes(tx.accountId) &&
+      !(tx.destinationAccountId && filters.accountIds.includes(tx.destinationAccountId))
+    )
+      return false
     if (filters.date && tx.date !== filters.date) return false
     if (min !== null && amount < min) return false
     if (max !== null && amount > max) return false
