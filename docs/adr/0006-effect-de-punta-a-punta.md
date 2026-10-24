@@ -85,10 +85,12 @@ síncronos. La recuperación que queda es la fase 7: zod viaja hoy dentro del ch
 (`command-schemas.ts` lo comparten cliente y servidor), así que sustituirlo por Effect Schema
 debería devolver más de esos 2,12 KB.
 
-**Regla de parada:** con la medición de la fase 5 por encima del presupuesto, no se abren las fases
-6 ni 7 ni se publica este PR hasta decidir entre (a) aceptar el delta, (b) revertir la migración del
-cliente o (c) intentar primero la retirada de zod de la fase 7 y volver a medir. Las fases 1-4 y la
-medición de la línea base quedan intactas.
+**Decisión:** se acepta el delta de +12,12 KB gzip (opción a). El cliente migrado se queda; las
+fases 6 (puntos de entrada de eventos de Vue) y 7 (retirada de zod) siguen en pie, y la medición
+final tras la fase 7 se vuelve a anotar en este ADR. La línea base de 200,29 KB gzip del informe de
+viabilidad no es la misma cifra que este conjunto completo (389,52 KB), pero el delta se mide sobre
+el mismo método en ambos extremos.
+
 
 
 ## Presupuesto y salida
@@ -97,4 +99,5 @@ Tras las fases 5 y 7 se vuelve a medir y se anota el delta aquí. Presupuesto pr
 arranque transferido no crece más de 10 KB gzip respecto al valor previo a la fase 5 (200,29 KB). Si
 se supera y no se puede recuperar con chunks diferidos, el cliente se queda en su forma actual y el
 resto de la migración sigue en pie. La medición de la fase 5 está en el apartado anterior y supera
-el presupuesto; la decisión queda abierta.
+el presupuesto; se acepta el delta y la migración sigue con las fases 6 y 7, que se vuelven a medir
+al cerrar.
