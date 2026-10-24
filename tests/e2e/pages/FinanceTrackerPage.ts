@@ -291,9 +291,7 @@ export class FinanceTrackerPage {
     // the UI dropped it.
     type: 'bug' | 'feature'
     summary: string
-    description: string
-    expectedResult?: string
-    actualResult?: string
+    description?: string
   }) {
     await this.openGlobalReportDialog()
     const panel = this.issueReportDialog
@@ -302,12 +300,8 @@ export class FinanceTrackerPage {
       .getByRole('button', { name: params.type === 'bug' ? 'Error' : 'Mejora' })
       .click()
     await panel.getByLabel('Resumen').fill(params.summary)
-    await panel.getByLabel('Descripción').fill(params.description)
-    if (params.expectedResult !== undefined) {
-      await panel.getByLabel('Resultado esperado').fill(params.expectedResult)
-    }
-    if (params.actualResult !== undefined) {
-      await panel.getByLabel('Resultado actual').fill(params.actualResult)
+    if (params.description !== undefined) {
+      await panel.getByLabel('Descripción').fill(params.description)
     }
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
   }

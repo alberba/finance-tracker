@@ -68,7 +68,7 @@ test.describe('Reports E2E', () => {
     await expect(tracker.issueReportStatus()).not.toContainText('automatización')
   })
 
-  test('envía únicamente los campos simplificados del formulario', async ({ page, tracker }) => {
+  test('envía únicamente los campos vigentes del formulario', async ({ page, tracker }) => {
     let submittedPayload: Record<string, unknown> | undefined
     await page.route('**/api/issues/report', async (route) => {
       submittedPayload = route.request().postDataJSON() as Record<string, unknown>
@@ -87,31 +87,66 @@ test.describe('Reports E2E', () => {
       type: 'bug',
       summary: 'Fallo al exportar datos',
       description: 'Después de guardar no persiste el estado.',
-      expectedResult: 'El cambio debe persistir.',
-      actualResult: 'El cambio desaparece al recargar.',
     })
 
     await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
     expect(submittedPayload).toMatchObject({
       type: 'bug',
       summary: 'Fallo al exportar datos',
-      expectedResult: 'El cambio debe persistir.',
-      actualResult: 'El cambio desaparece al recargar.',
+      description: 'Después de guardar no persiste el estado.',
     })
-    expect(submittedPayload).not.toHaveProperty('stepsToReproduce')
+    for (const retired of ['expectedResult', 'actualResult', 'stepsToReproduce']) {
+      expect(submittedPayload).not.toHaveProperty(retired)
+    }
     await expect(tracker.issueReportStatus().locator('a')).toHaveAttribute(
       'href',
       'https://github.com/example/repo/issues/321',
     )
   })
 
-  test('muestra validación específica cuando resumen o descripción no cumplen mínimo', async ({
+  test('crea un reporte con solo resumen y avisa de la publicación antes de enviar', async ({
+    page,
     tracker,
   }) => {
+    let submittedPayload: Record<string, unknown> | undefined
+    await page.route('**/api/issues/report', async (route) => {
+      submittedPayload = route.request().postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          issueNumber: 655,
+          issueUrl: 'https://github.com/example/repo/issues/655',
+        }),
+      })
+    })
+
+    await tracker.openGlobalReportDialog()
+    const panel = tracker.issueReportDialog
+    await expect(panel.getByLabel('Resultado esperado')).toHaveCount(0)
+    await expect(panel.getByLabel('Resultado actual')).toHaveCount(0)
+    await expect(panel.locator('#issue-report-notice')).toContainText('repositorio público')
+    await expect(panel.locator('#issue-report-notice')).toContainText('email')
+    await panel.getByLabel('Resumen').fill('El filtro no guarda el valor')
+
+    await panel.getByRole('button', { name: 'Crear reporte' }).click()
+
+    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
+    expect(submittedPayload).toMatchObject({
+      type: 'bug',
+      summary: 'El filtro no guarda el valor',
+    })
+    expect(submittedPayload).not.toHaveProperty('description')
+    for (const retired of ['expectedResult', 'actualResult', 'stepsToReproduce']) {
+      expect(submittedPayload).not.toHaveProperty(retired)
+    }
+  })
+
+  test('muestra validación específica cuando el resumen no cumple mínimo', async ({ tracker }) => {
     await tracker.openGlobalReportDialog()
     const panel = tracker.issueReportDialog
     await panel.getByLabel('Resumen').fill('abc')
-    await panel.getByLabel('Descripción').fill('corta')
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
     await expect(tracker.issueReportStatus()).toContainText(
       'el resumen debe tener al menos 5 caracteres',

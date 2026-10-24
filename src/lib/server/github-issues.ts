@@ -1,101 +1,91 @@
-import type { RuntimeEnv } from "./cloudflare-env";
-import type { IssueReportPayload } from "./issue-report-schema";
+import type { RuntimeEnv } from './cloudflare-env'
+import type { IssueReportPayload } from './issue-report-schema'
 
 export interface CreatedIssue {
-  number: number;
-  url: string;
+  number: number
+  url: string
 }
 
 export interface GithubIssueClient {
-  fetch: typeof fetch;
+  fetch: typeof fetch
 }
 
-const GITHUB_API_BASE = "https://api.github.com";
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
-const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422]);
+/**
+ * Quien envía el reporte, tomado del principal autenticado en el servidor.
+ * Nunca viene del payload del cliente.
+ */
+export interface IssueReporter {
+  userId: string
+  email: string | null
+  name: string | null
+}
 
-export type GithubIssueType = "Bug" | "Feature";
+const GITHUB_API_BASE = 'https://api.github.com'
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422])
+
+export type GithubIssueType = 'Bug' | 'Feature'
 
 function requiredEnv(name: keyof RuntimeEnv, env: RuntimeEnv): string {
-  const value = String(env[name] || "").trim();
+  const value = String(env[name] || '').trim()
   if (!value) {
-    throw new Error(`Falta variable de entorno requerida: ${name}`);
+    throw new Error(`Falta variable de entorno requerida: ${name}`)
   }
-  return value;
+  return value
 }
 
-function requiredAnyEnv(
-  names: ReadonlyArray<keyof RuntimeEnv>,
-  env: RuntimeEnv,
-): string {
+function requiredAnyEnv(names: ReadonlyArray<keyof RuntimeEnv>, env: RuntimeEnv): string {
   for (const name of names) {
-    const value = String(env[name] || "").trim();
+    const value = String(env[name] || '').trim()
     if (value) {
-      return value;
+      return value
     }
   }
 
-  throw new Error(`Falta variable de entorno requerida: ${names.join(" o ")}`);
+  throw new Error(`Falta variable de entorno requerida: ${names.join(' o ')}`)
 }
 
-function canonicalReportType(
-  type: IssueReportPayload["type"],
-): "bug" | "feature" {
-  return type === "bug" ? "bug" : "feature";
+function canonicalReportType(type: IssueReportPayload['type']): 'bug' | 'feature' {
+  return type === 'bug' ? 'bug' : 'feature'
 }
 
-export function getGithubIssueType(
-  type: IssueReportPayload["type"],
-): GithubIssueType {
-  return canonicalReportType(type) === "bug" ? "Bug" : "Feature";
+export function getGithubIssueType(type: IssueReportPayload['type']): GithubIssueType {
+  return canonicalReportType(type) === 'bug' ? 'Bug' : 'Feature'
 }
 
-export function buildIssueBody(payload: IssueReportPayload): string {
-  const reportType = canonicalReportType(payload.type);
-  const githubType = getGithubIssueType(payload.type);
-  const baseLines = [
-    "## Reporte desde la web",
-    "",
-    "### Resumen",
-    payload.summary,
-    "",
-    "### Problema o solicitud",
-    payload.description,
-    "",
-    "### Contexto de ejecución",
+export function buildIssueBody(payload: IssueReportPayload, reporter: IssueReporter): string {
+  const reportType = canonicalReportType(payload.type)
+  const githubType = getGithubIssueType(payload.type)
+  const lines = ['## Reporte desde la web', '', '### Resumen', payload.summary, '']
+
+  // Sin descripción no se escribe el encabezado: una sección vacía ensucia la issue.
+  if (payload.description) {
+    lines.push('### Problema o solicitud', payload.description, '')
+  }
+
+  lines.push(
+    '### Contexto de ejecución',
     `- Tipo: ${reportType}`,
     `- Tipo de reporte: ${reportType}`,
     `- Tipo de issue de GitHub: ${githubType}`,
     `- Se envió desde la sección: ${payload.section}`,
-    `- Se envió desde la ruta: ${payload.context.pathname || "n/a"}`,
-    `- Navegador: ${payload.context.userAgent || "n/a"}`,
-    `- Fecha cliente: ${payload.context.timestamp || "n/a"}`,
-  ];
+    `- Se envió desde la ruta: ${payload.context.pathname || 'n/a'}`,
+    `- Navegador: ${payload.context.userAgent || 'n/a'}`,
+    `- Fecha cliente: ${payload.context.timestamp || 'n/a'}`,
+    '',
+    '### Reportero',
+    `- Nombre: ${reporter.name || 'n/a'}`,
+    `- Email: ${reporter.email || 'n/a'}`,
+    `- Identificador: ${reporter.userId}`,
+  )
 
-  if (payload.stepsToReproduce) {
-    baseLines.push(
-      "",
-      "## Pasos para reproducir",
-      "",
-      payload.stepsToReproduce,
-    );
-  }
-
-  if (payload.expectedResult) {
-    baseLines.push("", "## Resultado esperado", "", payload.expectedResult);
-  }
-
-  if (payload.actualResult) {
-    baseLines.push("", "## Resultado actual", "", payload.actualResult);
-  }
-
-  return baseLines.join("\n").trim();
+  return lines.join('\n').trim()
 }
 
-export function buildIssueLabels(type: IssueReportPayload["type"]): string[] {
+export function buildIssueLabels(type: IssueReportPayload['type']): string[] {
   // Keep labels short and compatible with GitHub's default labels. The
   // structured issue type is sent separately in the request body.
-  return ["source:web-report", "status:triage", canonicalReportType(type)];
+  return ['source:web-report', 'status:triage', canonicalReportType(type)]
 }
 
 async function requestWithRetry(
@@ -103,102 +93,95 @@ async function requestWithRetry(
   retries: number,
   retryDelayMs: number,
 ): Promise<Response> {
-  let lastResponse: Response | null = null;
+  let lastResponse: Response | null = null
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await requestFn();
+    const response = await requestFn()
     if (!RETRYABLE_STATUS.has(response.status)) {
-      return response;
+      return response
     }
-    lastResponse = response;
+    lastResponse = response
 
     if (attempt < retries) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, retryDelayMs * (attempt + 1)),
-      );
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)))
     }
   }
 
-  return lastResponse as Response;
+  return lastResponse as Response
 }
 
 export async function createIssueFromWebReport(
   payload: IssueReportPayload,
+  reporter: IssueReporter,
   env: RuntimeEnv,
   client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CreatedIssue> {
-  const token = requiredAnyEnv(["GITHUB_ISSUE_TOKEN", "GITHUB_TOKEN"], env);
-  const owner = requiredEnv("GITHUB_OWNER", env);
-  const repo = requiredEnv("GITHUB_REPO", env);
-  const title = payload.summary.slice(0, 140);
-  const labels = buildIssueLabels(payload.type);
+  const token = requiredAnyEnv(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
+  const owner = requiredEnv('GITHUB_OWNER', env)
+  const repo = requiredEnv('GITHUB_REPO', env)
+  const title = payload.summary.slice(0, 140)
+  const labels = buildIssueLabels(payload.type)
   const baseRequestBody = {
     title,
-    body: buildIssueBody(payload),
+    body: buildIssueBody(payload, reporter),
     labels,
-  };
+  }
   const requestBody = {
     ...baseRequestBody,
     // GitHub accepts the issue type by name. If the repository does not have
     // issue types enabled, the fallback below creates the issue without it.
     type: getGithubIssueType(payload.type),
-  };
+  }
 
   const requestIssue = (body: object) =>
     requestWithRetry(
       () =>
         client.fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/issues`, {
-          method: "POST",
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "User-Agent": "finance-tracker-web-reporter",
+            Accept: 'application/vnd.github+json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'finance-tracker-web-reporter',
           },
           body: JSON.stringify(body),
         }),
       2,
       500,
-    );
+    )
 
-  let response = await requestIssue(requestBody);
+  let response = await requestIssue(requestBody)
 
   if (!response.ok) {
-    const details = await response.text();
+    const details = await response.text()
 
     // Some GitHub installations expose labels/issues but not structured issue
     // types. A type rejection must not prevent the report from being created.
     if (TYPE_RETRY_STATUS.has(response.status)) {
-      response = await requestIssue(baseRequestBody);
+      response = await requestIssue(baseRequestBody)
     } else {
       // El cuerpo de GitHub queda del lado del servidor: el mensaje del error
       // viaja a Sentry con `reportApiRouteFailure` y no debe repetirlo.
-      console.error(
-        `[github] GitHub API devolvió ${response.status}`,
-        details.slice(0, 500),
-      );
-      throw new Error(`GitHub API devolvió ${response.status}.`);
+      console.error(`[github] GitHub API devolvió ${response.status}`, details.slice(0, 500))
+      throw new Error(`GitHub API devolvió ${response.status}.`)
     }
   }
 
   if (!response.ok) {
-    const details = await response.text();
-    console.error(
-      `[github] GitHub API devolvió ${response.status}`,
-      details.slice(0, 500),
-    );
-    throw new Error(`GitHub API devolvió ${response.status}.`);
+    const details = await response.text()
+    console.error(`[github] GitHub API devolvió ${response.status}`, details.slice(0, 500))
+    throw new Error(`GitHub API devolvió ${response.status}.`)
   }
 
   const data = (await response.json()) as {
-    number?: number;
-    html_url?: string;
-  };
-  const issueNumber = Number(data.number);
-  const issueUrl = String(data.html_url || "");
+    number?: number
+    html_url?: string
+  }
+  const issueNumber = Number(data.number)
+  const issueUrl = String(data.html_url || '')
   if (!Number.isFinite(issueNumber) || !issueUrl) {
-    throw new Error("Respuesta inválida al crear issue en GitHub.");
+    throw new Error('Respuesta inválida al crear issue en GitHub.')
   }
 
-  return { number: issueNumber, url: issueUrl };
+  return { number: issueNumber, url: issueUrl }
 }
