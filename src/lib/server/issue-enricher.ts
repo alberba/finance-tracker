@@ -1,4 +1,5 @@
 import type { RuntimeEnv } from './cloudflare-env'
+import { reportReportSideFailure, type ReportSideFailureReporter } from './error-tracking'
 
 /**
  * Campos del reporte que se envían al modelo. El reportero (email, nombre,
@@ -24,6 +25,8 @@ export type IssueEnricher = (
 export interface OpencodeEnricherOptions {
   fetch: typeof fetch
   timeoutMs: number
+  /** Destino del aviso de fallo. Por defecto, Sentry; los tests inyectan un stub. */
+  reportFailure?: ReportSideFailureReporter
 }
 
 const OPENCODE_GO_ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/chat/completions'
@@ -114,6 +117,7 @@ export function createOpencodeEnricher(options: OpencodeEnricherOptions): IssueE
     // Sin clave el enriquecimiento está desactivado: silencio, sin red y sin log.
     if (!apiKey) return null
 
+    const reportFailure = options.reportFailure ?? reportReportSideFailure
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), options.timeoutMs)
     try {
@@ -137,6 +141,7 @@ export function createOpencodeEnricher(options: OpencodeEnricherOptions): IssueE
 
       if (!response.ok) {
         console.error(`[issue-enricher] El proveedor devolvió ${response.status}.`)
+        reportFailure({ stage: 'enrich', reason: `http-${response.status}` })
         return null
       }
 
@@ -144,18 +149,22 @@ export function createOpencodeEnricher(options: OpencodeEnricherOptions): IssueE
       if (analysis === null) {
         if (controller.signal.aborted) {
           console.error('[issue-enricher] Tiempo de espera agotado.')
+          reportFailure({ stage: 'enrich', reason: 'timeout' })
         } else {
           console.error('[issue-enricher] Respuesta del proveedor sin forma esperada.')
+          reportFailure({ stage: 'enrich', reason: 'shape' })
         }
         return null
       }
       return analysis
     } catch {
+      const timedOut = controller.signal.aborted
       console.error(
-        controller.signal.aborted
+        timedOut
           ? '[issue-enricher] Tiempo de espera agotado.'
           : '[issue-enricher] Fallo de red al consultar el proveedor.',
       )
+      reportFailure({ stage: 'enrich', reason: timedOut ? 'timeout' : 'network' })
       return null
     } finally {
       clearTimeout(timer)

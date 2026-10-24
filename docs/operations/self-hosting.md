@@ -142,9 +142,12 @@ Detrás de un proxy inverso, define `CLIENT_IP_HEADER=x-real-ip` (o la cabecera 
 sobrescriba con la IP real). Sin ella Better Auth usa `cf-connecting-ip`, que un cliente
 puede falsificar fuera de Cloudflare.
 
-Sentry del servidor usa el SDK Node en este destino. Sin configurar un DSN e
-inicializarlo, no envía eventos del servidor. La integración cliente existente sigue
-activa. No se han exportado ni modificado datos de Cloudflare.
+Sentry del servidor usa el SDK Node en este destino. El middleware lo inicializa en la
+primera petición si `SENTRY_DSN` está en el `.env`; sin DSN no se envía ningún evento del
+servidor. Además de los 500 de las rutas, viajan los fallos auxiliares del reporte web
+(`report.stage` = `enrich` o `upload`, `report.reason` = estado HTTP, `timeout`, `shape`,
+`network`...), siempre sin texto del usuario, claves ni cuerpos del proveedor. La integración
+cliente existente sigue activa. No se han exportado ni modificado datos de Cloudflare.
 
 ### Archivado de worktrees en Orca
 

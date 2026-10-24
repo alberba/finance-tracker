@@ -183,4 +183,80 @@ describe('issue enricher', () => {
       '[issue-enricher] Respuesta del proveedor sin forma esperada.',
     )
   })
+
+  describe('aviso de fallos', () => {
+    function enricherWith(fakeFetch: typeof fetch, reportFailure = vi.fn()) {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      return {
+        enrich: createOpencodeEnricher({ fetch: fakeFetch, timeoutMs: 50, reportFailure }),
+        reportFailure,
+      }
+    }
+
+    it('un 401 del proveedor se avisa una vez con el estado, sin texto del proveedor', async () => {
+      const { enrich, reportFailure } = enricherWith(
+        fetchReturning(new Response('SECRET_MARKER', { status: 401 })),
+      )
+
+      await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
+
+      expect(reportFailure).toHaveBeenCalledTimes(1)
+      expect(reportFailure).toHaveBeenCalledWith({ stage: 'enrich', reason: 'http-401' })
+    })
+
+    it('un fallo de red se avisa como network', async () => {
+      const { enrich, reportFailure } = enricherWith(
+        vi.fn<typeof fetch>(async () => {
+          throw new TypeError('fetch failed')
+        }),
+      )
+
+      await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
+
+      expect(reportFailure).toHaveBeenCalledWith({ stage: 'enrich', reason: 'network' })
+    })
+
+    it('un plazo agotado se avisa como timeout', async () => {
+      const { enrich, reportFailure } = enricherWith(
+        vi.fn<typeof fetch>(
+          (_url, init) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () =>
+                reject(new DOMException('aborted', 'AbortError')),
+              )
+            }),
+        ),
+      )
+
+      await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
+
+      expect(reportFailure).toHaveBeenCalledWith({ stage: 'enrich', reason: 'timeout' })
+    })
+
+    it('una respuesta sin la forma esperada se avisa como shape', async () => {
+      const { enrich, reportFailure } = enricherWith(fetchReturning(completion('texto libre')))
+
+      await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
+
+      expect(reportFailure).toHaveBeenCalledWith({ stage: 'enrich', reason: 'shape' })
+    })
+
+    it('sin clave no hay red ni aviso', async () => {
+      const fakeFetch = fetchReturning(completion(WELL_FORMED))
+      const { enrich, reportFailure } = enricherWith(fakeFetch)
+
+      await enrich(report, {})
+
+      expect(fakeFetch).not.toHaveBeenCalled()
+      expect(reportFailure).not.toHaveBeenCalled()
+    })
+
+    it('un análisis válido no avisa de nada', async () => {
+      const { enrich, reportFailure } = enricherWith(fetchReturning(completion(WELL_FORMED)))
+
+      await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
+
+      expect(reportFailure).not.toHaveBeenCalled()
+    })
+  })
 })
