@@ -9,6 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
+import { runWithDb } from '../../../../src/db/database'
 
 async function seedAccountAndCategory(trip: RoundTrip) {
   const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
@@ -152,7 +153,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
         openingBalance: 0,
         legacyId: "revolut",
       });
-      const rule = await recurringRulesRepository.create(db, userId, {
+      const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
         name: "Aportación mensual VWCE",
         type: "investment",
         accountId: account.id,
@@ -160,7 +161,7 @@ describe("round trip: borrar avisa en vez de fallar", () => {
         currency: "EUR",
         frequency: "monthly",
         legacyId: "rule-1",
-      });
+      }));
       await pendingMovementsRepository.create(db, userId, {
         recurringRuleId: rule.id,
         accountId: account.id,

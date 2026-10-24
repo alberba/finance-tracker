@@ -48,8 +48,8 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     stockeventsCashMappingsRepository.listMappingsByUser(db, userId),
     stockeventsCashMappingsRepository.listSyncEntriesByUser(db, userId),
     pendingMovementsRepository.listByUser(db, userId),
-    recurringRulesRepository.listByUser(db, userId),
-    subscriptionsRepository.listByUser(db, userId),
+    runWithDb(db, recurringRulesRepository.listByUser(userId)),
+    runWithDb(db, subscriptionsRepository.listByUser(userId)),
     runWithDb(db, budgetEntriesRepository.listByUser(userId)),
     runWithDb(db, goalsRepository.listByUser(userId)),
     transactionsRepository.listByUser(db, userId),
@@ -92,10 +92,10 @@ export async function wipeUserData(db: Db, userId: string): Promise<void> {
     await pendingMovementsRepository.remove(db, userId, pendingMovement.id)
   }
   for (const rule of recurringRules) {
-    await recurringRulesRepository.remove(db, userId, rule.id)
+    await runWithDb(db, recurringRulesRepository.remove(userId, rule.id))
   }
   for (const subscription of subscriptions) {
-    await subscriptionsRepository.remove(db, userId, subscription.id)
+    await runWithDb(db, subscriptionsRepository.remove(userId, subscription.id))
   }
   for (const entry of budgetEntries) {
     await runWithDb(db, budgetEntriesRepository.remove(userId, entry.id))

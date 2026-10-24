@@ -117,10 +117,10 @@ async function findByLegacyId(
       rows = (await accountsRepository.listCategoriesByUser(db, userId)) as VersionedRow[]
       break
     case 'subscription':
-      rows = (await subscriptionsRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, subscriptionsRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'recurringRule':
-      rows = (await recurringRulesRepository.listByUser(db, userId)) as VersionedRow[]
+      rows = (await runWithDb(db, recurringRulesRepository.listByUser(userId))) as VersionedRow[]
       break
     case 'pendingMovement':
       rows = (await pendingMovementsRepository.listByUser(db, userId)) as VersionedRow[]
@@ -172,9 +172,9 @@ async function loadForMutation(
       return row ? transactionWithTradeDetail(db, userId, row) : undefined
     }
     case 'subscription':
-      return (await subscriptionsRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, subscriptionsRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'recurringRule':
-      return (await recurringRulesRepository.get(db, userId, entityId)) as VersionedRow | undefined
+      return (await runWithDb(db, recurringRulesRepository.get(userId, entityId))) as VersionedRow | undefined
     case 'pendingMovement':
       return (await pendingMovementsRepository.get(db, userId, entityId)) as
         VersionedRow | undefined
@@ -240,9 +240,9 @@ async function createEntity(
     case 'transaction':
       return (await transactionsRepository.create(db, userId, data)) as VersionedRow
     case 'subscription':
-      return (await subscriptionsRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, subscriptionsRepository.create(userId, data))) as VersionedRow
     case 'recurringRule':
-      return (await recurringRulesRepository.create(db, userId, data)) as VersionedRow
+      return (await runWithDb(db, recurringRulesRepository.create(userId, data))) as VersionedRow
     case 'pendingMovement':
       return (await pendingMovementsRepository.create(db, userId, data)) as VersionedRow
     case 'budgetEntry':
@@ -351,21 +351,15 @@ async function updateEntity(
       return { ...row, tradeDetail } as VersionedRow
     }
     case 'subscription':
-      return (await subscriptionsRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, subscriptionsRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'recurringRule':
-      return (await recurringRulesRepository.update(
-        db,
-        userId,
+      return (await runWithDb(db, recurringRulesRepository.update(userId,
         entityId,
         patch,
-        expectedVersion,
-      )) as VersionedRow | undefined
+        expectedVersion,))) as VersionedRow | undefined
     case 'pendingMovement':
       return (await pendingMovementsRepository.update(
         db,
@@ -472,9 +466,9 @@ async function removeEntity(
     case 'transaction':
       return transactionsRepository.remove(db, userId, entityId, expectedVersion)
     case 'subscription':
-      return subscriptionsRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, subscriptionsRepository.remove(userId, entityId, expectedVersion))
     case 'recurringRule':
-      return recurringRulesRepository.remove(db, userId, entityId, expectedVersion)
+      return runWithDb(db, recurringRulesRepository.remove(userId, entityId, expectedVersion))
     case 'pendingMovement':
       return pendingMovementsRepository.remove(db, userId, entityId, expectedVersion)
     case 'budgetEntry':

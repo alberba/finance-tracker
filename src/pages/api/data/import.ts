@@ -221,7 +221,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'subscriptions')
           continue
         }
-        await subscriptionsRepository.create(tx, userId, {
+        await runWithDb(tx, subscriptionsRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           accountId: accountId ?? null,
@@ -232,7 +232,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           nextChargeDate: typeof row.nextChargeDate === 'string' ? row.nextChargeDate : null,
           frequency: String(row.frequency ?? 'monthly'),
           isActive: row.isActive === undefined ? true : Boolean(row.isActive),
-        })
+        }))
         bump(imported, 'subscriptions')
       }
 
@@ -249,7 +249,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'recurringRules')
           continue
         }
-        const created = await recurringRulesRepository.create(tx, userId, {
+        const created = await runWithDb(tx, recurringRulesRepository.create(userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           name: String(row.name ?? ''),
           type: String(row.type ?? ''),
@@ -271,7 +271,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           fee: optionalNumber(row.fee),
           time: optionalString(row.time),
           status: typeof row.status === 'string' ? row.status : undefined,
-        })
+        }))
         if (typeof row.id === 'string') {
           recurringRuleIdMap.set(row.id, created.id)
         }

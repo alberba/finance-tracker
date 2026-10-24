@@ -135,7 +135,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       unitPrice: '100',
     } as never,
   })
-  await subscriptionsRepository.create(db, userId, {
+  await runWithDb(db, subscriptionsRepository.create(userId, {
     name: 'Cine',
     accountId: account.id,
     categoryId: category.id,
@@ -145,8 +145,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     nextChargeDate: '2026-04-01',
     frequency: 'monthly',
     isActive: false,
-  })
-  const rule = await recurringRulesRepository.create(db, userId, {
+  }))
+  const rule = await runWithDb(db, recurringRulesRepository.create(userId, {
     name: 'Aporte mensual',
     type: 'investment',
     accountId: account.id,
@@ -166,7 +166,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     fee: 1,
     time: '10:00',
     status: 'paused',
-  })
+  }))
   await pendingMovementsRepository.create(db, userId, {
     recurringRuleId: rule.id,
     accountId: account.id,

@@ -150,7 +150,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
         },
       } as never)
     expect(outcome.status).toBe("rejected");
-    expect(await subscriptionsRepository.listByUser(db, userB.id)).toHaveLength(0);
+    expect(await runWithDb(db, subscriptionsRepository.listByUser(userB.id))).toHaveLength(0);
   });
 
   it("repository-level guard: subscriptions.create rejects another user's accountId/categoryId directly", async () => {
@@ -165,13 +165,13 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     });
 
     await expect(
-      subscriptionsRepository.create(db, userB.id, {
+      runWithDb(db, subscriptionsRepository.create(userB.id, {
         name: "Fuga",
         accountId: accountA.id,
         amount: 5,
         currency: "EUR",
         frequency: "monthly",
-      }),
+      })),
     ).rejects.toThrow();
   });
 

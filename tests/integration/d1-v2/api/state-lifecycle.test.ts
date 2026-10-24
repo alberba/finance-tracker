@@ -229,14 +229,14 @@ describe('POST /api/state/reset', () => {
     })
 
     // A part of a recurring rule: its generated (not-yet-confirmed) occurrence.
-    const rule = await recurringRulesRepository.create(testDb.db, principal.userId, {
+    const rule = await runWithDb(testDb.db, recurringRulesRepository.create(principal.userId, {
       name: 'Aportación',
       type: 'investment',
       accountId: account.id,
       amount: 200,
       currency: 'EUR',
       frequency: 'monthly',
-    })
+    }))
     await pendingMovementsRepository.create(testDb.db, principal.userId, {
       recurringRuleId: rule.id,
       accountId: account.id,
@@ -280,7 +280,7 @@ describe('POST /api/state/reset', () => {
     expect(response.status).toBe(200)
     expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
-    expect(await recurringRulesRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId))).toEqual([])
     expect(await pendingMovementsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await wealthRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await contributionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
