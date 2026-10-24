@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { Effect } from 'effect'
 import { createIssueFromWebReport } from '../../src/lib/server/github-issues'
+import { Http } from '../../src/lib/server/http'
 import type { IssueReportPayload } from '../../src/lib/server/issue-report-schema'
 
 const payload: IssueReportPayload = {
@@ -12,6 +14,17 @@ const payload: IssueReportPayload = {
     pathname: '/movimientos',
     timestamp: '2026-02-23T10:00:00.000Z',
   },
+}
+
+/** Ejecuta el efecto con un `fetch` falso en lugar de la capa Http real. */
+function createIssue(
+  payload: IssueReportPayload,
+  env: Record<string, string>,
+  request: typeof fetch,
+) {
+  return Effect.runPromise(
+    Effect.provideService(createIssueFromWebReport(payload, env), Http, { request }),
+  )
 }
 
 /** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
@@ -40,14 +53,14 @@ describe('github issues service', () => {
         ),
     )
 
-    const result = await createIssueFromWebReport(
+    const result = await createIssue(
       payload,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch as unknown as typeof fetch,
     )
 
     expect(result.number).toBe(99)
@@ -78,7 +91,7 @@ describe('github issues service', () => {
         ),
     )
 
-    await createIssueFromWebReport(
+    await createIssue(
       {
         ...payload,
         type: 'feature',
@@ -88,7 +101,7 @@ describe('github issues service', () => {
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch as unknown as typeof fetch,
     )
 
     const [, init] = fakeFetch.mock.calls[0]
@@ -108,14 +121,14 @@ describe('github issues service', () => {
         }),
       )
 
-    const result = await createIssueFromWebReport(
+    const result = await createIssue(
       payload,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch as unknown as typeof fetch,
     )
 
     expect(result.number).toBe(16)
@@ -136,14 +149,14 @@ describe('github issues service', () => {
         }),
       )
 
-    const result = await createIssueFromWebReport(
+    const result = await createIssue(
       payload,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch as unknown as typeof fetch,
     )
 
     expect(result.number).toBe(7)
@@ -155,14 +168,14 @@ describe('github issues service', () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => new Response('forbidden', { status: 403 }))
 
     await expect(
-      createIssueFromWebReport(
+      createIssue(
         payload,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch as unknown as typeof fetch,
       ),
     ).rejects.toThrow(/GitHub API devolvió 403/)
     expect(loggedError).toHaveBeenCalledExactlyOnceWith(
@@ -177,14 +190,14 @@ describe('github issues service', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const error = await captureError(
-      createIssueFromWebReport(
+      createIssue(
         payload,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch as unknown as typeof fetch,
       ),
     )
 
@@ -199,14 +212,14 @@ describe('github issues service', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const error = await captureError(
-      createIssueFromWebReport(
+      createIssue(
         payload,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch as unknown as typeof fetch,
       ),
     )
 
@@ -230,14 +243,14 @@ describe('github issues service', () => {
         ),
     )
 
-    await createIssueFromWebReport(
+    await createIssue(
       payload,
       {
         GITHUB_TOKEN: 'fallback-token',
         GITHUB_OWNER: 'org',
         GITHUB_REPO: 'repo',
       },
-      { fetch: fakeFetch as unknown as typeof fetch },
+      fakeFetch as unknown as typeof fetch,
     )
 
     const [, init] = fakeFetch.mock.calls[0]
@@ -250,13 +263,13 @@ describe('github issues service', () => {
     const fakeFetch = vi.fn<typeof fetch>()
 
     await expect(
-      createIssueFromWebReport(
+      createIssue(
         payload,
         {
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
         },
-        { fetch: fakeFetch as unknown as typeof fetch },
+        fakeFetch as unknown as typeof fetch,
       ),
     ).rejects.toThrow(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/)
     expect(fakeFetch).not.toHaveBeenCalled()
