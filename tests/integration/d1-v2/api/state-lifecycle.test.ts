@@ -237,13 +237,13 @@ describe('POST /api/state/reset', () => {
       currency: 'EUR',
       frequency: 'monthly',
     }))
-    await pendingMovementsRepository.create(testDb.db, principal.userId, {
+    await runWithDb(testDb.db, pendingMovementsRepository.create(principal.userId, {
       recurringRuleId: rule.id,
       accountId: account.id,
       amount: 200,
       currency: 'EUR',
       dueDate: '2026-10-01',
-    })
+    }))
 
     // A part of a wealth snapshot: its per-account balance.
     const snapshot = await wealthRepository.create(testDb.db, principal.userId, {
@@ -281,7 +281,7 @@ describe('POST /api/state/reset', () => {
     expect(await accountsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await transactionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await runWithDb(testDb.db, recurringRulesRepository.listByUser(principal.userId))).toEqual([])
-    expect(await pendingMovementsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
+    expect(await runWithDb(testDb.db, pendingMovementsRepository.listByUser(principal.userId))).toEqual([])
     expect(await wealthRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(await contributionsRepository.listByUser(testDb.db, principal.userId)).toEqual([])
     expect(

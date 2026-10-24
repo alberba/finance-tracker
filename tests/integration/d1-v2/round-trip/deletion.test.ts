@@ -162,13 +162,13 @@ describe("round trip: borrar avisa en vez de fallar", () => {
         frequency: "monthly",
         legacyId: "rule-1",
       }));
-      await pendingMovementsRepository.create(db, userId, {
+      await runWithDb(db, pendingMovementsRepository.create(userId, {
         recurringRuleId: rule.id,
         accountId: account.id,
         amount: 200,
         currency: "EUR",
         dueDate: "2026-10-01",
-      });
+      }));
     });
 
     const withRule = await trip.reload();

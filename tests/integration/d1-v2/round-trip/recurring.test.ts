@@ -43,7 +43,7 @@ describe('round trip: recurring rules and pending movements', () => {
         nextRunDate: '2026-10-01',
         legacyId: 'old-rule',
       }))
-      await pending.create(db, userId, {
+      await runWithDb(db, pending.create(userId, {
         recurringRuleId: rule.id,
         accountId: account.id,
         categoryId: category.id,
@@ -53,7 +53,7 @@ describe('round trip: recurring rules and pending movements', () => {
         type: 'expense',
         description: 'Cuota',
         legacyId: 'old-pending',
-      })
+      }))
       // The app constructs the recurring store before sync.init hydrates its state.
       useRecurringStore()
     })

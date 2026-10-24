@@ -1,7 +1,8 @@
 /** `stockevents_symbol_mappings` repository (WP6, extended: sync flags + optimistic concurrency). */
 
-import { and, eq } from "drizzle-orm";
-import { stockeventsSymbolMappings } from "../schema";
+import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
+import { stockeventsSymbolMappings } from '../schema'
 import {
   assertOwnedReferences,
   clientIdentity,
@@ -10,33 +11,36 @@ import {
   toFlag,
   versionGuard,
   type Db,
-} from "./shared";
+} from './shared'
 
-export type StockeventsSymbolMappingRow = typeof stockeventsSymbolMappings.$inferSelect;
+export type StockeventsSymbolMappingRow = typeof stockeventsSymbolMappings.$inferSelect
 
 export interface CreateStockeventsSymbolMappingInput {
-  id?: string;
-  legacyId?: string | null;
-  categoryId?: string | null;
-  stockeventsSymbol: string;
-  sync?: boolean;
-  watchlistId?: string | null;
-  hidden?: boolean;
+  id?: string
+  legacyId?: string | null
+  categoryId?: string | null
+  stockeventsSymbol: string
+  sync?: boolean
+  watchlistId?: string | null
+  hidden?: boolean
 }
 
 export interface UpdateStockeventsSymbolMappingInput {
-  categoryId?: string | null;
-  stockeventsSymbol?: string;
-  sync?: boolean;
-  watchlistId?: string | null;
-  hidden?: boolean;
+  categoryId?: string | null
+  stockeventsSymbol?: string
+  sync?: boolean
+  watchlistId?: string | null
+  hidden?: boolean
 }
 
-export async function listByUser(db: Db, userId: string): Promise<StockeventsSymbolMappingRow[]> {
-  return db.select().from(stockeventsSymbolMappings).where(eq(stockeventsSymbolMappings.userId, userId));
+async function listByUserSql(db: Db, userId: string): Promise<StockeventsSymbolMappingRow[]> {
+  return db
+    .select()
+    .from(stockeventsSymbolMappings)
+    .where(eq(stockeventsSymbolMappings.userId, userId))
 }
 
-export async function get(
+async function getSql(
   db: Db,
   userId: string,
   id: string,
@@ -44,11 +48,11 @@ export async function get(
   const [row] = await db
     .select()
     .from(stockeventsSymbolMappings)
-    .where(and(eq(stockeventsSymbolMappings.id, id), eq(stockeventsSymbolMappings.userId, userId)));
-  return row;
+    .where(and(eq(stockeventsSymbolMappings.id, id), eq(stockeventsSymbolMappings.userId, userId)))
+  return row
 }
 
-export async function findBySymbol(
+async function findBySymbolSql(
   db: Db,
   userId: string,
   symbol: string,
@@ -61,29 +65,29 @@ export async function findBySymbol(
         eq(stockeventsSymbolMappings.userId, userId),
         eq(stockeventsSymbolMappings.stockeventsSymbol, symbol),
       ),
-    );
-  return row;
+    )
+  return row
 }
 
 export function toDomainShape(row: StockeventsSymbolMappingRow): {
-  sync: boolean;
-  watchlistId: string;
-  hidden: boolean;
+  sync: boolean
+  watchlistId: string
+  hidden: boolean
 } {
   return {
     sync: fromFlag(row.sync),
-    watchlistId: row.watchlistId ?? "",
+    watchlistId: row.watchlistId ?? '',
     hidden: fromFlag(row.hidden),
-  };
+  }
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateStockeventsSymbolMappingInput,
 ): Promise<StockeventsSymbolMappingRow> {
-  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
-  const now = nowIso();
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId })
+  const now = nowIso()
   const [row] = await db
     .insert(stockeventsSymbolMappings)
     .values({
@@ -98,22 +102,22 @@ export async function create(
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return row;
+    .returning()
+  return row
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdateStockeventsSymbolMappingInput,
   expectedVersion?: number,
 ): Promise<StockeventsSymbolMappingRow | undefined> {
-  const existing = await get(db, userId, id);
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return undefined;
+    return undefined
   }
-  await assertOwnedReferences(db, userId, { categoryId: input.categoryId });
+  await assertOwnedReferences(db, userId, { categoryId: input.categoryId })
   const [row] = await db
     .update(stockeventsSymbolMappings)
     .set({
@@ -125,45 +129,49 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(stockeventsSymbolMappings.id, id),
-      eq(stockeventsSymbolMappings.userId, userId),
-      versionGuard(stockeventsSymbolMappings.version, expectedVersion),
-    ))
-    .returning();
-  return row;
+    .where(
+      and(
+        eq(stockeventsSymbolMappings.id, id),
+        eq(stockeventsSymbolMappings.userId, userId),
+        versionGuard(stockeventsSymbolMappings.version, expectedVersion),
+      ),
+    )
+    .returning()
+  return row
 }
 
-export async function remove(
+async function removeSql(
   db: Db,
   userId: string,
   id: string,
   expectedVersion?: number,
 ): Promise<boolean> {
-  const existing = await get(db, userId, id);
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
   const deleted = await db
     .delete(stockeventsSymbolMappings)
-    .where(and(
-      eq(stockeventsSymbolMappings.id, id),
-      eq(stockeventsSymbolMappings.userId, userId),
-      versionGuard(stockeventsSymbolMappings.version, expectedVersion),
-    ))
-    .returning({ id: stockeventsSymbolMappings.id });
-  return deleted.length > 0;
+    .where(
+      and(
+        eq(stockeventsSymbolMappings.id, id),
+        eq(stockeventsSymbolMappings.userId, userId),
+        versionGuard(stockeventsSymbolMappings.version, expectedVersion),
+      ),
+    )
+    .returning({ id: stockeventsSymbolMappings.id })
+  return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateStockeventsSymbolMappingInput[],
 ): Promise<StockeventsSymbolMappingRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   return db
     .insert(stockeventsSymbolMappings)
     .values(
@@ -180,5 +188,13 @@ export async function bulkInsert(
         updatedAt: now,
       })),
     )
-    .returning();
+    .returning()
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const findBySymbol = lift(findBySymbolSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)

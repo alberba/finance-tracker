@@ -299,10 +299,10 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     });
 
     await expect(
-      stockeventsSymbolMappingsRepository.create(db, userB.id, {
+      runWithDb(db, stockeventsSymbolMappingsRepository.create(userB.id, {
         categoryId: categoryA.id,
         stockeventsSymbol: "SECRET",
-      }),
+      })),
     ).rejects.toThrow(/categoría/i);
   });
 });
