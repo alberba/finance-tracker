@@ -1,5 +1,7 @@
-import { ApiClientError } from '../lib/client/api-error'
+import { Effect } from 'effect'
+
 import { requestApiJson } from '../lib/client/api-client'
+import type { ClientHttp } from '../lib/client/http'
 import { isDemoMode } from '../scripts/demo-mode'
 
 export type ReportType = 'bug' | 'feature' | 'enhancement'
@@ -44,21 +46,24 @@ export const ISSUE_REPORT_ENDPOINT = '/api/issues/report'
 
 const FALLBACK_MESSAGE = 'No se pudo crear la issue.'
 
-export async function submitIssueReport(payload: ReportPayload): Promise<ReportResponse> {
+export const submitIssueReport = (
+  payload: ReportPayload,
+): Effect.Effect<ReportResponse, never, ClientHttp> => {
   if (isDemoMode()) {
-    return { ok: false, error: 'Los reportes no se envían desde el modo demo.' }
+    return Effect.succeed({
+      ok: false,
+      error: 'Los reportes no se envían desde el modo demo.',
+    })
   }
 
-  try {
-    return await requestApiJson<ReportResponse>(ISSUE_REPORT_ENDPOINT, {
-      method: 'POST',
-      body: payload,
-      fallbackMessage: FALLBACK_MESSAGE,
-    })
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof ApiClientError ? error.message : FALLBACK_MESSAGE,
-    }
-  }
+  return requestApiJson<ReportResponse>(ISSUE_REPORT_ENDPOINT, {
+    method: 'POST',
+    body: payload,
+    fallbackMessage: FALLBACK_MESSAGE,
+  }).pipe(
+    Effect.match({
+      onFailure: (error) => ({ ok: false, error: error.message }) as const,
+      onSuccess: (body) => body,
+    }),
+  )
 }

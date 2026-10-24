@@ -11,6 +11,7 @@ import { yahooQuoteSymbol } from '../../domain/investment/symbol-matching'
 import { INSTRUMENT_TYPE_LABEL, QUOTE_PROVIDERS } from '../../domain/investment/instrument-labels'
 import type { InstrumentRowViewModel } from '../../domain/settings/view-model'
 import { searchMarketSymbols, type MarketSearchResult } from '../../services/market-api'
+import { runClientHttp } from '../../lib/client/runtime'
 import { useMarketStore } from '../../stores/market'
 
 // The portfolio's visible symbol and its independent provider ticker.
@@ -65,7 +66,7 @@ async function search(): Promise<void> {
   isSearching.value = true
   searchError.value = ''
   try {
-    results.value = await searchMarketSymbols(query, props.instrument.provider)
+    results.value = await runClientHttp(searchMarketSymbols(query, props.instrument.provider))
   } catch (error) {
     results.value = []
     searchError.value = error instanceof Error ? error.message : 'No se pudieron buscar símbolos'

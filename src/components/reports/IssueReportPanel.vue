@@ -16,6 +16,7 @@ import {
   type ReportPayload,
   type ReportType,
 } from '../../services/issue-report-api'
+import { runClientHttp } from '../../lib/client/runtime'
 import { useUiStore } from '../../stores/ui'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -154,7 +155,7 @@ async function onSubmit(): Promise<void> {
     if (attachments.value.length > 0) {
       payload.attachments = await encodeAttachments()
     }
-    const result = await submitIssueReport(payload)
+    const result = await runClientHttp(submitIssueReport(payload))
     if (!result.ok) {
       statusMessage.value = `No se pudo crear la issue: ${result.error}`
       return

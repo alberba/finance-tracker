@@ -6,6 +6,7 @@ import {
   openFinanzas,
   requireAuthenticationResult,
 } from '../lib/client/authentication'
+import { runClientHttp } from '../lib/client/runtime'
 export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
   options: { verifyEmail?: string; initialError?: string } = {},
@@ -74,11 +75,13 @@ export function useAuthenticationForm(
         return
       }
       if (mode.value === 'recover') {
-        await authenticationRequest('/api/recover-access', {
-          email: email.value,
-          otp: otp.value,
-          password: password.value,
-        })
+        await runClientHttp(
+          authenticationRequest('/api/recover-access', {
+            email: email.value,
+            otp: otp.value,
+            password: password.value,
+          }),
+        )
       } else if (mode.value === 'verify') {
         await requireAuthenticationResult(
           await authentication.emailOtp.verifyEmail({ email: email.value, otp: otp.value }),

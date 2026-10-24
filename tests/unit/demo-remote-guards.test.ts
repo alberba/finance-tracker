@@ -6,6 +6,7 @@ vi.mock('../../src/scripts/demo-mode', () => ({
 
 import { submitIssueReport } from '../../src/services/issue-report-api'
 import { fetchMarketQuotes, searchMarketSymbols } from '../../src/services/market-api'
+import { runClientHttp } from '../../src/lib/client/runtime'
 
 describe('demo remote guards', () => {
   beforeEach(() => {
@@ -16,28 +17,30 @@ describe('demo remote guards', () => {
     const fallbackQuotes = { fund: { price: 12, updatedAt: '2026-08-23' } }
 
     await expect(
-      fetchMarketQuotes([{ id: 'fund' } as never], fallbackQuotes as never),
+      runClientHttp(fetchMarketQuotes([{ id: 'fund' } as never], fallbackQuotes as never)),
     ).resolves.toBe(fallbackQuotes)
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('does not search symbols remotely', async () => {
-    await expect(searchMarketSymbols('ACME', 'manual')).resolves.toEqual([])
+    await expect(runClientHttp(searchMarketSymbols('ACME', 'manual'))).resolves.toEqual([])
     expect(fetch).not.toHaveBeenCalled()
   })
 
   it('rejects issue reports locally', async () => {
-    const result = await submitIssueReport({
-      type: 'bug',
-      summary: 'Reporte de prueba',
-      description: 'No debe salir del navegador.',
-      section: 'dashboard',
-      context: {
-        userAgent: 'vitest',
-        pathname: '/demo',
-        timestamp: '2026-08-23T00:00:00.000Z',
-      },
-    })
+    const result = await runClientHttp(
+      submitIssueReport({
+        type: 'bug',
+        summary: 'Reporte de prueba',
+        description: 'No debe salir del navegador.',
+        section: 'dashboard',
+        context: {
+          userAgent: 'vitest',
+          pathname: '/demo',
+          timestamp: '2026-08-23T00:00:00.000Z',
+        },
+      }),
+    )
 
     expect(result).toEqual({
       ok: false,

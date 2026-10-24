@@ -5,49 +5,78 @@
  * The file is the server's relational export, not the in-memory `State`,
  * so restoring it rebuilds the user's rows in D1. The legacy whole-state JSON
  * has another shape and is refused before it reaches the server.
+ *
+ * Both operations report failure as a value (`BackupResult`) because the Datos
+ * page shows it inline; the transport is still typed, so callers run the
+ * effect at their edge.
  */
 
+import { Effect } from 'effect'
+
 import { DATA_EXPORT_FORMAT } from '../data-export-format'
+import { readJson, sendRequest, type ClientHttp } from './http'
 
 export type BackupResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
-export async function fetchBackup(): Promise<BackupResult<string>> {
-  try {
-    const response = await fetch('/api/data/export')
+export const fetchBackup = (): Effect.Effect<BackupResult<string>, never, ClientHttp> =>
+  Effect.gen(function* () {
+    const attempt = yield* sendRequest('/api/data/export').pipe(
+      Effect.match({
+        onSuccess: (response) => ({ ok: true as const, response }),
+        onFailure: (cause) => ({
+          ok: false as const,
+          error: cause.cause instanceof Error ? cause.cause.message : 'Error de red',
+        }),
+      }),
+    )
+    if (!attempt.ok) return attempt
+    const response = attempt.response
     if (!response.ok) {
       return { ok: false, error: `El servidor respondió ${response.status}` }
     }
-    return { ok: true, value: JSON.stringify(await response.json(), null, 2) }
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Error de red' }
-  }
-}
+    const body = yield* readJson(response).pipe(Effect.orElseSucceed(() => null))
+    return { ok: true, value: JSON.stringify(body, null, 2) }
+  })
 
-export async function restoreBackup(content: string): Promise<BackupResult<{ skipped: number }>> {
-  let payload: unknown
-  try {
-    payload = JSON.parse(content)
-  } catch {
-    return { ok: false, error: 'El archivo no es un JSON válido.' }
-  }
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    (payload as { format?: unknown }).format !== DATA_EXPORT_FORMAT
-  ) {
-    return {
-      ok: false,
-      error:
-        'El archivo no es una copia exportada desde esta versión. Exporta de nuevo desde Datos.',
+export const restoreBackup = (
+  content: string,
+): Effect.Effect<BackupResult<{ skipped: number }>, never, ClientHttp> =>
+  Effect.gen(function* () {
+    let payload: unknown
+    try {
+      payload = JSON.parse(content)
+    } catch {
+      return { ok: false, error: 'El archivo no es un JSON válido.' }
     }
-  }
-  try {
-    const response = await fetch('/api/data/import?mode=replace', {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      (payload as { format?: unknown }).format !== DATA_EXPORT_FORMAT
+    ) {
+      return {
+        ok: false,
+        error:
+          'El archivo no es una copia exportada desde esta versión. Exporta de nuevo desde Datos.',
+      }
+    }
+
+    const attempt = yield* sendRequest('/api/data/import?mode=replace', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: content,
-    })
-    const body = (await response.json().catch(() => null)) as {
+    }).pipe(
+      Effect.match({
+        onSuccess: (response) => ({ ok: true as const, response }),
+        onFailure: (cause) => ({
+          ok: false as const,
+          error: cause.cause instanceof Error ? cause.cause.message : 'Error de red',
+        }),
+      }),
+    )
+    if (!attempt.ok) return attempt
+    const response = attempt.response
+
+    const body = (yield* readJson(response).pipe(Effect.orElseSucceed(() => null))) as {
       ok?: boolean
       error?: string
       skipped?: Record<string, number>
@@ -57,7 +86,4 @@ export async function restoreBackup(content: string): Promise<BackupResult<{ ski
     }
     const skipped = Object.values(body.skipped ?? {}).reduce((total, count) => total + count, 0)
     return { ok: true, value: { skipped } }
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Error de red' }
-  }
-}
+  })
