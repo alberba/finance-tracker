@@ -1,114 +1,129 @@
 /** `recurring_rules` repository (WP6). */
 
-import { and, eq } from "drizzle-orm";
-import { fromMinorUnits, toMinorUnits } from "../../lib/money";
-import { pendingMovements, recurringRules } from "../schema";
-import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from "./shared";
+import { and, eq } from 'drizzle-orm'
+import { lift } from '../database'
+import { fromMinorUnits, toMinorUnits } from '../../lib/money'
+import { pendingMovements, recurringRules } from '../schema'
+import { type Db, assertOwnedReferences, clientIdentity, nowIso, versionGuard } from './shared'
 
 export type RecurringRuleRow = Omit<
   typeof recurringRules.$inferSelect,
-  "amountMinor" | "unitPriceMinor" | "feeMinor" | "units"
+  'amountMinor' | 'unitPriceMinor' | 'feeMinor' | 'units'
 > & {
-  amount: number;
+  amount: number
   /** Operation fields — present only on an investment rule. */
-  units: number | null;
-  unitPrice: number | null;
-  fee: number | null;
-};
+  units: number | null
+  unitPrice: number | null
+  fee: number | null
+}
 
 export interface CreateRecurringRuleInput {
   /** Identity minted by the client (ADR 0001); omitted by v1-migrated writes. */
-  id?: string;
-  legacyId?: string | null;
-  name: string;
-  type: string;
-  accountId?: string | null;
-  categoryId?: string | null;
-  amount: number;
-  currency: string;
-  frequency: string;
-  interval?: number;
-  startDate?: string | null;
-  endDate?: string | null;
-  lastExecutionDate?: string | null;
-  nextRunDate?: string | null;
-  symbol?: string | null;
-  side?: string | null;
-  units?: number | null;
-  unitPrice?: number | null;
-  fee?: number | null;
-  time?: string | null;
-  status?: string;
+  id?: string
+  legacyId?: string | null
+  name: string
+  type: string
+  accountId?: string | null
+  categoryId?: string | null
+  amount: number
+  currency: string
+  frequency: string
+  interval?: number
+  startDate?: string | null
+  endDate?: string | null
+  lastExecutionDate?: string | null
+  nextRunDate?: string | null
+  symbol?: string | null
+  side?: string | null
+  units?: number | null
+  unitPrice?: number | null
+  fee?: number | null
+  time?: string | null
+  status?: string
 }
 
 export interface UpdateRecurringRuleInput {
-  name?: string;
-  type?: string;
-  accountId?: string | null;
-  categoryId?: string | null;
-  amount?: number;
-  currency?: string;
-  frequency?: string;
-  interval?: number;
-  startDate?: string | null;
-  endDate?: string | null;
-  lastExecutionDate?: string | null;
-  nextRunDate?: string | null;
-  symbol?: string | null;
-  side?: string | null;
-  units?: number | null;
-  unitPrice?: number | null;
-  fee?: number | null;
-  time?: string | null;
-  status?: string;
+  name?: string
+  type?: string
+  accountId?: string | null
+  categoryId?: string | null
+  amount?: number
+  currency?: string
+  frequency?: string
+  interval?: number
+  startDate?: string | null
+  endDate?: string | null
+  lastExecutionDate?: string | null
+  nextRunDate?: string | null
+  symbol?: string | null
+  side?: string | null
+  units?: number | null
+  unitPrice?: number | null
+  fee?: number | null
+  time?: string | null
+  status?: string
 }
 
 function toRow(row: typeof recurringRules.$inferSelect): RecurringRuleRow {
-  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row;
+  const { amountMinor, unitPriceMinor, feeMinor, units, ...rest } = row
   return {
     ...rest,
     amount: fromMinorUnits(amountMinor, row.currency),
     units: units === null ? null : Number(units),
     unitPrice: unitPriceMinor === null ? null : fromMinorUnits(unitPriceMinor, row.currency),
     fee: feeMinor === null ? null : fromMinorUnits(feeMinor, row.currency),
-  };
+  }
 }
 
 /** The operation columns, in write shape — `null` on a non-investment rule. */
 function operationValues(
-  input: { symbol?: string | null; side?: string | null; units?: number | null; unitPrice?: number | null; fee?: number | null; time?: string | null },
+  input: {
+    symbol?: string | null
+    side?: string | null
+    units?: number | null
+    unitPrice?: number | null
+    fee?: number | null
+    time?: string | null
+  },
   currency: string,
 ) {
   return {
     symbol: input.symbol ?? null,
     side: input.side ?? null,
     units: input.units === null || input.units === undefined ? null : String(input.units),
-    unitPriceMinor: input.unitPrice === null || input.unitPrice === undefined ? null : toMinorUnits(input.unitPrice, currency),
-    feeMinor: input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
+    unitPriceMinor:
+      input.unitPrice === null || input.unitPrice === undefined
+        ? null
+        : toMinorUnits(input.unitPrice, currency),
+    feeMinor:
+      input.fee === null || input.fee === undefined ? null : toMinorUnits(input.fee, currency),
     time: input.time ?? null,
-  };
+  }
 }
 
-export async function listByUser(db: Db, userId: string): Promise<RecurringRuleRow[]> {
-  const rows = await db.select().from(recurringRules).where(eq(recurringRules.userId, userId));
-  return rows.map(toRow);
+async function listByUserSql(db: Db, userId: string): Promise<RecurringRuleRow[]> {
+  const rows = await db.select().from(recurringRules).where(eq(recurringRules.userId, userId))
+  return rows.map(toRow)
 }
 
-export async function get(db: Db, userId: string, id: string): Promise<RecurringRuleRow | undefined> {
+async function getSql(db: Db, userId: string, id: string): Promise<RecurringRuleRow | undefined> {
   const [row] = await db
     .select()
     .from(recurringRules)
-    .where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)));
-  return row ? toRow(row) : undefined;
+    .where(and(eq(recurringRules.id, id), eq(recurringRules.userId, userId)))
+  return row ? toRow(row) : undefined
 }
 
-export async function create(
+async function createSql(
   db: Db,
   userId: string,
   input: CreateRecurringRuleInput,
 ): Promise<RecurringRuleRow> {
-  await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
-  const now = nowIso();
+  await assertOwnedReferences(db, userId, {
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+  })
+  const now = nowIso()
   const [row] = await db
     .insert(recurringRules)
     .values({
@@ -128,28 +143,31 @@ export async function create(
       lastExecutionDate: input.lastExecutionDate ?? null,
       nextRunDate: input.nextRunDate ?? null,
       ...operationValues(input, input.currency),
-      status: input.status ?? "active",
+      status: input.status ?? 'active',
       createdAt: now,
       updatedAt: now,
     })
-    .returning();
-  return toRow(row);
+    .returning()
+  return toRow(row)
 }
 
-export async function update(
+async function updateSql(
   db: Db,
   userId: string,
   id: string,
   input: UpdateRecurringRuleInput,
   expectedVersion?: number,
 ): Promise<RecurringRuleRow | undefined> {
-  const existing = await get(db, userId, id);
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return undefined;
+    return undefined
   }
-  await assertOwnedReferences(db, userId, { accountId: input.accountId, categoryId: input.categoryId });
-  const nextCurrency = input.currency ?? existing.currency;
-  const nextAmount = input.amount ?? existing.amount;
+  await assertOwnedReferences(db, userId, {
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+  })
+  const nextCurrency = input.currency ?? existing.currency
+  const nextAmount = input.amount ?? existing.amount
   const [row] = await db
     .update(recurringRules)
     .set({
@@ -164,7 +182,9 @@ export async function update(
       startDate: input.startDate === undefined ? existing.startDate : input.startDate,
       endDate: input.endDate === undefined ? existing.endDate : input.endDate,
       lastExecutionDate:
-        input.lastExecutionDate === undefined ? existing.lastExecutionDate : input.lastExecutionDate,
+        input.lastExecutionDate === undefined
+          ? existing.lastExecutionDate
+          : input.lastExecutionDate,
       nextRunDate: input.nextRunDate === undefined ? existing.nextRunDate : input.nextRunDate,
       ...operationValues(
         {
@@ -181,44 +201,55 @@ export async function update(
       updatedAt: nowIso(),
       version: existing.version + 1,
     })
-    .where(and(
-      eq(recurringRules.id, id),
-      eq(recurringRules.userId, userId),
-      versionGuard(recurringRules.version, expectedVersion),
-    ))
-    .returning();
-  return row ? toRow(row) : undefined;
+    .where(
+      and(
+        eq(recurringRules.id, id),
+        eq(recurringRules.userId, userId),
+        versionGuard(recurringRules.version, expectedVersion),
+      ),
+    )
+    .returning()
+  return row ? toRow(row) : undefined
 }
 
-export async function remove(db: Db, userId: string, id: string, expectedVersion?: number): Promise<boolean> {
-  const existing = await get(db, userId, id);
+async function removeSql(
+  db: Db,
+  userId: string,
+  id: string,
+  expectedVersion?: number,
+): Promise<boolean> {
+  const existing = await getSql(db, userId, id)
   if (!existing) {
-    return false;
+    return false
   }
   // A pending movement is a generated occurrence of its rule (`recurring_rule_id`
   // is NOT NULL, no ON DELETE CASCADE, and D1 always enforces it), so it goes
   // with the rule instead of blocking its removal (audit §2.6 pattern).
-  await db.delete(pendingMovements).where(and(
-    eq(pendingMovements.recurringRuleId, id),
-    eq(pendingMovements.userId, userId),
-  ));
-  const deleted = await db.delete(recurringRules).where(and(
-    eq(recurringRules.id, id),
-    eq(recurringRules.userId, userId),
-    versionGuard(recurringRules.version, expectedVersion),
-  )).returning({ id: recurringRules.id });
-  return deleted.length > 0;
+  await db
+    .delete(pendingMovements)
+    .where(and(eq(pendingMovements.recurringRuleId, id), eq(pendingMovements.userId, userId)))
+  const deleted = await db
+    .delete(recurringRules)
+    .where(
+      and(
+        eq(recurringRules.id, id),
+        eq(recurringRules.userId, userId),
+        versionGuard(recurringRules.version, expectedVersion),
+      ),
+    )
+    .returning({ id: recurringRules.id })
+  return deleted.length > 0
 }
 
-export async function bulkInsert(
+async function bulkInsertSql(
   db: Db,
   userId: string,
   inputs: CreateRecurringRuleInput[],
 ): Promise<RecurringRuleRow[]> {
   if (inputs.length === 0) {
-    return [];
+    return []
   }
-  const now = nowIso();
+  const now = nowIso()
   const rows = await db
     .insert(recurringRules)
     .values(
@@ -239,11 +270,18 @@ export async function bulkInsert(
         lastExecutionDate: input.lastExecutionDate ?? null,
         nextRunDate: input.nextRunDate ?? null,
         ...operationValues(input, input.currency),
-        status: input.status ?? "active",
+        status: input.status ?? 'active',
         createdAt: now,
         updatedAt: now,
       })),
     )
-    .returning();
-  return rows.map(toRow);
+    .returning()
+  return rows.map(toRow)
 }
+
+export const listByUser = lift(listByUserSql)
+export const get = lift(getSql)
+export const create = lift(createSql)
+export const update = lift(updateSql)
+export const remove = lift(removeSql)
+export const bulkInsert = lift(bulkInsertSql)

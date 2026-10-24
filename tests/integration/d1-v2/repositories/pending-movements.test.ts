@@ -3,15 +3,16 @@ import * as pendingMovementsRepo from "../../../../src/db/repositories/pending-m
 import * as recurringRulesRepo from "../../../../src/db/repositories/recurring-rules";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "./fixtures";
+import { runWithDb } from '../../../../src/db/database'
 
 async function seedRule(db: TestDatabase["db"], userId: string) {
-  return recurringRulesRepo.create(db, userId, {
+  return runWithDb(db, recurringRulesRepo.create(userId, {
     name: "Alquiler",
     type: "expense",
     amount: 750,
     currency: "EUR",
     frequency: "monthly",
-  });
+  }));
 }
 
 describe("pending-movements repository", () => {

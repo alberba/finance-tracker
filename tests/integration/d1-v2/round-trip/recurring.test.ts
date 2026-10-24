@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { useRecurringStore } from '../../../../src/stores/recurring'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { runWithDb } from '../../../../src/db/database'
 
 describe('round trip: recurring rules and pending movements', () => {
   let trip: RoundTrip | undefined
@@ -29,7 +30,7 @@ describe('round trip: recurring rules and pending movements', () => {
         kind: 'expense',
         legacyId: 'expense:Cuotas',
       })
-      const rule = await rules.create(db, userId, {
+      const rule = await runWithDb(db, rules.create(userId, {
         name: 'Cuota',
         type: 'expense',
         accountId: account.id,
@@ -41,7 +42,7 @@ describe('round trip: recurring rules and pending movements', () => {
         lastExecutionDate: '2026-09-01',
         nextRunDate: '2026-10-01',
         legacyId: 'old-rule',
-      })
+      }))
       await pending.create(db, userId, {
         recurringRuleId: rule.id,
         accountId: account.id,
