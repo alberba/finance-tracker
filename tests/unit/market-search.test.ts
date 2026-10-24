@@ -6,8 +6,13 @@ vi.mock('../../src/lib/server/yahoo-finance', async (importOriginal) => ({
   yahooFinance: { search: searchMock },
 }))
 
-import { searchYahooSymbols } from '../../src/lib/server/market-search'
+import { Effect } from 'effect'
+import { searchYahooSymbols, type MarketSearchEnv } from '../../src/lib/server/market-search'
+import { Http } from '../../src/lib/server/http'
 import { YahooFinanceHttpError } from '../../src/lib/server/yahoo-finance'
+
+const search = (query: string, env: MarketSearchEnv = {}, request: typeof fetch = fetch) =>
+  Effect.runPromise(Effect.provideService(searchYahooSymbols(query, env), Http, { request }))
 
 describe('búsqueda de símbolos de mercado', () => {
   beforeEach(() => {
@@ -26,7 +31,7 @@ describe('búsqueda de símbolos de mercado', () => {
       ],
     })
 
-    const results = await searchYahooSymbols('XDWH.XETRA')
+    const results = await search('XDWH.XETRA')
 
     expect(results).toEqual([
       {
@@ -59,9 +64,11 @@ describe('búsqueda de símbolos de mercado', () => {
       ),
     )
 
-    const results = await searchYahooSymbols('XDWH-FALLBACK', fetchMock, {
-      TWELVE_DATA_API_KEY: 'fallback-secret',
-    })
+    const results = await search(
+      'XDWH-FALLBACK',
+      { TWELVE_DATA_API_KEY: 'fallback-secret' },
+      fetchMock,
+    )
 
     expect(results).toEqual([
       {
