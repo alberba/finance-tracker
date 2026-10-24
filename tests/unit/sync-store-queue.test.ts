@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
-import { listAll, openOutbox } from '../../src/lib/client/outbox'
+import { listAll, openStorage } from '../helpers/client-storage'
 import { useSyncStore } from '../../src/stores/sync'
 
 const EMPTY_BOOTSTRAP = {
@@ -70,7 +70,7 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
   })
 
   async function queued() {
-    const db = await openOutbox(userId)
+    const db = await openStorage(userId)
     try {
       return await listAll(db)
     } finally {
@@ -313,7 +313,7 @@ describe('logout and session expiry preserve queued work', () => {
     await store.enqueueCommand({ action: 'noop', commandId: 'unsent-before-logout' })
     await expect(store.logout()).rejects.toThrow('No se pudieron sincronizar')
     expect(store.userId).toBe(identity)
-    const db = await openOutbox(identity)
+    const db = await openStorage(identity)
     expect((await listAll(db)).map((entry) => entry.command.commandId)).toContain(
       'unsent-before-logout',
     )
@@ -337,7 +337,7 @@ describe('logout and session expiry preserve queued work', () => {
     send.mockClear()
     await store.syncNow()
     expect(send).not.toHaveBeenCalled()
-    const db = await openOutbox(identity)
+    const db = await openStorage(identity)
     expect((await listAll(db)).map((entry) => entry.command.commandId)).toContain(
       'preserved-on-revocation',
     )

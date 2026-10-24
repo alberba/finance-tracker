@@ -65,9 +65,39 @@ del ADR y se compara contra esta medición al cerrar la fase 5.
 Nota de operación: `astro preview` escucha en `localhost` (IPv6), así que la medición se lanza con
 `BENCHMARK_BASE_URL=http://localhost:4322`. Con `127.0.0.1` no conecta.
 
+## Medición al cerrar la fase 5
+
+La misma medición, sobre el build de la fase 5 en esta rama, da una mediana de 7 iteraciones de
+**980,50 KB** en **52 peticiones**, `appReady` 1.364 ms y LCP 1.692 ms. La cifra de transferencia no
+es comparable punto a punto con la línea base: el benchmark corta cuando el dashboard ya está
+visible, así que un arranque más lento deja entrar más chunks en la ventana de medida y el número
+sube por composición, no solo por bytes nuevos. Para tener una cifra estable se midió el conjunto
+completo de scripts que la página carga en demo (`networkidle`) en el mismo entorno y con el mismo
+gzip: **389,52 KB gzip** en la línea base y **401,64 KB gzip** con el cliente migrado, es decir
+**+12,12 KB gzip (+3,1 %)**. Ese delta es el núcleo de Effect en el cliente; el código que ya
+existía (outbox, caché, store de sync) se movió de chunk y no creció por sí mismo.
+
+El presupuesto era no crecer más de 10 KB gzip. El delta medido lo supera en 2,12 KB. Las salidas
+probadas no lo recuperan: montar el cliente con `ManagedRuntime` + `Layer` engorda el chunk (se
+sustituyó por `provideService`), y sacar el store de sync del grafo de `command-mapping` no basta
+porque `stores/market.ts` y `stores/recurring.ts` leen `connection` y `userId` en computeds
+síncronos. La recuperación que queda es la fase 7: zod viaja hoy dentro del chunk de cliente
+(`command-schemas.ts` lo comparten cliente y servidor), así que sustituirlo por Effect Schema
+debería devolver más de esos 2,12 KB.
+
+**Decisión:** se acepta el delta de +12,12 KB gzip (opción a). El cliente migrado se queda; las
+fases 6 (puntos de entrada de eventos de Vue) y 7 (retirada de zod) siguen en pie, y la medición
+final tras la fase 7 se vuelve a anotar en este ADR. La línea base de 200,29 KB gzip del informe de
+viabilidad no es la misma cifra que este conjunto completo (389,52 KB), pero el delta se mide sobre
+el mismo método en ambos extremos.
+
+
+
 ## Presupuesto y salida
 
 Tras las fases 5 y 7 se vuelve a medir y se anota el delta aquí. Presupuesto propuesto: el JS de
 arranque transferido no crece más de 10 KB gzip respecto al valor previo a la fase 5 (200,29 KB). Si
 se supera y no se puede recuperar con chunks diferidos, el cliente se queda en su forma actual y el
-resto de la migración sigue en pie.
+resto de la migración sigue en pie. La medición de la fase 5 está en el apartado anterior y supera
+el presupuesto; se acepta el delta y la migración sigue con las fases 6 y 7, que se vuelven a medir
+al cerrar.

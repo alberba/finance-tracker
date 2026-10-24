@@ -1,3 +1,4 @@
+import { Effect } from 'effect'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -37,7 +38,9 @@ describe("useDataStore — 'empezar de cero'", () => {
   })
 
   it('startFresh() calls the API and reloads the page on success', async () => {
-    vi.mocked(initializeFreshState).mockResolvedValue({ ok: true, alreadyInitialized: false })
+    vi.mocked(initializeFreshState).mockReturnValue(
+      Effect.succeed({ ok: true, alreadyInitialized: false }),
+    )
     const { reload } = stubDom()
 
     const store = useDataStore()
@@ -48,7 +51,7 @@ describe("useDataStore — 'empezar de cero'", () => {
   })
 
   it('startFresh() does not reload the page when the API call fails', async () => {
-    vi.mocked(initializeFreshState).mockResolvedValue({ ok: false, error: 'boom' })
+    vi.mocked(initializeFreshState).mockReturnValue(Effect.succeed({ ok: false, error: 'boom' }))
     const { reload } = stubDom()
 
     const store = useDataStore()

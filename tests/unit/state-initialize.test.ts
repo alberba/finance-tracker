@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { initializeFreshState } from '../../src/lib/client/state-initialize'
+import { runClientHttp } from '../../src/lib/client/runtime'
 
 function mockFetchOnce(response: { status: number; body: unknown }): void {
   vi.stubGlobal(
@@ -21,7 +22,7 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
   it('returns ok:true on a fresh 201', async () => {
     mockFetchOnce({ status: 201, body: { ok: true, alreadyInitialized: false } })
 
-    const result = await initializeFreshState()
+    const result = await runClientHttp(initializeFreshState())
 
     expect(result).toEqual({ ok: true, alreadyInitialized: false })
     expect(fetch).toHaveBeenCalledWith(
@@ -33,7 +34,7 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
   it('reports alreadyInitialized:true idempotently on a repeat call (200)', async () => {
     mockFetchOnce({ status: 200, body: { ok: true, alreadyInitialized: true } })
 
-    const result = await initializeFreshState()
+    const result = await runClientHttp(initializeFreshState())
 
     expect(result).toEqual({ ok: true, alreadyInitialized: true })
   })
@@ -41,7 +42,7 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
   it('sends the requested currency in the body when provided', async () => {
     mockFetchOnce({ status: 201, body: { ok: true } })
 
-    await initializeFreshState('USD')
+    await runClientHttp(initializeFreshState('USD'))
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/state/initialize',
@@ -52,7 +53,7 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
   it('surfaces a 401 as ok:false with the server error message', async () => {
     mockFetchOnce({ status: 401, body: { error: 'Se requiere autenticación.' } })
 
-    const result = await initializeFreshState()
+    const result = await runClientHttp(initializeFreshState())
 
     expect(result).toEqual({ ok: false, error: 'Se requiere autenticación.' })
   })
@@ -60,7 +61,7 @@ describe("initializeFreshState (WP8 'empezar de cero')", () => {
   it('returns ok:false when fetch itself rejects (offline)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')))
 
-    const result = await initializeFreshState()
+    const result = await runClientHttp(initializeFreshState())
 
     expect(result).toEqual({ ok: false, error: 'network down' })
   })

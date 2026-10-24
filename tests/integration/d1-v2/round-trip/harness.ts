@@ -143,8 +143,8 @@ export async function startRoundTrip(
 
   /** Waits until the outbox stops changing and, when online, has drained. */
   async function quiesce(): Promise<void> {
-    const { count: countOutbox, openOutbox } = await import('../../../../src/lib/client/outbox')
-    const db = await openOutbox(user.id)
+    const { count: countOutbox, openStorage } = await import('../../../helpers/client-storage')
+    const db = await openStorage(user.id)
     try {
       let last = -1
       let stable = 0
@@ -178,8 +178,8 @@ export async function startRoundTrip(
     userId: user.id,
     testDb,
     pending: async () => {
-      const { listAll, openOutbox } = await import('../../../../src/lib/client/outbox')
-      const db = await openOutbox(user.id)
+      const { listAll, openStorage } = await import('../../../helpers/client-storage')
+      const db = await openStorage(user.id)
       try {
         return await listAll(db)
       } finally {

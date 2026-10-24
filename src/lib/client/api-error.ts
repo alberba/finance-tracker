@@ -4,8 +4,11 @@
  * Módulo puro a propósito: no hace `fetch`, no habla con Sentry y no toca el
  * DOM. `api-client.ts` construye estos errores y `error-reporting.ts` decide
  * qué viaja a Sentry; acá solo viven la categoría, el texto en castellano que
- * ve la persona y la regla de qué se reporta.
+ * ve la persona y la regla de qué se reporta. El error es un `Data.TaggedError`
+ * para poder recuperarlo por etiqueta en el canal tipado de Effect.
  */
+
+import { Data } from 'effect'
 
 export type ApiErrorCategory =
   /** El `fetch` rechazó: nunca hubo respuesta HTTP. */
@@ -55,17 +58,23 @@ function resolveMessage(category: ApiErrorCategory, init: ApiErrorInit): string 
   return CATEGORY_DEFAULT_MESSAGES[category]
 }
 
-export class ApiClientError extends Error {
+interface ApiClientErrorFields {
   readonly category: ApiErrorCategory
   readonly endpoint: string
   readonly status?: number
+  readonly message: string
+}
+
+export class ApiClientError extends Data.TaggedError('ApiClientError')<ApiClientErrorFields> {
+  override readonly name = 'ApiClientError'
 
   constructor(category: ApiErrorCategory, init: ApiErrorInit) {
-    super(resolveMessage(category, init))
-    this.name = 'ApiClientError'
-    this.category = category
-    this.endpoint = init.endpoint
-    this.status = init.status
+    super({
+      category,
+      endpoint: init.endpoint,
+      status: init.status,
+      message: resolveMessage(category, init),
+    })
   }
 }
 

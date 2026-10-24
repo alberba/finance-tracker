@@ -1,3 +1,5 @@
+import { Effect } from 'effect'
+
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { getThemeController } from '../lib/client/theme'
@@ -6,6 +8,8 @@ import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
 import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
 import { describeCheckAge } from '../lib/client/sync-connection'
+import { fetchSession } from '../lib/client/session'
+import { runClientHttp } from '../lib/client/runtime'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
@@ -230,9 +234,9 @@ function initSyncMenu(): void {
   const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
   const syncStore = useSyncStore(pinia)
 
-  const sessionRequest = fetch('/api/session')
-    .then((response) => (response.ok ? response.json() : null))
-    .then((body: { user?: { id?: string; email?: string }; authentication?: string } | null) => {
+  const sessionRequest = runClientHttp(fetchSession())
+    .catch(() => null)
+    .then((body) => {
       if (emailEl && body?.user?.email) {
         emailEl.replaceChildren(body.user.email)
       }
@@ -286,7 +290,7 @@ function initSyncMenu(): void {
         }
         await requireAuthenticationResult(await authentication.signOut())
         if (syncStore?.userId) await syncStore.logout({ discardPending: true })
-        else if (session?.user?.id) await wipeAllClientData(session.user.id)
+        else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))
         else wipeLegacyClientData()
         window.location.href = '/login'
       })
