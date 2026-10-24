@@ -1,6 +1,7 @@
 import { computed, reactive, shallowRef } from 'vue'
 import type { BitvavoPreview } from '../lib/bitvavo-types'
 import { runClientHttp } from '../lib/client/runtime'
+import { requestBitvavo } from '../lib/client/bitvavo-api'
 import { useSyncStore } from '../stores/sync'
 
 export function useBitvavoImport() {
@@ -28,12 +29,10 @@ export function useBitvavoImport() {
       ),
   )
 
-  async function request<T = Record<string, unknown>>(
+  function request<T = Record<string, unknown>>(
     body?: object,
     method: 'GET' | 'POST' | 'PUT' = 'POST',
   ): Promise<T> {
-    // The panel is opened on demand; keep its adapter out of the startup chunk.
-    const { requestBitvavo } = await import('../lib/client/bitvavo-api')
     return runClientHttp(requestBitvavo<T>(body, method))
   }
   async function perform(work: () => Promise<void>) {
