@@ -1,5 +1,4 @@
 import { onMounted, shallowRef } from 'vue'
-import { authenticationRequest } from '../lib/client/authentication-request'
 import { runClientHttp } from '../lib/client/runtime'
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 export function useSecuritySettings() {
@@ -8,6 +7,7 @@ export function useSecuritySettings() {
   onMounted(async () => {
     if (isReadOnlyDemoActive()) return
     try {
+      const { authenticationRequest } = await import('../lib/client/authentication-request')
       const session = await runClientHttp(
         authenticationRequest<{
           user: { isAdmin?: boolean }

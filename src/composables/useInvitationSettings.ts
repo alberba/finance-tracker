@@ -1,5 +1,4 @@
 import { onMounted, shallowRef } from 'vue'
-import { authenticationRequest } from '../lib/client/authentication-request'
 import { runClientHttp } from '../lib/client/runtime'
 import { useAuthenticationAction } from './useAuthenticationAction'
 export function useInvitationSettings() {
@@ -20,12 +19,14 @@ export function useInvitationSettings() {
   const administratorId = shallowRef('')
   const { busy, error, run } = useAuthenticationAction()
   async function load() {
+    const { authenticationRequest } = await import('../lib/client/authentication-request')
     registration.value = await runClientHttp(
       authenticationRequest<Registration>('/api/admin/registration'),
     )
   }
   function create() {
     return run(async () => {
+      const { authenticationRequest } = await import('../lib/client/authentication-request')
       const invitation = await runClientHttp(
         authenticationRequest<{ url: string }>('/api/admin/registration', {
           action: 'create',
@@ -39,6 +40,7 @@ export function useInvitationSettings() {
   }
   function update(body: unknown) {
     return run(async () => {
+      const { authenticationRequest } = await import('../lib/client/authentication-request')
       await runClientHttp(authenticationRequest('/api/admin/registration', body))
       await load()
     })

@@ -1,6 +1,5 @@
 import { computed, shallowRef } from 'vue'
 import { useSyncStore } from '../stores/sync'
-import { requestBitvavo } from '../lib/client/bitvavo-api'
 import { resolveEntityId } from '../lib/client/command-mapping'
 import { runClientHttp } from '../lib/client/runtime'
 import type { Transaction } from '../scripts/types'
@@ -23,6 +22,7 @@ export function useBitvavoMovementDetails(transaction: () => Transaction) {
     open.value = true
     error.value = ''
     try {
+      const { requestBitvavo } = await import('../lib/client/bitvavo-api')
       const body = await runClientHttp(
         requestBitvavo<{ instruments: Array<{ id: string; symbol: string; name: string | null }> }>(
           undefined,
@@ -43,6 +43,7 @@ export function useBitvavoMovementDetails(transaction: () => Transaction) {
       // Instruments use their own catalog identity in the server bootstrap.
       const instrument = instruments.value.find((item) => item.id === instrumentId.value)
       if (!transactionId || !instrument) throw new Error('Selecciona un instrumento disponible.')
+      const { requestBitvavo } = await import('../lib/client/bitvavo-api')
       await runClientHttp(
         requestBitvavo({
           action: 'linkInstrument',

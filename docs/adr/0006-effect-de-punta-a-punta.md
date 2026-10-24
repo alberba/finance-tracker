@@ -94,13 +94,15 @@ el mismo método en ambos extremos.
 ## Medición al cerrar la fase 7
 
 Con `command-schemas.ts`, `bitvavo-types.ts` y el WebMCP migrados a Effect Schema, zod desaparece
-de todos los chunks del cliente (`ZodError` ya no aparece en `dist/client`). El chunk del runtime
-de cliente baja de 40,30 a 35,98 KB gzip. Sobre el conjunto completo de scripts en demo, la medición
-queda en **397,60 KB gzip**, es decir **+8,08 KB (+2,1 %)** respecto a la línea base de 389,52 KB:
-dentro del presupuesto de 10 KB. La fase 7 recuperó 4,04 KB del delta de la fase 5 (12,12 → 8,08).
+de todos los chunks del cliente (`ZodError` ya no aparece en `dist/client`). Los chunks del runtime
+de cliente (Effect + red) suman 37,82 KB gzip frente a los 40,30 KB que ocupaban antes de retirar
+zod. Sobre el conjunto de scripts que la página carga en demo (`networkidle`), la medición queda en
+**399,23 KB gzip**, es decir **+9,71 KB (+2,5 %)** respecto a la línea base de 389,52 KB: dentro del
+presupuesto de 10 KB. La fase 7 recuperó 4,04 KB del delta de la fase 5, y diferir el adaptador de
+Bitvavo y la petición de recuperación de acceso fuera del arranque recuperó el resto.
 
-Benchmark del ADR con la misma red simulada, mediana de 7: **932,31 KB** en **51 peticiones**,
-`appReady` 1.328 ms y LCP 1.556 ms (línea base: 835,32 KB / 36 / 1.162 ms / 780 ms). El conteo de
+Benchmark del ADR con la misma red simulada, mediana de 7: **934,50 KB** en **52 peticiones**,
+`appReady` 1.424 ms y LCP 1.636 ms (línea base: 835,32 KB / 36 / 1.162 ms / 780 ms). El conteo de
 peticiones sigue dependiendo de cuántos chunks entran antes de que el dashboard esté visible, así
 que la comparación de bytes que manda es la del conjunto completo.
 
@@ -114,4 +116,4 @@ arranque transferido no crece más de 10 KB gzip respecto al valor previo a la f
 se supera y no se puede recuperar con chunks diferidos, el cliente se queda en su forma actual y el
 resto de la migración sigue en pie. La medición de la fase 5 está en el apartado anterior y supera
 el presupuesto; se acepta el delta y la migración sigue con las fases 6 y 7, que se vuelven a medir
-al cerrar. Tras la fase 7 el delta baja a +8,08 KB y el presupuesto se cumple.
+al cerrar. Tras la fase 7 el delta baja a +9,71 KB y el presupuesto se cumple.
