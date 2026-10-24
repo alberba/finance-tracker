@@ -70,9 +70,9 @@ const previewDetail = computed(() =>
 watch(
   () => form.type,
   () => {
-    if (!categoryOptions.value.some((option) => option.value === form.category)) {
-      form.category = categoryOptions.value[0]?.value ?? ''
-    }
+    // categoryOptions keeps the current category even when the new type lacks it, so check the type's own list.
+    const names = movementsStore.orderedCategories(form.type)
+    if (!names.includes(form.category)) form.category = names[0] ?? 'Sin categoría'
   },
 )
 
