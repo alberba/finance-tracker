@@ -226,7 +226,11 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    después `state: CLOSED`, `stateReason: DUPLICATE` y `duplicateOf` mediante GraphQL. No usa
    texto en la descripción ni labels como sustituto del cierre nativo. Las cerradas se mantienen
    como posibles recurrencias y las coincidencias dudosas solo como relacionadas. No aplica
-   `ready-for-agent`; añade `ui-change` si una feature cambia la apariencia. Un fallo previo a
+   `ready-for-agent` mientras haya decisiones pendientes. El agente clasifica el reporte por su
+   intención (`bug`, `feature`, `task` o `epic`) y el script sustituye el tipo y el estado de triage
+   anteriores tras verificar el brief. Si está listo, aplica `ready-for-agent`; si falta una
+   decisión, publica `## Decisiones pendientes` en el cuerpo y aplica `needs-info` (u otro estado
+   de triage justificado). Añade `ui-change` a las features visuales. Un fallo previo a
    publicar deja el reporte original disponible.
 
 La skill está versionada en `.opencode/skills/create-issue/`, con una copia del `SKILL.md` personal
@@ -258,6 +262,10 @@ El workflow tiene que estar en la rama por defecto para recibir `issues.opened`.
 fallo o procesar un reporte anterior, ejecuta **Analyze web report** con `issue_number` desde Actions,
 o `gh workflow run enrich-web-issue.yml --repo alberba/finance-tracker -f issue_number=123`.
 Los reintentos reutilizan el brief del bot; si ya se publicó el cuerpo, omiten el análisis.
+Para reevaluar una issue después de responder sus decisiones pendientes, activa `reprocess` en
+Run workflow o añade `-f reprocess=true` al comando. Se leen los comentarios de la propia issue,
+se actualiza el brief vigente y se retiran las preguntas y estados resueltos. Los comentarios y
+las candidatas se entregan en archivos separados para que el agente pueda leerlos por partes.
 La versión de OpenCode está fijada en el workflow; cada análisis tiene hasta 25 pasos y 8 minutos.
 
 ### Labels recomendadas en GitHub

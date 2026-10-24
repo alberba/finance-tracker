@@ -156,7 +156,12 @@ El script de publicación exige JSON válido, carga de la skill, lectura de cód
 Conserva el bloque de adjuntos y los metadatos del reporte, que no se pasan al agente; reemplaza
 el cuerpo, publica el brief enlazado y verifica el resultado. Los reintentos reutilizan el comentario
 del bot y omiten issues ya enriquecidas. Si detecta una edición humana antes de sustituir el cuerpo,
-interrumpe la publicación. Los reportes no duplicados siguen en `needs-triage`, con `ui-change` en features visuales.
+interrumpe la publicación. El agente devuelve `category`, `triage` y `pendingDecisions`: el publicador corrige los labels de
+categoría, retira estados anteriores (incluido `status:triage`) y conserva los demás labels.
+Aplica `ready-for-agent` solo con decisiones resueltas y brief verificado; `needs-info` y
+`ready-for-human` requieren preguntas o acciones bloqueantes explícitas. Si no está listo, el
+cuerpo contiene `## Decisiones pendientes` con esas preguntas. Las features visuales reciben
+`ui-change`. Las duplicadas cerradas no reciben un estado de implementación pendiente.
 El seguimiento de reportes de #340 debe detectar `CLOSED` + `DUPLICATE` y leer `duplicateOf`
 para mostrar «Cerrado como duplicado de #N», conservando la identidad y el hilo del reporte
 original. Debe respetar reaperturas y cambios manuales posteriores consultando el estado nativo
@@ -164,6 +169,10 @@ actual, sin inferirlo de comentarios, labels ni cierres como completado o no pla
 
 El secret de Actions `OPENCODE_GO_API_KEY` se configura aparte del entorno del servidor. El workflow
 necesita estar en la rama por defecto; se puede reintentar con `workflow_dispatch` e `issue_number`.
+Con `reprocess: true` se puede reevaluar una issue ya enriquecida cuando cambie su discusión:
+reutiliza el brief del bot, evita enlaces duplicados y retira preguntas resueltas. El contexto
+incluye los comentarios de la propia issue y las candidatas en archivos separados; se exige
+lectura de la discusión y se comprueba que no haya cambiado antes de aplicar el triage.
 La configuración, los permisos y los límites están documentados en [Reportes web](../../../README.md#reportes-web).
 
 Secciones del cuerpo inicial que publica la API:
