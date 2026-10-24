@@ -46,6 +46,18 @@ Fuente: `docs/architecture/frontend.md`.
 - Los datos semilla generados desde Excel viven en `src/data/seed.json`; `src/data/seed.ts` es solo
   un wrapper tipado. No se versionan payloads generados como TypeScript largo.
 
+## Effect
+
+Fuente: `docs/adr/0006-effect-de-punta-a-punta.md`.
+
+- El código con efectos (E/S, fallo, concurrencia, tiempo) devuelve `Effect<A, E, R>`; no hay
+  frontera `Promise` entre módulos. Los errores son `Data.TaggedError` y las dependencias entran
+  por `Context.Service` y `Layer`.
+- `runPromise` y `runFork` solo aparecen en los bordes: endpoints y middleware de Astro,
+  manejadores de eventos de Vue, acciones de Pinia y tests.
+- Las funciones puras y síncronas, como `src/domain/**`, no se envuelven en Effect.
+- `effect` se fija en versión exacta, sin `^`.
+
 ## Estilos
 
 Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md`.
