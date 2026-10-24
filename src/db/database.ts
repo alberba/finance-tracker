@@ -67,9 +67,9 @@ export const transaction = <A, E>(
  * Transitional edge: runs a repository effect against `db` from Promise-based code.
  * Rejects with the driver's original error so legacy callers keep their behaviour.
  */
-export async function runWithDb<A>(
+export async function runWithDb<A, E>(
   db: Db,
-  effect: Effect.Effect<A, DatabaseError, Database>,
+  effect: Effect.Effect<A, E, Database>,
 ): Promise<A> {
   try {
     return await Effect.runPromise(Effect.provideService(effect, Database, db))
