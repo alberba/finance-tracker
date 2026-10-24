@@ -153,16 +153,16 @@ it('requires a new OTP ceremony and issues a same-user, same-session, single-use
   const previous = await auth.api.getSession({ headers: new Headers({ cookie: original.cookie }) })
   expect(session!.session.id).not.toBe(previous!.session.id)
   const db = database.db as unknown as Db
-  expect(await consumeAuthenticationProof(db, proof, 'another-user', session!.session.id)).toBe(
-    false,
-  )
-  expect(await consumeAuthenticationProof(db, proof, original.user.id, previous!.session.id)).toBe(
-    false,
-  )
-  expect(await consumeAuthenticationProof(db, proof, original.user.id, session!.session.id)).toBe(
-    true,
-  )
-  expect(await consumeAuthenticationProof(db, proof, original.user.id, session!.session.id)).toBe(
-    false,
-  )
+  expect(
+    await runWithDb(db, consumeAuthenticationProof(proof, 'another-user', session!.session.id)),
+  ).toBe(false)
+  expect(
+    await runWithDb(db, consumeAuthenticationProof(proof, original.user.id, previous!.session.id)),
+  ).toBe(false)
+  expect(
+    await runWithDb(db, consumeAuthenticationProof(proof, original.user.id, session!.session.id)),
+  ).toBe(true)
+  expect(
+    await runWithDb(db, consumeAuthenticationProof(proof, original.user.id, session!.session.id)),
+  ).toBe(false)
 })

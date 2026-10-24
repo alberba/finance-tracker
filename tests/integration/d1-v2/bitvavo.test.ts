@@ -30,13 +30,18 @@ async function importedUser() {
   const { user, account } = await configuredUser()
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
-  return { user, account, preview, bootstrap: await buildBootstrapPayload(testDb.db, user.id) }
+  return {
+    user,
+    account,
+    preview,
+    bootstrap: await runWithDb(testDb.db, buildBootstrapPayload(user.id)),
+  }
 }
 
 it('imports a closed preview idempotently', async () => {
   const { user, preview } = await importedUser()
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
-  expect((await buildBootstrapPayload(testDb.db, user.id)).transactions).toHaveLength(2)
+  expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(2)
 })
 
 it('retains exact remote operations through bootstrap and projection', async () => {
@@ -58,7 +63,7 @@ it('isolates an import preview from another user', async () => {
   const { preview } = await importedUser()
   const stranger = await runWithDb(testDb.db, users.create({ email: 'stranger@example.com' }))
   await expect(confirmBitvavo(testDb.db, stranger.id, preview.id, [])).rejects.toThrow()
-  expect((await buildBootstrapPayload(testDb.db, stranger.id)).transactions).toEqual([])
+  expect((await runWithDb(testDb.db, buildBootstrapPayload(stranger.id))).transactions).toEqual([])
 })
 
 it('rejects deletion of a remote financial operation', async () => {
@@ -70,12 +75,15 @@ it('rejects deletion of a remote financial operation', async () => {
 
 async function configuredUser() {
   const user = await runWithDb(testDb.db, users.create({ email: 'owner@example.com' }))
-  const account = await runWithDb(testDb.db, accounts.create(user.id, {
-    name: 'Bitvavo',
-    kind: 'cash',
-    currency: 'EUR',
-    openingBalance: 0,
-  }))
+  const account = await runWithDb(
+    testDb.db,
+    accounts.create(user.id, {
+      name: 'Bitvavo',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
   await configureBitvavo(
     testDb.db,
     user.id,
@@ -94,15 +102,18 @@ async function configuredUser() {
 
 it('requires explicit duplicate resolution and links the chosen manual movement', async () => {
   const { user, account } = await configuredUser()
-  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
-    accountId: account.id,
-    type: 'investment',
-    date: '2020-01-01',
-    amount: 6.85,
-    currency: 'EUR',
-    declared: true,
-    operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
-  }))
+  const manual = await runWithDb(
+    testDb.db,
+    transactions.create(user.id, {
+      accountId: account.id,
+      type: 'investment',
+      date: '2020-01-01',
+      amount: 6.85,
+      currency: 'EUR',
+      declared: true,
+      operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
+    }),
+  )
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   expect(preview.operations[0].candidates.map((candidate) => candidate.id)).toEqual([manual.id])
   await expect(confirmBitvavo(testDb.db, user.id, preview.id, [])).rejects.toThrow('duplicados')
@@ -110,7 +121,7 @@ it('requires explicit duplicate resolution and links the chosen manual movement'
   await confirmBitvavo(testDb.db, user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },
   ])
-  const bootstrap = await buildBootstrapPayload(testDb.db, user.id)
+  const bootstrap = await runWithDb(testDb.db, buildBootstrapPayload(user.id))
   expect(bootstrap.transactions).toHaveLength(2)
   expect(bootstrap.transactions.find((row) => row.id === manual.id)).toMatchObject({
     declared: true,
@@ -126,10 +137,10 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
   )
   await expect(confirmBitvavo(testDb.db, user.id, preview.id, [])).rejects.toThrow('reintentar')
   expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBeNull()
-  expect((await buildBootstrapPayload(testDb.db, user.id)).transactions).toHaveLength(1)
+  expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(1)
   testDb.sqlite.exec('DROP TRIGGER fail_sale')
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
-  expect((await buildBootstrapPayload(testDb.db, user.id)).transactions).toHaveLength(2)
+  expect((await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions).toHaveLength(2)
   expect((await runWithDb(testDb.db, bitvavo.getConnection(user.id)))?.cursor).toBe(preview.to)
   const changes = await runWithDb(testDb.db, sync.listChangesSince(user.id, 0))
   expect(changes).toHaveLength(2)
@@ -138,17 +149,21 @@ it('resumes a partial failure without advancing the cursor or duplicating comple
 
 it('automatically links a unique symbol belonging to the user', async () => {
   const { user } = await configuredUser()
-  const instrument = await runWithDb(testDb.db, market.createInstrument({
-    symbol: 'BTC',
-    normalizedSymbol: 'BTC',
-    provider: 'coingecko',
-    currency: 'EUR',
-  }))
+  const instrument = await runWithDb(
+    testDb.db,
+    market.createInstrument({
+      symbol: 'BTC',
+      normalizedSymbol: 'BTC',
+      provider: 'coingecko',
+      currency: 'EUR',
+    }),
+  )
   await runWithDb(testDb.db, market.createUserInstrument(user.id, { instrumentId: instrument.id }))
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [])
   expect(
-    (await buildBootstrapPayload(testDb.db, user.id)).transactions[0].tradeDetail?.instrumentId,
+    (await runWithDb(testDb.db, buildBootstrapPayload(user.id))).transactions[0].tradeDetail
+      ?.instrumentId,
   ).toBe(instrument.id)
 })
 
@@ -189,20 +204,23 @@ it('rejects synchronized changes to remote financial fields', async () => {
 
 it('offers historical sales calculated with gross plus fee as explicit duplicate candidates', async () => {
   const { user, account } = await configuredUser()
-  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
-    accountId: account.id,
-    type: 'investment',
-    date: '2020-01-01',
-    amount: -58.63,
-    currency: 'EUR',
-    operation: {
-      symbol: 'BTC',
-      side: 'sell',
-      units: 0.0005,
-      unitPrice: 116958.69300942,
-      fee: 0.15,
-    },
-  }))
+  const manual = await runWithDb(
+    testDb.db,
+    transactions.create(user.id, {
+      accountId: account.id,
+      type: 'investment',
+      date: '2020-01-01',
+      amount: -58.63,
+      currency: 'EUR',
+      operation: {
+        symbol: 'BTC',
+        side: 'sell',
+        units: 0.0005,
+        unitPrice: 116958.69300942,
+        fee: 0.15,
+      },
+    }),
+  )
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   expect(preview.operations.find((op) => op.side === 'sell')?.candidates.map((c) => c.id)).toEqual([
     manual.id,
@@ -211,15 +229,18 @@ it('offers historical sales calculated with gross plus fee as explicit duplicate
 
 it('preserves a local description when linking an explicit manual duplicate', async () => {
   const { user, account } = await configuredUser()
-  const manual = await runWithDb(testDb.db, transactions.create(user.id, {
-    accountId: account.id,
-    type: 'investment',
-    date: '2020-01-01',
-    amount: 6.85,
-    currency: 'EUR',
-    description: 'My purchase notes',
-    operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
-  }))
+  const manual = await runWithDb(
+    testDb.db,
+    transactions.create(user.id, {
+      accountId: account.id,
+      type: 'investment',
+      date: '2020-01-01',
+      amount: 6.85,
+      currency: 'EUR',
+      description: 'My purchase notes',
+      operation: { symbol: 'BTC', side: 'buy', units: 0.00008878285, unitPrice: 76953, fee: 0.02 },
+    }),
+  )
   const preview = await previewBitvavo(testDb.db, user.id, env, http)
   await confirmBitvavo(testDb.db, user.id, preview.id, [
     { externalId: 'example-1', transactionId: manual.id },

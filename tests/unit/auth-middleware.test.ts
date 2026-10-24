@@ -64,12 +64,14 @@ beforeEach(() => {
   vi.clearAllMocks()
   getDb.mockReturnValue({})
   authenticatedPrincipal.mockReturnValue(Effect.succeed(authenticated))
-  resolvePrincipal.mockResolvedValue({
-    userId: 'test-user',
-    email: 'tester@example.test',
-    provider: TEST_AUTH_PROVIDER,
-    subject: 'tester@example.test',
-  })
+  resolvePrincipal.mockReturnValue(
+    Effect.succeed({
+      userId: 'test-user',
+      email: 'tester@example.test',
+      provider: TEST_AUTH_PROVIDER,
+      subject: 'tester@example.test',
+    }),
+  )
   setSession()
 })
 
@@ -137,14 +139,11 @@ describe('authentication middleware', () => {
 
     await onRequest(context, next)
 
-    expect(resolvePrincipal).toHaveBeenCalledWith(
-      {},
-      {
-        provider: TEST_AUTH_PROVIDER,
-        subject: 'tester@example.test',
-        email: 'tester@example.test',
-      },
-    )
+    expect(resolvePrincipal).toHaveBeenCalledWith({
+      provider: TEST_AUTH_PROVIDER,
+      subject: 'tester@example.test',
+      email: 'tester@example.test',
+    })
     expect((context.locals as App.Locals).principal).toMatchObject({ userId: 'test-user' })
     expect(next).toHaveBeenCalledOnce()
   })

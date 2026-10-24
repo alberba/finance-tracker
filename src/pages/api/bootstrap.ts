@@ -14,31 +14,32 @@
  * round-trip test harness can exercise it without HTTP.
  */
 
-import type { APIRoute } from "astro";
-import { getDb } from "../../db/client";
-import { buildBootstrapPayload } from "../../lib/server/bootstrap-payload";
-import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../lib/server/api-auth";
+import type { APIRoute } from 'astro'
+import { getDb } from '../../db/client'
+import { buildBootstrapPayload } from '../../lib/server/bootstrap-payload'
+import { runWithDb } from '../../db/database'
+import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../lib/server/api-auth'
 
-function parseYear(raw: string | null): number | undefined | "invalid" {
+function parseYear(raw: string | null): number | undefined | 'invalid' {
   if (!raw) {
-    return undefined;
+    return undefined
   }
-  const year = Number(raw);
+  const year = Number(raw)
   if (!Number.isInteger(year) || year < 1900 || year > 9999) {
-    return "invalid";
+    return 'invalid'
   }
-  return year;
+  return year
 }
 
 export const GET: APIRoute = async ({ request, locals }) =>
-  withApiErrorHandling("/api/bootstrap", async () => {
-    const principal = requirePrincipal(locals);
-    const url = new URL(request.url);
-    const year = parseYear(url.searchParams.get("year"));
-    if (year === "invalid") {
-      return jsonResponse({ error: "Parámetro 'year' inválido." }, 400);
+  withApiErrorHandling('/api/bootstrap', async () => {
+    const principal = requirePrincipal(locals)
+    const url = new URL(request.url)
+    const year = parseYear(url.searchParams.get('year'))
+    if (year === 'invalid') {
+      return jsonResponse({ error: "Parámetro 'year' inválido." }, 400)
     }
 
-    const payload = await buildBootstrapPayload(getDb(locals), principal.userId, year);
-    return jsonResponse(payload, 200);
-  });
+    const payload = await runWithDb(getDb(locals), buildBootstrapPayload(principal.userId, year))
+    return jsonResponse(payload, 200)
+  })

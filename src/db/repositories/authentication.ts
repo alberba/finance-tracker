@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import { lift } from '../database'
+import { lift, runWithDb } from '../database'
 import { authAdmission, authInvitation, authPolicy, authRole, authUser, users } from '../schema'
 import type { AuthPrincipal } from '../../lib/server/auth/principal'
 import { initializeNewUser } from '../../lib/server/initialize-new-user'
@@ -52,7 +52,7 @@ async function admitVerifiedUserSql(db: Db, id: string): Promise<void> {
       .insert(authAdmission)
       .values({ userId: id, invitationId: user.invitationId, createdAt: new Date() })
       .onConflictDoNothing()
-    if (!financialUser) await initializeNewUser(tx, id)
+    if (!financialUser) await runWithDb(tx, initializeNewUser(id))
   })
 }
 
