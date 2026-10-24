@@ -90,6 +90,51 @@ describe('POST /api/issues/report con el cliente de GitHub sano', () => {
   })
 })
 
+describe('POST /api/issues/report y el reportero', () => {
+  beforeEach(() => {
+    githubIssues.createIssueFromWebReport.mockReset()
+  })
+
+  it('pasa al servicio el reportero del principal, ignorando el del payload', async () => {
+    githubIssues.createIssueFromWebReport.mockResolvedValue({
+      number: 1,
+      url: 'https://github.com/alberba/finance-tracker/issues/1',
+    })
+    const spoofed = {
+      ...PAYLOAD,
+      reporter: { userId: 'otro', email: 'otro@example.com', name: 'Otro' },
+      email: 'otro@example.com',
+    }
+
+    const context = makeContext(spoofed)
+    const response = await POST(context)
+
+    expect(response.status).toBe(201)
+    const [payload, reporter] = githubIssues.createIssueFromWebReport.mock.calls[0]
+    expect(reporter).toEqual({
+      userId: context.locals.principal?.userId,
+      email: 'quien@example.com',
+      name: null,
+    })
+    expect(payload).not.toHaveProperty('reporter')
+    expect(payload).not.toHaveProperty('email')
+  })
+
+  it('sin principal responde 401 y no crea la issue', async () => {
+    const request = new Request('https://app.example.com/api/issues/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(PAYLOAD),
+    })
+    const locals = { runtimeEnv: {} }
+
+    const response = await POST({ request, locals } as unknown as Parameters<typeof POST>[0])
+
+    expect(response.status).toBe(401)
+    expect(githubIssues.createIssueFromWebReport).not.toHaveBeenCalled()
+  })
+})
+
 describe('POST /api/issues/report con un payload inválido', () => {
   it('un 400 de validación no se reporta como fallo de ruta', async () => {
     const response = await POST(makeContext({ ...PAYLOAD, summary: 'no' }))

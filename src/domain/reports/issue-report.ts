@@ -2,15 +2,13 @@ export function normalizeText(value: string): string {
   return value.replace(/\r\n/g, '\n').trim()
 }
 
-export function getValidationError(summary: string, description: string): string | null {
-  if (!summary || !description) {
-    return 'Revisa el formulario: resumen y descripción son obligatorios.'
+// La descripción es opcional y no tiene mínimo: solo el resumen se valida aquí.
+export function getValidationError(summary: string): string | null {
+  if (!summary) {
+    return 'Revisa el formulario: el resumen es obligatorio.'
   }
   if (summary.length < 5) {
     return 'Revisa el formulario: el resumen debe tener al menos 5 caracteres.'
-  }
-  if (description.length < 12) {
-    return 'Revisa el formulario: la descripción debe tener al menos 12 caracteres.'
   }
   return null
 }

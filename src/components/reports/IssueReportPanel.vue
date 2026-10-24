@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue'
+import { onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
+import {
+  encodeBase64,
+  getAttachmentError,
+  ISSUE_ATTACHMENT_MAX_BYTES,
+  ISSUE_ATTACHMENT_MAX_COUNT,
+  ISSUE_ATTACHMENT_TYPES,
+} from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
+  type ReportAttachment,
   type ReportPayload,
   type ReportType,
 } from '../../services/issue-report-api'
@@ -32,6 +40,8 @@ const TYPE_OPTIONS: SegmentedOption<ReportType>[] = [
 ]
 
 const TEXTAREA = `${FIELD_CONTROL} resize-y py-2.5 text-base`
+const ATTACHMENT_ACCEPT = ISSUE_ATTACHMENT_TYPES.join(',')
+const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${ISSUE_ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB: PNG, JPEG, WebP o GIF.`
 
 const uiStore = useUiStore()
 const { getIssueReportContext } = useIssueReportContext()
@@ -40,27 +50,84 @@ const form = reactive({
   type: 'bug' as ReportType,
   summary: '',
   description: '',
-  expectedResult: '',
-  actualResult: '',
 })
+
+interface DraftAttachment {
+  id: number
+  file: File
+  previewUrl: string
+}
+
+const attachments = shallowRef<DraftAttachment[]>([])
+let nextAttachmentId = 0
 
 const statusMessage = shallowRef('')
 const successStatus = shallowRef<SuccessStatus | null>(null)
 const submitting = shallowRef(false)
 
+function revokePreviews(items: DraftAttachment[]): void {
+  for (const item of items) URL.revokeObjectURL(item.previewUrl)
+}
+
+function clearAttachments(): void {
+  revokePreviews(attachments.value)
+  attachments.value = []
+}
+
+onBeforeUnmount(clearAttachments)
+
+function onAttachmentsPicked(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const picked = Array.from(input.files ?? [])
+  // Vaciar el input permite volver a elegir el mismo fichero tras quitarlo.
+  input.value = ''
+
+  for (const file of picked) {
+    const error = getAttachmentError(
+      { name: file.name, size: file.size, type: file.type },
+      attachments.value.length,
+    )
+    if (error) {
+      successStatus.value = null
+      statusMessage.value = error
+      return
+    }
+    attachments.value = [
+      ...attachments.value,
+      { id: nextAttachmentId++, file, previewUrl: URL.createObjectURL(file) },
+    ]
+  }
+  statusMessage.value = ''
+}
+
+function removeAttachment(id: number): void {
+  const removed = attachments.value.filter((item) => item.id === id)
+  revokePreviews(removed)
+  attachments.value = attachments.value.filter((item) => item.id !== id)
+}
+
+async function encodeAttachments(): Promise<ReportAttachment[]> {
+  return Promise.all(
+    attachments.value.map(async ({ file }) => ({
+      name: file.name,
+      contentType: file.type,
+      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
+    })),
+  )
+}
+
 function resetForm(): void {
   form.type = 'bug'
   form.summary = ''
   form.description = ''
-  form.expectedResult = ''
-  form.actualResult = ''
+  clearAttachments()
 }
 
 async function onSubmit(): Promise<void> {
   const summary = normalizeText(form.summary)
   const description = normalizeText(form.description)
 
-  const validationError = getValidationError(summary, description)
+  const validationError = getValidationError(summary)
   if (validationError) {
     successStatus.value = null
     statusMessage.value = validationError
@@ -72,11 +139,10 @@ async function onSubmit(): Promise<void> {
     // form submissions use the shorter GitHub-facing `feature` value.
     type: form.type === 'bug' ? 'bug' : 'feature',
     summary,
-    description,
+    // Sin descripción no se envía el campo: el servidor la deja vacía.
+    description: description || undefined,
     section: uiStore.ui.activeSection,
     context: getIssueReportContext(),
-    expectedResult: normalizeText(form.expectedResult) || undefined,
-    actualResult: normalizeText(form.actualResult) || undefined,
   }
 
   submitting.value = true
@@ -84,6 +150,9 @@ async function onSubmit(): Promise<void> {
   statusMessage.value = 'Creando reporte...'
 
   try {
+    if (attachments.value.length > 0) {
+      payload.attachments = await encodeAttachments()
+    }
     const result = await submitIssueReport(payload)
     if (!result.ok) {
       statusMessage.value = `No se pudo crear la issue: ${result.error}`
@@ -148,46 +217,58 @@ async function onSubmit(): Promise<void> {
           placeholder="Ej. El filtro de movimientos no guarda el valor"
         />
         <div :class="FIELD_LABEL">
-          <label for="issue-report-description">Descripción</label>
+          <label for="issue-report-description">Descripción (opcional)</label>
           <textarea
             id="issue-report-description"
             v-model="form.description"
             :class="TEXTAREA"
             name="description"
-            minlength="12"
             maxlength="8000"
-            required
             rows="4"
-            placeholder="Describe el error o mejora con el mayor detalle posible."
+            placeholder="Añade detalle si hace falta. El resumen puede bastar."
           ></textarea>
         </div>
+        <div :class="FIELD_LABEL">
+          <label for="issue-report-attachments">Capturas (opcional)</label>
+          <input
+            id="issue-report-attachments"
+            type="file"
+            name="attachments"
+            :accept="ATTACHMENT_ACCEPT"
+            multiple
+            class="text-text-muted file:bg-subtle file:text-text-main text-sm file:mr-3 file:rounded-md file:px-3 file:py-2"
+            @change="onAttachmentsPicked"
+          />
+          <p class="text-text-muted text-sm">{{ ATTACHMENT_LIMITS }}</p>
+        </div>
+        <ul
+          v-if="attachments.length > 0"
+          id="issue-report-attachment-list"
+          class="grid gap-2"
+          aria-label="Capturas adjuntas"
+        >
+          <li
+            v-for="item in attachments"
+            :key="item.id"
+            class="bg-subtle flex items-center gap-3 rounded-md p-2"
+          >
+            <img
+              :src="item.previewUrl"
+              :alt="`Vista previa de ${item.file.name}`"
+              class="size-14 shrink-0 rounded-md object-cover"
+            />
+            <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ item.file.name }}</span>
+            <BaseButton variant="ghost" @click="removeAttachment(item.id)">
+              Quitar {{ item.file.name }}
+            </BaseButton>
+          </li>
+        </ul>
       </fieldset>
 
-      <fieldset class="grid gap-3.5 sm:grid-cols-2">
-        <PanelSectionTitle>Detalle (opcional)</PanelSectionTitle>
-        <div :class="FIELD_LABEL">
-          <label for="issue-report-expected">Resultado esperado</label>
-          <textarea
-            id="issue-report-expected"
-            v-model="form.expectedResult"
-            :class="TEXTAREA"
-            name="expectedResult"
-            maxlength="4000"
-            rows="3"
-          ></textarea>
-        </div>
-        <div :class="FIELD_LABEL">
-          <label for="issue-report-actual">Resultado actual</label>
-          <textarea
-            id="issue-report-actual"
-            v-model="form.actualResult"
-            :class="TEXTAREA"
-            name="actualResult"
-            maxlength="4000"
-            rows="3"
-          ></textarea>
-        </div>
-      </fieldset>
+      <p id="issue-report-notice" class="text-text-muted text-sm leading-relaxed">
+        Este reporte se publica en un repositorio público, junto con tu nombre, tu email y el
+        identificador de tu cuenta. No escribas datos que no quieras compartir.
+      </p>
     </form>
 
     <p

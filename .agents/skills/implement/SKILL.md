@@ -12,7 +12,7 @@ Before the first command, run `pnpm setup:worktree` if `node_modules` or `.dev.v
 
 Call the Skill tool with "tdd" where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+Run typechecking regularly, single test files regularly, and `pnpm gate` once at the end. For E2E, run only the specs covering what you touched; CI runs the full browser suites.
 
 Once done, call the Skill tool with "code-review" to review the work.
 

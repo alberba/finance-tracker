@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createIssueFromWebReport } from '../../src/lib/server/github-issues'
-import type { IssueReportPayload } from '../../src/lib/server/issue-report-schema'
+import {
+  buildIssueBody,
+  createIssueFromWebReport,
+  type IssueReporter,
+} from '../../src/lib/server/github-issues'
+import {
+  parseIssueReportPayload,
+  type IssueReportPayload,
+} from '../../src/lib/server/issue-report-schema'
 
 const payload: IssueReportPayload = {
   type: 'bug',
@@ -12,6 +19,12 @@ const payload: IssueReportPayload = {
     pathname: '/movimientos',
     timestamp: '2026-02-23T10:00:00.000Z',
   },
+}
+
+const reporter: IssueReporter = {
+  userId: 'user-42',
+  email: 'ana@example.com',
+  name: 'ana',
 }
 
 /** El error que lanzó la promesa: acá importa su `message`, no la respuesta. */
@@ -42,6 +55,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -83,6 +97,7 @@ describe('github issues service', () => {
         ...payload,
         type: 'feature',
       },
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -110,6 +125,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -138,6 +154,7 @@ describe('github issues service', () => {
 
     const result = await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_ISSUE_TOKEN: 'token',
         GITHUB_OWNER: 'org',
@@ -157,6 +174,7 @@ describe('github issues service', () => {
     await expect(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -179,6 +197,7 @@ describe('github issues service', () => {
     const error = await captureError(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -201,6 +220,7 @@ describe('github issues service', () => {
     const error = await captureError(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_ISSUE_TOKEN: 'token',
           GITHUB_OWNER: 'org',
@@ -232,6 +252,7 @@ describe('github issues service', () => {
 
     await createIssueFromWebReport(
       payload,
+      reporter,
       {
         GITHUB_TOKEN: 'fallback-token',
         GITHUB_OWNER: 'org',
@@ -252,6 +273,7 @@ describe('github issues service', () => {
     await expect(
       createIssueFromWebReport(
         payload,
+        reporter,
         {
           GITHUB_OWNER: 'org',
           GITHUB_REPO: 'repo',
@@ -260,5 +282,211 @@ describe('github issues service', () => {
       ),
     ).rejects.toThrow(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/)
     expect(fakeFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildIssueBody', () => {
+  it('omite por completo la sección «Problema o solicitud» cuando no hay descripción', () => {
+    const body = buildIssueBody({ ...payload, description: '' }, reporter)
+
+    expect(body).not.toContain('Problema o solicitud')
+    expect(body).toContain('### Resumen')
+    expect(body).toContain(payload.summary)
+  })
+
+  it('incluye la descripción tal cual la escribió la persona usuaria', () => {
+    const description = 'Línea uno\n\n- detalle con *markdown* sin tocar'
+    const body = buildIssueBody({ ...payload, description }, reporter)
+
+    expect(body).toContain(`### Problema o solicitud\n${description}\n`)
+  })
+
+  it('conserva los saltos de línea de la descripción de extremo a extremo', () => {
+    const parsed = parseIssueReportPayload({
+      type: 'bug',
+      summary: 'Filtro roto',
+      description: 'Paso 1\n\nPaso 2:\n- primero\n- segundo',
+      section: 'transactions',
+      context: {},
+    })
+
+    const body = buildIssueBody(parsed, reporter)
+
+    expect(body).toContain('### Problema o solicitud\nPaso 1\n\nPaso 2:\n- primero\n- segundo\n')
+  })
+
+  it('escribe nombre, email e identificador del reportero recibido', () => {
+    const body = buildIssueBody(payload, reporter)
+
+    expect(body).toContain('### Reportero')
+    expect(body).toContain('- Nombre: ana')
+    expect(body).toContain('- Email: ana@example.com')
+    expect(body).toContain('- Identificador: user-42')
+  })
+
+  it('marca con n/a los datos del reportero que falten', () => {
+    const body = buildIssueBody(payload, { userId: 'user-7', email: null, name: null })
+
+    expect(body).toContain('- Nombre: n/a')
+    expect(body).toContain('- Email: n/a')
+    expect(body).toContain('- Identificador: user-7')
+  })
+
+  it('no escribe los campos retirados del formulario', () => {
+    const body = buildIssueBody(payload, reporter)
+
+    expect(body).not.toContain('Resultado esperado')
+    expect(body).not.toContain('Resultado actual')
+    expect(body).not.toContain('Pasos para reproducir')
+  })
+})
+
+describe('createIssueFromWebReport con reportero', () => {
+  it('envía el reportero en el cuerpo y omite la descripción vacía', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify({ number: 3, html_url: 'https://x/issues/3' }), {
+          status: 201,
+        }),
+    )
+
+    await createIssueFromWebReport(
+      { ...payload, description: '' },
+      reporter,
+      { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' },
+      { fetch: fakeFetch as unknown as typeof fetch },
+    )
+
+    const [, init] = fakeFetch.mock.calls[0]
+    const body = JSON.parse(String(init?.body || '{}'))
+    expect(body.body).toContain('- Email: ana@example.com')
+    expect(body.body).not.toContain('Problema o solicitud')
+  })
+})
+
+describe('enriquecimiento del reporte', () => {
+  const env = { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' }
+  const createdResponse = () =>
+    new Response(JSON.stringify({ number: 21, html_url: 'https://x/issues/21' }), { status: 201 })
+
+  const baselineBody = [
+    '## Reporte desde la web',
+    '',
+    '### Resumen',
+    'Error al guardar movimiento',
+    '',
+    '### Problema o solicitud',
+    'Al pulsar guardar, no se persiste en servidor.',
+    '',
+    '### Contexto de ejecución',
+    '- Tipo: bug',
+    '- Tipo de reporte: bug',
+    '- Tipo de issue de GitHub: Bug',
+    '- Se envió desde la sección: transactions',
+    '- Se envió desde la ruta: /movimientos',
+    '- Navegador: Playwright',
+    '- Fecha cliente: 2026-02-23T10:00:00.000Z',
+    '',
+    '### Reportero',
+    '- Nombre: ana',
+    '- Email: ana@example.com',
+    '- Identificador: user-42',
+  ].join('\n')
+
+  it('sin análisis el cuerpo es idéntico al de siempre', () => {
+    expect(buildIssueBody(payload, reporter)).toBe(baselineBody)
+    expect(buildIssueBody(payload, reporter, null)).toBe(baselineBody)
+  })
+
+  it('añade el análisis en una sección propia sin tocar el texto del usuario', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
+    const enrich = vi.fn(async () => '**Problema**: el guardado no persiste.')
+
+    await createIssueFromWebReport(payload, reporter, env, {
+      fetch: fakeFetch as unknown as typeof fetch,
+      enrich,
+    })
+
+    expect(enrich).toHaveBeenCalledExactlyOnceWith(
+      {
+        type: 'bug',
+        summary: payload.summary,
+        description: payload.description,
+        section: 'transactions',
+        pathname: '/movimientos',
+      },
+      env,
+    )
+    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
+    expect(body.title).toBe(payload.summary)
+    expect(body.body).toContain('## Análisis generado automáticamente')
+    expect(body.body).toContain('**Problema**: el guardado no persiste.')
+    expect(body.body).toContain(
+      '### Problema o solicitud\nAl pulsar guardar, no se persiste en servidor.\n',
+    )
+    expect(body.body.indexOf('## Análisis generado')).toBeGreaterThan(
+      body.body.indexOf('### Reportero'),
+    )
+  })
+
+  it('si el enriquecedor no devuelve nada, crea la issue con el cuerpo de siempre', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
+
+    const result = await createIssueFromWebReport(payload, reporter, env, {
+      fetch: fakeFetch as unknown as typeof fetch,
+      enrich: async () => null,
+    })
+
+    expect(result.number).toBe(21)
+    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
+    expect(body.body).toBe(baselineBody)
+  })
+
+  it('si el enriquecedor lanza, la issue se crea igual', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await createIssueFromWebReport(payload, reporter, env, {
+      fetch: fakeFetch as unknown as typeof fetch,
+      enrich: async () => {
+        throw new Error('boom')
+      },
+    })
+
+    expect(result.number).toBe(21)
+    expect(consoleError).toHaveBeenCalledExactlyOnceWith(
+      '[github] El análisis del reporte se omitió por un fallo inesperado.',
+    )
+    consoleError.mockRestore()
+  })
+
+  it('no consulta el enriquecedor si falta la configuración de GitHub', async () => {
+    const enrich = vi.fn(async () => 'análisis')
+
+    await expect(
+      createIssueFromWebReport(
+        payload,
+        reporter,
+        { GITHUB_ISSUE_TOKEN: 'token', GITHUB_REPO: 'repo' },
+        { fetch: vi.fn<typeof fetch>(), enrich },
+      ),
+    ).rejects.toThrow(/GITHUB_OWNER/)
+    expect(enrich).not.toHaveBeenCalled()
+  })
+
+  it('sin clave del proveedor el valor por defecto no hace red y solo llama a GitHub', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await createIssueFromWebReport(payload, reporter, env, {
+      fetch: fakeFetch as unknown as typeof fetch,
+    })
+
+    expect(fakeFetch).toHaveBeenCalledTimes(1)
+    expect(String(fakeFetch.mock.calls[0][0])).toContain('api.github.com')
+    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
+    expect(body.body).toBe(baselineBody)
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
   })
 })

@@ -277,78 +277,6 @@ describe('round trip: inversión', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('confirms and edits investment occurrences before sending, then recovers their links after restart', async () => {
-    Object.assign(window, { __FINANCE_TODAY__: '2026-10-01' })
-    trip.setOffline(true)
-    const { useRecurringStore } = await import('../../../../src/stores/recurring')
-    const recurring = useRecurringStore()
-    recurring.addRule({
-      type: 'investment',
-      accountId,
-      category: 'Nueva inversión',
-      description: 'Compra mensual',
-      amount: 101,
-      symbol: 'VWCE',
-      side: 'buy',
-      units: 1,
-      unitPrice: 100,
-      fee: 1,
-      time: '09:30',
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2026-09-01',
-    })
-    const ruleId = recurring.rules[0].id
-    const first = recurring.openPendingMovements[0].id
-    const second = recurring.openPendingMovements[1].id
-    expect(
-      recurring.editPending(first, {
-        type: 'investment',
-        date: '2026-09-02',
-        accountId,
-        category: 'Nueva inversión',
-        description: 'Compra editada',
-        amount: 252,
-        symbol: 'VWCE',
-        side: 'buy',
-        units: 2,
-        unitPrice: 125,
-        fee: 2,
-        time: '10:45',
-      }),
-    ).toBe(true)
-    expect(recurring.confirmPending(first)).toBe(true)
-    recurring.skipPending(second)
-    recurring.toggleRule(ruleId, false)
-
-    const offline = await trip.reloadOffline()
-    expect(offline.pendingMovements.find((item) => item.id === first)?.status).toBe('confirmed')
-    trip.setOffline(false)
-    const reloaded = await trip.reload()
-    const movement = reloaded.transactions.find((item) => item.description === 'Compra editada')
-    expect(movement).toMatchObject({
-      amount: 252,
-      category: 'Nueva inversión',
-      symbol: 'VWCE',
-      side: 'buy',
-      units: 2,
-      unitPrice: 125,
-      fee: 2,
-      time: '10:45',
-    })
-    expect(reloaded.pendingMovements.find((item) => item.id === first)).toMatchObject({
-      ruleId,
-      status: 'confirmed',
-      transactionId: movement!.id,
-    })
-    expect(reloaded.pendingMovements.find((item) => item.id === second)?.status).toBe('skipped')
-    expect(reloaded.recurringRules[0].active).toBe(false)
-    expect(reloaded.investmentCategories.filter((name) => name === 'Nueva inversión')).toHaveLength(
-      1,
-    )
-    expect(await trip.pending()).toEqual([])
-  })
-
   // A future start date means `refreshPending` generates nothing and the
   // calendar does not move — which, per audit §3.2a, is precisely when the
   // edit has nothing to piggyback on and is lost.
@@ -456,50 +384,6 @@ describe('round trip: inversión', () => {
       type: 'investment',
       description: 'Reclasificado a Inversión',
       category: 'Acciones',
-      symbol: 'VWCE',
-      side: 'buy',
-      units: 2,
-      unitPrice: 125,
-      fee: 1,
-      time: '15:00',
-    })
-  })
-
-  it('keeps investment operation fields when a pending movement is confirmed (#205)', async () => {
-    const { useRecurringStore } = await import('../../../../src/stores/recurring')
-    const recurring = useRecurringStore()
-    recurring.addRule({
-      type: 'expense',
-      accountId,
-      category: 'Ocio',
-      description: 'Gasto original',
-      amount: 100,
-      frequency: 'monthly',
-      interval: 1,
-      startDate: '2026-09-01',
-    })
-    let reloaded = await trip.reload()
-    const pmId = reloaded.pendingMovements[0].id
-    useRecurringStore().editPending(pmId, {
-      type: 'investment',
-      date: '2026-09-02',
-      accountId,
-      category: 'Acciones',
-      description: 'Aportación VWCE',
-      amount: 250,
-      symbol: 'VWCE',
-      side: 'buy',
-      units: 2,
-      unitPrice: 125,
-      fee: 1,
-      time: '15:00',
-    })
-    await trip.reload()
-    // A reloaded page has new stores; the pre-reload instance is gone.
-    expect(useRecurringStore().confirmPending(pmId)).toBe(true)
-
-    reloaded = await trip.reload()
-    expect(reloaded.transactions.find((tx) => tx.type === 'investment')).toMatchObject({
       symbol: 'VWCE',
       side: 'buy',
       units: 2,

@@ -1,5 +1,17 @@
 import { test, expect } from './fixtures'
 
+// PNG real de 1×1 píxel: pasa la comprobación de cabecera del servidor.
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+function imageFile(name: string, size = PNG_1X1.length) {
+  const buffer = Buffer.alloc(size)
+  PNG_1X1.copy(buffer, 0, 0, Math.min(PNG_1X1.length, size))
+  return { name, mimeType: 'image/png', buffer }
+}
+
 test.describe('Reports E2E', () => {
   test('abre el panel lateral de reporte desde el acceso global', async ({ page, tracker }) => {
     const trigger = page.locator('#global-report-trigger')
@@ -68,7 +80,7 @@ test.describe('Reports E2E', () => {
     await expect(tracker.issueReportStatus()).not.toContainText('automatización')
   })
 
-  test('envía únicamente los campos simplificados del formulario', async ({ page, tracker }) => {
+  test('envía únicamente los campos vigentes del formulario', async ({ page, tracker }) => {
     let submittedPayload: Record<string, unknown> | undefined
     await page.route('**/api/issues/report', async (route) => {
       submittedPayload = route.request().postDataJSON() as Record<string, unknown>
@@ -87,31 +99,66 @@ test.describe('Reports E2E', () => {
       type: 'bug',
       summary: 'Fallo al exportar datos',
       description: 'Después de guardar no persiste el estado.',
-      expectedResult: 'El cambio debe persistir.',
-      actualResult: 'El cambio desaparece al recargar.',
     })
 
     await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
     expect(submittedPayload).toMatchObject({
       type: 'bug',
       summary: 'Fallo al exportar datos',
-      expectedResult: 'El cambio debe persistir.',
-      actualResult: 'El cambio desaparece al recargar.',
+      description: 'Después de guardar no persiste el estado.',
     })
-    expect(submittedPayload).not.toHaveProperty('stepsToReproduce')
+    for (const retired of ['expectedResult', 'actualResult', 'stepsToReproduce']) {
+      expect(submittedPayload).not.toHaveProperty(retired)
+    }
     await expect(tracker.issueReportStatus().locator('a')).toHaveAttribute(
       'href',
       'https://github.com/example/repo/issues/321',
     )
   })
 
-  test('muestra validación específica cuando resumen o descripción no cumplen mínimo', async ({
+  test('crea un reporte con solo resumen y avisa de la publicación antes de enviar', async ({
+    page,
     tracker,
   }) => {
+    let submittedPayload: Record<string, unknown> | undefined
+    await page.route('**/api/issues/report', async (route) => {
+      submittedPayload = route.request().postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          issueNumber: 655,
+          issueUrl: 'https://github.com/example/repo/issues/655',
+        }),
+      })
+    })
+
+    await tracker.openGlobalReportDialog()
+    const panel = tracker.issueReportDialog
+    await expect(panel.getByLabel('Resultado esperado')).toHaveCount(0)
+    await expect(panel.getByLabel('Resultado actual')).toHaveCount(0)
+    await expect(panel.locator('#issue-report-notice')).toContainText('repositorio público')
+    await expect(panel.locator('#issue-report-notice')).toContainText('email')
+    await panel.getByLabel('Resumen').fill('El filtro no guarda el valor')
+
+    await panel.getByRole('button', { name: 'Crear reporte' }).click()
+
+    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
+    expect(submittedPayload).toMatchObject({
+      type: 'bug',
+      summary: 'El filtro no guarda el valor',
+    })
+    expect(submittedPayload).not.toHaveProperty('description')
+    for (const retired of ['expectedResult', 'actualResult', 'stepsToReproduce']) {
+      expect(submittedPayload).not.toHaveProperty(retired)
+    }
+  })
+
+  test('muestra validación específica cuando el resumen no cumple mínimo', async ({ tracker }) => {
     await tracker.openGlobalReportDialog()
     const panel = tracker.issueReportDialog
     await panel.getByLabel('Resumen').fill('abc')
-    await panel.getByLabel('Descripción').fill('corta')
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
     await expect(tracker.issueReportStatus()).toContainText(
       'el resumen debe tener al menos 5 caracteres',
@@ -233,5 +280,72 @@ test.describe('Reports E2E', () => {
       .toBe(page.viewportSize()!.width)
     await calc.getByRole('button', { name: 'Cerrar', exact: true }).click()
     await expect(calc).toBeHidden()
+  })
+
+  test('adjunta hasta tres capturas, las previsualiza, quita una y envía solo las vigentes', async ({
+    page,
+    tracker,
+  }) => {
+    let submittedPayload: Record<string, unknown> | undefined
+    await page.route('**/api/issues/report', async (route) => {
+      submittedPayload = route.request().postDataJSON() as Record<string, unknown>
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          issueNumber: 900,
+          issueUrl: 'https://github.com/example/repo/issues/900',
+        }),
+      })
+    })
+
+    await tracker.openGlobalReportDialog()
+    const panel = tracker.issueReportDialog
+    await panel.getByLabel('Resumen').fill('Captura del filtro roto')
+    await panel
+      .locator('#issue-report-attachments')
+      .setInputFiles([imageFile('uno.png'), imageFile('dos.png'), imageFile('tres.png')])
+
+    const list = panel.locator('#issue-report-attachment-list')
+    await expect(list.getByRole('img')).toHaveCount(3)
+    await expect(list.getByRole('img', { name: 'Vista previa de dos.png' })).toBeVisible()
+
+    await panel.getByRole('button', { name: 'Quitar dos.png' }).click()
+    await expect(list.getByRole('img')).toHaveCount(2)
+
+    await panel.getByRole('button', { name: 'Crear reporte' }).click()
+
+    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
+    const attachments = submittedPayload?.attachments as Array<Record<string, string>>
+    expect(attachments.map((item) => item.name)).toEqual(['uno.png', 'tres.png'])
+    expect(attachments[0]).toMatchObject({ contentType: 'image/png' })
+    expect(Buffer.from(attachments[0].data, 'base64').subarray(0, 8)).toEqual(
+      PNG_1X1.subarray(0, 8),
+    )
+  })
+
+  test('rechaza en la UI un cuarto adjunto, un fichero grande y un formato no admitido', async ({
+    tracker,
+  }) => {
+    await tracker.openGlobalReportDialog()
+    const panel = tracker.issueReportDialog
+    const input = panel.locator('#issue-report-attachments')
+
+    await input.setInputFiles([imageFile('a.png'), imageFile('b.png'), imageFile('c.png')])
+    await input.setInputFiles(imageFile('d.png'))
+    await expect(tracker.issueReportStatus()).toContainText('hasta 3')
+    await expect(panel.locator('#issue-report-attachment-list').getByRole('img')).toHaveCount(3)
+
+    await panel.getByRole('button', { name: 'Quitar a.png' }).click()
+    await input.setInputFiles(imageFile('grande.png', 2 * 1024 * 1024 + 1))
+    await expect(tracker.issueReportStatus()).toContainText('supera el límite de 2 MB')
+
+    await input.setInputFiles({
+      name: 'vector.svg',
+      mimeType: 'image/svg+xml',
+      buffer: Buffer.from('<svg/>'),
+    })
+    await expect(tracker.issueReportStatus()).toContainText('PNG, JPEG, WebP o GIF')
   })
 })
