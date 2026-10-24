@@ -5,8 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
-import { openIdbCache, putEntity, wipeIdbCache } from '../../src/lib/client/idb-cache'
-import { listAll, openOutbox, wipeOutbox } from '../../src/lib/client/outbox'
+import {
+  listAll,
+  openStorage,
+  putEntity,
+  wipeIdbCache,
+  wipeOutbox,
+} from '../helpers/client-storage'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useRecurringStore } from '../../src/stores/recurring'
 import { useSyncStore } from '../../src/stores/sync'
@@ -64,7 +69,7 @@ describe('confirmPending — category id shared by the movement and the pending 
       return queuedId ? { entityId: queuedId, version: 0 } : null
     }
 
-    const cacheDb = await openIdbCache(USER_ID)
+    const cacheDb = await openStorage(USER_ID)
     await putEntity(cacheDb, 'account', { id: 'srv-account', legacyId: 'broker', version: 0 })
     await putEntity(cacheDb, 'recurringRule', { id: 'srv-rule', legacyId: 'rule-eth', version: 0 })
     await putEntity(cacheDb, 'pendingMovement', {
@@ -118,7 +123,7 @@ describe('confirmPending — category id shared by the movement and the pending 
     expect(useRecurringStore().confirmPending('pm-eth')).toBe(true)
 
     const readCommands = async () => {
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const commands = (await listAll(outboxDb)).map((entry) => entry.command)
       outboxDb.close()
       return commands

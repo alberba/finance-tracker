@@ -7,9 +7,13 @@ vi.mock('../../src/scripts/demo-mode', () => ({
   isDemoMode: vi.fn(() => false),
 }))
 
-import { openIdbCache, putEntity } from '../../src/lib/client/idb-cache'
-import { openOutbox, wipeOutbox, listAll } from '../../src/lib/client/outbox'
-import { wipeIdbCache } from '../../src/lib/client/idb-cache'
+import {
+  listAll,
+  openStorage,
+  putEntity,
+  wipeIdbCache,
+  wipeOutbox,
+} from '../helpers/client-storage'
 import {
   resolveCategoryId,
   resolveEntityId,
@@ -68,7 +72,7 @@ describe('command-mapping (WP7b)', () => {
         openingBalance: 10,
       })
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(1)
       expect(entries[0]?.command).toMatchObject({
@@ -99,14 +103,14 @@ describe('command-mapping (WP7b)', () => {
 
       expect(store.lastError).toBeTruthy()
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       expect(await listAll(outboxDb)).toHaveLength(0)
       outboxDb.close()
     })
 
     it('syncUpdate resolves a cached server entity and enqueues an update with its version', async () => {
       await initSyncStore()
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'account', {
         id: 'server-acc-1',
         legacyId: 'local-acc-1',
@@ -117,7 +121,7 @@ describe('command-mapping (WP7b)', () => {
 
       await syncUpdate('account', 'local-acc-1', { name: 'Nueva' })
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(1)
       expect(entries[0]?.command).toMatchObject({
@@ -140,7 +144,7 @@ describe('command-mapping (WP7b)', () => {
       })
       await syncUpdate('account', 'local-acc-2', { name: 'Editada' })
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(1)
       expect(entries[0]?.command).toMatchObject({
@@ -160,7 +164,7 @@ describe('command-mapping (WP7b)', () => {
 
     it('syncRemove enqueues a remove for a synced entity', async () => {
       await initSyncStore()
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'account', {
         id: 'server-acc-3',
         legacyId: 'local-acc-3',
@@ -170,7 +174,7 @@ describe('command-mapping (WP7b)', () => {
 
       await syncRemove('account', 'local-acc-3')
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries[0]?.command).toMatchObject({
         action: 'remove',
@@ -191,7 +195,7 @@ describe('command-mapping (WP7b)', () => {
 
       await syncRemove('account', 'local-acc-4')
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(0)
       outboxDb.close()
@@ -207,7 +211,7 @@ describe('command-mapping (WP7b)', () => {
         currency: 'EUR',
       })
 
-      const outboxDbFirst = await openOutbox(USER_ID)
+      const outboxDbFirst = await openStorage(USER_ID)
       const firstEntries = await listAll(outboxDbFirst)
       expect(firstEntries[0]?.command.action).toBe('create')
       outboxDbFirst.close()
@@ -216,12 +220,12 @@ describe('command-mapping (WP7b)', () => {
       // (the natural-key lookup is checked before the still-pending outbox
       // create, so this alone is enough to flip the next call onto the
       // update path — no need to touch/close the outbox's live connection).
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'goal', { id: 'server-goal-1', key: 'short', version: 1 })
       cacheDb.close()
 
       await syncGoalUpsert('short', { key: 'short', name: 'Meta actualizada' })
-      const outboxDbSecond = await openOutbox(USER_ID)
+      const outboxDbSecond = await openStorage(USER_ID)
       const secondEntries = await listAll(outboxDbSecond)
       const update = secondEntries.find((entry) => entry.command.action === 'update')
       expect(update?.command).toMatchObject({
@@ -235,7 +239,7 @@ describe('command-mapping (WP7b)', () => {
     it('syncSettingsUpdate enqueues a settingsUpdate command', async () => {
       await initSyncStore()
       await syncSettingsUpdate({ currency: 'USD' })
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries[0]?.command).toMatchObject({
         action: 'settingsUpdate',
@@ -249,7 +253,7 @@ describe('command-mapping (WP7b)', () => {
       const first = await resolveCategoryId('expense', 'Comida')
       expect(first).toBeNull()
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(1)
       expect(entries[0]?.command).toMatchObject({
@@ -262,13 +266,13 @@ describe('command-mapping (WP7b)', () => {
       // Calling again must not enqueue a second create (folds into the pending one).
       const second = await resolveCategoryId('expense', 'Comida')
       expect(second).toBeNull()
-      const outboxDb2 = await openOutbox(USER_ID)
+      const outboxDb2 = await openStorage(USER_ID)
       expect(await listAll(outboxDb2)).toHaveLength(1)
       outboxDb2.close()
 
       // Once the category is cached (server round-trip), it resolves — found
       // by its real name+kind, not by a derived correlation id (ADR 0001).
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'category', {
         id: 'server-cat-1',
         name: 'Comida',
@@ -286,7 +290,7 @@ describe('command-mapping (WP7b)', () => {
       const first = await resolveOrCreateCategoryId('expense', 'Ocio')
       expect(first).toEqual(expect.any(String))
 
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(1)
       expect(entries[0]?.command).toMatchObject({
@@ -300,14 +304,14 @@ describe('command-mapping (WP7b)', () => {
       // minted id instead of minting (and creating) a second category.
       const second = await resolveOrCreateCategoryId('expense', 'Ocio')
       expect(second).toBe(first)
-      const outboxDb2 = await openOutbox(USER_ID)
+      const outboxDb2 = await openStorage(USER_ID)
       expect(await listAll(outboxDb2)).toHaveLength(1)
       outboxDb2.close()
     })
 
     it('resolveOrCreateCategoryId resolves an already-cached category without minting a new id', async () => {
       await initSyncStore()
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'category', {
         id: 'server-cat-2',
         name: 'Comida',
@@ -317,7 +321,7 @@ describe('command-mapping (WP7b)', () => {
       cacheDb.close()
 
       expect(await resolveOrCreateCategoryId('expense', 'Comida')).toBe('server-cat-2')
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       expect(await listAll(outboxDb)).toHaveLength(0)
       outboxDb.close()
     })
@@ -326,7 +330,7 @@ describe('command-mapping (WP7b)', () => {
       await initSyncStore()
       expect(await resolveEntityId('recurringRule', 'rule-1')).toBeNull()
 
-      const cacheDb = await openIdbCache(USER_ID)
+      const cacheDb = await openStorage(USER_ID)
       await putEntity(cacheDb, 'recurringRule', {
         id: 'server-rule-1',
         legacyId: 'rule-1',
@@ -345,7 +349,7 @@ describe('command-mapping (WP7b)', () => {
         currency: 'EUR',
         openingBalance: 400,
       })
-      const outboxDb = await openOutbox(USER_ID)
+      const outboxDb = await openStorage(USER_ID)
       try {
         const before = await listAll(outboxDb)
 
@@ -362,7 +366,7 @@ describe('command-mapping (WP7b)', () => {
         // tx-1/tx-2 are "already synced" — seed the cache so `syncUpdate`
         // resolves them via `getEntityRef` instead of warning that they're
         // unknown.
-        const cacheDb = await openIdbCache(USER_ID)
+        const cacheDb = await openStorage(USER_ID)
         await putEntity(cacheDb, 'transaction', { id: 'server-tx-1', legacyId: 'tx-1', version: 0 })
         await putEntity(cacheDb, 'transaction', { id: 'server-tx-2', legacyId: 'tx-2', version: 0 })
         cacheDb.close()
@@ -388,7 +392,7 @@ describe('command-mapping (WP7b)', () => {
           currency: 'EUR',
         }))
 
-        const outboxDb = await openOutbox(USER_ID)
+        const outboxDb = await openStorage(USER_ID)
         const entries = await listAll(outboxDb)
         const actions = entries.map((e) => e.command.action)
         expect(actions.sort()).toEqual(['create', 'update'].sort())
@@ -398,20 +402,20 @@ describe('command-mapping (WP7b)', () => {
       it('skips items whose buildData resolves to null', async () => {
         await initSyncStore()
         await syncListDiff('pendingMovement', [], [{ id: 'p-1' }], () => null)
-        const outboxDb = await openOutbox(USER_ID)
+        const outboxDb = await openStorage(USER_ID)
         expect(await listAll(outboxDb)).toHaveLength(0)
         outboxDb.close()
       })
 
       it('emits remove for every row present before but absent after', async () => {
         await initSyncStore()
-        const cacheDb = await openIdbCache(USER_ID)
+        const cacheDb = await openStorage(USER_ID)
         await putEntity(cacheDb, 'transaction', { id: 'server-tx-1', legacyId: 'tx-1', version: 0 })
         cacheDb.close()
 
         await syncListDiff('transaction', [{ id: 'tx-1' }], [], () => ({}))
 
-        const outboxDb = await openOutbox(USER_ID)
+        const outboxDb = await openStorage(USER_ID)
         const entries = await listAll(outboxDb)
         expect(entries[0]?.command).toMatchObject({ action: 'remove', entityId: 'server-tx-1' })
         outboxDb.close()
