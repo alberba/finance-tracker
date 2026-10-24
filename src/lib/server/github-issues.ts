@@ -174,6 +174,10 @@ async function uploadAttachments(
       // El subidor no debería lanzar; si lo hace, el reporte sigue adelante.
       result = { ok: false, error: 'Fallo inesperado al subir.' }
     }
+    if (!result.ok) {
+      // Solo el motivo corto: sin cuerpos de respuesta de GitHub, como el resto de logs.
+      console.error('[github] Adjunto no subido', result.error)
+    }
     outcomes.push({ name: attachment.name, result })
   }
   return outcomes

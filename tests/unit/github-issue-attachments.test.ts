@@ -115,6 +115,7 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
+      enrich: async () => null,
     })
 
     expect(uploadAttachment).toHaveBeenCalledTimes(1)
@@ -126,13 +127,17 @@ describe('createIssueFromWebReport con adjuntos', () => {
   it('crea la issue igualmente y lo indica si una subida falla', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => issueResponse())
     const uploadAttachment = vi.fn(async () => ({ ok: false as const, error: 'GitHub 500' }))
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
+      enrich: async () => null,
     })
 
     expect(result.number).toBe(77)
+    expect(logError).toHaveBeenCalledWith('[github] Adjunto no subido', 'GitHub 500')
+    logError.mockRestore()
     const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body))
     expect(body.body).toContain('### Adjuntos')
     expect(body.body).toContain('pantalla.png')
@@ -147,6 +152,7 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith(undefined), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
+      enrich: async () => null,
     })
 
     expect(uploadAttachment).not.toHaveBeenCalled()
