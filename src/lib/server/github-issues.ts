@@ -1,4 +1,5 @@
 import type { RuntimeEnv } from './cloudflare-env'
+import { reportReportSideFailure, type ReportSideFailureReporter } from './error-tracking'
 import { enrichIssueReport, type IssueEnricher } from './issue-enricher'
 import {
   uploadIssueAttachment,
@@ -19,6 +20,8 @@ export interface GithubIssueClient {
   uploadAttachment?: AttachmentUploader
   /** Análisis opcional del reporte. Por defecto, el enriquecedor de DeepSeek vía OpenCode Go. */
   enrich?: IssueEnricher
+  /** Aviso de los fallos auxiliares (subidas). Por defecto, Sentry; los tests inyectan un stub. */
+  reportFailure?: ReportSideFailureReporter
 }
 
 /** Resultado de subir un adjunto, con el nombre que se muestra en la issue. */
@@ -195,10 +198,17 @@ async function requestWithRetry(
   return lastResponse as Response
 }
 
+/** Motivo fijo para Sentry: solo el estado HTTP, nunca el texto libre del error. */
+function uploadFailureReason(error: string): string {
+  const status = /^GitHub devolvió (\d{3})\./.exec(error)?.[1]
+  return status ? `http-${status}` : 'failed'
+}
+
 async function uploadAttachments(
   attachments: NonNullable<IssueReportPayload['attachments']>,
   uploader: AttachmentUploader,
   context: AttachmentUploadContext,
+  reportFailure: ReportSideFailureReporter,
 ): Promise<AttachmentOutcome[]> {
   const outcomes: AttachmentOutcome[] = []
   for (const attachment of attachments) {
@@ -212,6 +222,7 @@ async function uploadAttachments(
     if (!result.ok) {
       // Solo el motivo corto: sin cuerpos de respuesta de GitHub, como el resto de logs.
       console.error('[github] Adjunto no subido', result.error)
+      reportFailure({ stage: 'upload', reason: uploadFailureReason(result.error) })
     }
     outcomes.push({ name: attachment.name, result })
   }
@@ -227,6 +238,7 @@ async function enrichReport(
   payload: IssueReportPayload,
   env: RuntimeEnv,
   enrich: IssueEnricher,
+  reportFailure: ReportSideFailureReporter,
 ): Promise<string | null> {
   try {
     return await enrich(
@@ -241,6 +253,7 @@ async function enrichReport(
     )
   } catch {
     console.error('[github] El análisis del reporte se omitió por un fallo inesperado.')
+    reportFailure({ stage: 'enrich', reason: 'unexpected' })
     return null
   }
 }
@@ -262,12 +275,18 @@ export async function createIssueFromWebReport(
   // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
   // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
   // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
-  const outcomes = await uploadAttachments(payload.attachments ?? [], uploadAttachment, {
-    fetch: client.fetch,
-    headers,
-    repositoryId: once(() => fetchRepositoryId(client.fetch, owner, repo, headers)),
-  })
-  const analysis = await enrichReport(payload, env, enrich)
+  const reportFailure = client.reportFailure ?? reportReportSideFailure
+  const outcomes = await uploadAttachments(
+    payload.attachments ?? [],
+    uploadAttachment,
+    {
+      fetch: client.fetch,
+      headers,
+      repositoryId: once(() => fetchRepositoryId(client.fetch, owner, repo, headers)),
+    },
+    reportFailure,
+  )
+  const analysis = await enrichReport(payload, env, enrich, reportFailure)
   const baseRequestBody = {
     title,
     body: buildIssueBody(payload, reporter, analysis, outcomes),
