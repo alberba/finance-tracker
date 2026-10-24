@@ -192,23 +192,23 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     amount: 50,
     currency: 'EUR',
   }))
-  const savingCategory = await accountsRepository.createCategory(db, userId, {
+  const savingCategory = await runWithDb(db, accountsRepository.createCategory(userId, {
     name: 'Fondo de emergencia',
     kind: 'saving',
-  })
-  const origin = await accountsRepository.create(db, userId, {
+  }))
+  const origin = await runWithDb(db, accountsRepository.create(userId, {
     name: 'Corriente',
     kind: 'cash',
     currency: 'EUR',
     openingBalance: 1000,
-  })
-  const destination = await accountsRepository.create(db, userId, {
+  }))
+  const destination = await runWithDb(db, accountsRepository.create(userId, {
     name: 'Hucha',
     kind: 'cash',
     currency: 'EUR',
     openingBalance: 0,
-  })
-  await transactionsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, transactionsRepository.create(userId, {
     legacyId: 'tx-saving',
     accountId: origin.id,
     destinationAccountId: destination.id,
@@ -218,8 +218,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     description: 'Ahorro',
     amount: 150,
     currency: 'EUR',
-  })
-  const savingRule = await recurringRulesRepository.create(db, userId, {
+  }))
+  const savingRule = await runWithDb(db, recurringRulesRepository.create(userId, {
     name: 'Ahorro mensual',
     type: 'saving',
     accountId: origin.id,
@@ -228,8 +228,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     amount: 100,
     currency: 'EUR',
     frequency: 'monthly',
-  })
-  await pendingMovementsRepository.create(db, userId, {
+  }))
+  await runWithDb(db, pendingMovementsRepository.create(userId, {
     recurringRuleId: savingRule.id,
     accountId: origin.id,
     destinationAccountId: destination.id,
@@ -239,7 +239,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     dueDate: '2026-05-05',
     type: 'saving',
     description: 'Ahorro',
-  })
+  }))
   await runWithDb(db, goalsRepository.create(userId, {
     key: 'saving:emergencia',
     categoryId: savingCategory.id,

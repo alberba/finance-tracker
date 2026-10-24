@@ -99,10 +99,12 @@ describe('POST /api/issues/report y el reportero', () => {
   })
 
   it('pasa al servicio el reportero del principal, ignorando el del payload', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 1,
-      url: 'https://github.com/alberba/finance-tracker/issues/1',
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 1,
+        url: 'https://github.com/alberba/finance-tracker/issues/1',
+      }),
+    )
     const spoofed = {
       ...PAYLOAD,
       reporter: { userId: 'otro', email: 'otro@example.com', name: 'Otro' },
@@ -150,11 +152,13 @@ describe('POST /api/issues/report con un payload inválido', () => {
 
 describe('POST /api/issues/report con una duplicada', () => {
   it('devuelve el enlace existente con 200 y duplicate, sin afirmar creación', async () => {
-    githubIssues.createIssueFromWebReport.mockResolvedValue({
-      number: 9,
-      url: 'https://github.com/org/repo/issues/9',
-      duplicate: true,
-    })
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 9,
+        url: 'https://github.com/org/repo/issues/9',
+        duplicate: true,
+      }),
+    )
     const response = await POST(makeContext())
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
