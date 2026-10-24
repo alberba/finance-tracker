@@ -30,6 +30,7 @@ import SidePanel from '../ui/SidePanel.vue'
 interface SuccessStatus {
   issueNumber: number
   issueUrl: string
+  duplicate?: boolean
 }
 
 const open = defineModel<boolean>('open', { required: true })
@@ -163,6 +164,7 @@ async function onSubmit(): Promise<void> {
     successStatus.value = {
       issueNumber: result.issueNumber,
       issueUrl: result.issueUrl,
+      duplicate: result.duplicate,
     }
     resetForm()
   } catch (error) {
@@ -278,7 +280,7 @@ async function onSubmit(): Promise<void> {
       aria-live="polite"
     >
       <template v-if="successStatus"
-        >Reporte creado:
+        >{{ successStatus.duplicate ? 'Este reporte ya existe:' : 'Reporte creado:' }}
         <a
           class="text-primary font-bold hover:underline"
           :href="successStatus.issueUrl"

@@ -17,8 +17,8 @@ COINGECKO_API_PLAN=demo
 # [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
 TEST_AUTH_ENABLED=true
 
-# Opcional: enriquecer los reportes web con un análisis de DeepSeek V4.1 Flash
-# vía OpenCode Go. Vacía, el reporte se crea igual sin análisis.
+# Opcional: comprobar duplicadas con DeepSeek antes de crear la issue.
+# El análisis de código usa el secret homónimo de GitHub Actions.
 OPENCODE_GO_API_KEY=
 
 # Autenticación integrada (#275).

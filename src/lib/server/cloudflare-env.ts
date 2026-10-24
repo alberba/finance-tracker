@@ -18,8 +18,8 @@ export interface RuntimeEnv {
   GITHUB_OWNER?: string
   GITHUB_REPO?: string
   /**
-   * Clave de OpenCode Go para enriquecer los reportes con DeepSeek V4.1 Flash
-   * (`issue-enricher.ts`). Opcional: sin ella la issue se crea sin análisis.
+   * Clave de OpenCode Go para comprobar duplicadas antes de crear el reporte.
+   * La redacción y el análisis de código viven en GitHub Actions.
    */
   OPENCODE_GO_API_KEY?: string
   SENTRY_DSN?: string

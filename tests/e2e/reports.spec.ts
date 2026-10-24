@@ -80,6 +80,28 @@ test.describe('Reports E2E', () => {
     await expect(tracker.issueReportStatus()).not.toContainText('automatización')
   })
 
+  test('enlaza la issue duplicada sin mostrar que se ha creado otra', async ({ page, tracker }) => {
+    await page.route('**/api/issues/report', (route) =>
+      route.fulfill({
+        status: 200,
+        json: {
+          ok: true,
+          issueNumber: 42,
+          issueUrl: 'https://github.com/example/repo/issues/42',
+          duplicate: true,
+        },
+      }),
+    )
+    await tracker.submitIssueReport({ type: 'bug', summary: 'El guardado no persiste' })
+    const status = tracker.issueReportStatus()
+    await expect(status).toContainText('Este reporte ya existe:')
+    await expect(status).not.toContainText('Reporte creado:')
+    await expect(status.getByRole('link', { name: '#42' })).toHaveAttribute(
+      'href',
+      'https://github.com/example/repo/issues/42',
+    )
+  })
+
   test('envía únicamente los campos vigentes del formulario', async ({ page, tracker }) => {
     let submittedPayload: Record<string, unknown> | undefined
     await page.route('**/api/issues/report', async (route) => {

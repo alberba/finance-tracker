@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/deepseek-v4.1-flash",
+  "enabled_providers": ["opencode-go"],
+  "provider": {
+    "opencode-go": {
+      "options": {
+        "apiKey": "{env:OPENCODE_GO_API_KEY}"
+      }
+    }
+  },
+  "autoupdate": false,
+  "share": "disabled",
+  "snapshot": false,
+  "permission": {
+    "*": "deny"
+  }
+}

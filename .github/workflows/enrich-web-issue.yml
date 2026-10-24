@@ -1,0 +1,52 @@
+name: Analyze web report
+
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Número del reporte web que se quiere analizar o reintentar
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: enrich-web-issue-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'source:web-report')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install OpenCode
+        run: npm install --global opencode-ai@1.19.4
+      - name: Fetch report and candidate issues
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/enrich-web-issue.mjs prepare
+      - name: Analyze code with DeepSeek and create-issue
+        if: steps.prepare.outputs.skip != 'true'
+        env:
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OPENCODE_CONFIG: ${{ github.workspace }}/.github/opencode-issue-enricher.json
+        run: |
+          test -n "$OPENCODE_GO_API_KEY" || { echo 'Falta el secret OPENCODE_GO_API_KEY'; exit 1; }
+          node .github/scripts/enrich-web-issue.mjs analyze
+      - name: Publish body and Agent Brief
+        if: steps.prepare.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node .github/scripts/enrich-web-issue.mjs publish
