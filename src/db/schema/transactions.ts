@@ -41,6 +41,9 @@ export const transactions = sqliteTable(
     // movement (ADR 0002).
     time: text('time'),
     declared: integer('declared', { mode: 'boolean' }).notNull().default(false),
+    // 1-12. The month the movement counts in when the user chose one other than
+    // its date's; `null` derives it from `date`.
+    accountingMonth: integer('accounting_month'),
     externalId: text('external_id'),
     remoteOperation: text('remote_operation', { mode: 'json' }).$type<RemoteOperation>(),
     createdAt: createdAtColumn(),

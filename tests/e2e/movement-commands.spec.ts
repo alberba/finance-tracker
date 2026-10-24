@@ -104,3 +104,71 @@ test('editing an investment from Movimientos preserves its data after sync and r
     await context.close()
   }
 })
+
+test('a movement counted in another month than its date keeps it after sync and reload @smoke', async ({
+  browser,
+}) => {
+  const email = `accounting-month-${randomUUID()}@e2e.test`
+  const context = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
+  try {
+    const headers = await syncV2TestHeaders(context.request, email)
+    const seed = await context.request.post('/api/sync', {
+      headers,
+      data: {
+        commands: [
+          {
+            commandId: randomUUID(),
+            action: 'create',
+            entityType: 'account',
+            data: {
+              id: randomUUID(),
+              name: 'Cuenta',
+              kind: 'cash',
+              currency: 'EUR',
+              openingBalance: 0,
+            },
+          },
+          {
+            commandId: randomUUID(),
+            action: 'create',
+            entityType: 'category',
+            data: { id: randomUUID(), name: 'Ocio', kind: 'expense' },
+          },
+        ],
+      },
+    })
+    expect(seed.ok()).toBe(true)
+    const page = await context.newPage()
+    await page.clock.setFixedTime(new Date('2026-03-15T12:00:00Z'))
+    const tracker = new FinanceTrackerPage(page)
+    await tracker.goto()
+
+    const created = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/sync') &&
+        response
+          .request()
+          .postDataJSON()
+          ?.commands.some(
+            (command: { action: string; entityType: string }) =>
+              command.action === 'create' && command.entityType === 'transaction',
+          ),
+    )
+    await tracker.addCustomTransaction({
+      date: '2026-01-31',
+      monthLabel: 'FEBRERO',
+      type: 'expense',
+      categoryLabel: 'Ocio',
+      amount: 40,
+      description: 'Cena fin de enero',
+      accountLabel: 'Cuenta',
+    })
+    expect((await (await created).json()).results[0].status).toBe('applied')
+
+    await tracker.reload()
+    // The ledger lists every month, so the row's own month is what must stay February (1).
+    await expect(tracker.transactionRow('Cena fin de enero')).toHaveAttribute('data-tx-month', '1')
+  } finally {
+    await context.close()
+  }
+})

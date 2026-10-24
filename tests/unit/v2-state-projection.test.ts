@@ -29,6 +29,15 @@ describe('projectSyncV2State', () => {
     })])
   })
 
+  it('counts a movement in its persisted accounting month, else in the month of its date', () => {
+    const b = bootstrap()
+    b.transactions[0] = { ...b.transactions[0], date: '2026-01-31', accountingMonth: 2 }
+
+    expect(projectSyncV2State(b).transactions[0].month).toBe(1)
+    b.transactions[0] = { ...b.transactions[0], accountingMonth: null }
+    expect(projectSyncV2State(b).transactions[0].month).toBe(0)
+  })
+
   it('projects pending movements including investment operation fields and investment accounts', () => {
     const b = bootstrap()
     b.accounts.push({ id: 'server-asset', legacyId: 'local-asset', name: 'Broker', kind: 'investment', openingBalance: 0 })

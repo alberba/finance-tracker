@@ -60,6 +60,7 @@ export interface CreateTransactionInput {
   currency: string
   time?: string | null
   declared?: boolean
+  accountingMonth?: number | null
   operation?: MovementOperationInput | null
   /** Provider identity of an imported movement (Bitvavo); only a backup restore sets it here. */
   externalId?: string | null
@@ -76,6 +77,7 @@ export interface UpdateTransactionInput {
   currency?: string
   time?: string | null
   declared?: boolean
+  accountingMonth?: number | null
   operation?: MovementOperationInput | null
 }
 
@@ -121,6 +123,7 @@ export async function create(
       currency: input.currency,
       time: input.time ?? null,
       declared: input.declared ?? false,
+      accountingMonth: input.accountingMonth ?? null,
       externalId: input.externalId ?? null,
       remoteOperation: input.remoteOperation ?? null,
       createdAt: now,
@@ -167,6 +170,8 @@ export async function update(
       currency: nextCurrency,
       time: input.time === undefined ? existing.time : input.time,
       declared: input.declared === undefined ? existing.declared : input.declared,
+      accountingMonth:
+        input.accountingMonth === undefined ? existing.accountingMonth : input.accountingMonth,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })

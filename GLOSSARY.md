@@ -24,6 +24,11 @@ El identificador derivado de los datos v1 que permite reconocer una fila ya migr
 sentido para filas que vienen de v1; las entidades nuevas se identifican por su propio id.
 _Avoid_: legacyId como identidad general
 
+**Mes contable**:
+El mes en el que cuenta un movimiento ("Cuenta en el mes"). Por defecto es el de su fecha; si el
+usuario elige otro se persiste con el movimiento y sobrevive a la sincronización.
+_Avoid_: mes del movimiento, mes de imputación
+
 **Operación**:
 La compra o venta que da contenido a un movimiento de inversión: símbolo, títulos, precio
 unitario y comisión. Viaja siempre dentro del comando del movimiento, nunca por separado.
