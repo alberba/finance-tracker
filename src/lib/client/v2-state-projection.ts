@@ -169,7 +169,10 @@ export function projectSyncV2State(
     return {
       id: legacyId(transaction),
       date: String(transaction.date),
-      month: monthFromISO(String(transaction.date)) ?? 0,
+      month:
+        typeof transaction.accountingMonth === 'number'
+          ? transaction.accountingMonth - 1
+          : (monthFromISO(String(transaction.date)) ?? 0),
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),

@@ -72,6 +72,37 @@ describe('round trip: shared movement commands (#263)', () => {
 
   afterEach(() => trip.cleanup())
 
+  it('keeps the accounting month chosen apart from the date after sync and reload (#337)', async () => {
+    expect(
+      useMovementsStore().addTransaction({
+        date: '2026-01-31',
+        month: 1,
+        type: 'expense',
+        accountId,
+        category: 'Ocio',
+        description: 'Cena',
+        amount: 40,
+      }),
+    ).toBe(true)
+    const created = await trip.reload()
+    const id = created.transactions[0].id
+    expect(created.transactions[0]).toMatchObject({ date: '2026-01-31', month: 1 })
+
+    expect(
+      useMovementsStore().saveEdit(id, {
+        date: '2026-01-31',
+        month: 0,
+        accountId,
+        type: 'expense',
+        category: 'Ocio',
+        description: 'Cena',
+        amount: '40',
+      }),
+    ).toBe(true)
+    const afterEdit = await trip.reload()
+    expect(afterEdit.transactions[0]).toMatchObject({ month: 0 })
+  })
+
   it('keeps the operation, own currency, time and declaration when edited from Movimientos', async () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
     const first = await trip.reload()
