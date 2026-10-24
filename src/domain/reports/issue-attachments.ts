@@ -1,6 +1,6 @@
 // Reglas de los adjuntos de un reporte. Las comparten el panel (validación al
 // elegir el fichero) y el servidor (validación definitiva). Sin dependencias de
-// navegador ni de Node: solo bytes y constantes.
+// runtime: solo bytes, constantes y `btoa`, que existe igual en navegadores que en Workers y Node.
 
 export const ISSUE_ATTACHMENT_MAX_COUNT = 3
 export const ISSUE_ATTACHMENT_MAX_BYTES = 2 * 1024 * 1024

@@ -14,6 +14,15 @@ const report: IssueEnrichmentInput = {
 
 const ENDPOINT = 'https://opencode.ai/inference/go/openai/v1/chat/completions'
 
+/** Respuesta con la forma pedida en el prompt: tres apartados y dos criterios. */
+const WELL_FORMED = [
+  '**Problema**: El guardado de movimientos no llega al servidor.',
+  '**Área probable**: movimientos',
+  '**Criterios de aceptación**:',
+  '- [ ] Guardar un movimiento lo persiste en el servidor.',
+  '- [ ] Recargar la página muestra el movimiento guardado.',
+].join('\n')
+
 function completion(content: unknown): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
 }
@@ -28,12 +37,12 @@ afterEach(() => {
 
 describe('issue enricher', () => {
   it('envía el modelo, la clave y las cabeceras de sesión y user-agent, y devuelve el análisis', async () => {
-    const fakeFetch = fetchReturning(completion('  ## Problema\nGuardar falla.  '))
+    const fakeFetch = fetchReturning(completion(`  ${WELL_FORMED}  `))
     const enrich = createOpencodeEnricher({ fetch: fakeFetch, timeoutMs: 1_000 })
 
     const analysis = await enrich(report, { OPENCODE_GO_API_KEY: 'secret-key' })
 
-    expect(analysis).toBe('## Problema\nGuardar falla.')
+    expect(analysis).toBe(WELL_FORMED)
     expect(fakeFetch).toHaveBeenCalledTimes(1)
     const [url, init] = fakeFetch.mock.calls[0]
     expect(url).toBe(ENDPOINT)
@@ -44,6 +53,7 @@ describe('issue enricher', () => {
     expect(headers.get('User-Agent')).toBe('finance-tracker-issue-enricher')
     const body = JSON.parse(String(init?.body))
     expect(body.model).toBe('deepseek-v4.1-flash')
+    expect(body.messages[0].content).toContain('**Criterios de aceptación**:')
     expect(body.messages.at(-1).content).toContain('Error al guardar movimiento')
     expect(body.messages.at(-1).content).toContain('/movimientos')
   })
@@ -51,8 +61,8 @@ describe('issue enricher', () => {
   it('reutiliza el mismo x-opencode-session dentro del proceso', async () => {
     const fakeFetch = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(completion('uno'))
-      .mockResolvedValueOnce(completion('dos'))
+      .mockResolvedValueOnce(completion(WELL_FORMED))
+      .mockResolvedValueOnce(completion(WELL_FORMED))
     const enrich = createOpencodeEnricher({ fetch: fakeFetch, timeoutMs: 1_000 })
 
     await enrich(report, { OPENCODE_GO_API_KEY: 'k' })
@@ -65,7 +75,7 @@ describe('issue enricher', () => {
   })
 
   it('sin clave devuelve null sin llamar al proveedor ni registrar nada', async () => {
-    const fakeFetch = fetchReturning(completion('no debería usarse'))
+    const fakeFetch = fetchReturning(completion(WELL_FORMED))
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const enrich = createOpencodeEnricher({ fetch: fakeFetch, timeoutMs: 1_000 })
 
@@ -120,14 +130,34 @@ describe('issue enricher', () => {
 
   it('una respuesta sin la forma esperada se descarta y se registra una sola vez', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const cases: Response[] = [
+    const malformed = [
+      // Sin envoltorio de la respuesta de chat.
       new Response(JSON.stringify({ choices: [] }), { status: 200 }),
       completion(42),
       completion('   '),
       new Response('no es json', { status: 200 }),
+      // Texto libre sin los apartados pedidos.
+      completion('Este reporte parece un error de guardado.'),
+      // Falta el apartado de área probable.
+      completion(
+        [
+          '**Problema**: El guardado falla.',
+          '**Criterios de aceptación**:',
+          '- [ ] Guardar persiste.',
+          '- [ ] Recargar muestra el dato.',
+        ].join('\n'),
+      ),
+      // Un solo criterio.
+      completion(WELL_FORMED.replace(/\n- \[ \] Recargar.*$/, '')),
+      // Cinco criterios.
+      completion([WELL_FORMED, '- [ ] Tercero.', '- [ ] Cuarto.', '- [ ] Quinto.'].join('\n')),
+      // Criterios sin la casilla Markdown.
+      completion(WELL_FORMED.replace(/- \[ \] /g, '- ')),
+      // Prosa después de los criterios.
+      completion(`${WELL_FORMED}\nEspero que ayude.`),
     ]
 
-    for (const response of cases) {
+    for (const response of malformed) {
       consoleError.mockClear()
       const enrich = createOpencodeEnricher({
         fetch: fetchReturning(response),
@@ -140,14 +170,17 @@ describe('issue enricher', () => {
     }
   })
 
-  it('limita la longitud del análisis', async () => {
+  it('descarta un análisis por encima de 4.000 caracteres en vez de cortarlo', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const oversized = WELL_FORMED.replace('movimientos', `movimientos${'a'.repeat(4_000)}`)
     const enrich = createOpencodeEnricher({
-      fetch: fetchReturning(completion('a'.repeat(9_000))),
+      fetch: fetchReturning(completion(oversized)),
       timeoutMs: 1_000,
     })
 
-    const analysis = await enrich(report, { OPENCODE_GO_API_KEY: 'k' })
-
-    expect(analysis).toHaveLength(4_000)
+    expect(await enrich(report, { OPENCODE_GO_API_KEY: 'k' })).toBeNull()
+    expect(consoleError).toHaveBeenCalledExactlyOnceWith(
+      '[issue-enricher] Respuesta del proveedor sin forma esperada.',
+    )
   })
 })

@@ -39,7 +39,14 @@ Identificadores clave en UI:
 - `src/pages/api/issues/report.ts`
 - `src/lib/server/issue-report-schema.ts`
 - `src/lib/server/github-issues.ts`
+- `src/lib/server/issue-attachments.ts`: sube los adjuntos a `uploads.github.com`
+- `src/lib/server/issue-enricher.ts`: análisis opcional con DeepSeek vía OpenCode Go
 - `src/lib/server/cloudflare-env.ts`
+
+### Dominio compartido
+
+- `src/domain/reports/issue-attachments.ts`: límites, tipos admitidos y detección por cabecera,
+  compartidos por el panel y el servidor
 
 ### Tests relacionados
 
@@ -47,7 +54,12 @@ Identificadores clave en UI:
 - `tests/e2e/finance-tracker.spec.ts`
 - `tests/e2e/pages/FinanceTrackerPage.ts`
 - `tests/unit/issue-report-schema.test.ts`
+- `tests/unit/issue-report-domain.test.ts`
+- `tests/unit/issue-report-route.test.ts`
+- `tests/unit/issue-attachments.test.ts`: reglas de adjuntos (dominio y esquema)
 - `tests/unit/github-issues.test.ts`
+- `tests/unit/github-issue-attachments.test.ts`: subida de adjuntos y lectura del id del repositorio
+- `tests/unit/issue-enricher.test.ts`: forma del análisis, plazo, errores y clave ausente
 
 ### Documentación/utilidades relacionadas
 

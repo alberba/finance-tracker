@@ -2,6 +2,7 @@ import type { RuntimeEnv } from './cloudflare-env'
 import { enrichIssueReport, type IssueEnricher } from './issue-enricher'
 import {
   uploadIssueAttachment,
+  type AttachmentUploadContext,
   type AttachmentUploader,
   type AttachmentUploadResult,
 } from './issue-attachments'
@@ -41,6 +42,40 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422])
 
 export type GithubIssueType = 'Bug' | 'Feature'
+
+/** Cabeceras de todas las llamadas a la API de GitHub de este servicio. */
+function githubHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'finance-tracker-web-reporter',
+  }
+}
+
+/** El endpoint de adjuntos exige el id numérico del repositorio. */
+async function fetchRepositoryId(
+  fetchFn: typeof fetch,
+  owner: string,
+  repo: string,
+  headers: Record<string, string>,
+): Promise<number> {
+  const response = await fetchFn(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers })
+  if (!response.ok) {
+    throw new Error(`No se pudo leer el repositorio (${response.status}).`)
+  }
+  const data = (await response.json()) as { id?: number }
+  const id = Number(data.id)
+  if (!Number.isFinite(id)) {
+    throw new Error('Respuesta inválida al leer el repositorio.')
+  }
+  return id
+}
+
+/** Ejecuta `fn` una sola vez y reutiliza su promesa en las llamadas siguientes. */
+function once<T>(fn: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | undefined
+  return () => (pending ??= fn())
+}
 
 function requiredEnv(name: keyof RuntimeEnv, env: RuntimeEnv): string {
   const value = String(env[name] || '').trim()
@@ -163,7 +198,7 @@ async function requestWithRetry(
 async function uploadAttachments(
   attachments: NonNullable<IssueReportPayload['attachments']>,
   uploader: AttachmentUploader,
-  context: Parameters<AttachmentUploader>[1],
+  context: AttachmentUploadContext,
 ): Promise<AttachmentOutcome[]> {
   const outcomes: AttachmentOutcome[] = []
   for (const attachment of attachments) {
@@ -214,24 +249,25 @@ export async function createIssueFromWebReport(
   payload: IssueReportPayload,
   reporter: IssueReporter,
   env: RuntimeEnv,
-  client: GithubIssueClient = {
-    fetch: globalThis.fetch.bind(globalThis),
-    uploadAttachment: uploadIssueAttachment,
-  },
+  client: GithubIssueClient = { fetch: globalThis.fetch.bind(globalThis) },
 ): Promise<CreatedIssue> {
   const token = requiredAnyEnv(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
   const owner = requiredEnv('GITHUB_OWNER', env)
   const repo = requiredEnv('GITHUB_REPO', env)
+  const headers = githubHeaders(token)
+  const uploadAttachment = client.uploadAttachment ?? uploadIssueAttachment
+  const enrich = client.enrich ?? enrichIssueReport
   const title = payload.summary.slice(0, 140)
   const labels = buildIssueLabels(payload.type)
   // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
   // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
-  const outcomes = await uploadAttachments(
-    payload.attachments ?? [],
-    client.uploadAttachment ?? uploadIssueAttachment,
-    { fetch: client.fetch, token, owner, repo },
-  )
-  const analysis = await enrichReport(payload, env, client.enrich ?? enrichIssueReport)
+  // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
+  const outcomes = await uploadAttachments(payload.attachments ?? [], uploadAttachment, {
+    fetch: client.fetch,
+    headers,
+    repositoryId: once(() => fetchRepositoryId(client.fetch, owner, repo, headers)),
+  })
+  const analysis = await enrichReport(payload, env, enrich)
   const baseRequestBody = {
     title,
     body: buildIssueBody(payload, reporter, analysis, outcomes),
@@ -249,12 +285,7 @@ export async function createIssueFromWebReport(
       () =>
         client.fetch(`${GITHUB_API_BASE}/repos/${owner}/${repo}/issues`, {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.github+json',
-            'Content-Type': 'application/json',
-            'User-Agent': 'finance-tracker-web-reporter',
-          },
+          headers: { ...headers, 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         }),
       2,
