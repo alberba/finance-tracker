@@ -64,7 +64,9 @@ const pendingNote = computed(() => {
       </div>
     </template>
     <template #note>
-      <p class="text-ink-muted text-sm">Ingresos menos gastos e inversión{{ pendingNote }}</p>
+      <p class="text-ink-muted text-sm">
+        Ingresos menos gastos e inversión; el ahorro no resta{{ pendingNote }}
+      </p>
     </template>
   </InkBand>
 </template>

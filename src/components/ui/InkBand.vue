@@ -14,7 +14,7 @@ export interface InkBandFact {
 }
 
 // The dark band that carries a screen's headline figure: the figure large
-// (decimals smaller), an optional change chip and up to three facts beside it.
+// (decimals smaller), an optional change chip and up to four facts beside it.
 // The `label` slot replaces the label (e.g. with month arrows); `note` adds a
 // line under the figure.
 const props = defineProps<{
@@ -30,6 +30,16 @@ const props = defineProps<{
 }>()
 
 const parts = computed(() => splitDecimals(props.value))
+// Four facts need two rows on a phone; three still fit side by side.
+const fourFacts = computed(() => (props.facts?.length ?? 0) > 3)
+const factsGridClass = computed(() =>
+  fourFacts.value ? 'grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-0' : 'grid-cols-3',
+)
+const factClass = computed(() =>
+  fourFacts.value
+    ? 'sm:border-l sm:pl-3 sm:first:border-l-0 sm:first:pl-0'
+    : 'border-l pl-3 first:border-l-0 first:pl-0',
+)
 </script>
 
 <template>
@@ -62,12 +72,14 @@ const parts = computed(() => splitDecimals(props.value))
     </div>
     <div
       v-if="facts?.length"
-      class="border-ink-text/10 grid grid-cols-3 border-t pt-4 lg:flex lg:flex-[3] lg:border-t-0 lg:pt-0"
+      class="border-ink-text/10 grid border-t pt-4 lg:flex lg:flex-[3] lg:border-t-0 lg:pt-0"
+      :class="factsGridClass"
     >
       <div
         v-for="fact in facts"
         :key="fact.label"
-        class="border-ink-text/10 grid min-w-0 content-end gap-1.5 border-l pl-3 first:border-l-0 first:pl-0 lg:flex-1 lg:px-6 lg:first:border-l lg:first:pl-6 lg:last:pr-0"
+        class="border-ink-text/10 grid min-w-0 content-end gap-1.5 lg:flex-1 lg:px-6 lg:first:border-l lg:first:pl-6 lg:last:pr-0"
+        :class="factClass"
       >
         <p :id="fact.labelId" class="text-ink-muted text-xs sm:text-sm">{{ fact.label }}</p>
         <p
