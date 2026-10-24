@@ -49,7 +49,7 @@ export const GET: APIRoute = async ({ locals }) =>
       stockeventsCashMappings,
       stockeventsCashSyncEntries,
     ] = await Promise.all([
-      userSettingsRepository.get(db, userId),
+      runWithDb(db, userSettingsRepository.get(userId)),
       accountsRepository.listByUser(db, userId),
       accountsRepository.listCategoriesByUser(db, userId),
       accountsRepository.listTwrLiquidityAccountsByUser(db, userId),
@@ -57,7 +57,7 @@ export const GET: APIRoute = async ({ locals }) =>
       subscriptionsRepository.listByUser(db, userId),
       recurringRulesRepository.listByUser(db, userId),
       pendingMovementsRepository.listByUser(db, userId),
-      budgetEntriesRepository.listByUser(db, userId),
+      runWithDb(db, budgetEntriesRepository.listByUser(userId)),
       runWithDb(db, goalsRepository.listByUser(userId)),
       wealthRepository.listByUser(db, userId),
       contributionsRepository.listByUser(db, userId),

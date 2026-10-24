@@ -40,7 +40,10 @@ sustitución va en la última fase, con el esquema ya medido; hasta entonces zod
 registra en su commit.
 
 1. Fundaciones: este ADR, ajuste de `CODING_STANDARDS.md`, bump de `effect`.
-2. Datos: Drizzle como servicio (`src/db`).
+2. Datos: Drizzle como servicio (`src/db`). Son 21 repositorios y cada uno arrastra a sus
+   llamadores, así que se migra un repositorio por commit. La consulta de Drizzle sigue siendo una
+   `Promise` por dentro; la frontera del repositorio es `Effect<A, DatabaseError, Database>`
+   (`lift`). Los llamadores aún sin migrar usan `runWithDb`, que desaparece en las fases 3 y 4.
 3. Servidor: `src/lib/server`, `src/services` y las integraciones restantes (`stockevents`,
    `market-data`, `github-issues`), siguiendo el patrón de Bitvavo.
 4. Endpoints: `src/pages/api` y middleware ejecutan sobre el runtime de servidor.

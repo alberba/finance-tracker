@@ -11,6 +11,7 @@ import * as userSettingsRepository from '../../../db/repositories/user-settings'
 import * as syncRepository from '../../../db/repositories/sync'
 import { runInTransaction } from '../../../db/repositories/shared'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
+import { runWithDb } from '../../../db/database'
 
 export const POST: APIRoute = async ({ request, locals }) =>
   withApiErrorHandling('/api/state/initialize', async () => {
@@ -29,14 +30,14 @@ export const POST: APIRoute = async ({ request, locals }) =>
     }
 
     const result = await runInTransaction(db, async (tx) => {
-      const existingSettings = await userSettingsRepository.get(tx, userId)
+      const existingSettings = await runWithDb(tx, userSettingsRepository.get(userId))
       if (existingSettings) {
         await syncRepository.ensureRevision(tx, userId)
         return { alreadyInitialized: true, settings: existingSettings }
       }
-      const settings = await userSettingsRepository.create(tx, userId, {
+      const settings = await runWithDb(tx, userSettingsRepository.create(userId, {
         currency: requestedCurrency ?? 'EUR',
-      })
+      }))
       const categories = await accountsRepository.listCategoriesByUser(tx, userId)
       await syncRepository.ensureRevision(tx, userId)
       return { alreadyInitialized: false, settings, categories }
