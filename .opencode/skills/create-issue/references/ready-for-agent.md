@@ -30,6 +30,7 @@ Qué debe ocurrir tras el cambio, con los casos límite y errores del alcance ac
 Conceptos, tipos, funciones o configuración implicados y sus contratos.
 
 **Criterios de aceptación:**
+
 - [ ] Resultados concretos, completos y verificables por separado.
 
 **Fuera de alcance:**
@@ -48,11 +49,15 @@ Reutilizar decisiones ya tomadas; en issues existentes, leer body, comentarios y
 
 En bugs, verificar el caso con evidencia existente o una reproducción de solo lectura dentro del alcance autorizado, y registrar si queda confirmado, no reproducido o sin datos. Un reporte suficiente deja lista la investigación sin acceso a producción; si ese acceso es indispensable para empezar, explicitar el bloqueo.
 
-Si el usuario prefiere registrar la issue antes de resolver las preguntas, conservar lo establecido y los pendientes bajo el estado que corresponda.
+Si queda una decisión de producto o alcance que impida empezar, escribirla en `## Decisiones pendientes` del cuerpo como pregunta concreta, con el contexto necesario para contestar. El brief puede explicar sus consecuencias técnicas, pero no es el único lugar donde aparecen las preguntas. Mantener separadas las propuestas y las decisiones confirmadas; una propuesta del agente no resuelve por sí sola un pendiente.
+
+Revisar los comentarios de la propia issue antes de actualizar ese bloque. Cuando el usuario resuelva una decisión, incorporarla al reporte y al brief, retirar la pregunta resuelta y reevaluar el estado. Las elecciones de implementación que el agente pueda tomar con el código no se convierten en decisiones de producto ni en preguntas al usuario.
+
+Si el usuario prefiere registrar la issue antes de resolver las preguntas, conservar lo establecido y los pendientes visibles en el cuerpo, bajo el estado que corresponda.
 
 ## Estado
 
-Mapear a las convenciones locales y mantener un único estado de triage:
+Tener un Agent Brief no implica estar lista. Aplicar `ready-for-agent` solo tras verificar el brief y comprobar que no quedan decisiones que impidan empezar. Mapear a las convenciones locales y mantener un único estado de triage:
 
 - `ready-for-agent`: especificación suficiente, ejecutable por un agente.
 - `needs-info`: falta un dato concreto del reportador.

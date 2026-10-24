@@ -16,6 +16,12 @@ const plan = {
   relatedNumbers: [7, 999],
   uiChange: false,
   duplicate: null,
+  category: 'bug',
+  triage: {
+    status: 'ready-for-agent',
+    reason: 'El comportamiento pedido y los criterios están definidos.',
+  },
+  pendingDecisions: [],
 }
 const body =
   '## Reporte desde la web\n\n### Resumen\nEl filtro no persiste\n\n### Adjuntos\n![captura](https://github.com/user-attachments/assets/123)\n\n### Contexto de ejecución\n- Ruta: /movimientos\n\n### Reportero\n- Email: PRIVATE_MARKER'
@@ -26,6 +32,8 @@ const snapshot = {
   candidates: { issues: [{ number: 7, state: 'open' }] },
 }
 const briefUrl = 'https://github.com/org/repo/issues/12#issuecomment-45'
+const readyLabels = ['source:web-report', 'bug', 'ready-for-agent']
+const duplicateLabels = ['source:web-report', 'bug']
 const comment = {
   id: 45,
   html_url: briefUrl,
@@ -44,6 +52,16 @@ function events(result: unknown) {
       part: {
         tool: 'read',
         state: { status: 'completed', input: { filePath: 'src/lib/server/github-issues.ts' } },
+      },
+    },
+    {
+      type: 'tool_use',
+      part: {
+        tool: 'read',
+        state: {
+          status: 'completed',
+          input: { filePath: '.scratch/issue-enrichment/discussion.json' },
+        },
       },
     },
     { type: 'text', part: { text: 'Texto intermedio' } },
@@ -89,7 +107,7 @@ describe('plan del agente de GitHub Actions', () => {
     expect(enriched).toContain(plan.body)
     expect(enriched).not.toContain('### Resumen')
     expect(enriched).toContain(splitReportBody(body).preserved)
-    expect(enriched).toContain('Relacionada: https://github.com/org/repo/issues/7')
+    expect(enriched).toContain('## Issues relacionadas\n\n- https://github.com/org/repo/issues/7')
     expect(enriched).not.toContain('issues/999')
     expect(enriched).toContain(`[Agent Brief](${briefUrl})`)
   })
@@ -105,14 +123,18 @@ describe('publicación del análisis', () => {
       .mockResolvedValueOnce(comment)
       .mockResolvedValueOnce(issue)
       .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ body: enrichedBody })
+      .mockResolvedValueOnce({ body: enrichedBody, labels: readyLabels.map((name) => ({ name })) })
     expect(await publishPlan(plan, snapshot, api)).toBe('published')
     expect(api.mock.calls[2]).toEqual([
       'repos/org/repo/issues/12/comments',
       'POST',
       { body: `${plan.brief}\n\n<!-- web-report-agent-brief -->` },
     ])
-    expect(api.mock.calls[4]).toEqual(['repos/org/repo/issues/12', 'PATCH', { body: enrichedBody }])
+    expect(api.mock.calls[4]).toEqual([
+      'repos/org/repo/issues/12',
+      'PATCH',
+      { body: enrichedBody, labels: readyLabels },
+    ])
   })
 
   it('rechaza una edición humana posterior al snapshot sin escribir', async () => {
@@ -146,7 +168,10 @@ describe('publicación del análisis', () => {
       .mockResolvedValueOnce(comment)
       .mockResolvedValueOnce(issue)
       .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ body: composeEnrichedBody(plan, snapshot, briefUrl) })
+      .mockResolvedValueOnce({
+        body: composeEnrichedBody(plan, snapshot, briefUrl),
+        labels: readyLabels.map((name) => ({ name })),
+      })
     await publishPlan(plan, snapshot, api)
     expect(api.mock.calls[2][0]).toBe('repos/org/repo/issues/comments/45')
     expect(api.mock.calls[2][1]).toBe('PATCH')
@@ -154,9 +179,11 @@ describe('publicación del análisis', () => {
   })
 
   it('un workflow ya completado no duplica el brief ni sobrescribe otra vez', async () => {
-    const api = vi
-      .fn()
-      .mockResolvedValueOnce({ ...issue, body: composeEnrichedBody(plan, snapshot, briefUrl) })
+    const api = vi.fn().mockResolvedValueOnce({
+      ...issue,
+      body: composeEnrichedBody(plan, snapshot, briefUrl),
+      labels: readyLabels.map((name) => ({ name })),
+    })
     expect(await publishPlan(plan, snapshot, api)).toBe('already-enriched')
     expect(api).toHaveBeenCalledTimes(1)
   })
@@ -211,7 +238,10 @@ describe('cierre nativo como duplicada', () => {
       .mockResolvedValueOnce({ ...comment, body: commentBody })
       .mockResolvedValueOnce(issue)
       .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ body: enrichedBody })
+      .mockResolvedValueOnce({
+        body: enrichedBody,
+        labels: duplicateLabels.map((name) => ({ name })),
+      })
       .mockResolvedValueOnce(result)
     return { api, enrichedBody }
   }
@@ -224,13 +254,14 @@ describe('cierre nativo como duplicada', () => {
       'PATCH',
       {
         body: enrichedBody,
+        labels: duplicateLabels,
         state: 'closed',
         state_reason: 'duplicate',
         duplicate_issue_id: 9007,
       },
     ])
     expect(enrichedBody).toContain(splitReportBody(body).preserved)
-    expect(enrichedBody).not.toContain('Relacionada: https://github.com/org/repo/issues/7')
+    expect(enrichedBody).not.toContain('## Issues relacionadas')
     expect(enrichedBody).not.toContain('Duplicate of')
     expect(api.mock.calls[7][0]).toBe('graphql')
   })
