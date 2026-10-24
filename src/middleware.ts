@@ -6,6 +6,7 @@ import { authenticatedPrincipal } from './db/repositories/authentication'
 import { createAuthentication } from './lib/server/auth/better-auth'
 import { resolvePrincipal, type AuthPrincipal } from './lib/server/auth/principal'
 import { getRuntimeEnv, type RuntimeEnv } from './lib/server/cloudflare-env'
+import { initServerErrorTracking } from './lib/server/error-tracking'
 import { isPublicDemoNavigation } from './lib/server/demo-access'
 import { isMaintenanceMode, maintenanceResponse } from './lib/server/maintenance'
 import {
@@ -44,6 +45,8 @@ function wrongQueueIdentity(request: Request, pathname: string, userId: string):
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const env = getRuntimeEnv(context.locals)
+  // Idempotente. En Node nadie más inicializa Sentry: sin esto no sale ningún evento.
+  initServerErrorTracking(env?.SENTRY_DSN)
 
   if (isMaintenanceMode(env)) return maintenanceResponse(context.request)
 

@@ -153,6 +153,55 @@ describe('createIssueFromWebReport con adjuntos', () => {
     expect(body.body).not.toContain('![pantalla.png]')
   })
 
+  it('avisa de una subida fallida con el estado HTTP y sin texto libre', async () => {
+    const reportFailure = vi.fn()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const uploadAttachment = vi.fn(async () => ({
+      ok: false as const,
+      error: 'GitHub devolvió 403.',
+    }))
+
+    await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
+      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
+      uploadAttachment,
+      enrich: async () => null,
+      reportFailure,
+    })
+
+    expect(reportFailure).toHaveBeenCalledTimes(1)
+    expect(reportFailure).toHaveBeenCalledWith({ stage: 'upload', reason: 'http-403' })
+  })
+
+  it('un error de subida sin estado se avisa con un motivo fijo, no con su texto', async () => {
+    const reportFailure = vi.fn()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
+      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
+      uploadAttachment: async () => ({ ok: false as const, error: 'texto libre SECRET_MARKER' }),
+      enrich: async () => null,
+      reportFailure,
+    })
+
+    expect(reportFailure).toHaveBeenCalledWith({ stage: 'upload', reason: 'failed' })
+  })
+
+  it('un enriquecedor que lanza se avisa como unexpected y el reporte se crea', async () => {
+    const reportFailure = vi.fn()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await createIssueFromWebReport(reportWith(undefined), reporter, ENV, {
+      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
+      enrich: async () => {
+        throw new Error('boom')
+      },
+      reportFailure,
+    })
+
+    expect(result.number).toBe(77)
+    expect(reportFailure).toHaveBeenCalledWith({ stage: 'enrich', reason: 'unexpected' })
+  })
+
   it('un reporte sin adjuntos no incluye la sección y no sube nada', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => issueResponse())
     const uploadAttachment = vi.fn()
