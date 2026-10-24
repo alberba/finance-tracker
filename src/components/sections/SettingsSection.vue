@@ -46,6 +46,7 @@ const tabs = computed<SectionTab[]>(() => {
   const categories =
     state.incomeCategories.length +
     state.expenseCategories.length +
+    state.savingCategories.length +
     state.investmentCategories.length
   const entries: Array<[SettingsTab, string, number | null]> = [
     ['accounts', 'Cuentas', state.accounts.length],

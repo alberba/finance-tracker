@@ -54,6 +54,8 @@ export interface NewTransactionInput {
   month: Month
   type: TransactionType
   accountId: string
+  /** Required for a saving: the cash account the money moves to. */
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -64,6 +66,7 @@ export interface EditedTransactionInput {
   /** The month it counts in; defaults to the month of the date. */
   month?: Month
   accountId: string
+  destinationAccountId?: string
   type: string
   category: string
   description: string
@@ -93,6 +96,9 @@ export interface EditedSubscriptionInput {
   frequency: SubscriptionFrequency
 }
 
+const SAVING_ACCOUNTS_MESSAGE =
+  'El ahorro necesita una cuenta de efectivo de origen y otra distinta de destino.'
+
 function currentYear(): number {
   return Number(todayISO().slice(0, 4))
 }
@@ -106,6 +112,20 @@ export const useMovementsStore = defineStore('movements', () => {
   const uiStore = useUiStore()
   const { showToast } = useToast()
   const ui = uiStore.ui
+
+  /** A saving moves money between two different cash accounts. */
+  function isValidSavingAccounts(input: {
+    accountId: string
+    destinationAccountId?: string
+  }): boolean {
+    const cash = new Set(financialStateStore.accounts.map((account) => account.id))
+    return (
+      Boolean(input.destinationAccountId) &&
+      input.destinationAccountId !== input.accountId &&
+      cash.has(input.accountId) &&
+      cash.has(input.destinationAccountId as string)
+    )
+  }
 
   const accountNameById = computed(() => {
     const map = new Map<string, string>()
@@ -246,6 +266,10 @@ export const useMovementsStore = defineStore('movements', () => {
       showToast('El importe debe ser mayor que 0.')
       return false
     }
+    if (input.type === 'saving' && !isValidSavingAccounts(input)) {
+      showToast(SAVING_ACCOUNTS_MESSAGE)
+      return false
+    }
 
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
@@ -255,6 +279,7 @@ export const useMovementsStore = defineStore('movements', () => {
         month: input.month,
         type: input.type,
         accountId: input.accountId,
+        ...(input.type === 'saving' ? { destinationAccountId: input.destinationAccountId } : {}),
         category: input.category || 'Sin categoría',
         description: input.description.trim(),
         amount: round2(input.amount),
@@ -280,6 +305,11 @@ export const useMovementsStore = defineStore('movements', () => {
       showToast('Completa fecha, cuenta, tipo, categoría e importe válido.')
       return false
     }
+    const destinationAccountId = fields.destinationAccountId?.trim() ?? ''
+    if (type === 'saving' && !isValidSavingAccounts({ accountId, destinationAccountId })) {
+      showToast(SAVING_ACCOUNTS_MESSAGE)
+      return false
+    }
 
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
@@ -291,6 +321,8 @@ export const useMovementsStore = defineStore('movements', () => {
       tx.month = fields.month ?? monthFromISO(date) ?? tx.month
       tx.accountId = accountId
       tx.type = type
+      if (type === 'saving') tx.destinationAccountId = destinationAccountId
+      else delete tx.destinationAccountId
       tx.category = category
       tx.description = description
       tx.amount = round2(amount)
@@ -332,6 +364,10 @@ export const useMovementsStore = defineStore('movements', () => {
       showToast('Tipo de movimiento no válido.')
       return
     }
+    if (newType === 'saving') {
+      showToast('Un ahorro necesita cuenta destino: edítalo uno a uno.')
+      return
+    }
 
     let updated = 0
     const before = financialStateStore.transactions
@@ -340,9 +376,14 @@ export const useMovementsStore = defineStore('movements', () => {
         if (item.remoteOperation || !selectedIds.has(item.id)) {
           return
         }
+        // A saving cannot leave from its own destination.
+        if (!newType && item.type === 'saving' && item.destinationAccountId === newAccountId) {
+          return
+        }
         updated += 1
         if (newType && isTransactionType(newType)) {
           item.type = newType
+          delete item.destinationAccountId
         }
         if (newAccountId) {
           item.accountId = newAccountId

@@ -156,6 +156,8 @@ export const entityCreateSchemas = {
       legacyId: nullableString.optional(),
       accountId: z.string().min(1),
       categoryId: nullableString.optional(),
+      // Only a saving (ahorro) carries one; it travels in the movement's own command (ADR 0006).
+      destinationAccountId: nullableString.optional(),
       type: z.string().min(1),
       date: z.string().min(1),
       description: nullableString.optional(),
@@ -193,6 +195,7 @@ export const entityCreateSchemas = {
       name: z.string().min(1),
       type: z.string().min(1),
       accountId: nullableString.optional(),
+      destinationAccountId: nullableString.optional(),
       categoryId: nullableString.optional(),
       amount: z.number(),
       currency: z.string().min(1),
@@ -211,6 +214,7 @@ export const entityCreateSchemas = {
       legacyId: nullableString.optional(),
       recurringRuleId: z.string().min(1),
       accountId: nullableString.optional(),
+      destinationAccountId: nullableString.optional(),
       categoryId: nullableString.optional(),
       amount: z.number(),
       currency: z.string().min(1),
@@ -236,6 +240,7 @@ export const entityCreateSchemas = {
     .object({
       legacyId: nullableString.optional(),
       key: z.string().min(1),
+      categoryId: nullableString.optional(),
       name: z.string().min(1),
       targetYear: z.number().int().nullable().optional(),
       targetAmount: z.number(),

@@ -8,7 +8,6 @@ import IconButton from '../ui/IconButton.vue'
 import LedgerTable, { type LedgerColumn } from '../ui/LedgerTable.vue'
 import { TONE_TEXT } from '../ui/tone'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { signedAmount } from '../../domain/transactions/registry'
 import { formatDayMonth, formatDueLabel } from '../../lib/format'
 import type { PendingMovement } from '../../scripts/types'
 import { todayISO } from '../../scripts/utils'
@@ -21,7 +20,7 @@ import { useRecurringStore } from '../../stores/recurring'
 
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
-const { formatSignedMoney } = useMoneyFormatter()
+const { formatMovementAmount } = useMoneyFormatter()
 const editPanel = useTemplateRef<InstanceType<typeof PendingEditPanel>>('editPanel')
 const pending = computed(() => recurringStore.openPendingMovements)
 const pendingCancel = ref<PendingMovement | null>(null)
@@ -120,7 +119,7 @@ const columns: LedgerColumn<PendingMovement>[] = [
           class="font-display tabular-nums"
           :class="row.type === 'income' ? TONE_TEXT.gain : 'text-text-main'"
         >
-          {{ formatSignedMoney(signedAmount(row)) }}
+          {{ formatMovementAmount(row) }}
         </span>
       </template>
       <template #cell-actions="{ row }">
@@ -163,8 +162,8 @@ const columns: LedgerColumn<PendingMovement>[] = [
     >
       <template v-if="pendingCancel">
         {{ pendingCancel.description }} del {{ formatDayMonth(pendingCancel.occurrenceDate) }} por
-        {{ formatSignedMoney(signedAmount(pendingCancel)) }}. No se apunta en el Registro ni vuelve
-        a aparecer; la regla sigue con los próximos vencimientos.
+        {{ formatMovementAmount(pendingCancel) }}. No se apunta en el Registro ni vuelve a aparecer;
+        la regla sigue con los próximos vencimientos.
       </template>
     </ConfirmDialog>
   </section>

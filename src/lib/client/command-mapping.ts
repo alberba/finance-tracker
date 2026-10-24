@@ -391,7 +391,7 @@ export async function syncTwrLiquidityAccounts(localAccountIds: readonly string[
   await syncSettingsUpdate({ twrLiquidityAccountIds })
 }
 
-export type CategoryKind = 'income' | 'expense' | 'investment'
+export type CategoryKind = 'income' | 'expense' | 'saving' | 'investment'
 
 /**
  * Matches a cached category by the attributes that identify it: its name

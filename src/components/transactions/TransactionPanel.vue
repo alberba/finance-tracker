@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { useAccountRequirement } from '../../composables/useAccountRequirement'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -26,7 +26,7 @@ import { useUiStore } from '../../stores/ui'
 const movementsStore = useMovementsStore()
 const uiStore = useUiStore()
 const { showToast } = useToast()
-const { formatSignedMoney } = useMoneyFormatter()
+const { formatMoney, formatSignedMoney } = useMoneyFormatter()
 const { navigateTo } = useSectionNavigation()
 
 const open = ref(false)
@@ -37,6 +37,7 @@ const form = reactive({
   description: '',
   category: '',
   accountId: '',
+  destinationAccountId: '',
   date: '',
   month: monthFromDate(new Date()),
 })
@@ -49,6 +50,11 @@ const monthOptions = ALL_MONTHS.map((month) => ({
 const accountOptions = computed(() =>
   movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
+const isSaving = computed(() => form.type === 'saving')
+// A saving never lands in the account it leaves.
+const destinationOptions = computed(() =>
+  accountOptions.value.filter((option) => option.value !== form.accountId),
+)
 const categoryOptions = computed(() => {
   const names = movementsStore.orderedCategories(form.type)
   return categorySelectOptions(names.length ? names : ['Sin categoría'], form.category)
@@ -57,25 +63,47 @@ const categoryOptions = computed(() => {
 const amount = computed(() => parseDecimal(form.amount))
 const preview = computed(() => {
   const value = Number.isFinite(amount.value) ? Math.abs(amount.value) : 0
+  // A saving moves money between accounts, so it carries no sign.
+  if (isSaving.value) return formatMoney(value)
   return formatSignedMoney(signedAmount({ type: form.type, amount: value }))
 })
 const previewLabel = computed(
   () => `${TYPE_LABEL[form.type]} de ${formatMonthName(form.month).toLowerCase()}`,
 )
 const previewDetail = computed(() =>
-  [movementsStore.getAccountName(form.accountId), formatDayMonth(form.date)]
+  [
+    movementsStore.getAccountName(form.accountId),
+    isSaving.value ? movementsStore.getAccountName(form.destinationAccountId) : '',
+    formatDayMonth(form.date),
+  ]
     .filter(Boolean)
     .join(' · '),
 )
 
+let loadingMovement = false
+
 watch(
   () => form.type,
   () => {
-    // categoryOptions keeps the current category even when the new type lacks it, so check the type's own list.
+    // Against the new type's own list: `categoryOptions` keeps the chosen category even when
+    // it belongs to another type, so it would never ask for a replacement.
     const names = movementsStore.orderedCategories(form.type)
-    if (!names.includes(form.category)) form.category = names[0] ?? 'Sin categoría'
+    // Opening a movement fills its own category, even one that no longer exists.
+    if (!loadingMovement && !names.includes(form.category)) {
+      form.category = names[0] ?? 'Sin categoría'
+    }
+    ensureDestination()
   },
 )
+watch(() => form.accountId, ensureDestination)
+
+// Keeps the destination valid: set, and different from the origin.
+function ensureDestination(): void {
+  if (!isSaving.value) return
+  if (!destinationOptions.value.some((option) => option.value === form.destinationAccountId)) {
+    form.destinationAccountId = destinationOptions.value[0]?.value ?? ''
+  }
+}
 
 function onDateChange(): void {
   const month = monthFromISO(form.date)
@@ -91,6 +119,7 @@ function reset(): void {
   if (!categoryOptions.value.some((option) => option.value === form.category)) {
     form.category = categoryOptions.value[0]?.value ?? ''
   }
+  ensureDestination()
 }
 
 function openNew(): void {
@@ -105,11 +134,16 @@ function openNew(): void {
 function openEdit(tx: Transaction): void {
   if (tx.remoteOperation) return
   editingId.value = tx.id
+  loadingMovement = true
+  void nextTick(() => {
+    loadingMovement = false
+  })
   form.type = tx.type
   form.amount = formatDecimalInput(Number(tx.amount || 0))
   form.description = tx.description || ''
   form.category = tx.category || ''
   form.accountId = tx.accountId
+  form.destinationAccountId = tx.destinationAccountId ?? ''
   form.date = tx.date
   form.month = tx.month
   open.value = true
@@ -122,6 +156,7 @@ function save(keepOpen: boolean): void {
       date: form.date,
       month: form.month,
       accountId: form.accountId,
+      destinationAccountId: form.destinationAccountId,
       type: form.type,
       category: form.category,
       description: form.description,
@@ -135,6 +170,7 @@ function save(keepOpen: boolean): void {
     month: form.month,
     type: form.type,
     accountId: form.accountId,
+    destinationAccountId: form.destinationAccountId,
     category: form.category,
     description: form.description,
     amount: Number.isFinite(amount.value) ? amount.value : 0,
@@ -209,9 +245,16 @@ const { needsAccount } = useAccountRequirement()
         />
         <BaseSelect
           v-model="form.accountId"
-          label="Cuenta"
+          :label="isSaving ? 'Cuenta origen' : 'Cuenta'"
           name="accountId"
           :options="accountOptions"
+        />
+        <BaseSelect
+          v-if="isSaving"
+          v-model="form.destinationAccountId"
+          label="Cuenta destino"
+          name="destinationAccountId"
+          :options="destinationOptions"
         />
       </fieldset>
 

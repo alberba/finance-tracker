@@ -22,6 +22,7 @@ export interface SettingsViewModel {
   liabilities: Entity[]
   incomeCategories: CategoryTagViewModel[]
   expenseCategories: CategoryTagViewModel[]
+  savingCategories: CategoryTagViewModel[]
   investmentCategories: CategoryTagViewModel[]
 }
 
@@ -31,6 +32,9 @@ export function categoryKeyToType(key: CategoryKey): BudgetType {
   }
   if (key === 'expenseCategories') {
     return 'expense'
+  }
+  if (key === 'savingCategories') {
+    return 'saving'
   }
   return 'investment'
 }
@@ -63,6 +67,11 @@ export function buildSettingsViewModel(state: State): SettingsViewModel {
     expenseCategories: buildCategoryTags(
       'expenseCategories',
       state.expenseCategories || [],
+      state.categoryEmojis,
+    ),
+    savingCategories: buildCategoryTags(
+      'savingCategories',
+      state.savingCategories || [],
       state.categoryEmojis,
     ),
     investmentCategories: buildCategoryTags(

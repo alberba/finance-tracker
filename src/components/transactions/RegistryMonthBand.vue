@@ -22,6 +22,7 @@ const totals = computed(() => movementsStore.bandTotals)
 const facts = computed(() => [
   { label: 'Ingresos', value: formatMoney(totals.value.income), valueId: 'tx-total-income' },
   { label: 'Gastos', value: formatMoney(totals.value.expense), valueId: 'tx-total-expense' },
+  { label: 'Ahorrado', value: formatMoney(totals.value.saving), valueId: 'tx-total-saving' },
   {
     label: 'Invertido',
     value: formatMoney(totals.value.investment),
@@ -63,7 +64,9 @@ const pendingNote = computed(() => {
       </div>
     </template>
     <template #note>
-      <p class="text-ink-muted text-sm">Ingresos menos gastos e inversión{{ pendingNote }}</p>
+      <p class="text-ink-muted text-sm">
+        Ingresos menos gastos e inversión; el ahorro no resta{{ pendingNote }}
+      </p>
     </template>
   </InkBand>
 </template>

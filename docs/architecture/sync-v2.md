@@ -20,6 +20,10 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    - Envía `accountingMonth` (1-12) solo cuando el mes elegido difiere del de la fecha; si no,
      `null` y el mes sigue a la fecha. Es ya el mismo número que `Transaction.month` (ADR 0006):
      la proyección (`projectSyncV2State`) lo copia tal cual y, si es `null`, lo deriva de `date`.
+   - Envía `destinationAccountId` solo en un ahorro, y lo exige resuelto: sin cuenta de destino el
+     comando se omite hasta que resuelva. En los demás tipos va `null`, que borra el destino al
+     cambiar de tipo. La proyección lo devuelve a `Transaction.destinationAccountId` solo cuando
+     sigue siendo un ahorro.
    - Para operaciones importadas de Bitvavo, emite únicamente declarado y descripción. Los stores
      mantienen las restricciones de edición y borrado.
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).

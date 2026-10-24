@@ -31,6 +31,7 @@ const CATEGORY_EMOJI_MAP: Record<string, string> = {
 const TYPE_FALLBACK_EMOJI: Record<BudgetType, string> = {
   income: "💰",
   expense: "💸",
+  saving: "🐖",
   investment: "📈",
 };
 

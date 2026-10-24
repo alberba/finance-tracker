@@ -51,12 +51,15 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
   if (!accountId) {
     return null
   }
+  const destinationAccountId = await resolveDestination(rule)
+  if (destinationAccountId === undefined) return null
   const categoryId = await resolveOrCreateCategoryId(rule.type as CategoryKind, rule.category)
   if (!categoryId) return null
   return {
     name: rule.description,
     type: rule.type,
     accountId,
+    destinationAccountId,
     categoryId,
     amount: rule.amount,
     currency,
@@ -69,6 +72,20 @@ async function buildRecurringRuleData(rule: RecurringRule, currency: string) {
     ...operationData(rule),
     status: rule.active ? 'active' : 'paused',
   }
+}
+
+/**
+ * The server id of a saving's destination account, `null` when the template is not a saving
+ * (clears a stale one) and `undefined` when it is a saving whose destination cannot be resolved
+ * yet, so the caller skips the command.
+ */
+async function resolveDestination(template: {
+  type: TransactionType
+  destinationAccountId?: string
+}): Promise<string | null | undefined> {
+  if (template.type !== 'saving') return null
+  if (!template.destinationAccountId) return undefined
+  return (await resolveEntityId('account', template.destinationAccountId)) ?? undefined
 }
 
 /**
@@ -127,6 +144,8 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
   if (!accountId) {
     return null
   }
+  const destinationAccountId = await resolveDestination(pending)
+  if (destinationAccountId === undefined) return null
   const categoryId = await resolveOrCreateCategoryId(pending.type as CategoryKind, pending.category)
   if (!categoryId) return null
   const transactionId = pending.transactionId
@@ -136,6 +155,7 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
   return {
     recurringRuleId,
     accountId,
+    destinationAccountId,
     categoryId,
     amount: pending.amount,
     currency,
@@ -151,6 +171,7 @@ async function buildPendingMovementData(pending: PendingMovement, currency: stri
 export interface NewRecurringRuleInput {
   type: TransactionType
   accountId: string
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -169,6 +190,7 @@ export interface NewRecurringRuleInput {
 export interface PendingMovementEdit {
   date: string
   accountId: string
+  destinationAccountId?: string
   category: string
   description: string
   amount: number
@@ -313,13 +335,17 @@ export const useRecurringStore = defineStore('recurring', () => {
       !input.category ||
       !input.description.trim() ||
       input.amount <= 0 ||
-      !input.startDate
+      !input.startDate ||
+      !isValidSaving(input)
     )
       return false
     const rule: RecurringRule = {
       id: uid('rule'),
       type: input.type,
       accountId: input.accountId,
+      ...(input.type === 'saving' && input.destinationAccountId
+        ? { destinationAccountId: input.destinationAccountId }
+        : {}),
       category: input.category,
       description: input.description.trim(),
       amount: round2(input.amount),
@@ -359,7 +385,8 @@ export const useRecurringStore = defineStore('recurring', () => {
       !input.category ||
       !input.description.trim() ||
       input.amount <= 0 ||
-      !input.startDate
+      !input.startDate ||
+      !isValidSaving(input)
     ) {
       return false
     }
@@ -381,6 +408,11 @@ export const useRecurringStore = defineStore('recurring', () => {
         : input.startDate
       rule.type = input.type
       rule.accountId = input.accountId
+      if (input.type === 'saving' && input.destinationAccountId) {
+        rule.destinationAccountId = input.destinationAccountId
+      } else {
+        delete rule.destinationAccountId
+      }
       rule.category = input.category
       rule.description = input.description.trim()
       rule.amount = round2(input.amount)
@@ -449,10 +481,12 @@ export const useRecurringStore = defineStore('recurring', () => {
     if (!pending) return false
     const occurrenceDate = edit?.date || pending.occurrenceDate
     const accountId = edit?.accountId || pending.accountId
+    const type = edit?.type || pending.type
+    const destinationAccountId =
+      type === 'saving' ? edit?.destinationAccountId || pending.destinationAccountId : undefined
     const category = edit?.category || pending.category
     const description = edit?.description || pending.description
     const amount = edit?.amount ?? pending.amount
-    const type = edit?.type || pending.type
     const symbol = edit?.symbol ?? pending.symbol
     const side = edit?.side ?? pending.side
     const units = edit?.units ?? pending.units
@@ -468,6 +502,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       month: monthFromISO(occurrenceDate) ?? 1,
       type,
       accountId,
+      ...(destinationAccountId ? { destinationAccountId } : {}),
       category,
       description: description.trim(),
       amount: type === 'investment' && side === 'sell' ? -Math.abs(amount) : Math.abs(amount),
@@ -493,6 +528,8 @@ export const useRecurringStore = defineStore('recurring', () => {
         current.type = type
         current.occurrenceDate = occurrenceDate
         current.accountId = accountId
+        if (destinationAccountId) current.destinationAccountId = destinationAccountId
+        else delete current.destinationAccountId
         current.category = category
         current.description = description
         current.amount = amount
@@ -562,6 +599,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     const valid =
       edit.date &&
       edit.accountId &&
+      isValidSaving({ type: targetType, accountId: edit.accountId, destinationAccountId: edit.destinationAccountId ?? pending.destinationAccountId }) &&
       edit.category &&
       edit.description.trim() &&
       amount > 0 &&
@@ -576,6 +614,9 @@ export const useRecurringStore = defineStore('recurring', () => {
       current.type = targetType
       current.occurrenceDate = edit.date
       current.accountId = edit.accountId
+      const destination = edit.destinationAccountId ?? current.destinationAccountId
+      if (targetType === 'saving' && destination) current.destinationAccountId = destination
+      else delete current.destinationAccountId
       current.category = edit.category
       current.description = edit.description.trim()
       current.amount = amount
@@ -644,6 +685,18 @@ export const useRecurringStore = defineStore('recurring', () => {
     cancelPending: (id: string) => changePendingStatus(id, 'cancelled'),
   }
 })
+
+/** A saving needs a destination different from its origin; other types ignore it. */
+function isValidSaving(input: {
+  type: TransactionType
+  accountId: string
+  destinationAccountId?: string
+}): boolean {
+  return (
+    input.type !== 'saving' ||
+    (Boolean(input.destinationAccountId) && input.destinationAccountId !== input.accountId)
+  )
+}
 
 function resolveToday(): string {
   const candidate =

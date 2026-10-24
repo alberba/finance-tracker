@@ -5,7 +5,7 @@ import SettingsCategoryList from './SettingsCategoryList.vue'
 import SettingsTabIntro from './SettingsTabIntro.vue'
 import { useSettingsStore } from '../../stores/settings'
 
-// Categorías: the three lists side by side, each in the order of its selects.
+// Categorías: the four lists side by side, each in the order of its selects.
 defineProps<{ isActive: boolean }>()
 
 const { viewModel } = storeToRefs(useSettingsStore())
@@ -25,7 +25,7 @@ const { viewModel } = storeToRefs(useSettingsStore())
       description="Con qué se clasifican los movimientos. El orden es el de los desplegables."
     />
     <div
-      class="border-line bg-panel shadow-soft grid gap-x-10 gap-y-8 rounded-lg border px-5 py-6 sm:px-7 lg:grid-cols-3"
+      class="border-line bg-panel shadow-soft grid gap-x-10 gap-y-8 rounded-lg border px-5 py-6 sm:px-7 lg:grid-cols-2 xl:grid-cols-4"
     >
       <SettingsCategoryList
         title="Ingresos"
@@ -36,6 +36,11 @@ const { viewModel } = storeToRefs(useSettingsStore())
         title="Gastos"
         category-key="expenseCategories"
         :tags="viewModel.expenseCategories"
+      />
+      <SettingsCategoryList
+        title="Ahorro"
+        category-key="savingCategories"
+        :tags="viewModel.savingCategories"
       />
       <SettingsCategoryList
         title="Inversión"

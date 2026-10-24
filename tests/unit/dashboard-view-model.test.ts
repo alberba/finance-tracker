@@ -76,10 +76,11 @@ describe('buildKpi', () => {
 
 describe('buildIncomeSplit', () => {
   it('splits the income into expenses, investment and what is left', () => {
-    const split = buildIncomeSplit({ income: 2000, expense: 800, investment: 200 }, money)
+    const split = buildIncomeSplit({ income: 2000, expense: 800, saving: 0, investment: 200 }, money)
 
     expect(split?.segments).toEqual([
       { key: 'expense', label: 'Gastos', weight: 40, share: formatPercent(40) },
+      { key: 'saving', label: 'Ahorro', weight: 0, share: formatPercent(0) },
       { key: 'investment', label: 'Inversión', weight: 10, share: formatPercent(10) },
       { key: 'unspent', label: 'Sin gastar', weight: 50, share: formatPercent(50) },
     ])
@@ -88,14 +89,14 @@ describe('buildIncomeSplit', () => {
   })
 
   it('leaves nothing unspent when spending passes the income', () => {
-    const split = buildIncomeSplit({ income: 1000, expense: 900, investment: 300 }, money)
+    const split = buildIncomeSplit({ income: 1000, expense: 900, saving: 0, investment: 300 }, money)
 
-    expect(split?.segments.map((segment) => segment.weight)).toEqual([75, 25, 0])
+    expect(split?.segments.map((segment) => segment.weight)).toEqual([75, 0, 25, 0])
     expect(split?.keptPer100).toBe('0.00 €')
   })
 
   it('is null without income', () => {
-    expect(buildIncomeSplit({ income: 0, expense: 50, investment: 0 }, money)).toBeNull()
+    expect(buildIncomeSplit({ income: 0, expense: 50, saving: 0, investment: 0 }, money)).toBeNull()
   })
 })
 

@@ -17,6 +17,7 @@ import {
   type PendingMovement,
   type PendingMovementStatus,
   type Quote,
+  type SavingGoal,
   type QuoteDataType,
   type QuoteStatus,
   type RecurringFrequency,
@@ -59,13 +60,15 @@ export const EMPTY_STATE_SEED = {
   liabilities: [],
   incomeCategories: ['Nómina', 'Extra'],
   expenseCategories: ['Comida', 'Vivienda'],
+  savingCategories: ['Fondo de emergencia'],
   investmentCategories: ['Fondos Indexados'],
   categoryEmojis: {},
   transactions: [],
   subscriptions: [],
   snapshots: {},
-  budget: { income: {}, expense: {}, investment: {} },
+  budget: { income: {}, expense: {}, saving: {}, investment: {} },
   goals: {},
+  savingGoals: [],
   contributions: [],
   instruments: [],
   quotes: {},
@@ -164,6 +167,7 @@ export function normalizeState(candidate: unknown): State {
     expenseCategories: normalizeStringList(
       input?.expenseCategories || base.expenseCategories || [],
     ),
+    savingCategories: normalizeStringList(input?.savingCategories || base.savingCategories || []),
     investmentCategories: normalizeStringList(
       input?.investmentCategories || base.investmentCategories || [],
     ),
@@ -173,6 +177,7 @@ export function normalizeState(candidate: unknown): State {
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
+    savingGoals: normalizeSavingGoals(input?.savingGoals || base.savingGoals || []),
     contributions: normalizeContributions(input?.contributions || base.contributions || []),
     instruments: normalizeInstruments(input?.instruments || base.instruments || []),
     quotes: normalizeQuotes(input?.quotes || base.quotes || {}),
@@ -348,6 +353,9 @@ function normalizeRecurringRules(list: unknown): RecurringRule[] {
       id: String(raw.id || uid('rule')),
       type,
       accountId: String(raw.accountId || ''),
+      ...(type === 'saving' && String(raw.destinationAccountId || '').trim()
+        ? { destinationAccountId: String(raw.destinationAccountId).trim() }
+        : {}),
       category: String(raw.category || 'Sin categoría'),
       description: String(raw.description || ''),
       amount: round2(parseFloatSafe(raw.amount, 0)),
@@ -387,6 +395,9 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
     const unitPrice = normalizeNonNegativeNumber(raw.unitPrice, 6)
     const fee = normalizeNonNegativeNumber(raw.fee, 2)
     const time = normalizeTime(raw.time)
+    const type = isTransactionType(String(raw.type || 'expense'))
+      ? (String(raw.type) as PendingMovement['type'])
+      : 'expense'
     return {
       id: String(raw.id || uid('pending')),
       occurrenceKey: String(
@@ -394,10 +405,11 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
       ),
       ruleId: String(raw.ruleId || ''),
       occurrenceDate: String(raw.occurrenceDate || todayISO()),
-      type: isTransactionType(String(raw.type || 'expense'))
-        ? (String(raw.type) as PendingMovement['type'])
-        : 'expense',
+      type,
       accountId: String(raw.accountId || ''),
+      ...(type === 'saving' && String(raw.destinationAccountId || '').trim()
+        ? { destinationAccountId: String(raw.destinationAccountId).trim() }
+        : {}),
       category: String(raw.category || 'Sin categoría'),
       description: String(raw.description || ''),
       amount: round2(parseFloatSafe(raw.amount, 0)),
@@ -562,6 +574,11 @@ function normalizeTransactions(list: unknown): Transaction[] {
         .slice(0, 3)
       if (movementCurrency) safe.movementCurrency = movementCurrency
 
+      if (type === 'saving') {
+        const destinationAccountId = String(rawItem.destinationAccountId || '').trim()
+        if (destinationAccountId) safe.destinationAccountId = destinationAccountId
+      }
+
       if (type === 'investment') {
         const symbol = String(rawItem.symbol || '')
           .trim()
@@ -696,10 +713,11 @@ function normalizeBudget(budget: unknown): State['budget'] {
   const safe: State['budget'] = {
     income: {},
     expense: {},
+    saving: {},
     investment: {},
   }
 
-  ;(['income', 'expense', 'investment'] as BudgetType[]).forEach((type) => {
+  ;(['income', 'expense', 'saving', 'investment'] as BudgetType[]).forEach((type) => {
     Object.entries(asRecord(rawBudget[type])).forEach(([category, values]) => {
       const monthlyValues = Array.isArray(values) ? values : []
       safe[type][category] = Array.from({ length: 12 }, (_, month) =>
@@ -709,6 +727,24 @@ function normalizeBudget(budget: unknown): State['budget'] {
   })
 
   return safe
+}
+
+function normalizeSavingGoals(list: unknown): SavingGoal[] {
+  const items = Array.isArray(list) ? list : []
+  return items.flatMap((item) => {
+    const raw = asRecord(item)
+    const name = String(raw.name || '').trim()
+    const category = String(raw.category || '').trim()
+    if (!name || !category) return []
+    return [
+      {
+        id: String(raw.id || uid('saving-goal')),
+        name,
+        targetAmount: round2(Math.max(parseFloatSafe(raw.targetAmount, 0), 0)),
+        category,
+      },
+    ]
+  })
 }
 
 function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {
@@ -757,13 +793,15 @@ function normalizeContributions(list: unknown): Contribution[] {
 }
 
 function syncBudgetFromCategories(targetState: State): void {
-  ;(['income', 'expense', 'investment'] as BudgetType[]).forEach((type) => {
+  ;(['income', 'expense', 'saving', 'investment'] as BudgetType[]).forEach((type) => {
     const categories =
       type === 'income'
         ? targetState.incomeCategories
         : type === 'expense'
           ? targetState.expenseCategories
-          : targetState.investmentCategories
+          : type === 'saving'
+            ? targetState.savingCategories
+            : targetState.investmentCategories
 
     categories.forEach((category) => {
       if (!targetState.budget[type][category]) {

@@ -21,6 +21,7 @@ export const useBudgetStore = defineStore('budget', () => {
   const budget = computed(() => financialStateStore.budget)
   const incomeCategories = computed(() => financialStateStore.state.incomeCategories)
   const expenseCategories = computed(() => financialStateStore.state.expenseCategories)
+  const savingCategories = computed(() => financialStateStore.state.savingCategories)
   const investmentCategories = computed(() => financialStateStore.state.investmentCategories)
 
   function getCategoriesForType(type: BudgetType): string[] {
@@ -29,6 +30,9 @@ export const useBudgetStore = defineStore('budget', () => {
     }
     if (type === 'expense') {
       return expenseCategories.value
+    }
+    if (type === 'saving') {
+      return savingCategories.value
     }
     return investmentCategories.value
   }
@@ -95,6 +99,7 @@ export const useBudgetStore = defineStore('budget', () => {
     budget,
     incomeCategories,
     expenseCategories,
+    savingCategories,
     investmentCategories,
     getCategoriesForType,
     updateBudgetValue,

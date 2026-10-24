@@ -18,9 +18,9 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMovementsStore } from '../../stores/movements'
 import { useRecurringStore } from '../../stores/recurring'
 
-// Creates and edits an income or expense rule in the side panel. Each due
+// Creates and edits an income, expense or saving rule in the side panel. Each due
 // date becomes a pending movement in Movimientos.
-type RuleType = 'income' | 'expense'
+type RuleType = 'income' | 'expense' | 'saving'
 
 const financialStateStore = useFinancialStateStore()
 const movementsStore = useMovementsStore()
@@ -32,6 +32,7 @@ const emit = defineEmits<{ delete: [rule: RecurringRule] }>()
 const TYPE_OPTIONS: SegmentedOption<RuleType>[] = [
   { value: 'income', label: 'Ingreso' },
   { value: 'expense', label: 'Gasto' },
+  { value: 'saving', label: 'Ahorro' },
 ]
 const FREQUENCY_OPTIONS: SegmentedOption<RecurringFrequency>[] = [
   { value: 'daily', label: 'Diaria' },
@@ -48,6 +49,7 @@ const form = reactive({
   description: '',
   category: '',
   accountId: '',
+  destinationAccountId: '',
   amount: '',
   frequency: 'monthly' as RecurringFrequency,
   interval: '1',
@@ -69,6 +71,20 @@ function categoriesOf(type: RuleType): string[] {
 const categoryOptions = computed(() =>
   categoriesOf(form.type).map((category) => ({ value: category, label: category })),
 )
+const isSaving = computed(() => form.type === 'saving')
+// A saving never lands in the account it leaves.
+const destinationOptions = computed(() =>
+  accountOptions.value.filter((option) => option.value !== form.accountId),
+)
+
+// Keeps a saving's destination set and different from the origin.
+function ensureDestination(): void {
+  if (!isSaving.value) return
+  if (!destinationOptions.value.some((option) => option.value === form.destinationAccountId)) {
+    form.destinationAccountId = destinationOptions.value[0]?.value ?? ''
+  }
+}
+watch(() => form.accountId, ensureDestination)
 
 watch(
   () => form.type,
@@ -76,6 +92,7 @@ watch(
     if (!categoryOptions.value.some((option) => option.value === form.category)) {
       form.category = categoryOptions.value[0]?.value ?? ''
     }
+    ensureDestination()
   },
 )
 
@@ -94,18 +111,20 @@ const monthly = computed(() =>
 )
 
 function fill(rule: RecurringRule | null): void {
-  const type: RuleType = rule?.type === 'income' ? 'income' : 'expense'
+  const type: RuleType = rule?.type === 'income' || rule?.type === 'saving' ? rule.type : 'expense'
   Object.assign(form, {
     type,
     description: rule?.description ?? '',
     category: rule?.category ?? categoriesOf(type)[0],
     accountId: rule?.accountId ?? accountOptions.value[0]?.value ?? '',
+    destinationAccountId: rule?.destinationAccountId ?? '',
     amount: rule ? String(rule.amount).replace('.', ',') : '',
     frequency: rule?.frequency ?? 'monthly',
     interval: String(rule?.interval ?? 1),
     startDate: rule?.startDate ?? todayISO(),
     endDate: rule?.endDate ?? '',
   })
+  ensureDestination()
 }
 
 function openNew(): void {
@@ -126,6 +145,7 @@ function save(): void {
   const input = {
     type: form.type,
     accountId: form.accountId,
+    destinationAccountId: form.destinationAccountId,
     category: form.category,
     description: form.description,
     amount: numberOf(form.amount),
@@ -191,9 +211,17 @@ const { needsAccount } = useAccountRequirement()
         />
         <BaseSelect
           v-model="form.accountId"
-          label="Cuenta"
+          :label="isSaving ? 'Cuenta origen' : 'Cuenta'"
           name="accountId"
           :options="accountOptions"
+          required
+        />
+        <BaseSelect
+          v-if="isSaving"
+          v-model="form.destinationAccountId"
+          label="Cuenta destino"
+          name="destinationAccountId"
+          :options="destinationOptions"
           required
         />
       </fieldset>
@@ -244,7 +272,7 @@ const { needsAccount } = useAccountRequirement()
         >
           <span class="text-ink-muted text-sm">Al mes, de media</span>
           <p class="font-display text-2xl font-medium tabular-nums">
-            {{ form.type === 'income' ? '+' : '−' }}{{ formatMoney(monthly) }}
+            {{ form.type === 'income' ? '+' : isSaving ? '' : '−' }}{{ formatMoney(monthly) }}
           </p>
         </div>
       </fieldset>

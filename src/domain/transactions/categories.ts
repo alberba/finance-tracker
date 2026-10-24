@@ -7,6 +7,9 @@ export function getCategoriesForType(state: State, type: BudgetType): string[] {
   if (type === 'expense') {
     return state.expenseCategories
   }
+  if (type === 'saving') {
+    return state.savingCategories
+  }
   return state.investmentCategories
 }
 

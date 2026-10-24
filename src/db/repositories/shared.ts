@@ -173,6 +173,37 @@ export class RejectedCommandError extends Error {
 }
 
 /**
+ * A saving needs two cash accounts, and the destination cannot be the origin.
+ * Checks ownership as well, so a guessed id from another tenant is rejected.
+ */
+export async function assertSavingAccounts(
+  db: Db,
+  userId: string,
+  refs: { accountId?: string | null; destinationAccountId?: string | null },
+): Promise<void> {
+  const { accountId, destinationAccountId } = refs
+  if (accountId && accountId === destinationAccountId) {
+    throw new RejectedCommandError('El ahorro necesita una cuenta destino distinta del origen.')
+  }
+  for (const [id, label] of [
+    [accountId, 'origen'],
+    [destinationAccountId, 'destino'],
+  ] as const) {
+    if (!id) continue
+    const [account] = await db
+      .select({ kind: schema.accounts.kind })
+      .from(schema.accounts)
+      .where(and(eq(schema.accounts.id, id), eq(schema.accounts.userId, userId)))
+    if (!account) {
+      throw new RejectedCommandError('La cuenta indicada no existe o no pertenece al usuario.')
+    }
+    if (account.kind !== 'cash') {
+      throw new RejectedCommandError(`La cuenta ${label} de un ahorro debe ser de efectivo.`)
+    }
+  }
+}
+
+/**
  * Cross-tenant FK-ownership guard (WP10 security fix).
  *
  * `accountId`/`categoryId` columns on `transactions`, `subscriptions`,

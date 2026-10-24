@@ -180,13 +180,15 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           continue
         }
         const categoryId = remapOptionalId(categoryIdMap, row.categoryId)
-        if (categoryId === '__skip__') {
+        const destinationAccountId = remapOptionalId(accountIdMap, row.destinationAccountId)
+        if (categoryId === '__skip__' || destinationAccountId === '__skip__') {
           bump(skipped, 'transactions')
           continue
         }
         await transactionsRepository.create(tx, userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           accountId,
+          destinationAccountId: destinationAccountId ?? null,
           categoryId: categoryId ?? null,
           type: String(row.type ?? ''),
           date: String(row.date ?? ''),
@@ -237,7 +239,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
       for (const row of asRows(body.recurringRules)) {
         const accountId = remapOptionalId(accountIdMap, row.accountId)
         const categoryId = remapOptionalId(categoryIdMap, row.categoryId)
-        if (accountId === '__skip__' || categoryId === '__skip__') {
+        const destinationAccountId = remapOptionalId(accountIdMap, row.destinationAccountId)
+        if (
+          accountId === '__skip__' ||
+          categoryId === '__skip__' ||
+          destinationAccountId === '__skip__'
+        ) {
           bump(skipped, 'recurringRules')
           continue
         }
@@ -246,6 +253,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           name: String(row.name ?? ''),
           type: String(row.type ?? ''),
           accountId: accountId ?? null,
+          destinationAccountId: destinationAccountId ?? null,
           categoryId: categoryId ?? null,
           amount: typeof row.amount === 'number' ? row.amount : 0,
           currency: String(row.currency ?? 'EUR'),
@@ -278,7 +286,12 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         }
         const accountId = remapOptionalId(accountIdMap, row.accountId)
         const categoryId = remapOptionalId(categoryIdMap, row.categoryId)
-        if (accountId === '__skip__' || categoryId === '__skip__') {
+        const destinationAccountId = remapOptionalId(accountIdMap, row.destinationAccountId)
+        if (
+          accountId === '__skip__' ||
+          categoryId === '__skip__' ||
+          destinationAccountId === '__skip__'
+        ) {
           bump(skipped, 'pendingMovements')
           continue
         }
@@ -286,6 +299,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           recurringRuleId,
           accountId: accountId ?? null,
+          destinationAccountId: destinationAccountId ?? null,
           categoryId: categoryId ?? null,
           amount: typeof row.amount === 'number' ? row.amount : 0,
           currency: String(row.currency ?? 'EUR'),
@@ -324,11 +338,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
         bump(imported, 'budgetEntries')
       }
 
-      // -- goals (no FK dependency) ------------------------------------------
+      // -- goals (FK: categoryId optional, set on a savings goal) -------------
       for (const row of asRows(body.goals)) {
+        const categoryId = remapOptionalId(categoryIdMap, row.categoryId)
+        if (categoryId === '__skip__') {
+          bump(skipped, 'goals')
+          continue
+        }
         await goalsRepository.create(tx, userId, {
           legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
           key: String(row.key ?? ''),
+          categoryId: categoryId ?? null,
           name: String(row.name ?? ''),
           targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
           targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,

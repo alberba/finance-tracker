@@ -60,7 +60,7 @@ export interface BudgetViewModel {
   types: Record<BudgetType, BudgetTypeViewModel>
 }
 
-export const BUDGET_TYPES: BudgetType[] = ['expense', 'income', 'investment']
+export const BUDGET_TYPES: BudgetType[] = ['expense', 'income', 'saving', 'investment']
 
 function currentMonthOf(year: number, now: Date): number {
   if (year < now.getFullYear()) return MONTHS.length + 1
@@ -162,6 +162,7 @@ export function buildBudgetViewModel(state: State, now = new Date()): BudgetView
     types: {
       expense: buildType(state, 'expense', currentMonth),
       income: buildType(state, 'income', currentMonth),
+      saving: buildType(state, 'saving', currentMonth),
       investment: buildType(state, 'investment', currentMonth),
     },
   }

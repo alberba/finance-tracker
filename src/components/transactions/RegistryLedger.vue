@@ -9,7 +9,6 @@ import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTa
 import { TONE_TEXT } from '../ui/tone'
 import { TYPE_LABEL, TYPE_TAG, seriesColor } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { signedAmount } from '../../domain/transactions/registry'
 import { formatDayMonth, formatMonthName, formatMonthYear } from '../../lib/format'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import type { Transaction, TxSortColumn } from '../../scripts/types'
@@ -27,7 +26,7 @@ const emit = defineEmits<{ edit: [tx: Transaction] }>()
 
 const movementsStore = useMovementsStore()
 const ui = useUiStore().ui
-const { formatSignedMoney } = useMoneyFormatter()
+const { formatMovementAmount, formatSignedMoney } = useMoneyFormatter()
 const showOlder = ref(false)
 const pendingDelete = ref<Transaction | null>(null)
 const confirmOpen = computed({
@@ -250,7 +249,7 @@ const emptyText = computed(() =>
           :class="row.type === 'income' ? TONE_TEXT.gain : 'text-text-main'"
           data-tx-amount
         >
-          {{ formatSignedMoney(signedAmount(row)) }}
+          {{ formatMovementAmount(row) }}
         </span>
       </template>
       <template #cell-actions="{ row }">
@@ -290,8 +289,8 @@ const emptyText = computed(() =>
     >
       <template v-if="pendingDelete">
         {{ pendingDelete.description || pendingDelete.category }} del
-        {{ formatDayMonth(pendingDelete.date) }} por
-        {{ formatSignedMoney(signedAmount(pendingDelete)) }}. No se puede deshacer.
+        {{ formatDayMonth(pendingDelete.date) }} por {{ formatMovementAmount(pendingDelete) }}. No
+        se puede deshacer.
       </template>
     </ConfirmDialog>
   </section>

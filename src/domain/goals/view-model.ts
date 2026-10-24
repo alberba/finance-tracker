@@ -56,6 +56,7 @@ export interface GoalsViewModel {
   met: { count: number; total: number }
   /** The earliest deadline among the goals still pending. */
   next: { targetYear: number } | null
+  savingGoals: SavingGoalRowViewModel[]
 }
 
 interface GoalSlot {
@@ -198,6 +199,47 @@ function investmentPace(rows: GoalRowViewModel[]): GoalPace {
   return totalRate > 0 && total ? { rate: totalRate, by: [total.key] } : { rate: 0, by: [] }
 }
 
+export interface SavingGoalRowViewModel {
+  id: string
+  name: string
+  category: string
+  /** Everything saved in the category, including savings made before the goal existed. */
+  saved: number
+  target: number
+  /** 0–100, capped once the goal is met. */
+  progress: number
+  /** Negative once met: the surplus. */
+  remaining: number
+  met: boolean
+}
+
+/** The user's savings goals, each measured by the savings of its category. */
+export function buildSavingGoals(state: State): SavingGoalRowViewModel[] {
+  const savedByCategory = new Map<string, number>()
+  for (const tx of state.transactions) {
+    if (tx.type !== 'saving') continue
+    savedByCategory.set(
+      tx.category,
+      (savedByCategory.get(tx.category) ?? 0) + Number(tx.amount || 0),
+    )
+  }
+  return state.savingGoals.map((goal) => {
+    const saved = round2(savedByCategory.get(goal.category) ?? 0)
+    const target = Math.max(round2(goal.targetAmount || 0), 0)
+    const remaining = round2(target - saved)
+    return {
+      id: goal.id,
+      name: goal.name,
+      category: goal.category,
+      saved,
+      target,
+      progress: target > 0 ? Math.min((saved / target) * 100, 100) : 0,
+      remaining,
+      met: target > 0 && remaining <= 0,
+    }
+  })
+}
+
 export function buildGoalsViewModel(state: State, month: Month, now = new Date()): GoalsViewModel {
   const currentMap = buildCurrentMap(state, month)
   const measured = ORDER.map((key) => ({
@@ -233,6 +275,7 @@ export function buildGoalsViewModel(state: State, month: Month, now = new Date()
     pace: { net: netPace(netRows), investment: investmentPace(investmentRows) },
     met: { count: defined.filter((row) => row.met).length, total: defined.length },
     next: nextYear === null ? null : { targetYear: nextYear },
+    savingGoals: buildSavingGoals(state),
   }
 }
 

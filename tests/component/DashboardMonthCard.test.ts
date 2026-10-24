@@ -20,7 +20,7 @@ const expense: DashboardKpi = {
 const flat: DashboardKpi = {
   ...expense,
   kind: 'investment',
-  label: 'Ahorro o inversión',
+  label: 'Ahorro e inversión',
   change: { label: '0,00 %', trend: 'flat', tone: 'neutral' },
 }
 

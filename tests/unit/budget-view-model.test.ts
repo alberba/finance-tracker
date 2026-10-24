@@ -26,11 +26,13 @@ function state(overrides: Partial<State> = {}): State {
     year: 2026,
     incomeCategories: ['Nómina'],
     expenseCategories: ['Comida', 'Ocio'],
+    savingCategories: ['Hucha'],
     investmentCategories: ['Fondos'],
     categoryEmojis: {},
     budget: {
       income: { Nómina: plan(2000) },
       expense: { Comida: plan(300), Ocio: plan(100, { 11: 250 }) },
+      saving: { Hucha: plan(150) },
       investment: { Fondos: plan(200) },
     },
     transactions: [

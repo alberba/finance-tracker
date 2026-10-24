@@ -62,6 +62,7 @@ export const recurringRules = sqliteTable(
     name: text("name").notNull(),
     type: text("type").notNull(),
     accountId: text("account_id").references(() => accounts.id),
+    destinationAccountId: text("destination_account_id").references(() => accounts.id),
     categoryId: text("category_id").references(() => categories.id),
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),
@@ -113,6 +114,7 @@ export const pendingMovements = sqliteTable(
       .notNull()
       .references(() => recurringRules.id, { onDelete: "cascade" }),
     accountId: text("account_id").references(() => accounts.id),
+    destinationAccountId: text("destination_account_id").references(() => accounts.id),
     categoryId: text("category_id").references(() => categories.id),
     amountMinor: moneyMinorColumn("amount_minor"),
     currency: currencyColumn(),

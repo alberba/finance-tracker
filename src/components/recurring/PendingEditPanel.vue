@@ -26,6 +26,7 @@ const draft = reactive({
   type: 'expense' as TransactionType,
   date: '',
   accountId: '',
+  destinationAccountId: '',
   category: '',
   description: '',
   amount: '',
@@ -38,6 +39,11 @@ const draft = reactive({
 })
 
 const isInvestment = computed(() => draft.type === 'investment')
+const isSaving = computed(() => draft.type === 'saving')
+// A saving never lands in the account it leaves.
+const destinationAccounts = computed(() =>
+  financialStateStore.accounts.filter((account) => account.id !== draft.accountId),
+)
 const investmentTotal = computed(() =>
   round2(
     (parseDecimal(draft.units) || 0) * (parseDecimal(draft.unitPrice) || 0) +
@@ -72,8 +78,18 @@ watch(
     if (assets.some((asset) => asset.id === draft.accountId) && accounts[0]) {
       draft.accountId = accounts[0].id
     }
+    ensureDestination()
   },
 )
+watch(() => draft.accountId, ensureDestination)
+
+// Keeps a saving's destination set and different from the origin.
+function ensureDestination(): void {
+  if (initializing || !isSaving.value) return
+  if (!destinationAccounts.value.some((account) => account.id === draft.destinationAccountId)) {
+    draft.destinationAccountId = destinationAccounts.value[0]?.id ?? ''
+  }
+}
 
 function openFor(item: PendingMovement): void {
   initializing = true
@@ -81,6 +97,7 @@ function openFor(item: PendingMovement): void {
   draft.type = item.type || 'expense'
   draft.date = item.occurrenceDate
   draft.accountId = item.accountId
+  draft.destinationAccountId = item.destinationAccountId || ''
   draft.category = item.category
   draft.description = item.description
   draft.amount = String(item.amount)
@@ -101,6 +118,7 @@ function save(): void {
     type: draft.type,
     date: draft.date,
     accountId: draft.accountId,
+    destinationAccountId: draft.destinationAccountId,
     category: draft.category,
     description: draft.description,
     amount: parseDecimal(draft.amount) || 0,
@@ -141,7 +159,11 @@ defineExpose({ openFor })
         </legend>
         <BaseInput v-model="draft.description" class="sm:col-span-2" label="Descripción" required />
         <BaseInput v-model="draft.date" label="Fecha" type="date" required />
-        <BaseSelect v-model="draft.accountId" label="Cuenta" required>
+        <BaseSelect
+          v-model="draft.accountId"
+          :label="isSaving ? 'Cuenta origen' : 'Cuenta'"
+          required
+        >
           <template v-if="isInvestment">
             <optgroup
               v-if="financialStateStore.investmentAssets.length"
@@ -174,6 +196,16 @@ defineExpose({ openFor })
               {{ account.name }}
             </option>
           </template>
+        </BaseSelect>
+        <BaseSelect
+          v-if="isSaving"
+          v-model="draft.destinationAccountId"
+          label="Cuenta destino"
+          required
+        >
+          <option v-for="account in destinationAccounts" :key="account.id" :value="account.id">
+            {{ account.name }}
+          </option>
         </BaseSelect>
         <BaseSelect
           v-model="draft.category"

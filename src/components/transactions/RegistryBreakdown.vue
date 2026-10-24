@@ -17,13 +17,14 @@ const ui = useUiStore().ui
 const { formatMoney } = useMoneyFormatter()
 
 const type = ref<TransactionType>('expense')
-const options = (['expense', 'income', 'investment'] as const).map((value) => ({
+const options = (['expense', 'income', 'saving', 'investment'] as const).map((value) => ({
   value,
   label: TYPE_PLURAL[value],
 }))
 const VERB: Record<TransactionType, string> = {
   expense: 'gastado',
   income: 'ingresado',
+  saving: 'ahorrado',
   investment: 'invertido',
 }
 

@@ -55,6 +55,9 @@ export const goals = sqliteTable(
       .references(() => users.id),
     legacyId: text("legacy_id"),
     key: text("key").notNull(),
+    // A savings goal (objetivo de ahorro) is tied to a saving category; the three wealth
+    // goals and the investment ones leave it null.
+    categoryId: text("category_id").references(() => categories.id),
     name: text("name").notNull(),
     targetYear: integer("target_year"),
     targetAmountMinor: moneyMinorColumn("target_amount_minor"),

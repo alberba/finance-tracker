@@ -311,6 +311,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       'Salud',
       'Otros',
     ],
+    savingCategories: ['Fondo de emergencia'],
     investmentCategories: ['Fondos Indexados', 'Criptomonedas'],
     categoryEmojis: {},
     transactions,
@@ -327,6 +328,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
         Salud: budgetMonths(30),
         Otros: budgetMonths(50),
       },
+      saving: {},
       investment: {
         'Fondos Indexados': budgetMonths(300),
         Criptomonedas: budgetMonths(25),
@@ -340,6 +342,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       investmentFunds: { name: 'Fondos indexados', targetYear: year + 2, targetAmount: 20000 },
       investmentCrypto: { name: 'Criptomonedas', targetYear: year + 2, targetAmount: 4000 },
     },
+    savingGoals: [],
     contributions,
     instruments: [
       {

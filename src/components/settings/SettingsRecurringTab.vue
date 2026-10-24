@@ -18,7 +18,7 @@ import type { RecurringRule } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
-// Recurrentes: the income and expense rules that keep generating pending
+// Recurrentes: the income, expense and saving rules that keep generating pending
 // movements, switched on or off in place and edited in the side panel. The
 // investment ones live in Inversión.
 defineProps<{ isActive: boolean }>()
@@ -44,7 +44,8 @@ function signed(rule: Pick<RecurringRule, 'type'>, amount: number): number {
 
 const monthlyNet = computed(() =>
   rules.value
-    .filter((rule) => rule.active)
+    // A saving moves money between accounts, so it is not part of the net.
+    .filter((rule) => rule.active && rule.type !== 'saving')
     .reduce((sum, rule) => sum + signed(rule, ruleMonthlyEquivalent(rule)), 0),
 )
 
@@ -129,7 +130,11 @@ const { needsAccount } = useAccountRequirement()
             ]"
             data-settings-rule-amount
           >
-            {{ formatSignedMoney(signed(row, row.amount)) }}
+            {{
+              row.type === 'saving'
+                ? formatMoney(row.amount)
+                : formatSignedMoney(signed(row, row.amount))
+            }}
           </span>
         </template>
         <template #cell-state="{ row }">

@@ -38,8 +38,18 @@ export interface SyncV2Bootstrap {
 const CATEGORY_STATE_KEYS = {
   income: 'incomeCategories',
   expense: 'expenseCategories',
+  saving: 'savingCategories',
   investment: 'investmentCategories',
 } as const
+
+/** The destination account of a saving, as the local id of that account; absent otherwise. */
+function projectDestination(
+  entity: CachedEntity,
+  accountIds: Map<string, string>,
+): { destinationAccountId?: string } {
+  const destination = accountIds.get(String(entity.destinationAccountId))
+  return entity.type === 'saving' && destination ? { destinationAccountId: destination } : {}
+}
 
 /**
  * The operation of an investment movement template, as the domain types
@@ -108,13 +118,15 @@ export function projectSyncV2State(
     liabilities: [],
     incomeCategories: [],
     expenseCategories: [],
+    savingCategories: [],
     investmentCategories: [],
     categoryEmojis: {},
     transactions: [],
     subscriptions: [],
     snapshots: {},
-    budget: { income: {}, expense: {}, investment: {} },
+    budget: { income: {}, expense: {}, saving: {}, investment: {} },
     goals: {},
+    savingGoals: [],
     contributions: [],
     instruments: [],
     quotes: {},
@@ -175,6 +187,7 @@ export function projectSyncV2State(
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),
+      ...projectDestination(transaction, accountIds),
       category: categories.get(String(transaction.categoryId)) || 'Sin categoría',
       description: String(transaction.description || ''),
       amount: Number(transaction.amount || 0),
@@ -226,7 +239,7 @@ export function projectSyncV2State(
     }
   })
 
-  projected.budget = { income: {}, expense: {}, investment: {} }
+  projected.budget = { income: {}, expense: {}, saving: {}, investment: {} }
   for (const entry of bootstrap.budgetEntries) {
     const kind = bootstrap.categories.find((category) => category.id === entry.categoryId)
       ?.kind as keyof State['budget']
@@ -242,6 +255,19 @@ export function projectSyncV2State(
   }
 
   for (const goal of bootstrap.goals) {
+    // A goal tied to a saving category is an objetivo de ahorro, not one of the fixed slots.
+    if (goal.categoryId) {
+      const category = categories.get(String(goal.categoryId))
+      if (category) {
+        projected.savingGoals.push({
+          id: legacyId(goal),
+          name: String(goal.name || ''),
+          targetAmount: Number(goal.targetAmount || 0),
+          category,
+        })
+      }
+      continue
+    }
     const key = String(goal.key) as GoalKey
     if (!(key in projected.goals)) continue
     projected.goals[key] = {
@@ -302,6 +328,7 @@ export function projectSyncV2State(
     id: legacyId(rule),
     type: String(rule.type) as State['recurringRules'][number]['type'],
     accountId: accountIds.get(String(rule.accountId)) || '',
+    ...projectDestination(rule, accountIds),
     category: categories.get(String(rule.categoryId)) || 'Sin categoría',
     description: String(rule.name || ''),
     amount: Number(rule.amount || 0),
@@ -322,6 +349,7 @@ export function projectSyncV2State(
     occurrenceDate: String(pending.dueDate),
     type: String(pending.type || 'expense') as State['pendingMovements'][number]['type'],
     accountId: accountIds.get(String(pending.accountId)) || '',
+    ...projectDestination(pending, accountIds),
     category: categories.get(String(pending.categoryId)) || 'Sin categoría',
     description: String(pending.description || ''),
     amount: Number(pending.amount || 0),
