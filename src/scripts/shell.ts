@@ -1,3 +1,5 @@
+import { Effect } from 'effect'
+
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { getThemeController } from '../lib/client/theme'
@@ -288,7 +290,7 @@ function initSyncMenu(): void {
         }
         await requireAuthenticationResult(await authentication.signOut())
         if (syncStore?.userId) await syncStore.logout({ discardPending: true })
-        else if (session?.user?.id) await wipeAllClientData(session.user.id)
+        else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))
         else wipeLegacyClientData()
         window.location.href = '/login'
       })

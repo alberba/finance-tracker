@@ -5,8 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
-import { openIdbCache, putEntity, wipeIdbCache } from '../../src/lib/client/idb-cache'
-import { listAll, openOutbox, wipeOutbox, type OutboxEntry } from '../../src/lib/client/outbox'
+import {
+  listAll,
+  openStorage,
+  putEntity,
+  wipeIdbCache,
+  wipeOutbox,
+  type OutboxEntry,
+} from '../helpers/client-storage'
 import { isDemoMode } from '../../src/scripts/demo-mode'
 import { useBudgetStore } from '../../src/stores/budget'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
@@ -54,7 +60,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     // The category has already synced, so `resolveOrCreateCategoryId`
     // resolves it (by its real name+kind, ADR 0001) immediately instead of
     // minting and creating it again.
-    const cacheDb = await openIdbCache(USER_ID)
+    const cacheDb = await openStorage(USER_ID)
     try {
       await putEntity(cacheDb, 'category', {
         id: 'server-cat-1',
@@ -73,7 +79,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     const budgetStore = useBudgetStore()
     budgetStore.updateBudgetValue('expense', 'Ocio', 1, 100)
 
-    const outboxDb = await openOutbox(USER_ID)
+    const outboxDb = await openStorage(USER_ID)
     let created: OutboxEntry['command'] | undefined
     try {
       const afterFirstEdit = await vi.waitFor(async () => {
@@ -107,7 +113,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
       year: number
       month: number
     }
-    const cacheDb2 = await openIdbCache(USER_ID)
+    const cacheDb2 = await openStorage(USER_ID)
     try {
       await putEntity(cacheDb2, 'budgetEntry', {
         id: 'server-budget-entry-1',
@@ -122,7 +128,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
 
     budgetStore.updateBudgetValue('expense', 'Ocio', 1, 250)
 
-    const outboxDb2 = await openOutbox(USER_ID)
+    const outboxDb2 = await openStorage(USER_ID)
     try {
       const afterSecondEdit = await vi.waitFor(async () => {
         const entries = await listAll(outboxDb2)
@@ -153,7 +159,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     syncStore.connection = 'offline'
     activeStore = syncStore
 
-    const cacheDb = await openIdbCache(USER_ID)
+    const cacheDb = await openStorage(USER_ID)
     try {
       await putEntity(cacheDb, 'category', {
         id: 'server-cat-2',
@@ -182,7 +188,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
     expect(financialState.state.budget.expense.Ocio[11]).toBe(250.56)
 
     // Each changed month syncs in turn, so wait until both are queued.
-    const outboxDb = await openOutbox(USER_ID)
+    const outboxDb = await openStorage(USER_ID)
     try {
       const entries = await vi.waitFor(async () => {
         const queued = await listAll(outboxDb)
