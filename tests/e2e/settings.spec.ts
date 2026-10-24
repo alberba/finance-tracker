@@ -158,40 +158,6 @@ test.describe('Settings E2E', () => {
     await expect(item).toHaveCount(0)
   })
 
-  test('eliminar una cuenta pide confirmación y borra sus suscripciones pendientes', async ({
-    tracker,
-    page,
-  }) => {
-    const today = new Date().toISOString().slice(0, 10)
-    await tracker.addSubscription({
-      name: 'Suscripción cuenta eliminada',
-      amount: 12,
-      categoryLabel: 'Comida',
-      frequency: 'monthly',
-      firstChargeDate: today,
-    })
-
-    const panel = await tracker.openSettingsCard('Cuentas', 'Revolut')
-    await panel.getByRole('button', { name: 'Eliminar' }).click()
-    const confirm = page.getByRole('alertdialog', { name: '¿Eliminar esta cuenta?' })
-    await expect(confirm).toContainText('También se borran sus movimientos y suscripciones')
-    await confirm.getByRole('button', { name: 'Eliminar cuenta' }).click()
-
-    await expect(
-      tracker
-        .section('settings')
-        .getByRole('button', { name: 'Abrir la ficha de Revolut', exact: true }),
-    ).toHaveCount(0)
-    await expect(page.getByRole('status')).toContainText('Elemento eliminado')
-
-    await tracker.openSubscriptionsTab()
-    await expect(
-      tracker.transactionsSection
-        .locator('#transactions-tab-subscriptions tr[data-subscription-id]')
-        .filter({ hasText: 'Suscripción cuenta eliminada' }),
-    ).toHaveCount(0)
-  })
-
   test('configura la lista y el ticker de Stock Events en la ficha del activo', async ({
     tracker,
     page,

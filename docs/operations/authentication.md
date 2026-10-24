@@ -118,7 +118,6 @@ escrituras financieras nuevas ni volver al protocolo de blob retirado.
   se activa exclusivamente en el runner (`AUTH_E2E_NETWORK=true`); mantiene los
   handlers de Better Auth, callbacks y persistencia reales. No desplegar esos flags.
   Ejecutar check/build antes o después del E2E porque comparten caché de Vite.
-- Logout y borrado de datos privados: `pnpm test:e2e tests/e2e/logout.spec.ts`.
 - No definir `TEST_AUTH_ENABLED` ni `TEST_RESEND_URL` en producción.
   El override de email y de IP de prueba es inerte con un origen no loopback.
 

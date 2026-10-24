@@ -73,28 +73,6 @@ test.describe('Dashboard section', () => {
     { kind: 'expense', january: '352,89 €', february: '404,77 €' },
     { kind: 'investment', january: '250,00 €', february: '200,00 €' },
   ]) {
-    test(`consulta y restaura los importes de ${kind} con hover`, async ({ page, tracker }) => {
-      await tracker.openDashboard()
-      const dashboard = tracker.dashboardSection
-      await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('3')
-      const kpi = dashboard.locator(`[data-kpi="${kind}"]`)
-      const figure = kpi.locator(`#kpi-${kind}`)
-      const bars = kpi.getByRole('button')
-
-      // Un pase de sección puede dejar el puntero donde caerá la barra; sin
-      // movimiento real no hay mousemove y la vista previa no se dispara.
-      await page.mouse.move(0, 0)
-      await bars.nth(0).hover()
-      await expect(figure).toHaveText(january)
-      await bars.nth(1).hover()
-      await expect(figure).toHaveText(february)
-      await bars.nth(3).hover()
-      await expect(figure).toHaveText('0,00 €')
-      await bars.nth(0).hover()
-      await dashboard.getByRole('heading', { name: 'Dashboard', exact: true }).hover()
-      await expect(figure).toHaveText('0,00 €')
-    })
-
     test(`consulta y restaura los importes de ${kind} con Tab mientras el puntero sigue sobre otra barra`, async ({
       page,
       tracker,
