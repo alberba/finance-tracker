@@ -5,10 +5,12 @@ import {
   buildStockEventsTransactionPayload,
   findSyncedMapping,
 } from '../../src/domain/stockevents/transaction-payload'
+import { Effect } from 'effect'
 import {
   checkStockEventsSymbols,
   createStockEventsTransaction,
 } from '../../src/lib/server/stockevents'
+import { Http } from '../../src/lib/server/http'
 import { normalizeState } from '../../src/scripts/state'
 import type { StockEventsSettings, Transaction } from '../../src/scripts/types'
 
@@ -29,6 +31,9 @@ const buyMovement: Transaction = {
   fee: 4.5,
   movementCurrency: 'EUR',
 }
+
+const runWithHttp = <A, E>(effect: Effect.Effect<A, E, Http>, request: typeof fetch) =>
+  Effect.runPromise(Effect.provideService(effect, Http, { request }))
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status })
@@ -233,12 +238,11 @@ describe('comprobación de símbolos contra Stock Events', () => {
       return jsonResponse({ error: { code: 'not_found', message: 'no' } }, 404)
     })
 
-    const results = await checkStockEventsSymbols(
-      'se_live_x',
-      [
+    const results = await runWithHttp(
+      checkStockEventsSymbols('se_live_x', [
         { symbol: 'VWCE', watchlistId: 'wl-1' },
         { symbol: 'AAPL', watchlistId: 'wl-1' },
-      ],
+      ]),
       fetchMock,
     )
 
@@ -256,9 +260,8 @@ describe('comprobación de símbolos contra Stock Events', () => {
       if (method === 'GET') return jsonResponse({ data: [] })
       return jsonResponse({ error: { code: 'unknown_symbol', message: 'Unknown symbol' } }, 422)
     })
-    const results = await checkStockEventsSymbols(
-      'se_live_x',
-      [{ symbol: 'NOPE', watchlistId: 'wl-1' }],
+    const results = await runWithHttp(
+      checkStockEventsSymbols('se_live_x', [{ symbol: 'NOPE', watchlistId: 'wl-1' }]),
       fetchMock,
     )
     expect(results[0]).toMatchObject({ symbol: 'NOPE', status: 'not-detected' })
@@ -269,7 +272,10 @@ describe('comprobación de símbolos contra Stock Events', () => {
       jsonResponse({ error: { code: 'unauthorized', message: 'nope' } }, 401),
     )
     await expect(
-      checkStockEventsSymbols('bad-key', [{ symbol: 'VWCE', watchlistId: 'wl-1' }], fetchMock),
+      runWithHttp(
+        checkStockEventsSymbols('bad-key', [{ symbol: 'VWCE', watchlistId: 'wl-1' }]),
+        fetchMock,
+      ),
     ).rejects.toThrow('API key inválida o revocada')
   })
 })
@@ -293,9 +299,8 @@ describe('creación de transacciones en Stock Events', () => {
       return jsonResponse({ error: { code: 'not_found', message: 'no' } }, 404)
     })
 
-    const created = await createStockEventsTransaction(
-      'se_live_x',
-      {
+    const created = await runWithHttp(
+      createStockEventsTransaction('se_live_x', {
         watchlistId: 'wl-1',
         symbol: 'VWCE',
         date: '2026-07-15T10:30:00Z',
@@ -303,7 +308,7 @@ describe('creación de transacciones en Stock Events', () => {
         price: 100,
         priceCurrency: 'EUR',
         type: 'buy',
-      },
+      }),
       fetchMock,
     )
 
@@ -324,12 +329,14 @@ describe('creación de transacciones en Stock Events', () => {
       const url = String(input)
       const method = init?.method || 'GET'
       calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined })
-      return jsonResponse({ data: { id: 'se-cash-1', watchlistId: 'wl-1', symbol: 'CASH_EUR' } }, 201)
+      return jsonResponse(
+        { data: { id: 'se-cash-1', watchlistId: 'wl-1', symbol: 'CASH_EUR' } },
+        201,
+      )
     })
 
-    await createStockEventsTransaction(
-      'se_live_x',
-      {
+    await runWithHttp(
+      createStockEventsTransaction('se_live_x', {
         watchlistId: 'wl-1',
         symbol: 'CASH_EUR',
         date: '2026-07-19T00:00:00Z',
@@ -338,7 +345,7 @@ describe('creación de transacciones en Stock Events', () => {
         priceCurrency: 'EUR',
         toCash: true,
         type: 'DEFAULT',
-      },
+      }),
       fetchMock,
     )
 

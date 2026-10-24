@@ -14,9 +14,10 @@ export async function readApiKey(locals: App.Locals): Promise<string> {
   const principal = requirePrincipal(locals)
   const db = getDb(locals)
   const env = getRuntimeEnvFromLocals(locals)
-  const credential = await runWithDb(db, integrationCredentialsRepository.getByProvider(principal.userId,
-    STOCKEVENTS_PROVIDER,
-    env,))
+  const credential = await runWithDb(
+    db,
+    integrationCredentialsRepository.getByProvider(principal.userId, STOCKEVENTS_PROVIDER, env),
+  )
   return credential?.secret ?? ''
 }
 
