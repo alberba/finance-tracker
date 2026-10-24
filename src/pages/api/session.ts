@@ -9,13 +9,13 @@ import type { APIRoute } from 'astro'
 import { getDb } from '../../db/client'
 import * as syncRepository from '../../db/repositories/sync'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../lib/server/api-auth'
-import { runWithDb } from '../../db/database'
+import { runServer } from '../../lib/server/runtime'
 
 export const GET: APIRoute = async ({ locals }) =>
   withApiErrorHandling('/api/session', async () => {
     const principal = requirePrincipal(locals)
     const db = getDb(locals)
-    const revisionRow = await runWithDb(db, syncRepository.getRevision(principal.userId))
+    const revisionRow = await runServer(db, syncRepository.getRevision(principal.userId))
 
     return jsonResponse(
       {

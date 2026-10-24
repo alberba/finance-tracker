@@ -14,7 +14,7 @@ import {
   requirePrincipal,
   withApiErrorHandling,
 } from '../../../lib/server/api-auth'
-import { runWithDb } from '../../../db/database'
+import { runServer } from '../../../lib/server/runtime'
 
 function administrator(locals: App.Locals) {
   const principal = requirePrincipal(locals)
@@ -24,7 +24,7 @@ function administrator(locals: App.Locals) {
 export const GET: APIRoute = ({ locals }) =>
   withApiErrorHandling('/api/admin/registration', async () => {
     administrator(locals)
-    return jsonResponse(await runWithDb(getDb(locals), registrationAdministration()), 200)
+    return jsonResponse(await runServer(getDb(locals), registrationAdministration()), 200)
   })
 const actionSchema = z.discriminatedUnion('action', [
   z.object({
@@ -44,7 +44,7 @@ export const POST: APIRoute = ({ request, locals }) =>
     const db = getDb(locals)
     const action = parsed.data
     if (action.action === 'create') {
-      const invitation = await runWithDb(db, createInvitation(principal.userId, action.maxUses, action.days))
+      const invitation = await runServer(db, createInvitation(principal.userId, action.maxUses, action.days))
       return jsonResponse(
         {
           ...invitation,
@@ -53,8 +53,8 @@ export const POST: APIRoute = ({ request, locals }) =>
         201,
       )
     }
-    if (action.action === 'revoke') await runWithDb(db, revokeInvitation(action.id))
-    if (action.action === 'policy') await runWithDb(db, updateRegistrationPolicy(action.publicRegistration))
-    if (action.action === 'grant-admin') await runWithDb(db, grantAdministrator(action.userId))
+    if (action.action === 'revoke') await runServer(db, revokeInvitation(action.id))
+    if (action.action === 'policy') await runServer(db, updateRegistrationPolicy(action.publicRegistration))
+    if (action.action === 'grant-admin') await runServer(db, grantAdministrator(action.userId))
     return jsonResponse({ success: true }, 200)
   })

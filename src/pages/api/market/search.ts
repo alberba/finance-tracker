@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro'
 import { searchYahooSymbols } from '../../../lib/server/market-search'
 import { createJsonResponse } from '../../../lib/server/json-response'
-import { runHttp } from '../../../lib/server/http'
+import { runServer } from '../../../lib/server/runtime'
+import { getDb } from '../../../db/client'
 import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
 
@@ -18,7 +19,10 @@ export const GET: APIRoute = async ({ url, locals }) =>
 
     try {
       return json({
-        results: await runHttp(searchYahooSymbols(query, getRuntimeEnvFromLocals(locals))),
+        results: await runServer(
+          getDb(locals),
+          searchYahooSymbols(query, getRuntimeEnvFromLocals(locals)),
+        ),
       })
     } catch (error) {
       console.error('[market/search] Symbol search failed', error)

@@ -17,7 +17,7 @@ import * as syncRepository from '../../../db/repositories/sync'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
 import { runInTransaction } from '../../../db/repositories/shared'
 import { wipeUserData } from '../../../lib/server/wipe-user-data'
-import { runWithDb } from '../../../db/database'
+import { runServer } from '../../../lib/server/runtime'
 
 const DEFAULT_CATEGORIES: Array<{ name: string; kind: string; sortOrder: number }> = [
   { name: 'Ingresos', kind: 'income', sortOrder: 0 },
@@ -31,9 +31,9 @@ export const POST: APIRoute = async ({ locals }) =>
     const userId = principal.userId
 
     const result = await runInTransaction(db, async (tx) => {
-      const previousSettings = await runWithDb(tx, userSettingsRepository.get(userId))
-      await runWithDb(tx, wipeUserData(userId))
-      const settings = await runWithDb(
+      const previousSettings = await runServer(tx, userSettingsRepository.get(userId))
+      await runServer(tx, wipeUserData(userId))
+      const settings = await runServer(
         tx,
         userSettingsRepository.create(userId, {
           currency: 'EUR',
@@ -44,12 +44,12 @@ export const POST: APIRoute = async ({ locals }) =>
           onboardingCompleted: previousSettings?.onboardingCompleted === 1,
         }),
       )
-      const categories = await runWithDb(
+      const categories = await runServer(
         tx,
         accountsRepository.bulkInsertCategories(userId, DEFAULT_CATEGORIES),
       )
-      const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
-      await runWithDb(
+      const { revision } = await runServer(tx, syncRepository.bumpRevision(userId))
+      await runServer(
         tx,
         syncRepository.createChange(userId, {
           revision,

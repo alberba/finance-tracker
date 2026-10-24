@@ -7,7 +7,7 @@ import {
   NEW_AUTHENTICATION_PURPOSE,
 } from '../../lib/server/auth/new-authentication'
 import { getRuntimeEnv } from '../../lib/server/cloudflare-env'
-import { runWithDb } from '../../db/database'
+import { runServer } from '../../lib/server/runtime'
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from '../../lib/server/api-auth'
 
 const proofRequest = z.discriminatedUnion('action', [
@@ -59,7 +59,7 @@ export const POST: APIRoute = ({ request, locals }) =>
       const session = await auth.api.getSession({ headers, query: { disableCookieCache: true } })
       if (!session || session.user.id !== principal.userId)
         return jsonResponse({ error: 'No se pudo comprobar el nuevo acceso.' }, 403)
-      const proof = await runWithDb(
+      const proof = await runServer(
         db,
         issueAuthenticationProof(principal.userId, session.session.id),
       )

@@ -30,7 +30,7 @@ import * as recurringRulesRepository from '../../../db/repositories/recurring-ru
 import * as pendingMovementsRepository from '../../../db/repositories/pending-movements'
 import * as budgetEntriesRepository from '../../../db/repositories/budget-entries'
 import * as goalsRepository from '../../../db/repositories/goals'
-import { runWithDb } from '../../../db/database'
+import { runServer } from '../../../lib/server/runtime'
 import type { Db } from '../../../db/repositories/shared'
 import * as wealthRepository from '../../../db/repositories/wealth'
 import * as contributionsRepository from '../../../db/repositories/contributions'
@@ -101,7 +101,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
     }
 
     const summary: ImportSummary = await runInTransaction(db, async (tx) => {
-      const previousSettings = await runWithDb(tx, userSettingsRepository.get(userId))
+      const previousSettings = await runServer(tx, userSettingsRepository.get(userId))
       const onboarding = {
         onboardingPresented: previousSettings
           ? previousSettings.onboardingPresented === 1
@@ -120,7 +120,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           : optionalFlag((body.settings as Row | undefined)?.onboardingCompleted),
       }
       if (replace) {
-        await runWithDb(tx, wipeUserData(userId))
+        await runServer(tx, wipeUserData(userId))
       }
       const categoryIdMap = new Map<string, string>()
       const accountIdMap = new Map<string, string>()
@@ -130,7 +130,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- categories (no FK dependency) --------------------------------
       for (const row of asRows(body.categories)) {
-        const created = await runWithDb(
+        const created = await runServer(
           tx,
           accountsRepository.createCategory(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -148,7 +148,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- accounts (no FK dependency) ------------------------------------
       for (const row of asRows(body.accounts)) {
-        const created = await runWithDb(
+        const created = await runServer(
           tx,
           accountsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -172,7 +172,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'twrLiquidityAccounts')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           accountsRepository.createTwrLiquidityAccount(userId, {
             legacyId: optionalString(row.legacyId),
@@ -195,7 +195,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'transactions')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           transactionsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -232,7 +232,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'subscriptions')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           subscriptionsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -258,7 +258,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'recurringRules')
           continue
         }
-        const created = await runWithDb(
+        const created = await runServer(
           tx,
           recurringRulesRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -302,7 +302,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'pendingMovements')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           pendingMovementsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -336,7 +336,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'budgetEntries')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           budgetEntriesRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -352,7 +352,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- goals (no FK dependency) ------------------------------------------
       for (const row of asRows(body.goals)) {
-        await runWithDb(
+        await runServer(
           tx,
           goalsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -368,7 +368,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- wealthSnapshots (+ balances, FK: accountId optional) --------------
       for (const row of asRows(body.wealthSnapshots)) {
-        const created = await runWithDb(
+        const created = await runServer(
           tx,
           wealthRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -388,7 +388,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'snapshotBalances')
             continue
           }
-          await runWithDb(
+          await runServer(
             tx,
             wealthRepository.createBalance(userId, {
               snapshotId: created.id,
@@ -403,7 +403,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
 
       // -- contributions (+ allocations, FK: accountId optional) ------------
       for (const row of asRows(body.contributions)) {
-        const created = await runWithDb(
+        const created = await runServer(
           tx,
           contributionsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -426,7 +426,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             bump(skipped, 'contributionAllocations')
             continue
           }
-          await runWithDb(
+          await runServer(
             tx,
             contributionsRepository.createAllocation(userId, {
               contributionId: created.id,
@@ -445,7 +445,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        const instrument = await runWithDb(tx, marketRepository.getInstrument(row.instrumentId))
+        const instrument = await runServer(tx, marketRepository.getInstrument(row.instrumentId))
         const configuration = quoteConfigurationSchema.safeParse(row.quoteConfig)
         if (!instrument && !configuration.success) {
           bump(skipped, 'userInstruments')
@@ -456,7 +456,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'userInstruments')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           marketRepository.createUserInstrument(userId, {
             instrumentId: row.instrumentId,
@@ -476,7 +476,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsSymbolMappings')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           stockeventsSymbolMappingsRepository.create(userId, {
             legacyId: typeof row.legacyId === 'string' ? row.legacyId : null,
@@ -501,7 +501,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashMappings')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           stockeventsCashMappingsRepository.upsertMapping(userId, {
             accountId: accountId ?? (typeof row.accountId === 'string' ? row.accountId : null),
@@ -518,7 +518,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           bump(skipped, 'stockeventsCashSyncEntries')
           continue
         }
-        await runWithDb(
+        await runServer(
           tx,
           stockeventsCashMappingsRepository.upsertSyncEntry(userId, {
             contributionDate: String(row.contributionDate ?? ''),
@@ -534,7 +534,7 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
       // -- settings (singleton) ----------------------------------------------
       if (body.settings && typeof body.settings === 'object') {
         const settingsRow = body.settings as Row
-        const existing = await runWithDb(tx, userSettingsRepository.get(userId))
+        const existing = await runServer(tx, userSettingsRepository.get(userId))
         const patch = {
           ...onboarding,
           currency: typeof settingsRow.currency === 'string' ? settingsRow.currency : undefined,
@@ -544,17 +544,17 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
           stockeventsTradesToCash: optionalFlag(settingsRow.stockeventsTradesToCash),
         }
         if (existing) {
-          await runWithDb(tx, userSettingsRepository.update(userId, patch))
+          await runServer(tx, userSettingsRepository.update(userId, patch))
         } else {
-          await runWithDb(tx, userSettingsRepository.create(userId, patch))
+          await runServer(tx, userSettingsRepository.create(userId, patch))
         }
         bump(imported, 'settings')
       } else if (replace) {
-        await runWithDb(tx, userSettingsRepository.create(userId, onboarding))
+        await runServer(tx, userSettingsRepository.create(userId, onboarding))
       }
 
-      const { revision } = await runWithDb(tx, syncRepository.bumpRevision(userId))
-      await runWithDb(
+      const { revision } = await runServer(tx, syncRepository.bumpRevision(userId))
+      await runServer(
         tx,
         syncRepository.createChange(userId, {
           revision,
@@ -608,7 +608,7 @@ async function importOperation(tx: Db, value: unknown): Promise<MovementOperatio
   }
   const instrument =
     typeof value.instrumentId === 'string'
-      ? await runWithDb(tx, marketRepository.getInstrument(value.instrumentId))
+      ? await runServer(tx, marketRepository.getInstrument(value.instrumentId))
       : undefined
   return {
     instrumentId: instrument?.id ?? null,

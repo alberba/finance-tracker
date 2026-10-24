@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro'
 import { checkStockEventsSymbols, type SymbolCheckRequest } from '../../../lib/server/stockevents'
 import { errorResponse, json, readApiKey } from './_helpers'
-import { runHttp } from '../../../lib/server/http'
+import { runServer } from '../../../lib/server/runtime'
+import { getDb } from '../../../db/client'
 import { withApiErrorHandling } from '../../../lib/server/api-auth'
 
 interface CheckSymbolsBody {
@@ -16,7 +17,9 @@ export const POST: APIRoute = async ({ request, locals }) =>
     const checks = normalizeChecks(body.checks)
     if (!checks.length) return json({ results: [] })
     try {
-      return json({ results: await runHttp(checkStockEventsSymbols(apiKey, checks)) })
+      return json({
+        results: await runServer(getDb(locals), checkStockEventsSymbols(apiKey, checks)),
+      })
     } catch (error) {
       return errorResponse(error)
     }
