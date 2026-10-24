@@ -107,7 +107,7 @@ describe('plan del agente de GitHub Actions', () => {
     expect(enriched).toContain(plan.body)
     expect(enriched).not.toContain('### Resumen')
     expect(enriched).toContain(splitReportBody(body).preserved)
-    expect(enriched).toContain('Relacionada: https://github.com/org/repo/issues/7')
+    expect(enriched).toContain('## Issues relacionadas\n\n- https://github.com/org/repo/issues/7')
     expect(enriched).not.toContain('issues/999')
     expect(enriched).toContain(`[Agent Brief](${briefUrl})`)
   })
@@ -261,7 +261,7 @@ describe('cierre nativo como duplicada', () => {
       },
     ])
     expect(enrichedBody).toContain(splitReportBody(body).preserved)
-    expect(enrichedBody).not.toContain('Relacionada: https://github.com/org/repo/issues/7')
+    expect(enrichedBody).not.toContain('## Issues relacionadas')
     expect(enrichedBody).not.toContain('Duplicate of')
     expect(api.mock.calls[7][0]).toBe('graphql')
   })

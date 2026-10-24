@@ -155,10 +155,16 @@ export function composeEnrichedBody(plan, snapshot, briefUrl) {
             : [plan.triage.reason]),
         ]
       : []),
-    ...related.map(
-      (issue) =>
-        `Relacionada: https://github.com/${snapshot.repository}/issues/${issue.number} (${issue.state}).`,
-    ),
+    ...(related.length > 0
+      ? [
+          `## Issues relacionadas\n\n${related
+            .map(
+              (issue) =>
+                `- https://github.com/${snapshot.repository}/issues/${issue.number} (${issue.state}).`,
+            )
+            .join('\n')}`,
+        ]
+      : []),
     splitReportBody(snapshot.issue.body)
       .preserved.split('\n')
       .filter(
