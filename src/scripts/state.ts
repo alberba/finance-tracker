@@ -395,6 +395,9 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
     const unitPrice = normalizeNonNegativeNumber(raw.unitPrice, 6)
     const fee = normalizeNonNegativeNumber(raw.fee, 2)
     const time = normalizeTime(raw.time)
+    const type = isTransactionType(String(raw.type || 'expense'))
+      ? (String(raw.type) as PendingMovement['type'])
+      : 'expense'
     return {
       id: String(raw.id || uid('pending')),
       occurrenceKey: String(
@@ -402,11 +405,9 @@ function normalizePendingMovements(list: unknown): PendingMovement[] {
       ),
       ruleId: String(raw.ruleId || ''),
       occurrenceDate: String(raw.occurrenceDate || todayISO()),
-      type: isTransactionType(String(raw.type || 'expense'))
-        ? (String(raw.type) as PendingMovement['type'])
-        : 'expense',
+      type,
       accountId: String(raw.accountId || ''),
-      ...(raw.type === 'saving' && String(raw.destinationAccountId || '').trim()
+      ...(type === 'saving' && String(raw.destinationAccountId || '').trim()
         ? { destinationAccountId: String(raw.destinationAccountId).trim() }
         : {}),
       category: String(raw.category || 'Sin categoría'),
