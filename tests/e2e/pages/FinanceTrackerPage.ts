@@ -696,8 +696,8 @@ export class FinanceTrackerPage {
     await expect(this.page.getByRole('status')).toContainText('Movimiento actualizado.')
   }
 
-  /** Picks the budget tab (Gastos, Ingresos, Inversión). */
-  async openBudgetTab(type: 'income' | 'expense' | 'investment') {
+  /** Picks the budget tab (Gastos, Ingresos, Ahorro, Inversión). */
+  async openBudgetTab(type: 'income' | 'expense' | 'saving' | 'investment') {
     await this.openBudget()
     await this.budgetSection.locator(`[data-budget-tab="${type}"]`).click()
   }

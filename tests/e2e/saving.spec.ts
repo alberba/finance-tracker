@@ -48,12 +48,30 @@ test.describe('Ahorro E2E', () => {
     ).toBeVisible()
   })
 
-  test('crea un objetivo de ahorro ligado a una categoría', async ({ tracker, page }) => {
+  test('crea un objetivo de ahorro que suma los ahorros anteriores de su categoría', async ({
+    tracker,
+    page,
+  }) => {
     await tracker.openSettingsTab('Categorías')
     const savings = tracker.section('settings').locator('[data-category-list="savingCategories"]')
     await savings.getByLabel('Nueva categoría de ahorro').fill('Colchón')
     await savings.getByRole('button', { name: 'Añadir' }).click()
     await expect(savings.locator('[data-category="Colchón"]')).toBeVisible()
+
+    await tracker.openTransactions()
+    await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
+    const movement = tracker.transactionPanel
+    await movement
+      .getByRole('group', { name: 'Tipo de movimiento' })
+      .getByRole('button', { name: 'Ahorro', exact: true })
+      .click()
+    await movement.getByLabel('Cuenta origen').selectOption({ label: 'Revolut' })
+    await movement.getByLabel('Cuenta destino').selectOption({ label: 'Revolut Ahorros' })
+    await movement.getByLabel('Categoría').selectOption({ label: 'Colchón' })
+    await movement.getByLabel('Descripción').fill('Ahorro previo')
+    await movement.getByLabel('Importe').fill('120')
+    await movement.getByRole('button', { name: 'Guardar movimiento' }).click()
+    await expect(page.locator('#toast')).toContainText('Movimiento guardado.')
 
     await tracker.openGoals()
     const goals = tracker.goalsSection
@@ -69,5 +87,18 @@ test.describe('Ahorro E2E', () => {
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('Fondo de emergencia')
     await expect(row).toContainText('Colchón')
+    // The saving made before the goal existed already counts towards it.
+    await expect(row).toContainText('120,00')
+    await expect(row).toContainText('4,00')
+  })
+
+  test('el presupuesto tiene el ahorro como cuarto tipo', async ({ tracker }) => {
+    await tracker.openBudgetTab('saving')
+    const budget = tracker.budgetSection
+    await expect(budget.locator('[data-budget-tab="saving"]')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(budget.getByRole('tab', { name: /^Ahorro/ })).toBeVisible()
   })
 })
