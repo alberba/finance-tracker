@@ -2,7 +2,8 @@
 
 ## Context
 
-- Issues: use `gh` with GitHub Issues; read [issue-tracker](docs/agents/issue-tracker.md) for
+- Issues: use `gh` with GitHub Issues; read an issue with
+  `gh issue view N --json title,body,labels,comments` (`--comments` prints nothing); read [issue-tracker](docs/agents/issue-tracker.md) for
   operations and the issue-comments gotcha.
 - Triage: read [triage-labels](docs/agents/triage-labels.md) for the canonical roles and labels.
 - Domain exploration: read [domain](docs/agents/domain.md) for vocabulary and ADRs.

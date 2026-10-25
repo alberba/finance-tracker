@@ -246,7 +246,7 @@ export function projectSyncV2State(
     if (!(kind in projected.budget)) continue
     const category = categories.get(String(entry.categoryId)) || 'Sin categoría'
     const amounts = projected.budget[kind][category] || Array(12).fill(0)
-    // `entry.month` is 1-12, like everywhere else (ADR 0006); the plan's
+    // `entry.month` is 1-12, like everywhere else (ADR 0008); the plan's
     // 12-slot array is addressed through its one index helper.
     const month = asMonth(Number(entry.month))
     if (!month) continue

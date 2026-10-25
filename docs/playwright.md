@@ -181,7 +181,7 @@ de sincronizar. No modifican datos ni cambian filtros de la interfaz:
   mes y tipo; paginación mediante `offset` y `limit` (25 por defecto, máximo 100).
 
 Los parámetros y los resultados usan meses de 1 a 12 (enero = 1), también en las celdas de
-`get_budget` (ADR 0006). Las monedas no se convierten; la búsqueda devuelve la moneda de cada
+`get_budget` (ADR 0008). Las monedas no se convierten; la búsqueda devuelve la moneda de cada
 movimiento y los totales siguen el comportamiento del registro.
 
 El navegador debe tener abierta la app con una sesión autenticada o el demo y soporte WebMCP

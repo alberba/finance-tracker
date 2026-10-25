@@ -31,7 +31,7 @@ export const transactions = sqliteTable(
       .notNull()
       .references(() => accounts.id),
     categoryId: text('category_id').references(() => categories.id),
-    // Only a saving (ahorro) has one: the cash account the money moves to (ADR 0006).
+    // Only a saving (ahorro) has one: the cash account the money moves to (ADR 0007).
     destinationAccountId: text('destination_account_id').references(() => accounts.id),
     type: text('type').notNull(),
     date: text('date').notNull(),

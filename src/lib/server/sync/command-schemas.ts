@@ -170,7 +170,7 @@ const entityCreateFields = {
     legacyId: optionalText,
     accountId: nonEmpty,
     categoryId: optionalText,
-    // Only a saving (ahorro) carries one; it travels in the movement's own command (ADR 0006).
+    // Only a saving (ahorro) carries one; it travels in the movement's own command (ADR 0007).
     destinationAccountId: optionalText,
     type: nonEmpty,
     date: nonEmpty,

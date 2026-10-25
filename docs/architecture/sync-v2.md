@@ -18,7 +18,7 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
      Una operación insuficiente se omite para conservar la previa en D1 o en un alta aún en cola. Cambiar a un tipo distinto
      de inversión envía `null`, eliminando solo la operación.
    - Envía `accountingMonth` (1-12) solo cuando el mes elegido difiere del de la fecha; si no,
-     `null` y el mes sigue a la fecha. Es ya el mismo número que `Transaction.month` (ADR 0006):
+     `null` y el mes sigue a la fecha. Es ya el mismo número que `Transaction.month` (ADR 0008):
      la proyección (`projectSyncV2State`) lo copia tal cual y, si es `null`, lo deriva de `date`.
    - Envía `destinationAccountId` solo en un ahorro, y lo exige resuelto: sin cuenta de destino el
      comando se omite hasta que resuelva. En los demás tipos va `null`, que borra el destino al
@@ -30,8 +30,8 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 2. `src/lib/client/command-mapping.ts`: `syncListDiff` / `syncCreate` / `syncUpdate` convierten el
    antes/después en comandos.
 3. `src/stores/sync.ts` `enqueueCommand` → `src/lib/client/outbox.ts` `enqueue`: valida contra los
-   esquemas zod y guarda en IndexedDB. `flush` envía a `POST /api/sync`.
-4. `src/lib/server/sync/command-schemas.ts`: esquema zod del comando. Lo comparten cliente y
+   esquemas Effect Schema y guarda en IndexedDB. `flush` envía a `POST /api/sync`.
+4. `src/lib/server/sync/command-schemas.ts`: esquema (Effect Schema) del comando. Lo comparten cliente y
    servidor. Los objetos son `.strict()`: un campo que falte aquí hace que la cola rechace el
    comando al encolarlo.
 5. `src/lib/server/sync/apply-command.ts`: `applyOneCommand`, un `case` por entidad.
@@ -64,6 +64,19 @@ agrupación. El alta materializa la referencia del catálogo global sin modifica
 otros usuarios; los cambios del proveedor y ticker actualizan solo la configuración privada.
 La proyección toma esa configuración de `userInstruments`, incluidos los comandos pendientes,
 y conserva los precios transitorios solo si no cambia su fuente.
+
+## Tocar el tipo de movimiento
+
+Añadir o cambiar un tipo (`income`, `expense`, `investment`, `saving`…) afecta además a sitios que
+el compilador no siempre marca. Tras `pnpm check`, busca el tipo con `grep -rn` en:
+
+- `src/lib/finance-core.ts` y `src/domain/dashboard/view-model.ts`: totales y patrimonio.
+- `src/domain/transactions/registry.ts` y `src/components/transactions/`: etiquetas, formulario
+  y `TransactionPanel.vue`.
+- `src/stores/recurring.ts` y `src/domain/recurring/pending.ts`: reglas y pendientes.
+- `src/data/demo-seed.ts`, `src/lib/client/webmcp.ts` y `src/styles/global.css` (color del tipo,
+  vigilado por `tests/unit/styles-guards.test.ts`).
+- `tests/unit/finance-core.test.ts` y `tests/unit/dashboard-view-model.test.ts`.
 
 ## Test
 

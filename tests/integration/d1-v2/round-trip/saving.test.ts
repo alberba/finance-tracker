@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * Round trip for ahorro — a movement type with a destination cash account
- * (ADR 0006). The destination travels inside the movement's own command, so
+ * (ADR 0007). The destination travels inside the movement's own command, so
  * it has to survive create, edit, a type change, recurring rules and pending
  * movements, and it must keep its account from being deleted.
  */

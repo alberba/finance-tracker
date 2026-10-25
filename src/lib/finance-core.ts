@@ -181,7 +181,7 @@ export function computeAccountBalance(
 
   transactions.forEach((item) => {
     const isOrigin = item.accountId === accountId;
-    // A saving also lands in its destination account (ADR 0006).
+    // A saving also lands in its destination account (ADR 0007).
     const isDestination = item.type === "saving" && item.destinationAccountId === accountId;
     if (!isOrigin && !isDestination) {
       return;

@@ -37,7 +37,7 @@ import {
   sanitizeFlowAllocations,
 } from './contribution-workflow'
 
-// v2: the month went from 0-11 to 1-12 (ADR 0006); a v1 demo blob is discarded, not migrated.
+// v2: the month went from 0-11 to 1-12 (ADR 0008); a v1 demo blob is discarded, not migrated.
 export const STORAGE_KEY = 'finance-tracker-state-v2'
 
 export const EMPTY_STATE_SEED = {

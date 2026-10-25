@@ -36,6 +36,16 @@ function deadReferences(docPath: string): string[] {
   return dead
 }
 
+describe('ADR numbers', () => {
+  it('are unique, so "ADR NNNN" names one decision', () => {
+    const numbers = readdirSync(join(root, 'docs/adr'))
+      .filter((name) => /^\d{4}-.+\.md$/.test(name))
+      .map((name) => name.slice(0, 4))
+    const repeated = numbers.filter((number, index) => numbers.indexOf(number) !== index)
+    expect(repeated).toEqual([])
+  })
+})
+
 describe('documentation references', () => {
   it.each(docPaths)('%s has no dead links', (docPath) => {
     expect(deadReferences(docPath), relative(root, join(root, docPath))).toEqual([])
