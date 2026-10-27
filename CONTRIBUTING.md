@@ -18,6 +18,10 @@ pnpm dev
 con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `pnpm test:e2e:install`.
 
+Con varios worktrees a la vez, usa `pnpm dev:worktree` en lugar de `pnpm dev`: elige un puerto propio
+del worktree (4321 en el checkout principal) y ajusta `BETTER_AUTH_URL` en `.dev.vars` para que el
+login de Better Auth coincida con él. Se para con `pnpm exec astro dev stop`.
+
 Sesiones y proveedores de login: [autenticación](docs/operations/authentication.md).
 Node/SQLite, Docker y arranque o archivado de worktrees en Orca:
 [self-hosting](docs/operations/self-hosting.md).

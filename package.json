@@ -10,6 +10,7 @@
     "db:repair": "tsx scripts/repair-corrupted-data.ts",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "dev": "astro dev",
+    "dev:worktree": "node scripts/dev-worktree.mjs",
     "build": "astro build",
     "audit:prod": "pnpm audit --prod --audit-level high",
     "benchmark:performance": "node scripts/benchmark-performance.mjs",
