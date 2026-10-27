@@ -95,7 +95,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "better-auth": "1.7.12",
     "better-sqlite3": "^13.0.3",
-    "chart.js": "4.5.1",
+    "chart.js": "4.6.1",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.3",
     "effect": "4.0.6",
