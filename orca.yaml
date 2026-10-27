@@ -1,0 +1,11 @@
+scripts:
+  setup: |
+    set -eu
+    export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+    cd "$ORCA_WORKTREE_PATH"
+    pnpm setup:worktree
+    pnpm local:archive:install
+  archive: |
+    set -eu
+    export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+    node "$ORCA_ROOT_PATH/.data/orca/archive-local.mjs" "$ORCA_WORKTREE_PATH"
