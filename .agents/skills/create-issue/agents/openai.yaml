@@ -1,0 +1,4 @@
+interface:
+  display_name: "Crear issue de GitHub"
+  short_description: "Crea issues desde descripciones usando templates"
+  default_prompt: "Usa $create-issue para crear una issue de GitHub a partir de esta descripción."

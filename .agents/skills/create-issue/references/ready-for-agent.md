@@ -4,11 +4,11 @@ Una issue está `ready-for-agent` cuando un agente puede empezar sin pedir decis
 
 ## Reporte y brief
 
-El **cuerpo** sigue el template del repo, es breve y depende del tipo:
+El **cuerpo** lo lee una persona en un minuto. Sigue el template del repo y cuenta el **problema** y la **solución** en pocas líneas, más lo **fuera de alcance** si alguien podría discutirlo y las decisiones pendientes si las hay. Criterios, interfaces, evidencia y notas de implementación van solo en el brief.
 
-- **bug:** el efecto para el usuario, un caso concreto con la discrepancia actual/esperada y el estado de verificación.
-- **feature:** la necesidad del usuario, el resultado pedido y las decisiones abiertas.
-- **task/epic:** el objetivo y su alcance.
+- **bug:** el problema es el efecto para el usuario con un caso actual/esperado y el estado de verificación; la solución, el resultado pedido.
+- **feature:** el problema es la necesidad del usuario; la solución, el resultado pedido y las decisiones abiertas.
+- **task/epic:** el problema que se resuelve y el cambio que lo resuelve.
 
 Distingue impacto reportado de alcance comprobado, conserva los adjuntos y termina con el enlace al brief publicado.
 

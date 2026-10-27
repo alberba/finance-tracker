@@ -15,11 +15,13 @@ Una issue por problema de alcance independiente; los bullets de pasos o criterio
 
 ## 2. Preparar
 
-Leer las convenciones del tracker y los templates. Elegir el tipo por la intención global (`bug`, `feature`, `task`, `epic`; `task` si ninguna domina) y mapearlo al template y al label local.
+Leer las convenciones del tracker y los templates. Elegir el tipo por la intención global (`bug`, `feature`, `task`, `epic`; `task` si ninguna domina) y mapearlo al template y al tipo nativo de la organización (`--type` en `gh issue create` y `gh issue edit`), o al label local si no los define.
 
 Explorar el código en solo lectura hasta localizar el componente y las referencias del reporte; si no se localizan, preparar con lo disponible y decirlo. Separar hechos reportados, verificados, hipótesis y propuestas.
 
-Seguir el template, con sus campos y prefijo de título; sin template, `## Descripción` y `## Notas técnicas`. Los datos desconocidos quedan pendientes; los criterios de aceptación salen del comportamiento pedido.
+Seguir el template, con sus campos y su prefijo de título si lo define; sin template, `## Descripción` y `## Notas técnicas`. Los datos desconocidos quedan pendientes; los criterios de aceptación salen del comportamiento pedido.
+
+El título empieza por el verbo de lo que se hace (en los bugs, por el síntoma), se entiende sin abrir la issue y usa el vocabulario del glosario. Tipo, partner y módulo viven en sus campos, no en el título; las issues hermanas de un epic comparten forma.
 
 Preparar las issues nuevas para `ready-for-agent` según [Preparación para agentes](references/ready-for-agent.md): reporte en el cuerpo, brief en un comentario. Resolver con contexto y código lo posible; escribir las decisiones que bloqueen la implementación como preguntas concretas en `## Decisiones pendientes` del cuerpo.
 
@@ -29,7 +31,7 @@ En las `feature` que cambien la apariencia de la interfaz (layout, estilos, tipo
 
 Con imágenes o vídeo pegados o con rutas, seguir [Adjuntos](references/adjuntos.md). Solo ficheros existentes; grabar media nueva es otro flujo.
 
-Preparada = cada acción con destino, título/body, brief o comentario, labels, adjuntos, estado recomendado y pendientes.
+Preparada = cada acción con destino, título/body, brief o comentario, labels, adjuntos, estado recomendado, esfuerzo (si el repo lo define) y pendientes.
 
 ## 3. Duplicadas y relacionadas
 
@@ -47,14 +49,16 @@ Mostrar el resultado concreto antes de pedir aprobación: destino, acción, tít
 
 La autorización explícita ya dada cubre su alcance y no se pide de nuevo. Si falta, una sola pregunta reúne confirmación y decisiones de contenido. Un cambio de dato suelto («P1») actualiza el borrador sin confirmar la publicación. Una aprobación parcial habilita solo lo aprobado.
 
-Publicar con la acción autorizada y sus pendientes relevantes resueltos. Sin estimación temporal ni proyecto, salvo petición expresa.
+Publicar con la acción autorizada y sus pendientes relevantes resueltos. Sin estimación temporal, salvo petición expresa. Si el repo define campos de esfuerzo relativo (en un proyecto de GitHub o en la propia issue, p. ej. `Size` o `Effort`), proponer su valor por el alcance dentro de esta misma aprobación.
 
 ## 5. Publicar y verificar
 
-Escribir el texto exacto en un fichero temporal, creado y borrado en comandos distintos del de publicación, y pasarlo con `--body-file` a `gh issue create` o `gh issue comment`. Título, labels y rutas, como argumentos con quoting seguro.
+Escribir el texto exacto en un fichero temporal, creado y borrado en comandos distintos del de publicación, y pasarlo con `--body-file` a `gh issue create` o `gh issue comment`. Título, tipo, labels y rutas, como argumentos con quoting seguro.
 
 Autorizar la creación incluye publicar el brief: `gh issue comment --body-file`, enlazado desde el cuerpo. Aplicar `ready-for-agent` tras verificar el brief; crear el label si falta y hay permiso.
 
+Si el repo define campos de esfuerzo, fijar los aprobados tras crear: los de proyecto con `gh project item-edit` (ids en `gh project view`, `item-list` y `field-list`) y los de issue con la mutación GraphQL `setIssueFieldValue` (`issueFields: [{fieldId, singleSelectOptionId}]`, ids en `organization.issueFields`). Sin proyecto ni campos de issue, este paso se omite.
+
 Antes de reintentar un fallo, comprobar stdout y GitHub: la issue pudo crearse pese al error, sobre todo con adjuntos. Recuperar lo existente y completar lo pendiente; repetir la creación solo si no se publicó.
 
-Verificar en GitHub cuerpo, brief, enlace, labels, referencias y adjuntos. En lote, reanudar solo lo pendiente. Cerrar con las URLs y los pendientes concretos, distinguiendo publicación verificada de verificación incompleta.
+Verificar en GitHub cuerpo, brief, enlace, tipo, labels, esfuerzo (si aplica), referencias y adjuntos. En lote, reanudar solo lo pendiente. Cerrar con las URLs y los pendientes concretos, distinguiendo publicación verificada de verificación incompleta.
