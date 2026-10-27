@@ -23,6 +23,7 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 | Año, mes y rango del dashboard                  | `src/stores/dashboard.ts`; mes y sección activa en `src/stores/ui.ts`.                                      |
 | Edición y cálculos de Presupuesto               | [Guía de Presupuesto](../context/tabs/presupuesto.md).                                                      |
 | Persistencia autenticada y recuperación offline | [Sync v2](sync-v2.md).                                                                                      |
+| Importación y conexión de Bitvavo               | [Bitvavo](bitvavo.md).                                                                                      |
 
 ## Secciones: nombre en la UI → ficheros
 

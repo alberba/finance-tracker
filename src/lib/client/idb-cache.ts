@@ -1,8 +1,9 @@
 /**
- * IndexedDB-backed local cache (WP7), keyed per authenticated identity.
+ * IndexedDB-backed local cache, keyed per authenticated identity.
  *
- * Replaces the `localStorage` whole-blob cache (`src/scripts/state.ts`) for
- * the v2 sync path: one database per `userId`, one object store per
+ * Cache of the authenticated v2 sync path. The `localStorage` blob in
+ * `src/scripts/state.ts` only persists demo mode; that module still owns
+ * `normalizeState`. One database per `userId`, one object store per
  * `SyncEntityType` (see `src/lib/server/sync/command-schemas.ts`, imported
  * here read-only so the entity list can never drift from the server
  * contract), plus a small `__meta` store for the sync revision cursor and

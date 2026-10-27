@@ -50,6 +50,8 @@ solo para mejorar el porcentaje. El HTML se escribe en `coverage/`.
 6. No aumentes timeouts o workers para ocultar una carrera; corrige el aislamiento.
 7. En happy-dom, `select.value` deja de seguir a `v-model` cuando las opciones cambian después de
    montar. Comprueba lo que se guarda (el evento emitido o el store), no `select.value`.
+8. En los round-trip, `trip.reload()` crea un Pinia nuevo: vuelve a obtener los stores después de
+   recargar, porque las referencias anteriores apuntan al Pinia viejo.
 
 ## Cuarentena de tests inestables (#233)
 
