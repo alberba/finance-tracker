@@ -45,13 +45,13 @@ function events(result: unknown) {
     { type: 'step_start' },
     {
       type: 'tool_use',
-      part: { tool: 'skill', state: { status: 'completed', input: { name: 'create-issue' } } },
+      part: { tool: 'skill', state: { status: 'completed', input: { id: 'create-issue' } } },
     },
     {
       type: 'tool_use',
       part: {
         tool: 'read',
-        state: { status: 'completed', input: { filePath: 'src/lib/server/github-issues.ts' } },
+        state: { status: 'completed', input: { path: 'src/lib/server/github-issues.ts' } },
       },
     },
     {
@@ -60,7 +60,7 @@ function events(result: unknown) {
         tool: 'read',
         state: {
           status: 'completed',
-          input: { filePath: '.scratch/issue-enrichment/discussion.json' },
+          input: { path: '.scratch/issue-enrichment/discussion.json' },
         },
       },
     },
@@ -78,7 +78,7 @@ describe('plan del agente de GitHub Actions', () => {
     expect(parseAgentPlan(events(plan))).toEqual(plan)
   })
 
-  it.each(['skill', 'read', 'step_finish'])('rechaza un análisis que no completa %s', (missing) => {
+  it.each(['skill', 'read'])('rechaza un análisis que no completa %s', (missing) => {
     const output = events(plan)
       .split('\n')
       .filter((line) => {
@@ -89,13 +89,28 @@ describe('plan del agente de GitHub Actions', () => {
     expect(() => parseAgentPlan(output)).toThrow('El análisis debe terminar')
   })
 
+  it('acepta una respuesta final sin step_finish de cierre', () => {
+    const output = events(plan)
+      .split('\n')
+      .filter((line) => JSON.parse(line).type !== 'step_finish')
+      .join('\n')
+    expect(parseAgentPlan(output)).toEqual(plan)
+  })
+
+  it('rechaza una respuesta final cortada por el modelo', () => {
+    const output = events(plan).replace('"reason":"stop"', '"reason":"length"')
+    expect(() => parseAgentPlan(output)).toThrow(
+      expect.objectContaining({ code: 'OPENCODE_INCOMPLETE' }),
+    )
+  })
+
   it.each([
     ['src/lib/server/github-issues.ts', 'OPENCODE_CODE_READ'],
     ['.scratch/issue-enrichment/discussion.json', 'OPENCODE_DISCUSSION'],
   ])('distingue la lectura obligatoria que falta: %s', (filePath, code) => {
     const output = events(plan)
       .split('\n')
-      .filter((line) => JSON.parse(line).part?.state?.input?.filePath !== filePath)
+      .filter((line) => JSON.parse(line).part?.state?.input?.path !== filePath)
       .join('\n')
     expect(() => parseAgentPlan(output)).toThrow(expect.objectContaining({ code }))
   })
@@ -132,7 +147,7 @@ describe('plan del agente de GitHub Actions', () => {
   it('identifica el estado HTTP del proveedor sin incluir su mensaje', () => {
     const output = JSON.stringify({
       type: 'error',
-      error: { data: { statusCode: 401, message: 'PRIVATE_MARKER' } },
+      error: { type: 'provider.auth', status: 401, message: 'PRIVATE_MARKER' },
     })
     expect(() => parseAgentPlan(output)).toThrow(
       expect.objectContaining({ code: 'OPENCODE_HTTP_401' }),

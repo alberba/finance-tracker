@@ -10,8 +10,11 @@ permission:
     '*.env.*': deny
     '*.dev.vars*': deny
     '**/.git/**': deny
+    '.git/**': deny
     '**/.scratch/**': deny
+    '.scratch/**': deny
     '**/.scratch/issue-enrichment/*.json': allow
+    '.scratch/issue-enrichment/*.json': allow
   glob: allow
   grep: allow
   skill:

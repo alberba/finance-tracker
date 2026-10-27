@@ -213,7 +213,7 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    adjuntos. La búsqueda tarda como máximo 3 segundos y el modelo tiene un plazo de 8 segundos.
    Sin clave, sin candidatas o ante un fallo, se crea el reporte original.
 5. Al abrirse una issue con `source:web-report`, **Analyze web report** ejecuta OpenCode con
-   DeepSeek V4.1 Flash en GitHub Actions. Carga la skill personal `create-issue`, lee el código
+   DeepSeek V4.1 Flash en GitHub Actions. Carga la skill `create-issue`, lee el código
    del checkout y las convenciones del repo, y compara hasta 10 candidatas con sus comentarios
    (hasta 10 comentarios por candidata). La búsqueda es limitada y sus fallos o truncamientos
    quedan en el contexto del análisis; las cerradas pueden ser recurrencias.
@@ -233,9 +233,9 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    de triage justificado). Añade `ui-change` a las features visuales. Un fallo previo a
    publicar deja el reporte original disponible.
 
-La skill está versionada en `.opencode/skills/create-issue/`, con una copia del `SKILL.md` personal
-y sus referencias de preparación y adjuntos. Para adoptar cambios de la skill personal, actualiza
-esa copia. El agente usa `.opencode/agents/issue-enricher.md` y la configuración restringida de
+La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
+`skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
+con `npx skills`. El agente usa `.opencode/agents/issue-enricher.md` y la configuración restringida de
 `.github/opencode-issue-enricher.json`: lectura y búsqueda, sin shell, escritura ni subagentes.
 El token de GitHub solo está disponible en los pasos de consulta y publicación; los datos de cuenta
 se conservan fuera del contexto que se entrega al agente. El código del repositorio sí se envía al

@@ -142,7 +142,7 @@ y candidatas con cuerpo truncado. La búsqueda tiene un plazo de 3 s; el modelo,
 o ante fallos se crea igualmente el reporte. La comprobación es limitada y puede omitir coincidencias.
 
 Después de crear, el workflow **Analyze web report** ejecuta OpenCode con DeepSeek en un checkout.
-Carga `.opencode/skills/create-issue/SKILL.md`, explora el código y lee hasta 10 candidatas con hasta
+Carga `.agents/skills/create-issue/SKILL.md`, explora el código y lee hasta 10 candidatas con hasta
 10 comentarios por candidata. Prepara el cuerpo según el template (sin template: `## Descripción`
 y `## Notas técnicas`) y un Agent Brief con hechos contrastados, hipótesis y pendientes. Las
 referencias a cerradas se interpretan como posibles recurrencias. La decisión `duplicate` del

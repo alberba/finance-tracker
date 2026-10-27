@@ -82,13 +82,13 @@ function events(result: unknown) {
     { type: 'step_start' },
     {
       type: 'tool_use',
-      part: { tool: 'skill', state: { status: 'completed', input: { name: 'create-issue' } } },
+      part: { tool: 'skill', state: { status: 'completed', input: { id: 'create-issue' } } },
     },
     {
       type: 'tool_use',
       part: {
         tool: 'read',
-        state: { status: 'completed', input: { filePath: 'src/lib/server/github-issues.ts' } },
+        state: { status: 'completed', input: { path: 'src/lib/server/github-issues.ts' } },
       },
     },
     {
@@ -97,7 +97,7 @@ function events(result: unknown) {
         tool: 'read',
         state: {
           status: 'completed',
-          input: { filePath: '.scratch/issue-enrichment/discussion.json' },
+          input: { path: '.scratch/issue-enrichment/discussion.json' },
         },
       },
     },

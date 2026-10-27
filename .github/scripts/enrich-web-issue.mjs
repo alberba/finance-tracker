@@ -114,7 +114,7 @@ function analysisError(
 
 export function parseAgentPlan(events) {
   let text = ''
-  let completed = false
+  let finishReason = null
   let loadedSkill = false
   let readCode = false
   let readDiscussion = false
@@ -126,7 +126,7 @@ export function parseAgentPlan(events) {
       throw analysisError('OPENCODE_EVENTS_JSON')
     }
     if (event.type === 'error') {
-      const status = event.error?.data?.statusCode
+      const status = event.error?.status
       throw analysisError(
         Number.isInteger(status) && status >= 400 && status <= 599
           ? `OPENCODE_HTTP_${status}`
@@ -136,21 +136,24 @@ export function parseAgentPlan(events) {
     // Intermediate text is discarded when the agent starts another tool iteration.
     if (event.type === 'step_start') {
       text = ''
-      completed = false
+      finishReason = null
     }
-    if (event.type === 'step_finish') completed = event.part?.reason === 'stop'
+    if (event.type === 'step_finish') finishReason = event.part?.reason ?? null
     if (event.type === 'tool_use' && event.part?.state?.status === 'completed') {
       const { tool, state } = event.part
-      if (tool === 'skill' && state.input?.name === 'create-issue') loadedSkill = true
-      if (tool === 'read' && typeof state.input?.filePath === 'string') {
-        const path = resolve(state.input.filePath)
+      if (tool === 'skill' && state.input?.id === 'create-issue') loadedSkill = true
+      if (tool === 'read' && typeof state.input?.path === 'string') {
+        const path = resolve(state.input.path)
         if (path.startsWith(`${resolve('src')}${sep}`)) readCode = true
         if (path === resolve('.scratch/issue-enrichment/discussion.json')) readDiscussion = true
       }
     }
     if (event.type === 'text') text += event.part?.text ?? ''
   }
-  if (!completed) throw analysisError('OPENCODE_INCOMPLETE')
+  // OpenCode 2 does not always emit a closing step_finish after the final text.
+  if (!text.trim() || (finishReason !== null && finishReason !== 'stop')) {
+    throw analysisError('OPENCODE_INCOMPLETE')
+  }
   if (!loadedSkill) throw analysisError('OPENCODE_SKILL')
   if (!readCode) throw analysisError('OPENCODE_CODE_READ')
   if (!readDiscussion) throw analysisError('OPENCODE_DISCUSSION')
@@ -365,6 +368,7 @@ async function analyze() {
       'issue-enricher',
       '--model',
       'opencode-go/deepseek-v4.1-flash',
+      '--standalone',
       '--format',
       'json',
       // --file es variádico: el mensaje debe ir antes para que no se interprete como ruta.
