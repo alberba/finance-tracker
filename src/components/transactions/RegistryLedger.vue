@@ -9,6 +9,7 @@ import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTa
 import { TONE_TEXT } from '../ui/tone'
 import { TYPE_LABEL, TYPE_TAG, seriesColor } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
+import { hasTypeRestriction } from '../../domain/transactions/registry'
 import { formatDayMonth, formatMonthName, formatMonthYear } from '../../lib/format'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import type { Transaction, TxSortColumn } from '../../scripts/types'
@@ -51,7 +52,7 @@ const filtering = computed(() => {
   const filters = ui.txFilters
   return Boolean(
     filters.search ||
-    filters.types.length ||
+    hasTypeRestriction(filters.types) ||
     filters.accountIds.length ||
     filters.date ||
     filters.amountMin ||

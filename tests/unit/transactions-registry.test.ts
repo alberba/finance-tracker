@@ -4,6 +4,7 @@ import {
   accountingYear,
   buildMonthGroups,
   categoryBreakdown,
+  hasTypeRestriction,
   monthTotals,
   registryYears,
   type RegistryFilters,
@@ -125,6 +126,25 @@ describe('buildMonthGroups', () => {
     expect(byAccount.flatMap((group) => group.rows.map((row) => row.id))).toEqual(['vwce'])
   })
 
+  it('shows the same movements for every type as for no type at all', () => {
+    const everyType = buildMonthGroups(
+      transactions,
+      2026,
+      { ...NO_FILTERS, types: ['income', 'expense', 'saving', 'investment'] },
+      NEWEST_FIRST,
+    )
+    const noFilter = buildMonthGroups(transactions, 2026, NO_FILTERS, NEWEST_FIRST)
+
+    expect(everyType).toEqual(noFilter)
+    expect(everyType.flatMap((group) => group.rows.map((row) => row.type))).toEqual([
+      'expense',
+      'investment',
+      'income',
+      'income',
+      'expense',
+    ])
+  })
+
   it('sorts the movements of each month by amount when asked', () => {
     const groups = buildMonthGroups(transactions, 2026, NO_FILTERS, {
       column: 'amount',
@@ -144,6 +164,18 @@ describe('registryYears', () => {
     ]
 
     expect(registryYears(transactions, 2027)).toEqual([2027, 2026, 2024])
+  })
+})
+
+describe('hasTypeRestriction', () => {
+  it('is false when no type or every type is chosen, since both show them all', () => {
+    expect(hasTypeRestriction([])).toBe(false)
+    expect(hasTypeRestriction(['income', 'expense', 'saving', 'investment'])).toBe(false)
+  })
+
+  it('is true when the chosen types leave any type out', () => {
+    expect(hasTypeRestriction(['expense'])).toBe(true)
+    expect(hasTypeRestriction(['expense', 'investment'])).toBe(true)
   })
 })
 

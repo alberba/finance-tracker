@@ -381,18 +381,42 @@ test.describe('Finance tracker E2E', () => {
     await tracker.setTransactionDescriptionFilter('e2e-multi')
     await expect(tracker.transactionRows).toHaveCount(3)
 
-    await tracker.setTransactionTypeChip('Ingresos', false)
+    // Every chip starts off, so the registry shows every type.
+    for (const label of ['Ingresos', 'Gastos', 'Ahorros', 'Inversión']) {
+      await expect(tracker.typeChip(label)).not.toBeChecked()
+    }
 
+    await tracker.setTransactionTypeChip('Gastos', true)
+
+    await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-expense' })).toHaveCount(1)
+    await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-investment' })).toHaveCount(0)
+    await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-income' })).toHaveCount(0)
+
+    await tracker.setTransactionTypeChip('Inversión', true)
+
+    await expect(tracker.typeChip('Gastos')).toBeChecked()
+    await expect(tracker.typeChip('Inversión')).toBeChecked()
     await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-expense' })).toHaveCount(1)
     await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-investment' })).toHaveCount(1)
     await expect(tracker.transactionRows.filter({ hasText: 'e2e-multi-income' })).toHaveCount(0)
 
-    await tracker.setTransactionTypeChip('Ingresos', true)
+    // The type chips combine with the account filter: only the investment.
     await tracker.registryToolbar
       .getByLabel('Cuenta', { exact: true })
       .selectOption({ label: 'MyInvestor' })
     await expect(tracker.transactionRows).toHaveCount(1)
     await expect(tracker.transactionRows.first()).toContainText('e2e-multi-investment')
+    await tracker.registryToolbar
+      .getByLabel('Cuenta', { exact: true })
+      .selectOption({ label: 'Todas las cuentas' })
+
+    // Turning off the last two chips brings every type back.
+    await tracker.setTransactionTypeChip('Inversión', false)
+    await tracker.setTransactionTypeChip('Gastos', false)
+
+    await expect(tracker.typeChip('Gastos')).not.toBeChecked()
+    await expect(tracker.typeChip('Inversión')).not.toBeChecked()
+    await expect(tracker.transactionRows).toHaveCount(3)
 
     await tracker.clearTransactionFilters()
   })

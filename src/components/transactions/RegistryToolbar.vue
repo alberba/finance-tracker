@@ -6,7 +6,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import BaseSelect from '../ui/BaseSelect.vue'
 import FilterChip from '../ui/FilterChip.vue'
 import { TYPE_DOT, TYPE_PLURAL } from './transaction-types'
-import type { TransactionType } from '../../scripts/types'
+import { TRANSACTION_TYPES, type TransactionType } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 
@@ -16,7 +16,6 @@ const movementsStore = useMovementsStore()
 const ui = useUiStore().ui
 const filters = ui.txFilters
 
-const CHIP_TYPES: TransactionType[] = ['income', 'expense', 'saving', 'investment']
 const showMore = ref(false)
 
 const yearOptions = computed(() =>
@@ -41,15 +40,15 @@ const extraFilterCount = computed(
 )
 
 function isOn(type: TransactionType): boolean {
-  return !filters.types.length || filters.types.includes(type)
+  return filters.types.includes(type)
 }
 
-// No chip list means every type. The last chip on cannot be turned off, so
-// the registry never filters everything out by accident.
+// A chip on adds its type to the union; off removes it. No type chosen shows
+// every type, so turning the last chip off goes back to showing them all.
 function setType(type: TransactionType, on: boolean): void {
-  const active = CHIP_TYPES.filter((item) => (item === type ? on : isOn(item)))
-  if (!active.length) return
-  filters.types = active.length === CHIP_TYPES.length ? [] : active
+  const chosen = filters.types.filter((item) => item !== type)
+  if (on) chosen.push(type)
+  filters.types = TRANSACTION_TYPES.filter((item) => chosen.includes(item))
 }
 
 function clearExtra(): void {
@@ -95,7 +94,7 @@ function clearExtra(): void {
       </BaseInput>
       <div class="flex flex-wrap gap-2" role="group" aria-label="Filtrar por tipo">
         <FilterChip
-          v-for="type in CHIP_TYPES"
+          v-for="type in TRANSACTION_TYPES"
           :key="type"
           :model-value="isOn(type)"
           :label="TYPE_PLURAL[type]"
