@@ -674,8 +674,14 @@ detalle, vive en `components/reports/`).
 
 ### 9.3 Composición
 
-Escritorio (`desk:`; contenedor `mx-auto max-w-6xl`): dos columnas
-`desk:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] gap-x-10`.
+Lista + detalle sin escalera de breakpoints (`good-css`, «Sidebar that wraps on its own»): contenedor
+`mx-auto max-w-6xl` con `flex flex-wrap gap-x-10 gap-y-6`; la lista es el lateral
+(`basis-88 grow`, `flex-basis` ideal ≈ 22 rem) y el detalle el principal (`basis-0 grow-999 min-w-1/2`),
+de modo que el punto de ruptura es un reparto del contenedor, no del viewport. Con
+`@container` (el `<section>` de la página es `container-type: inline-size`) y la variante `@max-3xl:`
+cuando hay un reporte abierto la lista se oculta y el detalle ocupa todo el ancho (vista de un solo
+panel); en contenedor ancho conviven. El lateral lleva `self-start sticky top-6` (con `align-self:
+start`, requisito de la técnica).
 
 ```
 Tu cuenta                                              [ Crear reporte ]
@@ -699,11 +705,13 @@ Sigue el estado de lo que has enviado y aclara lo que haga falta.
                                                │                        [ Publicar aclaración ]
 ```
 
-- Fila de lista = `<button>` de ancho completo (`role` nativo), filetes `border-line` entre filas, sin
-  cajas. Contenido: `#N` (`font-mono`), título (`font-display`, máx. 2 líneas, `line-clamp-2`), línea de
+- Fila de lista = **enlace real** `<a href="/reportes?reporte=N">` (interceptado por `useReportsRoute`
+  para no recargar; permite «abrir en pestaña nueva» y lectura correcta por lector de pantalla),
+  con el patrón «Whole card clickable from one link» si la fila acumula más controles; filetes
+  `border-line` entre filas, sin cajas. Contenido: `#N` (`font-mono`), título (`font-display`, máx. 2 líneas, `line-clamp-2`), línea de
   estado (`ReportStatus`) y fecha (`formatShortDate`). Seleccionada: `aria-current="true"` + filete
   izquierdo `border-primary` de 2 px. «Nuevo» alineado a la derecha del número.
-- Móvil: la lista ocupa todo el ancho; abrir un reporte reemplaza la vista con un botón «← Mis reportes»
+- Contenedor estrecho (móvil): la lista ocupa todo el ancho; abrir un reporte reemplaza la vista con un botón «← Mis reportes»
   (`useReportsRoute` empuja `?reporte=n`; el atrás del navegador vuelve). Gutter 16 px; filas ≥ 56 px de
   alto táctil; barra inferior del shell ya reserva `pb-[calc(104px+…)]`.
 - Hilo: cada carta = `<article>` con cabecera mono (`Tú`/login, fecha larga con hora vía
@@ -733,9 +741,9 @@ Sigue el estado de lo que has enviado y aclara lo que haga falta.
 
 ### 9.5 Movimiento y accesibilidad
 
-- Entrada de la página con el `animate-panel-in` ya existente en `AppSection`; en lista, aparición
-  escalonada sutil (`animation-delay` por índice, ≤ 6 filas, 40 ms) respetando `prefers-reduced-motion`
-  (`motion-safe:`). Sin otras animaciones.
+- **Sin movimiento nuevo.** Solo la entrada que ya trae `AppSection` (`animate-panel-in`). La skill
+  `good-css` pide no añadir movimiento fuera de lo que pida una entrada o la tarea, y las skills de
+  animación no están instaladas: se descarta el escalonado de filas que se planteó al principio.
 - Contraste AA en claro y oscuro (solo tokens de texto ya validados); foco visible con
   `focus-visible:outline-primary`; todas las acciones por teclado; el cambio de vista
   lista↔detalle mueve el foco al `h3` del detalle y de vuelta a la fila de origen.
@@ -743,6 +751,52 @@ Sigue el estado de lo que has enviado y aclara lo que haga falta.
 - El punto de novedades nunca es el único aviso: contador/etiqueta «Nuevo» con texto.
 - Localizadores E2E por rol/etiqueta/`data-*`: `data-report-entry="<n>"`, `data-report-new`,
   `data-reports-updates`, `data-reports-badge`, `data-thread-item="<id>"`.
+
+### 9.6 Cómo se aplicó `good-css` (`.agents/skills/good-css`, solo lectura)
+
+La skill **no está en `origin/main`**: existe sin versionar en el checkout principal
+(`/home/alberba/Projects/finance-tracker/.agents/skills/good-css`) y en el worktree `docs-design-system`;
+este diseño se hizo leyendo `SKILL.md` y las entradas de `layout`, `text-and-media`, `interaction`,
+`spacing-and-shape` y los títulos de `motion`/`show-and-hide`/`scroll-and-viewport`/`foundations`. No
+se modificó ningún otro worktree. El implementador debe releer las entradas citadas antes de maquetar.
+
+Aplicado, con la sintaxis del proyecto (Tailwind 4.3 con tokens de `@theme`):
+
+| Entrada de la skill                          | Decisión en este diseño                                                                                         |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Sidebar that wraps on its own                | Lista/detalle por `flex-wrap` con `basis` + `grow`, sin `desk:grid-cols` (§9.3).                                  |
+| Container queries                            | La página es el contenedor; el modo de un solo panel depende de su ancho, no del viewport (§9.3). `container-type` solo en el `<section>`, que no es shrink-to-fit. |
+| Logical properties                           | Utilidades lógicas en código nuevo: `mbs-`, `pbs-`, `pis-`, `inset-bs-`, `border-s-2` (filete lateral del hilo). Nada de `mt-`/`pl-`/`left-`. |
+| Space between siblings set by the parent     | Pilas con `grid gap-*`/`flex flex-col gap-*`; el Markdown renderizado usa la forma de margen (`[&>*]:mbs-0 [&>*+*]:mbs-3`) porque su contenido no se controla. |
+| Long text that wraps, truncates or clamps    | Cuerpo de comentarios: `wrap-break-word`, **nunca truncado** (el lector debe poder leerlo). Título en lista: `line-clamp-2` (el detalle lo muestra completo). `min-w-0` en cada flex intermedio. |
+| Image box that holds any upload              | Miniaturas de adjuntos: caja `aspect-4/3 object-cover` con fondo `bg-subtle`, `inline-size` fijo y `flex-none`; `object-contain` en la vista ampliada. |
+| Tabular numbers                              | `tabular-nums` en `#N`, fechas y contadores («9+», «n/4000»).                                                  |
+| Icon sized by the text beside it             | Icono de aviso/«Nuevo»: `size-[1cap]` (arbitrario justificado: no existe token) con `flex-none`; avisos multilínea con `1lh`. |
+| One focus ring with `:focus-visible`         | Filas, acciones y compositor usan `focus-visible:outline-2 outline-primary` (como el resto del shell). Nunca `outline-none`. |
+| Hover only where hover exists + `:active`    | Solo variantes `hover:` de Tailwind v4 (ya envuelven `(hover: hover)`) y `active:` en filas, «Editar», «Borrar» y botón de la hoja «Más». |
+| Hit area larger than the visual              | «Editar»/«Borrar»/«Quitar» y el cerrar de adjuntos con área ≥ 44 px (`::after` ampliado o `min-h-11`).         |
+| Textarea that grows with its content         | Compositor y edición: `field-sizing-content min-h-[3lh] max-h-[12lh] resize-none` **sin** observer ni animación (la skill: sin fallback, el textarea queda fijo y con scroll en navegadores sin soporte; hoy `BaseInput`/textarea del panel usa `resize-y`, aquí se sustituye por esto). |
+| Form feedback with `:user-invalid`           | El compositor no valida con clases «touched»: el único error de campo (texto vacío) se muestra con texto en `role="alert"` y `aria-invalid`; no se añade script de blur. |
+| `:has()` for parent state                    | `has-[…]` para el resaltado de la fila seleccionada; el bloqueo de scroll tras `ConfirmDialog`/panel ya lo resuelven `dialog` modal y la hoja global. |
+| Concentric nested radius                     | Miniatura dentro de la carta del hilo: radio interior = `rounded-md`, exterior = interior + padding (`rounded-lg` con `p-2` cuando se enmarca). |
+| Section spacing / push with auto margin      | Cabecera del hilo con autor a la izquierda y acciones con `ms-auto`; sin separadores espaciadores.              |
+| `overflow: clip` over `hidden`               | `overflow-clip` en contenedores de recorte (filas con `line-clamp`); `hidden` solo en lo que un script desplaza (ninguno). |
+| Opt-in motion / motion tokens                | Ninguna transición nueva; si el implementador añade una (p. ej. el punto del botón flotante), con propiedades nombradas dentro de `motion-safe:` y sin `ease-in` ni `transition: all`. |
+
+**Desviaciones deliberadas** (la skill manda en CSS, pero `CODING_STANDARDS.md` es autoritativo en este repo):
+
+1. *Content grid with breakouts*: la skill pide sustituir cada contenedor centrado `max-width`. Todas las
+   secciones de v2 usan `mx-auto grid w-full max-w-5xl` sobre el `<main>` del shell y no hay hijos que
+   rompan el ancho, así que esta página mantiene `mx-auto max-w-6xl` (consistencia con el shell; el
+   rediseño del contenedor global es otro cambio).
+2. *OKLCH/`clamp()` y `light-dark()`*: los colores y escalas ya salen de los tokens de `@theme` en
+   `global.css`; **no** se escribe ningún color nuevo (`CODING_STANDARDS.md` prohíbe valores arbitrarios si
+   existe token). Cualquier token de texto nuevo exigiría entrar en los pares del test de contraste.
+3. *The reset*: no se toca `global.css` ni se añade hoja de estilos (`styles-guards.test.ts`).
+4. *Support*: `field-sizing` (Chrome 123, Safari 26.2, Firefox 152) y `line-clamp` con `overflow: clip`
+   (Safari 27/Chrome 150; la skill indica `hidden` como alternativa) pueden faltar en navegadores
+   antiguos; son mejoras progresivas y la página funciona sin ellas. Tailwind `@container`/`@max-*`
+   exigen Tailwind 4, ya en uso.
 
 ---
 
