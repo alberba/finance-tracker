@@ -22,3 +22,4 @@ export * as stockeventsSymbolMappingsRepository from "./stockevents-symbol-mappi
 export * as stockeventsCashMappingsRepository from "./stockevents-cash-mappings";
 export * as syncRepository from "./sync";
 export * as auditEventsRepository from "./audit-events";
+export * as issueReportsRepository from "./issue-reports";
