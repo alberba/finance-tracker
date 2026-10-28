@@ -16,11 +16,13 @@ import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
-import { runWithDb, transaction } from '../src/db/database'
-import type { Db } from '../src/db/repositories/shared'
+import { Data, Duration, Effect } from 'effect'
+
+import { Database, query, transaction, type DatabaseError } from '../src/db/database'
 import * as issueReportsRepository from '../src/db/repositories/issue-reports'
 import { nowIso } from '../src/db/repositories/shared'
-import { issueReports, users } from '../src/db/schema'
+import { users } from '../src/db/schema'
+import { Http } from '../src/lib/server/http'
 import { uuidv7 } from '../src/lib/server/uuidv7'
 import { openLocalV2Db } from './lib/local-v2-db'
 import {
@@ -49,16 +51,24 @@ interface RawIssue {
   pull_request?: unknown
 }
 
-function requiredEnv(env: BackfillEnv): { token: string; owner: string; repo: string } {
+/** Error de la CLI: mensaje ya listo para stderr, sin cuerpos de GitHub. */
+export class BackfillError extends Data.TaggedError('BackfillError')<{ message: string }> {}
+
+function requiredEnv(
+  env: BackfillEnv,
+): Effect.Effect<{ token: string; owner: string; repo: string }, BackfillError> {
   const token = env.GITHUB_ISSUE_TOKEN || env.GITHUB_TOKEN
   const owner = env.GITHUB_OWNER
   const repo = env.GITHUB_REPO
   if (!token || !owner || !repo) {
-    throw new Error(
-      'Faltan credenciales de GitHub: define GITHUB_ISSUE_TOKEN (o GITHUB_TOKEN), GITHUB_OWNER y GITHUB_REPO.',
+    return Effect.fail(
+      new BackfillError({
+        message:
+          'Faltan credenciales de GitHub: define GITHUB_ISSUE_TOKEN (o GITHUB_TOKEN), GITHUB_OWNER y GITHUB_REPO.',
+      }),
     )
   }
-  return { token, owner, repo }
+  return Effect.succeed({ token, owner, repo })
 }
 
 function rateLimitDelayMs(response: Response): number {
@@ -71,88 +81,100 @@ function rateLimitDelayMs(response: Response): number {
   return 60_000
 }
 
-export async function fetchWebReportIssues(options: {
-  request?: typeof fetch
+export function fetchWebReportIssues(options: {
   env: BackfillEnv
-  sleep?: (ms: number) => Promise<void>
-}): Promise<BackfillIssue[]> {
-  const request = options.request ?? fetch
-  const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
-  const { token, owner, repo } = requiredEnv(options.env)
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'finance-tracker-reports-backfill',
-  }
-
-  const issues: BackfillIssue[] = []
-  for (let page = 1; ; page += 1) {
-    const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/issues?${new URLSearchParams({
-      labels: LABEL,
-      state: 'all',
-      per_page: String(PER_PAGE),
-      page: String(page),
-    })}`
-
-    let response = await request(url, { headers })
-    let retries = 0
-    while (response.status === 403 && retries < MAX_RATE_LIMIT_RETRIES) {
-      await sleep(rateLimitDelayMs(response))
-      response = await request(url, { headers })
-      retries += 1
-    }
-    if (!response.ok) {
-      throw new Error(`GitHub devolvió ${response.status} al listar los reportes.`)
+}): Effect.Effect<BackfillIssue[], BackfillError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const { token, owner, repo } = yield* requiredEnv(options.env)
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'finance-tracker-reports-backfill',
     }
 
-    const pageIssues = (await response.json()) as RawIssue[]
-    if (!Array.isArray(pageIssues) || pageIssues.length === 0) break
-    for (const raw of pageIssues) {
-      if (raw.pull_request || typeof raw.number !== 'number') continue
-      issues.push({
-        number: raw.number,
-        created_at: raw.created_at ?? '',
-        body: raw.body ?? null,
-        pull_request: raw.pull_request,
+    const issues: BackfillIssue[] = []
+    for (let page = 1; ; page += 1) {
+      const url = `${GITHUB_API_BASE}/repos/${owner}/${repo}/issues?${new URLSearchParams({
+        labels: LABEL,
+        state: 'all',
+        per_page: String(PER_PAGE),
+        page: String(page),
+      })}`
+
+      const send = Effect.tryPromise({
+        try: () => http.request(url, { headers }),
+        catch: () => new BackfillError({ message: 'No se pudo contactar con GitHub.' }),
       })
+      let response = yield* send
+      let retries = 0
+      while (response.status === 403 && retries < MAX_RATE_LIMIT_RETRIES) {
+        yield* Effect.sleep(Duration.millis(rateLimitDelayMs(response)))
+        response = yield* send
+        retries += 1
+      }
+      if (!response.ok) {
+        return yield* new BackfillError({
+          message: `GitHub devolvió ${response.status} al listar los reportes.`,
+        })
+      }
+
+      const pageIssues = yield* Effect.tryPromise({
+        try: () => response.json() as Promise<RawIssue[]>,
+        catch: () => new BackfillError({ message: 'GitHub devolvió una lista inválida.' }),
+      })
+      if (!Array.isArray(pageIssues) || pageIssues.length === 0) break
+      for (const raw of pageIssues) {
+        if (raw.pull_request || typeof raw.number !== 'number') continue
+        issues.push({
+          number: raw.number,
+          created_at: raw.created_at ?? '',
+          body: raw.body ?? null,
+          pull_request: raw.pull_request,
+        })
+      }
     }
-  }
-  return issues
+    return issues
+  })
 }
 
-async function readExisting(db: Db): Promise<number[]> {
-  const rows = await db.select({ issueNumber: issueReports.issueNumber }).from(issueReports)
-  return rows.map((row) => row.issueNumber)
+function readExisting(): Effect.Effect<number[], DatabaseError, Database> {
+  return issueReportsRepository
+    .listAll()
+    .pipe(Effect.map((rows) => rows.map((row) => row.issueNumber)))
 }
 
-async function readKnownUserIds(db: Db): Promise<string[]> {
-  const rows = await db.select({ id: users.id }).from(users)
-  return rows.map((row) => row.id)
+function readKnownUserIds(): Effect.Effect<string[], DatabaseError, Database> {
+  return query((db) => db.select({ id: users.id }).from(users)).pipe(
+    Effect.map((rows) => rows.map((row) => row.id)),
+  )
 }
 
-export async function runReportsBackfill(options: {
-  db: Db
+export function runReportsBackfill(options: {
   issues: BackfillIssue[]
   now?: string
   execute?: boolean
-}): Promise<{ plan: BackfillPlan; inserted: number; executed: boolean }> {
-  const now = options.now ?? nowIso()
-  const plan = buildBackfillPlan({
-    issues: options.issues,
-    existing: await readExisting(options.db),
-    knownUserIds: await readKnownUserIds(options.db),
-    now,
+}): Effect.Effect<
+  { plan: BackfillPlan; inserted: number; executed: boolean },
+  DatabaseError,
+  Database
+> {
+  return Effect.gen(function* () {
+    const now = options.now ?? nowIso()
+    const plan = buildBackfillPlan({
+      issues: options.issues,
+      existing: yield* readExisting(),
+      knownUserIds: yield* readKnownUserIds(),
+      now,
+    })
+
+    if (!options.execute || plan.toInsert.length === 0) {
+      return { plan, inserted: 0, executed: false }
+    }
+
+    const inserted = yield* transaction(issueReportsRepository.insertManyIfMissing(plan.toInsert))
+    return { plan, inserted, executed: true }
   })
-
-  if (!options.execute || plan.toInsert.length === 0) {
-    return { plan, inserted: 0, executed: false }
-  }
-
-  const inserted = await runWithDb(
-    options.db,
-    transaction(issueReportsRepository.insertManyIfMissing(plan.toInsert)),
-  )
-  return { plan, inserted, executed: true }
 }
 
 function sqlLiteral(value: string): string {
@@ -220,11 +242,17 @@ async function main(argv: string[]): Promise<void> {
   }
 
   const log = values.json ? console.error : console.log
-  const issues = await fetchWebReportIssues({ env: process.env })
   const database = openLocalV2Db(values['v2-sqlite'] as string)
   try {
     const execute = values.execute && !values['dry-run']
-    const result = await runReportsBackfill({ db: database.db, issues, execute })
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const issues = yield* fetchWebReportIssues({ env: process.env })
+        return yield* runReportsBackfill({ issues, execute }).pipe(
+          Effect.provideService(Database, database.db),
+        )
+      }).pipe(Effect.provideService(Http, { request: fetch })),
+    )
     log(formatBackfillPlan(result.plan))
     if (result.executed) log(`Insertadas: ${result.inserted}`)
     if (values['remote-sql-out']) {
