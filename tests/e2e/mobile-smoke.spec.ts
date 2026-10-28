@@ -141,8 +141,50 @@ test.describe('Mobile smoke', () => {
       tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }),
     ).toBeInViewport()
     await expect(registryTab).toHaveAttribute('aria-selected', 'true')
+    await expect(
+      page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('button', {
+        name: 'Movimientos',
+      }),
+    ).toHaveAttribute('aria-current', 'page')
     await expect(tracker.typeChip('Gastos')).toBeChecked()
     await expect(tracker.transactionPanel).toBeHidden()
+  })
+
+  test('llegar a Movimientos desde otra sección en móvil vuelve al inicio', async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openTransactions()
+    const transactionsMaxScroll = await tracker.maxScrollY()
+    expect(transactionsMaxScroll).toBeGreaterThan(0)
+
+    await tracker.clickNav('dashboard')
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(
+      tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
+    ).toBeVisible()
+    const dashboardMaxScroll = await tracker.maxScrollY()
+    const keptScroll = Math.min(transactionsMaxScroll, dashboardMaxScroll)
+    expect(keptScroll).toBeGreaterThan(0)
+
+    await tracker.scrollToPageY(keptScroll)
+    await expect.poll(() => tracker.scrollY()).toBe(keptScroll)
+
+    await tracker.clickNav('transactions')
+
+    await expect(page).toHaveURL(/\/movimientos$/)
+    await expect.poll(() => tracker.scrollY()).toBe(0)
+    await expect(
+      tracker.transactionsSection.getByRole('heading', { name: 'Movimientos', exact: true }),
+    ).toBeInViewport()
+    await expect(
+      tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }),
+    ).toBeInViewport()
+    await expect(
+      page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('button', {
+        name: 'Movimientos',
+      }),
+    ).toHaveAttribute('aria-current', 'page')
   })
 
   test('agrupa las secciones secundarias en un menú inferior accesible', async ({

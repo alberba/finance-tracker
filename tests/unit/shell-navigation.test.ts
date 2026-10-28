@@ -7,7 +7,7 @@ import { useUiStore } from '../../src/stores/ui'
 import type { SectionId } from '../../src/scripts/types'
 
 let scrollToSpy: ReturnType<typeof vi.spyOn>
-let popstateHandler: EventListener | null = null
+const popstateHandlers: EventListener[] = []
 
 function navButton(sectionId: SectionId): HTMLButtonElement {
   const button = document.querySelector<HTMLButtonElement>(`[data-section="${sectionId}"]`)
@@ -43,7 +43,7 @@ beforeEach(() => {
   const addEventListener = window.addEventListener.bind(window)
   vi.spyOn(window, 'addEventListener').mockImplementation((type, listener, options) => {
     if (type === 'popstate' && typeof listener === 'function') {
-      popstateHandler = listener
+      popstateHandlers.push(listener)
     }
     addEventListener(type, listener, options)
   })
@@ -52,8 +52,9 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  if (popstateHandler) window.removeEventListener('popstate', popstateHandler)
-  popstateHandler = null
+  popstateHandlers.splice(0).forEach((handler) => {
+    window.removeEventListener('popstate', handler)
+  })
   vi.restoreAllMocks()
   document.body.innerHTML = ''
   window.history.replaceState(null, '', '/')

@@ -335,9 +335,18 @@ export class FinanceTrackerPage {
 
   /** Scrolls the document to the bottom, as reading a long section does. */
   async scrollToPageBottom() {
-    await this.page.evaluate(() => {
-      window.scrollTo(0, document.documentElement.scrollHeight)
-    })
+    await this.scrollToPageY(await this.maxScrollY())
+  }
+
+  /** Highest vertical offset the current section's document can reach. */
+  async maxScrollY(): Promise<number> {
+    return this.page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
+  }
+
+  async scrollToPageY(top: number) {
+    await this.page.evaluate((offset) => {
+      window.scrollTo(0, offset)
+    }, top)
   }
 
   async scrollY(): Promise<number> {

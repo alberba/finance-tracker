@@ -191,9 +191,20 @@ test.describe('Navegación de secciones', () => {
   })
 
   test('llegar a Movimientos desde otra sección empieza al inicio', async ({ page, tracker }) => {
+    // La sección de destino tiene que poder conservar el desplazamiento: si el
+    // navegador lo recortase al montar una sección más corta, el test pasaría
+    // sin el reinicio. Se elige un offset válido en ambas secciones.
+    await tracker.openTransactions()
+    const transactionsMaxScroll = await tracker.maxScrollY()
+    expect(transactionsMaxScroll).toBeGreaterThan(0)
+
     await tracker.openDashboard()
-    await tracker.scrollToPageBottom()
-    await expect.poll(() => tracker.scrollY()).toBeGreaterThan(0)
+    const dashboardMaxScroll = await tracker.maxScrollY()
+    const keptScroll = Math.min(transactionsMaxScroll, dashboardMaxScroll)
+    expect(keptScroll).toBeGreaterThan(0)
+
+    await tracker.scrollToPageY(keptScroll)
+    await expect.poll(() => tracker.scrollY()).toBe(keptScroll)
 
     await tracker.clickNav('transactions')
 
