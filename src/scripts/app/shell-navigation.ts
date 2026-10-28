@@ -46,9 +46,7 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
       if (!section) {
         return
       }
-      const sectionId = normalizeSectionId(section)
-      switchSection(sectionId)
-      returnToSectionStart(sectionId)
+      switchSection(section, { returnToStart: true })
     })
 
     window.addEventListener('popstate', () => {
@@ -73,19 +71,15 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
   }
 
   /**
-   * Un clic en la navegación es lo único que reinicia el desplazamiento.
-   * `switchSection` también sirve al arranque y a `popstate`, que conservan la
-   * posición del documento, así que la decisión vive aquí y no dentro de él.
+   * Cambia la sección activa, sus marcas y la ruta. El arranque y `popstate`
+   * lo llaman sin `returnToStart`, así que conservan la posición del documento;
+   * solo el clic de navegación del usuario lo activa (#383).
    */
-  function returnToSectionStart(sectionId: SectionId) {
-    if (!SECTIONS_THAT_RETURN_TO_START_ON_NAV.includes(sectionId)) {
-      return
-    }
-    window.scrollTo({ top: 0, behavior: 'auto' })
-  }
-
-  function switchSection(sectionId: SectionId | string, options: { updateHistory?: boolean } = {}) {
-    const { updateHistory = true } = options
+  function switchSection(
+    sectionId: SectionId | string,
+    options: { updateHistory?: boolean; returnToStart?: boolean } = {},
+  ) {
+    const { updateHistory = true, returnToStart = false } = options
     const normalizedSectionId = normalizeSectionId(sectionId)
     ui.activeSection = normalizedSectionId
     uiStore.setActiveSection(normalizedSectionId)
@@ -112,6 +106,10 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
       if (window.location.pathname !== nextPath) {
         window.history.pushState(null, '', nextPath)
       }
+    }
+
+    if (returnToStart && SECTIONS_THAT_RETURN_TO_START_ON_NAV.includes(normalizedSectionId)) {
+      window.scrollTo({ top: 0, behavior: 'auto' })
     }
   }
 
