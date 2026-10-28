@@ -615,16 +615,23 @@ export class FinanceTrackerPage {
     return this.transactionsSection.locator('[data-registry-toolbar]')
   }
 
+  get typeChipGroup(): Locator {
+    return this.registryToolbar.getByRole('group', { name: 'Filtrar por tipo' })
+  }
+
+  /** Checkbox of a type chip, for asserting whether the filter is on. */
+  typeChip(label: string): Locator {
+    return this.typeChipGroup.getByRole('checkbox', { name: label })
+  }
+
   get transactionSearch(): Locator {
     return this.registryToolbar.getByLabel('Buscar movimientos')
   }
 
   /** Turns a type chip of the registry toolbar on or off. */
   async setTransactionTypeChip(label: string, on: boolean) {
-    const chip = this.registryToolbar
-      .getByRole('group', { name: 'Filtrar por tipo' })
-      .locator('label', { hasText: label })
-    if ((await chip.locator('input').isChecked()) !== on) {
+    const chip = this.typeChipGroup.locator('label', { hasText: label })
+    if ((await this.typeChip(label).isChecked()) !== on) {
       await chip.click()
     }
   }
@@ -645,8 +652,8 @@ export class FinanceTrackerPage {
     await this.registryToolbar
       .getByLabel('Cuenta', { exact: true })
       .selectOption({ label: 'Todas las cuentas' })
-    for (const label of ['Ingresos', 'Gastos', 'Inversión']) {
-      await this.setTransactionTypeChip(label, true)
+    for (const label of ['Ingresos', 'Gastos', 'Ahorros', 'Inversión']) {
+      await this.setTransactionTypeChip(label, false)
     }
   }
 

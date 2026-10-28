@@ -124,6 +124,24 @@ describe('RegistryLedger', () => {
     expect(wrapper.find('[data-tx-show-older]').exists()).toBe(false)
   })
 
+  it('pliega los meses igual con los cuatro tipos elegidos que sin ninguno', () => {
+    const { uiStore } = setupTransactions([
+      makeTx({ id: 'tx-oct', date: '2026-10-05', month: 10, description: 'Alquiler octubre' }),
+      makeTx({ id: 'tx-sep', date: '2026-09-12', month: 9, description: 'Alquiler septiembre' }),
+    ])
+    uiStore.ui.txFilters.types = ['income', 'expense', 'saving', 'investment']
+
+    const wrapper = mount(RegistryLedger, {
+      props: { selecting: false },
+    })
+
+    expect(wrapper.findAll('tbody')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('Alquiler septiembre')
+    expect(wrapper.get('[data-tx-show-older]').text()).toBe(
+      'Ver septiembre y anteriores · 1 movimientos',
+    )
+  })
+
   it('muestra el último mes con movimientos si el mes seleccionado no tiene', () => {
     setupTransactions(
       [

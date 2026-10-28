@@ -1,7 +1,7 @@
 import type { Month } from '../../lib/month'
 import { parseDecimal, round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
-import type { Transaction, TransactionType } from '../../scripts/types'
+import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../scripts/types'
 
 type Dated = Pick<Transaction, 'date' | 'month'>
 
@@ -58,6 +58,14 @@ export interface RegistryFilters {
   date: string
   amountMin: string
   amountMax: string
+}
+
+/**
+ * Whether the chosen types narrow the registry. No type means every type, and
+ * so does choosing all of them, so neither hides anything.
+ */
+export function hasTypeRestriction(types: string[]): boolean {
+  return types.length > 0 && !TRANSACTION_TYPES.every((type) => types.includes(type))
 }
 
 export interface MonthGroup {
