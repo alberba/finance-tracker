@@ -74,6 +74,29 @@ export class FinanceTrackerPage {
     return this.page.getByRole('dialog', { name: /^(Nuevo|Editar) movimiento$/ })
   }
 
+  /** The scrolling body of the movement side panel. */
+  get transactionPanelBody(): Locator {
+    return this.transactionPanel.locator('[data-side-panel-body]')
+  }
+
+  /** Scrolls the movement panel body to its end. */
+  async scrollTransactionPanelToBottom() {
+    const body = this.transactionPanelBody
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  }
+
+  /** Asserts the movement panel opened at the top of the form. */
+  async expectTransactionPanelAtTop() {
+    await expect(this.transactionPanelBody).toHaveJSProperty('scrollTop', 0)
+    await expect(
+      this.transactionPanel.getByRole('group', { name: 'Tipo de movimiento' }),
+    ).toBeInViewport()
+    await expect(this.transactionPanel.getByLabel('Importe')).toBeInViewport()
+  }
+
   /** Ledger rows of the registry, every month shown. */
   get transactionRows(): Locator {
     return this.transactionsSection.locator('[data-tx-ledger] tr[data-tx-id]')

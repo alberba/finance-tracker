@@ -183,6 +183,26 @@ test.describe('Dashboard section', () => {
     await expect(page.getByRole('dialog', { name: 'Nuevo movimiento' })).toBeVisible()
   })
 
+  test('el panel de nuevo movimiento se reabre al inicio desde la cabecera', async ({
+    tracker,
+  }) => {
+    await tracker.openDashboard()
+    const open = tracker.dashboardSection.getByRole('button', { name: 'Nuevo movimiento' })
+    const panel = tracker.transactionPanel
+
+    await open.click()
+    await expect(panel).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+
+    await tracker.scrollTransactionPanelToBottom()
+    await panel.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(panel).toBeHidden()
+
+    await open.click()
+    await expect(panel).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+  })
+
   test('muestra las cotizaciones y avisa solo de las retrasadas', async ({ page, tracker }) => {
     await page.route('**/api/market/quotes', async (route) => {
       const body = route.request().postDataJSON() as {
