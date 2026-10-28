@@ -451,7 +451,7 @@ Autorización (todas deben cumplirse; si no, 404/403/409 sin efecto):
 1. Propiedad del reporte (404).
 2. Cadena ⇒ `allowed = { root.number, followed?.number }`.
 3. `GET issues/comments/{id}` (404 si no existe). Número de issue = último segmento de `issue_url`;
-   debe estar en `allowed` (403).
+   debe estar en `allowed` (404, igual que uno inexistente: no revela si el id existe en otro reporte).
 4. `classifyComment` = `mine` (marcador = principal **y** autor = bot [D1]) (403 — un mismo mensaje para
    ajeno y sin marcador: «No puedes modificar este comentario.»).
 5. La issue del comentario está `OPEN` según la consulta 1 (409).
@@ -480,6 +480,7 @@ pueda adelantar la marca y silenciar novedades).
 | Payload inválido                  | 400    | `Payload inválido.` + `details` (zod)  |
 | Adjunto demasiado grande          | 413    | mensaje del esquema                    |
 | Hilo cerrado                      | 409    | texto fijo                             |
+| Comentario de otro reporte        | 404    | `Reporte no encontrado.`               |
 | Comentario no editable            | 403    | texto fijo                             |
 | Límite de uso                     | 429    | como el POST actual                    |
 | GitHub falla (lectura o escritura)| 502    | `No se pudo consultar/publicar en GitHub. Inténtalo de nuevo.` |
@@ -884,7 +885,8 @@ Regla: capa más baja posible, un fallo por razón.
 - `issue-report-route.test.ts` (actualizar): siempre 201, sin `duplicate`, `tracked: false` si el `INSERT`
   falla pero la issue se crea, `userId` del principal.
 - `reports-routes.test.ts`: cada ruta nueva con `locals.principal` falso: 401 sin principal, 400 en
-  parámetros inválidos, 404 uniforme, 502 de GitHub, 409 cerrado, 403 no editable, 429.
+  parámetros inválidos, 404 uniforme (reporte o comentario de otro reporte), 502 de GitHub, 409 cerrado,
+  403 no editable, 429.
 - `issue-attachments.test.ts`/`issue-report-schema.test.ts`: cubrir el refactor de esquemas.
 
 **Integración (`tests/integration/d1-v2/`, SQLite real, `Http` falso)**:
@@ -893,8 +895,9 @@ Regla: capa más baja posible, un fallo por razón.
   por usuario, orden, `markSeen` monótono, `insertManyIfMissing` por lotes.
 - `api/reports.test.ts`: dos usuarios; B pide el número de A ⇒ 404 y **cero** llamadas a GitHub; lista de A
   no contiene filas de B; seguimiento de una principal compartida (ambos ven solo sus aclaraciones);
-  edición/borrado rechazan marcador ajeno, autor distinto del bot, issue cerrada y comentario de otra
-  issue; `seen` recortado a «ahora»; usuario sin filas ⇒ lista vacía sin llamar a GitHub.
+  edición/borrado rechazan con 404 un comentario de otra issue, con 403 un marcador ajeno o un autor
+  distinto del bot, y con 409 una issue cerrada; `seen` recortado a «ahora»; usuario sin filas ⇒ lista
+  vacía sin llamar a GitHub.
 - `migrations/issue-reports.test.ts`: la migración crea tabla e índices y la FK.
 - `repair`-style: `reports-backfill.test.ts` extremo a extremo sobre un SQLite temporal con GitHub falso
   paginado (incluye PRs ignorados, dos ejecuciones sin duplicados, informe de saltadas).
