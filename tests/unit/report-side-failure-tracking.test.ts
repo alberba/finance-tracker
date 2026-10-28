@@ -12,14 +12,19 @@ const sentry = vi.hoisted(() => ({
 vi.mock('@sentry/cloudflare', () => sentry)
 
 const setTag = vi.fn()
+const setFingerprint = vi.fn()
 
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
-  sentry.withScope.mockImplementation((handler: (scope: { setTag: typeof setTag }) => void) => {
-    // El scope expone solo setTag: cualquier otro adjunto reventaría el test.
-    handler({ setTag })
-  })
+  sentry.withScope.mockImplementation(
+    (
+      handler: (scope: { setTag: typeof setTag; setFingerprint: typeof setFingerprint }) => void,
+    ) => {
+      // El scope expone solo setTag y setFingerprint: cualquier otro adjunto reventaría el test.
+      handler({ setTag, setFingerprint })
+    },
+  )
 })
 
 async function loadTracking() {
@@ -37,7 +42,22 @@ describe('reportReportSideFailure', () => {
       ['report.reason', 'http-401'],
     ])
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
-    expect(sentry.captureMessage).toHaveBeenCalledWith('Fallo auxiliar del reporte web', 'warning')
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      'Fallo auxiliar del reporte web (enrich: http-401)',
+      'warning',
+    )
+  })
+
+  it('agrupa por fase y motivo: cada combinación es su propia issue', async () => {
+    const { reportReportSideFailure } = await loadTracking()
+
+    reportReportSideFailure({ stage: 'enrich', reason: 'http-401' })
+    reportReportSideFailure({ stage: 'upload', reason: 'http-403' })
+
+    expect(setFingerprint.mock.calls).toEqual([
+      [['report-side-failure', 'enrich', 'http-401']],
+      [['report-side-failure', 'upload', 'http-403']],
+    ])
   })
 
   it('no relanza si el SDK falla, y deja un log fijo', async () => {
