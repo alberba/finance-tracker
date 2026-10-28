@@ -62,7 +62,7 @@ const followed = computed(() => (props.report.unavailable ? undefined : props.re
         </span>
 
         <ReportStatus :entry="props.report" compact />
-        <span class="text-text-muted font-mono text-xs tabular-nums">
+        <span class="text-text-muted text-xs tabular-nums">
           Enviado el {{ formatShortDate(props.report.submittedAt) }}
         </span>
       </span>

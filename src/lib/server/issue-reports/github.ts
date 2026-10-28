@@ -22,6 +22,7 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
 export interface GraphIssueNode extends IssueNode {
   statusChangedAt: string | null
   recentComments: RawComment[]
+  commentsPage: { hasPreviousPage: boolean; startCursor: string | null }
 }
 
 interface GraphIssuePayload {
@@ -32,8 +33,14 @@ interface GraphIssuePayload {
   stateReason?: string | null
   repository?: { nameWithOwner?: string } | null
   timelineItems?: { nodes?: Array<{ __typename?: string; createdAt?: string }> }
-  comments?: { nodes?: RawCommentPayload[] }
+  comments?: RawCommentsPayload | null
   duplicateOf?: GraphIssuePayload | null
+}
+
+interface RawCommentsPayload {
+  totalCount?: number
+  pageInfo?: { hasPreviousPage?: boolean; startCursor?: string | null } | null
+  nodes?: RawCommentPayload[]
 }
 
 interface RawCommentPayload {
@@ -49,13 +56,22 @@ interface GraphqlBody {
   errors?: Array<{ type?: string; path?: Array<string | number>; message?: string }>
 }
 
+/** Una página de hilo: tamaño máximo que acepta GraphQL y cursor hacia atrás. */
+const COMMENTS_PAGE_SIZE = 100
+/** Alias por consulta: acota el coste de una sola petición GraphQL. */
+const MAX_ISSUES_PER_QUERY = 50
+/** Comentarios por alias en la consulta de novedades; el resto se pide paginado. */
+const RECENT_COMMENTS_PAGE_SIZE = 25
+
 const ISSUE_FIELDS = `number url title state stateReason
   repository { nameWithOwner }
   timelineItems(last: 1, itemTypes: [CLOSED_EVENT, REOPENED_EVENT]) {
     nodes { __typename ... on ClosedEvent { createdAt } ... on ReopenedEvent { createdAt } }
   }`
 
-const RECENT_COMMENTS = `comments(last: 5) {
+const RECENT_COMMENTS = `comments(last: ${RECENT_COMMENTS_PAGE_SIZE}) {
+    totalCount
+    pageInfo { hasPreviousPage startCursor }
     nodes { databaseId createdAt body author { __typename login } }
   }`
 
@@ -63,9 +79,23 @@ function graphqlError(message: string, status?: number): ReportsGithubError {
   return new ReportsGithubError({ message, ...(status === undefined ? {} : { status }) })
 }
 
+function rawComments(payload: RawCommentsPayload | null | undefined): RawComment[] {
+  return (payload?.nodes ?? [])
+    .filter((comment) => typeof comment.databaseId === 'number' && typeof comment.body === 'string')
+    .map((comment) => ({
+      databaseId: comment.databaseId as number,
+      createdAt: comment.createdAt ?? '',
+      updatedAt: comment.updatedAt,
+      body: comment.body as string,
+      author: comment.author?.login
+        ? { login: comment.author.login, __typename: comment.author.__typename }
+        : null,
+    }))
+}
+
 function issueNode(payload: GraphIssuePayload | null): GraphIssueNode | null {
   if (!payload || typeof payload.number !== 'number' || !payload.url) return null
-  const comments = payload.comments?.nodes ?? []
+  const pageInfo = payload.comments?.pageInfo
   return {
     number: payload.number,
     url: payload.url,
@@ -76,18 +106,22 @@ function issueNode(payload: GraphIssuePayload | null): GraphIssueNode | null {
       ? { nameWithOwner: payload.repository.nameWithOwner }
       : null,
     statusChangedAt: payload.timelineItems?.nodes?.[0]?.createdAt ?? null,
-    recentComments: comments
-      .filter((comment) => typeof comment.databaseId === 'number' && typeof comment.body === 'string')
-      .map((comment) => ({
-        databaseId: comment.databaseId as number,
-        createdAt: comment.createdAt ?? '',
-        body: comment.body as string,
-        author: comment.author?.login
-          ? { login: comment.author.login, __typename: comment.author.__typename }
-          : null,
-      })),
+    recentComments: rawComments(payload.comments),
+    commentsPage: {
+      hasPreviousPage: Boolean(pageInfo?.hasPreviousPage) && Boolean(pageInfo?.startCursor),
+      startCursor: pageInfo?.startCursor ?? null,
+    },
     ...(payload.duplicateOf ? { duplicateOf: issueNode(payload.duplicateOf) } : {}),
   }
+}
+
+/** Ignora los `NOT_FOUND` propios de un alias: significan «issue inaccesible». */
+function hasUnexpectedGraphqlError(errors: NonNullable<GraphqlBody['errors']>): boolean {
+  return errors.some((error) => {
+    const expected =
+      error.type === 'NOT_FOUND' && Boolean(error.path?.some((part) => /^i\d+$/.test(String(part))))
+    return !expected
+  })
 }
 
 function withTimeout(request: typeof fetch, url: string, init: RequestInit): Promise<Response> {
@@ -169,7 +203,27 @@ export function resolveBotLogin(
 
 const botLogins = new Map<string, string>()
 
+/**
+ * Lectura GraphQL de la lista: un alias por issue. Se parte en consultas de
+ * `MAX_ISSUES_PER_QUERY` para que el coste de una petición quede acotado.
+ */
 export function fetchIssueChain(
+  config: GithubConfig,
+  numbers: number[],
+  options: { comments: boolean },
+): Effect.Effect<Map<number, GraphIssueNode | null>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const result = new Map<number, GraphIssueNode | null>()
+    for (let start = 0; start < numbers.length; start += MAX_ISSUES_PER_QUERY) {
+      const chunk = numbers.slice(start, start + MAX_ISSUES_PER_QUERY)
+      const page = yield* fetchIssueChainPage(config, chunk, options)
+      for (const [number, node] of page) result.set(number, node)
+    }
+    return result
+  })
+}
+
+function fetchIssueChainPage(
   config: GithubConfig,
   numbers: number[],
   options: { comments: boolean },
@@ -207,14 +261,11 @@ ${fragments}`
       catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
     })
 
-    const unexpected = (parsed.errors ?? []).filter((error) => {
-      const expected =
-        error.type === 'NOT_FOUND' &&
-        Boolean(error.path?.some((part) => /^i\d+$/.test(String(part))))
-      return !expected
-    })
-    if (unexpected.length > 0) {
-      console.error('[reports] GraphQL devolvió errores', unexpected.map((error) => error.message))
+    if (hasUnexpectedGraphqlError(parsed.errors ?? [])) {
+      console.error(
+        '[reports] GraphQL devolvió errores',
+        (parsed.errors ?? []).map((error) => error.message),
+      )
       return yield* graphqlError('GitHub devolvió un error al consultar las issues.')
     }
     if (!parsed.data?.repository) {
@@ -229,68 +280,169 @@ ${fragments}`
   })
 }
 
-export interface IssueThread {
-  totalCount: number
+export interface IssueCommentsPage {
   comments: RawComment[]
+  hasPreviousPage: boolean
+  startCursor: string | null
 }
 
+export interface OlderCommentsRequest {
+  /** Issue cuyo hilo se sigue. */
+  number: number
+  /** `startCursor` de la página más antigua que ya se leyó. */
+  before: string
+}
+
+/**
+ * Página anterior del hilo de cada issue, en una sola consulta con alias. Es la
+ * continuación de `recentComments`: solo se pide cuando la ventana de novedades
+ * no llegó a un comentario anterior a `lastSeenAt`.
+ */
+export function fetchOlderComments(
+  config: GithubConfig,
+  requests: OlderCommentsRequest[],
+): Effect.Effect<Map<number, IssueCommentsPage>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const result = new Map<number, IssueCommentsPage>()
+    for (let start = 0; start < requests.length; start += MAX_ISSUES_PER_QUERY) {
+      const chunk = requests.slice(start, start + MAX_ISSUES_PER_QUERY)
+      const page = yield* fetchOlderCommentsPage(config, chunk)
+      for (const [number, comments] of page) result.set(number, comments)
+    }
+    return result
+  })
+}
+
+function fetchOlderCommentsPage(
+  config: GithubConfig,
+  requests: OlderCommentsRequest[],
+): Effect.Effect<Map<number, IssueCommentsPage>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    if (requests.length === 0) return new Map()
+    const http = yield* Http
+    const declarations = requests.map((request) => `$c${request.number}: String!`).join(', ')
+    const aliases = requests
+      .map(
+        (request) =>
+          `i${request.number}: issue(number: ${request.number}) { comments(last: ${COMMENTS_PAGE_SIZE}, before: $c${request.number}) { totalCount pageInfo { hasPreviousPage startCursor } nodes { databaseId createdAt body author { __typename login } } } }`,
+      )
+      .join('\n')
+    const variables: Record<string, unknown> = { owner: config.owner, name: config.repo }
+    for (const request of requests) variables[`c${request.number}`] = request.before
+
+    const query = `query ($owner: String!, $name: String!, ${declarations}) {
+  repository(owner: $owner, name: $name) {
+${aliases}
+  }
+}`
+
+    const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
+      method: 'POST',
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    })
+    const raw = yield* Effect.promise(() => response.text().catch(() => ''))
+    if (!response.ok) {
+      logFailure('POST /graphql (comentarios anteriores)', response.status, raw)
+      return yield* graphqlError('GitHub rechazó la consulta del hilo.', response.status)
+    }
+    const parsed = yield* Effect.try({
+      try: () =>
+        JSON.parse(raw) as GraphqlBody & {
+          data?: {
+            repository?: Record<string, { comments?: RawCommentsPayload | null } | null> | null
+          }
+        },
+      catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
+    })
+    if (hasUnexpectedGraphqlError(parsed.errors ?? [])) {
+      console.error(
+        '[reports] GraphQL de comentarios devolvió errores',
+        (parsed.errors ?? []).map((error) => error.message),
+      )
+      return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
+    }
+    const result = new Map<number, IssueCommentsPage>()
+    for (const request of requests) {
+      const comments = parsed.data?.repository?.[`i${request.number}`]?.comments
+      if (!comments) continue
+      result.set(request.number, {
+        comments: rawComments(comments),
+        hasPreviousPage:
+          Boolean(comments.pageInfo?.hasPreviousPage) && Boolean(comments.pageInfo?.startCursor),
+        startCursor: comments.pageInfo?.startCursor ?? null,
+      })
+    }
+    return result
+  })
+}
+
+/** Hilo completo: se recorren todas las páginas hacia atrás, sin recortar. */
 export function fetchIssueThread(
   config: GithubConfig,
   number: number,
-): Effect.Effect<IssueThread, ReportsGithubError, Http> {
+): Effect.Effect<RawComment[], ReportsGithubError, Http> {
   return Effect.gen(function* () {
     const http = yield* Http
-    const query = `query ($owner: String!, $name: String!, $number: Int!) {
+    let comments: RawComment[] = []
+    let before: string | undefined
+
+    for (;;) {
+      const query = `query ($owner: String!, $name: String!, $number: Int!${
+        before ? ', $before: String!' : ''
+      }) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
-      comments(last: 100) {
+      comments(last: ${COMMENTS_PAGE_SIZE}${before ? ', before: $before' : ''}) {
         totalCount
+        pageInfo { hasPreviousPage startCursor }
         nodes { databaseId createdAt updatedAt body author { __typename login } }
       }
     }
   }
 }`
-    const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
-      method: 'POST',
-      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query,
-        variables: { owner: config.owner, name: config.repo, number },
-      }),
-    })
-    const raw = yield* Effect.promise(() => response.text().catch(() => ''))
-    if (!response.ok) {
-      logFailure('POST /graphql (hilo)', response.status, raw)
-      return yield* graphqlError('GitHub rechazó la consulta del hilo.', response.status)
-    }
-    const parsed = yield* Effect.try({
-      try: () => JSON.parse(raw) as GraphqlBody & {
-        data?: { repository?: { issue?: { comments?: { totalCount?: number; nodes?: RawCommentPayload[] } } | null } | null }
-      },
-      catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
-    })
-    const comments = parsed.data?.repository?.issue?.comments
-    if (!comments) {
-      if (parsed.errors?.length) {
-        console.error('[reports] GraphQL del hilo devolvió errores', parsed.errors)
-        return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
+      const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
+        method: 'POST',
+        headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          variables: {
+            owner: config.owner,
+            name: config.repo,
+            number,
+            ...(before ? { before } : {}),
+          },
+        }),
+      })
+      const raw = yield* Effect.promise(() => response.text().catch(() => ''))
+      if (!response.ok) {
+        logFailure('POST /graphql (hilo)', response.status, raw)
+        return yield* graphqlError('GitHub rechazó la consulta del hilo.', response.status)
       }
-      return { totalCount: 0, comments: [] }
+      const parsed = yield* Effect.try({
+        try: () =>
+          JSON.parse(raw) as GraphqlBody & {
+            data?: {
+              repository?: { issue?: { comments?: RawCommentsPayload | null } | null } | null
+            }
+          },
+        catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
+      })
+      const page = parsed.data?.repository?.issue?.comments
+      if (!page) {
+        if (parsed.errors?.length) {
+          console.error('[reports] GraphQL del hilo devolvió errores', parsed.errors)
+          return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
+        }
+        break
+      }
+      comments = [...rawComments(page), ...comments]
+      const cursor = page.pageInfo?.startCursor ?? null
+      if (!page.pageInfo?.hasPreviousPage || !cursor || cursor === before) break
+      before = cursor
     }
-    return {
-      totalCount: Number(comments.totalCount ?? comments.nodes?.length ?? 0),
-      comments: (comments.nodes ?? [])
-        .filter((comment) => typeof comment.databaseId === 'number' && typeof comment.body === 'string')
-        .map((comment) => ({
-          databaseId: comment.databaseId as number,
-          createdAt: comment.createdAt ?? '',
-          updatedAt: comment.updatedAt,
-          body: comment.body as string,
-          author: comment.author?.login
-            ? { login: comment.author.login, __typename: comment.author.__typename }
-            : null,
-        })),
-    }
+
+    return comments
   })
 }
 

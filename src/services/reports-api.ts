@@ -39,16 +39,23 @@ function detailPath(issueNumber: number): string {
 }
 
 /** Lista de la cuenta; en demo, las dos entradas ficticias. */
-export const fetchReports = (): Effect.Effect<ReportsListResponse, ApiClientError, ClientHttp> => {
+export const fetchReports = (
+  options: { cursor?: string | null } = {},
+): Effect.Effect<ReportsListResponse, ApiClientError, ClientHttp> => {
   if (isDemoMode()) {
     return Effect.succeed({
       ok: true,
       reports: DEMO_REPORTS.map((detail) => detail.report),
       hasMore: false,
+      nextCursor: null,
+      unseenCount: DEMO_REPORTS.filter((detail) => detail.report.hasUpdates).length,
       fetchedAt: DEMO_REPORTS[0].fetchedAt,
     })
   }
-  return requestApiJson<ReportsListResponse>(LIST_ENDPOINT, {
+  const endpoint = options.cursor
+    ? `${LIST_ENDPOINT}?cursor=${encodeURIComponent(options.cursor)}`
+    : LIST_ENDPOINT
+  return requestApiJson<ReportsListResponse>(endpoint, {
     fallbackMessage: 'No se pudieron cargar tus reportes.',
   })
 }

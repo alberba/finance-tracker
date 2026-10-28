@@ -29,8 +29,9 @@ Identificadores clave en UI:
    (ya no hay comprobación previa de duplicadas) y registra la propiedad en `issue_reports`.
 2. El acuse muestra `Reporte creado: #N` y un enlace «Ver en Mis reportes». Si el registro falló,
    muestra que aparecerá en cuanto se recupere y el POST responde `tracked: false`.
-3. `/reportes` pide `GET /api/reports`: una sola consulta GraphQL con alias por número. Los cierres
-   asíncronos del workflow aparecen en la siguiente carga, sin sondeos ni caché de estado.
+3. `/reportes` pide `GET /api/reports`: consultas GraphQL con alias por número (≤50 por petición) y
+   páginas de 20 entradas con «Cargar más reportes». Los cierres asíncronos del workflow aparecen en la
+   siguiente carga, sin sondeos ni caché de estado.
 4. Al abrir un detalle se pide `GET /api/reports/:n`, que resuelve la cadena de duplicadas y lee el
    hilo de la issue seguida. El cliente marca la lectura con `POST /api/reports/:n/seen`.
 5. Las aclaraciones propias se publican, editan y borran con `POST`/`PATCH`/`DELETE` sobre
@@ -142,9 +143,10 @@ fechas son constantes y sirven de fixtures para la E2E.
 
 - El contrato de la API y los tipos de `report-entry.ts` deben cambiar juntos; el cliente nunca
   envía `userId`, URL de issue ni de comentario.
-- El token del bot necesita `GITHUB_BOT_LOGIN` si es una GitHub App; sin login resoluble, el detalle
-  falla cerrado y la lista degrada a avisos solo por estado.
-- La lista lee como máximo 100 reportes; si hay más, se avisa y no se pagina.
+- El token del bot necesita `GITHUB_BOT_LOGIN` si es una GitHub App; sin login resoluble, la lista y el
+  detalle fallan cerrados con un error visible en vez de perder avisos.
+- La lista pagina de 20 en 20 con «Cargar más reportes»; el contador de novedades cubre todas las
+  entradas de la cuenta.
 - El cuerpo de la issue nunca se edita desde la app.
 
 ## Documentación relacionada

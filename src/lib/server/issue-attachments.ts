@@ -9,7 +9,7 @@ export interface AttachmentUploadContext {
   /** Cabeceras de autenticación y de la API de GitHub, las mismas que el resto de llamadas. */
   headers: Record<string, string>
   /** Id numérico del repositorio. El llamador lo resuelve una vez por reporte. */
-  repositoryId: () => Promise<number>
+  repositoryId: number
 }
 
 /**
@@ -26,7 +26,7 @@ export const uploadIssueAttachment: AttachmentUploader = async (attachment, cont
     const url = new URL(GITHUB_UPLOADS_URL)
     url.searchParams.set('name', attachment.name)
     url.searchParams.set('content_type', attachment.contentType)
-    url.searchParams.set('repository_id', String(await context.repositoryId()))
+    url.searchParams.set('repository_id', String(context.repositoryId))
 
     const response = await context.fetch(url, {
       method: 'POST',

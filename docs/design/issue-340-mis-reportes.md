@@ -44,8 +44,10 @@ Decididas aquí (el brief no las fija):
   respuesta que llegue entre la lectura y la marca no se da por vista sin mostrarse.
 - **[D5] Detalle por query.** `/reportes` (lista) y `/reportes?reporte=<n>` (detalle) comparten la
   ruta Astro; recargar conserva el detalle y no hay rutas dinámicas de página.
-- **[D6] Límite de lista.** Se leen los **100 reportes más recientes** de la cuenta (alias GraphQL).
-  Sin paginación en esta fase; si hay más, la respuesta lleva `hasMore: true` y la UI lo dice.
+- **[D6] Lista paginada.** La lista devuelve **20 entradas por página** y un `nextCursor` opaco
+  (`submittedAt|issueNumber`) que la UI consume con «Cargar más reportes». No hay tope: todas las
+  filas de la cuenta son alcanzables. El contador de novedades se calcula sobre **todas** las filas
+  en la primera página, no solo sobre la página visible.
 - **[D7] Fallo del registro de propiedad.** Si la issue se crea pero el `INSERT` falla, el POST
   devuelve `201` igualmente (la issue existe) con `tracked: false`; el acuse lo dice honestamente y
   `pnpm reports:backfill` lo recupera. Nunca se reintenta creando otra issue.
@@ -137,7 +139,7 @@ export interface ReportDetail {
   report: AvailableReportEntry
   threadIssue: ReportIssueRef // la que se sigue (original o principal)
   thread: ThreadItem[] // ascendente por fecha
-  hiddenBefore: number // comentarios anteriores a los 100 leídos (0 normalmente)
+  // sin recorte: el hilo se pagina hasta leerlo completo
   canComment: boolean // threadIssue.state === 'OPEN'
   fetchedAt: string // ISO del servidor al empezar a leer (para [D4])
 }
@@ -276,7 +278,7 @@ Repositorio `src/db/repositories/issue-reports.ts` (patrón `audit-events.ts`: `
 | Función                                  | Contrato                                                                                       |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `recordSubmission(userId, n, at)`        | `INSERT … ON CONFLICT DO NOTHING`; `submittedAt = lastSeenAt = at`. Devuelve `boolean` insertada. |
-| `listRecentByUser(userId, limit)`        | Ordena `submitted_at DESC, issue_number DESC`; `limit + 1` filas para calcular `hasMore`.        |
+| `listByUser(userId)`                     | Todas las filas de la cuenta ordenadas `submitted_at DESC, issue_number DESC`; la paginación se hace en el servicio con `nextCursor`. |
 | `getByUserAndNumber(userId, n)`          | Fila o `undefined`. Es **la** comprobación de propiedad.                                        |
 | `markSeen(userId, n, seenAtIso)`         | `UPDATE … SET last_seen_at = max(last_seen_at, ?)` (comparar ISO como texto es válido: mismo formato). Devuelve `boolean`. |
 | `insertManyIfMissing(rows)`              | Solo backfill: `INSERT … ON CONFLICT DO NOTHING`, `chunkIds`-style por el límite de variables (`MAX_SQL_VARIABLES_PER_STATEMENT`). |
@@ -338,7 +340,11 @@ fragment F on Issue {
   }
 }
 fragment C on Issue {   # solo en la lista
-  comments(last: 5) { nodes { databaseId createdAt body author { __typename login } } }
+  comments(last: 25) {
+    totalCount
+    pageInfo { hasPreviousPage startCursor }
+    nodes { databaseId createdAt body author { __typename login } }
+  }
 }
 query ($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
@@ -351,10 +357,14 @@ query ($owner: String!, $name: String!) {
 }
 ```
 
-- **Lista**: una sola consulta con todos los alias (≤100) → cumple «una sola consulta con alias».
-- **Detalle**: consulta 1 = un alias con `F` (sin `C`) para resolver la cadena; consulta 2 = hilo de la
-  issue seguida: `issue(number: N) { comments(last: 100) { totalCount nodes { databaseId createdAt updatedAt body author { __typename login } } } }`
-  (`hiddenBefore = totalCount - nodes.length`).
+- **Lista**: consultas con alias por issue, como máximo 50 alias por petición. El fragmento `C` pide
+  `comments(last: 25)` con `pageInfo { hasPreviousPage startCursor }`; si la página no llega a un
+  comentario anterior o igual a `lastSeenAt` y no hay aviso del mantenedor, se pide la página anterior
+  (`comments(last: 100, before: $c<issue>)`, un alias por issue) hasta agotar la ventana. No hay tope de
+  comentarios recientes.
+- **Detalle**: consulta 1 = un alias con `F` (sin `C`) para resolver la cadena; consulta 2 en adelante =
+  hilo de la issue seguida, `comments(last: 100)` paginado hacia atrás con `before` hasta
+  `hasPreviousPage: false`. Se muestran todos los comentarios.
 - Alias `null` ⇒ la issue no es accesible (borrada/transferida/sin permisos) ⇒ `unavailable`. Los
   `errors[]` con `type: 'NOT_FOUND'` y `path` `[repository, iNNN]` son esperados y no fallan la
   petición. Cualquier otro error, HTTP no-2xx o sin `data` ⇒ `ReportsGithubError` (la lista muestra
@@ -381,22 +391,25 @@ duplicateLinkUnavailable = linkBroken
 
 - Alcanzados 3 saltos con la última aún duplicada: se muestra esa (con su estado propio); **no** es
   `linkBroken`.
-- `linkBroken` con `hops == 0` ⇒ la entrada «vuelve a la original» (no hay `followed`), conserva su
-  estado y avisa. Con `hops > 0` ⇒ `followed` es el último nodo accesible y también se avisa.
+- `linkBroken` en cualquier salto ⇒ la entrada «vuelve a la original» (no hay `followed`), conserva su
+  estado y avisa. Nunca se muestra un eslabón intermedio como destino de la cadena.
 - Solo campos nativos: no se mira texto, labels ni comentarios. Un label `duplicate` o «duplicado» en
   el título no produce nada (test explícito).
 
 ### 5.4 Lista — `GET /api/reports`
 
-1. `rows = listRecentByUser(userId, 100)`. Sin filas ⇒ `{ reports: [], hasMore:false, fetchedAt }` **sin
-   llamar a GitHub**.
-2. Una consulta GraphQL (lista). Para cada fila: `resolveFollowed` → entrada (`unavailable` si el alias
-   es `null`).
-3. `hasUpdates` con `computeHasUpdates`, usando los 5 últimos comentarios de la issue seguida
-   (`classifyComment` con `botLogin`; si `resolveBotLogin` falla, en la **lista** se degrada a
-   `hasUpdates` solo por cambio de estado en vez de fallar toda la lista — decisión de coste; en el
-   **detalle** sí falla cerrado, [D1]).
-4. Respuesta `200 { ok: true, reports, hasMore, fetchedAt }`, `Cache-Control: no-store` (vía
+1. `rows = listByUser(userId)`; sin filas ⇒ `{ reports: [], hasMore:false, nextCursor:null,
+   unseenCount:0, fetchedAt }` **sin llamar a GitHub**. `pageStartIndex` recorta la página pedida por
+   `?cursor=` (20 entradas).
+2. Consultas GraphQL con alias (≤50 por petición) para las filas que toca escanear. Para cada fila:
+   `resolveFollowed` → entrada (`unavailable` si el alias es `null`).
+3. `hasUpdates` con `computeHasUpdates`, usando la ventana de comentarios de la issue seguida
+   (`scanCommentWindow` con `classifyComment` y `botLogin`) y paginando hacia atrás hasta llegar a un
+   comentario ya leído. `resolveBotLogin` falla cerrado también en la **lista**, como en el detalle
+   ([D1]): sin login del bot no se puede distinguir al mantenedor y perder avisos en silencio sería
+   una falsa señal.
+4. Respuesta `200 { ok: true, reports, hasMore, nextCursor, unseenCount?, fetchedAt }` — `unseenCount`
+   solo en la primera página y calculado sobre todas las filas. `Cache-Control: no-store` (vía
    `jsonResponse` de `api-auth`). **Sin caché de estado en servidor**: un cierre asíncrono del workflow
    aparece en la siguiente carga.
 
@@ -542,7 +555,7 @@ copia o el `finance.sqlite` del volumen con la copia diaria ya hecha; primero si
 | Fichero                                            | Responsabilidad                                                                          |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `src/services/reports-api.ts`                      | `Effect` + `requestApiJson` (patrón `issue-report-api.ts`): `fetchReports`, `fetchReportDetail`, `markReportSeen`, `postReportComment`, `patchReportComment`, `deleteReportComment`. En demo devuelve `demo-reports` sin red; las escrituras en demo devuelven `{ ok:false, error:'En la demo no se envían comentarios.' }`. |
-| `src/stores/reports.ts`                            | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `unseenCount` (computed), `refresh({ force })` (deduplica una petición en curso), `markSeenLocally(n)`. Acciones llaman `runClientHttp`. |
+| `src/stores/reports.ts`                            | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `nextCursor`, `unseenCount` (del servidor), `loadingMore`, `loadMoreError`, `refresh({ force })` y `loadMore()` (deduplican una petición en curso), `markSeenLocally(n)`. Acciones llaman `runClientHttp`. |
 | `src/composables/useReportThread.ts`               | Ciclo de vida del detalle (carga, `markSeen`, alta/edición/borrado, borradores, estados `pending`/`error`). Conserva el texto ante error. |
 | `src/composables/useReportsRoute.ts`               | Adaptador de `window`: lee/escribe `?reporte=<n>`, `popstate`. Es el único que toca `location`/`history` en esta zona. |
 | `src/composables/useSectionNavigation.ts`          | Añadir `navigateToReports(n?)` (push de `/reportes[?reporte=n]` + `popstate`).            |
@@ -613,7 +626,8 @@ vallado, regla. Inline: texto, `código`, **negrita**, _cursiva_, ~~tachado~~, e
 - El store arranca desde `GlobalReportLauncher.vue` (montado una vez): `onMounted` → si no demo,
   `reportsStore.refresh()`. `ReportsPage` llama `refresh({ force: true })` al entrar. Sin `setInterval`,
   sin `visibilitychange`. Los fallos del chequeo inicial son silenciosos (sin punto).
-- `unseenCount = reports.filter(r => r.hasUpdates).length`.
+- `unseenCount` llega calculado del servidor sobre **todas** las filas de la cuenta en la primera
+  página; la marca local de lectura lo decrementa sin esperar a la red.
 - Botón flotante (`#global-report-trigger`): punto `bg-accent` (`size-2.5`, anillo `ring-2 ring-elevated`)
   esquina superior derecha, `data-reports-updates`, con descripción accesible oculta
   («Hay novedades en tus reportes», vinculada con `aria-describedby`). No cambia el `aria-label`
@@ -737,7 +751,8 @@ Sigue el estado de lo que has enviado y aclara lo que haga falta.
   (`bg-notice`).
 - Lista vacía: «Aún no has enviado ningún reporte.» + `BaseButton` «Crear reporte» (abre el panel).
 - Error de lista/detalle: bloque `role="alert"` + «Reintentar».
-- `hasMore`: nota «Mostrando tus 100 reportes más recientes.».
+- `hasMore`: botón «Cargar más reportes» que pide la página siguiente con `nextCursor`; si esa
+  petición falla, se muestra el error junto al botón sin ocultar la lista ya cargada.
 
 ### 9.5 Movimiento y accesibilidad
 
@@ -926,10 +941,10 @@ de servidor en el árbol (`rg`).
 
 ## 13. Riesgos y notas para el implementador
 
-- **GraphQL de la lista**: 100 alias × 4 niveles × (1 evento + 5 comentarios) ≈ 2 800 nodos, lejos del
-  límite de 500 000 de GitHub; el coste en cuerpos de comentarios (los briefs del agente pesan varios KB)
-  puede ser alto. Si en pruebas reales el payload molesta, bajar `comments(last: 5)` a `3` en el
-  fragmento `C`; no sustituirlo por consultas por issue (rompe «una sola consulta»).
+- **GraphQL de la lista**: 50 alias × 4 niveles × (1 evento + 25 comentarios) ≈ 5 200 nodos, lejos del
+  límite de 500 000 de GitHub. El coste en cuerpos de comentarios (los briefs del agente pesan varios KB)
+  puede ser alto: se acota con el tamaño de página, no recortando la ventana. Las páginas anteriores solo
+  se piden para las filas que aún no han llegado a un comentario ya leído.
 - `duplicateOf` devuelve `null` también cuando la principal es inaccesible: es el caso «principal
   inaccesible» del brief. No distinguir más.
 - Un `GITHUB_TOKEN` de GitHub App no puede llamar a `/user`: configurar `GITHUB_BOT_LOGIN` en ese caso

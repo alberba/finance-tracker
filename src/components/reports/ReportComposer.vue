@@ -1,18 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
-import {
-  encodeBase64,
-  getAttachmentError,
-  ISSUE_ATTACHMENT_TYPES,
-} from '../../domain/reports/issue-attachments'
+import { getAttachmentError, ISSUE_ATTACHMENT_TYPES } from '../../domain/reports/issue-attachments'
 import { REPORTER_COMMENT_MAX_LENGTH } from '../../domain/reports/reporter-comment'
 import { isDemoMode } from '../../scripts/demo-mode'
 import type { ReportAttachment } from '../../services/issue-report-api'
 import BaseButton from '../ui/BaseButton.vue'
 import { FIELD_LABEL } from '../ui/field'
 import AttachmentList from './AttachmentList.vue'
-import { ATTACHMENT_LIMITS, COMMENT_TEXTAREA } from './report-form'
+import { ATTACHMENT_LIMITS, COMMENT_TEXTAREA, encodeAttachmentFile } from './report-form'
 
 // Compositor de una aclaración nueva. Mismas reglas de adjuntos que el panel
 // del reporte; en demo queda desactivado.
@@ -86,13 +82,7 @@ function removeAttachment(id: number): void {
 }
 
 async function encodeAttachments(): Promise<ReportAttachment[]> {
-  return Promise.all(
-    attachments.value.map(async ({ file }) => ({
-      name: file.name,
-      contentType: file.type,
-      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
-    })),
-  )
+  return Promise.all(attachments.value.map(({ file }) => encodeAttachmentFile(file)))
 }
 
 async function onSubmit(): Promise<void> {

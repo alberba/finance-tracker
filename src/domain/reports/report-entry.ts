@@ -75,10 +75,8 @@ export interface ReportDetail {
   report: ReportEntry
   /** La issue cuyo hilo se muestra: la original o la principal que se sigue. */
   threadIssue: ReportIssueRef | null
-  /** Ascendente por fecha. */
+  /** Ascendente por fecha; el hilo completo, sin recortes. */
   thread: ThreadItem[]
-  /** Comentarios anteriores a los 100 leídos (normalmente 0). */
-  hiddenBefore: number
   canComment: boolean
   /** ISO del servidor al empezar a leer; base de `markSeen` ([D4]). */
   fetchedAt: string
@@ -88,6 +86,10 @@ export interface ReportsListResponse {
   ok: true
   reports: ReportEntry[]
   hasMore: boolean
+  /** Cursor opaco de la página siguiente; `null` en la última. */
+  nextCursor: string | null
+  /** Contador global de novedades; solo llega en la primera página. */
+  unseenCount?: number
   fetchedAt: string
 }
 

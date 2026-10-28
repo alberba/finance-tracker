@@ -26,9 +26,19 @@ import type {
   ThreadAttachment,
   ThreadItem,
 } from '../../../domain/reports/report-entry'
-import { buildAvailableEntry, resolveFollowed, toIssueRef } from '../../../domain/reports/report-status'
-import { computeHasUpdates } from '../../../domain/reports/report-updates'
-import { fetchRepositoryId, githubConfig, once, type GithubConfig } from '../github-api'
+import {
+  buildAvailableEntry,
+  resolveFollowed,
+  toIssueRef,
+} from '../../../domain/reports/report-status'
+import { computeHasUpdates, scanCommentWindow } from '../../../domain/reports/report-updates'
+import {
+  fetchRepositoryId,
+  githubConfig,
+  githubHeaders,
+  type GithubApiError,
+  type GithubConfig,
+} from '../github-api'
 import { Http } from '../http'
 import { uploadIssueAttachment } from '../issue-attachments'
 import type { ResolvedAttachment } from '../issue-report-schema'
@@ -39,6 +49,7 @@ import {
   fetchComment as fetchGithubComment,
   fetchIssueChain,
   fetchIssueThread,
+  fetchOlderComments,
   resolveBotLogin,
   updateComment as updateGithubComment,
   type GithubComment,
@@ -54,7 +65,13 @@ import {
 } from './errors'
 import type { CommentUpdateInput } from './comment-schema'
 
-const LIST_LIMIT = 100
+/** Entradas por página de la lista; el resto se pide con `nextCursor`. */
+export const LIST_PAGE_SIZE = 20
+
+export interface ReportsListCursor {
+  submittedAt: string
+  issueNumber: number
+}
 
 function toGithubError(error: { message: string; status?: number }): ReportsGithubError {
   return new ReportsGithubError({
@@ -76,41 +93,121 @@ function latestIso(a: string | null | undefined, b: string | null | undefined): 
   return first >= second ? (a as string) : (b as string)
 }
 
-function latestMaintainerAt(
-  comments: RawComment[],
-  context: { userId: string; botLogin: string | null },
-): string | null {
-  let latest: string | null = null
-  for (const comment of comments) {
-    // Sin login del bot no se puede distinguir una aclaración propia de un
-    // comentario del mantenedor: la lista degrada a solo cambios de estado.
-    if (!context.botLogin) continue
-    if (
-      classifyComment(comment, { userId: context.userId, botLogin: context.botLogin }) !==
-      'maintainer'
-    ) {
-      continue
-    }
-    latest = latestIso(latest, comment.createdAt)
+export function encodeListCursor(row: { submittedAt: string; issueNumber: number }): string {
+  return `${row.submittedAt}|${row.issueNumber}`
+}
+
+/** Índice de la primera fila de la página siguiente; `rows.length` si ya no queda. */
+export function pageStartIndex(
+  rows: readonly { submittedAt: string; issueNumber: number }[],
+  cursor: ReportsListCursor | null,
+): number {
+  if (!cursor) return 0
+  const exact = rows.findIndex(
+    (row) => row.issueNumber === cursor.issueNumber && row.submittedAt === cursor.submittedAt,
+  )
+  if (exact >= 0) return exact + 1
+  // Si la fila del cursor ya no existe, se continúa por el orden guardado.
+  const next = rows.findIndex(
+    (row) =>
+      row.submittedAt < cursor.submittedAt ||
+      (row.submittedAt === cursor.submittedAt && row.issueNumber < cursor.issueNumber),
+  )
+  return next === -1 ? rows.length : next
+}
+
+interface EntryContext {
+  userId: string
+  botLogin: string
+}
+
+interface NotificationState {
+  latestMaintainerAt: string | null
+  /** La ventana leída ya llega a la última lectura: no hay más que pedir. */
+  covered: boolean
+  commentsIssue: number
+  before: string | null
+}
+
+function initialNotificationState(
+  node: GraphIssueNode,
+  row: IssueReportRow,
+  context: EntryContext,
+  ownerRepo: string,
+): NotificationState {
+  const resolved = resolveFollowed(node, ownerRepo)
+  const threadNode = resolved.followed ?? node
+  const window = scanCommentWindow(threadNode.recentComments, row.lastSeenAt, context)
+  return {
+    latestMaintainerAt: window.latestMaintainerAt,
+    covered: window.covered || !threadNode.commentsPage.hasPreviousPage,
+    commentsIssue: threadNode.number,
+    before: threadNode.commentsPage.startCursor,
   }
-  return latest
+}
+
+/**
+ * Agota la ventana de novedades de cada fila: mientras una página no llegue a un
+ * comentario ya visto, se pide la anterior. Nunca se recorta a un número fijo de
+ * comentarios recientes.
+ */
+function collectNotificationStates(
+  config: GithubConfig,
+  nodes: Map<number, GraphIssueNode | null>,
+  rows: readonly IssueReportRow[],
+  context: EntryContext,
+): Effect.Effect<Map<number, NotificationState>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const ownerRepo = `${config.owner}/${config.repo}`
+    const states = new Map<number, NotificationState>()
+    const byNumber = new Map(rows.map((row) => [row.issueNumber, row]))
+    for (const row of rows) {
+      const node = nodes.get(row.issueNumber)
+      if (!node) continue
+      states.set(row.issueNumber, initialNotificationState(node, row, context, ownerRepo))
+    }
+
+    for (;;) {
+      const pending = [...states.entries()].filter(([, state]) => !state.covered && state.before)
+      if (pending.length === 0) break
+      const pages = yield* fetchOlderComments(
+        config,
+        pending.map(([, state]) => ({
+          number: state.commentsIssue,
+          before: state.before as string,
+        })),
+      )
+      for (const [rootNumber, state] of pending) {
+        const row = byNumber.get(rootNumber)
+        const page = pages.get(state.commentsIssue)
+        if (!row || !page) {
+          state.covered = true
+          continue
+        }
+        const window = scanCommentWindow(page.comments, row.lastSeenAt, context)
+        state.latestMaintainerAt = latestIso(state.latestMaintainerAt, window.latestMaintainerAt)
+        state.covered =
+          window.covered ||
+          !page.hasPreviousPage ||
+          !page.startCursor ||
+          page.startCursor === state.before
+        state.before = page.startCursor
+      }
+    }
+    return states
+  })
 }
 
 function buildEntry(
   node: GraphIssueNode,
   row: { issueNumber: number; submittedAt: string; lastSeenAt: string },
-  context: { userId: string; botLogin: string | null },
+  latestMaintainerCommentAt: string | null,
 ): AvailableReportEntry {
   const repository = node.repository?.nameWithOwner ?? ''
   const resolved = resolveFollowed(node, repository)
   const statusChangedAt = latestIso(
     node.statusChangedAt,
     resolved.followed?.statusChangedAt ?? null,
-  )
-  // El hilo es el de la principal si se sigue; si no, el de la original.
-  const latestComment = latestMaintainerAt(
-    (resolved.followed ?? node).recentComments,
-    context,
   )
   return buildAvailableEntry(node, resolved, {
     submittedAt: row.submittedAt,
@@ -119,7 +216,7 @@ function buildEntry(
     hasUpdates: computeHasUpdates({
       lastSeenAt: row.lastSeenAt,
       statusChangedAt,
-      latestMaintainerCommentAt: latestComment,
+      latestMaintainerCommentAt,
     }),
   }) as AvailableReportEntry
 }
@@ -176,48 +273,100 @@ function uploadAttachments(
 ): Effect.Effect<ThreadAttachment[], ReportsGithubError, Http> {
   return Effect.gen(function* () {
     if (attachments.length === 0) return []
+    const repositoryId = yield* fetchRepositoryId(config).pipe(
+      Effect.mapError((error: GithubApiError) => toGithubError(error)),
+    )
     const { request } = yield* Http
-    return yield* Effect.tryPromise({
-      try: () => uploadAll(request, config, attachments),
-      catch: (error) =>
-        error instanceof ReportsGithubError
-          ? error
-          : new ReportsGithubError({ message: 'No se pudo subir un adjunto.' }),
-    })
+    const uploaded: ThreadAttachment[] = []
+    for (const attachment of attachments) {
+      const result = yield* Effect.promise(() =>
+        uploadIssueAttachment(attachment, {
+          fetch: request,
+          headers: githubHeaders(config.token),
+          repositoryId,
+        }),
+      )
+      if (!result.ok) {
+        console.error('[reports] Adjunto no subido', result.error)
+        return yield* new ReportsGithubError({ message: 'No se pudo subir un adjunto.' })
+      }
+      uploaded.push({ name: attachment.name, url: result.url })
+    }
+    return uploaded
   })
 }
 
 export const listReports = (
   userId: string,
   env: RuntimeEnv,
+  options: { cursor?: ReportsListCursor | null } = {},
 ): Effect.Effect<
-  { reports: ReportEntry[]; hasMore: boolean; fetchedAt: string },
+  {
+    reports: ReportEntry[]
+    hasMore: boolean
+    nextCursor: string | null
+    /** Solo en la primera página: el contador de novedades cubre todas las filas. */
+    unseenCount?: number
+    fetchedAt: string
+  },
   ReportsError | DatabaseError,
   Database | Http
 > =>
   Effect.gen(function* () {
     const fetchedAt = nowIso()
-    const rows = yield* issueReportsRepository.listRecentByUser(userId, LIST_LIMIT)
-    if (rows.length === 0) return { reports: [], hasMore: false, fetchedAt }
+    const rows = yield* issueReportsRepository.listByUser(userId)
+    const start = pageStartIndex(rows, options.cursor ?? null)
+    const pageRows = rows.slice(start, start + LIST_PAGE_SIZE)
+    const hasMore = start + pageRows.length < rows.length
+    const nextCursor =
+      hasMore && pageRows.length > 0 ? encodeListCursor(pageRows[pageRows.length - 1]) : null
+
+    if (rows.length === 0) {
+      return { reports: [], hasMore: false, nextCursor: null, unseenCount: 0, fetchedAt }
+    }
+    // La primera página escanea todas las filas para que el contador de avisos
+    // no ignore reportes que aún no se han cargado.
+    const scanRows = options.cursor ? pageRows : rows
+    if (scanRows.length === 0) {
+      return { reports: [], hasMore: false, nextCursor: null, fetchedAt }
+    }
 
     const config = yield* loadConfig(env)
+    // Sin el login del bot no se distingue una aclaración propia de un comentario
+    // del mantenedor: la lista falla en vez de perder avisos en silencio ([D1]).
+    const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
+    const context = { userId, botLogin }
+
     const nodes = yield* fetchIssueChain(
       config,
-      rows.map((row) => row.issueNumber),
+      scanRows.map((row) => row.issueNumber),
       { comments: true },
     )
-    // La lista no se cae porque `/user` falle: pierde los avisos por comentario.
-    const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN).pipe(
-      Effect.catchTag('ReportsGithubError', () => Effect.succeed(null)),
-    )
+    const states = yield* collectNotificationStates(config, nodes, scanRows, context)
 
-    const reports = rows.slice(0, LIST_LIMIT).map((row) => {
+    const entries = new Map<number, ReportEntry>()
+    for (const row of scanRows) {
       const node = nodes.get(row.issueNumber)
-      if (!node) return unavailableEntry(row)
-      return buildEntry(node, row, { userId, botLogin })
-    })
+      entries.set(
+        row.issueNumber,
+        node
+          ? buildEntry(node, row, states.get(row.issueNumber)?.latestMaintainerAt ?? null)
+          : unavailableEntry(row),
+      )
+    }
 
-    return { reports, hasMore: rows.length > LIST_LIMIT, fetchedAt }
+    const reports = pageRows.map((row) => entries.get(row.issueNumber) ?? unavailableEntry(row))
+    const unseenCount = options.cursor
+      ? undefined
+      : [...entries.values()].filter((entry) => entry.hasUpdates).length
+
+    return {
+      reports,
+      hasMore,
+      nextCursor,
+      ...(unseenCount === undefined ? {} : { unseenCount }),
+      fetchedAt,
+    }
   })
 
 interface OwnedReportContext {
@@ -290,7 +439,9 @@ function requireOwnComment(
   }
   const issue = commentIssue(context, current.issueNumber)
   if (!issue) {
-    return Effect.fail(new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }))
+    return Effect.fail(
+      new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }),
+    )
   }
   const kind = classifyComment(
     {
@@ -303,7 +454,9 @@ function requireOwnComment(
     { userId, botLogin },
   )
   if (kind !== 'mine') {
-    return Effect.fail(new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }))
+    return Effect.fail(
+      new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }),
+    )
   }
   if (issue.state !== 'OPEN') {
     return Effect.fail(new ReportClosedError({ message: 'El reporte está cerrado.' }))
@@ -326,7 +479,6 @@ export const getReportDetail = (
         report: unavailableEntry(row),
         threadIssue: null,
         thread: [],
-        hiddenBefore: 0,
         canComment: false,
         fetchedAt,
       }
@@ -335,11 +487,15 @@ export const getReportDetail = (
     const threadIssue = context.threadIssue
     // En el detalle se falla cerrado [D1]: sin login del bot no hay «Tú».
     const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
+    // El hilo se lee completo, página a página: no hay recorte de comentarios.
     const thread = yield* fetchIssueThread(config, threadIssue.number)
     const open = threadIssue.state === 'OPEN'
-    const items = mapThread(thread.comments, { userId, botLogin }, open)
+    const items = mapThread(thread, { userId, botLogin }, open)
 
-    const statusChangedAt = latestIso(root.statusChangedAt, context.followed?.statusChangedAt ?? null)
+    const statusChangedAt = latestIso(
+      root.statusChangedAt,
+      context.followed?.statusChangedAt ?? null,
+    )
     const latestComment = items
       .filter((item) => item.kind === 'maintainer')
       .reduce<string | null>((latest, item) => latestIso(latest, item.createdAt), null)
@@ -365,7 +521,6 @@ export const getReportDetail = (
       report,
       threadIssue: toIssueRef(threadIssue),
       thread: items,
-      hiddenBefore: Math.max(0, thread.totalCount - thread.comments.length),
       canComment: open,
       fetchedAt,
     }
@@ -405,33 +560,6 @@ export const addComment = (
       true,
     )
   })
-
-async function uploadAll(
-  request: typeof fetch,
-  config: GithubConfig,
-  attachments: ResolvedAttachment[],
-): Promise<ThreadAttachment[]> {
-  const headers = {
-    Authorization: `Bearer ${config.token}`,
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'finance-tracker-web-reporter',
-  }
-  const repositoryId = once(() => fetchRepositoryId(request, config.owner, config.repo, headers))
-  const uploaded: ThreadAttachment[] = []
-  for (const attachment of attachments) {
-    const result = await uploadIssueAttachment(attachment, {
-      fetch: request,
-      headers,
-      repositoryId,
-    })
-    if (!result.ok) {
-      console.error('[reports] Adjunto no subido', result.error)
-      throw new ReportsGithubError({ message: 'No se pudo subir un adjunto.' })
-    }
-    uploaded.push({ name: attachment.name, url: result.url })
-  }
-  return uploaded
-}
 
 export const editComment = (
   userId: string,

@@ -24,7 +24,12 @@ function duplicate(number: number, duplicateOf: IssueNode | null): IssueNode {
   return node({ number, state: 'CLOSED', stateReason: 'DUPLICATE', duplicateOf })
 }
 
-const BASE = { submittedAt: '2026-10-01T00:00:00.000Z', lastSeenAt: '2026-10-02T00:00:00.000Z', hasUpdates: false, statusChangedAt: null }
+const BASE = {
+  submittedAt: '2026-10-01T00:00:00.000Z',
+  lastSeenAt: '2026-10-02T00:00:00.000Z',
+  hasUpdates: false,
+  statusChangedAt: null,
+}
 
 describe('resolveFollowed', () => {
   it('no sigue una issue abierta aunque tenga campos de duplicada', () => {
@@ -69,19 +74,19 @@ describe('resolveFollowed', () => {
     expect(result.duplicateLinkUnavailable).toBe(true)
   })
 
-  it('marca el enlace roto cuando hay un ciclo', () => {
+  it('vuelve a la original cuando la cadena tiene un ciclo', () => {
     const first = duplicate(1, null)
     const second = duplicate(2, first)
     ;(first as IssueNode).duplicateOf = second
     const result = resolveFollowed(first, REPO)
-    expect(result.followed?.number).toBe(2)
+    expect(result.followed).toBeUndefined()
     expect(result.duplicateLinkUnavailable).toBe(true)
   })
 
-  it('conserva el último nodo accesible cuando un salto intermedio está roto', () => {
+  it('vuelve a la original si un salto posterior de la duplicada es inaccesible', () => {
     const root = duplicate(1, duplicate(2, null))
     const result = resolveFollowed(root, REPO)
-    expect(result.followed?.number).toBe(2)
+    expect(result.followed).toBeUndefined()
     expect(result.duplicateLinkUnavailable).toBe(true)
   })
 
@@ -92,7 +97,9 @@ describe('resolveFollowed', () => {
 })
 
 describe('describeReportStatus', () => {
-  function available(overrides: Partial<Extract<ReportEntry, { unavailable?: false }>> = {}): ReportEntry {
+  function available(
+    overrides: Partial<Extract<ReportEntry, { unavailable?: false }>> = {},
+  ): ReportEntry {
     return {
       number: 10,
       url: 'https://github.com/acme/finance-tracker/issues/10',

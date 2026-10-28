@@ -51,10 +51,7 @@ function jsonHeaders(body: unknown, status = 200) {
 }
 
 describe('uploadIssueAttachment', () => {
-  const context = (
-    fetchFn: typeof fetch,
-    repositoryId: () => Promise<number> = async () => 123456,
-  ): AttachmentUploadContext => ({
+  const context = (fetchFn: typeof fetch, repositoryId = 123456): AttachmentUploadContext => ({
     fetch: fetchFn,
     headers: { Authorization: 'Bearer token' },
     repositoryId,
@@ -102,20 +99,6 @@ describe('uploadIssueAttachment', () => {
 
     expect(result.ok).toBe(false)
   })
-
-  it('devuelve error sin subir nada cuando no se puede leer el id del repositorio', async () => {
-    const fakeFetch = vi.fn<typeof fetch>()
-
-    const result = await uploadIssueAttachment(
-      attachment,
-      context(fakeFetch as typeof fetch, async () => {
-        throw new Error('No se pudo leer el repositorio (404).')
-      }),
-    )
-
-    expect(result).toEqual({ ok: false, error: 'No se pudo leer el repositorio (404).' })
-    expect(fakeFetch).not.toHaveBeenCalled()
-  })
 })
 
 /** El test es el borde: ejecuta el efecto con un `fetch` falso como capa Http. */
@@ -135,7 +118,11 @@ function createIssueFromWebReport(
 
 describe('createIssueFromWebReport con adjuntos', () => {
   it('escribe la sección «Adjuntos» con una referencia por imagen subida', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => issueResponse())
+    const fakeFetch = vi.fn<typeof fetch>(async (input) =>
+      String(input) === 'https://api.github.com/repos/org/repo'
+        ? jsonHeaders({ id: 123456 })
+        : issueResponse(),
+    )
     const uploadAttachment = vi.fn(async () => ({
       ok: true as const,
       url: 'https://github.com/user-attachments/assets/abc',
@@ -147,13 +134,18 @@ describe('createIssueFromWebReport con adjuntos', () => {
     })
 
     expect(uploadAttachment).toHaveBeenCalledTimes(1)
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body))
+    const issueCall = fakeFetch.mock.calls.find(([input]) => String(input).endsWith('/issues'))
+    const body = JSON.parse(String(issueCall?.[1]?.body))
     expect(body.body).toContain('### Adjuntos')
     expect(body.body).toContain('![pantalla.png](https://github.com/user-attachments/assets/abc)')
   })
 
   it('crea la issue igualmente y lo indica si una subida falla', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => issueResponse())
+    const fakeFetch = vi.fn<typeof fetch>(async (input) =>
+      String(input) === 'https://api.github.com/repos/org/repo'
+        ? jsonHeaders({ id: 123456 })
+        : issueResponse(),
+    )
     const uploadAttachment = vi.fn(async () => ({ ok: false as const, error: 'GitHub 500' }))
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -165,7 +157,8 @@ describe('createIssueFromWebReport con adjuntos', () => {
     expect(result.number).toBe(77)
     expect(logError).toHaveBeenCalledWith('[github] Adjunto no subido', 'GitHub 500')
     logError.mockRestore()
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body))
+    const issueCall = fakeFetch.mock.calls.find(([input]) => String(input).endsWith('/issues'))
+    const body = JSON.parse(String(issueCall?.[1]?.body))
     expect(body.body).toContain('### Adjuntos')
     expect(body.body).toContain('pantalla.png')
     expect(body.body).toContain('no se pudo subir')
@@ -181,7 +174,11 @@ describe('createIssueFromWebReport con adjuntos', () => {
     }))
 
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
-      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
+      fetch: vi.fn<typeof fetch>(async (input) =>
+        String(input) === 'https://api.github.com/repos/org/repo'
+          ? jsonHeaders({ id: 123456 })
+          : issueResponse(),
+      ) as typeof fetch,
       uploadAttachment,
       reportFailure,
     })
@@ -195,7 +192,11 @@ describe('createIssueFromWebReport con adjuntos', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
-      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
+      fetch: vi.fn<typeof fetch>(async (input) =>
+        String(input) === 'https://api.github.com/repos/org/repo'
+          ? jsonHeaders({ id: 123456 })
+          : issueResponse(),
+      ) as typeof fetch,
       uploadAttachment: async () => ({ ok: false as const, error: 'texto libre SECRET_MARKER' }),
       reportFailure,
     })
@@ -215,6 +216,35 @@ describe('createIssueFromWebReport con adjuntos', () => {
     expect(uploadAttachment).not.toHaveBeenCalled()
     const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body))
     expect(body.body).not.toContain('### Adjuntos')
+  })
+
+  it('crea la issue sin adjuntos cuando no se puede leer el id del repositorio', async () => {
+    const fakeFetch = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input)
+      if (url === 'https://api.github.com/repos/org/repo') {
+        return jsonHeaders({ message: 'Not Found' }, 404)
+      }
+      return issueResponse()
+    })
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const result = await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
+      fetch: fakeFetch as typeof fetch,
+    })
+
+    expect(result.number).toBe(77)
+    expect(
+      fakeFetch.mock.calls.some(([input]) =>
+        String(input).startsWith('https://uploads.github.com/'),
+      ),
+    ).toBe(false)
+    expect(logError).toHaveBeenCalledWith(
+      '[github] Adjunto no subido',
+      'No se pudo leer el repositorio (404).',
+    )
+    const body = JSON.parse(String(fakeFetch.mock.calls.at(-1)?.[1]?.body))
+    expect(body.body).toContain('no se pudo subir')
+    logError.mockRestore()
   })
 
   it('lee el id del repositorio una sola vez aunque el reporte traiga varios adjuntos', async () => {

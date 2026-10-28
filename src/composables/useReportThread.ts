@@ -35,6 +35,7 @@ export function useReportThread(issueNumber: Ref<number | null>) {
   const error = shallowRef('')
   const pending = ref(false)
   let requestToken = 0
+  let pendingMutations = 0
 
   function reset(): void {
     detail.value = null
@@ -94,32 +95,38 @@ export function useReportThread(issueNumber: Ref<number | null>) {
     }
   }
 
-  /** Ejecuta una mutación con el estado `pending`/`error` compartido. */
-  async function mutate<T>(call: () => Promise<T>): Promise<T | null> {
+  /**
+   * Ejecuta una mutación del hilo indicado. Si la persona cambia de reporte
+   * antes de que responda, el resultado (y el error) no contaminan el hilo B.
+   */
+  async function mutate<T>(number: number, call: () => Promise<T>): Promise<T | null> {
+    pendingMutations += 1
     pending.value = true
-    error.value = ''
+    if (issueNumber.value === number) error.value = ''
     try {
       return await call()
     } catch (cause) {
-      error.value = messageOf(cause)
+      if (issueNumber.value === number) error.value = messageOf(cause)
       return null
     } finally {
-      pending.value = false
+      pendingMutations -= 1
+      pending.value = pendingMutations > 0
     }
   }
 
   async function addComment(input: ReportCommentInput): Promise<boolean> {
     const number = issueNumber.value
     if (number === null) return false
-    const result = await mutate(() => runClientHttp(postReportComment(number, input)))
+    const result = await mutate(number, () => runClientHttp(postReportComment(number, input)))
     if (!result) return false
     if (!result.ok) {
-      error.value = result.error
+      if (issueNumber.value === number) error.value = result.error
       return false
     }
-    if (detail.value) {
-      detail.value = { ...detail.value, thread: [...detail.value.thread, result.comment] }
-    }
+    // Si la persona ya abrió otro reporte, la aclaración se publicó en A pero no
+    // se aplica a la vista actual: el padre no debe reiniciar el borrador de B.
+    if (issueNumber.value !== number || !detail.value) return false
+    detail.value = { ...detail.value, thread: [...detail.value.thread, result.comment] }
     return true
   }
 
@@ -129,12 +136,15 @@ export function useReportThread(issueNumber: Ref<number | null>) {
   ): Promise<boolean> {
     const number = issueNumber.value
     if (number === null) return false
-    const result = await mutate(() => runClientHttp(patchReportComment(number, commentId, input)))
+    const result = await mutate(number, () =>
+      runClientHttp(patchReportComment(number, commentId, input)),
+    )
     if (!result) return false
     if (!result.ok) {
-      error.value = result.error
+      if (issueNumber.value === number) error.value = result.error
       return false
     }
+    if (issueNumber.value !== number) return false
     replaceItem(result.comment)
     return true
   }
@@ -142,17 +152,16 @@ export function useReportThread(issueNumber: Ref<number | null>) {
   async function removeComment(commentId: number): Promise<boolean> {
     const number = issueNumber.value
     if (number === null) return false
-    const result = await mutate(() => runClientHttp(deleteReportComment(number, commentId)))
+    const result = await mutate(number, () => runClientHttp(deleteReportComment(number, commentId)))
     if (!result) return false
     if (!result.ok) {
-      error.value = result.error
+      if (issueNumber.value === number) error.value = result.error
       return false
     }
-    if (detail.value) {
-      detail.value = {
-        ...detail.value,
-        thread: detail.value.thread.filter((item) => item.id !== commentId),
-      }
+    if (issueNumber.value !== number || !detail.value) return false
+    detail.value = {
+      ...detail.value,
+      thread: detail.value.thread.filter((item) => item.id !== commentId),
     }
     return true
   }

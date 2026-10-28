@@ -18,11 +18,11 @@ import {
   type AttachmentUploadResult,
 } from './issue-attachments'
 import {
-  GITHUB_API_BASE,
   fetchRepositoryId,
+  GITHUB_API_BASE,
   githubConfig,
   githubHeaders,
-  once,
+  type GithubApiError,
   type GithubConfigError,
 } from './github-api'
 import type { IssueReportPayload } from './issue-report-schema'
@@ -140,17 +140,24 @@ function uploadFailureReason(error: string): string {
 async function uploadAttachments(
   attachments: NonNullable<IssueReportPayload['attachments']>,
   uploader: AttachmentUploader,
-  context: AttachmentUploadContext,
+  context: Omit<AttachmentUploadContext, 'repositoryId'>,
+  repository: { ok: true; id: number } | { ok: false; error: string },
   reportFailure: ReportSideFailureReporter,
 ): Promise<AttachmentOutcome[]> {
   const outcomes: AttachmentOutcome[] = []
   for (const attachment of attachments) {
     let result: AttachmentUploadResult
-    try {
-      result = await uploader(attachment, context)
-    } catch {
-      // El subidor no debería lanzar; si lo hace, el reporte sigue adelante.
-      result = { ok: false, error: 'Fallo inesperado al subir.' }
+    // Sin id del repositorio no hay endpoint de subida: el reporte sigue sin
+    // la imagen y se anota igual que una subida fallida.
+    if (!repository.ok) {
+      result = { ok: false, error: repository.error }
+    } else {
+      try {
+        result = await uploader(attachment, { ...context, repositoryId: repository.id })
+      } catch {
+        // El subidor no debería lanzar; si lo hace, el reporte sigue adelante.
+        result = { ok: false, error: 'Fallo inesperado al subir.' }
+      }
     }
     if (!result.ok) {
       // Solo el motivo corto: sin cuerpos de respuesta de GitHub, como el resto de logs.
@@ -223,16 +230,23 @@ export function createIssueFromWebReport(
 
     // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
     // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
-    // El id del repositorio se lee como mucho una vez por reporte, aunque haya varios adjuntos.
+    // El id del repositorio se lee una sola vez por reporte, aunque haya varios adjuntos.
+    const attachments = payload.attachments ?? []
+    const repository: { ok: true; id: number } | { ok: false; error: string } =
+      attachments.length === 0
+        ? { ok: false, error: '' }
+        : yield* fetchRepositoryId(config).pipe(
+            Effect.map((id) => ({ ok: true as const, id })),
+            Effect.catchTag('GithubApiError', (error: GithubApiError) =>
+              Effect.succeed({ ok: false as const, error: error.message }),
+            ),
+          )
     const outcomes = yield* Effect.promise(() =>
       uploadAttachments(
-        payload.attachments ?? [],
+        attachments,
         uploadAttachment,
-        {
-          fetch: http.request,
-          headers,
-          repositoryId: once(() => fetchRepositoryId(http.request, owner, repo, headers)),
-        },
+        { fetch: http.request, headers },
+        repository,
         reportFailure,
       ),
     )

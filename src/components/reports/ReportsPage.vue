@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 
 import { useReportsRoute } from '../../composables/useReportsRoute'
 import { useReportThread } from '../../composables/useReportThread'
-import type {
-  ReportCommentInput,
-  ReportCommentUpdateInput,
-} from '../../services/reports-api'
+import type { ReportCommentInput, ReportCommentUpdateInput } from '../../services/reports-api'
 import { requestReportDialogOpen } from '../../scripts/report-dialog'
 import { useReportsStore } from '../../stores/reports'
 import AppSection from '../ui/AppSection.vue'
@@ -32,17 +29,13 @@ async function onAddComment(input: ReportCommentInput): Promise<void> {
   if (await addComment(input)) composerResetSignal.value += 1
 }
 
-async function onUpdateComment(
-  commentId: number,
-  input: ReportCommentUpdateInput,
-): Promise<void> {
+async function onUpdateComment(commentId: number, input: ReportCommentUpdateInput): Promise<void> {
   if (await updateComment(commentId, input)) editingCommentId.value = null
 }
 
 async function onRemoveComment(commentId: number): Promise<void> {
   await removeComment(commentId)
 }
-const list = useTemplateRef<HTMLElement>('list')
 
 onMounted(() => void reportsStore.refresh({ force: true }))
 
@@ -53,9 +46,8 @@ function openCreate(): void {
 async function back(): Promise<void> {
   const previous = selectedNumber.value
   backToList()
-  await nextTick()
   if (previous === null) return
-  document.querySelector<HTMLElement>(`[data-report-entry="${previous}"]`)?.focus()
+  await focusEntry(previous)
 }
 </script>
 
@@ -106,8 +98,7 @@ async function back(): Promise<void> {
 
       <div v-else class="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-10 gap-y-6">
         <section
-          ref="list"
-          class="sticky min-w-0 grow basis-88 self-start inset-bs-6"
+          class="sticky inset-bs-6 min-w-0 grow basis-88 self-start"
           :class="selectedNumber !== null ? 'hidden @3xl:block' : ''"
           aria-label="Lista de reportes"
         >
@@ -116,9 +107,18 @@ async function back(): Promise<void> {
             :selected-number="selectedNumber"
             @select="select"
           />
-          <p v-if="reportsStore.hasMore" class="text-text-muted mbs-3 text-sm">
-            Mostrando tus 100 reportes más recientes.
-          </p>
+          <div v-if="reportsStore.hasMore" class="mbs-3 grid justify-items-start gap-2">
+            <BaseButton
+              variant="secondary"
+              :disabled="reportsStore.loadingMore"
+              @click="reportsStore.loadMore()"
+            >
+              {{ reportsStore.loadingMore ? 'Cargando…' : 'Cargar más reportes' }}
+            </BaseButton>
+            <p v-if="reportsStore.loadMoreError" class="text-loss text-sm" role="alert">
+              {{ reportsStore.loadMoreError }}
+            </p>
+          </div>
         </section>
 
         <div

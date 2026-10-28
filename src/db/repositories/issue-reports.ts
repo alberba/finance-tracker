@@ -30,14 +30,13 @@ async function recordSubmissionSql(
   return inserted.length > 0
 }
 
-/** Filas más recientes primero, con una de más para calcular `hasMore`. */
-async function listRecentByUserSql(db: Db, userId: string, limit: number): Promise<IssueReportRow[]> {
+/** Todas las filas de la cuenta, las más recientes primero. */
+async function listByUserSql(db: Db, userId: string): Promise<IssueReportRow[]> {
   return db
     .select()
     .from(issueReports)
     .where(eq(issueReports.userId, userId))
     .orderBy(desc(issueReports.submittedAt), desc(issueReports.issueNumber))
-    .limit(limit + 1)
 }
 
 /** La comprobación de propiedad: la fila de esta cuenta o `undefined`. */
@@ -105,7 +104,7 @@ async function listAllSql(db: Db): Promise<IssueReportRow[]> {
 }
 
 export const recordSubmission = lift(recordSubmissionSql)
-export const listRecentByUser = lift(listRecentByUserSql)
+export const listByUser = lift(listByUserSql)
 export const getByUserAndNumber = lift(getByUserAndNumberSql)
 export const markSeen = lift(markSeenSql)
 export const insertManyIfMissing = lift(insertManyIfMissingSql)

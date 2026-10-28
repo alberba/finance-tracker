@@ -7,12 +7,7 @@
  * duplicada.
  */
 
-import type {
-  IssueNode,
-  ReportEntry,
-  ReportIssueRef,
-  ReportStatusTone,
-} from './report-entry'
+import type { IssueNode, ReportEntry, ReportIssueRef, ReportStatusTone } from './report-entry'
 
 export const MAX_DUPLICATE_HOPS = 3
 
@@ -30,9 +25,14 @@ function sameRepository(node: IssueNode, ownerRepo: string): boolean {
 /**
  * Recorre `duplicateOf` mientras la issue actual esté cerrada como duplicada.
  * Se corta a los tres saltos: la última alcanzada se muestra con su estado, sin
- * considerarlo un enlace roto.
+ * considerarlo un enlace roto. Si un salto no se puede seguir (principal
+ * ausente, de otro repositorio o cíclica), la entrada vuelve a la issue original
+ * y conserva su estado: nunca se muestra un eslabón intermedio como destino.
  */
-export function resolveFollowed<T extends IssueNode>(root: T, ownerRepo: string): ResolveFollowedResult & { followed?: T } {
+export function resolveFollowed<T extends IssueNode>(
+  root: T,
+  ownerRepo: string,
+): ResolveFollowedResult & { followed?: T } {
   let current: T = root
   const visited = new Set([root.number])
   let hops = 0
@@ -53,9 +53,13 @@ export function resolveFollowed<T extends IssueNode>(root: T, ownerRepo: string)
     hops += 1
   }
 
+  if (duplicateLinkUnavailable) {
+    return { duplicateLinkUnavailable: true }
+  }
+
   return {
     ...(hops > 0 ? { followed: current } : {}),
-    duplicateLinkUnavailable,
+    duplicateLinkUnavailable: false,
   }
 }
 
@@ -177,7 +181,12 @@ export function describeReportStatus(entry: ReportEntry): ReportStatusDescriptio
 export function buildAvailableEntry(
   root: IssueNode,
   resolved: ResolveFollowedResult,
-  base: { submittedAt: string; lastSeenAt: string; hasUpdates: boolean; statusChangedAt: string | null },
+  base: {
+    submittedAt: string
+    lastSeenAt: string
+    hasUpdates: boolean
+    statusChangedAt: string | null
+  },
 ): ReportEntry {
   return {
     ...toIssueRef(root),

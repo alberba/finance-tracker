@@ -32,16 +32,47 @@ interface FakeIssue {
 interface FakeGithub {
   issues: Map<number, FakeIssue>
   comments: Map<number, FakeComment>
-  threads: Map<number, { totalCount: number; comments: FakeComment[] }>
   calls: string[]
+  queries: string[]
   failGraphql?: boolean
+  failUser?: boolean
 }
 
 const OWNER = 'acme'
 const REPO = 'finance-tracker'
 const BOT = 'finance-bot'
 
-function issueRef(issue: FakeIssue): Record<string, unknown> {
+/** Página de comentarios del final del hilo; el cursor es `c<índice>`. */
+function commentPage(comments: FakeComment[], before: string | null, size: number) {
+  const end = before ? Number(before.slice(1)) : comments.length
+  const start = Math.max(0, end - size)
+  return {
+    nodes: comments.slice(start, end),
+    totalCount: comments.length,
+    pageInfo: {
+      hasPreviousPage: start > 0,
+      startCursor: start < comments.length ? `c${start}` : null,
+    },
+  }
+}
+
+function commentNodes(comments: FakeComment[]) {
+  return comments.map((comment) => ({
+    databaseId: comment.id,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt,
+    body: comment.body,
+    author: { __typename: comment.type ?? 'User', login: comment.login },
+  }))
+}
+
+function issueRef(
+  issue: FakeIssue,
+  pageSize: number,
+  before: string | null = null,
+  withComments = true,
+): Record<string, unknown> {
+  const page = commentPage(issue.comments ?? [], before, pageSize)
   return {
     number: issue.number,
     url: `https://github.com/${OWNER}/${REPO}/issues/${issue.number}`,
@@ -54,19 +85,18 @@ function issueRef(issue: FakeIssue): Record<string, unknown> {
         ? [{ __typename: 'ClosedEvent', createdAt: issue.statusChangedAt }]
         : [],
     },
-    ...(issue.comments
+    ...(withComments
       ? {
           comments: {
-            nodes: issue.comments.map((comment) => ({
-              databaseId: comment.id,
-              createdAt: comment.createdAt,
-              body: comment.body,
-              author: { __typename: comment.type ?? 'User', login: comment.login },
-            })),
+            totalCount: page.totalCount,
+            pageInfo: page.pageInfo,
+            nodes: commentNodes(page.nodes),
           },
         }
       : {}),
-    ...(issue.duplicateOf ? { duplicateOf: issueRef(issue.duplicateOf) } : {}),
+    ...(issue.duplicateOf
+      ? { duplicateOf: issueRef(issue.duplicateOf, pageSize, null, withComments) }
+      : {}),
   }
 }
 
@@ -84,40 +114,54 @@ function installFakeGithub(state: FakeGithub): void {
       const url = String(input)
       state.calls.push(`${init?.method ?? 'GET'} ${url}`)
 
-      if (url.endsWith('/user')) return json({ login: BOT })
+      if (url.endsWith('/user')) {
+        return state.failUser ? json({ message: 'boom' }, 500) : json({ login: BOT })
+      }
       if (url.endsWith('/graphql')) {
         if (state.failGraphql) return json({ message: 'boom' }, 500)
         const body = JSON.parse(String(init?.body)) as {
           query: string
           variables: Record<string, unknown>
         }
-        if (body.query.includes('comments(last: 100)')) {
-          const thread = state.threads.get(Number(body.variables.number))
+        state.queries.push(body.query)
+        const pageSize = Number(/comments\(last: (\d+)/.exec(body.query)?.[1] ?? 100)
+
+        // Hilo del detalle: una sola issue por variable, con paginación hacia atrás.
+        if (body.query.includes('issue(number: $number)')) {
+          const number = Number(body.variables.number)
+          const before = typeof body.variables.before === 'string' ? body.variables.before : null
+          const comments = state.issues.get(number)?.comments ?? []
+          const page = commentPage(comments, before, pageSize)
           return json({
             data: {
               repository: {
-                issue: thread
-                  ? {
-                      comments: {
-                        totalCount: thread.totalCount,
-                        nodes: thread.comments.map((comment) => ({
-                          databaseId: comment.id,
-                          createdAt: comment.createdAt,
-                          updatedAt: comment.updatedAt,
-                          body: comment.body,
-                          author: { __typename: comment.type ?? 'User', login: comment.login },
-                        })),
-                      },
-                    }
-                  : null,
+                issue: { comments: { ...page, nodes: commentNodes(page.nodes) } },
               },
             },
           })
         }
+
+        // Página anterior de la ventana de novedades: un alias por issue.
+        if (body.query.includes('before: $c')) {
+          const repository: Record<string, unknown> = {}
+          for (const match of body.query.matchAll(
+            /i(\d+): issue\(number: (\d+)\) \{ comments\(last: (\d+), before: \$c\d+\)/g,
+          )) {
+            const number = Number(match[2])
+            const comments = state.issues.get(number)?.comments ?? []
+            const before = String(body.variables[`c${match[1]}`] ?? '')
+            const page = commentPage(comments, before, Number(match[3]))
+            repository[`i${match[1]}`] = {
+              comments: { ...page, nodes: commentNodes(page.nodes) },
+            }
+          }
+          return json({ data: { repository } })
+        }
+
         const repository: Record<string, unknown> = {}
         for (const match of body.query.matchAll(/i(\d+): issue\(number: (\d+)\)/g)) {
           const issue = state.issues.get(Number(match[2]))
-          repository[`i${match[1]}`] = issue ? issueRef(issue) : null
+          repository[`i${match[1]}`] = issue ? issueRef(issue, pageSize) : null
         }
         return json({ data: { repository } })
       }
@@ -179,8 +223,13 @@ function principal(userId: string): AuthPrincipal {
   return { userId, email: `${userId}@example.com`, provider: 'test', subject: userId }
 }
 
-function context(userId: string | null, params: Record<string, string> = {}, body?: unknown) {
-  const request = new Request('https://app.example.com/api/reports', {
+function context(
+  userId: string | null,
+  params: Record<string, string> = {},
+  body?: unknown,
+  options: { token?: string; query?: string; botLogin?: string | null } = {},
+) {
+  const request = new Request(`https://app.example.com/api/reports${options.query ?? ''}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -191,10 +240,10 @@ function context(userId: string | null, params: Record<string, string> = {}, bod
     locals: {
       ...(userId ? { principal: principal(userId) } : {}),
       runtimeEnv: {
-        GITHUB_ISSUE_TOKEN: 'token',
+        GITHUB_ISSUE_TOKEN: options.token ?? 'token',
         GITHUB_OWNER: OWNER,
         GITHUB_REPO: REPO,
-        GITHUB_BOT_LOGIN: BOT,
+        ...(options.botLogin === null ? {} : { GITHUB_BOT_LOGIN: options.botLogin ?? BOT }),
       },
     },
   } as never
@@ -224,7 +273,12 @@ describe('/api/reports', () => {
     currentDb = testDb.db
     userA = await seedUser(testDb.db, 'a@example.com')
     userB = await seedUser(testDb.db, 'b@example.com')
-    state = { issues: new Map(), comments: new Map(), threads: new Map(), calls: [] }
+    state = {
+      issues: new Map(),
+      comments: new Map(),
+      calls: [],
+      queries: [],
+    }
     installFakeGithub(state)
   })
 
@@ -361,6 +415,175 @@ describe('/api/reports', () => {
     expect(response.status).toBe(502)
   })
 
+  it('falla la lista si no puede identificar al bot, en vez de perder avisos', async () => {
+    await record(userA.id, 10)
+    state.issues.set(10, {
+      number: 10,
+      title: 'Abierta',
+      state: 'OPEN',
+      stateReason: null,
+      comments: [
+        {
+          id: 1,
+          body: 'Lo revisamos.',
+          issueNumber: 10,
+          createdAt: '2026-10-20T00:00:00.000Z',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+          login: 'ana',
+        },
+      ],
+    })
+    state.failUser = true
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    // Token propio: el login del bot se cachea por token entre peticiones. Sin
+    // `GITHUB_BOT_LOGIN`, la única forma de identificarlo es `GET /user`.
+    const response = await GET(
+      context(userA.id, {}, undefined, { token: 'token-sin-bot', botLogin: null }),
+    )
+    expect(response.status).toBe(502)
+  })
+
+  it('pagina la lista y cuenta los avisos de las páginas que aún no se han cargado', async () => {
+    for (let number = 1; number <= 25; number += 1) {
+      await record(userA.id, number, `2026-10-${String(number).padStart(2, '0')}T00:00:00.000Z`)
+      state.issues.set(number, {
+        number,
+        title: `Reporte ${number}`,
+        state: 'OPEN',
+        stateReason: null,
+      })
+    }
+    // La novedad vive en la entrada más antigua: cae en la segunda página.
+    state.issues.get(1)!.comments = [
+      {
+        id: 1,
+        body: 'Lo revisamos.',
+        issueNumber: 1,
+        createdAt: '2026-10-26T00:00:00.000Z',
+        updatedAt: '2026-10-26T00:00:00.000Z',
+        login: 'ana',
+      },
+    ]
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const first = (await (await GET(context(userA.id))).json()) as {
+      reports: Array<{ number: number }>
+      hasMore: boolean
+      nextCursor: string | null
+      unseenCount: number
+    }
+    expect(first.reports.map((report) => report.number)).toEqual(
+      Array.from({ length: 20 }, (_, index) => 25 - index),
+    )
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).not.toBeNull()
+    expect(first.unseenCount).toBe(1)
+
+    const second = (await (
+      await GET(
+        context(userA.id, {}, undefined, {
+          query: `?cursor=${encodeURIComponent(first.nextCursor as string)}`,
+        }),
+      )
+    ).json()) as {
+      reports: Array<{ number: number }>
+      hasMore: boolean
+      nextCursor: string | null
+      unseenCount?: number
+    }
+    expect(second.reports.map((report) => report.number)).toEqual([5, 4, 3, 2, 1])
+    expect(second.hasMore).toBe(false)
+    expect(second.nextCursor).toBeNull()
+    expect(second.unseenCount).toBeUndefined()
+  })
+
+  it('sigue paginando el hilo hasta encontrar el aviso del mantenedor', async () => {
+    await record(userA.id, 10, '2026-10-05T00:00:00.000Z')
+    const comments = Array.from({ length: 30 }, (_, index) => ({
+      id: index + 1,
+      body:
+        index === 0
+          ? 'Lo miramos con calma.'
+          : `<!-- finance-tracker:reporter-comment user=${userA.id} -->\n**Aclaración del reportero**\n\nnota ${index}`,
+      issueNumber: 10,
+      createdAt: `2026-10-${String(10 + Math.floor(index / 10)).padStart(2, '0')}T${String(index % 10).padStart(2, '0')}:00:00.000Z`,
+      updatedAt: '2026-10-11T00:00:00.000Z',
+      login: index === 0 ? 'ana' : BOT,
+    }))
+    state.issues.set(10, {
+      number: 10,
+      title: 'Abierta',
+      state: 'OPEN',
+      stateReason: null,
+      comments,
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const body = (await (await GET(context(userA.id))).json()) as {
+      reports: Array<{ hasUpdates: boolean }>
+    }
+    expect(body.reports[0]?.hasUpdates).toBe(true)
+    expect(state.queries.some((query) => query.includes('before: $c'))).toBe(true)
+  })
+
+  it('vuelve a la issue original cuando un salto posterior de la duplicada es inaccesible', async () => {
+    await record(userA.id, 10)
+    state.issues.set(10, {
+      number: 10,
+      title: 'Original',
+      state: 'CLOSED',
+      stateReason: 'DUPLICATE',
+      duplicateOf: {
+        number: 20,
+        title: 'Intermedia',
+        state: 'CLOSED',
+        stateReason: 'DUPLICATE',
+      },
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const body = (await (await GET(context(userA.id))).json()) as {
+      reports: Array<{
+        followed?: unknown
+        duplicateLinkUnavailable?: boolean
+        stateReason?: string | null
+      }>
+    }
+    expect(body.reports[0]?.followed).toBeUndefined()
+    expect(body.reports[0]?.duplicateLinkUnavailable).toBe(true)
+    expect(body.reports[0]?.stateReason).toBe('DUPLICATE')
+  })
+
+  it('devuelve el hilo completo aunque supere una página de comentarios', async () => {
+    await record(userA.id, 10)
+    state.issues.set(10, {
+      number: 10,
+      title: 'Abierta',
+      state: 'OPEN',
+      stateReason: null,
+      comments: Array.from({ length: 150 }, (_, index) => ({
+        id: index + 1,
+        body: `Comentario ${index + 1}`,
+        issueNumber: 10,
+        createdAt: `2026-09-${String(1 + (index % 28)).padStart(2, '0')}T00:00:00.000Z`,
+        updatedAt: '2026-09-01T00:00:00.000Z',
+        login: 'ana',
+      })),
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/[number]/index')
+    const response = await GET(context(userA.id, { number: '10' }))
+    const body = (await response.json()) as {
+      detail: { thread: Array<{ id: number }> }
+    }
+    expect(body.detail.thread).toHaveLength(150)
+    expect(body.detail.thread[0]?.id).toBe(1)
+    expect(state.queries.filter((query) => query.includes('issue(number: $number)'))).toHaveLength(
+      2,
+    )
+  })
+
   it('devuelve el detalle con el hilo de la principal y oculta automatización y ajenos', async () => {
     await record(userA.id, 10)
     state.issues.set(10, {
@@ -370,9 +593,11 @@ describe('/api/reports', () => {
       stateReason: 'DUPLICATE',
       duplicateOf: { number: 20, title: 'Principal', state: 'OPEN', stateReason: null },
     })
-    state.issues.set(20, { number: 20, title: 'Principal', state: 'OPEN', stateReason: null })
-    state.threads.set(20, {
-      totalCount: 4,
+    state.issues.set(20, {
+      number: 20,
+      title: 'Principal',
+      state: 'OPEN',
+      stateReason: null,
       comments: [
         {
           id: 1,
@@ -415,13 +640,11 @@ describe('/api/reports', () => {
       detail: {
         threadIssue: { number: number }
         thread: Array<{ id: number; kind: string; text: string; editable: boolean }>
-        hiddenBefore: number
       }
     }
     expect(body.detail.threadIssue.number).toBe(20)
     expect(body.detail.thread.map((item) => item.id)).toEqual([1, 4])
     expect(body.detail.thread[1]).toMatchObject({ kind: 'reporter', text: 'mía', editable: true })
-    expect(body.detail.hiddenBefore).toBe(0)
   })
 
   it('rechaza comentar en un hilo cerrado con 409', async () => {
@@ -487,11 +710,14 @@ describe('/api/reports', () => {
       login: BOT,
     })
 
-    const { PATCH, DELETE } = await import(
-      '../../../../src/pages/api/reports/[number]/comments/[commentId]'
-    )
+    const { PATCH, DELETE } =
+      await import('../../../../src/pages/api/reports/[number]/comments/[commentId]')
     const patched = await PATCH(
-      context(userA.id, { number: '10', commentId: '50' }, { text: 'editada', keepAttachments: [] }),
+      context(
+        userA.id,
+        { number: '10', commentId: '50' },
+        { text: 'editada', keepAttachments: [] },
+      ),
     )
     expect(patched.status).toBe(200)
     expect(state.comments.get(50)?.body).toContain('editada')

@@ -43,7 +43,6 @@ watch(
     heading.value?.focus()
   },
 )
-
 </script>
 
 <template>
@@ -118,9 +117,6 @@ watch(
         </NumberedBlock>
 
         <NumberedBlock number="02" title="Hilo" title-id="report-thread-title">
-          <p v-if="props.detail.hiddenBefore > 0" class="text-text-muted mbe-3 text-sm">
-            Se muestran los 100 comentarios más recientes del hilo.
-          </p>
           <ReportThread
             :items="props.detail.thread"
             :can-comment="props.detail.canComment"

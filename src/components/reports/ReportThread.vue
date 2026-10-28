@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import {
-  encodeBase64,
   getAttachmentError,
   ISSUE_ATTACHMENT_MAX_COUNT,
   ISSUE_ATTACHMENT_TYPES,
@@ -18,7 +17,7 @@ import IconButton from '../ui/IconButton.vue'
 import { FIELD_LABEL } from '../ui/field'
 import AttachmentList from './AttachmentList.vue'
 import ReportMarkdown from './ReportMarkdown.vue'
-import { COMMENT_TEXTAREA } from './report-form'
+import { COMMENT_TEXTAREA, encodeAttachmentFile } from './report-form'
 
 // Correspondencia del reporte: cada aclaración es una carta con remitente y
 // filete lateral, no una burbuja de chat. Solo las propias se pueden editar.
@@ -53,9 +52,7 @@ const deleteTarget = ref<ThreadItem | null>(null)
 const confirmOpen = ref(false)
 let nextFileId = 0
 
-const keptRows = computed(() =>
-  kept.value.map((url) => ({ id: url, name: url, previewUrl: url })),
-)
+const keptRows = computed(() => kept.value.map((url) => ({ id: url, name: url, previewUrl: url })))
 const newRows = computed(() =>
   newFiles.value.map((file) => ({
     id: file.id,
@@ -133,13 +130,7 @@ function removeNewFile(id: number): void {
 }
 
 async function encodeNewFiles(): Promise<ReportAttachment[]> {
-  return Promise.all(
-    newFiles.value.map(async ({ file }) => ({
-      name: file.name,
-      contentType: file.type,
-      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
-    })),
-  )
+  return Promise.all(newFiles.value.map(({ file }) => encodeAttachmentFile(file)))
 }
 
 function save(): void {

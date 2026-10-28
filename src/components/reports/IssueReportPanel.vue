@@ -3,11 +3,7 @@ import { computed, onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
-import {
-  encodeBase64,
-  getAttachmentError,
-  ISSUE_ATTACHMENT_TYPES,
-} from '../../domain/reports/issue-attachments'
+import { getAttachmentError, ISSUE_ATTACHMENT_TYPES } from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
@@ -22,7 +18,7 @@ import BaseInput from '../ui/BaseInput.vue'
 import { FIELD_CONTROL, FIELD_LABEL } from '../ui/field'
 import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
 import AttachmentList from './AttachmentList.vue'
-import { ATTACHMENT_LIMITS } from './report-form'
+import { ATTACHMENT_LIMITS, encodeAttachmentFile } from './report-form'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
 
@@ -124,13 +120,7 @@ function removeAttachment(id: number): void {
 }
 
 async function encodeAttachments(): Promise<ReportAttachment[]> {
-  return Promise.all(
-    attachments.value.map(async ({ file }) => ({
-      name: file.name,
-      contentType: file.type,
-      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
-    })),
-  )
+  return Promise.all(attachments.value.map(({ file }) => encodeAttachmentFile(file)))
 }
 
 function resetForm(): void {

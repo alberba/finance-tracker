@@ -407,7 +407,6 @@ function reportDetail(overrides: Record<string, unknown> = {}) {
       stateReason: null,
     },
     thread: [],
-    hiddenBefore: 0,
     canComment: true,
     fetchedAt: '2026-10-24T12:00:00.000Z',
     ...overrides,
@@ -432,6 +431,7 @@ async function mockReportsApi(
   page: import('@playwright/test').Page,
   options: {
     list?: () => ReportEntryShape[]
+    loadMore?: () => ReportEntryShape[]
     detail?: () => Record<string, unknown>
     commentStatus?: number
   } = {},
@@ -442,12 +442,25 @@ async function mockReportsApi(
     const method = request.method()
 
     if (url.pathname === '/api/reports') {
+      const cursor = url.searchParams.get('cursor')
+      const isNextPage = cursor !== null
+      const reports =
+        isNextPage && options.loadMore
+          ? options.loadMore()
+          : options.list
+            ? options.list()
+            : [reportEntry()]
+      const hasMore = !isNextPage && options.loadMore !== undefined
       return route.fulfill({
         status: 200,
         json: {
           ok: true,
-          reports: options.list ? options.list() : [reportEntry()],
-          hasMore: false,
+          reports,
+          hasMore,
+          nextCursor: hasMore ? '2026-10-01T00:00:00.000Z|901' : null,
+          ...(cursor === null
+            ? { unseenCount: reports.filter((entry) => entry.hasUpdates).length }
+            : {}),
           fetchedAt: '2026-10-24T12:00:00.000Z',
         },
       })
@@ -589,8 +602,27 @@ test.describe('Mis reportes E2E', () => {
     await expect(page.locator('[data-report-entry="901"]').getByText('Nuevo')).toBeVisible()
 
     await page.locator('[data-report-entry="901"]').click()
-    await expect(tracker.reportsPage.getByRole('heading', { name: reportEntry().title })).toBeVisible()
+    await expect(
+      tracker.reportsPage.getByRole('heading', { name: reportEntry().title }),
+    ).toBeVisible()
     await expect(dot).toHaveCount(0)
+  })
+
+  test('carga la página siguiente sin ocultar la lista', async ({ page, tracker }) => {
+    await mockReportsApi(page, {
+      list: () => [reportEntry()],
+      loadMore: () => [reportEntry({ number: 902, title: 'Exportación a PDF' })],
+    })
+    await page.goto('/reportes')
+    await expect(page.locator('[data-report-entry="901"]')).toBeVisible()
+
+    await tracker.reportsPage.getByRole('button', { name: 'Cargar más reportes' }).click()
+
+    await expect(page.locator('[data-report-entry="902"]')).toContainText('Exportación a PDF')
+    await expect(page.locator('[data-report-entry="901"]')).toBeVisible()
+    await expect(
+      tracker.reportsPage.getByRole('button', { name: 'Cargar más reportes' }),
+    ).toHaveCount(0)
   })
 
   test('la hoja «Más» enlaza a Mis reportes y muestra el contador de novedades', async ({

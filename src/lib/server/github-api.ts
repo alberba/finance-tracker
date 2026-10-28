@@ -7,11 +7,17 @@
 import { Data, Effect } from 'effect'
 
 import type { RuntimeEnv } from './cloudflare-env'
+import { Http } from './http'
 
 export const GITHUB_API_BASE = 'https://api.github.com'
 
 export class GithubConfigError extends Data.TaggedError('GithubConfigError')<{
   message: string
+}> {}
+
+export class GithubApiError extends Data.TaggedError('GithubApiError')<{
+  message: string
+  status?: number
 }> {}
 
 export interface GithubConfig {
@@ -66,26 +72,31 @@ export function githubConfig(env: RuntimeEnv): Effect.Effect<GithubConfig, Githu
 }
 
 /** El endpoint de adjuntos exige el id numérico del repositorio. */
-export async function fetchRepositoryId(
-  request: typeof fetch,
-  owner: string,
-  repo: string,
-  headers: Record<string, string>,
-): Promise<number> {
-  const response = await request(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers })
-  if (!response.ok) {
-    throw new Error(`No se pudo leer el repositorio (${response.status}).`)
-  }
-  const data = (await response.json()) as { id?: number }
-  const id = Number(data.id)
-  if (!Number.isFinite(id)) {
-    throw new Error('Respuesta inválida al leer el repositorio.')
-  }
-  return id
-}
-
-/** Ejecuta `fn` una sola vez y reutiliza su promesa en las llamadas siguientes. */
-export function once<T>(fn: () => Promise<T>): () => Promise<T> {
-  let pending: Promise<T> | undefined
-  return () => (pending ??= fn())
+export function fetchRepositoryId(
+  config: GithubConfig,
+): Effect.Effect<number, GithubApiError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        http.request(`${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}`, {
+          headers: githubHeaders(config.token),
+        }),
+      catch: () => new GithubApiError({ message: 'No se pudo contactar con GitHub.' }),
+    })
+    if (!response.ok) {
+      return yield* new GithubApiError({
+        message: `No se pudo leer el repositorio (${response.status}).`,
+        status: response.status,
+      })
+    }
+    const data = yield* Effect.promise(
+      () => response.json().catch(() => null) as Promise<{ id?: number } | null>,
+    )
+    const id = Number(data?.id)
+    if (!Number.isFinite(id)) {
+      return yield* new GithubApiError({ message: 'Respuesta inválida al leer el repositorio.' })
+    }
+    return id
+  })
 }

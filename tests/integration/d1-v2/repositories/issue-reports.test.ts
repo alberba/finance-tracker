@@ -41,14 +41,14 @@ describe('issue-reports repository', () => {
     expect(await runWithDb(db, issueReportsRepo.listIssueNumbersByUser(userB.id))).toEqual([])
   })
 
-  it('devuelve las más recientes primero y una fila de más', async () => {
+  it('devuelve las más recientes primero', async () => {
     const { db } = testDb
     const user = await seedUser(db)
     await runWithDb(db, issueReportsRepo.recordSubmission(user.id, 1, T1))
     await runWithDb(db, issueReportsRepo.recordSubmission(user.id, 3, T3))
     await runWithDb(db, issueReportsRepo.recordSubmission(user.id, 2, T2))
 
-    const rows = await runWithDb(db, issueReportsRepo.listRecentByUser(user.id, 2))
+    const rows = await runWithDb(db, issueReportsRepo.listByUser(user.id))
     expect(rows.map((row) => row.issueNumber)).toEqual([3, 2, 1])
   })
 
@@ -59,9 +59,9 @@ describe('issue-reports repository', () => {
 
     expect(await runWithDb(db, issueReportsRepo.markSeen(user.id, 10, T3))).toBe(true)
     expect(await runWithDb(db, issueReportsRepo.markSeen(user.id, 10, T2))).toBe(true)
-    expect((await runWithDb(db, issueReportsRepo.getByUserAndNumber(user.id, 10)))?.lastSeenAt).toBe(
-      T3,
-    )
+    expect(
+      (await runWithDb(db, issueReportsRepo.getByUserAndNumber(user.id, 10)))?.lastSeenAt,
+    ).toBe(T3)
   })
 
   it('no marca visto un reporte de otra cuenta', async () => {
@@ -90,8 +90,8 @@ describe('issue-reports repository', () => {
 
   it('rechaza una fila de una cuenta inexistente (FK)', async () => {
     const { db } = testDb
-    await expect(
-      runWithDb(db, issueReportsRepo.recordSubmission('nadie', 1, T1)),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i)
+    await expect(runWithDb(db, issueReportsRepo.recordSubmission('nadie', 1, T1))).rejects.toThrow(
+      /FOREIGN KEY constraint failed/i,
+    )
   })
 })
