@@ -3,8 +3,8 @@
  *
  * Returns `Effect<CreatedIssue, GithubIssueError, Http>`: retries and the
  * type-less fallback are composed, and HTTP enters through the `Http` service.
- * Attachments, duplicate checking and the auxiliary-failure reporter stay
- * injectable for the tests, as they were before the migration.
+ * Attachments and the auxiliary-failure reporter stay injectable for the
+ * tests, as they were before the migration.
  */
 
 import { Data, Duration, Effect } from 'effect'
@@ -12,29 +12,34 @@ import type { RuntimeEnv } from './cloudflare-env'
 import { reportReportSideFailure, type ReportSideFailureReporter } from './error-tracking'
 import { Http } from './http'
 import {
-  checkIssueDuplicate,
-  type IssueDuplicateChecker,
-  type IssueDuplicateResult,
-} from './issue-duplicate-checker'
-import {
   uploadIssueAttachment,
   type AttachmentUploadContext,
   type AttachmentUploader,
   type AttachmentUploadResult,
 } from './issue-attachments'
+import {
+  GITHUB_API_BASE,
+  fetchRepositoryId,
+  githubConfig,
+  githubHeaders,
+  once,
+  type GithubConfigError,
+} from './github-api'
 import type { IssueReportPayload } from './issue-report-schema'
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422])
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 500
 
 export interface CreatedIssue {
   number: number
   url: string
-  duplicate?: boolean
 }
 
 export interface GithubIssueClient {
   /** Subidor de adjuntos. Por defecto, el que habla con la API real de GitHub. */
   uploadAttachment?: AttachmentUploader
-  /** Comprobación semántica previa; la redacción se ejecuta en GitHub Actions. */
-  checkDuplicate?: IssueDuplicateChecker
   /** Aviso de los fallos auxiliares (subidas). Por defecto, Sentry; los tests inyectan un stub. */
   reportFailure?: ReportSideFailureReporter
 }
@@ -55,74 +60,11 @@ export interface IssueReporter {
   name: string | null
 }
 
-const GITHUB_API_BASE = 'https://api.github.com'
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
-const TYPE_RETRY_STATUS = new Set([400, 403, 404, 422])
-const MAX_RETRIES = 2
-const RETRY_DELAY_MS = 500
-
 export type GithubIssueType = 'Bug' | 'Feature'
 
 export class GithubIssueError extends Data.TaggedError('GithubIssueError')<{
   message: string
 }> {}
-
-/** Cabeceras de todas las llamadas a la API de GitHub de este servicio. */
-function githubHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'finance-tracker-web-reporter',
-  }
-}
-
-/** El endpoint de adjuntos exige el id numérico del repositorio. */
-async function fetchRepositoryId(
-  request: typeof fetch,
-  owner: string,
-  repo: string,
-  headers: Record<string, string>,
-): Promise<number> {
-  const response = await request(`${GITHUB_API_BASE}/repos/${owner}/${repo}`, { headers })
-  if (!response.ok) {
-    throw new Error(`No se pudo leer el repositorio (${response.status}).`)
-  }
-  const data = (await response.json()) as { id?: number }
-  const id = Number(data.id)
-  if (!Number.isFinite(id)) {
-    throw new Error('Respuesta inválida al leer el repositorio.')
-  }
-  return id
-}
-
-/** Ejecuta `fn` una sola vez y reutiliza su promesa en las llamadas siguientes. */
-function once<T>(fn: () => Promise<T>): () => Promise<T> {
-  let pending: Promise<T> | undefined
-  return () => (pending ??= fn())
-}
-
-function requiredVar(
-  name: keyof RuntimeEnv,
-  env: RuntimeEnv,
-): Effect.Effect<string, GithubIssueError> {
-  const value = String(env[name] || '').trim()
-  return value
-    ? Effect.succeed(value)
-    : Effect.fail(new GithubIssueError({ message: `Falta variable de entorno requerida: ${name}` }))
-}
-
-function requiredAnyVar(
-  names: ReadonlyArray<keyof RuntimeEnv>,
-  env: RuntimeEnv,
-): Effect.Effect<string, GithubIssueError> {
-  for (const name of names) {
-    const value = String(env[name] || '').trim()
-    if (value) return Effect.succeed(value)
-  }
-  return Effect.fail(
-    new GithubIssueError({ message: `Falta variable de entorno requerida: ${names.join(' o ')}` }),
-  )
-}
 
 function canonicalReportType(type: IssueReportPayload['type']): 'bug' | 'feature' {
   return type === 'bug' ? 'bug' : 'feature'
@@ -220,35 +162,6 @@ async function uploadAttachments(
   return outcomes
 }
 
-/**
- * La comprobación de duplicadas nunca bloquea el reporte: si algo falla, la issue se crea
- * con el texto original. Los comprobadores ya registran sus fallos; este catch cubre
- * solo un comprobador que lance pese al contrato.
- */
-async function findDuplicate(
-  payload: IssueReportPayload,
-  env: RuntimeEnv,
-  checkDuplicate: IssueDuplicateChecker,
-  reportFailure: ReportSideFailureReporter,
-): Promise<IssueDuplicateResult | null> {
-  try {
-    return await checkDuplicate(
-      {
-        type: canonicalReportType(payload.type),
-        summary: payload.summary,
-        description: payload.description,
-        section: payload.section,
-        pathname: payload.context.pathname,
-      },
-      env,
-    )
-  } catch {
-    console.error('[github] La comprobación de duplicadas se omitió por un fallo inesperado.')
-    reportFailure({ stage: 'duplicate', reason: 'unexpected' })
-    return null
-  }
-}
-
 function postIssue(
   request: typeof fetch,
   token: string,
@@ -296,22 +209,17 @@ export function createIssueFromWebReport(
 ): Effect.Effect<CreatedIssue, GithubIssueError, Http> {
   return Effect.gen(function* () {
     const http = yield* Http
-    const token = yield* requiredAnyVar(['GITHUB_ISSUE_TOKEN', 'GITHUB_TOKEN'], env)
-    const owner = yield* requiredVar('GITHUB_OWNER', env)
-    const repo = yield* requiredVar('GITHUB_REPO', env)
+    const config = yield* githubConfig(env).pipe(
+      Effect.mapError(
+        (error: GithubConfigError) => new GithubIssueError({ message: error.message }),
+      ),
+    )
+    const { token, owner, repo } = config
     const headers = githubHeaders(token)
     const uploadAttachment = client.uploadAttachment ?? uploadIssueAttachment
-    const checkDuplicate = client.checkDuplicate ?? checkIssueDuplicate
     const reportFailure = client.reportFailure ?? reportReportSideFailure
     const title = payload.summary.slice(0, 140)
     const labels = buildIssueLabels(payload.type)
-
-    const duplicate = yield* Effect.promise(() =>
-      findDuplicate(payload, env, checkDuplicate, reportFailure),
-    )
-    if (duplicate) {
-      return { ...duplicate, duplicate: true }
-    }
 
     // Los adjuntos se suben antes de crear la issue para poder referenciarlos en
     // el cuerpo. Un fallo de subida queda anotado en el cuerpo, nunca bloquea.
@@ -368,7 +276,9 @@ export function createIssueFromWebReport(
     const issueNumber = Number(data?.number)
     const issueUrl = String(data?.html_url || '')
     if (!Number.isFinite(issueNumber) || !issueUrl) {
-      return yield* new GithubIssueError({ message: 'Respuesta inválida al crear issue en GitHub.' })
+      return yield* new GithubIssueError({
+        message: 'Respuesta inválida al crear issue en GitHub.',
+      })
     }
 
     return { number: issueNumber, url: issueUrl }

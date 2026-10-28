@@ -8,6 +8,7 @@
     "cf:types": "wrangler types",
     "d1:migrate:local:v2": "wrangler d1 migrations apply finance-tracker-db-v2 --local --persist-to .wrangler/state",
     "db:repair": "tsx scripts/repair-corrupted-data.ts",
+    "reports:backfill": "tsx scripts/reports-backfill.ts",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "dev": "astro dev",
     "dev:worktree": "node scripts/dev-worktree.mjs",

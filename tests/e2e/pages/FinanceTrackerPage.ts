@@ -103,6 +103,19 @@ export class FinanceTrackerPage {
     return this.page.getByRole('dialog', { name: 'Crear reporte' })
   }
 
+  get reportsPage(): Locator {
+    return this.page.locator('#reports')
+  }
+
+  /** Abre «Mis reportes» por su ruta real (fuera de las secciones). */
+  async openReports(issueNumber?: number) {
+    await this.page.goto(`/reportes${issueNumber ? `?reporte=${issueNumber}` : ''}`)
+    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await expect(
+      this.reportsPage.getByRole('heading', { name: 'Mis reportes', exact: true }),
+    ).toBeVisible()
+  }
+
   async goto() {
     await this.page.goto('/')
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()

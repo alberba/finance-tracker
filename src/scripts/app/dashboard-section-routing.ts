@@ -1,5 +1,12 @@
 import { ROUTE_SECTION_MAP, SECTION_ROUTE_MAP, isSectionId, type SectionId } from '../types'
 
+/** «Mis reportes» vive fuera de `APP_SECTIONS`: es una página propia (#340). */
+export const REPORTS_ROUTE = '/reportes'
+
+export function isReportsPath(pathname: string): boolean {
+  return normalizePath(pathname) === REPORTS_ROUTE
+}
+
 export function getSectionFromPath(pathname: string): SectionId {
   const normalizedPath = normalizePath(pathname)
   if (normalizedPath === '/') {

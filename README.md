@@ -207,17 +207,12 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Antes de crear, la API puede comprobar duplicadas con DeepSeek: busca por palabras del
-   reporte en issues abiertas y cerradas y compara hasta 20 candidatas. Una coincidencia con el
-   mismo problema y alcance en una issue abierta devuelve su enlace sin crear otra ni subir
-   adjuntos. La búsqueda tarda como máximo 3 segundos y el modelo tiene un plazo de 8 segundos.
-   Sin clave, sin candidatas o ante un fallo, se crea el reporte original.
-5. Al abrirse una issue con `source:web-report`, **Analyze web report** ejecuta OpenCode con
+4. Al abrirse una issue con `source:web-report`, **Analyze web report** ejecuta OpenCode con
    DeepSeek V4.1 Flash en GitHub Actions. Carga la skill `create-issue`, lee el código
    del checkout y las convenciones del repo, y compara hasta 10 candidatas con sus comentarios
    (hasta 10 comentarios por candidata). La búsqueda es limitada y sus fallos o truncamientos
    quedan en el contexto del análisis; las cerradas pueden ser recurrencias.
-6. El agente prepara el cuerpo principal y un Agent Brief. El script valida el JSON y que se haya
+5. El agente prepara el cuerpo principal y un Agent Brief. El script valida el JSON y que se haya
    cargado la skill y leído código antes de publicar. Reemplaza el cuerpo sin añadir un campo de
    enriquecimiento, conserva adjuntos y metadatos, publica el brief como comentario enlazado y
    verifica el resultado. Una edición humana detectada durante el análisis impide sustituir el cuerpo.
@@ -232,6 +227,13 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    decisión, publica `## Decisiones pendientes` en el cuerpo y aplica `needs-info` (u otro estado
    de triage justificado). Añade `ui-change` a las features visuales. Un fallo previo a
    publicar deja el reporte original disponible.
+
+El alta guarda una fila de propiedad en `issue_reports` y el acuse enlaza a **Mis reportes**
+(`/reportes`). Esa página lista los reportes de la cuenta con el estado nativo de GitHub, sigue a la
+principal cuando el reporte se cierra como duplicada (hasta tres saltos) y permite añadir, editar y
+borrar aclaraciones propias con adjuntos. GitHub sigue siendo la fuente de verdad del estado; no hay
+sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad devuelve `201` con
+`tracked: false` y el reporte se recupera con `pnpm reports:backfill`.
 
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
@@ -250,12 +252,13 @@ En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
   no dispara este workflow automáticamente.
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
-- `OPENCODE_GO_API_KEY` (opcional): habilita la comprobación semántica previa de duplicadas.
+- `GITHUB_BOT_LOGIN` (opcional): login de la cuenta que publica las aclaraciones. Necesario si el
+  token es de una GitHub App, porque `/user` no está disponible para ellas.
 
 En GitHub → Settings → Secrets and variables → Actions:
 
-- `OPENCODE_GO_API_KEY`: clave de OpenCode Go usada por el agente con DeepSeek. Es independiente
-  de la variable homónima del servidor: hay que configurarla también como secret de Actions.
+- `OPENCODE_GO_API_KEY`: clave de OpenCode Go usada por el agente con DeepSeek en Actions. El
+  servidor ya no la usa; solo se configura como secret del workflow.
 - El token para publicar lo proporciona GitHub con `issues: write`; no requiere otro secret.
 
 El workflow tiene que estar en la rama por defecto para recibir `issues.opened`. Para reintentar un

@@ -1,14 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Effect } from 'effect'
 
-// Se mockean el cliente de GitHub (para forzar el fallo controlado) y el
-// tracking (para que el SDK real de Sentry nunca se importe): acá solo se
-// comprueba que la ruta reporta su propio 500.
+// Se mockean el cliente de GitHub (para forzar el fallo controlado), la base de
+// datos y el tracking (para que el SDK real de Sentry nunca se importe): acá
+// solo se comprueba lo que decide la ruta.
 const githubIssues = vi.hoisted(() => ({ createIssueFromWebReport: vi.fn() }))
-const errorTracking = vi.hoisted(() => ({ reportApiRouteFailure: vi.fn() }))
+const errorTracking = vi.hoisted(() => ({
+  reportApiRouteFailure: vi.fn(),
+  reportReportSideFailure: vi.fn(),
+}))
+const db = vi.hoisted(() => ({ getDb: vi.fn(() => ({})) }))
+const issueReports = vi.hoisted(() => ({ recordSubmission: vi.fn() }))
 
 vi.mock('../../src/lib/server/github-issues', () => githubIssues)
 vi.mock('../../src/lib/server/error-tracking', () => errorTracking)
+vi.mock('../../src/db/client', () => db)
+vi.mock('../../src/db/repositories/issue-reports', () => issueReports)
 
 import { POST } from '../../src/pages/api/issues/report'
 
@@ -51,6 +58,7 @@ function makeContext(body: unknown = PAYLOAD) {
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  issueReports.recordSubmission.mockReturnValue(Effect.succeed(true))
 })
 
 describe('POST /api/issues/report con el cliente de GitHub caído', () => {
@@ -73,7 +81,7 @@ describe('POST /api/issues/report con el cliente de GitHub caído', () => {
 })
 
 describe('POST /api/issues/report con el cliente de GitHub sano', () => {
-  it('crea la issue sin reportar nada', async () => {
+  it('crea la issue y registra la propiedad con el userId del principal', async () => {
     githubIssues.createIssueFromWebReport.mockReturnValue(
       Effect.succeed({
         number: 654,
@@ -81,15 +89,46 @@ describe('POST /api/issues/report con el cliente de GitHub sano', () => {
       }),
     )
 
-    const response = await POST(makeContext())
+    const context = makeContext()
+    const response = await POST(context)
 
     expect(response.status).toBe(201)
     expect(await response.json()).toEqual({
       ok: true,
       issueNumber: 654,
       issueUrl: 'https://github.com/alberba/finance-tracker/issues/654',
+      tracked: true,
     })
+    expect(issueReports.recordSubmission).toHaveBeenCalledWith(
+      context.locals.principal?.userId,
+      654,
+      expect.any(String),
+    )
     expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
+  })
+
+  it('si el registro falla, la issue sigue siendo un 201 con tracked false', async () => {
+    githubIssues.createIssueFromWebReport.mockReturnValue(
+      Effect.succeed({
+        number: 7,
+        url: 'https://github.com/alberba/finance-tracker/issues/7',
+      }),
+    )
+    issueReports.recordSubmission.mockReturnValue(Effect.fail(new Error('db caída')))
+
+    const response = await POST(makeContext())
+
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual({
+      ok: true,
+      issueNumber: 7,
+      issueUrl: 'https://github.com/alberba/finance-tracker/issues/7',
+      tracked: false,
+    })
+    expect(errorTracking.reportReportSideFailure).toHaveBeenCalledWith({
+      stage: 'track',
+      reason: 'db',
+    })
   })
 })
 
@@ -147,25 +186,5 @@ describe('POST /api/issues/report con un payload inválido', () => {
     expect(response.status).toBe(400)
     expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
     expect(githubIssues.createIssueFromWebReport).not.toHaveBeenCalled()
-  })
-})
-
-describe('POST /api/issues/report con una duplicada', () => {
-  it('devuelve el enlace existente con 200 y duplicate, sin afirmar creación', async () => {
-    githubIssues.createIssueFromWebReport.mockReturnValue(
-      Effect.succeed({
-        number: 9,
-        url: 'https://github.com/org/repo/issues/9',
-        duplicate: true,
-      }),
-    )
-    const response = await POST(makeContext())
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({
-      ok: true,
-      issueNumber: 9,
-      issueUrl: 'https://github.com/org/repo/issues/9',
-      duplicate: true,
-    })
   })
 })

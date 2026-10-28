@@ -2,6 +2,7 @@ import { isDemoMode } from './demo-mode'
 import { watch } from 'vue'
 import { type State } from './types'
 import { setupShellNavigation } from './app/shell-navigation'
+import { isReportsPath } from './app/dashboard-section-routing'
 import { getEventElement } from './app/dom-helpers'
 import { getAppElements } from './app/elements'
 import { type UiState } from './app/ui-state'
@@ -48,9 +49,16 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
     }
     ui.activeSection = shellNavigation.getSectionFromPath(window.location.pathname)
     bindEvents()
-    shellNavigation.switchSection(ui.activeSection, {
-      updateHistory: false,
-    })
+    // `/reportes` no es una sección: el shell monta la página y ningún menú
+    // queda activo. El resto arranca como siempre.
+    if (isReportsPath(window.location.pathname)) {
+      uiStore.setPage('reports')
+    } else {
+      uiStore.setPage('section')
+      shellNavigation.switchSection(ui.activeSection, {
+        updateHistory: false,
+      })
+    }
     const context = (document as Document & { modelContext?: FinanceModelContext }).modelContext
     try {
       await registerFinanceTools(context, () => {

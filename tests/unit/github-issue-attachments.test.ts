@@ -124,7 +124,7 @@ function createIssueFromWebReport(
   reporter: IssueReporter,
   env: Record<string, string>,
   client: { fetch: typeof fetch } & GithubIssueClient,
-): Promise<{ number: number; url: string; duplicate?: boolean }> {
+): Promise<{ number: number; url: string }> {
   const { fetch: request, ...rest } = client
   return Effect.runPromise(
     Effect.provideService(createIssueFromWebReportEffect(payload, reporter, env, rest), Http, {
@@ -144,7 +144,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
-      checkDuplicate: async () => null,
     })
 
     expect(uploadAttachment).toHaveBeenCalledTimes(1)
@@ -161,7 +160,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     const result = await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
-      checkDuplicate: async () => null,
     })
 
     expect(result.number).toBe(77)
@@ -185,7 +183,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
       uploadAttachment,
-      checkDuplicate: async () => null,
       reportFailure,
     })
 
@@ -200,27 +197,10 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
       uploadAttachment: async () => ({ ok: false as const, error: 'texto libre SECRET_MARKER' }),
-      checkDuplicate: async () => null,
       reportFailure,
     })
 
     expect(reportFailure).toHaveBeenCalledWith({ stage: 'upload', reason: 'failed' })
-  })
-
-  it('un comprobador de duplicadas que lanza se avisa como unexpected y el reporte se crea', async () => {
-    const reportFailure = vi.fn()
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    const result = await createIssueFromWebReport(reportWith(undefined), reporter, ENV, {
-      fetch: vi.fn<typeof fetch>(async () => issueResponse()) as typeof fetch,
-      checkDuplicate: async () => {
-        throw new Error('boom')
-      },
-      reportFailure,
-    })
-
-    expect(result.number).toBe(77)
-    expect(reportFailure).toHaveBeenCalledWith({ stage: 'duplicate', reason: 'unexpected' })
   })
 
   it('un reporte sin adjuntos no incluye la sección y no sube nada', async () => {
@@ -230,7 +210,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     await createIssueFromWebReport(reportWith(undefined), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
       uploadAttachment,
-      checkDuplicate: async () => null,
     })
 
     expect(uploadAttachment).not.toHaveBeenCalled()
@@ -254,7 +233,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
       ENV,
       {
         fetch: fakeFetch as typeof fetch,
-        checkDuplicate: async () => null,
       },
     )
 

@@ -40,7 +40,13 @@ El `id` y la etiqueta salen de `src/config/app-sections.ts`. El código usa el `
 | Configuración (`settings`)   | `SettingsSection.vue`                    | `components/settings`; `domain/settings`; `stores/settings.ts`, `recurring.ts`                                            | `unit/settings-view-model`; `e2e/settings`                                  |
 | Datos (`data`)               | `DataSection.vue`                        | `domain/data`; `stores/data.ts`                                                                                           | `unit/data-store-*`; `e2e/data`                                             |
 
-Rutas de tests relativas a `tests/`. Reportes no es una sección: lo abre `components/reports/GlobalReportLauncher.vue` ([guía](../context/tabs/reportes.md)).
+Rutas de tests relativas a `tests/`.
+
+**Reportes no es una sección.** El lanzador `components/reports/GlobalReportLauncher.vue` abre el
+panel de alta, pero el seguimiento vive en la página `/reportes` (fuera de `APP_SECTIONS`):
+`FinanceTrackerShell` recibe `page="reports"`, `FinanceWorkspace` monta
+`components/reports/ReportsPage.vue` en lugar de la sección y `stores/ui.ts` guarda
+`page: 'section' | 'reports'`. Ver la [guía de reportes](../context/tabs/reportes.md).
 
 ## Reglas de integracion
 

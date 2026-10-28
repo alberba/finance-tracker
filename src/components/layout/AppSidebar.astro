@@ -5,32 +5,26 @@ import SidebarUserMenu from './SidebarUserMenu.astro'
 import ThemeSwitcher from './ThemeSwitcher.vue'
 
 export interface Props {
-  activeSection: SectionId
+  activeSection: SectionId | null
 }
 
 const { activeSection } = Astro.props
 ---
 
-<aside
-  class="bg-sidebar text-ink-text sidebar-collapsed:items-center sidebar-collapsed:overflow-visible sidebar-collapsed:px-2.5 desk:flex sticky top-0 z-10 hidden h-screen [scrollbar-width:none] flex-col gap-4.5 overflow-x-hidden overflow-y-auto px-3 pt-5.5 pb-3.5"
->
-  <header
-    class="border-ink-text/8 sidebar-collapsed:justify-center sidebar-collapsed:self-stretch sidebar-collapsed:px-0 flex items-center gap-3 border-b px-1.5 pb-4.5"
-  >
+<aside class="bg-sidebar text-ink-text sidebar-collapsed:items-center sidebar-collapsed:overflow-visible sidebar-collapsed:px-2.5 desk:flex sticky top-0 z-10 hidden h-screen [scrollbar-width:none] flex-col gap-4.5 overflow-x-hidden overflow-y-auto px-3 pt-5.5 pb-3.5">
+  <header class="border-ink-text/8 sidebar-collapsed:justify-center sidebar-collapsed:self-stretch sidebar-collapsed:px-0 flex items-center gap-3 border-b px-1.5 pb-4.5">
     <img src="/favicon.svg" alt="" width="40" height="40" class="size-10 shrink-0 rounded-md" />
     <h1 class="font-display sidebar-collapsed:sr-only text-lg leading-[1.05] font-bold">
-      Finance<br />Tracker
+      Finance
+      <br />
+      Tracker
     </h1>
   </header>
 
   <SidebarNav activeSection={activeSection} />
 
-  <div
-    class="border-ink-text/8 sidebar-collapsed:items-center mt-auto flex w-full flex-col gap-1 border-t pt-3"
-  >
-    <div
-      class="sidebar-collapsed:justify-center sidebar-collapsed:pl-0 flex min-h-11.5 items-center justify-between gap-3 pl-3"
-    >
+  <div class="border-ink-text/8 sidebar-collapsed:items-center mt-auto flex w-full flex-col gap-1 border-t pt-3">
+    <div class="sidebar-collapsed:justify-center sidebar-collapsed:pl-0 flex min-h-11.5 items-center justify-between gap-3 pl-3">
       <span
         class="text-ink-muted sidebar-collapsed:hidden text-[0.9375rem] font-medium"
         aria-hidden="true"
@@ -60,7 +54,9 @@ const { activeSection } = Astro.props
         <polyline points="13,4 7,10 13,16"></polyline>
         <polyline points="8,4 2,10 8,16"></polyline>
       </svg>
-      <span class="sidebar-collapsed:hidden" data-sidebar-toggle-label>Colapsar</span>
+      <span class="sidebar-collapsed:hidden" data-sidebar-toggle-label>
+        Colapsar
+      </span>
     </button>
 
     <SidebarUserMenu />

@@ -2,6 +2,7 @@
 import { onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
+import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import {
   encodeBase64,
   getAttachmentError,
@@ -31,7 +32,7 @@ import SidePanel from '../ui/SidePanel.vue'
 interface SuccessStatus {
   issueNumber: number
   issueUrl: string
-  duplicate?: boolean
+  tracked: boolean
 }
 
 const open = defineModel<boolean>('open', { required: true })
@@ -47,6 +48,13 @@ const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${IS
 
 const uiStore = useUiStore()
 const { getIssueReportContext } = useIssueReportContext()
+const { navigateToReports } = useSectionNavigation()
+
+/** Cierra el panel antes de navegar: el detalle se monta en la página. */
+function openReportFromAck(issueNumber: number): void {
+  open.value = false
+  navigateToReports(issueNumber)
+}
 
 const form = reactive({
   type: 'bug' as ReportType,
@@ -165,7 +173,7 @@ async function onSubmit(): Promise<void> {
     successStatus.value = {
       issueNumber: result.issueNumber,
       issueUrl: result.issueUrl,
-      duplicate: result.duplicate,
+      tracked: result.tracked,
     }
     resetForm()
   } catch (error) {
@@ -187,6 +195,17 @@ async function onSubmit(): Promise<void> {
   >
     <p class="text-text-muted leading-relaxed">
       Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.
+    </p>
+
+    <p class="text-sm">
+      <a
+        class="text-primary focus-visible:outline-primary font-bold underline-offset-4 hover:underline focus-visible:outline-2"
+        href="/reportes"
+        data-report-tracking-link
+        @click.prevent="navigateToReports()"
+        >Mis reportes</a
+      >
+      <span class="text-text-muted"> · estado y aclaraciones de lo que ya has enviado.</span>
     </p>
 
     <form
@@ -280,15 +299,28 @@ async function onSubmit(): Promise<void> {
       role="status"
       aria-live="polite"
     >
-      <template v-if="successStatus"
-        >{{ successStatus.duplicate ? 'Este reporte ya existe:' : 'Reporte creado:' }}
-        <a
-          class="text-primary font-bold hover:underline"
-          :href="successStatus.issueUrl"
-          target="_blank"
-          rel="noreferrer"
-          >#{{ successStatus.issueNumber }}</a
-        >
+      <template v-if="successStatus">
+        <template v-if="successStatus.tracked">
+          Reporte creado:
+          <a
+            class="text-primary font-bold hover:underline"
+            :href="successStatus.issueUrl"
+            target="_blank"
+            rel="noreferrer"
+            >#{{ successStatus.issueNumber }}</a
+          >
+          ·
+          <a
+            class="text-primary font-bold underline-offset-4 hover:underline"
+            href="/reportes"
+            data-report-tracking-link
+            @click.prevent="openReportFromAck(successStatus.issueNumber)"
+            >Ver en Mis reportes</a
+          >
+        </template>
+        <template v-else>
+          No pudimos añadirlo a Mis reportes todavía; aparecerá en cuanto se recupere.
+        </template>
       </template>
       <template v-else>{{ statusMessage }}</template>
     </p>

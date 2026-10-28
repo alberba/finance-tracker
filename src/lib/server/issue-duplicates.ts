@@ -1,6 +1,17 @@
 import { z } from 'zod'
 import type { RuntimeEnv } from './cloudflare-env'
-import type { IssueDuplicateInput } from './issue-duplicate-checker'
+
+/**
+ * Campos del reporte que se envían al buscador de candidatas. El reportero
+ * (email, nombre, identificador) y el user-agent nunca salen del servidor.
+ */
+export interface IssueDuplicateInput {
+  type: 'bug' | 'feature'
+  summary: string
+  description: string
+  section: string
+  pathname: string
+}
 
 const candidateSchema = z.object({
   number: z.number().int().positive(),

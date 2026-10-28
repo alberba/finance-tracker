@@ -32,7 +32,8 @@ interface ReportResponseOk {
   ok: true
   issueNumber: number
   issueUrl: string
-  duplicate?: boolean
+  /** `false` si la issue se creó pero no se pudo registrar en «Mis reportes». */
+  tracked: boolean
 }
 
 interface ReportResponseError {

@@ -2,6 +2,8 @@ import { Effect } from 'effect'
 
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
+import { useSectionNavigation } from '../composables/useSectionNavigation'
+import { initReportsBadge } from './app/reports-badge'
 import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
@@ -92,7 +94,7 @@ function initMobileMoreMenu(): void {
     if (
       event.target === dialog ||
       (event.target instanceof Element &&
-        event.target.closest('[data-section], [data-report-dialog-open]'))
+        event.target.closest('[data-section], [data-report-dialog-open], [data-reports-open]'))
     ) {
       close()
     }
@@ -108,6 +110,10 @@ function initMobileMoreMenu(): void {
 function initReportDialogActions(): void {
   document.querySelectorAll<HTMLElement>('[data-report-dialog-open]').forEach((action) => {
     action.addEventListener('click', requestReportDialogOpen)
+  })
+  const { navigateToReports } = useSectionNavigation()
+  document.querySelectorAll<HTMLElement>('[data-reports-open]').forEach((action) => {
+    action.addEventListener('click', () => navigateToReports())
   })
 }
 
@@ -306,6 +312,7 @@ function initShellInteractions(): void {
   initTheme()
   initMobileMoreMenu()
   initReportDialogActions()
+  initReportsBadge()
   initPwaInstall()
   initServiceWorker()
   initDemoModeActions()

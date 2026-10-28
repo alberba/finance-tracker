@@ -105,3 +105,29 @@ export const requestApiJson = <T>(
 
     return body as T
   })
+
+/**
+ * Como `requestApiJson`, para endpoints que responden sin cuerpo (204). Un 2xx
+ * no intenta parsear nada; un error sí lee el mensaje de la API.
+ */
+export const requestApiNoContent = (
+  endpoint: string,
+  init: ApiRequestInit,
+): Effect.Effect<void, ApiClientError, ClientHttp> =>
+  Effect.gen(function* () {
+    const response = yield* sendRequest(endpoint, buildRequestInit(init)).pipe(
+      Effect.mapError(() => reported(buildError('offline', endpoint, init))),
+    )
+
+    if (response.ok) return
+
+    const body = yield* readJson(response).pipe(Effect.orElseSucceed(() => undefined))
+    return yield* Effect.fail(
+      reported(
+        buildError(categoryForStatus(response.status), endpoint, init, {
+          status: response.status,
+          serverMessage: serverMessageFrom(body),
+        }),
+      ),
+    )
+  })

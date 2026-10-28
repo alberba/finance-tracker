@@ -2,6 +2,7 @@ import { type SectionId } from '../types'
 import {
   getPathFromSection,
   getSectionFromPath,
+  isReportsPath,
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { pinia } from '../../stores/pinia'
@@ -40,9 +41,24 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
     })
 
     window.addEventListener('popstate', () => {
+      if (isReportsPath(window.location.pathname)) {
+        uiStore.setPage('reports')
+        clearActiveNavigation()
+        return
+      }
+      uiStore.setPage('section')
       const sectionId = getSectionFromPath(window.location.pathname)
       switchSection(sectionId, { updateHistory: false })
     })
+  }
+
+  /** Quita la marca de la sección activa: en `/reportes` no hay ninguna. */
+  function clearActiveNavigation() {
+    Array.from(el.navTabs.querySelectorAll<HTMLElement>('[data-nav-item]')).forEach((button) => {
+      button.removeAttribute('aria-current')
+    })
+    const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
+    if (mobileMoreTrigger) mobileMoreTrigger.dataset.active = 'false'
   }
 
   function switchSection(sectionId: SectionId | string, options: { updateHistory?: boolean } = {}) {
@@ -50,6 +66,7 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
     const normalizedSectionId = normalizeSectionId(sectionId)
     ui.activeSection = normalizedSectionId
     uiStore.setActiveSection(normalizedSectionId)
+    uiStore.setPage('section')
 
     Array.from(el.navTabs.querySelectorAll<HTMLElement>('[data-nav-item]')).forEach((button) => {
       const isActive = button.dataset.section === normalizedSectionId

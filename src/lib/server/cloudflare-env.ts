@@ -18,10 +18,10 @@ export interface RuntimeEnv {
   GITHUB_OWNER?: string
   GITHUB_REPO?: string
   /**
-   * Clave de OpenCode Go para comprobar duplicadas antes de crear el reporte.
-   * La redacción y el análisis de código viven en GitHub Actions.
+   * Login de la cuenta que publica las aclaraciones, para tokens de GitHub App
+   * que no pueden llamar a `/user` (#340 [D1]). Opcional.
    */
-  OPENCODE_GO_API_KEY?: string
+  GITHUB_BOT_LOGIN?: string
   SENTRY_DSN?: string
   MARKET_DATA_PROVIDER?: string
   TWELVE_DATA_API_KEY?: string

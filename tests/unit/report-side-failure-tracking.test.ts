@@ -35,15 +35,15 @@ describe('reportReportSideFailure', () => {
   it('manda un evento con mensaje fijo y solo la fase y el motivo como tags', async () => {
     const { reportReportSideFailure } = await loadTracking()
 
-    reportReportSideFailure({ stage: 'duplicate', reason: 'http-401' })
+    reportReportSideFailure({ stage: 'track', reason: 'http-401' })
 
     expect(setTag.mock.calls).toEqual([
-      ['report.stage', 'duplicate'],
+      ['report.stage', 'track'],
       ['report.reason', 'http-401'],
     ])
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
     expect(sentry.captureMessage).toHaveBeenCalledWith(
-      'Fallo auxiliar del reporte web (enrich: http-401)',
+      'Fallo auxiliar del reporte web (track: http-401)',
       'warning',
     )
   })
@@ -51,11 +51,11 @@ describe('reportReportSideFailure', () => {
   it('agrupa por fase y motivo: cada combinación es su propia issue', async () => {
     const { reportReportSideFailure } = await loadTracking()
 
-    reportReportSideFailure({ stage: 'enrich', reason: 'http-401' })
+    reportReportSideFailure({ stage: 'track', reason: 'http-401' })
     reportReportSideFailure({ stage: 'upload', reason: 'http-403' })
 
     expect(setFingerprint.mock.calls).toEqual([
-      [['report-side-failure', 'enrich', 'http-401']],
+      [['report-side-failure', 'track', 'http-401']],
       [['report-side-failure', 'upload', 'http-403']],
     ])
   })

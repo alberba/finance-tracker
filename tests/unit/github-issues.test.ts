@@ -36,7 +36,7 @@ function createIssueFromWebReport(
   reporter: IssueReporter,
   env: Record<string, string>,
   client: { fetch: typeof fetch } & GithubIssueClient,
-): Promise<{ number: number; url: string; duplicate?: boolean }> {
+): Promise<{ number: number; url: string }> {
   const { fetch: request, ...rest } = client
   return Effect.runPromise(
     Effect.provideService(createIssueFromWebReportEffect(payload, reporter, env, rest), Http, {
@@ -416,77 +416,15 @@ describe('comprobación de duplicadas previa al reporte', () => {
     expect(buildIssueBody(payload, reporter, [])).toBe(baselineBody)
   })
 
-  it('devuelve una duplicada sin crear issues, comentarios ni subir adjuntos', async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>()
-    const uploadAttachment = vi.fn()
-    const duplicate = { number: 9, url: 'https://github.com/org/repo/issues/9' }
-    const result = await createIssueFromWebReport(
-      {
-        ...payload,
-        attachments: [
-          {
-            name: 'captura.png',
-            contentType: 'image/png',
-            bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
-          },
-        ],
-      },
-      reporter,
-      env,
-      {
-        fetch,
-        uploadAttachment,
-        checkDuplicate: async () => duplicate,
-      },
-    )
-    expect(result).toEqual({ ...duplicate, duplicate: true })
-    expect(fetch).not.toHaveBeenCalled()
-    expect(uploadAttachment).not.toHaveBeenCalled()
-  })
-
-  it('si el comprobador no devuelve nada, crea la issue con el cuerpo de siempre', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
-
-    const result = await createIssueFromWebReport(payload, reporter, env, {
-      fetch: fakeFetch as unknown as typeof fetch,
-      checkDuplicate: async () => null,
-    })
-
-    expect(result.number).toBe(21)
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
-    expect(body.body).toBe(baselineBody)
-  })
-
-  it('si el comprobador lanza, la issue se crea igual', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    const result = await createIssueFromWebReport(payload, reporter, env, {
-      fetch: fakeFetch as unknown as typeof fetch,
-      checkDuplicate: async () => {
-        throw new Error('boom')
-      },
-    })
-
-    expect(result.number).toBe(21)
-    expect(consoleError).toHaveBeenCalledExactlyOnceWith(
-      '[github] La comprobación de duplicadas se omitió por un fallo inesperado.',
-    )
-    consoleError.mockRestore()
-  })
-
-  it('no consulta el comprobador si falta la configuración de GitHub', async () => {
-    const checkDuplicate = vi.fn(async () => null)
-
+  it('falla con un mensaje claro si falta la configuración de GitHub', async () => {
     await expect(
       createIssueFromWebReport(
         payload,
         reporter,
         { GITHUB_ISSUE_TOKEN: 'token', GITHUB_REPO: 'repo' },
-        { fetch: vi.fn<typeof fetch>(), checkDuplicate },
+        { fetch: vi.fn<typeof fetch>() },
       ),
     ).rejects.toThrow(/GITHUB_OWNER/)
-    expect(checkDuplicate).not.toHaveBeenCalled()
   })
 
   it('sin clave del proveedor el valor por defecto no hace red y solo llama a GitHub', async () => {
