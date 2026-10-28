@@ -11,6 +11,15 @@ import { useUiStore } from '../../stores/ui'
 
 const MOBILE_PRIMARY_SECTIONS: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
 
+/**
+ * Secciones cuyo clic de navegación devuelve la vista al inicio (#383).
+ *
+ * Solo Movimientos: su registro largo esconde la cabecera y el alta al
+ * revisar meses anteriores. El resto de secciones mantiene su navegación
+ * actual, que el alcance de la issue deja explícitamente fuera.
+ */
+const SECTIONS_THAT_RETURN_TO_START_ON_NAV: readonly SectionId[] = ['transactions']
+
 interface DashboardNavigationUi {
   activeSection: SectionId
   month: Month
@@ -37,7 +46,9 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
       if (!section) {
         return
       }
-      switchSection(section)
+      const sectionId = normalizeSectionId(section)
+      switchSection(sectionId)
+      returnToSectionStart(sectionId)
     })
 
     window.addEventListener('popstate', () => {
@@ -59,6 +70,18 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
     })
     const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
     if (mobileMoreTrigger) mobileMoreTrigger.dataset.active = 'false'
+  }
+
+  /**
+   * Un clic en la navegación es lo único que reinicia el desplazamiento.
+   * `switchSection` también sirve al arranque y a `popstate`, que conservan la
+   * posición del documento, así que la decisión vive aquí y no dentro de él.
+   */
+  function returnToSectionStart(sectionId: SectionId) {
+    if (!SECTIONS_THAT_RETURN_TO_START_ON_NAV.includes(sectionId)) {
+      return
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' })
   }
 
   function switchSection(sectionId: SectionId | string, options: { updateHistory?: boolean } = {}) {

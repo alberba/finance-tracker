@@ -117,6 +117,34 @@ test.describe('Mobile smoke', () => {
     expect(layout).toEqual({ isWithinVisualViewport: true, bodyScrolls: true })
   })
 
+  test('la entrada Movimientos de la barra inferior vuelve al inicio de la sección', async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openTransactions()
+    await tracker.setTransactionTypeChip('Gastos', true)
+    const transactionsHeading = tracker.transactionsSection.getByRole('heading', {
+      name: 'Movimientos',
+      exact: true,
+    })
+    const registryTab = tracker.transactionsSection.getByRole('tab', { name: /^Registro/ })
+    await tracker.scrollToPageBottom()
+    await expect.poll(() => tracker.scrollY()).toBeGreaterThan(0)
+    await expect(transactionsHeading).not.toBeInViewport()
+
+    await tracker.clickNav('transactions')
+
+    await expect(page).toHaveURL(/\/movimientos$/)
+    await expect.poll(() => tracker.scrollY()).toBe(0)
+    await expect(transactionsHeading).toBeInViewport()
+    await expect(
+      tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }),
+    ).toBeInViewport()
+    await expect(registryTab).toHaveAttribute('aria-selected', 'true')
+    await expect(tracker.typeChip('Gastos')).toBeChecked()
+    await expect(tracker.transactionPanel).toBeHidden()
+  })
+
   test('agrupa las secciones secundarias en un menú inferior accesible', async ({
     page,
     tracker,

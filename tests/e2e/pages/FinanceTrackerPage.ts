@@ -328,6 +328,22 @@ export class FinanceTrackerPage {
     await this.openSection(sectionConfig.buttonLabel, sectionId, sectionConfig.headingText)
   }
 
+  /** Clicks a section's nav entry even when that section is already active. */
+  async clickNav(sectionId: FinanceSectionId) {
+    await this.clickNavButton(SECTION_CONFIG[sectionId].buttonLabel, sectionId)
+  }
+
+  /** Scrolls the document to the bottom, as reading a long section does. */
+  async scrollToPageBottom() {
+    await this.page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight)
+    })
+  }
+
+  async scrollY(): Promise<number> {
+    return this.page.evaluate(() => window.scrollY)
+  }
+
   section(sectionId: FinanceSectionId): Locator {
     return this.page.locator(`#${sectionId}`)
   }
