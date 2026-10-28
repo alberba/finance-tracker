@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  AttachmentUploadError,
   uploadIssueAttachment,
   type AttachmentUploadContext,
 } from '../../src/lib/server/issue-attachments'
@@ -56,18 +57,17 @@ describe('uploadIssueAttachment', () => {
     headers: { Authorization: 'Bearer token' },
     repositoryId,
   })
+  const upload = (fetchFn: typeof fetch): Promise<string> =>
+    Effect.runPromise(uploadIssueAttachment(attachment, context(fetchFn)))
 
   it('sube los bytes al endpoint de adjuntos con el id del repositorio y devuelve la URL', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () =>
       jsonHeaders({ href: 'https://github.com/user-attachments/assets/abc' }),
     )
 
-    const result = await uploadIssueAttachment(attachment, context(fakeFetch as typeof fetch))
+    const result = await upload(fakeFetch as typeof fetch)
 
-    expect(result).toEqual({
-      ok: true,
-      url: 'https://github.com/user-attachments/assets/abc',
-    })
+    expect(result).toBe('https://github.com/user-attachments/assets/abc')
     expect(fakeFetch).toHaveBeenCalledTimes(1)
     const [uploadUrl, init] = fakeFetch.mock.calls[0]
     const url = new URL(String(uploadUrl))
@@ -82,22 +82,22 @@ describe('uploadIssueAttachment', () => {
     expect(sent).toEqual(PNG_BYTES)
   })
 
-  it('devuelve error sin lanzar cuando GitHub rechaza la subida', async () => {
+  it('falla con un error etiquetado cuando GitHub rechaza la subida', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => new Response('forbidden', { status: 403 }))
 
-    const result = await uploadIssueAttachment(attachment, context(fakeFetch as typeof fetch))
-
-    expect(result.ok).toBe(false)
+    await expect(upload(fakeFetch as typeof fetch)).rejects.toMatchObject({
+      _tag: 'AttachmentUploadError',
+      message: 'GitHub devolvió 403.',
+      status: 403,
+    })
   })
 
-  it('devuelve error sin lanzar cuando la red falla', async () => {
+  it('falla con un error etiquetado cuando la red falla', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async () => {
       throw new TypeError('network down')
     })
 
-    const result = await uploadIssueAttachment(attachment, context(fakeFetch as typeof fetch))
-
-    expect(result.ok).toBe(false)
+    await expect(upload(fakeFetch as typeof fetch)).rejects.toBeInstanceOf(AttachmentUploadError)
   })
 })
 
@@ -123,10 +123,9 @@ describe('createIssueFromWebReport con adjuntos', () => {
         ? jsonHeaders({ id: 123456 })
         : issueResponse(),
     )
-    const uploadAttachment = vi.fn(async () => ({
-      ok: true as const,
-      url: 'https://github.com/user-attachments/assets/abc',
-    }))
+    const uploadAttachment = vi.fn(() =>
+      Effect.succeed('https://github.com/user-attachments/assets/abc'),
+    )
 
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: fakeFetch as typeof fetch,
@@ -146,7 +145,9 @@ describe('createIssueFromWebReport con adjuntos', () => {
         ? jsonHeaders({ id: 123456 })
         : issueResponse(),
     )
-    const uploadAttachment = vi.fn(async () => ({ ok: false as const, error: 'GitHub 500' }))
+    const uploadAttachment = vi.fn(() =>
+      Effect.fail(new AttachmentUploadError({ message: 'GitHub 500' })),
+    )
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const result = await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
@@ -168,10 +169,9 @@ describe('createIssueFromWebReport con adjuntos', () => {
   it('avisa de una subida fallida con el estado HTTP y sin texto libre', async () => {
     const reportFailure = vi.fn()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    const uploadAttachment = vi.fn(async () => ({
-      ok: false as const,
-      error: 'GitHub devolvió 403.',
-    }))
+    const uploadAttachment = vi.fn(() =>
+      Effect.fail(new AttachmentUploadError({ message: 'GitHub devolvió 403.', status: 403 })),
+    )
 
     await createIssueFromWebReport(reportWith([attachment]), reporter, ENV, {
       fetch: vi.fn<typeof fetch>(async (input) =>
@@ -197,7 +197,8 @@ describe('createIssueFromWebReport con adjuntos', () => {
           ? jsonHeaders({ id: 123456 })
           : issueResponse(),
       ) as typeof fetch,
-      uploadAttachment: async () => ({ ok: false as const, error: 'texto libre SECRET_MARKER' }),
+      uploadAttachment: () =>
+        Effect.fail(new AttachmentUploadError({ message: 'texto libre SECRET_MARKER' })),
       reportFailure,
     })
 

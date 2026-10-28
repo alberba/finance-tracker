@@ -554,6 +554,20 @@ test.describe('Mis reportes E2E', () => {
     ).toBeVisible()
   })
 
+  test('el botón atrás del navegador devuelve el foco a la fila', async ({ page, tracker }) => {
+    await mockReportsApi(page)
+    await tracker.openReports()
+
+    const entry = page.locator('[data-report-entry="901"]')
+    await expect(entry).toBeVisible()
+    await entry.click()
+    await expect(page).toHaveURL(/\/reportes\?reporte=901/)
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/reportes$/)
+    await expect(entry).toBeFocused()
+  })
+
   test('el cierre asíncrono como duplicada aparece en la siguiente carga', async ({
     page,
     tracker,

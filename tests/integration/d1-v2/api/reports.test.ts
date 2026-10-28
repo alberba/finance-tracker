@@ -17,6 +17,7 @@ interface FakeComment {
   updatedAt: string
   login: string
   type?: string
+  authorAssociation?: string
 }
 
 interface FakeIssue {
@@ -63,6 +64,7 @@ function commentNodes(comments: FakeComment[]) {
     updatedAt: comment.updatedAt,
     body: comment.body,
     author: { __typename: comment.type ?? 'User', login: comment.login },
+    authorAssociation: comment.authorAssociation ?? 'MEMBER',
   }))
 }
 
@@ -124,6 +126,12 @@ function installFakeGithub(state: FakeGithub): void {
           variables: Record<string, unknown>
         }
         state.queries.push(body.query)
+        // GitHub rechaza una consulta con la misma variable declarada dos veces:
+        // reproducimos ese fallo para cubrir dos reportes que siguen la misma issue.
+        const declarations = [...body.query.matchAll(/\$c(\d+):/g)].map((match) => match[1])
+        if (new Set(declarations).size !== declarations.length) {
+          return json({ errors: [{ type: 'BAD_REQUEST', message: 'duplicate variable' }] })
+        }
         const pageSize = Number(/comments\(last: (\d+)/.exec(body.query)?.[1] ?? 100)
 
         // Hilo del detalle: una sola issue por variable, con paginación hacia atrás.
@@ -527,6 +535,47 @@ describe('/api/reports', () => {
     expect(state.queries.some((query) => query.includes('before: $c'))).toBe(true)
   })
 
+  it('no repite variables GraphQL cuando dos reportes siguen la misma principal', async () => {
+    await record(userA.id, 10, '2026-10-01T00:00:00.000Z')
+    await record(userA.id, 11, '2026-10-01T00:00:00.000Z')
+    const main: FakeIssue = {
+      number: 20,
+      title: 'Principal',
+      state: 'OPEN',
+      stateReason: null,
+      comments: Array.from({ length: 30 }, (_, index) => ({
+        id: 100 + index,
+        body: `<!-- finance-tracker:reporter-comment user=${userA.id} -->\n**Aclaración del reportero**\n\nnota ${index + 1}`,
+        issueNumber: 20,
+        createdAt: '2026-10-02T00:00:00.000Z',
+        updatedAt: '2026-10-02T00:00:00.000Z',
+        login: BOT,
+      })),
+    }
+    state.issues.set(20, main)
+    state.issues.set(10, {
+      number: 10,
+      title: 'Duplicada A',
+      state: 'CLOSED',
+      stateReason: 'DUPLICATE',
+      duplicateOf: main,
+    })
+    state.issues.set(11, {
+      number: 11,
+      title: 'Duplicada B',
+      state: 'CLOSED',
+      stateReason: 'DUPLICATE',
+      duplicateOf: main,
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const response = await GET(context(userA.id))
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { reports: Array<{ followed?: { number: number } }> }
+    expect(body.reports.map((report) => report.followed?.number)).toEqual([20, 20])
+    expect(state.queries.filter((query) => query.includes('before: $c0'))).toHaveLength(1)
+  })
+
   it('vuelve a la issue original cuando un salto posterior de la duplicada es inaccesible', async () => {
     await record(userA.id, 10)
     state.issues.set(10, {
@@ -630,6 +679,15 @@ describe('/api/reports', () => {
           createdAt: '2026-10-02T03:00:00.000Z',
           updatedAt: '2026-10-02T03:00:00.000Z',
           login: BOT,
+        },
+        {
+          id: 5,
+          body: 'Yo también lo veo, pero no soy del equipo.',
+          issueNumber: 20,
+          createdAt: '2026-10-02T04:00:00.000Z',
+          updatedAt: '2026-10-02T04:00:00.000Z',
+          login: 'tercero',
+          authorAssociation: 'NONE',
         },
       ],
     })

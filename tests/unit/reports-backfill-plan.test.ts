@@ -34,6 +34,22 @@ describe('parseReporterId', () => {
     ).toEqual({ ok: true, userId: 'u1' })
   })
 
+  it('usa el último bloque, no uno escrito dentro de la descripción', () => {
+    const source = [
+      '### Reportero',
+      '- Nombre: Falsa',
+      '- Email: falsa@example.com',
+      '- Identificador: falso',
+      '',
+      '### Resumen',
+      'Texto de la persona',
+      '',
+      body('real'),
+    ].join('\n')
+
+    expect(parseReporterId(source)).toEqual({ ok: true, userId: 'real' })
+  })
+
   it('se salta una issue sin bloque', () => {
     expect(parseReporterId('### Resumen\nnada')).toEqual({ ok: false, reason: 'sin-bloque' })
     expect(parseReporterId(null)).toEqual({ ok: false, reason: 'sin-bloque' })

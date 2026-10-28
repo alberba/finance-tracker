@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFile, writeFile, mkdir, appendFile } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { Effect } from 'effect'
 import { z } from 'zod'
 import { findIssueCandidates } from '../../src/lib/server/issue-duplicates.ts'
 
@@ -262,16 +263,21 @@ async function prepare() {
   const labelNames = github(`repos/${repository}/labels?per_page=100`).map((label) => label.name)
   const [owner, repo] = repository.split('/')
   const { report } = splitReportBody(issue.body ?? '')
-  const candidates = await findIssueCandidates(
-    {
-      type: issue.labels.some((label) => label.name === 'bug') ? 'bug' : 'feature',
-      summary: issue.title,
-      description: report,
-      section: '',
-      pathname: '',
-    },
-    { GITHUB_ISSUE_TOKEN: process.env.GH_TOKEN, GITHUB_OWNER: owner, GITHUB_REPO: repo },
-    fetch,
+  const candidates = await Effect.runPromise(
+    findIssueCandidates(
+      {
+        type: issue.labels.some((label) => label.name === 'bug') ? 'bug' : 'feature',
+        summary: issue.title,
+        description: report,
+        section: '',
+        pathname: '',
+      },
+      { GITHUB_ISSUE_TOKEN: process.env.GH_TOKEN, GITHUB_OWNER: owner, GITHUB_REPO: repo },
+      fetch,
+    ).pipe(
+      // La búsqueda es auxiliar: si GitHub falla, el enricher sigue sin candidatas.
+      Effect.catchAll(() => Effect.succeed({ issues: [], status: 'unavailable' })),
+    ),
   )
   candidates.issues = candidates.issues.filter((candidate) => candidate.number !== number)
   if (candidates.issues.length > 10) candidates.status = 'partial'

@@ -47,4 +47,15 @@ describe('ReportMarkdown', () => {
     expect(wrapper.find('blockquote').text()).toContain('cita')
     expect(wrapper.get('pre code').text()).toBe('const a = 1')
   })
+
+  it('conserva listas y código dentro de una cita', () => {
+    const wrapper = mount(ReportMarkdown, {
+      props: {
+        source: ['> - uno', '> - dos', '>', '> ```ts', '> const a = 1', '> ```'].join('\n'),
+      },
+    })
+    const quote = wrapper.get('blockquote')
+    expect(quote.findAll('li')).toHaveLength(2)
+    expect(quote.get('pre code').text()).toBe('const a = 1')
+  })
 })

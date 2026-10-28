@@ -28,7 +28,8 @@ export type BlockNode =
   | { type: 'code'; language: string | null; value: string }
   | { type: 'rule' }
 
-export const REPORT_MARKDOWN_MAX_LENGTH = 20_000
+/** Límite del cuerpo de un comentario en GitHub: 65 536 caracteres. */
+export const REPORT_MARKDOWN_MAX_LENGTH = 65_536
 export const REPORT_MARKDOWN_MAX_DEPTH = 4
 
 const SAFE_LINK_PROTOCOL = /^https?:\/\//i
@@ -48,7 +49,9 @@ export function isAllowedImageHost(value: string): boolean {
     const url = new URL(value)
     if (url.protocol !== 'https:') return false
     if (url.hostname === 'github.com') return url.pathname.startsWith('/user-attachments/')
-    return url.hostname === 'githubusercontent.com' || url.hostname.endsWith('.githubusercontent.com')
+    return (
+      url.hostname === 'githubusercontent.com' || url.hostname.endsWith('.githubusercontent.com')
+    )
   } catch {
     return false
   }
@@ -62,7 +65,11 @@ function findClosing(source: string, needle: string, from: number): number {
   return source.indexOf(needle, from)
 }
 
-function parseImage(source: string, start: number, depth: number): { node: InlineNode; end: number } | null {
+function parseImage(
+  source: string,
+  start: number,
+  depth: number,
+): { node: InlineNode; end: number } | null {
   const labelEnd = source.indexOf(']', start + 2)
   if (labelEnd === -1 || source[labelEnd + 1] !== '(') return null
   const urlEnd = source.indexOf(')', labelEnd + 2)
@@ -82,7 +89,11 @@ function parseImage(source: string, start: number, depth: number): { node: Inlin
   return { node: text(alt || url), end: urlEnd + 1 }
 }
 
-function parseLink(source: string, start: number, depth: number): { node: InlineNode; end: number } | null {
+function parseLink(
+  source: string,
+  start: number,
+  depth: number,
+): { node: InlineNode; end: number } | null {
   const labelEnd = source.indexOf(']', start + 1)
   if (labelEnd === -1 || source[labelEnd + 1] !== '(') return null
   const urlEnd = source.indexOf(')', labelEnd + 2)
@@ -111,7 +122,10 @@ function parseDelimited(
   const closing = findClosing(source, delimiter, start + delimiter.length + 1)
   if (closing === -1) return null
   return {
-    node: { type, children: parseInline(source.slice(start + delimiter.length, closing), depth + 1) },
+    node: {
+      type,
+      children: parseInline(source.slice(start + delimiter.length, closing), depth + 1),
+    },
     end: closing + delimiter.length,
   }
 }

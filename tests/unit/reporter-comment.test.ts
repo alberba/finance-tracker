@@ -11,12 +11,18 @@ import {
 const USER = 'user-123'
 const BOT = 'finance-bot'
 
-function comment(body: string, login = BOT, type = 'User') {
+function comment(
+  body: string,
+  login = BOT,
+  type = 'User',
+  authorAssociation: string | null = 'MEMBER',
+) {
   return {
     databaseId: 1,
     createdAt: '2026-10-01T00:00:00.000Z',
     body,
     author: { login, type },
+    authorAssociation,
   }
 }
 
@@ -45,7 +51,11 @@ describe('buildReporterCommentBody / parseReporterComment', () => {
 
   it('hace ida y vuelta sin adjuntos', () => {
     const body = buildReporterCommentBody({ userId: USER, text: 'Solo texto' })
-    expect(parseReporterComment(body)).toEqual({ userId: USER, text: 'Solo texto', attachments: [] })
+    expect(parseReporterComment(body)).toEqual({
+      userId: USER,
+      text: 'Solo texto',
+      attachments: [],
+    })
   })
 
   it('exige el marcador al principio del cuerpo', () => {
@@ -121,7 +131,32 @@ describe('classifyComment', () => {
     expect(classifyComment(comment(body, 'intruso'), context)).toBe('hidden')
   })
 
-  it('deja como mantenedor un comentario normal', () => {
+  it('deja como mantenedor un comentario de quien mantiene el repositorio', () => {
     expect(classifyComment(comment('Lo revisamos.', 'ana'), context)).toBe('maintainer')
+  })
+
+  it('oculta un comentario de terceros aunque no lleve marcador', () => {
+    expect(classifyComment(comment('Yo también lo veo.', 'otra', 'User', 'NONE'), context)).toBe(
+      'hidden',
+    )
+    expect(
+      classifyComment(comment('Yo también lo veo.', 'otra', 'User', 'CONTRIBUTOR'), context),
+    ).toBe('hidden')
+  })
+
+  it('normaliza app[bot] de REST con app de GraphQL al comparar el bot', () => {
+    const body = buildReporterCommentBody({ userId: USER, text: 'mía' })
+    expect(
+      classifyComment(comment(body, 'finance-app[bot]'), {
+        userId: USER,
+        botLogin: 'finance-app',
+      }),
+    ).toBe('mine')
+    expect(
+      classifyComment(comment(body, 'finance-app'), {
+        userId: USER,
+        botLogin: 'finance-app[bot]',
+      }),
+    ).toBe('mine')
   })
 })

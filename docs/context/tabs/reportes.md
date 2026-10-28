@@ -57,7 +57,9 @@ Identificadores clave en UI:
 - Solo son editables si el marcador coincide con el principal **y** el autor es el login del bot
   (`GITHUB_BOT_LOGIN` o `GET /user`). Un marcador con otro autor se oculta.
 - La automatización (`<!-- web-report-agent-brief -->`, `<!-- web-report-enriched -->` o autor bot)
-  y las aclaraciones de otras personas no salen del servidor.
+  y las aclaraciones de otras personas no salen del servidor. Un comentario sin marcador solo cuenta
+  como mantenedor si `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`; los de terceros se
+  ocultan. El login del bot se compara normalizado (`app[bot]` en REST, `app` en GraphQL).
 - Los adjuntos comparten límites y validación con el alta (`src/domain/reports/issue-attachments.ts`)
   y se enlazan tras un segundo marcador. Quitar uno de la aclaración no lo borra de GitHub; la UI lo
   avisa.
@@ -100,7 +102,8 @@ Identificadores clave en UI:
 ### Servidor
 
 - `src/lib/server/github-api.ts` — configuración y cabeceras compartidas.
-- `src/lib/server/rate-limit.ts` — limitador de ventana (5/min altas, 10/min comentarios).
+- `src/lib/server/rate-limit.ts` — limitador de ventana fija por cuenta, con purga de claves
+  caducadas (5/min altas, 10/min comentarios).
 - `src/lib/server/issue-reports/github.ts` — GraphQL de estado/hilo y REST de comentarios.
 - `src/lib/server/issue-reports/service.ts` — casos de uso.
 - `src/lib/server/issue-reports/errors.ts` — errores y respuestas.

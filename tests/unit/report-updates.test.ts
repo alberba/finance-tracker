@@ -66,6 +66,7 @@ describe('scanCommentWindow', () => {
       createdAt: '2026-10-22T10:00:00.000Z',
       body: 'Lo revisamos.',
       author: { login: 'ana', __typename: 'User' },
+      authorAssociation: 'MEMBER',
       ...overrides,
     }
   }

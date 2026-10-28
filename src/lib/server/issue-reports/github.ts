@@ -49,6 +49,7 @@ interface RawCommentPayload {
   updatedAt?: string
   body?: string
   author?: { __typename?: string; login?: string } | null
+  authorAssociation?: string | null
 }
 
 interface GraphqlBody {
@@ -72,7 +73,7 @@ const ISSUE_FIELDS = `number url title state stateReason
 const RECENT_COMMENTS = `comments(last: ${RECENT_COMMENTS_PAGE_SIZE}) {
     totalCount
     pageInfo { hasPreviousPage startCursor }
-    nodes { databaseId createdAt body author { __typename login } }
+    nodes { databaseId createdAt body authorAssociation author { __typename login } }
   }`
 
 function graphqlError(message: string, status?: number): ReportsGithubError {
@@ -90,6 +91,7 @@ function rawComments(payload: RawCommentsPayload | null | undefined): RawComment
       author: comment.author?.login
         ? { login: comment.author.login, __typename: comment.author.__typename }
         : null,
+      authorAssociation: comment.authorAssociation ?? null,
     }))
 }
 
@@ -294,20 +296,38 @@ export interface OlderCommentsRequest {
 }
 
 /**
+ * Clave de una página anterior. Dos reportes que siguen la misma issue comparten
+ * `number`, pero pueden estar en puntos distintos del hilo: la clave incluye el
+ * cursor para no confundir sus páginas.
+ */
+export function olderCommentsKey(number: number, before: string): string {
+  return `${number}|${before}`
+}
+
+/**
  * Página anterior del hilo de cada issue, en una sola consulta con alias. Es la
  * continuación de `recentComments`: solo se pide cuando la ventana de novedades
  * no llegó a un comentario anterior a `lastSeenAt`.
+ *
+ * Las peticiones idénticas se deduplican antes de construir la consulta: dos
+ * filas que siguen la misma principal no pueden repetir variable ni alias
+ * GraphQL (GitHub rechazaría la consulta entera).
  */
 export function fetchOlderComments(
   config: GithubConfig,
   requests: OlderCommentsRequest[],
-): Effect.Effect<Map<number, IssueCommentsPage>, ReportsGithubError, Http> {
+): Effect.Effect<Map<string, IssueCommentsPage>, ReportsGithubError, Http> {
   return Effect.gen(function* () {
-    const result = new Map<number, IssueCommentsPage>()
-    for (let start = 0; start < requests.length; start += MAX_ISSUES_PER_QUERY) {
-      const chunk = requests.slice(start, start + MAX_ISSUES_PER_QUERY)
+    const unique = new Map<string, OlderCommentsRequest>()
+    for (const request of requests) {
+      unique.set(olderCommentsKey(request.number, request.before), request)
+    }
+    const pending = [...unique.values()]
+    const result = new Map<string, IssueCommentsPage>()
+    for (let start = 0; start < pending.length; start += MAX_ISSUES_PER_QUERY) {
+      const chunk = pending.slice(start, start + MAX_ISSUES_PER_QUERY)
       const page = yield* fetchOlderCommentsPage(config, chunk)
-      for (const [number, comments] of page) result.set(number, comments)
+      for (const [key, comments] of page) result.set(key, comments)
     }
     return result
   })
@@ -316,19 +336,23 @@ export function fetchOlderComments(
 function fetchOlderCommentsPage(
   config: GithubConfig,
   requests: OlderCommentsRequest[],
-): Effect.Effect<Map<number, IssueCommentsPage>, ReportsGithubError, Http> {
+): Effect.Effect<Map<string, IssueCommentsPage>, ReportsGithubError, Http> {
   return Effect.gen(function* () {
     if (requests.length === 0) return new Map()
     const http = yield* Http
-    const declarations = requests.map((request) => `$c${request.number}: String!`).join(', ')
+    // Alias y variables por índice, no por número de issue: dos peticiones de la
+    // misma issue con cursores distintos no colisionan.
+    const declarations = requests.map((_, index) => `$c${index}: String!`).join(', ')
     const aliases = requests
       .map(
-        (request) =>
-          `i${request.number}: issue(number: ${request.number}) { comments(last: ${COMMENTS_PAGE_SIZE}, before: $c${request.number}) { totalCount pageInfo { hasPreviousPage startCursor } nodes { databaseId createdAt body author { __typename login } } } }`,
+        (request, index) =>
+          `i${index}: issue(number: ${request.number}) { comments(last: ${COMMENTS_PAGE_SIZE}, before: $c${index}) { totalCount pageInfo { hasPreviousPage startCursor } nodes { databaseId createdAt body authorAssociation author { __typename login } } } }`,
       )
       .join('\n')
     const variables: Record<string, unknown> = { owner: config.owner, name: config.repo }
-    for (const request of requests) variables[`c${request.number}`] = request.before
+    requests.forEach((request, index) => {
+      variables[`c${index}`] = request.before
+    })
 
     const query = `query ($owner: String!, $name: String!, ${declarations}) {
   repository(owner: $owner, name: $name) {
@@ -362,17 +386,17 @@ ${aliases}
       )
       return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
     }
-    const result = new Map<number, IssueCommentsPage>()
-    for (const request of requests) {
-      const comments = parsed.data?.repository?.[`i${request.number}`]?.comments
-      if (!comments) continue
-      result.set(request.number, {
+    const result = new Map<string, IssueCommentsPage>()
+    requests.forEach((request, index) => {
+      const comments = parsed.data?.repository?.[`i${index}`]?.comments
+      if (!comments) return
+      result.set(olderCommentsKey(request.number, request.before), {
         comments: rawComments(comments),
         hasPreviousPage:
           Boolean(comments.pageInfo?.hasPreviousPage) && Boolean(comments.pageInfo?.startCursor),
         startCursor: comments.pageInfo?.startCursor ?? null,
       })
-    }
+    })
     return result
   })
 }
@@ -396,7 +420,7 @@ export function fetchIssueThread(
       comments(last: ${COMMENTS_PAGE_SIZE}${before ? ', before: $before' : ''}) {
         totalCount
         pageInfo { hasPreviousPage startCursor }
-        nodes { databaseId createdAt updatedAt body author { __typename login } }
+        nodes { databaseId createdAt updatedAt body authorAssociation author { __typename login } }
       }
     }
   }
@@ -453,6 +477,7 @@ export interface GithubComment {
   createdAt: string
   updatedAt: string
   author: { login: string; type?: string } | null
+  authorAssociation?: string | null
 }
 
 interface RestCommentPayload {
@@ -461,6 +486,7 @@ interface RestCommentPayload {
   issue_url?: string
   created_at?: string
   updated_at?: string
+  author_association?: string | null
   user?: { login?: string; type?: string } | null
 }
 
@@ -475,6 +501,7 @@ function restComment(payload: RestCommentPayload): GithubComment | null {
     createdAt: payload.created_at ?? '',
     updatedAt: payload.updated_at ?? payload.created_at ?? '',
     author: payload.user?.login ? { login: payload.user.login, type: payload.user.type } : null,
+    authorAssociation: payload.author_association ?? null,
   }
 }
 

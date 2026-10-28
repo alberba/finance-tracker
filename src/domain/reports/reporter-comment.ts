@@ -10,7 +10,10 @@
 export const REPORTER_MARKER_PREFIX = '<!-- finance-tracker:reporter-comment user='
 export const REPORTER_ATTACHMENTS_MARKER = '<!-- finance-tracker:reporter-attachments -->'
 export const REPORTER_HEADER = '**Aclaración del reportero**'
-export const AUTOMATION_MARKERS = ['<!-- web-report-agent-brief -->', '<!-- web-report-enriched -->']
+export const AUTOMATION_MARKERS = [
+  '<!-- web-report-agent-brief -->',
+  '<!-- web-report-enriched -->',
+]
 
 /** Mismos límites que el formulario de alta. */
 export const REPORTER_COMMENT_MAX_LENGTH = 4000
@@ -19,6 +22,8 @@ export const REPORTER_COMMENT_MAX_ATTACHMENTS = 3
 const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 const MARKER_PATTERN = /^<!-- finance-tracker:reporter-comment user=([^\s>]+) -->\r?\n?/
 const ATTACHMENT_LINE_PATTERN = /^!\[([^\]]*)\]\(([^)\s]+)\)$/
+/** Asociaciones con las que GitHub marca a quien mantiene el repositorio. */
+const MAINTAINER_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
 
 export interface RawCommentAuthor {
   login: string
@@ -33,6 +38,8 @@ export interface RawComment {
   updatedAt?: string
   body: string
   author: RawCommentAuthor | null
+  /** `authorAssociation` de GitHub: OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, NONE. */
+  authorAssociation?: string | null
 }
 
 export interface ReporterComment {
@@ -81,7 +88,9 @@ function isAllowedAttachmentUrl(value: string): boolean {
     const url = new URL(value)
     if (url.protocol !== 'https:') return false
     if (url.hostname === 'github.com') return url.pathname.startsWith('/user-attachments/')
-    return url.hostname === 'githubusercontent.com' || url.hostname.endsWith('.githubusercontent.com')
+    return (
+      url.hostname === 'githubusercontent.com' || url.hostname.endsWith('.githubusercontent.com')
+    )
   } catch {
     return false
   }
@@ -105,7 +114,8 @@ export function parseReporterComment(body: string): ReporterComment | null {
 
   const markerIndex = rest.lastIndexOf(REPORTER_ATTACHMENTS_MARKER)
   const textPart = markerIndex === -1 ? rest : rest.slice(0, markerIndex)
-  const attachmentPart = markerIndex === -1 ? '' : rest.slice(markerIndex + REPORTER_ATTACHMENTS_MARKER.length)
+  const attachmentPart =
+    markerIndex === -1 ? '' : rest.slice(markerIndex + REPORTER_ATTACHMENTS_MARKER.length)
 
   const attachments: Array<{ name: string; url: string }> = []
   for (const line of attachmentPart.split(/\r?\n/)) {
@@ -126,6 +136,17 @@ export function parseReporterComment(body: string): ReporterComment | null {
 
 export type CommentKind = 'automation' | 'mine' | 'maintainer' | 'hidden'
 
+/**
+ * REST devuelve el login de una GitHub App como `app[bot]`; GraphQL lo devuelve
+ * como `app`. Se comparan normalizados, sin el sufijo y sin distinguir mayúsculas.
+ */
+export function normalizeBotLogin(login: string): string {
+  return login
+    .trim()
+    .replace(/\[bot\]$/i, '')
+    .toLowerCase()
+}
+
 function isAutomation(comment: RawComment): boolean {
   const author = comment.author
   if (author?.type === 'Bot' || author?.__typename === 'Bot') return true
@@ -135,7 +156,9 @@ function isAutomation(comment: RawComment): boolean {
 /**
  * Clasificación: primero manda el marcador de aclaración (el texto de la
  * persona neutraliza los marcadores de automatización, así que no pueden
- * colisionar); después, la automatización; el resto es del mantenedor.
+ * colisionar); después, la automatización; solo quien mantiene el repositorio
+ * cuenta como mantenedor. Cualquier otro comentario se oculta: un comentario de
+ * terceros no es una respuesta del mantenedor.
  */
 export function classifyComment(
   comment: RawComment,
@@ -144,11 +167,14 @@ export function classifyComment(
   const parsed = parseReporterComment(comment.body)
   if (parsed) {
     const isOwn = parsed.userId === context.userId
-    const isBotAuthor = comment.author?.login === context.botLogin
+    const login = comment.author?.login
+    const isBotAuthor =
+      login !== undefined && normalizeBotLogin(login) === normalizeBotLogin(context.botLogin)
     return isOwn && isBotAuthor ? 'mine' : 'hidden'
   }
 
   if (isAutomation(comment)) return 'automation'
 
-  return 'maintainer'
+  const association = comment.authorAssociation?.toUpperCase()
+  return association && MAINTAINER_ASSOCIATIONS.has(association) ? 'maintainer' : 'hidden'
 }

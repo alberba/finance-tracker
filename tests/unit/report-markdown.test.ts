@@ -95,6 +95,11 @@ describe('parseReportMarkdown', () => {
     expect(list.items.map((item) => item.depth)).toEqual([0, 1, 0])
   })
 
+  it('no recorta una aclaración de 20 001 caracteres', () => {
+    const blocks = parseReportMarkdown('a'.repeat(20_001))
+    expect(textOf(inlines(blocks))).toHaveLength(20_001)
+  })
+
   it('corta entradas patológicas al límite', () => {
     const blocks = parseReportMarkdown('a'.repeat(REPORT_MARKDOWN_MAX_LENGTH + 50))
     expect(textOf(inlines(blocks))).toHaveLength(REPORT_MARKDOWN_MAX_LENGTH)

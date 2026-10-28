@@ -22,7 +22,11 @@ export function useReportsRoute() {
   )
 
   function sync(): void {
+    const previous = selectedNumber.value
     selectedNumber.value = readSelected(window.location.pathname, window.location.search)
+    // El botón atrás del navegador vuelve del detalle a la lista: el foco regresa
+    // a la fila de la que se salió, igual que con el botón «Volver».
+    if (selectedNumber.value === null && previous !== null) void focusEntry(previous)
   }
 
   function write(issueNumber: number | null): void {

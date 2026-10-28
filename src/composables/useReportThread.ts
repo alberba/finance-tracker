@@ -4,7 +4,7 @@
  * hace borrado optimista: espera a GitHub.
  */
 
-import { ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, ref, shallowRef, watch, type Ref } from 'vue'
 
 import type { ReportDetail, ThreadItem } from '../domain/reports/report-entry'
 import { ApiClientError } from '../lib/client/api-error'
@@ -33,9 +33,19 @@ export function useReportThread(issueNumber: Ref<number | null>) {
   const detail = shallowRef<ReportDetail | null>(null)
   const status = ref<ReportThreadStatus>('idle')
   const error = shallowRef('')
-  const pending = ref(false)
+  /** Mutaciones en vuelo por número de reporte: el compositor de B no se bloquea por A. */
+  const pendingIssues = shallowRef<ReadonlySet<number>>(new Set())
+  const pending = computed(
+    () => issueNumber.value !== null && pendingIssues.value.has(issueNumber.value),
+  )
   let requestToken = 0
-  let pendingMutations = 0
+
+  function setPending(number: number, value: boolean): void {
+    const next = new Set(pendingIssues.value)
+    if (value) next.add(number)
+    else next.delete(number)
+    pendingIssues.value = next
+  }
 
   function reset(): void {
     detail.value = null
@@ -100,8 +110,7 @@ export function useReportThread(issueNumber: Ref<number | null>) {
    * antes de que responda, el resultado (y el error) no contaminan el hilo B.
    */
   async function mutate<T>(number: number, call: () => Promise<T>): Promise<T | null> {
-    pendingMutations += 1
-    pending.value = true
+    setPending(number, true)
     if (issueNumber.value === number) error.value = ''
     try {
       return await call()
@@ -109,8 +118,7 @@ export function useReportThread(issueNumber: Ref<number | null>) {
       if (issueNumber.value === number) error.value = messageOf(cause)
       return null
     } finally {
-      pendingMutations -= 1
-      pending.value = pendingMutations > 0
+      setPending(number, false)
     }
   }
 

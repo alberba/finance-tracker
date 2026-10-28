@@ -185,10 +185,10 @@ function confirmDelete(): void {
       :data-thread-item="item.id"
     >
       <header class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p class="text-text-main font-mono text-xs font-semibold tracking-wide">
+        <p class="text-text-main text-xs font-semibold">
           {{ item.author }}
         </p>
-        <p class="text-text-muted font-mono text-xs tabular-nums">
+        <p class="text-text-muted text-xs tabular-nums">
           {{ formatStamp(item.createdAt) }}
           <span v-if="item.editedAt" class="text-text-muted"> · editado</span>
         </p>

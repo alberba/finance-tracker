@@ -42,7 +42,9 @@ const REQUIRED_LABELS = ['Nombre', 'Email', 'Identificador'] as const
 export function parseReporterId(body: string | null | undefined): ParseReporterResult {
   if (!body) return { ok: false, reason: 'sin-bloque' }
   const lines = body.split(/\r?\n/)
-  const start = lines.findIndex((line) => line.trim() === '### Reportero')
+  // El bloque real lo escribe `buildIssueBody` al final; la descripción de la
+  // persona puede contener un «### Reportero» anterior y no debe confundirlo.
+  const start = lines.findLastIndex((line) => line.trim() === '### Reportero')
   if (start === -1) return { ok: false, reason: 'sin-bloque' }
 
   let end = lines.length

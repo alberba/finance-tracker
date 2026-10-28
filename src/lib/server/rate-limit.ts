@@ -1,8 +1,11 @@
 /**
- * Limitador de uso en memoria con ventana deslizante por clave (#340 [D8]).
+ * Limitador de uso en memoria con ventana fija por clave (#340 [D8]).
  *
  * Vive en el proceso, como el que tenía el alta de reportes: no pretende ser un
- * límite distribuido, solo frenar ráfagas de una misma cuenta.
+ * límite distribuido, solo frenar ráfagas de una misma cuenta. La ventana se
+ * abre con la primera llamada de la clave y no se desliza; al caducar, la clave
+ * vuelve a empezar. Las claves caducadas se purgan para que el mapa no crezca
+ * sin límite en un proceso de larga vida.
  */
 
 export interface RateLimiterOptions {
@@ -14,12 +17,17 @@ export interface RateLimiterOptions {
 export interface RateLimiter {
   /** `true` si la llamada entra en la ventana; `false` si hay que rechazarla. */
   consume: (key: string) => boolean
+  /** Claves vivas en memoria; diagnóstico y prueba de la purga. */
+  size: () => number
 }
 
 interface Bucket {
   count: number
   windowStart: number
 }
+
+/** A partir de este tamaño se recorren las claves caducadas y se descartan. */
+const SWEEP_THRESHOLD = 1_000
 
 export function createRateLimiter({
   windowMs,
@@ -28,9 +36,16 @@ export function createRateLimiter({
 }: RateLimiterOptions): RateLimiter {
   const buckets = new Map<string, Bucket>()
 
+  function prune(currentTime: number): void {
+    for (const [key, bucket] of buckets) {
+      if (currentTime - bucket.windowStart > windowMs) buckets.delete(key)
+    }
+  }
+
   return {
     consume(key: string): boolean {
       const currentTime = now()
+      if (buckets.size >= SWEEP_THRESHOLD) prune(currentTime)
       const current = buckets.get(key)
       if (!current || currentTime - current.windowStart > windowMs) {
         buckets.set(key, { count: 1, windowStart: currentTime })
@@ -40,6 +55,9 @@ export function createRateLimiter({
       current.count += 1
       buckets.set(key, current)
       return true
+    },
+    size(): number {
+      return buckets.size
     },
   }
 }

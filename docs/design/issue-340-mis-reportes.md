@@ -51,14 +51,16 @@ Decididas aquí (el brief no las fija):
 - **[D7] Fallo del registro de propiedad.** Si la issue se crea pero el `INSERT` falla, el POST
   devuelve `201` igualmente (la issue existe) con `tracked: false`; el acuse lo dice honestamente y
   `pnpm reports:backfill` lo recupera. Nunca se reintenta creando otra issue.
-- **[D8] Límites de uso.** Un limitador de ventana compartido (`rate-limit.ts`, extraído de
+- **[D8] Límites de uso.** Un limitador de ventana fija por clave (`rate-limit.ts`, extraído de
   `report.ts`): POST de reportes 5/min (igual que hoy); escrituras de comentarios 10/min por usuario.
-  Lecturas sin límite propio (una consulta GraphQL por carga; usuarios sin filas no llaman a GitHub).
+  La ventana se abre con la primera llamada y las claves caducadas se purgan para que el mapa no crezca
+  sin límite. Lecturas sin límite propio (una consulta GraphQL por carga; usuarios sin filas no llaman
+  a GitHub).
 - **[D9] Notificación y demo.** En demo no hay llamadas ni badge: los dos reportes ficticios tienen
   `hasUpdates: false`. El estado visual de «Nuevo» se cubre con tests de componente y E2E con mocks.
 - **[D10] `wipeUserData`/reset no borran `issue_reports`** (no son datos financieros; son la
-  propiedad de issues públicas). Si existe un flujo de borrado de cuenta (`usersRepository.remove`),
-  debe borrar antes estas filas por la FK; hoy ninguna ruta lo invoca (verificado), solo se documenta.
+  propiedad de issues públicas). El borrado de cuenta (`usersRepository.remove`) sí borra antes estas
+  filas por la FK, aunque hoy ninguna ruta lo invoque: la baja no puede fallar ni dejar huérfanos.
 
 ---
 
@@ -203,7 +205,10 @@ Reglas:
   `*.githubusercontent.com`); las demás se descartan. Máximo 3.
 - `classifyComment` (orden): `automation` si `author.type === 'Bot'` o el cuerpo contiene algún
   `AUTOMATION_MARKERS`; si empieza por el marcador de reportero: `mine` solo si `userId` coincide
-  **y** `author.login === botLogin` [D1], si no `hidden`; el resto, `maintainer`.
+  **y** `author.login === botLogin` [D1], si no `hidden`; el resto solo es `maintainer` si
+  `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`. Un comentario de terceros se oculta: no
+  es una respuesta del mantenedor. El login del bot se compara normalizado (`app[bot]` de REST y
+  `app` de GraphQL son la misma cuenta).
 - Al editar, el servidor reconstruye el cuerpo completo con `buildReporterCommentBody` (reponiendo el
   marcador con el `userId` **del principal**, nunca el parseado).
 
@@ -360,8 +365,9 @@ query ($owner: String!, $name: String!) {
 - **Lista**: consultas con alias por issue, como máximo 50 alias por petición. El fragmento `C` pide
   `comments(last: 25)` con `pageInfo { hasPreviousPage startCursor }`; si la página no llega a un
   comentario anterior o igual a `lastSeenAt` y no hay aviso del mantenedor, se pide la página anterior
-  (`comments(last: 100, before: $c<issue>)`, un alias por issue) hasta agotar la ventana. No hay tope de
-  comentarios recientes.
+  (`comments(last: 100, before: $c<índice>)`, un alias por petición) hasta agotar la ventana. Las
+  peticiones idénticas se deduplican: dos reportes que siguen la misma principal no repiten variable ni
+  alias GraphQL. No hay tope de comentarios recientes.
 - **Detalle**: consulta 1 = un alias con `F` (sin `C`) para resolver la cadena; consulta 2 en adelante =
   hilo de la issue seguida, `comments(last: 100)` paginado hacia atrás con `before` hasta
   `hasPreviousPage: false`. Se muestran todos los comentarios.
@@ -409,9 +415,11 @@ duplicateLinkUnavailable = linkBroken
    ([D1]): sin login del bot no se puede distinguir al mantenedor y perder avisos en silencio sería
    una falsa señal.
 4. Respuesta `200 { ok: true, reports, hasMore, nextCursor, unseenCount?, fetchedAt }` — `unseenCount`
-   solo en la primera página y calculado sobre todas las filas. `Cache-Control: no-store` (vía
-   `jsonResponse` de `api-auth`). **Sin caché de estado en servidor**: un cierre asíncrono del workflow
-   aparece en la siguiente carga.
+   solo en la primera página y calculado sobre todas las filas. Es el precio de que el contador no
+   ignore reportes aún no cargados: la primera carga escanea todas las filas (en lotes de 50 alias) y
+   las páginas siguientes solo su página. `Cache-Control: no-store` (vía `jsonResponse` de
+   `api-auth`). **Sin caché de estado en servidor**: un cierre asíncrono del workflow aparece en la
+   siguiente carga.
 
 ### 5.5 Detalle — `GET /api/reports/:number`
 
@@ -617,8 +625,8 @@ vallado, regla. Inline: texto, `código`, **negrita**, _cursiva_, ~~tachado~~, e
 - Imágenes: solo hosts de GitHub (`github.com/user-attachments/`, `*.githubusercontent.com`);
   `<img loading="lazy" referrerpolicy="no-referrer" alt>` dentro de un enlace; cualquier otra URL de
   imagen se degrada a enlace de texto.
-- Límite: 20 000 caracteres por comentario y profundidad ≤ 4 (el resto, texto plano) contra entradas
-  patológicas.
+- Límite: 65 536 caracteres (el máximo del cuerpo de un comentario en GitHub) y profundidad ≤ 4
+  (el resto, texto plano) contra entradas patológicas.
 - Sin `v-html`; el test de límites (§11) falla si aparece en `src/components/reports/`.
 
 ### 8.6 Novedades
@@ -728,8 +736,9 @@ Sigue el estado de lo que has enviado y aclara lo que haga falta.
 - Contenedor estrecho (móvil): la lista ocupa todo el ancho; abrir un reporte reemplaza la vista con un botón «← Mis reportes»
   (`useReportsRoute` empuja `?reporte=n`; el atrás del navegador vuelve). Gutter 16 px; filas ≥ 56 px de
   alto táctil; barra inferior del shell ya reserva `pb-[calc(104px+…)]`.
-- Hilo: cada carta = `<article>` con cabecera mono (`Tú`/login, fecha larga con hora vía
-  `formatStamp`), filete lateral `border-l-2` (`border-primary` para «Tú», `border-line-strong` para
+- Hilo: cada carta = `<article>` con cabecera en texto normal (`Tú`/login, fecha larga con hora vía
+  `formatStamp`; DM Mono se reserva a símbolos, kickers y numeración), filete lateral `border-l-2`
+  (`border-primary` para «Tú», `border-line-strong` para
   mantenedor), cuerpo `ReportMarkdown`. «editado» en `text-text-muted` si `editedAt`. Acciones «Editar»
   y «Borrar» (`BaseButton variant="ghost"`) solo en `editable`.
 - Edición **en el sitio**: la carta pasa a textarea + lista de adjuntos existentes con «Quitar nombre» y

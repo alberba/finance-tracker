@@ -103,6 +103,27 @@ describe('useReportThread', () => {
     expect(thread.pending.value).toBe(false)
   })
 
+  it('solo marca pendiente el hilo cuya mutación sigue en vuelo', async () => {
+    const issueNumber = ref<number | null>(901)
+    const thread = useReportThread(issueNumber)
+    await flushPromises()
+
+    const pending = thread.addComment({ text: 'Aclaración del reporte 901' })
+    expect(thread.pending.value).toBe(true)
+
+    issueNumber.value = 902
+    await flushPromises()
+    expect(thread.pending.value).toBe(false)
+
+    issueNumber.value = 901
+    await flushPromises()
+    expect(thread.pending.value).toBe(true)
+
+    postComment.resolve(json({ ok: true, comment: COMMENT }, 201))
+    expect(await pending).toBe(true)
+    expect(thread.pending.value).toBe(false)
+  })
+
   it('no muestra en el hilo B el error de una mutación del hilo A', async () => {
     const issueNumber = ref<number | null>(901)
     const thread = useReportThread(issueNumber)

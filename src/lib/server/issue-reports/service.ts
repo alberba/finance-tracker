@@ -50,6 +50,7 @@ import {
   fetchIssueChain,
   fetchIssueThread,
   fetchOlderComments,
+  olderCommentsKey,
   resolveBotLogin,
   updateComment as updateGithubComment,
   type GithubComment,
@@ -57,6 +58,7 @@ import {
 } from './github'
 import {
   CommentForbiddenError,
+  REPORT_NOT_FOUND_MESSAGE,
   ReportClosedError,
   ReportInputError,
   ReportNotFoundError,
@@ -179,7 +181,7 @@ function collectNotificationStates(
       )
       for (const [rootNumber, state] of pending) {
         const row = byNumber.get(rootNumber)
-        const page = pages.get(state.commentsIssue)
+        const page = pages.get(olderCommentsKey(state.commentsIssue, state.before as string))
         if (!row || !page) {
           state.covered = true
           continue
@@ -279,18 +281,17 @@ function uploadAttachments(
     const { request } = yield* Http
     const uploaded: ThreadAttachment[] = []
     for (const attachment of attachments) {
-      const result = yield* Effect.promise(() =>
-        uploadIssueAttachment(attachment, {
-          fetch: request,
-          headers: githubHeaders(config.token),
-          repositoryId,
-        }),
+      const url = yield* uploadIssueAttachment(attachment, {
+        fetch: request,
+        headers: githubHeaders(config.token),
+        repositoryId,
+      }).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => console.error('[reports] Adjunto no subido', error.message)),
+        ),
+        Effect.mapError(toGithubError),
       )
-      if (!result.ok) {
-        console.error('[reports] Adjunto no subido', result.error)
-        return yield* new ReportsGithubError({ message: 'No se pudo subir un adjunto.' })
-      }
-      uploaded.push({ name: attachment.name, url: result.url })
+      uploaded.push({ name: attachment.name, url })
     }
     return uploaded
   })
@@ -416,7 +417,7 @@ function requireReport(
 ): Effect.Effect<OwnedReportContext, ReportNotFoundError> {
   return context
     ? Effect.succeed(context)
-    : Effect.fail(new ReportNotFoundError({ message: 'Reporte no encontrado.' }))
+    : Effect.fail(new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE }))
 }
 
 function commentIssue(
@@ -433,7 +434,7 @@ function requireOwnComment(
   current: GithubComment | null,
   userId: string,
   botLogin: string,
-): Effect.Effect<GraphIssueNode, ReportsError> {
+): Effect.Effect<GithubComment, ReportsError> {
   if (!current) {
     return Effect.fail(new ReportNotFoundError({ message: 'Comentario no encontrado.' }))
   }
@@ -450,6 +451,7 @@ function requireOwnComment(
       updatedAt: current.updatedAt,
       body: current.body,
       author: current.author,
+      authorAssociation: current.authorAssociation,
     },
     { userId, botLogin },
   )
@@ -461,7 +463,7 @@ function requireOwnComment(
   if (issue.state !== 'OPEN') {
     return Effect.fail(new ReportClosedError({ message: 'El reporte está cerrado.' }))
   }
-  return Effect.succeed(issue)
+  return Effect.succeed(current)
 }
 
 export const getReportDetail = (
@@ -472,7 +474,7 @@ export const getReportDetail = (
   Effect.gen(function* () {
     const fetchedAt = nowIso()
     const context = yield* loadOwnedReport(userId, issueNumber, env)
-    if (!context) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+    if (!context) return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
     const { row, config, root } = context
     if (!root || !context.threadIssue) {
       return {
@@ -535,7 +537,7 @@ export const addComment = (
   Effect.gen(function* () {
     const context = yield* requireReport(yield* loadOwnedReport(userId, issueNumber, env))
     if (!context.threadIssue) {
-      return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+      return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
     }
     if (context.threadIssue.state !== 'OPEN') {
       return yield* new ReportClosedError({ message: 'El reporte está cerrado.' })
@@ -570,12 +572,9 @@ export const editComment = (
 ): Effect.Effect<ThreadItem, ReportsError | DatabaseError, Database | Http> =>
   Effect.gen(function* () {
     const context = yield* requireReport(yield* loadOwnedReport(userId, issueNumber, env))
-    const current = yield* fetchGithubComment(context.config, commentId)
+    const fetched = yield* fetchGithubComment(context.config, commentId)
     const botLogin = yield* resolveBotLogin(context.config, env.GITHUB_BOT_LOGIN)
-    yield* requireOwnComment(context, current, userId, botLogin)
-    if (!current) {
-      return yield* new ReportNotFoundError({ message: 'Comentario no encontrado.' })
-    }
+    const current = yield* requireOwnComment(context, fetched, userId, botLogin)
 
     const existing = parseReporterComment(current.body)?.attachments ?? []
     const existingUrls = new Set(existing.map((attachment) => attachment.url))
@@ -634,10 +633,10 @@ export const markSeen = (
 ): Effect.Effect<void, ReportsError | DatabaseError, Database> =>
   Effect.gen(function* () {
     const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
-    if (!row) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+    if (!row) return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
     const now = nowIso()
     // El cliente no puede adelantar la marca para silenciar novedades ([D4]).
     const effective = Date.parse(seenAt) < Date.parse(now) ? seenAt : now
     const updated = yield* issueReportsRepository.markSeen(userId, issueNumber, effective)
-    if (!updated) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+    if (!updated) return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
   })

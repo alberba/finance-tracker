@@ -8,6 +8,7 @@ import type { ReportThreadStatus } from '../../composables/useReportThread'
 import type { ReportCommentInput, ReportCommentUpdateInput } from '../../services/reports-api'
 import BaseButton from '../ui/BaseButton.vue'
 import DocumentSurface from '../ui/DocumentSurface.vue'
+import KickerLabel from '../ui/KickerLabel.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
 import ReportComposer from './ReportComposer.vue'
 import ReportStatus from './ReportStatus.vue'
@@ -87,9 +88,9 @@ watch(
 
     <template v-else-if="props.status === 'ready' && props.detail">
       <header class="grid gap-2">
-        <p class="text-text-muted font-mono text-xs tracking-[0.16em] uppercase tabular-nums">
+        <KickerLabel tone="muted" class="tabular-nums">
           Reporte #{{ props.issueNumber }}
-        </p>
+        </KickerLabel>
         <h3
           :id="`report-detail-${props.issueNumber}`"
           ref="heading"
