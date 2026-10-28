@@ -71,7 +71,7 @@ export function useReportThread(issueNumber: Ref<number | null>) {
         return
       }
       status.value = 'ready'
-      void markSeen(number, response.detail.fetchedAt)
+      void markSeen(number, response.detail.fetchedAt, response.detail.report.hasUpdates)
     } catch (cause) {
       if (token !== requestToken) return
       detail.value = null
@@ -88,8 +88,8 @@ export function useReportThread(issueNumber: Ref<number | null>) {
    * Marca la lectura en el servidor sin bloquear la vista. Si falla, el estado
    * local se mantiene hasta la próxima carga y no se muestra error ([D4]).
    */
-  async function markSeen(number: number, fetchedAt: string): Promise<void> {
-    reportsStore.markSeenLocally(number, fetchedAt)
+  async function markSeen(number: number, fetchedAt: string, hadUpdates: boolean): Promise<void> {
+    reportsStore.markSeenLocally(number, fetchedAt, hadUpdates)
     try {
       await runClientHttp(markReportSeen(number, fetchedAt))
     } catch {

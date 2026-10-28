@@ -1,8 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import ReportThread from '../../src/components/reports/ReportThread.vue'
 import type { ThreadItem } from '../../src/domain/reports/report-entry'
+import { buttonByText } from '../helpers/buttons'
 
 function item(overrides: Partial<ThreadItem> = {}): ThreadItem {
   return {
@@ -29,6 +30,10 @@ function mountThread(items: ThreadItem[], canComment = true, editingId: number |
     },
   })
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('ReportThread', () => {
   it('muestra solo acciones de edición en las aclaraciones propias editables', () => {
@@ -68,7 +73,7 @@ describe('ReportThread', () => {
       true,
     )
 
-    await wrapper.get('button').trigger('click')
+    await buttonByText(wrapper, 'Editar').trigger('click')
     await wrapper.setProps({ editingId: 3 })
     const remove = wrapper.get('button[aria-label="Quitar adjunto"]')
     await remove.trigger('click')
@@ -91,8 +96,7 @@ describe('ReportThread', () => {
       ],
       true,
     )
-    const edit = wrapper.findAll('button').find((button) => button.text() === 'Editar')
-    await edit?.trigger('click')
+    await buttonByText(wrapper, 'Editar').trigger('click')
     await wrapper.setProps({ editingId: 4 })
 
     const file = new File(['contenido'], 'captura.png', { type: 'image/png' })
@@ -103,8 +107,7 @@ describe('ReportThread', () => {
     Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
 
     await input.trigger('change')
-    const save = wrapper.findAll('button').find((button) => button.text() === 'Guardar')
-    await save?.trigger('click')
+    await buttonByText(wrapper, 'Guardar').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toBe(

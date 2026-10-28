@@ -138,10 +138,10 @@ describe('ReportsPage', () => {
 
     const wrapper = mountPage()
     await flushPromises()
-    expect(wrapper.get('[role="alert"]').text()).toContain('GitHub no disponible')
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.text()).toContain('GitHub no disponible')
 
-    const retry = wrapper.findAll('button').find((button) => button.text() === 'Reintentar')
-    await retry?.trigger('click')
+    await alert.get('button').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[data-report-entry="901"]').text()).toContain(TITLE)

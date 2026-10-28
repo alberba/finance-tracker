@@ -440,9 +440,9 @@ function requireOwnComment(
   }
   const issue = commentIssue(context, current.issueNumber)
   if (!issue) {
-    return Effect.fail(
-      new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }),
-    )
+    // Mismo 404 que un comentario inexistente: el código no debe revelar si el
+    // commentId existe en otra issue o en otro reporte.
+    return Effect.fail(new ReportNotFoundError({ message: 'Comentario no encontrado.' }))
   }
   const kind = classifyComment(
     {
@@ -635,8 +635,11 @@ export const markSeen = (
     const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
     if (!row) return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
     const now = nowIso()
+    // `max()` compara cadenas: sin milisegundos, «…00Z» ordena después de
+    // «…00.500Z» y la marca no avanzaría. Normaliza siempre a ISO con milisegundos.
+    const requested = new Date(seenAt).toISOString()
     // El cliente no puede adelantar la marca para silenciar novedades ([D4]).
-    const effective = Date.parse(seenAt) < Date.parse(now) ? seenAt : now
+    const effective = Date.parse(requested) < Date.parse(now) ? requested : now
     const updated = yield* issueReportsRepository.markSeen(userId, issueNumber, effective)
     if (!updated) return yield* new ReportNotFoundError({ message: REPORT_NOT_FOUND_MESSAGE })
   })

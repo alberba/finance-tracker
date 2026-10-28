@@ -89,9 +89,9 @@ describe('ReportDetail', () => {
   it('muestra el error y pide reintentar', async () => {
     const wrapper = mountDetail({}, 'error')
 
-    expect(wrapper.get('[role="alert"]').text()).toContain('GitHub no disponible')
-    const retry = wrapper.findAll('button').find((button) => button.text() === 'Reintentar')
-    await retry?.trigger('click')
+    const alert = wrapper.get('[role="alert"]')
+    expect(alert.text()).toContain('GitHub no disponible')
+    await alert.get('button').trigger('click')
     expect(wrapper.emitted('retry')).toHaveLength(1)
   })
 

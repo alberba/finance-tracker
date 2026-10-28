@@ -30,6 +30,9 @@ const text = ref('')
 const attachments = shallowRef<DraftAttachment[]>([])
 const localError = ref('')
 const announcement = ref('')
+/** Cubre la ventana entre el envío y `props.pending`: codificar adjuntos es async. */
+const submitting = ref(false)
+const busy = computed(() => demo || props.pending || submitting.value)
 let nextId = 0
 
 const rows = computed(() =>
@@ -85,6 +88,9 @@ async function encodeAttachments(): Promise<ReportAttachment[]> {
 }
 
 async function onSubmit(): Promise<void> {
+  // El padre aún no ha marcado `pending` mientras se codifican los adjuntos:
+  // sin esta guarda, dos envíos seguidos publicarían la misma aclaración dos veces.
+  if (busy.value) return
   const value = text.value.trim()
   if (!value) {
     localError.value = 'Escribe una aclaración.'
@@ -95,14 +101,19 @@ async function onSubmit(): Promise<void> {
     return
   }
   localError.value = ''
-  let encoded: ReportAttachment[]
+  submitting.value = true
   try {
-    encoded = await encodeAttachments()
-  } catch {
-    localError.value = 'No se pudieron leer los adjuntos. Inténtalo de nuevo.'
-    return
+    let encoded: ReportAttachment[]
+    try {
+      encoded = await encodeAttachments()
+    } catch {
+      localError.value = 'No se pudieron leer los adjuntos. Inténtalo de nuevo.'
+      return
+    }
+    emit('submit', { text: value, attachments: encoded })
+  } finally {
+    submitting.value = false
   }
-  emit('submit', { text: value, attachments: encoded })
 }
 
 // El padre incrementa la señal cuando el alta se publicó: limpia el borrador.
@@ -125,7 +136,7 @@ watch(
         :class="COMMENT_TEXTAREA"
         name="text"
         :maxlength="REPORTER_COMMENT_MAX_LENGTH"
-        :disabled="demo || props.pending"
+        :disabled="busy"
         placeholder="Amplía, corrige o detalla lo que enviaste."
       ></textarea>
       <p class="text-text-muted text-xs tabular-nums" aria-hidden="true">
@@ -141,7 +152,7 @@ watch(
         name="attachments"
         :accept="ISSUE_ATTACHMENT_TYPES.join(',')"
         multiple
-        :disabled="demo || props.pending"
+        :disabled="busy"
         class="text-text-muted file:bg-subtle file:text-text-main text-sm file:mr-3 file:rounded-md file:px-3 file:py-2"
         @change="onFilesPicked"
       />
@@ -172,13 +183,13 @@ watch(
       {{ props.error || localError }}
     </p>
 
-    <p class="sr-only" aria-live="polite">
-      {{ props.pending ? 'Publicando…' : announcement }}
+    <p class="sr-only" role="status">
+      {{ busy ? 'Publicando…' : announcement }}
     </p>
 
     <div class="flex justify-end">
-      <BaseButton type="submit" variant="primary" :disabled="demo || props.pending">
-        {{ props.pending ? 'Publicando…' : 'Publicar aclaración' }}
+      <BaseButton type="submit" variant="primary" :disabled="busy">
+        {{ busy ? 'Publicando…' : 'Publicar aclaración' }}
       </BaseButton>
     </div>
   </form>

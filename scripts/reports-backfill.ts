@@ -181,17 +181,25 @@ function sqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`
 }
 
-/** INSERT para D1, con ids nuevos: la fila de destino solo depende de (user, issue). */
+/**
+ * INSERT para D1, con ids nuevos: la fila de destino solo depende de (user, issue).
+ *
+ * La comprobación de usuarios del plan se hace contra la SQLite local, que
+ * puede no coincidir con D1. La guarda `WHERE EXISTS` vuelve a validar el
+ * `user_id` en la base de destino: si allí no existe, esa fila se omite en vez
+ * de romper la clave foránea y abortar el resto del fichero.
+ */
 export function buildRemoteSql(plan: BackfillPlan): string[] {
   return plan.toInsert.map((row) => {
+    const userId = sqlLiteral(row.userId)
     const values = [
       sqlLiteral(uuidv7()),
-      sqlLiteral(row.userId),
+      userId,
       String(row.issueNumber),
       sqlLiteral(row.submittedAt),
       sqlLiteral(row.lastSeenAt),
     ]
-    return `INSERT INTO issue_reports (id, user_id, issue_number, submitted_at, last_seen_at) VALUES (${values.join(', ')}) ON CONFLICT DO NOTHING;`
+    return `INSERT INTO issue_reports (id, user_id, issue_number, submitted_at, last_seen_at) SELECT ${values.join(', ')} WHERE EXISTS (SELECT 1 FROM users WHERE id = ${userId}) ON CONFLICT DO NOTHING;`
   })
 }
 
@@ -200,6 +208,8 @@ export function writeRemoteSql(plan: BackfillPlan, outPath: string): number {
   const file = [
     '-- Generado por scripts/reports-backfill.ts (--remote-sql-out).',
     '-- Aplicar con: wrangler d1 execute finance-tracker-db-v2 --remote --file=<este fichero>',
+    '-- Cada INSERT exige que el user_id exista en la D1 de destino; si falta,',
+    '-- se omite la fila y no se rompe la clave foránea.',
     '',
     ...statements,
     '',
@@ -219,7 +229,9 @@ Opciones:
   --execute             Aplica el plan (por defecto solo simula)
   --dry-run             Fuerza la simulación (sin escrituras)
   --json                Emite el plan en JSON; el texto humano va a stderr
-  --remote-sql-out=<r>  Escribe el plan como INSERT ... ON CONFLICT DO NOTHING para D1
+  --remote-sql-out=<r>  Escribe INSERT ... ON CONFLICT DO NOTHING para D1. Los
+                        usuarios se validan contra --v2-sqlite; el SQL vuelve a
+                        comprobar cada user_id contra la D1 de destino.
   --help                Muestra esta ayuda
 `
 

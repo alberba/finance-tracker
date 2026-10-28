@@ -89,10 +89,18 @@ export const useReportsStore = defineStore('reports', () => {
     return pendingMore
   }
 
-  /** Apaga «Nuevo» y los avisos sin esperar al servidor. */
-  function markSeenLocally(issueNumber: number, seenAt?: string): void {
+  /**
+   * Apaga «Nuevo» y los avisos sin esperar al servidor.
+   *
+   * El contador es global, pero la lista solo trae una página: al abrir un
+   * reporte por enlace directo (o después de «Cargar más») puede no estar
+   * cargado. En ese caso `hadUpdates` —el `hasUpdates` del detalle— decide si
+   * hay que descontar; sin él no se toca el contador para no inventar bajadas.
+   */
+  function markSeenLocally(issueNumber: number, seenAt?: string, hadUpdates?: boolean): void {
     const target = reports.value.find((report) => report.number === issueNumber)
-    if (target?.hasUpdates) unseenCount.value = Math.max(0, unseenCount.value - 1)
+    const wasUnseen = target ? target.hasUpdates : (hadUpdates ?? false)
+    if (wasUnseen) unseenCount.value = Math.max(0, unseenCount.value - 1)
     reports.value = reports.value.map((report) =>
       report.number === issueNumber
         ? { ...report, hasUpdates: false, lastSeenAt: seenAt ?? report.lastSeenAt }

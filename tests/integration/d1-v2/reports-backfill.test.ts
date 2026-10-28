@@ -119,13 +119,20 @@ describe('reports:backfill', () => {
     ])
   })
 
-  it('emite SQL remoto idempotente para D1', async () => {
+  it('emite SQL remoto idempotente y protegido por la FK de la D1 de destino', async () => {
+    const known = await seedUser(testDb.db, 'remote@example.com')
     const plan = {
       toInsert: [
         {
-          userId: 'u1',
+          userId: known.id,
           issueNumber: 1,
           submittedAt: '2026-01-01T00:00:00.000Z',
+          lastSeenAt: '2026-10-26T00:00:00.000Z',
+        },
+        {
+          userId: 'cuenta-que-solo-existe-en-local',
+          issueNumber: 2,
+          submittedAt: '2026-01-02T00:00:00.000Z',
           lastSeenAt: '2026-10-26T00:00:00.000Z',
         },
       ],
@@ -135,10 +142,21 @@ describe('reports:backfill', () => {
     const folder = mkdtempSync(join(tmpdir(), 'reports-backfill-'))
     const path = join(folder, 'backfill.sql')
     try {
-      expect(writeRemoteSql(plan, path)).toBe(1)
+      expect(writeRemoteSql(plan, path)).toBe(2)
       const sql = readFileSync(path, 'utf8')
       expect(sql).toContain('INSERT INTO issue_reports')
       expect(sql).toContain('ON CONFLICT DO NOTHING;')
+      expect(sql).toContain(`WHERE EXISTS (SELECT 1 FROM users WHERE id = '${known.id}')`)
+
+      // Se aplica tal cual sobre una base con FK activa: la cuenta ausente se
+      // omite y no aborta el fichero.
+      for (const statement of sql.split('\n').filter((line) => line.startsWith('INSERT'))) {
+        testDb.sqlite.exec(statement)
+      }
+      const rows = testDb.sqlite
+        .prepare('SELECT issue_number FROM issue_reports ORDER BY issue_number')
+        .all() as Array<{ issue_number: number }>
+      expect(rows).toEqual([{ issue_number: 1 }])
     } finally {
       rmSync(folder, { recursive: true, force: true })
     }

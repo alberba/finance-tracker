@@ -287,7 +287,7 @@ Repositorio `src/db/repositories/issue-reports.ts` (patrón `audit-events.ts`: `
 | `recordSubmission(userId, n, at)`        | `INSERT … ON CONFLICT DO NOTHING`; `submittedAt = lastSeenAt = at`. Devuelve `boolean` insertada. |
 | `listByUser(userId)`                     | Todas las filas de la cuenta ordenadas `submitted_at DESC, issue_number DESC`; la paginación se hace en el servicio con `nextCursor`. |
 | `getByUserAndNumber(userId, n)`          | Fila o `undefined`. Es **la** comprobación de propiedad.                                        |
-| `markSeen(userId, n, seenAtIso)`         | `UPDATE … SET last_seen_at = max(last_seen_at, ?)` (comparar ISO como texto es válido: mismo formato). Devuelve `boolean`. |
+| `markSeen(userId, n, seenAtIso)`         | `UPDATE … SET last_seen_at = max(last_seen_at, ?)` (el servicio normaliza a ISO con milisegundos: comparar texto solo es válido con el mismo formato). Devuelve `boolean`. |
 | `insertManyIfMissing(rows)`              | Solo backfill: `INSERT … ON CONFLICT DO NOTHING`, `chunkIds`-style por el límite de variables (`MAX_SQL_VARIABLES_PER_STATEMENT`). |
 | `listIssueNumbersByUser(userId)` / `listAll()` | Backfill (existentes).                                                                       |
 
@@ -466,8 +466,9 @@ Condición de carrera conocida y aceptada: última escritura gana; no se version
 
 ### 5.8 Marcar visto — `POST /api/reports/:number/seen`
 
-Cuerpo `{ seenAt: ISO }` (zod `z.iso.datetime()`); propiedad (404); `markSeen(userId, n, min(seenAt, now))`
-(el servidor recorta a «ahora» para que el cliente no pueda adelantar la marca y silenciar novedades).
+Cuerpo `{ seenAt: ISO }` (zod `z.iso.datetime()`); propiedad (404); el servicio normaliza a ISO con
+milisegundos y aplica `markSeen(userId, n, min(seenAt, now))` (recorta a «ahora» para que el cliente no
+pueda adelantar la marca y silenciar novedades).
 `204`. Sin llamada a GitHub.
 
 ### 5.9 Resumen de códigos
@@ -565,7 +566,7 @@ copia o el `finance.sqlite` del volumen con la copia diaria ya hecha; primero si
 | Fichero                                            | Responsabilidad                                                                          |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `src/services/reports-api.ts`                      | `Effect` + `requestApiJson` (patrón `issue-report-api.ts`): `fetchReports`, `fetchReportDetail`, `markReportSeen`, `postReportComment`, `patchReportComment`, `deleteReportComment`. En demo devuelve `demo-reports` sin red; las escrituras en demo devuelven `{ ok:false, error:'En la demo no se envían comentarios.' }`. |
-| `src/stores/reports.ts`                            | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `nextCursor`, `unseenCount` (del servidor), `loadingMore`, `loadMoreError`, `refresh({ force })` y `loadMore()` (deduplican una petición en curso), `markSeenLocally(n)`. Acciones llaman `runClientHttp`. |
+| `src/stores/reports.ts`                            | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `nextCursor`, `unseenCount` (del servidor), `loadingMore`, `loadMoreError`, `refresh({ force })` y `loadMore()` (deduplican una petición en curso), `markSeenLocally(n, seenAt, hadUpdates)`. Acciones llaman `runClientHttp`. |
 | `src/composables/useReportThread.ts`               | Ciclo de vida del detalle (carga, `markSeen`, alta/edición/borrado, borradores, estados `pending`/`error`). Conserva el texto ante error. |
 | `src/composables/useReportsRoute.ts`               | Adaptador de `window`: lee/escribe `?reporte=<n>`, `popstate`. Es el único que toca `location`/`history` en esta zona. |
 | `src/composables/useSectionNavigation.ts`          | Añadir `navigateToReports(n?)` (push de `/reportes[?reporte=n]` + `popstate`).            |
@@ -646,9 +647,10 @@ vallado, regla. Inline: texto, `código`, **negrita**, _cursiva_, ~~tachado~~, e
   y un punto sobre `[data-mobile-more-trigger]`; sincronizado por `reports-badge.ts` con `watch` de Pinia
   (el markup es Astro estático).
 - Cada entrada con `hasUpdates` lleva `PillTag tone="accent"` «Nuevo».
-- Al abrir el detalle (`ready`): `markReportSeen(n, detail.fetchedAt)` y `markSeenLocally(n)` (apaga «Nuevo»,
-  baja el contador y los puntos). Si el POST falla, se mantiene el estado local hasta la próxima carga y
-  no se muestra error (no bloquea).
+- Al abrir el detalle (`ready`): `markReportSeen(n, detail.fetchedAt)` y
+  `markSeenLocally(n, detail.fetchedAt, detail.report.hasUpdates)` (apaga «Nuevo», baja el contador y los
+  puntos; `hadUpdates` cubre los reportes que no están en la página cargada). Si el POST falla, se mantiene
+  el estado local hasta la próxima carga y no se muestra error (no bloquea).
 
 ### 8.7 Demo
 

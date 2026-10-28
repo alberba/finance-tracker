@@ -69,6 +69,11 @@ pnpm reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite --execute
 pnpm reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
 ```
 
+En el paso 3 la lista de usuarios contra la que se valida el plan sigue siendo la de
+`--v2-sqlite`, no la de D1. Usa una copia reciente de producción. Además, cada `INSERT`
+del fichero lleva una guarda `WHERE EXISTS (SELECT 1 FROM users …)`: si una cuenta ya no
+existe en D1, esa fila se omite en lugar de romper la clave foránea y abortar el resto.
+
 El comando es idempotente y puede repetirse. Lee las issues con label `source:web-report` paginando
 la API REST (nunca el buscador) y se salta, listándolas al final, las que no tienen bloque
 `### Reportero`, lo tienen modificado o cuyo `Identificador` no corresponde a ninguna cuenta. Se

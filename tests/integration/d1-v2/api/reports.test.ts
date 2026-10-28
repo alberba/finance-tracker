@@ -749,6 +749,28 @@ describe('/api/reports', () => {
     expect(response.status).toBe(403)
   })
 
+  it('devuelve 404 si el comentario existe pero no pertenece a este reporte', async () => {
+    await record(userA.id, 10)
+    state.issues.set(10, { number: 10, title: 'Abierta', state: 'OPEN', stateReason: null })
+    state.issues.set(20, { number: 20, title: 'Otro reporte', state: 'OPEN', stateReason: null })
+    state.comments.set(50, {
+      id: 50,
+      body: `<!-- finance-tracker:reporter-comment user=${userA.id} -->\n**Aclaración del reportero**\n\nmía`,
+      issueNumber: 20,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+      login: BOT,
+    })
+
+    const { PATCH } =
+      await import('../../../../src/pages/api/reports/[number]/comments/[commentId]')
+    const response = await PATCH(
+      context(userA.id, { number: '10', commentId: '50' }, { text: 'cambio', keepAttachments: [] }),
+    )
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ ok: false, error: 'Reporte no encontrado.' })
+  })
+
   it('edita y borra una aclaración publicada en la principal que se sigue', async () => {
     await record(userA.id, 10)
     state.issues.set(10, {
@@ -796,6 +818,29 @@ describe('/api/reports', () => {
       .prepare('SELECT last_seen_at FROM issue_reports WHERE issue_number = 10')
       .get() as { last_seen_at: string }
     expect(Date.parse(row.last_seen_at)).toBeLessThanOrEqual(Date.now())
+  })
+
+  it('normaliza la marca de visto a ISO con milisegundos antes del max()', async () => {
+    await record(userA.id, 10)
+    const { POST } = await import('../../../../src/pages/api/reports/[number]/seen')
+
+    expect(
+      (await POST(context(userA.id, { number: '10' }, { seenAt: '2026-10-10T00:00:00Z' }))).status,
+    ).toBe(204)
+    const first = testDb.sqlite
+      .prepare('SELECT last_seen_at FROM issue_reports WHERE issue_number = 10')
+      .get() as { last_seen_at: string }
+    expect(first.last_seen_at).toBe('2026-10-10T00:00:00.000Z')
+
+    // Sin normalizar, «…00Z» ordena después de «…00.500Z» y el max() no avanza.
+    expect(
+      (await POST(context(userA.id, { number: '10' }, { seenAt: '2026-10-10T00:00:00.500Z' })))
+        .status,
+    ).toBe(204)
+    const second = testDb.sqlite
+      .prepare('SELECT last_seen_at FROM issue_reports WHERE issue_number = 10')
+      .get() as { last_seen_at: string }
+    expect(second.last_seen_at).toBe('2026-10-10T00:00:00.500Z')
   })
 
   it('limita las lecturas de la lista', async () => {
