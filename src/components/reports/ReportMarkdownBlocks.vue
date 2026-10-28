@@ -13,7 +13,7 @@ const HEADING = ['text-base', 'text-base', 'text-lg', 'text-lg', 'text-xl', 'tex
 <template>
   <div class="[&>*]:mbs-0 [&>*+*]:mbs-3">
     <template v-for="(block, index) in blocks" :key="index">
-      <p v-if="block.type === 'paragraph'" class="text-[0.9375rem] leading-relaxed wrap-break-word">
+      <p v-if="block.type === 'paragraph'" class="text-button leading-relaxed wrap-break-word">
         <ReportMarkdownInline :nodes="block.children" />
       </p>
       <p
@@ -33,7 +33,7 @@ const HEADING = ['text-base', 'text-base', 'text-lg', 'text-lg', 'text-xl', 'tex
         <li
           v-for="(item, itemIndex) in block.items"
           :key="itemIndex"
-          class="list-disc text-[0.9375rem] leading-relaxed wrap-break-word"
+          class="text-button list-disc leading-relaxed wrap-break-word"
           :class="item.depth > 0 ? 'ms-4' : ''"
         >
           <ReportMarkdownInline :nodes="item.children" />
@@ -43,7 +43,7 @@ const HEADING = ['text-base', 'text-base', 'text-lg', 'text-lg', 'text-xl', 'tex
         <li
           v-for="(item, itemIndex) in block.items"
           :key="itemIndex"
-          class="list-decimal text-[0.9375rem] leading-relaxed wrap-break-word"
+          class="text-button list-decimal leading-relaxed wrap-break-word"
           :class="item.depth > 0 ? 'ms-4' : ''"
         >
           <ReportMarkdownInline :nodes="item.children" />

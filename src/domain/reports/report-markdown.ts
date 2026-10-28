@@ -199,7 +199,7 @@ function isBlockStart(line: string): boolean {
   )
 }
 
-function parseBlocks(lines: string[]): BlockNode[] {
+function parseBlocks(lines: string[], depth = 0): BlockNode[] {
   const blocks: BlockNode[] = []
   let index = 0
 
@@ -249,7 +249,14 @@ function parseBlocks(lines: string[]): BlockNode[] {
         content.push(quote[1])
         index += 1
       }
-      blocks.push({ type: 'quote', blocks: parseBlocks(content) })
+      // Las citas anidadas se limitan como el énfasis inline: el bloque que
+      // supera el límite se degrada a párrafo para que ni el parser ni el
+      // render recursivo puedan desbordar la pila con `> > > …`.
+      blocks.push(
+        depth >= REPORT_MARKDOWN_MAX_DEPTH
+          ? { type: 'paragraph', children: parseInline(content.join('\n')) }
+          : { type: 'quote', blocks: parseBlocks(content, depth + 1) },
+      )
       continue
     }
 
@@ -286,5 +293,5 @@ function parseBlocks(lines: string[]): BlockNode[] {
 export function parseReportMarkdown(source: string): BlockNode[] {
   const normalized = (source ?? '').replace(/\r\n?/g, '\n').slice(0, REPORT_MARKDOWN_MAX_LENGTH)
   if (!normalized.trim()) return []
-  return parseBlocks(normalized.split('\n'))
+  return parseBlocks(normalized.split('\n'), 0)
 }

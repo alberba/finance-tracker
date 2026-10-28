@@ -48,6 +48,15 @@ describe('ReportMarkdown', () => {
     expect(wrapper.get('pre code').text()).toBe('const a = 1')
   })
 
+  it('no desborda la pila con una cita anidada sin fin', () => {
+    const wrapper = mount(ReportMarkdown, {
+      props: { source: `${'> '.repeat(2_000)}texto profundo` },
+    })
+
+    expect(wrapper.findAll('blockquote')).toHaveLength(4)
+    expect(wrapper.text()).toContain('texto profundo')
+  })
+
   it('conserva listas y código dentro de una cita', () => {
     const wrapper = mount(ReportMarkdown, {
       props: {

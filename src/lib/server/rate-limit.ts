@@ -67,3 +67,11 @@ export const reportSubmissionLimiter = createRateLimiter({ windowMs: 60_000, max
 
 /** Escrituras de aclaraciones: 10 por minuto y cuenta. */
 export const reportCommentLimiter = createRateLimiter({ windowMs: 60_000, max: 10 })
+
+/**
+ * Lectura de la lista: 30 por minuto y cuenta. La primera página escanea el
+ * hilo entero de todas las filas para calcular los avisos ([D6]), así que una
+ * ráfaga puede multiplicar las consultas a GitHub aunque el detalle siga sin
+ * límite propio (una sola issue por carga).
+ */
+export const reportListLimiter = createRateLimiter({ windowMs: 60_000, max: 30 })

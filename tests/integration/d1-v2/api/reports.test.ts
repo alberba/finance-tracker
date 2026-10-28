@@ -798,6 +798,18 @@ describe('/api/reports', () => {
     expect(Date.parse(row.last_seen_at)).toBeLessThanOrEqual(Date.now())
   })
 
+  it('limita las lecturas de la lista', async () => {
+    const { reportListLimiter } = await import('../../../../src/lib/server/rate-limit')
+    for (let index = 0; index < 30; index += 1) reportListLimiter.consume(userA.id)
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const response = await GET(context(userA.id))
+    expect(response.status).toBe(429)
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: 'Demasiadas peticiones. Inténtalo en un minuto.',
+    })
+  })
+
   it('limita las escrituras de comentarios', async () => {
     const { reportCommentLimiter } = await import('../../../../src/lib/server/rate-limit')
     for (let index = 0; index < 10; index += 1) reportCommentLimiter.consume(userA.id)

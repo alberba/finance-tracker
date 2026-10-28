@@ -122,15 +122,30 @@ export function useReportThread(issueNumber: Ref<number | null>) {
     }
   }
 
-  async function addComment(input: ReportCommentInput): Promise<boolean> {
+  /**
+   * Mutación sobre el hilo abierto en el momento de invocarla. Devuelve el
+   * número y el resultado, o `null` si no hay hilo, la llamada falla o la API
+   * responde `ok: false`; en ese caso deja el error solo si sigue siendo el
+   * hilo visible.
+   */
+  async function commit<T extends { ok: true }>(
+    call: (number: number) => Promise<T | { ok: false; error: string }>,
+  ): Promise<{ number: number; result: T } | null> {
     const number = issueNumber.value
-    if (number === null) return false
-    const result = await mutate(number, () => runClientHttp(postReportComment(number, input)))
-    if (!result) return false
+    if (number === null) return null
+    const result = await mutate(number, () => call(number))
+    if (!result) return null
     if (!result.ok) {
       if (issueNumber.value === number) error.value = result.error
-      return false
+      return null
     }
+    return { number, result }
+  }
+
+  async function addComment(input: ReportCommentInput): Promise<boolean> {
+    const committed = await commit((number) => runClientHttp(postReportComment(number, input)))
+    if (!committed) return false
+    const { number, result } = committed
     // Si la persona ya abrió otro reporte, la aclaración se publicó en A pero no
     // se aplica a la vista actual: el padre no debe reiniciar el borrador de B.
     if (issueNumber.value !== number || !detail.value) return false
@@ -142,30 +157,22 @@ export function useReportThread(issueNumber: Ref<number | null>) {
     commentId: number,
     input: ReportCommentUpdateInput,
   ): Promise<boolean> {
-    const number = issueNumber.value
-    if (number === null) return false
-    const result = await mutate(number, () =>
+    const committed = await commit((number) =>
       runClientHttp(patchReportComment(number, commentId, input)),
     )
-    if (!result) return false
-    if (!result.ok) {
-      if (issueNumber.value === number) error.value = result.error
-      return false
-    }
+    if (!committed) return false
+    const { number, result } = committed
     if (issueNumber.value !== number) return false
     replaceItem(result.comment)
     return true
   }
 
   async function removeComment(commentId: number): Promise<boolean> {
-    const number = issueNumber.value
-    if (number === null) return false
-    const result = await mutate(number, () => runClientHttp(deleteReportComment(number, commentId)))
-    if (!result) return false
-    if (!result.ok) {
-      if (issueNumber.value === number) error.value = result.error
-      return false
-    }
+    const committed = await commit((number) =>
+      runClientHttp(deleteReportComment(number, commentId)),
+    )
+    if (!committed) return false
+    const { number } = committed
     if (issueNumber.value !== number || !detail.value) return false
     detail.value = {
       ...detail.value,

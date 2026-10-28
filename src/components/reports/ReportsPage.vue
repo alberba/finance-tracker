@@ -121,10 +121,7 @@ async function back(): Promise<void> {
           </div>
         </section>
 
-        <div
-          v-if="selectedNumber !== null"
-          class="min-w-[50%] grow-[999] basis-0 @max-3xl:min-w-full"
-        >
+        <div v-if="selectedNumber !== null" class="min-w-1/2 grow-999 basis-0 @max-3xl:min-w-full">
           <ReportDetail
             :issue-number="selectedNumber"
             :detail="detail"
@@ -141,7 +138,7 @@ async function back(): Promise<void> {
             @back="back"
           />
         </div>
-        <div v-else class="hidden grow-[999] basis-0 @3xl:block">
+        <div v-else class="hidden grow-999 basis-0 @3xl:block">
           <p class="text-text-muted border-line rounded-lg border border-dashed p-6 text-sm">
             Selecciona un reporte para ver su estado y su hilo.
           </p>

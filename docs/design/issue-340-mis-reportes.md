@@ -52,10 +52,12 @@ Decididas aquí (el brief no las fija):
   devuelve `201` igualmente (la issue existe) con `tracked: false`; el acuse lo dice honestamente y
   `pnpm reports:backfill` lo recupera. Nunca se reintenta creando otra issue.
 - **[D8] Límites de uso.** Un limitador de ventana fija por clave (`rate-limit.ts`, extraído de
-  `report.ts`): POST de reportes 5/min (igual que hoy); escrituras de comentarios 10/min por usuario.
-  La ventana se abre con la primera llamada y las claves caducadas se purgan para que el mapa no crezca
-  sin límite. Lecturas sin límite propio (una consulta GraphQL por carga; usuarios sin filas no llaman
-  a GitHub).
+  `report.ts`): POST de reportes 5/min (igual que hoy); escrituras de comentarios 10/min por usuario;
+  `GET /api/reports` 30/min por usuario. La ventana se abre con la primera llamada y las claves
+  caducadas se purgan para que el mapa no crezca sin límite. La lista necesita límite propio porque la
+  primera página recorre el hilo entero de todas las filas para el contador de novedades [D6]; el
+  detalle sigue sin límite propio (una sola issue por carga) y los usuarios sin filas no llaman a
+  GitHub.
 - **[D9] Notificación y demo.** En demo no hay llamadas ni badge: los dos reportes ficticios tienen
   `hasUpdates: false`. El estado visual de «Nuevo» se cubre con tests de componente y E2E con mocks.
 - **[D10] `wipeUserData`/reset no borran `issue_reports`** (no son datos financieros; son la

@@ -19,7 +19,6 @@ const props = withDefaults(
 const emit = defineEmits<{ submit: [payload: { text: string; attachments: ReportAttachment[] }] }>()
 
 const demo = isDemoMode()
-const TEXTAREA = COMMENT_TEXTAREA
 
 interface DraftAttachment {
   id: number
@@ -96,7 +95,14 @@ async function onSubmit(): Promise<void> {
     return
   }
   localError.value = ''
-  emit('submit', { text: value, attachments: await encodeAttachments() })
+  let encoded: ReportAttachment[]
+  try {
+    encoded = await encodeAttachments()
+  } catch {
+    localError.value = 'No se pudieron leer los adjuntos. Inténtalo de nuevo.'
+    return
+  }
+  emit('submit', { text: value, attachments: encoded })
 }
 
 // El padre incrementa la señal cuando el alta se publicó: limpia el borrador.
@@ -116,7 +122,7 @@ watch(
       <textarea
         id="report-comment-text"
         v-model="text"
-        :class="TEXTAREA"
+        :class="COMMENT_TEXTAREA"
         name="text"
         :maxlength="REPORTER_COMMENT_MAX_LENGTH"
         :disabled="demo || props.pending"

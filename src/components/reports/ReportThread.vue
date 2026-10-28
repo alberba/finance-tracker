@@ -35,8 +35,6 @@ const emit = defineEmits<{
   delete: [commentId: number]
 }>()
 
-const TEXTAREA = COMMENT_TEXTAREA
-
 interface DraftFile {
   id: number
   file: File
@@ -133,7 +131,7 @@ async function encodeNewFiles(): Promise<ReportAttachment[]> {
   return Promise.all(newFiles.value.map(({ file }) => encodeAttachmentFile(file)))
 }
 
-function save(): void {
+async function save(): Promise<void> {
   const id = props.editingId
   if (id === null) return
   const value = editText.value.trim()
@@ -145,12 +143,17 @@ function save(): void {
     localError.value = `La aclaración supera el límite de ${REPORTER_COMMENT_MAX_LENGTH} caracteres.`
     return
   }
-  void encodeNewFiles().then((attachments) => {
-    emit('update', id, {
-      text: value,
-      keepAttachments: kept.value,
-      attachments,
-    })
+  let attachments: ReportAttachment[]
+  try {
+    attachments = await encodeNewFiles()
+  } catch {
+    localError.value = 'No se pudieron leer los adjuntos. Inténtalo de nuevo.'
+    return
+  }
+  emit('update', id, {
+    text: value,
+    keepAttachments: kept.value,
+    attachments,
   })
 }
 
@@ -208,7 +211,7 @@ function confirmDelete(): void {
             <textarea
               :id="`report-comment-edit-${item.id}`"
               v-model="editText"
-              :class="TEXTAREA"
+              :class="COMMENT_TEXTAREA"
               :maxlength="REPORTER_COMMENT_MAX_LENGTH"
             ></textarea>
           </div>

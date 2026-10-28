@@ -103,7 +103,7 @@ Identificadores clave en UI:
 
 - `src/lib/server/github-api.ts` — configuración y cabeceras compartidas.
 - `src/lib/server/rate-limit.ts` — limitador de ventana fija por cuenta, con purga de claves
-  caducadas (5/min altas, 10/min comentarios).
+  caducadas (5/min altas, 10/min comentarios, 30/min lecturas de la lista).
 - `src/lib/server/issue-reports/github.ts` — GraphQL de estado/hilo y REST de comentarios.
 - `src/lib/server/issue-reports/service.ts` — casos de uso.
 - `src/lib/server/issue-reports/errors.ts` — errores y respuestas.

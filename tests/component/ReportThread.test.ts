@@ -1,5 +1,5 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
 
 import ReportThread from '../../src/components/reports/ReportThread.vue'
 import type { ThreadItem } from '../../src/domain/reports/report-entry'
@@ -75,6 +75,42 @@ describe('ReportThread', () => {
 
     const status = wrapper.get('[role="status"]')
     expect(status.text()).toBe('Quitar un adjunto no lo borra de GitHub.')
+  })
+
+  it('muestra un error si no puede leer un adjunto y no envía la edición', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:captura')
+    const wrapper = mountThread(
+      [
+        item({
+          id: 4,
+          kind: 'reporter',
+          author: 'Tú',
+          editable: true,
+          text: 'Con captura rota',
+        }),
+      ],
+      true,
+    )
+    const edit = wrapper.findAll('button').find((button) => button.text() === 'Editar')
+    await edit?.trigger('click')
+    await wrapper.setProps({ editingId: 4 })
+
+    const file = new File(['contenido'], 'captura.png', { type: 'image/png' })
+    Object.defineProperty(file, 'arrayBuffer', {
+      value: () => Promise.reject(new Error('lectura fallida')),
+    })
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+
+    await input.trigger('change')
+    const save = wrapper.findAll('button').find((button) => button.text() === 'Guardar')
+    await save?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'No se pudieron leer los adjuntos. Inténtalo de nuevo.',
+    )
+    expect(wrapper.emitted('update')).toBeUndefined()
   })
 
   it('muestra el texto editado y la marca de edición', () => {

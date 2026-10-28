@@ -42,7 +42,15 @@ describe('parseReportMarkdown', () => {
 
   it('renderiza negrita, cursiva, tachado y código', () => {
     const nodes = inlines(parseReportMarkdown('**fuerte** _suave_ ~~viejo~~ `código`'))
-    expect(nodes.map((node) => node.type)).toEqual(['strong', 'text', 'em', 'text', 'del', 'text', 'code'])
+    expect(nodes.map((node) => node.type)).toEqual([
+      'strong',
+      'text',
+      'em',
+      'text',
+      'del',
+      'text',
+      'code',
+    ])
   })
 
   it('acepta enlaces http y https', () => {
@@ -76,17 +84,22 @@ describe('parseReportMarkdown', () => {
 
   it('parsea encabezados, listas, citas, código y reglas', () => {
     const blocks = parseReportMarkdown(
-      ['# Título', '', '- uno', '- dos', '', '> cita', '', '```ts', 'const a = 1', '```', '', '---'].join(
-        '\n',
-      ),
+      [
+        '# Título',
+        '',
+        '- uno',
+        '- dos',
+        '',
+        '> cita',
+        '',
+        '```ts',
+        'const a = 1',
+        '```',
+        '',
+        '---',
+      ].join('\n'),
     )
-    expect(blocks.map((block) => block.type)).toEqual([
-      'heading',
-      'list',
-      'quote',
-      'code',
-      'rule',
-    ])
+    expect(blocks.map((block) => block.type)).toEqual(['heading', 'list', 'quote', 'code', 'rule'])
   })
 
   it('anida listas simples por sangría', () => {
@@ -108,5 +121,25 @@ describe('parseReportMarkdown', () => {
   it('no revienta con anidación profunda', () => {
     const source = `${'*'.repeat(40)}texto${'*'.repeat(40)}`
     expect(() => parseReportMarkdown(source)).not.toThrow()
+  })
+
+  it('limita las citas anidadas y degrada el exceso a texto', () => {
+    const source = `${'> '.repeat(2_000)}hola`
+    let blocks: BlockNode[] = []
+    expect(() => {
+      blocks = parseReportMarkdown(source)
+    }).not.toThrow()
+
+    let depth = 0
+    let current = blocks
+    while (current[0]?.type === 'quote') {
+      depth += 1
+      current = current[0].blocks
+    }
+
+    expect(depth).toBe(4)
+    // El resto de marcadores queda como texto, sin más bloques de cita.
+    expect(current[0]).toMatchObject({ type: 'paragraph' })
+    expect(textOf(inlines(current))).toContain('hola')
   })
 })
