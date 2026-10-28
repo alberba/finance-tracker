@@ -59,7 +59,16 @@ export function resolveFollowed<T extends IssueNode>(root: T, ownerRepo: string)
   }
 }
 
-function toRef(node: IssueNode): ReportIssueRef {
+/** Palabra corta del estado de una issue (sin el prefijo «Cerrado ·»). */
+export function issueStateWord(issue: ReportIssueRef): string {
+  if (issue.state === 'OPEN') return 'Abierto'
+  if (issue.stateReason === 'COMPLETED') return 'Completado'
+  if (issue.stateReason === 'NOT_PLANNED') return 'No planificado'
+  if (issue.stateReason === 'DUPLICATE') return 'Cerrado como duplicado'
+  return 'Cerrado'
+}
+
+export function toIssueRef(node: IssueNode): ReportIssueRef {
   return {
     number: node.number,
     url: node.url,
@@ -69,7 +78,7 @@ function toRef(node: IssueNode): ReportIssueRef {
   }
 }
 
-function toneFor(state: string | null): ReportStatusTone {
+function toneFor(state: ReportIssueRef['state'] | ReportIssueRef['stateReason']): ReportStatusTone {
   if (state === 'OPEN') return 'warn'
   if (state === 'COMPLETED') return 'gain'
   return 'neutral'
@@ -171,9 +180,9 @@ export function buildAvailableEntry(
   base: { submittedAt: string; lastSeenAt: string; hasUpdates: boolean; statusChangedAt: string | null },
 ): ReportEntry {
   return {
-    ...toRef(root),
+    ...toIssueRef(root),
     ...base,
-    ...(resolved.followed ? { followed: toRef(resolved.followed) } : {}),
+    ...(resolved.followed ? { followed: toIssueRef(resolved.followed) } : {}),
     ...(resolved.duplicateLinkUnavailable ? { duplicateLinkUnavailable: true } : {}),
   }
 }

@@ -200,7 +200,8 @@ flujos de navegador están en [`docs/playwright.md`](docs/playwright.md).
 
 Este repo permite enviar reportes desde la web y convertirlos en issues de GitHub:
 
-1. Desde la sección **Reportes** puedes enviar un reporte (`error` o `mejora`).
+1. Desde el lanzador **Reportar** (o la hoja «Más» en móvil) puedes enviar un reporte (`error` o
+   `mejora`).
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
    - `needs-triage`

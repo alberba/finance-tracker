@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures'
+import type { AvailableReportEntry } from '../../src/domain/reports/report-entry'
 
 // PNG real de 1×1 píxel: pasa la comprobación de cabecera del servidor.
 const PNG_1X1 = Buffer.from(
@@ -375,24 +376,7 @@ test.describe('Reports E2E', () => {
   })
 })
 
-type ReportEntryShape = {
-  number: number
-  url: string
-  title: string
-  state: 'OPEN' | 'CLOSED'
-  stateReason: 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | null
-  submittedAt: string
-  lastSeenAt: string
-  hasUpdates: boolean
-  statusChangedAt: string | null
-  followed?: {
-    number: number
-    url: string
-    title: string
-    state: 'OPEN' | 'CLOSED'
-    stateReason: null
-  }
-}
+type ReportEntryShape = AvailableReportEntry
 
 const ISSUE_URL = 'https://github.com/example/finance-tracker/issues'
 
@@ -589,6 +573,24 @@ test.describe('Mis reportes E2E', () => {
     await tracker.reload()
     await expect(tracker.reportsPage.getByText('Se sigue en #887').first()).toBeVisible()
     await expect(tracker.reportsPage.getByText('#901 · Cerrado como duplicado')).toBeVisible()
+  })
+
+  test('avisa de novedades en el botón y en la entrada y las apaga al abrir', async ({
+    page,
+    tracker,
+  }) => {
+    await mockReportsApi(page, {
+      list: () => [reportEntry({ hasUpdates: true })],
+    })
+
+    await tracker.openReports()
+    const dot = page.locator('#global-report-trigger [data-reports-updates]')
+    await expect(dot).toBeVisible()
+    await expect(page.locator('[data-report-entry="901"]').getByText('Nuevo')).toBeVisible()
+
+    await page.locator('[data-report-entry="901"]').click()
+    await expect(tracker.reportsPage.getByRole('heading', { name: reportEntry().title })).toBeVisible()
+    await expect(dot).toHaveCount(0)
   })
 
   test('añade, edita y borra una aclaración propia', async ({ page, tracker }) => {

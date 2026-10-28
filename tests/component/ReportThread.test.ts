@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import ReportThread from '../../src/components/reports/ReportThread.vue'
 import type { ThreadItem } from '../../src/domain/reports/report-entry'
@@ -18,15 +18,14 @@ function item(overrides: Partial<ThreadItem> = {}): ThreadItem {
   }
 }
 
-function mountThread(items: ThreadItem[], canComment = true) {
+function mountThread(items: ThreadItem[], canComment = true, editingId: number | null = null) {
   return mount(ReportThread, {
     props: {
       items,
       canComment,
       pending: false,
       error: '',
-      updateComment: vi.fn(async () => true),
-      removeComment: vi.fn(async () => true),
+      editingId,
     },
   })
 }
@@ -53,18 +52,24 @@ describe('ReportThread', () => {
   })
 
   it('avisa de que quitar un adjunto no lo borra de GitHub', async () => {
-    const wrapper = mountThread([
-      item({
-        id: 3,
-        kind: 'reporter',
-        author: 'Tú',
-        editable: true,
-        text: 'Con captura',
-        attachments: [{ name: 'captura.png', url: 'https://github.com/user-attachments/assets/1' }],
-      }),
-    ])
+    const wrapper = mountThread(
+      [
+        item({
+          id: 3,
+          kind: 'reporter',
+          author: 'Tú',
+          editable: true,
+          text: 'Con captura',
+          attachments: [
+            { name: 'captura.png', url: 'https://github.com/user-attachments/assets/1' },
+          ],
+        }),
+      ],
+      true,
+    )
 
     await wrapper.get('button').trigger('click')
+    await wrapper.setProps({ editingId: 3 })
     const remove = wrapper.get('button[aria-label="Quitar adjunto"]')
     await remove.trigger('click')
 

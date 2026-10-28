@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import {
   encodeBase64,
@@ -15,8 +15,10 @@ import type { ReportCommentUpdateInput } from '../../services/reports-api'
 import BaseButton from '../ui/BaseButton.vue'
 import ConfirmDialog from '../ui/ConfirmDialog.vue'
 import IconButton from '../ui/IconButton.vue'
-import { FIELD_CONTROL, FIELD_LABEL } from '../ui/field'
+import { FIELD_LABEL } from '../ui/field'
+import AttachmentList from './AttachmentList.vue'
 import ReportMarkdown from './ReportMarkdown.vue'
+import { COMMENT_TEXTAREA } from './report-form'
 
 // Correspondencia del reporte: cada aclaración es una carta con remitente y
 // filete lateral, no una burbuja de chat. Solo las propias se pueden editar.
@@ -25,11 +27,16 @@ const props = defineProps<{
   canComment: boolean
   pending: boolean
   error: string
-  updateComment: (commentId: number, input: ReportCommentUpdateInput) => Promise<boolean>
-  removeComment: (commentId: number) => Promise<boolean>
+  editingId: number | null
 }>()
 
-const TEXTAREA = `${FIELD_CONTROL} field-sizing-content max-h-[12lh] min-h-[3lh] resize-none py-2.5 text-base`
+const emit = defineEmits<{
+  'update:editingId': [commentId: number | null]
+  update: [commentId: number, input: ReportCommentUpdateInput]
+  delete: [commentId: number]
+}>()
+
+const TEXTAREA = COMMENT_TEXTAREA
 
 interface DraftFile {
   id: number
@@ -37,7 +44,6 @@ interface DraftFile {
   previewUrl: string
 }
 
-const editingId = ref<number | null>(null)
 const editText = ref('')
 const kept = ref<string[]>([])
 const newFiles = shallowRef<DraftFile[]>([])
@@ -47,12 +53,23 @@ const deleteTarget = ref<ThreadItem | null>(null)
 const confirmOpen = ref(false)
 let nextFileId = 0
 
+const keptRows = computed(() =>
+  kept.value.map((url) => ({ id: url, name: url, previewUrl: url })),
+)
+const newRows = computed(() =>
+  newFiles.value.map((file) => ({
+    id: file.id,
+    name: file.file.name,
+    previewUrl: file.previewUrl,
+  })),
+)
+
 function revoke(files: DraftFile[]): void {
   for (const file of files) URL.revokeObjectURL(file.previewUrl)
 }
 
 function clearEditor(): void {
-  editingId.value = null
+  emit('update:editingId', null)
   editText.value = ''
   kept.value = []
   revoke(newFiles.value)
@@ -64,11 +81,25 @@ function clearEditor(): void {
 onBeforeUnmount(() => revoke(newFiles.value))
 
 function startEdit(item: ThreadItem): void {
-  clearEditor()
-  editingId.value = item.id
   editText.value = item.text
   kept.value = item.attachments.map((attachment) => attachment.url)
+  localError.value = ''
+  attachmentNotice.value = ''
+  emit('update:editingId', item.id)
 }
+
+// El padre cierra el editor cuando la edición se guardó.
+watch(
+  () => props.editingId,
+  (value) => {
+    if (value === null) {
+      editText.value = ''
+      kept.value = []
+      revoke(newFiles.value)
+      newFiles.value = []
+    }
+  },
+)
 
 function removeKept(url: string): void {
   kept.value = kept.value.filter((current) => current !== url)
@@ -111,8 +142,8 @@ async function encodeNewFiles(): Promise<ReportAttachment[]> {
   )
 }
 
-async function save(): Promise<void> {
-  const id = editingId.value
+function save(): void {
+  const id = props.editingId
   if (id === null) return
   const value = editText.value.trim()
   if (!value) {
@@ -123,12 +154,13 @@ async function save(): Promise<void> {
     localError.value = `La aclaración supera el límite de ${REPORTER_COMMENT_MAX_LENGTH} caracteres.`
     return
   }
-  const saved = await props.updateComment(id, {
-    text: value,
-    keepAttachments: kept.value,
-    attachments: await encodeNewFiles(),
+  void encodeNewFiles().then((attachments) => {
+    emit('update', id, {
+      text: value,
+      keepAttachments: kept.value,
+      attachments,
+    })
   })
-  if (saved) clearEditor()
 }
 
 function askDelete(item: ThreadItem): void {
@@ -136,10 +168,10 @@ function askDelete(item: ThreadItem): void {
   confirmOpen.value = true
 }
 
-async function confirmDelete(): Promise<void> {
+function confirmDelete(): void {
   const target = deleteTarget.value
   if (!target) return
-  await props.removeComment(target.id)
+  emit('delete', target.id)
   deleteTarget.value = null
 }
 </script>
@@ -147,7 +179,7 @@ async function confirmDelete(): Promise<void> {
 <template>
   <div class="grid min-w-0 gap-4">
     <p
-      v-if="props.error && editingId === null"
+      v-if="props.error && props.editingId === null"
       class="bg-subtle text-loss rounded-md px-3 py-2 text-sm"
       role="alert"
     >
@@ -170,7 +202,7 @@ async function confirmDelete(): Promise<void> {
           <span v-if="item.editedAt" class="text-text-muted"> · editado</span>
         </p>
         <div
-          v-if="item.editable && props.canComment && editingId !== item.id"
+          v-if="item.editable && props.canComment && props.editingId !== item.id"
           class="ms-auto flex items-center gap-1"
         >
           <BaseButton variant="ghost" @click="startEdit(item)">Editar</BaseButton>
@@ -178,7 +210,7 @@ async function confirmDelete(): Promise<void> {
         </div>
       </header>
 
-      <template v-if="editingId === item.id">
+      <template v-if="props.editingId === item.id">
         <div class="mbs-3 grid gap-3">
           <div :class="FIELD_LABEL">
             <label :for="`report-comment-edit-${item.id}`">Editar aclaración</label>
@@ -190,36 +222,24 @@ async function confirmDelete(): Promise<void> {
             ></textarea>
           </div>
 
-          <ul v-if="kept.length > 0 || newFiles.length > 0" class="grid gap-2">
-            <li
-              v-for="url in kept"
-              :key="url"
-              class="bg-subtle flex items-center gap-3 rounded-md p-2"
-            >
-              <img :src="url" alt="" class="bg-subtle size-14 shrink-0 rounded-md object-cover" />
-              <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ url }}</span>
-              <IconButton label="Quitar adjunto" icon="close" @click="removeKept(url)" />
-            </li>
-            <li
-              v-for="file in newFiles"
-              :key="file.id"
-              class="bg-subtle flex items-center gap-3 rounded-md p-2"
-            >
-              <img
-                :src="file.previewUrl"
-                :alt="`Vista previa de ${file.file.name}`"
-                class="size-14 shrink-0 rounded-md object-cover"
+          <AttachmentList :items="keptRows" label="Adjuntos de la aclaración">
+            <template #action="{ item: attachment }">
+              <IconButton
+                label="Quitar adjunto"
+                icon="close"
+                @click="removeKept(String(attachment.id))"
               />
-              <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{
-                file.file.name
-              }}</span>
+            </template>
+          </AttachmentList>
+          <AttachmentList :items="newRows" label="Adjuntos nuevos">
+            <template #action="{ item: attachment }">
               <IconButton
                 label="Quitar adjunto nuevo"
                 icon="close"
-                @click="removeNewFile(file.id)"
+                @click="removeNewFile(Number(attachment.id))"
               />
-            </li>
-          </ul>
+            </template>
+          </AttachmentList>
 
           <p v-if="attachmentNotice" class="text-text-muted text-sm" role="status">
             {{ attachmentNotice }}

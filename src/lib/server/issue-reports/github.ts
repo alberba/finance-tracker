@@ -356,33 +356,44 @@ export function fetchComment(
   })
 }
 
+function mutateComment(
+  config: GithubConfig,
+  method: 'POST' | 'PATCH',
+  url: string,
+  body: string,
+  failureMessage: string,
+): Effect.Effect<GithubComment, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* write(http.request, url, {
+      method,
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    })
+    if (!response.ok) {
+      const text = yield* Effect.promise(() => response.text().catch(() => ''))
+      logFailure(`${method} comment`, response.status, text)
+      return yield* graphqlError(failureMessage, response.status)
+    }
+    const data = yield* Effect.promise(() => readJson<RestCommentPayload>(response))
+    const comment = data ? restComment(data) : null
+    if (!comment) return yield* graphqlError(failureMessage, response.status)
+    return comment
+  })
+}
+
 export function createComment(
   config: GithubConfig,
   issueNumber: number,
   body: string,
 ): Effect.Effect<GithubComment, ReportsGithubError, Http> {
-  return Effect.gen(function* () {
-    const http = yield* Http
-    const response = yield* write(
-      http.request,
-      `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments`,
-      {
-        method: 'POST',
-        headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
-      },
-    )
-    const data = yield* Effect.promise(() => readJson<RestCommentPayload>(response))
-    const comment = data ? restComment(data) : null
-    if (!response.ok || !comment) {
-      if (!response.ok) {
-        const text = yield* Effect.promise(() => response.text().catch(() => ''))
-        logFailure('POST comment', response.status, text)
-      }
-      return yield* graphqlError('No se pudo publicar la aclaración.', response.status)
-    }
-    return comment
-  })
+  return mutateComment(
+    config,
+    'POST',
+    `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments`,
+    body,
+    'No se pudo publicar la aclaración.',
+  )
 }
 
 export function updateComment(
@@ -390,28 +401,13 @@ export function updateComment(
   commentId: number,
   body: string,
 ): Effect.Effect<GithubComment, ReportsGithubError, Http> {
-  return Effect.gen(function* () {
-    const http = yield* Http
-    const response = yield* write(
-      http.request,
-      `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
-      {
-        method: 'PATCH',
-        headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body }),
-      },
-    )
-    const data = yield* Effect.promise(() => readJson<RestCommentPayload>(response))
-    const comment = data ? restComment(data) : null
-    if (!response.ok || !comment) {
-      if (!response.ok) {
-        const text = yield* Effect.promise(() => response.text().catch(() => ''))
-        logFailure('PATCH comment', response.status, text)
-      }
-      return yield* graphqlError('No se pudo guardar la aclaración.', response.status)
-    }
-    return comment
-  })
+  return mutateComment(
+    config,
+    'PATCH',
+    `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+    body,
+    'No se pudo guardar la aclaración.',
+  )
 }
 
 export function deleteComment(

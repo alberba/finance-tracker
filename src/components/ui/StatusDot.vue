@@ -3,12 +3,13 @@ import type { StatusTone } from '../../domain/investment/quote-status'
 
 // A colored dot with its label; the label carries the meaning, the dot only
 // reinforces it.
-defineProps<{ tone: StatusTone; label: string }>()
+defineProps<{ tone: StatusTone | 'neutral'; label: string }>()
 
-const DOT: Record<StatusTone, string> = {
+const DOT: Record<StatusTone | 'neutral', string> = {
   gain: 'bg-income',
   warn: 'bg-accent',
   loss: 'bg-expense',
+  neutral: 'bg-line-strong',
 }
 </script>
 

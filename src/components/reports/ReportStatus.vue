@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import type { ReportEntry, ReportIssueRef } from '../../domain/reports/report-entry'
-import { describeReportStatus } from '../../domain/reports/report-status'
+import { describeReportStatus, issueStateWord } from '../../domain/reports/report-status'
 import StatusDot from '../ui/StatusDot.vue'
 
 // Estado de un reporte: las palabras llevan el significado y el punto lo
@@ -13,14 +13,6 @@ const props = withDefaults(defineProps<{ entry: ReportEntry; compact?: boolean }
 
 const description = computed(() => describeReportStatus(props.entry))
 
-function stateWord(issue: ReportIssueRef): string {
-  if (issue.state === 'OPEN') return 'Abierto'
-  if (issue.stateReason === 'COMPLETED') return 'Completado'
-  if (issue.stateReason === 'NOT_PLANNED') return 'No planificado'
-  if (issue.stateReason === 'DUPLICATE') return 'Cerrado como duplicado'
-  return 'Cerrado'
-}
-
 const headline = computed(() => {
   if (
     description.value.state &&
@@ -28,7 +20,7 @@ const headline = computed(() => {
     'followed' in props.entry &&
     props.entry.followed
   ) {
-    return `${description.value.headline} · ${stateWord(description.value.state)}`
+    return `${description.value.headline} · ${issueStateWord(description.value.state)}`
   }
   return description.value.headline
 })
@@ -37,17 +29,10 @@ const headline = computed(() => {
 <template>
   <div class="grid min-w-0 gap-1.5" :data-report-status="entry.number">
     <p class="min-w-0 text-sm">
-      <StatusDot
-        v-if="description.tone !== 'neutral' && description.state"
-        :tone="description.tone"
-        :label="headline"
-      >
+      <StatusDot v-if="description.state" :tone="description.tone" :label="headline">
         <span class="text-text-main font-semibold">{{ headline }}</span>
       </StatusDot>
-      <span v-else class="inline-flex min-w-0 items-center gap-2">
-        <span class="bg-line-strong size-2 shrink-0 rounded-full" aria-hidden="true"></span>
-        <span class="text-text-main font-semibold">{{ headline }}</span>
-      </span>
+      <span v-else class="text-text-main font-semibold">{{ headline }}</span>
     </p>
     <p v-if="description.secondary" class="text-text-muted font-mono text-xs tabular-nums">
       {{ description.secondary }}

@@ -6,7 +6,6 @@ import { formatLongDate } from '../../lib/format'
 import { isDemoMode } from '../../scripts/demo-mode'
 import type { ReportThreadStatus } from '../../composables/useReportThread'
 import type { ReportCommentInput, ReportCommentUpdateInput } from '../../services/reports-api'
-import type { ReportAttachment } from '../../services/issue-report-api'
 import BaseButton from '../ui/BaseButton.vue'
 import DocumentSurface from '../ui/DocumentSurface.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
@@ -20,16 +19,21 @@ const props = defineProps<{
   status: ReportThreadStatus
   error: string
   pending: boolean
-  load: () => Promise<void>
-  addComment: (input: ReportCommentInput) => Promise<boolean>
-  updateComment: (commentId: number, input: ReportCommentUpdateInput) => Promise<boolean>
-  removeComment: (commentId: number) => Promise<boolean>
+  editingCommentId: number | null
+  composerResetSignal: number
 }>()
-defineEmits<{ back: [] }>()
+
+defineEmits<{
+  back: []
+  retry: []
+  addComment: [input: ReportCommentInput]
+  updateComment: [commentId: number, input: ReportCommentUpdateInput]
+  removeComment: [commentId: number]
+  'update:editingCommentId': [commentId: number | null]
+}>()
 
 const demo = isDemoMode()
 const heading = useTemplateRef<HTMLElement>('heading')
-const composer = useTemplateRef<InstanceType<typeof ReportComposer>>('composer')
 
 watch(
   () => props.status,
@@ -40,21 +44,6 @@ watch(
   },
 )
 
-async function onComposerSubmit(payload: {
-  text: string
-  attachments: ReportAttachment[]
-}): Promise<void> {
-  const saved = await props.addComment(payload)
-  if (saved) composer.value?.reset()
-}
-
-async function onDelete(commentId: number): Promise<void> {
-  await props.removeComment(commentId)
-}
-
-function onUpdate(commentId: number, input: ReportCommentUpdateInput): Promise<boolean> {
-  return props.updateComment(commentId, input)
-}
 </script>
 
 <template>
@@ -71,7 +60,7 @@ function onUpdate(commentId: number, input: ReportCommentUpdateInput): Promise<b
 
     <div v-else-if="props.status === 'error'" class="grid justify-items-start gap-3" role="alert">
       <p class="text-text-main">{{ props.error }}</p>
-      <BaseButton variant="secondary" @click="props.load()">Reintentar</BaseButton>
+      <BaseButton variant="secondary" @click="$emit('retry')">Reintentar</BaseButton>
     </div>
 
     <div v-else-if="props.status === 'notFound'" class="grid justify-items-start gap-3">
@@ -137,18 +126,20 @@ function onUpdate(commentId: number, input: ReportCommentUpdateInput): Promise<b
             :can-comment="props.detail.canComment"
             :pending="props.pending"
             :error="props.error"
-            :update-comment="onUpdate"
-            :remove-comment="onDelete"
+            :editing-id="props.editingCommentId"
+            @update:editing-id="$emit('update:editingCommentId', $event)"
+            @update="(commentId, input) => $emit('updateComment', commentId, input)"
+            @delete="(commentId) => $emit('removeComment', commentId)"
           />
         </NumberedBlock>
 
         <NumberedBlock number="03" title="Nueva aclaración" title-id="report-composer-title">
           <ReportComposer
             v-if="props.detail.canComment || demo"
-            ref="composer"
             :pending="props.pending"
             :error="props.error"
-            @submit="onComposerSubmit"
+            :reset-signal="props.composerResetSignal"
+            @submit="$emit('addComment', $event)"
           />
           <p v-else class="bg-subtle text-text-muted rounded-md px-4 py-3 text-sm" role="note">
             Este reporte está cerrado: el hilo es de solo lectura.

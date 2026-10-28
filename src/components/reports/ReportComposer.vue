@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import {
   encodeBase64,
   getAttachmentError,
-  ISSUE_ATTACHMENT_MAX_BYTES,
-  ISSUE_ATTACHMENT_MAX_COUNT,
   ISSUE_ATTACHMENT_TYPES,
 } from '../../domain/reports/issue-attachments'
 import { REPORTER_COMMENT_MAX_LENGTH } from '../../domain/reports/reporter-comment'
 import { isDemoMode } from '../../scripts/demo-mode'
 import type { ReportAttachment } from '../../services/issue-report-api'
 import BaseButton from '../ui/BaseButton.vue'
-import { FIELD_CONTROL, FIELD_LABEL } from '../ui/field'
+import { FIELD_LABEL } from '../ui/field'
+import AttachmentList from './AttachmentList.vue'
+import { ATTACHMENT_LIMITS, COMMENT_TEXTAREA } from './report-form'
 
 // Compositor de una aclaración nueva. Mismas reglas de adjuntos que el panel
 // del reporte; en demo queda desactivado.
-const props = defineProps<{ pending: boolean; error: string }>()
+const props = withDefaults(
+  defineProps<{ pending: boolean; error: string; resetSignal?: number }>(),
+  { resetSignal: 0 },
+)
 const emit = defineEmits<{ submit: [payload: { text: string; attachments: ReportAttachment[] }] }>()
 
 const demo = isDemoMode()
-const TEXTAREA = `${FIELD_CONTROL} field-sizing-content max-h-[12lh] min-h-[3lh] resize-none py-2.5 text-base`
-const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${ISSUE_ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB: PNG, JPEG, WebP o GIF.`
+const TEXTAREA = COMMENT_TEXTAREA
 
 interface DraftAttachment {
   id: number
@@ -32,7 +34,16 @@ interface DraftAttachment {
 const text = ref('')
 const attachments = shallowRef<DraftAttachment[]>([])
 const localError = ref('')
+const announcement = ref('')
 let nextId = 0
+
+const rows = computed(() =>
+  attachments.value.map((item) => ({
+    id: item.id,
+    name: item.file.name,
+    previewUrl: item.previewUrl,
+  })),
+)
 
 function revoke(items: DraftAttachment[]): void {
   for (const item of items) URL.revokeObjectURL(item.previewUrl)
@@ -98,7 +109,14 @@ async function onSubmit(): Promise<void> {
   emit('submit', { text: value, attachments: await encodeAttachments() })
 }
 
-defineExpose({ reset })
+// El padre incrementa la señal cuando el alta se publicó: limpia el borrador.
+watch(
+  () => props.resetSignal,
+  () => {
+    reset()
+    announcement.value = 'Aclaración publicada.'
+  },
+)
 </script>
 
 <template>
@@ -134,23 +152,13 @@ defineExpose({ reset })
       <p class="text-text-muted text-sm">{{ ATTACHMENT_LIMITS }}</p>
     </div>
 
-    <ul v-if="attachments.length > 0" class="grid gap-2" aria-label="Capturas adjuntas">
-      <li
-        v-for="item in attachments"
-        :key="item.id"
-        class="bg-subtle flex items-center gap-3 rounded-md p-2"
-      >
-        <img
-          :src="item.previewUrl"
-          :alt="`Vista previa de ${item.file.name}`"
-          class="size-14 shrink-0 rounded-md object-cover"
-        />
-        <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ item.file.name }}</span>
-        <BaseButton variant="ghost" @click="removeAttachment(item.id)">
-          Quitar {{ item.file.name }}
+    <AttachmentList :items="rows" label="Capturas adjuntas">
+      <template #action="{ item }">
+        <BaseButton variant="ghost" @click="removeAttachment(Number(item.id))">
+          Quitar {{ item.name }}
         </BaseButton>
-      </li>
-    </ul>
+      </template>
+    </AttachmentList>
 
     <p id="report-comment-notice" class="text-text-muted text-sm leading-relaxed">
       Se publica en un repositorio público. Las capturas ya subidas no se borran de GitHub al
@@ -166,6 +174,10 @@ defineExpose({ reset })
       role="alert"
     >
       {{ props.error || localError }}
+    </p>
+
+    <p class="sr-only" aria-live="polite">
+      {{ props.pending ? 'Publicando…' : announcement }}
     </p>
 
     <div class="flex justify-end">

@@ -126,7 +126,10 @@ function installFakeGithub(state: FakeGithub): void {
       if (commentMatch) {
         const comment = state.comments.get(Number(commentMatch[1]))
         if (!comment) return json({ message: 'Not Found' }, 404)
-        if (init?.method === 'DELETE') return new Response(null, { status: 204 })
+        if (init?.method === 'DELETE') {
+          state.comments.delete(comment.id)
+          return new Response(null, { status: 204 })
+        }
         if (init?.method === 'PATCH') {
           const payload = JSON.parse(String(init.body)) as { body: string }
           comment.body = payload.body
@@ -274,6 +277,58 @@ describe('/api/reports', () => {
     expect(body.reports[0]?.followed?.number).toBe(20)
   })
 
+  it('avisa de un comentario nuevo del mantenedor en un reporte normal', async () => {
+    await record(userA.id, 10, '2026-10-01T00:00:00.000Z')
+    state.issues.set(10, {
+      number: 10,
+      title: 'Abierta',
+      state: 'OPEN',
+      stateReason: null,
+      comments: [
+        {
+          id: 1,
+          body: 'Lo revisamos esta semana.',
+          issueNumber: 10,
+          createdAt: '2026-10-20T00:00:00.000Z',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+          login: 'ana',
+        },
+      ],
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const body = (await (await GET(context(userA.id))).json()) as {
+      reports: Array<{ hasUpdates: boolean }>
+    }
+    expect(body.reports[0]?.hasUpdates).toBe(true)
+  })
+
+  it('no cuenta una aclaración propia como novedad', async () => {
+    await record(userA.id, 10, '2026-10-01T00:00:00.000Z')
+    state.issues.set(10, {
+      number: 10,
+      title: 'Abierta',
+      state: 'OPEN',
+      stateReason: null,
+      comments: [
+        {
+          id: 1,
+          body: `<!-- finance-tracker:reporter-comment user=${userA.id} -->\n**Aclaración del reportero**\n\nmía`,
+          issueNumber: 10,
+          createdAt: '2026-10-20T00:00:00.000Z',
+          updatedAt: '2026-10-20T00:00:00.000Z',
+          login: BOT,
+        },
+      ],
+    })
+
+    const { GET } = await import('../../../../src/pages/api/reports/index')
+    const body = (await (await GET(context(userA.id))).json()) as {
+      reports: Array<{ hasUpdates: boolean }>
+    }
+    expect(body.reports[0]?.hasUpdates).toBe(false)
+  })
+
   it('marca no disponible una issue que GitHub ya no devuelve', async () => {
     await record(userA.id, 10)
     const { GET } = await import('../../../../src/pages/api/reports/index')
@@ -411,6 +466,39 @@ describe('/api/reports', () => {
       context(userA.id, { number: '10', commentId: '50' }, { text: 'cambio', keepAttachments: [] }),
     )
     expect(response.status).toBe(403)
+  })
+
+  it('edita y borra una aclaración publicada en la principal que se sigue', async () => {
+    await record(userA.id, 10)
+    state.issues.set(10, {
+      number: 10,
+      title: 'Original',
+      state: 'CLOSED',
+      stateReason: 'DUPLICATE',
+      duplicateOf: { number: 20, title: 'Principal', state: 'OPEN', stateReason: null },
+    })
+    state.issues.set(20, { number: 20, title: 'Principal', state: 'OPEN', stateReason: null })
+    state.comments.set(50, {
+      id: 50,
+      body: `<!-- finance-tracker:reporter-comment user=${userA.id} -->\n**Aclaración del reportero**\n\nmía`,
+      issueNumber: 20,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+      login: BOT,
+    })
+
+    const { PATCH, DELETE } = await import(
+      '../../../../src/pages/api/reports/[number]/comments/[commentId]'
+    )
+    const patched = await PATCH(
+      context(userA.id, { number: '10', commentId: '50' }, { text: 'editada', keepAttachments: [] }),
+    )
+    expect(patched.status).toBe(200)
+    expect(state.comments.get(50)?.body).toContain('editada')
+
+    const deleted = await DELETE(context(userA.id, { number: '10', commentId: '50' }))
+    expect(deleted.status).toBe(204)
+    expect(state.comments.has(50)).toBe(false)
   })
 
   it('recorta la marca de visto a «ahora»', async () => {

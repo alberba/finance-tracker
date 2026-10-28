@@ -11,6 +11,7 @@ import { Effect } from 'effect'
 import type { RuntimeEnv } from '../cloudflare-env'
 import { Database, type DatabaseError } from '../../../db/database'
 import * as issueReportsRepository from '../../../db/repositories/issue-reports'
+import type { IssueReportRow } from '../../../db/repositories/issue-reports'
 import { nowIso } from '../../../db/repositories/shared'
 import {
   buildReporterCommentBody,
@@ -20,19 +21,18 @@ import {
 } from '../../../domain/reports/reporter-comment'
 import type {
   AvailableReportEntry,
-  IssueNode,
   ReportDetail,
   ReportEntry,
-  ReportIssueRef,
   ThreadAttachment,
   ThreadItem,
 } from '../../../domain/reports/report-entry'
-import { buildAvailableEntry, resolveFollowed } from '../../../domain/reports/report-status'
+import { buildAvailableEntry, resolveFollowed, toIssueRef } from '../../../domain/reports/report-status'
 import { computeHasUpdates } from '../../../domain/reports/report-updates'
 import { fetchRepositoryId, githubConfig, once, type GithubConfig } from '../github-api'
 import { Http } from '../http'
 import { uploadIssueAttachment } from '../issue-attachments'
 import type { ResolvedAttachment } from '../issue-report-schema'
+import { ISSUE_ATTACHMENT_MAX_COUNT } from '../../../domain/reports/issue-attachments'
 import {
   createComment as createGithubComment,
   deleteComment as deleteGithubComment,
@@ -41,6 +41,7 @@ import {
   fetchIssueThread,
   resolveBotLogin,
   updateComment as updateGithubComment,
+  type GithubComment,
   type GraphIssueNode,
 } from './github'
 import {
@@ -64,16 +65,6 @@ function toGithubError(error: { message: string; status?: number }): ReportsGith
 
 function loadConfig(env: RuntimeEnv) {
   return githubConfig(env).pipe(Effect.mapError(toGithubError))
-}
-
-function toRef(node: IssueNode): ReportIssueRef {
-  return {
-    number: node.number,
-    url: node.url,
-    title: node.title,
-    state: node.state,
-    stateReason: node.stateReason,
-  }
 }
 
 function latestIso(a: string | null | undefined, b: string | null | undefined): string | null {
@@ -116,9 +107,11 @@ function buildEntry(
     node.statusChangedAt,
     resolved.followed?.statusChangedAt ?? null,
   )
-  const latestComment = resolved.followed
-    ? latestMaintainerAt(resolved.followed.recentComments, context)
-    : null
+  // El hilo es el de la principal si se sigue; si no, el de la original.
+  const latestComment = latestMaintainerAt(
+    (resolved.followed ?? node).recentComments,
+    context,
+  )
   return buildAvailableEntry(node, resolved, {
     submittedAt: row.submittedAt,
     lastSeenAt: row.lastSeenAt,
@@ -227,6 +220,97 @@ export const listReports = (
     return { reports, hasMore: rows.length > LIST_LIMIT, fetchedAt }
   })
 
+interface OwnedReportContext {
+  row: IssueReportRow
+  config: GithubConfig
+  root: GraphIssueNode | null
+  followed?: GraphIssueNode
+  duplicateLinkUnavailable: boolean
+  threadIssue?: GraphIssueNode
+}
+
+/**
+ * Propiedad + cadena de duplicadas, la antesala común de detalle y escrituras.
+ * `root` nulo significa que GitHub ya no devuelve la issue (no que no sea de la
+ * cuenta: eso lo decide la fila).
+ */
+function loadOwnedReport(
+  userId: string,
+  issueNumber: number,
+  env: RuntimeEnv,
+): Effect.Effect<OwnedReportContext | null, ReportsError | DatabaseError, Database | Http> {
+  return Effect.gen(function* () {
+    const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
+    if (!row) return null
+
+    const config = yield* loadConfig(env)
+    const nodes = yield* fetchIssueChain(config, [issueNumber], { comments: false })
+    const root = nodes.get(issueNumber) ?? null
+    if (!root) {
+      return { row, config, root, duplicateLinkUnavailable: false }
+    }
+
+    const resolved = resolveFollowed(root, `${config.owner}/${config.repo}`)
+    return {
+      row,
+      config,
+      root,
+      followed: resolved.followed,
+      duplicateLinkUnavailable: resolved.duplicateLinkUnavailable,
+      threadIssue: resolved.followed ?? root,
+    }
+  })
+}
+
+function requireReport(
+  context: OwnedReportContext | null,
+): Effect.Effect<OwnedReportContext, ReportNotFoundError> {
+  return context
+    ? Effect.succeed(context)
+    : Effect.fail(new ReportNotFoundError({ message: 'Reporte no encontrado.' }))
+}
+
+function commentIssue(
+  context: OwnedReportContext,
+  issueNumber: number,
+): GraphIssueNode | undefined {
+  if (context.root?.number === issueNumber) return context.root
+  if (context.followed?.number === issueNumber) return context.followed
+  return undefined
+}
+
+function requireOwnComment(
+  context: OwnedReportContext,
+  current: GithubComment | null,
+  userId: string,
+  botLogin: string,
+): Effect.Effect<GraphIssueNode, ReportsError> {
+  if (!current) {
+    return Effect.fail(new ReportNotFoundError({ message: 'Comentario no encontrado.' }))
+  }
+  const issue = commentIssue(context, current.issueNumber)
+  if (!issue) {
+    return Effect.fail(new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }))
+  }
+  const kind = classifyComment(
+    {
+      databaseId: current.databaseId,
+      createdAt: current.createdAt,
+      updatedAt: current.updatedAt,
+      body: current.body,
+      author: current.author,
+    },
+    { userId, botLogin },
+  )
+  if (kind !== 'mine') {
+    return Effect.fail(new CommentForbiddenError({ message: 'No puedes modificar este comentario.' }))
+  }
+  if (issue.state !== 'OPEN') {
+    return Effect.fail(new ReportClosedError({ message: 'El reporte está cerrado.' }))
+  }
+  return Effect.succeed(issue)
+}
+
 export const getReportDetail = (
   userId: string,
   issueNumber: number,
@@ -234,13 +318,10 @@ export const getReportDetail = (
 ): Effect.Effect<ReportDetail, ReportsError | DatabaseError, Database | Http> =>
   Effect.gen(function* () {
     const fetchedAt = nowIso()
-    const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
-    if (!row) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-
-    const config = yield* loadConfig(env)
-    const nodes = yield* fetchIssueChain(config, [issueNumber], { comments: false })
-    const root = nodes.get(issueNumber)
-    if (!root) {
+    const context = yield* loadOwnedReport(userId, issueNumber, env)
+    if (!context) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+    const { row, config, root } = context
+    if (!root || !context.threadIssue) {
       return {
         report: unavailableEntry(row),
         threadIssue: null,
@@ -251,35 +332,38 @@ export const getReportDetail = (
       }
     }
 
-    const resolved = resolveFollowed(root, `${config.owner}/${config.repo}`)
-    const threadIssue = resolved.followed ?? root
+    const threadIssue = context.threadIssue
     // En el detalle se falla cerrado [D1]: sin login del bot no hay «Tú».
     const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
     const thread = yield* fetchIssueThread(config, threadIssue.number)
     const open = threadIssue.state === 'OPEN'
     const items = mapThread(thread.comments, { userId, botLogin }, open)
 
-    const statusChangedAt = latestIso(
-      root.statusChangedAt,
-      resolved.followed?.statusChangedAt ?? null,
-    )
+    const statusChangedAt = latestIso(root.statusChangedAt, context.followed?.statusChangedAt ?? null)
     const latestComment = items
       .filter((item) => item.kind === 'maintainer')
       .reduce<string | null>((latest, item) => latestIso(latest, item.createdAt), null)
-    const report = buildAvailableEntry(root, resolved, {
-      submittedAt: row.submittedAt,
-      lastSeenAt: row.lastSeenAt,
-      statusChangedAt,
-      hasUpdates: computeHasUpdates({
+    const report = buildAvailableEntry(
+      root,
+      {
+        ...(context.followed ? { followed: context.followed } : {}),
+        duplicateLinkUnavailable: context.duplicateLinkUnavailable,
+      },
+      {
+        submittedAt: row.submittedAt,
         lastSeenAt: row.lastSeenAt,
         statusChangedAt,
-        latestMaintainerCommentAt: latestComment,
-      }),
-    })
+        hasUpdates: computeHasUpdates({
+          lastSeenAt: row.lastSeenAt,
+          statusChangedAt,
+          latestMaintainerCommentAt: latestComment,
+        }),
+      },
+    )
 
     return {
       report,
-      threadIssue: toRef(threadIssue),
+      threadIssue: toIssueRef(threadIssue),
       thread: items,
       hiddenBefore: Math.max(0, thread.totalCount - thread.comments.length),
       canComment: open,
@@ -294,26 +378,21 @@ export const addComment = (
   env: RuntimeEnv,
 ): Effect.Effect<ThreadItem, ReportsError | DatabaseError, Database | Http> =>
   Effect.gen(function* () {
-    const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
-    if (!row) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-
-    const config = yield* loadConfig(env)
-    const nodes = yield* fetchIssueChain(config, [issueNumber], { comments: false })
-    const root = nodes.get(issueNumber)
-    if (!root) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-    const resolved = resolveFollowed(root, `${config.owner}/${config.repo}`)
-    const threadIssue = resolved.followed ?? root
-    if (threadIssue.state !== 'OPEN') {
+    const context = yield* requireReport(yield* loadOwnedReport(userId, issueNumber, env))
+    if (!context.threadIssue) {
+      return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
+    }
+    if (context.threadIssue.state !== 'OPEN') {
       return yield* new ReportClosedError({ message: 'El reporte está cerrado.' })
     }
 
-    const uploaded = yield* uploadAttachments(config, input.attachments)
+    const uploaded = yield* uploadAttachments(context.config, input.attachments)
     const body = buildReporterCommentBody({
       userId,
       text: input.text,
       attachments: uploaded,
     })
-    const created = yield* createGithubComment(config, threadIssue.number, body)
+    const created = yield* createGithubComment(context.config, context.threadIssue.number, body)
     return threadItem(
       {
         databaseId: created.databaseId,
@@ -362,42 +441,12 @@ export const editComment = (
   env: RuntimeEnv,
 ): Effect.Effect<ThreadItem, ReportsError | DatabaseError, Database | Http> =>
   Effect.gen(function* () {
-    const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
-    if (!row) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-
-    const config = yield* loadConfig(env)
-    const nodes = yield* fetchIssueChain(config, [issueNumber], { comments: false })
-    const root = nodes.get(issueNumber)
-    if (!root) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-    const resolved = resolveFollowed(root, `${config.owner}/${config.repo}`)
-    const allowed = new Set(
-      [root.number, resolved.followed?.number].filter((value): value is number => Boolean(value)),
-    )
-
-    const current = yield* fetchGithubComment(config, commentId)
-    if (!current) return yield* new ReportNotFoundError({ message: 'Comentario no encontrado.' })
-    if (!allowed.has(current.issueNumber)) {
-      return yield* new CommentForbiddenError({ message: 'No puedes modificar este comentario.' })
-    }
-
-    const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
-    const kind = classifyComment(
-      {
-        databaseId: current.databaseId,
-        createdAt: current.createdAt,
-        updatedAt: current.updatedAt,
-        body: current.body,
-        author: current.author,
-      },
-      { userId, botLogin },
-    )
-    if (kind !== 'mine') {
-      return yield* new CommentForbiddenError({ message: 'No puedes modificar este comentario.' })
-    }
-
-    const commentedIssue = nodes.get(current.issueNumber)
-    if (!commentedIssue || commentedIssue.state !== 'OPEN') {
-      return yield* new ReportClosedError({ message: 'El reporte está cerrado.' })
+    const context = yield* requireReport(yield* loadOwnedReport(userId, issueNumber, env))
+    const current = yield* fetchGithubComment(context.config, commentId)
+    const botLogin = yield* resolveBotLogin(context.config, env.GITHUB_BOT_LOGIN)
+    yield* requireOwnComment(context, current, userId, botLogin)
+    if (!current) {
+      return yield* new ReportNotFoundError({ message: 'Comentario no encontrado.' })
     }
 
     const existing = parseReporterComment(current.body)?.attachments ?? []
@@ -409,20 +458,20 @@ export const editComment = (
       })
     }
     const kept = existing.filter((attachment) => input.keepAttachments.includes(attachment.url))
-    if (kept.length + input.attachments.length > 3) {
+    if (kept.length + input.attachments.length > ISSUE_ATTACHMENT_MAX_COUNT) {
       return yield* new ReportInputError({
-        message: 'Solo puedes adjuntar hasta 3 imágenes.',
+        message: `Solo puedes adjuntar hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes.`,
         status: 400,
       })
     }
 
-    const uploaded = yield* uploadAttachments(config, input.attachments)
+    const uploaded = yield* uploadAttachments(context.config, input.attachments)
     const body = buildReporterCommentBody({
       userId,
       text: input.text,
       attachments: [...kept, ...uploaded],
     })
-    const updated = yield* updateGithubComment(config, commentId, body)
+    const updated = yield* updateGithubComment(context.config, commentId, body)
     return threadItem(
       {
         databaseId: updated.databaseId,
@@ -443,44 +492,11 @@ export const deleteComment = (
   env: RuntimeEnv,
 ): Effect.Effect<void, ReportsError | DatabaseError, Database | Http> =>
   Effect.gen(function* () {
-    const row = yield* issueReportsRepository.getByUserAndNumber(userId, issueNumber)
-    if (!row) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-
-    const config = yield* loadConfig(env)
-    const nodes = yield* fetchIssueChain(config, [issueNumber], { comments: false })
-    const root = nodes.get(issueNumber)
-    if (!root) return yield* new ReportNotFoundError({ message: 'Reporte no encontrado.' })
-    const resolved = resolveFollowed(root, `${config.owner}/${config.repo}`)
-    const allowed = new Set(
-      [root.number, resolved.followed?.number].filter((value): value is number => Boolean(value)),
-    )
-
-    const current = yield* fetchGithubComment(config, commentId)
-    if (!current) return yield* new ReportNotFoundError({ message: 'Comentario no encontrado.' })
-    if (!allowed.has(current.issueNumber)) {
-      return yield* new CommentForbiddenError({ message: 'No puedes modificar este comentario.' })
-    }
-
-    const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
-    const kind = classifyComment(
-      {
-        databaseId: current.databaseId,
-        createdAt: current.createdAt,
-        updatedAt: current.updatedAt,
-        body: current.body,
-        author: current.author,
-      },
-      { userId, botLogin },
-    )
-    if (kind !== 'mine') {
-      return yield* new CommentForbiddenError({ message: 'No puedes modificar este comentario.' })
-    }
-
-    const commentedIssue = nodes.get(current.issueNumber)
-    if (!commentedIssue || commentedIssue.state !== 'OPEN') {
-      return yield* new ReportClosedError({ message: 'El reporte está cerrado.' })
-    }
-    yield* deleteGithubComment(config, commentId)
+    const context = yield* requireReport(yield* loadOwnedReport(userId, issueNumber, env))
+    const current = yield* fetchGithubComment(context.config, commentId)
+    const botLogin = yield* resolveBotLogin(context.config, env.GITHUB_BOT_LOGIN)
+    yield* requireOwnComment(context, current, userId, botLogin)
+    yield* deleteGithubComment(context.config, commentId)
   })
 
 export const markSeen = (

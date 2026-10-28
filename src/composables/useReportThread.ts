@@ -94,27 +94,33 @@ export function useReportThread(issueNumber: Ref<number | null>) {
     }
   }
 
-  async function addComment(input: ReportCommentInput): Promise<boolean> {
-    const number = issueNumber.value
-    if (number === null) return false
+  /** Ejecuta una mutación con el estado `pending`/`error` compartido. */
+  async function mutate<T>(call: () => Promise<T>): Promise<T | null> {
     pending.value = true
     error.value = ''
     try {
-      const result = await runClientHttp(postReportComment(number, input))
-      if (!result.ok) {
-        error.value = result.error
-        return false
-      }
-      if (detail.value) {
-        detail.value = { ...detail.value, thread: [...detail.value.thread, result.comment] }
-      }
-      return true
+      return await call()
     } catch (cause) {
       error.value = messageOf(cause)
-      return false
+      return null
     } finally {
       pending.value = false
     }
+  }
+
+  async function addComment(input: ReportCommentInput): Promise<boolean> {
+    const number = issueNumber.value
+    if (number === null) return false
+    const result = await mutate(() => runClientHttp(postReportComment(number, input)))
+    if (!result) return false
+    if (!result.ok) {
+      error.value = result.error
+      return false
+    }
+    if (detail.value) {
+      detail.value = { ...detail.value, thread: [...detail.value.thread, result.comment] }
+    }
+    return true
   }
 
   async function updateComment(
@@ -123,48 +129,32 @@ export function useReportThread(issueNumber: Ref<number | null>) {
   ): Promise<boolean> {
     const number = issueNumber.value
     if (number === null) return false
-    pending.value = true
-    error.value = ''
-    try {
-      const result = await runClientHttp(patchReportComment(number, commentId, input))
-      if (!result.ok) {
-        error.value = result.error
-        return false
-      }
-      replaceItem(result.comment)
-      return true
-    } catch (cause) {
-      error.value = messageOf(cause)
+    const result = await mutate(() => runClientHttp(patchReportComment(number, commentId, input)))
+    if (!result) return false
+    if (!result.ok) {
+      error.value = result.error
       return false
-    } finally {
-      pending.value = false
     }
+    replaceItem(result.comment)
+    return true
   }
 
   async function removeComment(commentId: number): Promise<boolean> {
     const number = issueNumber.value
     if (number === null) return false
-    pending.value = true
-    error.value = ''
-    try {
-      const result = await runClientHttp(deleteReportComment(number, commentId))
-      if (!result.ok) {
-        error.value = result.error
-        return false
-      }
-      if (detail.value) {
-        detail.value = {
-          ...detail.value,
-          thread: detail.value.thread.filter((item) => item.id !== commentId),
-        }
-      }
-      return true
-    } catch (cause) {
-      error.value = messageOf(cause)
+    const result = await mutate(() => runClientHttp(deleteReportComment(number, commentId)))
+    if (!result) return false
+    if (!result.ok) {
+      error.value = result.error
       return false
-    } finally {
-      pending.value = false
     }
+    if (detail.value) {
+      detail.value = {
+        ...detail.value,
+        thread: detail.value.thread.filter((item) => item.id !== commentId),
+      }
+    }
+    return true
   }
 
   watch(issueNumber, () => void load(), { immediate: true })

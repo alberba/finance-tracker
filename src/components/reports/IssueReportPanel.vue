@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import {
   encodeBase64,
   getAttachmentError,
-  ISSUE_ATTACHMENT_MAX_BYTES,
-  ISSUE_ATTACHMENT_MAX_COUNT,
   ISSUE_ATTACHMENT_TYPES,
 } from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
@@ -23,6 +21,8 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import { FIELD_CONTROL, FIELD_LABEL } from '../ui/field'
 import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
+import AttachmentList from './AttachmentList.vue'
+import { ATTACHMENT_LIMITS } from './report-form'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
 
@@ -44,7 +44,6 @@ const TYPE_OPTIONS: SegmentedOption<ReportType>[] = [
 
 const TEXTAREA = `${FIELD_CONTROL} resize-y py-2.5 text-base`
 const ATTACHMENT_ACCEPT = ISSUE_ATTACHMENT_TYPES.join(',')
-const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${ISSUE_ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB: PNG, JPEG, WebP o GIF.`
 
 const uiStore = useUiStore()
 const { getIssueReportContext } = useIssueReportContext()
@@ -70,6 +69,14 @@ interface DraftAttachment {
 
 const attachments = shallowRef<DraftAttachment[]>([])
 let nextAttachmentId = 0
+
+const attachmentRows = computed(() =>
+  attachments.value.map((item) => ({
+    id: item.id,
+    name: item.file.name,
+    previewUrl: item.previewUrl,
+  })),
+)
 
 const statusMessage = shallowRef('')
 const successStatus = shallowRef<SuccessStatus | null>(null)
@@ -263,28 +270,17 @@ async function onSubmit(): Promise<void> {
           />
           <p class="text-text-muted text-sm">{{ ATTACHMENT_LIMITS }}</p>
         </div>
-        <ul
-          v-if="attachments.length > 0"
+        <AttachmentList
           id="issue-report-attachment-list"
-          class="grid gap-2"
-          aria-label="Capturas adjuntas"
+          :items="attachmentRows"
+          label="Capturas adjuntas"
         >
-          <li
-            v-for="item in attachments"
-            :key="item.id"
-            class="bg-subtle flex items-center gap-3 rounded-md p-2"
-          >
-            <img
-              :src="item.previewUrl"
-              :alt="`Vista previa de ${item.file.name}`"
-              class="size-14 shrink-0 rounded-md object-cover"
-            />
-            <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ item.file.name }}</span>
-            <BaseButton variant="ghost" @click="removeAttachment(item.id)">
-              Quitar {{ item.file.name }}
+          <template #action="{ item }">
+            <BaseButton variant="ghost" @click="removeAttachment(Number(item.id))">
+              Quitar {{ item.name }}
             </BaseButton>
-          </li>
-        </ul>
+          </template>
+        </AttachmentList>
       </fieldset>
 
       <p id="issue-report-notice" class="text-text-muted text-sm leading-relaxed">

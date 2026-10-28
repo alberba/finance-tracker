@@ -60,18 +60,17 @@ export function reportsErrorResponse(error: ReportsError): Response {
       error.status,
     )
   }
-  return jsonResponse(
-    { ok: false, error: 'No se pudo consultar GitHub. Inténtalo de nuevo.' },
-    502,
-  )
+  return jsonResponse({ ok: false, error: 'No se pudo consultar GitHub. Inténtalo de nuevo.' }, 502)
 }
 
+const REPORTS_ERROR_CLASSES = [
+  ReportsGithubError,
+  ReportNotFoundError,
+  ReportClosedError,
+  CommentForbiddenError,
+  ReportInputError,
+] as const
+
 export function isReportsError(error: unknown): error is ReportsError {
-  return (
-    error instanceof ReportsGithubError ||
-    error instanceof ReportNotFoundError ||
-    error instanceof ReportClosedError ||
-    error instanceof CommentForbiddenError ||
-    error instanceof ReportInputError
-  )
+  return REPORTS_ERROR_CLASSES.some((ErrorClass) => error instanceof ErrorClass)
 }

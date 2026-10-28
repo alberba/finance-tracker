@@ -197,7 +197,7 @@ Reglas:
 - `parseReporterComment` exige el marcador **anclado al inicio** del cuerpo (primer carácter),
   `userId` con `/^[A-Za-z0-9_-]{1,64}$/`, cabecera en la línea siguiente (tolerante: se elimina si
   existe), y separa adjuntos por la última aparición de `REPORTER_ATTACHMENTS_MARKER`. Cada línea de
-  adjunto debe ser `![alt](url)` con URL `https://` de un host permitido (`github.com/user-attachments/`,
+  adjunto debe ser `![alt]\(url\)` con URL `https://` de un host permitido (`github.com/user-attachments/`,
   `*.githubusercontent.com`); las demás se descartan. Máximo 3.
 - `classifyComment` (orden): `automation` si `author.type === 'Bot'` o el cuerpo contiene algún
   `AUTOMATION_MARKERS`; si empieza por el marcador de reportero: `mine` solo si `userId` coincide

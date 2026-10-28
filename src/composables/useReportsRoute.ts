@@ -4,7 +4,7 @@
  * `location`/`history`.
  */
 
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const PARAM = 'reporte'
 const NUMBER_PATTERN = /^\d{1,9}$/
@@ -41,8 +41,14 @@ export function useReportsRoute() {
     write(null)
   }
 
+  /** Devuelve el foco a la fila de la que se salió, sin que la página toque el DOM. */
+  async function focusEntry(issueNumber: number): Promise<void> {
+    await nextTick()
+    document.querySelector<HTMLElement>(`[data-report-entry="${issueNumber}"]`)?.focus()
+  }
+
   onMounted(() => window.addEventListener('popstate', sync))
   onBeforeUnmount(() => window.removeEventListener('popstate', sync))
 
-  return { selectedNumber, select, backToList }
+  return { selectedNumber, select, backToList, focusEntry }
 }

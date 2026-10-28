@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onMounted, useTemplateRef } from 'vue'
+import { onMounted, ref, useTemplateRef, watch } from 'vue'
 
 import { useReportsRoute } from '../../composables/useReportsRoute'
 import { useReportThread } from '../../composables/useReportThread'
+import type {
+  ReportCommentInput,
+  ReportCommentUpdateInput,
+} from '../../services/reports-api'
 import { requestReportDialogOpen } from '../../scripts/report-dialog'
 import { useReportsStore } from '../../stores/reports'
 import AppSection from '../ui/AppSection.vue'
@@ -14,9 +18,30 @@ import ReportList from './ReportList.vue'
 // «Mis reportes» (#340): lista e hilo en una sola pantalla de trabajo. No es
 // una sección de `APP_SECTIONS`: el shell monta esta página en `/reportes`.
 const reportsStore = useReportsStore()
-const { selectedNumber, select, backToList } = useReportsRoute()
+const { selectedNumber, select, backToList, focusEntry } = useReportsRoute()
 const { detail, status, error, pending, load, addComment, updateComment, removeComment } =
   useReportThread(selectedNumber)
+const editingCommentId = ref<number | null>(null)
+const composerResetSignal = ref(0)
+
+watch(selectedNumber, () => {
+  editingCommentId.value = null
+})
+
+async function onAddComment(input: ReportCommentInput): Promise<void> {
+  if (await addComment(input)) composerResetSignal.value += 1
+}
+
+async function onUpdateComment(
+  commentId: number,
+  input: ReportCommentUpdateInput,
+): Promise<void> {
+  if (await updateComment(commentId, input)) editingCommentId.value = null
+}
+
+async function onRemoveComment(commentId: number): Promise<void> {
+  await removeComment(commentId)
+}
 const list = useTemplateRef<HTMLElement>('list')
 
 onMounted(() => void reportsStore.refresh({ force: true }))
@@ -82,7 +107,7 @@ async function back(): Promise<void> {
       <div v-else class="mx-auto flex w-full max-w-6xl flex-wrap items-start gap-x-10 gap-y-6">
         <section
           ref="list"
-          class="min-w-0 grow basis-88 self-start"
+          class="sticky min-w-0 grow basis-88 self-start inset-bs-6"
           :class="selectedNumber !== null ? 'hidden @3xl:block' : ''"
           aria-label="Lista de reportes"
         >
@@ -106,10 +131,13 @@ async function back(): Promise<void> {
             :status="status"
             :error="error"
             :pending="pending"
-            :load="load"
-            :add-comment="addComment"
-            :update-comment="updateComment"
-            :remove-comment="removeComment"
+            :editing-comment-id="editingCommentId"
+            :composer-reset-signal="composerResetSignal"
+            @retry="load"
+            @add-comment="onAddComment"
+            @update-comment="onUpdateComment"
+            @remove-comment="onRemoveComment"
+            @update:editing-comment-id="editingCommentId = $event"
             @back="back"
           />
         </div>

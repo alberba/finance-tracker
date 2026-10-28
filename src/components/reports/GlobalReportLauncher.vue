@@ -51,7 +51,7 @@ onMounted(() => {
     <span
       v-if="hasUpdates"
       data-reports-updates
-      class="bg-accent ring-elevated absolute end-0 top-0 size-2.5 rounded-full ring-2"
+      class="bg-accent ring-elevated absolute end-0 inset-bs-0 size-2.5 rounded-full ring-2"
       aria-hidden="true"
     ></span>
   </button>
