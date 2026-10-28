@@ -593,6 +593,25 @@ test.describe('Mis reportes E2E', () => {
     await expect(dot).toHaveCount(0)
   })
 
+  test('la hoja «Más» enlaza a Mis reportes y muestra el contador de novedades', async ({
+    page,
+    tracker,
+  }) => {
+    await mockReportsApi(page, { list: () => [reportEntry({ hasUpdates: true })] })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await tracker.openReports()
+
+    await page.getByRole('button', { name: 'Más secciones' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Más secciones' })
+    const row = sheet.getByRole('button', { name: /Mis reportes/ })
+    await expect(row).toBeVisible()
+    await expect(sheet.locator('[data-reports-badge]')).toHaveText('1')
+
+    await row.click()
+    await expect(page).toHaveURL(/\/reportes$/)
+    await expect(sheet).toBeHidden()
+  })
+
   test('añade, edita y borra una aclaración propia', async ({ page, tracker }) => {
     await mockReportsApi(page, {
       detail: () =>
