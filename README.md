@@ -221,12 +221,14 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
    `gh label list` y una expresión regular estricta, con límites de tamaño). Antes de editar el
    cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Escapa toda
-   sintaxis de imagen y HTML fuera de bloques de código y código en línea (salvo las imágenes
-   exactas del cuerpo original) y neutraliza menciones solo en texto, no en código ni correos; los
-   enlaces normales, incluidos `localhost`, se conservan. Limita los labels a la allowlist
-   documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el estado/tipo
-   anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente no puede
-   publicar ni crear labels o issues por sí mismo.
+   sintaxis de imagen y HTML en todo el texto, también en código, insertando U+200B; después
+   reinserta solo las imágenes inline exactas del cuerpo original cuya URL sea
+   `user-attachments` o `assets` del repositorio, nunca imágenes de referencia. Neutraliza menciones
+   solo en texto, no en código ni correos; los enlaces normales, incluidos `localhost`, se
+   conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los labels a la
+   allowlist documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el
+   estado/tipo anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente
+   no puede publicar ni crear labels o issues por sí mismo.
 5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
    comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
    como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
@@ -259,12 +261,13 @@ posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo ori
 lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
 al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
 `pnpm reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
-fuera de código y neutraliza menciones en texto; solo reinserta las imágenes exactas del cuerpo
-original y no reescribe los enlaces normales (incluidos `localhost`, enlaces del reportero y
-`user-attachments`). Los labels se limitan a la allowlist de triage, tipo y `ui-change`;
-`ready-for-agent` se mantiene porque es el resultado esperado del flujo, y el estado/tipo anterior
-del mismo eje se sustituye. El código del repositorio y el contenido del reporte se envían al
-proveedor al leerlos durante el análisis.
+en todo el texto, también en código; solo reinserta imágenes inline exactas del cuerpo original con
+URL `user-attachments` o `assets` del repositorio, nunca referencias, y no reescribe los enlaces
+normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones solo se
+neutralizan en texto; `<details>` y `<https://...>` se muestran como texto. Los labels se limitan a
+la allowlist de triage, tipo y `ui-change`; `ready-for-agent` se mantiene porque es el resultado
+esperado del flujo, y el estado/tipo anterior del mismo eje se sustituye. El código del repositorio
+y el contenido del reporte se envían al proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 

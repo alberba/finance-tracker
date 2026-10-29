@@ -147,10 +147,25 @@ function imageSnippets(text) {
   return [...snippets]
 }
 
-function originalImageSnippets(originalBody) {
-  return splitCodeSegments(originalBody)
-    .filter((segment) => !segment.code)
-    .flatMap((segment) => imageSnippets(segment.text))
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Solo imágenes inline permitidas del cuerpo original; nunca referencias. */
+function originalInlineImages(originalBody, repository) {
+  const snippets = new Set()
+  const user = /!\[[^\]]*\]\((https:\/\/github\.com\/user-attachments\/[^)\s]+)\)/gi
+  for (const match of originalBody.matchAll(user)) snippets.add(match[0])
+
+  if (repository) {
+    const repo = escapeRegex(repository)
+    const own = new RegExp(
+      `!\\[[^\\]]*\\]\\(https:\\/\\/github\\.com\\/${repo}\\/assets\\/[^)\\s]+\\)`,
+      'gi',
+    )
+    for (const match of originalBody.matchAll(own)) snippets.add(match[0])
+  }
+  return [...snippets]
 }
 
 function fenceStart(line) {
@@ -190,7 +205,10 @@ function splitInlineCode(text) {
   return segments
 }
 
-/** Separa bloques ```/~~~ y código en línea para no escapar su contenido. */
+/**
+ * Este separador se usa solo para no neutralizar @ dentro de código. Las
+ * imágenes y el HTML no tienen exención: se escapan en todo el texto.
+ */
 function splitCodeSegments(text) {
   const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? []
   const blocks = []
@@ -223,12 +241,22 @@ function splitCodeSegments(text) {
   return blocks.flatMap((block) => (block.code ? [block] : splitInlineCode(block.text)))
 }
 
-/** Menciones de texto; no toca correos ni URLs, y el código ya está separado. */
 function neutralizeMentions(text) {
-  return text.replace(/(^|[^\w./-])@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, '$1@\u200b$2')
+  return text.replace(/(^|[^\w.])@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, '$1@\u200b$2')
 }
 
-function escapeNormalSegment(text, originalImages) {
+function neutralizeMentionsOutsideCode(text) {
+  return splitCodeSegments(text)
+    .map((segment) => (segment.code ? segment.text : neutralizeMentions(segment.text)))
+    .join('')
+}
+
+/**
+ * Escapa toda imagen y HTML en todo el texto, también dentro de código, con
+ * U+200B. Después reinserta solo las imágenes inline permitidas del original.
+ */
+export function sanitizeMarkdown(text, { originalBody = '', repository = '' } = {}) {
+  const originalImages = originalInlineImages(originalBody, repository)
   let result = text
   const placeholders = []
   for (const image of originalImages) {
@@ -238,8 +266,8 @@ function escapeNormalSegment(text, originalImages) {
     result = result.split(image).join(placeholder)
   }
 
-  result = result.replace(/!\[/g, '!\\[').replace(/</g, '&lt;')
-  result = neutralizeMentions(result)
+  result = result.replace(/!\[/g, '!\u200b[').replace(/</g, '<\u200b')
+  result = neutralizeMentionsOutsideCode(result)
 
   for (let index = 0; index < placeholders.length; index += 1) {
     result = result.split(`\u0000OPENCODE_IMAGE_${index}\u0000`).join(placeholders[index])
@@ -247,44 +275,33 @@ function escapeNormalSegment(text, originalImages) {
   return result
 }
 
-/**
- * Escapa toda imagen y HTML fuera de código. Solo reinserta, sin modificar,
- * las imágenes que aparecen exactamente en el cuerpo original.
- */
-export function sanitizeMarkdown(text, { originalBody = '' } = {}) {
-  const originalImages = originalImageSnippets(originalBody)
-  return splitCodeSegments(text)
-    .map((segment) =>
-      segment.code ? segment.text : escapeNormalSegment(segment.text, originalImages),
-    )
-    .join('')
-}
-
-function mergeAttachments(body, originalBody) {
+function mergeAttachments(body, originalBody, repository) {
   const original = extractSection(originalBody, '### Adjuntos')
   if (!original) return body
+  const safeOriginal = sanitizeMarkdown(original, { originalBody, repository })
   const current = extractSection(body, '### Adjuntos')
-  if (!current) return appendSection(body, original)
+  if (!current) return appendSection(body, safeOriginal)
 
   const present = new Set(imageSnippets(current))
-  const missing = imageSnippets(original).filter((snippet) => !present.has(snippet))
+  const missing = imageSnippets(safeOriginal).filter((snippet) => !present.has(snippet))
   if (missing.length === 0) return body
 
   const lines = body.split(/\r?\n/)
   const start = lines.findLastIndex((line) => line.trim() === '### Adjuntos')
   const end = sectionEnd(lines, start)
   const missingLines = missing.flatMap((snippet) => {
-    const line = original.split(/\r?\n/).find((candidate) => candidate.includes(snippet))
+    const line = safeOriginal.split(/\r?\n/).find((candidate) => candidate.includes(snippet))
     return line ? [line.trim()] : []
   })
   lines.splice(end, 0, ...missingLines)
   return lines.join('\n')
 }
 
-function mergeContext(body, originalBody) {
+function mergeContext(body, originalBody, repository) {
   if (extractSection(body, '### Contexto de ejecución')) return body
   const original = extractSection(originalBody, '### Contexto de ejecución')
-  return original ? appendSection(body, original) : body
+  if (!original) return body
+  return appendSection(body, sanitizeMarkdown(original, { originalBody, repository }))
 }
 
 /**
@@ -292,13 +309,13 @@ function mergeContext(body, originalBody) {
  * agente o del texto del reporte, conserva adjuntos/contexto del original y
  * añade al final el bloque ### Reportero auténtico (el último de la issue).
  */
-export function composeEnrichedBody(body, originalBody) {
+export function composeEnrichedBody(body, originalBody, repository = '') {
   let result = stripSection(body, '### Reportero')
   const marker = /^\s*<!-- web-report-enriched -->\s*$/m.exec(originalBody)?.[0]?.trim()
   if (marker && !result.includes(marker)) result = `${marker}\n\n${result}`
 
-  result = mergeAttachments(result, originalBody)
-  result = mergeContext(result, originalBody)
+  result = mergeAttachments(result, originalBody, repository)
+  result = mergeContext(result, originalBody, repository)
   const reporter = extractSection(originalBody, '### Reportero')
   if (reporter) result = appendSection(result, reporter)
   return result
@@ -379,8 +396,8 @@ export function publishReport({
 
   let bodyAsComment = false
   if (body) {
-    const sanitized = sanitizeMarkdown(body.text, { originalBody })
-    const composed = composeEnrichedBody(sanitized, originalBody)
+    const sanitized = sanitizeMarkdown(body.text, { originalBody, repository })
+    const composed = composeEnrichedBody(sanitized, originalBody, repository)
     if (Buffer.byteLength(composed, 'utf8') > MAX_BODY_BYTES) {
       throw new Error(`body.md compuesto supera ${MAX_BODY_BYTES} bytes.`)
     }
@@ -388,7 +405,7 @@ export function publishReport({
     bodyAsComment = bodyChanged
   }
   if (comment) {
-    const sanitized = sanitizeMarkdown(comment.text, { originalBody })
+    const sanitized = sanitizeMarkdown(comment.text, { originalBody, repository })
     if (Buffer.byteLength(sanitized, 'utf8') > MAX_COMMENT_BYTES) {
       throw new Error(`comment.md compuesto supera ${MAX_COMMENT_BYTES} bytes.`)
     }

