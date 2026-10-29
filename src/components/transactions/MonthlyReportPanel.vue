@@ -129,7 +129,7 @@ async function downloadPdf(): Promise<void> {
         class="bg-ink border-ink-line text-ink-text flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md border px-5 py-4"
         data-report-summary
       >
-        <span class="text-ink-muted text-sm">{{ countLabel }}</span>
+        <span class="text-ink-muted text-sm">{{ report.periodLabel }} · {{ countLabel }}</span>
         <p class="font-display flex gap-4 text-sm tabular-nums">
           <span>Ingresos {{ formatMoney(report.summary.income, report.currency) }}</span>
           <span>Gastos {{ formatMoney(report.summary.expense, report.currency) }}</span>

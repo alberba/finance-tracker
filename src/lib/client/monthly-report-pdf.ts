@@ -3,6 +3,7 @@ import {
   REPORT_FONT_FILES,
   reportFileName,
 } from '../../domain/monthly-report/pdf-document'
+import type { MonthlyReportPeriod } from '../../domain/monthly-report/period'
 import type { MonthlyReportViewModel } from '../../domain/monthly-report/view-model'
 
 // Turns a report into a PDF in the browser (ADR 0009). pdfmake and the fonts it embeds weigh
@@ -28,12 +29,16 @@ function toBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
-async function loadFontFile(file: string): Promise<string> {
+async function fetchFont(file: string): Promise<Response> {
   const load = FONT_LOADERS[`../../assets/fonts/report/${file}`]
   if (!load) throw new Error(`Falta la fuente ${file} del informe.`)
   const response = await fetch(await load())
   if (!response.ok) throw new Error(`No se pudo cargar la fuente ${file}.`)
-  return toBase64(await response.arrayBuffer())
+  return response
+}
+
+async function loadFontFile(file: string): Promise<string> {
+  return toBase64(await (await fetchFont(file)).arrayBuffer())
 }
 
 function fontFiles(): string[] {
@@ -43,7 +48,7 @@ function fontFiles(): string[] {
 /** Generates the report as a PDF and hands it to the browser as a download. */
 export async function downloadMonthlyReportPdf(
   report: MonthlyReportViewModel,
-  period: { from: string; to: string },
+  period: MonthlyReportPeriod,
 ): Promise<void> {
   const files = fontFiles()
   const [pdfModule, contents] = await Promise.all([
@@ -55,9 +60,7 @@ export async function downloadMonthlyReportPdf(
   const vfs = Object.fromEntries(files.map((file, index) => [file, contents[index]]))
   pdfMake.addVirtualFileSystem(vfs)
   pdfMake.setFonts(FONT_DICTIONARY)
-  await pdfMake
-    .createPdf(buildMonthlyReportDocument(report))
-    .download(reportFileName(period.from, period.to))
+  await pdfMake.createPdf(buildMonthlyReportDocument(report)).download(reportFileName(period))
 }
 
 /**
@@ -66,13 +69,7 @@ export async function downloadMonthlyReportPdf(
  */
 export async function preloadMonthlyReportPdf(): Promise<void> {
   try {
-    await Promise.all([
-      import('pdfmake/build/pdfmake'),
-      ...fontFiles().map(async (file) => {
-        const load = FONT_LOADERS[`../../assets/fonts/report/${file}`]
-        if (load) await fetch(await load())
-      }),
-    ])
+    await Promise.all([import('pdfmake/build/pdfmake'), ...fontFiles().map(fetchFont)])
   } catch {
     // Offline or blocked: the real download reports its own error.
   }

@@ -176,6 +176,12 @@ describe('buildMonthlyReportViewModel', () => {
     ])
   })
 
+  it('files a category of only spaces under «Sin categoría» too', () => {
+    const report = build([tx('a', '2026-09-01', 'expense', 10, { category: '   ' })])
+
+    expect(report.expenseCategories.map((row) => row.category)).toEqual(['Sin categoría'])
+  })
+
   it('leaves out categories with no amount', () => {
     const report = build([
       tx('a', '2026-09-01', 'expense', 0, { category: 'Nada' }),

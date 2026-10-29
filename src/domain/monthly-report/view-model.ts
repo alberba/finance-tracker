@@ -104,7 +104,7 @@ function categoryRows(
   const byCategory = new Map<string, { count: number; amount: number }>()
   transactions.forEach((tx) => {
     if (tx.type !== type) return
-    const category = tx.category || 'Sin categoría'
+    const category = tx.category?.trim() || 'Sin categoría'
     const row = byCategory.get(category) ?? { count: 0, amount: 0 }
     row.count += 1
     row.amount += Number(tx.amount || 0)
@@ -177,7 +177,7 @@ export function buildMonthlyReportViewModel(input: {
     id: tx.id,
     date: datePart(tx),
     description: tx.description,
-    category: tx.category || 'Sin categoría',
+    category: tx.category?.trim() || 'Sin categoría',
     account:
       tx.type === 'saving' && tx.destinationAccountId
         ? `${accountName(tx.accountId)} → ${accountName(tx.destinationAccountId)}`

@@ -82,6 +82,7 @@ describe('MonthlyReportPanel', () => {
 
     expect((from().element as HTMLInputElement).value).toBe('2026-09-01')
     expect((to().element as HTMLInputElement).value).toBe('2026-09-30')
+    expect(wrapper.get('[data-report-summary]').text()).toContain('1 sept 2026 – 30 sept 2026')
     expect(wrapper.get('[data-report-summary]').text()).toContain('2 movimientos')
     expect(wrapper.text()).toContain('Incluye todos los movimientos del periodo.')
     wrapper.unmount()

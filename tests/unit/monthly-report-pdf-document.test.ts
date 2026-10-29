@@ -136,6 +136,8 @@ describe('buildMonthlyReportDocument', () => {
 
 describe('reportFileName', () => {
   it('is «Informe desde - hasta.pdf»', () => {
-    expect(reportFileName('2026-09-25', '2026-10-24')).toBe('Informe 2026-09-25 - 2026-10-24.pdf')
+    expect(reportFileName({ from: '2026-09-25', to: '2026-10-24' })).toBe(
+      'Informe 2026-09-25 - 2026-10-24.pdf',
+    )
   })
 })

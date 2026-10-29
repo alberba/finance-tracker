@@ -8,6 +8,7 @@ import type {
 
 import { formatMoney, formatPercent, formatShortDate, formatSignedMoney } from '../../lib/format'
 import type { TransactionType } from '../../scripts/types'
+import type { MonthlyReportPeriod } from './period'
 import type {
   MonthlyReportCategoryRow,
   MonthlyReportMovementRow,
@@ -290,6 +291,7 @@ export function buildMonthlyReportDocument(report: MonthlyReportViewModel): TDoc
         },
         {
           text: `Página ${currentPage} de ${pageCount}`,
+          font: 'DMMono',
           width: 'auto',
           alignment: 'right',
           color: MUTED,
@@ -303,6 +305,6 @@ export function buildMonthlyReportDocument(report: MonthlyReportViewModel): TDoc
 }
 
 /** The file name a downloaded report gets. */
-export function reportFileName(from: string, to: string): string {
+export function reportFileName({ from, to }: MonthlyReportPeriod): string {
   return `Informe ${from} - ${to}.pdf`
 }
