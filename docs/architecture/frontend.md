@@ -55,7 +55,7 @@ panel de alta, pero el seguimiento vive en la página `/reportes` (fuera de `APP
 - La lista de secciones navegables vive en `src/config/app-sections.ts`; no se duplican labels ni orden en el shell.
 - Los scripts de comportamiento global del shell viven en `src/scripts`, no en bloques inline grandes dentro de Astro.
 - Solo se mantiene inline el codigo critico necesario antes del primer render, como la seleccion inicial del tema.
-- Las dependencias cliente deben entrar por npm y Vite. Evitar CDN en el shell salvo recursos externos inevitables, como fuentes.
+- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes (Syne, DM Sans y DM Mono) viven en `public/fonts` y se sirven desde el propio dominio.
 - Tailwind debe entrar por `src/styles/global.css` con `@import "tailwindcss"` y por el plugin Vite `@tailwindcss/vite`.
 - Los estilos globales existentes se migran por zona tocada, evitando reescrituras masivas sin cobertura visual.
 

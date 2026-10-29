@@ -1,11 +1,23 @@
-const CACHE_VERSION = 'finance-tracker-v3'
+const CACHE_VERSION = 'finance-tracker-v4'
+// The self-hosted faces are part of the shell: once installed, the app keeps
+// Syne, DM Sans and DM Mono offline even before the page requests them.
 const APP_SHELL = [
   '/manifest.webmanifest',
   '/favicon.svg',
   '/icons/apple-touch-icon.png',
   '/icons/pwa-192.png',
   '/icons/pwa-512.png',
+  '/fonts/syne-latin-wght.woff2',
+  '/fonts/dm-sans-latin-wght.woff2',
+  '/fonts/dm-sans-latin-wght-italic.woff2',
+  '/fonts/dm-mono-latin-400.woff2',
+  '/fonts/dm-mono-latin-500.woff2',
 ]
+
+// Cache reads ignore `Vary`: static assets can answer `Vary: Origin` (the
+// Cloudflare preview does), and the request that filled an entry need not carry
+// the same headers as the CORS font request that reads it. Entries are keyed by
+// URL.
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)))
@@ -68,7 +80,7 @@ async function cacheResourceUrls(urls) {
   await Promise.allSettled(
     sameOriginUrls.map(async (url) => {
       const request = new Request(url, { credentials: 'same-origin' })
-      if (await cache.match(request)) {
+      if (await cache.match(request, { ignoreVary: true })) {
         return
       }
       const response = await fetch(request)
@@ -94,7 +106,7 @@ async function networkFirst(request) {
 
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_VERSION)
-  const cached = await cache.match(request)
+  const cached = await cache.match(request, { ignoreVary: true })
   const network = fetch(request)
     .then(async (response) => {
       if (response.ok && !response.redirected) {

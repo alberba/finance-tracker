@@ -19,23 +19,7 @@ type Fixtures = {
   snapshotTime: string | undefined
 }
 
-const GOOGLE_FONTS = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//
-
 export const test = base.extend<Fixtures>({
-  // `extraHTTPHeaders` sends the test-auth header to every origin. Google Fonts
-  // rejects it in the CORS preflight, and screenshots fall back to system fonts.
-  context: async ({ context }, use, testInfo) => {
-    await context.route(GOOGLE_FONTS, async (route) => {
-      if (testInfo.tags.includes('@snapshot')) {
-        await route.fulfill({ contentType: 'text/css', body: '' })
-        return
-      }
-      const headers = { ...route.request().headers() }
-      delete headers['x-test-user-email']
-      await route.continue({ headers })
-    })
-    await use(context)
-  },
   testUserEmail: async ({ browserName }, use, testInfo) => {
     await use(
       testInfo.tags.includes('@snapshot')
