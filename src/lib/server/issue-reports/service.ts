@@ -10,6 +10,7 @@ import { Effect } from 'effect'
 
 import type { RuntimeEnv } from '../cloudflare-env'
 import { Database, type DatabaseError } from '../../../db/database'
+import { describeReport } from '../../../domain/reports/report-description'
 import * as issueReportsRepository from '../../../db/repositories/issue-reports'
 import type { IssueReportRow } from '../../../db/repositories/issue-reports'
 import { nowIso } from '../../../db/repositories/shared'
@@ -482,6 +483,8 @@ export const getReportDetail = (
         threadIssue: null,
         thread: [],
         canComment: false,
+        original: null,
+        issueDescription: null,
         fetchedAt,
       }
     }
@@ -490,7 +493,8 @@ export const getReportDetail = (
     // En el detalle se falla cerrado [D1]: sin login del bot no hay «Tú».
     const botLogin = yield* resolveBotLogin(config, env.GITHUB_BOT_LOGIN)
     // El hilo se lee completo, página a página: no hay recorte de comentarios.
-    const thread = yield* fetchIssueThread(config, threadIssue.number)
+    const issueThread = yield* fetchIssueThread(config, threadIssue.number)
+    const thread = issueThread.comments
     const open = threadIssue.state === 'OPEN'
     const items = mapThread(thread, { userId, botLogin }, open)
 
@@ -524,6 +528,7 @@ export const getReportDetail = (
       threadIssue: toIssueRef(threadIssue),
       thread: items,
       canComment: open,
+      ...describeReport(row.originalBody, context.followed ? null : issueThread.body),
       fetchedAt,
     }
   })

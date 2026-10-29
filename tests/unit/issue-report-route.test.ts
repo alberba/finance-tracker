@@ -86,6 +86,7 @@ describe('POST /api/issues/report con el cliente de GitHub sano', () => {
       Effect.succeed({
         number: 654,
         url: 'https://github.com/alberba/finance-tracker/issues/654',
+        body: '## Reporte desde la web',
       }),
     )
 
@@ -103,6 +104,7 @@ describe('POST /api/issues/report con el cliente de GitHub sano', () => {
       context.locals.principal?.userId,
       654,
       expect.any(String),
+      '## Reporte desde la web',
     )
     expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
   })
@@ -112,6 +114,7 @@ describe('POST /api/issues/report con el cliente de GitHub sano', () => {
       Effect.succeed({
         number: 7,
         url: 'https://github.com/alberba/finance-tracker/issues/7',
+        body: '## Reporte desde la web',
       }),
     )
     issueReports.recordSubmission.mockReturnValue(Effect.fail(new Error('db caída')))

@@ -21,6 +21,8 @@ export const issueReports = sqliteTable(
     issueNumber: integer('issue_number').notNull(),
     submittedAt: text('submitted_at').notNull(),
     lastSeenAt: text('last_seen_at').notNull(),
+    /** Cuerpo de la issue al crearla; el enricher lo sobrescribe en GitHub. `null` en altas anteriores. */
+    originalBody: text('original_body'),
   },
   (table) => [
     uniqueIndex('issue_reports_user_issue_idx').on(table.userId, table.issueNumber),

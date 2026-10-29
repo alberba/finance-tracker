@@ -50,6 +50,10 @@ export const DEMO_REPORTS: ReportDetail[] = [
       },
     ],
     canComment: false,
+    original:
+      '### Resumen\nEl gráfico de gastos no respeta el filtro de mes\n\n### Problema o solicitud\nAl elegir octubre, el gráfico sigue sumando los gastos de septiembre.',
+    issueDescription:
+      '## Problema\nEl gráfico de gastos ignora el filtro de mes del Dashboard y suma también el mes anterior.\n\n## Resultado esperado\nQue el gráfico solo incluya los gastos del mes elegido.',
     fetchedAt: '2026-10-24T12:00:00.000Z',
   },
   {
@@ -91,6 +95,9 @@ export const DEMO_REPORTS: ReportDetail[] = [
       },
     ],
     canComment: false,
+    original:
+      '### Resumen\nAñadir exportación a PDF de los movimientos\n\n### Problema o solicitud\nMe gustaría descargar mis movimientos en PDF.',
+    issueDescription: null,
     fetchedAt: '2026-10-24T12:00:00.000Z',
   },
 ]

@@ -37,6 +37,8 @@ function reportDetail(overrides: Partial<ReportDetail> = {}): ReportDetail {
     },
     thread: [],
     canComment: true,
+    original: null,
+    issueDescription: null,
     fetchedAt: '2026-10-24T12:00:00.000Z',
     ...overrides,
   }

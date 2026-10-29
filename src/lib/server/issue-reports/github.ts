@@ -374,7 +374,7 @@ ${aliases}
       try: () =>
         JSON.parse(raw) as GraphqlBody & {
           data?: {
-            repository?: Record<string, { comments?: RawCommentsPayload | null } | null> | null
+            repository?: Record<string, { body?: string; comments?: RawCommentsPayload | null } | null> | null
           }
         },
       catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
@@ -401,14 +401,21 @@ ${aliases}
   })
 }
 
+export interface IssueThread {
+  comments: RawComment[]
+  /** Cuerpo de la issue cuyo hilo se lee. */
+  body: string
+}
+
 /** Hilo completo: se recorren todas las páginas hacia atrás, sin recortar. */
 export function fetchIssueThread(
   config: GithubConfig,
   number: number,
-): Effect.Effect<RawComment[], ReportsGithubError, Http> {
+): Effect.Effect<IssueThread, ReportsGithubError, Http> {
   return Effect.gen(function* () {
     const http = yield* Http
     let comments: RawComment[] = []
+    let body = ''
     let before: string | undefined
 
     for (;;) {
@@ -417,6 +424,7 @@ export function fetchIssueThread(
       }) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
+      ${before ? '' : 'body'}
       comments(last: ${COMMENTS_PAGE_SIZE}${before ? ', before: $before' : ''}) {
         totalCount
         pageInfo { hasPreviousPage startCursor }
@@ -447,12 +455,14 @@ export function fetchIssueThread(
         try: () =>
           JSON.parse(raw) as GraphqlBody & {
             data?: {
-              repository?: { issue?: { comments?: RawCommentsPayload | null } | null } | null
+              repository?: { issue?: { body?: string; comments?: RawCommentsPayload | null } | null } | null
             }
           },
         catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
       })
-      const page = parsed.data?.repository?.issue?.comments
+      const issue = parsed.data?.repository?.issue
+      if (!before) body = issue?.body ?? ''
+      const page = issue?.comments
       if (!page) {
         if (parsed.errors?.length) {
           console.error('[reports] GraphQL del hilo devolvió errores', parsed.errors)
@@ -466,7 +476,7 @@ export function fetchIssueThread(
       before = cursor
     }
 
-    return comments
+    return { comments, body }
   })
 }
 
