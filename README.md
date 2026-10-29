@@ -224,7 +224,8 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    sintaxis de imagen y HTML en todo el texto, también en código, insertando U+200B; después
    reinserta solo las imágenes inline exactas del cuerpo original cuya URL sea
    `user-attachments` o `assets` del repositorio, nunca imágenes de referencia. Neutraliza menciones
-   solo en texto, no en código ni correos; los enlaces normales, incluidos `localhost`, se
+   en todo el texto, también en código (por eso un identificador como `@types/node` conserva un
+   U+200B invisible), salvo correos y URLs; los enlaces normales, incluidos `localhost`, se
    conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los labels a la
    allowlist documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el
    estado/tipo anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente
@@ -263,9 +264,10 @@ al final el bloque auténtico y completa los adjuntos, imágenes y contexto que 
 `pnpm reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
 en todo el texto, también en código; solo reinserta imágenes inline exactas del cuerpo original con
 URL `user-attachments` o `assets` del repositorio, nunca referencias, y no reescribe los enlaces
-normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones solo se
-neutralizan en texto; `<details>` y `<https://...>` se muestran como texto. Los labels se limitan a
-la allowlist de triage, tipo y `ui-change`; `ready-for-agent` se mantiene porque es el resultado
+normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones se
+neutralizan en todo el texto, también en código: el coste es un U+200B invisible en identificadores
+como `@types/node`, mientras correos y URLs se respetan. `<details>` y `<https://...>` se muestran
+como texto. Los labels se limitan a la allowlist de triage, tipo y `ui-change`; `ready-for-agent` se mantiene porque es el resultado
 esperado del flujo, y el estado/tipo anterior del mismo eje se sustituye. El código del repositorio
 y el contenido del reporte se envían al proveedor al leerlos durante el análisis.
 

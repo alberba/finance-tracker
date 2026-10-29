@@ -74,7 +74,11 @@ function expectNoActiveMarkup(text: string, allowed: string[] = []): void {
   let withoutAllowed = text
   for (const snippet of allowed) withoutAllowed = withoutAllowed.split(snippet).join('')
   expect(withoutAllowed).not.toContain('![')
-  expect(withoutAllowed).not.toMatch(/<[A-Za-z/!]/)
+  expect(withoutAllowed).not.toMatch(/<(?!\u200b)/)
+  const withoutContacts = withoutAllowed
+    .replace(/(?:https?|ftp):\/\/[^\s<>()]+|www\.[^\s<>()]+/gi, '')
+    .replace(/[\w.]+@[\w.-]+/g, '')
+  expect(withoutContacts).not.toMatch(/@[A-Za-z0-9]/)
 }
 
 describe('composeEnrichedBody', () => {
@@ -266,7 +270,7 @@ describe('sanitizeMarkdown', () => {
     expectNoActiveMarkup(sanitized)
   })
 
-  it('escapa imágenes y HTML dentro de código pero mantiene las menciones y el texto legibles', () => {
+  it('escapa imágenes y HTML dentro de código y deja el texto legible con menciones neutralizadas', () => {
     const text = [
       '```md',
       '![x](https://evil.example/a.png)',
@@ -281,9 +285,20 @@ describe('sanitizeMarkdown', () => {
 
     expect(sanitized).toContain('!\u200b[x](https://evil.example/a.png)')
     expect(sanitized).toContain('<\u200bimg src="https://evil.example/x.png">')
-    expect(sanitized).toContain('@types/node @smoke')
-    expect(sanitized).toContain('`!\u200b[y](https://evil.example/b.png) <\u200btag> @types/node`')
+    expect(sanitized).toContain('@\u200btypes/node @\u200bsmoke')
+    expect(sanitized).toContain(
+      '`!\u200b[y](https://evil.example/b.png) <\u200btag> @\u200btypes/node`',
+    )
     expect(sanitized.replaceAll('\u200b', '')).toContain('![x](https://evil.example/a.png)')
+    expectNoActiveMarkup(sanitized)
+  })
+
+  it('neutraliza menciones dentro de código que cruza párrafos', () => {
+    const text = '`\n\n@alberba @org/team\n\n`'
+    const sanitized = sanitizeMarkdown(text, { originalBody: '' })
+
+    expect(sanitized).toContain('@\u200balberba')
+    expect(sanitized).toContain('@\u200borg')
     expectNoActiveMarkup(sanitized)
   })
 
@@ -294,6 +309,7 @@ describe('sanitizeMarkdown', () => {
       'ana@example.com',
       '[local](http://localhost:4321/x)',
       'https://github.com/org/repo/issues/1',
+      'https://example.com/@user',
     ].join('\n')
 
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
@@ -304,6 +320,7 @@ describe('sanitizeMarkdown', () => {
     expect(sanitized).toContain('ana@example.com')
     expect(sanitized).toContain('[local](http://localhost:4321/x)')
     expect(sanitized).toContain('https://github.com/org/repo/issues/1')
+    expect(sanitized).toContain('https://example.com/@user')
     expectNoActiveMarkup(sanitized)
   })
 

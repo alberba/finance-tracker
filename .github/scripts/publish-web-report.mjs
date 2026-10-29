@@ -168,87 +168,20 @@ function originalInlineImages(originalBody, repository) {
   return [...snippets]
 }
 
-function fenceStart(line) {
-  const match = /^\s*(?:>\s*)*(?:(?:[-*+]|\d+[.)])\s+)?(`{3,}|~{3,})/.exec(line)
-  return match ? { char: match[1][0], length: match[1].length } : null
-}
+const MENTION_URL = /(?:https?|ftp):\/\/[^\s<>()]+|www\.[^\s<>()]+/gi
 
-function fenceClose(line, fence) {
-  const prefix = '^\\s*(?:>\\s*)*(?:(?:[-*+]|\\d+[.)])\\s+)?'
-  const marker = fence.char === '`' ? '`' : '~'
-  return new RegExp(`${prefix}${marker}{${fence.length},}\\s*$`).test(line)
-}
-
-function splitInlineCode(text) {
-  const segments = []
-  let index = 0
-  let normalStart = 0
-  while (index < text.length) {
-    if (text[index] !== '`') {
-      index += 1
-      continue
-    }
-    let length = 1
-    while (text[index + length] === '`') length += 1
-    const marker = '`'.repeat(length)
-    const end = text.indexOf(marker, index + length)
-    if (end === -1) {
-      index += length
-      continue
-    }
-    if (normalStart < index) segments.push({ code: false, text: text.slice(normalStart, index) })
-    segments.push({ code: true, text: text.slice(index, end + length) })
-    index = end + length
-    normalStart = index
-  }
-  if (normalStart < text.length) segments.push({ code: false, text: text.slice(normalStart) })
-  return segments
-}
-
-/**
- * Este separador se usa solo para no neutralizar @ dentro de código. Las
- * imágenes y el HTML no tienen exención: se escapan en todo el texto.
- */
-function splitCodeSegments(text) {
-  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? []
-  const blocks = []
-  let buffer = ''
-  let fence = null
-  const push = (code) => {
-    if (buffer) blocks.push({ code, text: buffer })
-    buffer = ''
-  }
-
-  for (const line of lines) {
-    if (fence) {
-      buffer += line
-      if (fenceClose(line, fence)) {
-        push(true)
-        fence = null
-      }
-      continue
-    }
-    const start = fenceStart(line)
-    if (start) {
-      push(false)
-      buffer = line
-      fence = start
-      continue
-    }
-    buffer += line
-  }
-  push(Boolean(fence))
-  return blocks.flatMap((block) => (block.code ? [block] : splitInlineCode(block.text)))
-}
-
+/** Menciones de texto, también en código; respeta correos y URLs. */
 function neutralizeMentions(text) {
-  return text.replace(/(^|[^\w.])@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, '$1@\u200b$2')
-}
-
-function neutralizeMentionsOutsideCode(text) {
-  return splitCodeSegments(text)
-    .map((segment) => (segment.code ? segment.text : neutralizeMentions(segment.text)))
-    .join('')
+  const urls = [...text.matchAll(MENTION_URL)].map((match) => [
+    match.index ?? 0,
+    (match.index ?? 0) + match[0].length,
+  ])
+  return text.replace(/@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, (match, login, offset) => {
+    const previous = text[offset - 1]
+    if (previous && /[\w.]/.test(previous)) return match
+    if (urls.some(([start, end]) => offset >= start && offset < end)) return match
+    return `@\u200b${login}`
+  })
 }
 
 /**
@@ -267,7 +200,7 @@ export function sanitizeMarkdown(text, { originalBody = '', repository = '' } = 
   }
 
   result = result.replace(/!\[/g, '!\u200b[').replace(/</g, '<\u200b')
-  result = neutralizeMentionsOutsideCode(result)
+  result = neutralizeMentions(result)
 
   for (let index = 0; index < placeholders.length; index += 1) {
     result = result.split(`\u0000OPENCODE_IMAGE_${index}\u0000`).join(placeholders[index])
