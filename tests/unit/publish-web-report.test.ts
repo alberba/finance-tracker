@@ -313,10 +313,14 @@ describe('sanitizeMarkdown', () => {
       '[local](http://localhost:4321/x)',
       'https://github.com/org/repo/issues/1',
       'https://example.com/@user',
+      'www.example.com/@q',
+      'http://localhost:4321/@user',
       'http://@alberba',
       'https://@org/team',
       'www.@x',
       'ftp://a/@b',
+      'xhttps://example.com/@alberba',
+      'awww.example.com/@alberba',
     ].join('\n')
 
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
@@ -328,10 +332,14 @@ describe('sanitizeMarkdown', () => {
     expect(sanitized).toContain('[local](http://localhost:4321/x)')
     expect(sanitized).toContain('https://github.com/org/repo/issues/1')
     expect(sanitized).toContain('https://example.com/@user')
+    expect(sanitized).toContain('www.example.com/@q')
+    expect(sanitized).toContain('http://localhost:4321/@user')
     expect(sanitized).toContain('http://@\u200balberba')
     expect(sanitized).toContain('https://@\u200borg/team')
     expect(sanitized).toContain('www.@\u200bx')
     expect(sanitized).toContain('ftp://a/@\u200bb')
+    expect(sanitized).toContain('xhttps://example.com/@\u200balberba')
+    expect(sanitized).toContain('awww.example.com/@\u200balberba')
     expectNoActiveMarkup(sanitized)
   })
 

@@ -170,7 +170,7 @@ function originalInlineImages(originalBody, repository) {
 
 const MENTION_HOST = '(?:[A-Za-z0-9][A-Za-z0-9.-]*\\.[A-Za-z]{2,}|localhost)'
 const MENTION_URL = new RegExp(
-  `(?:https?|ftp):\\/\\/${MENTION_HOST}[^\\s<>()]*|www\\.${MENTION_HOST}[^\\s<>()]*`,
+  `(?<![A-Za-z0-9])(?:(?:https?|ftp):\\/\\/${MENTION_HOST}[^\\s<>()]*|www\\.${MENTION_HOST}[^\\s<>()]*)`,
   'gi',
 )
 
