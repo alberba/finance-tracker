@@ -1,6 +1,7 @@
 ---
 import { runServer } from '../lib/server/runtime'
 import AccessForm from '../components/auth/AccessForm.vue'
+import FontPreloads from '../components/layout/FontPreloads.astro'
 import '../styles/global.css'
 import { getRuntimeEnv } from '../lib/server/cloudflare-env'
 import { getDb } from '../db/client'
@@ -48,12 +49,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#eef1f6" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Syne:wght@400..800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <FontPreloads />
     <title>Acceso · Finanzas</title>
   </head>
   <body>

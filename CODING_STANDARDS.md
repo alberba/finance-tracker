@@ -39,8 +39,8 @@ Fuente: `docs/architecture/frontend.md`.
   orden en el shell.
 - El comportamiento global del shell vive en `src/scripts`, no en bloques inline grandes dentro de
   Astro. Solo queda inline lo crítico antes del primer render, como la selección inicial del tema.
-- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell salvo recursos externos
-  inevitables, como fuentes.
+- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes (Syne, DM
+  Sans y DM Mono) viven en `public/fonts` y se sirven desde el propio dominio.
 - Tailwind entra por `src/styles/global.css` con `@import "tailwindcss"` y el plugin Vite
   `@tailwindcss/vite`.
 - Los datos semilla generados desde Excel viven en `src/data/seed.json`; `src/data/seed.ts` es solo

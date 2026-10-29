@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css'
 import AppSidebar from './layout/AppSidebar.astro'
+import FontPreloads from './layout/FontPreloads.astro'
 import MobileNavigation from './layout/MobileNavigation.astro'
 import FinanceWorkspace from './FinanceWorkspace.vue'
 import { getSectionFromPath } from '../scripts/app/dashboard-section-routing'
@@ -91,12 +92,7 @@ const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.p
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Syne:wght@400..800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <FontPreloads mono />
     <script>
       import '../scripts/app'
       import '../scripts/shell'

@@ -105,8 +105,8 @@ spec no requiere registrarlo para que corra. Para recalibrar, combina los blob r
 Los visuales se reparten por caso entre tres shards, cada uno en una D1 independiente. Los casos
 `@snapshot` fijan `snapshotTime` en el fixture antes de la primera navegación; los controles de
 layout mantienen su propio `fixedTime` y las fuentes reales.
-El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render y
-responde localmente a Google Fonts. El helper espera fuentes/scroll sin volver a abrir la app.
+El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render. Las
+fuentes se sirven desde el propio dominio y el helper espera fuentes/scroll sin volver a abrir la app.
 
 El artifact `playwright-report` combina los blob reports cuando falla funcional, visual o sync.
 Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conservan siete días.
@@ -137,10 +137,9 @@ Sin Docker, los snapshots se regeneran en CI: Actions → Browser regression →
 `update_snapshots` marcado. El job visual regenera los `*-linux.png` y los commitea en esa rama.
 
 Los snapshots fuerzan Arial a propósito (`tests/e2e/screenshot-stable.css`), desde el primer
-render, y no dependen de descargas de Google Fonts. El resto de capturas
-(fallos, comparaciones con un diseño) usa las fuentes reales de Google Fonts: el fixture `context`
-de `tests/e2e/fixtures.ts` quita la cabecera `X-Test-User-Email` a esas peticiones, porque con ella
-el preflight CORS falla y salen fuentes del sistema.
+render, y no dependen de la descarga de fuentes. El resto de capturas (fallos, comparaciones con
+un diseño) usa las fuentes reales, servidas desde el propio dominio: el fixture ya no necesita
+interceptar Google Fonts.
 
 ## Worktrees
 

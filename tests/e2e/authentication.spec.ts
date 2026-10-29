@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { AuthenticationPage } from './pages/AuthenticationPage'
+import { expectSelfHostedFonts } from './pages/fonts'
 
 function authenticationHeaders(info: TestInfo) {
   let hash = 0
@@ -59,6 +60,19 @@ test('private pages and financial APIs require a Better Auth session @smoke', as
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
+})
+
+test('la página de acceso sirve las fuentes desde el propio dominio @smoke', async ({ page }) => {
+  const externalFontRequests: string[] = []
+  page.on('request', (request) => {
+    if (/^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(request.url())) {
+      externalFontRequests.push(request.url())
+    }
+  })
+
+  await page.goto('/login')
+  await expectSelfHostedFonts(page)
+  expect(externalFontRequests).toEqual([])
 })
 
 async function admittedAdministrator(page: import('@playwright/test').Page) {

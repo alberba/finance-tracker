@@ -8,8 +8,8 @@
   visibility: hidden !important;
 }
 
-/* Las fuentes remotas no son deterministas en CI. El snapshot comprueba el
-   layout con una fuente local estable; la carga de fuentes se valida en la app. */
+/* Las capturas fijan Arial para que el layout no dependa de la carga de las
+   fuentes. La tipografía real se valida en startup.spec y authentication.spec. */
 :root {
   --font-display: Arial, sans-serif !important;
 }
