@@ -231,13 +231,21 @@ sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad d
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
 con `npx skills`. La configuración restringida de `.github/opencode-issue-enricher.json` fija el
-modelo y limita la sesión a leer y buscar dentro del checkout (deniega `/proc`, `/home/runner`,
-`/etc` y cualquier ruta fuera de `GITHUB_WORKSPACE`), usar `gh issue view/comment/edit` solo con el
-número del reporte, `gh issue list`/`gh label list` y crear ficheros temporales para `--body-file`;
-`gh issue create` está denegado porque el reporte ya existe. El `GH_TOKEN` del workflow solo se
-expone a ese paso. El cuerpo de la issue conserva su bloque `### Reportero` para el backfill, pero
-el mensaje no lo incluye. El código del repositorio y el contenido del reporte se envían al
-proveedor al leerlos durante el análisis.
+modelo y limita la sesión a leer dentro de `GITHUB_WORKSPACE` (deniega `/proc`, `/home/runner`,
+`/etc`, `/dev`, `/sys`, `/root`, `/tmp` y rutas con `..`) y a escribir solo en
+`.scratch/enricher/`. El shell acepta formas fijas de `gh` con el número del reporte y `--repo`:
+`view`/`list`/`label list` para leer, `comment` solo con
+`--body-file .scratch/enricher/comment.md`, y `edit` solo con `--add-label`/`--remove-label`.
+`--body`, las rutas absolutas, los globs y `gh issue create` están denegados. El prompt obliga a
+escribir el comentario en esa ruta con la herramienta de escritura y a publicarlo con `--body-file`.
+Las comprobaciones ALLOW/DENY viven en `tests/unit/opencode-permissions.test.ts`.
+
+Riesgo residual: el `GH_TOKEN` del job es efímero y solo tiene `issues:write` en este repositorio;
+la clave de OpenCode es rotable y tiene límite de gasto. El shell sigue ejecutándose con los
+permisos del runner, así que estas reglas reducen el canal de exfiltración pero no son un sandbox
+perfecto. El cuerpo de la issue conserva su bloque `### Reportero` para el backfill, pero el mensaje
+no lo incluye. El código del repositorio y el contenido del reporte se envían al proveedor al
+leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 
