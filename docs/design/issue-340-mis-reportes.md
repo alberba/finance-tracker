@@ -836,9 +836,8 @@ Eliminar (no dejar código muerto):
 - `src/lib/server/issue-duplicate-checker.ts` y `tests/unit/issue-duplicate-checker.test.ts`.
 - En `github-issues.ts`: `checkDuplicate`, `findDuplicate`, imports de `IssueDuplicate*`, `duplicate` de
   `CreatedIssue` y `GithubIssueClient`.
-- `src/lib/server/issue-duplicates.ts` **se mantiene**: define `IssueDuplicateInput` (hoy vive en
-  el checker eliminado) y lo consume el enricher. Cuando el enricher pasa a `@create-issue`, el
-  módulo se conserva para la búsqueda de candidatas del alta de reportes.
+- `src/lib/server/issue-duplicates.ts` y `tests/unit/issue-duplicates.test.ts`: se eliminan con el
+  enricher. El alta de reportes no los consume; no queda ningún consumidor en `src`.
 - `RuntimeEnv.OPENCODE_GO_API_KEY` (el servidor ya no la usa; el secret de Actions es independiente),
   `.dev.vars.example` (línea 22), `README.md` (línea 253 y el párrafo que la distingue de la de Actions),
   `docs/operations/self-hosting.md` (mención en `.env`).
@@ -940,10 +939,11 @@ TDD en 1–4 (`tdd` skill). Cada paso deja `pnpm check` y los tests del paso en 
    tests existentes en verde) → `issue-reports/github.ts` → `service.ts` → rutas `/api/reports/**` →
    tests de ruta e integración.
 4. **Alta**: retirar el checker y `duplicate`, registrar propiedad, `tracked`, limpieza de env/docs/tests
-   (§10). Comprobar que el enricher conserva `findIssueCandidates` mientras exista.
-   > Nota posterior: el workflow pasó a ejecutar `@create-issue` directamente; se eliminaron
-   > `.github/scripts/enrich-web-issue.mjs` y `.opencode/agents/issue-enricher.md`.
-   > `src/lib/server/issue-duplicates.ts` se conserva para el alta de reportes.
+   (§10). El enricher se sustituyó por `@create-issue`; `findIssueCandidates` se eliminó al quedarse
+   sin consumidores.
+   > Nota posterior: el workflow ejecuta `@create-issue` directamente y se eliminaron
+   > `.github/scripts/enrich-web-issue.mjs`, `.opencode/agents/issue-enricher.md` y
+   > `src/lib/server/issue-duplicates.ts`.
 5. **Backfill**: plan puro + CLI + `package.json` + prueba de integración + docs de operaciones.
 6. **Cliente base**: `reports-api.ts`, `stores/reports.ts`, `useReportsRoute`, `useReportThread`,
    ruta Astro, shell/UI store/popstate, `useSectionNavigation.navigateToReports`.

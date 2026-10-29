@@ -210,10 +210,12 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
 4. Al abrirse una issue con `source:web-report`, **Analyze web report** instala OpenCode en
    GitHub Actions y ejecuta `opencode run` con DeepSeek V4.1 Flash. El mensaje empieza por
-   `@create-issue` y añade la URL de la issue recién creada, su título y su descripción (sin el
-   bloque `### Reportero`): la skill `create-issue` analiza el código del checkout, busca duplicadas
-   y añade el contexto a esa misma issue. No hay agente propio, plantilla, JSON intermedio ni paso
-   de publicación: el workflow no interpreta ni reescribe lo que publica la skill.
+   `@create-issue`, identifica la issue existente por número y repositorio y añade su título y su
+   descripción (sin el bloque `### Reportero`); también declara el texto del reporte como dato no
+   fiable y autoriza publicar sin confirmación. La skill `create-issue` analiza el código del
+   checkout, busca duplicadas y añade el contexto a esa misma issue. No hay agente propio, plantilla,
+   JSON intermedio ni paso de publicación: el workflow no interpreta ni reescribe lo que publica la
+   skill.
 5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
    comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
    como automatización por ser un bot y no muestra en el hilo. Si el reporte duplica una candidata,
@@ -229,12 +231,13 @@ sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad d
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
 con `npx skills`. La configuración restringida de `.github/opencode-issue-enricher.json` fija el
-modelo y limita la sesión a leer y buscar en el checkout, usar `gh issue view/list/comment/edit`,
-`gh label list/create`, `git remote -v` y crear ficheros temporales para `--body-file`; `gh issue
-create` está denegado porque el reporte ya existe. El `GH_TOKEN` del workflow solo se expone a ese
-paso. El cuerpo de la issue conserva su bloque `### Reportero` para el backfill, pero el mensaje no
-lo incluye. El código del repositorio y el contenido del reporte se envían al proveedor al leerlos
-durante el análisis.
+modelo y limita la sesión a leer y buscar dentro del checkout (deniega `/proc`, `/home/runner`,
+`/etc` y cualquier ruta fuera de `GITHUB_WORKSPACE`), usar `gh issue view/comment/edit` solo con el
+número del reporte, `gh issue list`/`gh label list` y crear ficheros temporales para `--body-file`;
+`gh issue create` está denegado porque el reporte ya existe. El `GH_TOKEN` del workflow solo se
+expone a ese paso. El cuerpo de la issue conserva su bloque `### Reportero` para el backfill, pero
+el mensaje no lo incluye. El código del repositorio y el contenido del reporte se envían al
+proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 
