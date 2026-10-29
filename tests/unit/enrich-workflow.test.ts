@@ -18,6 +18,11 @@ describe('workflow de reportes web', () => {
     const analyze = step('Analyze with create-issue')
     expect(analyze).toContain('OPENCODE_GO_API_KEY')
     expect(analyze).not.toMatch(/^\s+(GH_TOKEN|GITHUB_TOKEN):/m)
+    expect(analyze).not.toContain('github.token')
+    expect(analyze).not.toContain('secrets.GITHUB_TOKEN')
+    expect([...analyze.matchAll(/secrets\.([A-Za-z0-9_]+)/g)].map((match) => match[1])).toEqual([
+      'OPENCODE_GO_API_KEY',
+    ])
     expect(analyze).toContain('unset GH_TOKEN GITHUB_TOKEN')
   })
 
@@ -29,6 +34,7 @@ describe('workflow de reportes web', () => {
     const steps = lines.findIndex((line, index) => index > enrich && line === '    steps:')
     const job = lines.slice(enrich, steps).join('\n')
     expect(job).not.toMatch(/GH_TOKEN|GITHUB_TOKEN/)
+    expect(job).not.toContain('github.token')
   })
 
   it('los pasos con gh reciben el token solo en su propio env', () => {

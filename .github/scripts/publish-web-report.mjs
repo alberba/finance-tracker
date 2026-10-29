@@ -3,8 +3,6 @@ import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { sanitizeReporterText } from '../../src/domain/reports/reporter-comment.ts'
-
 /** Límites de GitHub y del workflow, comprobados antes de tocar la issue. */
 export const MAX_BODY_BYTES = 64 * 1024
 export const MAX_COMMENT_BYTES = 64 * 1024
@@ -142,67 +140,124 @@ function appendSection(body, section) {
   return `${body.trimEnd()}\n\n${section.trim()}\n`
 }
 
-function imageUrls(section) {
-  return [...section.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)].map((match) => match[1])
+function imageSnippets(text) {
+  const snippets = new Set()
+  for (const match of text.matchAll(/!\[[^\]]*\]\([^)]+\)/g)) snippets.add(match[0])
+  for (const match of text.matchAll(/!\[[^\]]*\]\[[^\]]*\]/g)) snippets.add(match[0])
+  return [...snippets]
 }
 
-export function allowedAttachmentUrls(originalBody) {
-  const urls = []
-  for (const match of originalBody.matchAll(/https:\/\/github\.com\/user-attachments\/[^\s)]+/g)) {
-    try {
-      urls.push(new URL(match[0]).href)
-    } catch {
-      // Ignora URLs malformadas del cuerpo original.
+function originalImageSnippets(originalBody) {
+  return splitCodeSegments(originalBody)
+    .filter((segment) => !segment.code)
+    .flatMap((segment) => imageSnippets(segment.text))
+}
+
+function fenceStart(line) {
+  const match = /^\s*(?:>\s*)*(?:(?:[-*+]|\d+[.)])\s+)?(`{3,}|~{3,})/.exec(line)
+  return match ? { char: match[1][0], length: match[1].length } : null
+}
+
+function fenceClose(line, fence) {
+  const prefix = '^\\s*(?:>\\s*)*(?:(?:[-*+]|\\d+[.)])\\s+)?'
+  const marker = fence.char === '`' ? '`' : '~'
+  return new RegExp(`${prefix}${marker}{${fence.length},}\\s*$`).test(line)
+}
+
+function splitInlineCode(text) {
+  const segments = []
+  let index = 0
+  let normalStart = 0
+  while (index < text.length) {
+    if (text[index] !== '`') {
+      index += 1
+      continue
     }
+    let length = 1
+    while (text[index + length] === '`') length += 1
+    const marker = '`'.repeat(length)
+    const end = text.indexOf(marker, index + length)
+    if (end === -1) {
+      index += length
+      continue
+    }
+    if (normalStart < index) segments.push({ code: false, text: text.slice(normalStart, index) })
+    segments.push({ code: true, text: text.slice(index, end + length) })
+    index = end + length
+    normalStart = index
   }
-  return new Set(urls)
+  if (normalStart < text.length) segments.push({ code: false, text: text.slice(normalStart) })
+  return segments
 }
 
-function allowedUrl(raw, repository, attachments) {
-  const target = raw.trim().split(/\s+/)[0]?.replace(/^<|>$/g, '') ?? ''
-  if (!target || target.includes('\\') || /%(?:2e|2f)/i.test(target)) return false
-  if (target.startsWith('#') || (target.startsWith('/') && !target.startsWith('//'))) return true
-  try {
-    const url = new URL(target)
-    if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'github.com') return false
-    const path = url.pathname.toLowerCase()
-    const repo = repository.toLowerCase()
-    if (path === `/${repo}` || path.startsWith(`/${repo}/`)) return true
-    return path.startsWith('/user-attachments/') && attachments.has(url.href)
-  } catch {
-    return false
+/** Separa bloques ```/~~~ y código en línea para no escapar su contenido. */
+function splitCodeSegments(text) {
+  const lines = text.match(/[^\n]*\n|[^\n]+$/g) ?? []
+  const blocks = []
+  let buffer = ''
+  let fence = null
+  const push = (code) => {
+    if (buffer) blocks.push({ code, text: buffer })
+    buffer = ''
   }
+
+  for (const line of lines) {
+    if (fence) {
+      buffer += line
+      if (fenceClose(line, fence)) {
+        push(true)
+        fence = null
+      }
+      continue
+    }
+    const start = fenceStart(line)
+    if (start) {
+      push(false)
+      buffer = line
+      fence = start
+      continue
+    }
+    buffer += line
+  }
+  push(Boolean(fence))
+  return blocks.flatMap((block) => (block.code ? [block] : splitInlineCode(block.text)))
+}
+
+/** Menciones de texto; no toca correos ni URLs, y el código ya está separado. */
+function neutralizeMentions(text) {
+  return text.replace(/(^|[^\w./-])@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, '$1@\u200b$2')
+}
+
+function escapeNormalSegment(text, originalImages) {
+  let result = text
+  const placeholders = []
+  for (const image of originalImages) {
+    if (!result.includes(image)) continue
+    const placeholder = `\u0000OPENCODE_IMAGE_${placeholders.length}\u0000`
+    placeholders.push(image)
+    result = result.split(image).join(placeholder)
+  }
+
+  result = result.replace(/!\[/g, '!\\[').replace(/</g, '&lt;')
+  result = neutralizeMentions(result)
+
+  for (let index = 0; index < placeholders.length; index += 1) {
+    result = result.split(`\u0000OPENCODE_IMAGE_${index}\u0000`).join(placeholders[index])
+  }
+  return result
 }
 
 /**
- * Neutraliza imágenes/enlaces externos y menciones del contenido del agente.
- * Solo permite enlaces al repositorio y adjuntos user-attachments que ya
- * estaban en el cuerpo original.
+ * Escapa toda imagen y HTML fuera de código. Solo reinserta, sin modificar,
+ * las imágenes que aparecen exactamente en el cuerpo original.
  */
-export function sanitizeMarkdown(text, { repository, originalBody = '' }) {
-  const attachments = allowedAttachmentUrls(originalBody)
-  let result = text
-
-  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, raw) =>
-    allowedUrl(raw, repository, attachments) ? `![${alt}](${raw})` : alt,
-  )
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, raw) =>
-    allowedUrl(raw, repository, attachments) ? `[${label}](${raw})` : label,
-  )
-  result = result.replace(/<img\b[^>]*>/gi, '')
-  result = result.replace(/<\/?(?:video|audio|source|iframe|object|embed|link)\b[^>]*>/gi, '')
-  result = result.replace(/<a\b[^>]*>([\s\S]*?)<\/a>/gi, '$1')
-  result = result.replace(/<(https?:\/\/[^>]+)>/gi, (match, url) =>
-    allowedUrl(url, repository, attachments) ? match : '',
-  )
-  result = result.replace(/^\s{0,3}\[[^\]]+\]:\s*(\S+).*$/gm, (line, url) =>
-    allowedUrl(url, repository, attachments) ? line : '',
-  )
-  result = result.replace(/https?:\/\/[^\s<>()]+/g, (url) =>
-    allowedUrl(url, repository, attachments) ? url : '[enlace omitido]',
-  )
-
-  return sanitizeReporterText(result)
+export function sanitizeMarkdown(text, { originalBody = '' } = {}) {
+  const originalImages = originalImageSnippets(originalBody)
+  return splitCodeSegments(text)
+    .map((segment) =>
+      segment.code ? segment.text : escapeNormalSegment(segment.text, originalImages),
+    )
+    .join('')
 }
 
 function mergeAttachments(body, originalBody) {
@@ -211,15 +266,15 @@ function mergeAttachments(body, originalBody) {
   const current = extractSection(body, '### Adjuntos')
   if (!current) return appendSection(body, original)
 
-  const present = new Set(imageUrls(current))
-  const missing = imageUrls(original).filter((url) => !present.has(url))
+  const present = new Set(imageSnippets(current))
+  const missing = imageSnippets(original).filter((snippet) => !present.has(snippet))
   if (missing.length === 0) return body
 
   const lines = body.split(/\r?\n/)
   const start = lines.findLastIndex((line) => line.trim() === '### Adjuntos')
   const end = sectionEnd(lines, start)
-  const missingLines = missing.flatMap((url) => {
-    const line = original.split(/\r?\n/).find((candidate) => candidate.includes(url))
+  const missingLines = missing.flatMap((snippet) => {
+    const line = original.split(/\r?\n/).find((candidate) => candidate.includes(snippet))
     return line ? [line.trim()] : []
   })
   lines.splice(end, 0, ...missingLines)
@@ -324,7 +379,7 @@ export function publishReport({
 
   let bodyAsComment = false
   if (body) {
-    const sanitized = sanitizeMarkdown(body.text, { repository, originalBody })
+    const sanitized = sanitizeMarkdown(body.text, { originalBody })
     const composed = composeEnrichedBody(sanitized, originalBody)
     if (Buffer.byteLength(composed, 'utf8') > MAX_BODY_BYTES) {
       throw new Error(`body.md compuesto supera ${MAX_BODY_BYTES} bytes.`)
@@ -333,7 +388,7 @@ export function publishReport({
     bodyAsComment = bodyChanged
   }
   if (comment) {
-    const sanitized = sanitizeMarkdown(comment.text, { repository, originalBody })
+    const sanitized = sanitizeMarkdown(comment.text, { originalBody })
     if (Buffer.byteLength(sanitized, 'utf8') > MAX_COMMENT_BYTES) {
       throw new Error(`comment.md compuesto supera ${MAX_COMMENT_BYTES} bytes.`)
     }

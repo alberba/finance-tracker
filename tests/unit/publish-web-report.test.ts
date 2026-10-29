@@ -169,7 +169,7 @@ describe('composeEnrichedBody', () => {
 })
 
 describe('sanitizeMarkdown', () => {
-  it('elimina imágenes y enlaces externos y conserva el texto', () => {
+  it('escapa imágenes externas y conserva los enlaces normales', () => {
     const text = [
       '![externa](https://evil.example/a.png)',
       '[enlace](https://evil.example/path)',
@@ -178,46 +178,95 @@ describe('sanitizeMarkdown', () => {
       '  [img]: https://evil.example/ref.png',
     ].join('\n')
 
-    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+    const sanitized = sanitizeMarkdown(text, { originalBody: ORIGINAL_BODY })
 
-    expect(sanitized).not.toContain('evil.example')
-    expect(sanitized).toContain('externa')
-    expect(sanitized).toContain('enlace')
-    expect(sanitized).toContain('[enlace omitido]')
+    expect(sanitized).toContain('!\\[externa](https://evil.example/a.png)')
+    expect(sanitized).toContain('[enlace](https://evil.example/path)')
+    expect(sanitized).toContain('https://evil.example/suelto')
+    expect(sanitized).toContain('!\\[referencia][img]')
+    expect(sanitized).toContain('[img]: https://evil.example/ref.png')
   })
 
-  it('permite el repositorio propio y los adjuntos del cuerpo original', () => {
+  it('escapa referencias aunque la definición esté en blockquote, lista, mayúsculas o entidad', () => {
     const text = [
-      `![captura](${ATTACHMENT})`,
-      '[issue](https://github.com/org/repo/issues/1)',
-      '[otro repo](https://github.com/otro/repo/issues/1)',
-      `![otro adjunto](https://github.com/user-attachments/assets/otro)`,
-      '[ancla](#descripción)',
-      '[ruta](/org/repo/issues/2)',
-      '[traversal](https://github.com/org/repo/%2e%2e/evil)',
-      '[backslash](https://github.com/org/repo\\evil)',
+      '> [x]: HTTPS://evil.com/a',
+      '- [y]: &#104;ttps://evil.com/b',
+      '',
+      '![i][x]',
+      '![j][y]',
     ].join('\n')
 
-    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+    const sanitized = sanitizeMarkdown(text, { originalBody: '' })
 
-    expect(sanitized).toContain(ATTACHMENT)
-    expect(sanitized).toContain('https://github.com/org/repo/issues/1')
-    expect(sanitized).not.toContain('https://github.com/otro/repo/issues/1')
-    expect(sanitized).not.toContain('user-attachments/assets/otro')
-    expect(sanitized).toContain('#descripción')
-    expect(sanitized).toContain('/org/repo/issues/2')
-    expect(sanitized).not.toContain('%2e%2e')
-    expect(sanitized).not.toContain('\\evil')
+    expect(sanitized).toContain('> [x]: HTTPS://evil.com/a')
+    expect(sanitized).toContain('- [y]: &#104;ttps://evil.com/b')
+    expect(sanitized).toContain('!\\[i][x]')
+    expect(sanitized).toContain('!\\[j][y]')
   })
 
-  it('neutraliza menciones, imágenes HTML y comentarios HTML', () => {
-    const text = '<img src="https://evil.example/x.png"> Hola @ana <!-- oculto -->'
-    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+  it('conserva solo las imágenes exactas del cuerpo original y escapa el resto de HTML', () => {
+    const original = `### Adjuntos\n![x](https://evil.example/original.png)`
+    const text = [
+      '![x](https://evil.example/original.png)',
+      '![y](https://evil.example/other.png)',
+      '<img src="https://evil.example/x.png">',
+      '<picture><source srcset="https://evil.example/x"><img src="https://evil.example/y"></picture>',
+    ].join('\n')
 
+    const sanitized = sanitizeMarkdown(text, { originalBody: original })
+
+    expect(sanitized).toContain('![x](https://evil.example/original.png)')
+    expect(sanitized).toContain('!\\[y](https://evil.example/other.png)')
+    expect(sanitized).toContain('&lt;img')
     expect(sanitized).not.toContain('<img')
-    expect(sanitized).not.toContain('evil.example')
+    expect(sanitized).not.toContain('<picture')
+  })
+
+  it('no toca imágenes ni HTML dentro de bloques o código en línea', () => {
+    const text = [
+      '```md',
+      '![x](https://evil.example/a.png)',
+      '<img src="https://evil.example/x.png">',
+      '@types/node @smoke',
+      '```',
+      '',
+      '`![y](https://evil.example/b.png) <tag> @types/node`',
+    ].join('\n')
+
+    const sanitized = sanitizeMarkdown(text, { originalBody: '' })
+
+    expect(sanitized).toContain('![x](https://evil.example/a.png)')
+    expect(sanitized).toContain('<img src="https://evil.example/x.png">')
+    expect(sanitized).toContain('@types/node @smoke')
+    expect(sanitized).toContain('`![y](https://evil.example/b.png) <tag> @types/node`')
+  })
+
+  it('neutraliza menciones solo en texto y respeta correos, localhost y URLs', () => {
+    const text = [
+      'Hola @ana y @org/team',
+      'ana@example.com',
+      '[local](http://localhost:4321/x)',
+      'https://github.com/org/repo/issues/1',
+    ].join('\n')
+
+    const sanitized = sanitizeMarkdown(text, { originalBody: '' })
+
+    expect(sanitized).toContain('@\u200bana')
+    expect(sanitized).toContain('@\u200borg')
+    expect(sanitized).toContain('ana@example.com')
+    expect(sanitized).toContain('[local](http://localhost:4321/x)')
+    expect(sanitized).toContain('https://github.com/org/repo/issues/1')
+  })
+
+  it('escapa HTML y comentarios HTML del texto normal', () => {
+    const text = '<b>@ana</b> <!-- oculto -->'
+    const sanitized = sanitizeMarkdown(text, { originalBody: '' })
+
+    expect(sanitized).not.toContain('<b>')
+    expect(sanitized).toContain('&lt;b>')
     expect(sanitized).toContain('@\u200bana')
     expect(sanitized).not.toContain('<!-- oculto -->')
+    expect(sanitized).toContain('&lt;!-- oculto -->')
   })
 })
 
@@ -339,7 +388,7 @@ describe('publicación de los ficheros del agente', () => {
     const publishedBody = readFileSync(bodyFile, 'utf8')
     expect(publishedBody).toContain('- Identificador: user-1')
     expect(publishedBody).toContain(ATTACHMENT)
-    expect(publishedBody).not.toContain('evil.example')
+    expect(publishedBody).toContain('!\\[externa](https://evil.example/a.png)')
     expect(publishedBody).not.toContain('inyectado@example.com')
     expect(publishedBody).toContain('@\u200bana')
     expect(publishedBody.match(/^### Reportero$/gm)).toHaveLength(1)

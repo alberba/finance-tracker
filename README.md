@@ -220,8 +220,10 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    auténtico del cuerpo original y recupera los adjuntos, imágenes y contexto que falten; comenta
    `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
    `gh label list` y una expresión regular estricta, con límites de tamaño). Antes de editar el
-   cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Sanea imágenes
-   y enlaces externos y menciones de `body.md`/`comment.md`, y limita los labels a la allowlist
+   cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Escapa toda
+   sintaxis de imagen y HTML fuera de bloques de código y código en línea (salvo las imágenes
+   exactas del cuerpo original) y neutraliza menciones solo en texto, no en código ni correos; los
+   enlaces normales, incluidos `localhost`, se conservan. Limita los labels a la allowlist
    documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el estado/tipo
    anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente no puede
    publicar ni crear labels o issues por sí mismo.
@@ -256,9 +258,10 @@ posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo ori
 `### Reportero`) se guarda fuera del workspace y solo lo usa el script de publicación; el agente no
 lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
 al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
-`pnpm reports:backfill` sigue leyendo el identificador correcto. El script neutraliza imágenes y
-enlaces externos y menciones: solo permite enlaces al repositorio y `user-attachments` que ya
-estaban en el cuerpo original. Los labels se limitan a la allowlist de triage, tipo y `ui-change`;
+`pnpm reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
+fuera de código y neutraliza menciones en texto; solo reinserta las imágenes exactas del cuerpo
+original y no reescribe los enlaces normales (incluidos `localhost`, enlaces del reportero y
+`user-attachments`). Los labels se limitan a la allowlist de triage, tipo y `ui-change`;
 `ready-for-agent` se mantiene porque es el resultado esperado del flujo, y el estado/tipo anterior
 del mismo eje se sustituye. El código del repositorio y el contenido del reporte se envían al
 proveedor al leerlos durante el análisis.
