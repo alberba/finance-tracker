@@ -5,21 +5,12 @@ import { computed } from 'vue'
 import { buildDataSummaryViewModel, buildTransactionsCsv } from '../domain/data/view-model'
 import { useToast } from '../composables/useToast'
 import { fetchBackup, restoreBackup } from '../lib/client/data-backup'
+import { downloadBlob } from '../lib/client/download'
 import { runClientHttp } from '../lib/client/runtime'
 import { initializeFreshState } from '../lib/client/state-initialize'
 import { isDemoMode } from '../scripts/demo-mode'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
-
-function downloadBlob(content: string, mimeType: string, filename: string): void {
-  const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
 
 export const useDataStore = defineStore('data', () => {
   const financialStateStore = useFinancialStateStore()

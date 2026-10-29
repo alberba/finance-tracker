@@ -8,6 +8,28 @@ import type { TransactionType } from '../../src/scripts/types'
 
 const CHIP_TYPES: TransactionType[] = ['income', 'expense', 'saving', 'investment']
 
+describe('RegistryToolbar exportar', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('ofrece «Exportar» y pide abrir el informe al pulsarlo', async () => {
+    const wrapper = mount(RegistryToolbar)
+
+    await wrapper.get('#tx-export').trigger('click')
+
+    expect(wrapper.get('#tx-export').text()).toBe('Exportar')
+    expect(wrapper.emitted('export')).toHaveLength(1)
+  })
+
+  it('ya no tiene los filtros de fecha exacta e importe', () => {
+    const wrapper = mount(RegistryToolbar)
+
+    expect(wrapper.text()).not.toContain('Importe y fecha')
+    expect(wrapper.find('#tx-extra-filters').exists()).toBe(false)
+  })
+})
+
 describe('RegistryToolbar type chips', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

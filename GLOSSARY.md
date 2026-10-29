@@ -29,6 +29,16 @@ El mes en el que cuenta un movimiento ("Cuenta en el mes"). Por defecto es el de
 usuario elige otro se persiste con el movimiento y sobrevive a la sincronización.
 _Avoid_: mes del movimiento, mes de imputación
 
+**Informe**:
+El resumen financiero imprimible de un periodo del informe: totales, categorías, últimos
+movimientos y posición global.
+_Avoid_: reporte (es una incidencia enviada a GitHub), extracto
+
+**Periodo del informe**:
+El rango de fechas, ambas incluidas, que delimita un informe. Se filtra por la fecha del
+movimiento, nunca por su mes contable.
+_Avoid_: mes del informe, cierre (es un punto de valoración de la cartera)
+
 **Operación**:
 La compra o venta que da contenido a un movimiento de inversión: símbolo, títulos, precio
 unitario y comisión. Viaja siempre dentro del comando del movimiento, nunca por separado.

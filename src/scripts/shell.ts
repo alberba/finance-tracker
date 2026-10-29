@@ -160,8 +160,23 @@ function initServiceWorker(): void {
         type: 'CACHE_RESOURCE_URLS',
         urls: ['/', window.location.pathname, ...resourceUrls],
       })
+      warmMonthlyReportPdf()
     })
   })
+}
+
+/**
+ * Once the browser is idle, fetch what the monthly report's PDF needs (pdfmake and the fonts)
+ * so that the service worker keeps it and the report also downloads offline.
+ */
+function warmMonthlyReportPdf(): void {
+  const warm = (): void => {
+    void import('../lib/client/monthly-report-pdf').then((module) =>
+      module.preloadMonthlyReportPdf(),
+    )
+  }
+  if ('requestIdleCallback' in window) window.requestIdleCallback(warm, { timeout: 10_000 })
+  else setTimeout(warm, 5_000)
 }
 
 function setUserMenuOpen(menu: HTMLElement, trigger: HTMLElement, open: boolean): void {

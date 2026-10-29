@@ -72,9 +72,6 @@ const NO_FILTERS: RegistryFilters = {
   search: '',
   types: [],
   accountIds: [],
-  date: '',
-  amountMin: '',
-  amountMax: '',
 }
 const NEWEST_FIRST = { column: 'date', direction: 'desc' } as const
 

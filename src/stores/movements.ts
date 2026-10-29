@@ -155,7 +155,7 @@ export const useMovementsStore = defineStore('movements', () => {
     buildMonthGroups(
       financialStateStore.transactions,
       ui.txYear,
-      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      { search: '', types: [], accountIds: [] },
       ui.txSort,
     ).reduce((sum, group) => sum + group.count, 0),
   )
@@ -228,7 +228,7 @@ export const useMovementsStore = defineStore('movements', () => {
     const months = buildMonthGroups(
       financialStateStore.transactions,
       year,
-      { search: '', types: [], accountIds: [], date: '', amountMin: '', amountMax: '' },
+      { search: '', types: [], accountIds: [] },
       ui.txSort,
     ).map((group) => group.month)
     ui.txFilterMonth = months[0] ?? 12

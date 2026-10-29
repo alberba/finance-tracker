@@ -12,6 +12,7 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - Objetivos con barra de progreso y ritmo mensual necesario
 - Configuración editable de cuentas, activos y categorías
 - Exportación/importación JSON + exportación CSV de movimientos
+- Informe mensual de movimientos por periodo, en PDF y CSV, desde Movimientos → Exportar
 - Persistencia autenticada en sync v2; la demo conserva su estado local aislado
 - Cotizaciones server-side para instrumentos configurados y movimientos recurrentes con revisión explícita
 

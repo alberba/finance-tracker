@@ -50,14 +50,7 @@ watch(
 
 const filtering = computed(() => {
   const filters = ui.txFilters
-  return Boolean(
-    filters.search ||
-    hasTypeRestriction(filters.types) ||
-    filters.accountIds.length ||
-    filters.date ||
-    filters.amountMin ||
-    filters.amountMax,
-  )
+  return Boolean(filters.search || hasTypeRestriction(filters.types) || filters.accountIds.length)
 })
 
 // The band's month shows (or the latest month with movements, when that month
