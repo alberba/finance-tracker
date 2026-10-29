@@ -76,8 +76,11 @@ function expectNoActiveMarkup(text: string, allowed: string[] = []): void {
   expect(withoutAllowed).not.toContain('![')
   expect(withoutAllowed).not.toMatch(/<(?!\u200b)/)
   const withoutContacts = withoutAllowed
-    .replace(/(?:https?|ftp):\/\/[^\s<>()]+|www\.[^\s<>()]+/gi, '')
-    .replace(/[\w.]+@[\w.-]+/g, '')
+    .replace(
+      /\b(?:https?|ftp):\/\/(?:[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}|localhost)(?::\d+)?[^\s<>()]*|\bwww\.[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,}[^\s<>()]*/gi,
+      '',
+    )
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '')
   expect(withoutContacts).not.toMatch(/@[A-Za-z0-9]/)
 }
 
@@ -310,6 +313,10 @@ describe('sanitizeMarkdown', () => {
       '[local](http://localhost:4321/x)',
       'https://github.com/org/repo/issues/1',
       'https://example.com/@user',
+      'http://@alberba',
+      'https://@org/team',
+      'www.@x',
+      'ftp://a/@b',
     ].join('\n')
 
     const sanitized = sanitizeMarkdown(text, { originalBody: '' })
@@ -321,6 +328,10 @@ describe('sanitizeMarkdown', () => {
     expect(sanitized).toContain('[local](http://localhost:4321/x)')
     expect(sanitized).toContain('https://github.com/org/repo/issues/1')
     expect(sanitized).toContain('https://example.com/@user')
+    expect(sanitized).toContain('http://@\u200balberba')
+    expect(sanitized).toContain('https://@\u200borg/team')
+    expect(sanitized).toContain('www.@\u200bx')
+    expect(sanitized).toContain('ftp://a/@\u200bb')
     expectNoActiveMarkup(sanitized)
   })
 

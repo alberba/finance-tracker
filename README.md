@@ -225,8 +225,9 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    reinserta solo las imágenes inline exactas del cuerpo original cuya URL sea
    `user-attachments` o `assets` del repositorio, nunca imágenes de referencia. Neutraliza menciones
    en todo el texto, también en código (por eso un identificador como `@types/node` conserva un
-   U+200B invisible), salvo correos y URLs; los enlaces normales, incluidos `localhost`, se
-   conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los labels a la
+   U+200B invisible), salvo correos y URLs con host válido; los enlaces normales, incluidos
+   `localhost`, se conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los
+   labels a la
    allowlist documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el
    estado/tipo anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente
    no puede publicar ni crear labels o issues por sí mismo.
@@ -266,10 +267,11 @@ en todo el texto, también en código; solo reinserta imágenes inline exactas d
 URL `user-attachments` o `assets` del repositorio, nunca referencias, y no reescribe los enlaces
 normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones se
 neutralizan en todo el texto, también en código: el coste es un U+200B invisible en identificadores
-como `@types/node`, mientras correos y URLs se respetan. `<details>` y `<https://...>` se muestran
-como texto. Los labels se limitan a la allowlist de triage, tipo y `ui-change`; `ready-for-agent` se mantiene porque es el resultado
-esperado del flujo, y el estado/tipo anterior del mismo eje se sustituye. El código del repositorio
-y el contenido del reporte se envían al proveedor al leerlos durante el análisis.
+como `@types/node`, mientras correos y URLs con host válido se respetan. `<details>` y
+`<https://...>` se muestran como texto. Los labels se limitan a la allowlist de triage, tipo y
+`ui-change`; `ready-for-agent` se mantiene porque es el resultado esperado del flujo, y el
+estado/tipo anterior del mismo eje se sustituye. El código del repositorio y el contenido del
+reporte se envían al proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 

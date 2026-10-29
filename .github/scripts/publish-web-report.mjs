@@ -168,9 +168,13 @@ function originalInlineImages(originalBody, repository) {
   return [...snippets]
 }
 
-const MENTION_URL = /(?:https?|ftp):\/\/[^\s<>()]+|www\.[^\s<>()]+/gi
+const MENTION_HOST = '(?:[A-Za-z0-9][A-Za-z0-9.-]*\\.[A-Za-z]{2,}|localhost)'
+const MENTION_URL = new RegExp(
+  `(?:https?|ftp):\\/\\/${MENTION_HOST}[^\\s<>()]*|www\\.${MENTION_HOST}[^\\s<>()]*`,
+  'gi',
+)
 
-/** Menciones de texto, también en código; respeta correos y URLs. */
+/** Menciones de texto, también en código; respeta correos y URLs con host. */
 function neutralizeMentions(text) {
   const urls = [...text.matchAll(MENTION_URL)].map((match) => [
     match.index ?? 0,
@@ -178,7 +182,7 @@ function neutralizeMentions(text) {
   ])
   return text.replace(/@([A-Za-z0-9][A-Za-z0-9-]{0,38})/g, (match, login, offset) => {
     const previous = text[offset - 1]
-    if (previous && /[\w.]/.test(previous)) return match
+    if (previous && /\w/.test(previous)) return match
     if (urls.some(([start, end]) => offset >= start && offset < end)) return match
     return `@\u200b${login}`
   })
