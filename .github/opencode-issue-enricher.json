@@ -27,7 +27,8 @@
     { "action": "read", "resource": "/root/*", "effect": "deny" },
     { "action": "read", "resource": "/tmp/*", "effect": "deny" },
     { "action": "read", "resource": "{env:GITHUB_WORKSPACE}*", "effect": "allow" },
-    { "action": "read", "resource": "{env:GITHUB_WORKSPACE}/.git*", "effect": "deny" },
+    { "action": "read", "resource": "{env:GITHUB_WORKSPACE}/.git", "effect": "deny" },
+    { "action": "read", "resource": "{env:GITHUB_WORKSPACE}/.git/*", "effect": "deny" },
     { "action": "read", "resource": "{env:GITHUB_WORKSPACE}/*.env*", "effect": "deny" },
     { "action": "read", "resource": "{env:GITHUB_WORKSPACE}/.dev.vars*", "effect": "deny" },
     { "action": "read", "resource": "AGENTS.md", "effect": "allow" },
@@ -50,7 +51,10 @@
     { "action": "read", "resource": "scripts*", "effect": "allow" },
     { "action": "read", "resource": "src*", "effect": "allow" },
     { "action": "read", "resource": "tests*", "effect": "allow" },
-    { "action": "read", "resource": ".git*", "effect": "deny" },
+    { "action": "read", "resource": "*../*", "effect": "deny" },
+    { "action": "read", "resource": "*..", "effect": "deny" },
+    { "action": "read", "resource": ".git", "effect": "deny" },
+    { "action": "read", "resource": ".git/*", "effect": "deny" },
     { "action": "read", "resource": "*.env*", "effect": "deny" },
     { "action": "read", "resource": "*.dev.vars*", "effect": "deny" },
     { "action": "glob", "resource": "*", "effect": "allow" },
@@ -62,35 +66,33 @@
     { "action": "shell", "resource": "gh issue view {env:ISSUE_NUMBER} *", "effect": "allow" },
     { "action": "shell", "resource": "gh issue comment {env:ISSUE_NUMBER} *", "effect": "allow" },
     { "action": "shell", "resource": "gh issue edit {env:ISSUE_NUMBER} *", "effect": "allow" },
+    {
+      "action": "shell",
+      "resource": "gh issue view --repo {env:GITHUB_REPOSITORY} {env:ISSUE_NUMBER} *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh issue comment --repo {env:GITHUB_REPOSITORY} {env:ISSUE_NUMBER} *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh issue edit --repo {env:GITHUB_REPOSITORY} {env:ISSUE_NUMBER} *",
+      "effect": "allow"
+    },
     { "action": "shell", "resource": "gh issue list *", "effect": "allow" },
     { "action": "shell", "resource": "gh label list *", "effect": "allow" },
     { "action": "shell", "resource": "gh issue comment --help", "effect": "allow" },
     { "action": "shell", "resource": "mktemp *", "effect": "allow" },
-    {
-      "action": "shell",
-      "resource": "gh issue comment {env:ISSUE_NUMBER} *--body-file*",
-      "effect": "deny"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue comment {env:ISSUE_NUMBER} --body-file /tmp/*",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue comment {env:ISSUE_NUMBER} --body-file .scratch/*",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue edit {env:ISSUE_NUMBER} *--body-file*",
-      "effect": "deny"
-    },
     { "action": "shell", "resource": "gh issue create *", "effect": "deny" },
     { "action": "shell", "resource": "gh issue create --help", "effect": "allow" },
     { "action": "shell", "resource": "*/proc/*", "effect": "deny" },
     { "action": "shell", "resource": "*/home/runner/*", "effect": "deny" },
     { "action": "shell", "resource": "*/etc/*", "effect": "deny" },
+    { "action": "shell", "resource": "*/dev/*", "effect": "deny" },
+    { "action": "shell", "resource": "*/sys/*", "effect": "deny" },
+    { "action": "shell", "resource": "*/root/*", "effect": "deny" },
     { "action": "shell", "resource": "*GH_TOKEN*", "effect": "deny" },
     { "action": "shell", "resource": "*OPENCODE_GO_API_KEY*", "effect": "deny" },
     { "action": "shell", "resource": "*GITHUB_TOKEN*", "effect": "deny" }
