@@ -33,80 +33,25 @@
     { "action": "read", "resource": "*.dev.vars*", "effect": "deny" },
 
     { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "glob", "resource": "/*", "effect": "deny" },
+    { "action": "glob", "resource": "~*", "effect": "deny" },
+    { "action": "glob", "resource": "*..*", "effect": "deny" },
+
     { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "/*", "effect": "deny" },
+    { "action": "grep", "resource": "~*", "effect": "deny" },
+    { "action": "grep", "resource": "*..*", "effect": "deny" },
+
     { "action": "skill", "resource": "create-issue", "effect": "allow" },
+
     { "action": "edit", "resource": ".scratch/enricher/*", "effect": "allow" },
     {
       "action": "edit",
       "resource": "{env:GITHUB_WORKSPACE}/.scratch/enricher/*",
       "effect": "allow"
     },
+    { "action": "edit", "resource": "*..*", "effect": "deny" },
 
-    {
-      "action": "shell",
-      "resource": "gh issue view {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} *",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue list --repo {env:GITHUB_REPOSITORY} *",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh label list --repo {env:GITHUB_REPOSITORY} *",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue edit {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} --add-label *",
-      "effect": "allow"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue edit {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} --remove-label *",
-      "effect": "allow"
-    },
-    { "action": "shell", "resource": "gh issue comment --help", "effect": "allow" },
-    { "action": "shell", "resource": "gh issue create *", "effect": "deny" },
-    { "action": "shell", "resource": "gh issue create --help", "effect": "allow" },
-
-    {
-      "action": "shell",
-      "resource": "gh issue comment {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} *--body-file*",
-      "effect": "deny"
-    },
-    {
-      "action": "shell",
-      "resource": "gh issue edit {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} *--body-file*",
-      "effect": "deny"
-    },
-    { "action": "shell", "resource": "*--body *", "effect": "deny" },
-    { "action": "shell", "resource": "*--body=*", "effect": "deny" },
-    { "action": "shell", "resource": "*--body", "effect": "deny" },
-
-    { "action": "shell", "resource": "*$*", "effect": "deny" },
-    { "action": "shell", "resource": "*`*", "effect": "deny" },
-    { "action": "shell", "resource": "*[*", "effect": "deny" },
-    { "action": "shell", "resource": "*{*", "effect": "deny" },
-    { "action": "shell", "resource": "*<*", "effect": "deny" },
-    { "action": "shell", "resource": "*>*", "effect": "deny" },
-    { "action": "shell", "resource": "*|*", "effect": "deny" },
-    { "action": "shell", "resource": "*;*", "effect": "deny" },
-    { "action": "shell", "resource": "*&*", "effect": "deny" },
-    { "action": "shell", "resource": "*..*", "effect": "deny" },
-
-    { "action": "shell", "resource": "*/proc/*", "effect": "deny" },
-    { "action": "shell", "resource": "*/home/runner/*", "effect": "deny" },
-    { "action": "shell", "resource": "*/etc/*", "effect": "deny" },
-    { "action": "shell", "resource": "*/dev/*", "effect": "deny" },
-    { "action": "shell", "resource": "*/sys/*", "effect": "deny" },
-    { "action": "shell", "resource": "*/root/*", "effect": "deny" },
-
-    {
-      "action": "shell",
-      "resource": "gh issue comment {env:ISSUE_NUMBER} --repo {env:GITHUB_REPOSITORY} --body-file .scratch/enricher/comment.md",
-      "effect": "allow"
-    }
+    { "action": "shell", "resource": "*", "effect": "deny" }
   ]
 }

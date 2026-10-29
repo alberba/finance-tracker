@@ -208,18 +208,22 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Al abrirse una issue con `source:web-report`, **Analyze web report** instala OpenCode en
-   GitHub Actions y ejecuta `opencode run` con DeepSeek V4.1 Flash. El mensaje empieza por
-   `@create-issue`, identifica la issue existente por número y repositorio y añade su título y su
-   descripción (sin el bloque `### Reportero`); también declara el texto del reporte como dato no
-   fiable y autoriza publicar sin confirmación. La skill `create-issue` analiza el código del
-   checkout, busca duplicadas y añade el contexto a esa misma issue. No hay agente propio, plantilla,
-   JSON intermedio ni paso de publicación: el workflow no interpreta ni reescribe lo que publica la
-   skill.
+4. Al abrirse una issue con `source:web-report`, **Analyze web report** separa lectura, análisis y
+   publicación. Un paso previo, sin OpenCode, lee la issue con `gh issue view` (título, cuerpo sin el
+   bloque `### Reportero`, labels y comentarios) y escribe `.scratch/enricher/issue.json`. Después,
+   OpenCode ejecuta `opencode run` con DeepSeek V4.1 Flash y un mensaje que empieza por
+   `@create-issue`, identifica la issue por número y repositorio y añade su título y descripción; el
+   texto del reporte se declara dato no fiable. Ese paso no recibe `GH_TOKEN` ni `GITHUB_TOKEN` y no
+   tiene shell: la skill analiza el código y deja el resultado en `.scratch/enricher/body.md`,
+   `comment.md` y `labels.txt`. Un paso posterior, también sin OpenCode, publica esos ficheros con
+   `gh`: reemplaza el cuerpo si existe `body.md`, comenta `comment.md` y añade solo labels que ya
+   existan en el repositorio (validados contra `gh label list` y una expresión regular estricta, con
+   límites de tamaño). No hay agente propio ni plantilla, y el agente no puede publicar ni crear
+   labels o issues por sí mismo.
 5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
    comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
-   como automatización por ser un bot y no muestra en el hilo. Si el reporte duplica una candidata,
-   la skill lo indica con la URL y el estado; no cierra la issue nativamente.
+   como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
+   skill no busca duplicadas ni cierra la issue; solo prepara el cuerpo, el brief y los labels.
 
 El alta guarda una fila de propiedad en `issue_reports` y el acuse enlaza a **Mis reportes**
 (`/reportes`). Esa página lista los reportes de la cuenta con el estado nativo de GitHub, sigue a la
@@ -231,21 +235,21 @@ sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad d
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
 con `npx skills`. La configuración restringida de `.github/opencode-issue-enricher.json` fija el
-modelo y limita la sesión a leer dentro de `GITHUB_WORKSPACE` (deniega `/proc`, `/home/runner`,
-`/etc`, `/dev`, `/sys`, `/root`, `/tmp` y rutas con `..`) y a escribir solo en
-`.scratch/enricher/`. El shell acepta formas fijas de `gh` con el número del reporte y `--repo`:
-`view`/`list`/`label list` para leer, `comment` solo con
-`--body-file .scratch/enricher/comment.md`, y `edit` solo con `--add-label`/`--remove-label`.
-`--body`, las rutas absolutas, los globs y `gh issue create` están denegados. El prompt obliga a
-escribir el comentario en esa ruta con la herramienta de escritura y a publicarlo con `--body-file`.
-Las comprobaciones ALLOW/DENY viven en `tests/unit/opencode-permissions.test.ts`.
+modelo, no concede shell y limita la lectura al checkout (`/*` deny, `{GITHUB_WORKSPACE}*` allow,
+`..`, `~`, `.git`, `.env` y `.dev.vars` denegados); `grep`/`glob` rechazan `/*`, `~*` y `*..*`, y la
+escritura solo permite `.scratch/enricher/`. El prompt fija `body.md`, `comment.md` y `labels.txt`.
+El token de GitHub solo se expone a los pasos previo y posterior; el paso de OpenCode únicamente
+recibe `OPENCODE_GO_API_KEY`. La tabla ALLOW/DENY vive en
+`tests/unit/opencode-permissions.test.ts` y la publicación en `.github/scripts/publish-web-report.mjs`
+con su prueba.
 
-Riesgo residual: el `GH_TOKEN` del job es efímero y solo tiene `issues:write` en este repositorio;
-la clave de OpenCode es rotable y tiene límite de gasto. El shell sigue ejecutándose con los
-permisos del runner, así que estas reglas reducen el canal de exfiltración pero no son un sandbox
-perfecto. El cuerpo de la issue conserva su bloque `### Reportero` para el backfill, pero el mensaje
-no lo incluye. El código del repositorio y el contenido del reporte se envían al proveedor al
-leerlos durante el análisis.
+Riesgo residual: `OPENCODE_GO_API_KEY` está en el proceso de OpenCode; sin shell y sin lectura fuera
+del checkout no hay una vía conocida para leerla. El `GH_TOKEN` solo existe en los pasos previo y
+posterior, es efímero y tiene `issues:write` en este repositorio. El bloque `### Reportero` se
+excluye del JSON y del prompt; el cuerpo original se conserva salvo que el agente escriba
+`body.md`, que entonces reemplaza el cuerpo y debe mantener el contenido útil y los adjuntos. El
+código del repositorio y el contenido del reporte se envían al proveedor al leerlos durante el
+análisis.
 
 ### Variables y secrets requeridos
 
