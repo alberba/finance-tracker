@@ -45,6 +45,8 @@ function detail(overrides: Partial<ReportDetailData> = {}): ReportDetailData {
     },
     thread: [threadItem()],
     canComment: true,
+    original: '### Resumen\nEl gráfico no filtra\n\n### Problema o solicitud\nSuma septiembre.',
+    issueDescription: null,
     fetchedAt: '2026-10-24T12:00:00.000Z',
     ...overrides,
   }
@@ -68,6 +70,37 @@ function mountDetail(
 }
 
 describe('ReportDetail', () => {
+  it('muestra tu descripción original en solo lectura', () => {
+    const wrapper = mountDetail()
+
+    const block = wrapper.get('[aria-labelledby="report-original-title"]')
+    expect(block.text()).toContain('Tu descripción')
+    expect(block.text()).toContain('Suma septiembre.')
+    expect(block.find('textarea').exists()).toBe(false)
+  })
+
+  it('muestra la descripción de la issue cuando difiere de la original', () => {
+    const wrapper = mountDetail({ issueDescription: '## Resultado esperado\nSolo octubre.' })
+
+    const block = wrapper.get('[aria-labelledby="report-issue-description-title"]')
+    expect(block.text()).toContain('Descripción en GitHub')
+    expect(block.text()).toContain('Solo octubre.')
+  })
+
+  it('omite el bloque de la issue cuando no aporta nada', () => {
+    const wrapper = mountDetail()
+
+    expect(wrapper.find('[aria-labelledby="report-issue-description-title"]').exists()).toBe(false)
+  })
+
+  it('avisa cuando la descripción original no se conserva', () => {
+    const wrapper = mountDetail({ original: null, issueDescription: 'Cuerpo actual.' })
+
+    const block = wrapper.get('[aria-labelledby="report-original-title"]')
+    expect(block.text()).toContain('no se conserva')
+    expect(wrapper.text()).toContain('Cuerpo actual.')
+  })
+
   it('muestra el título, el hilo y el compositor cuando el hilo está abierto', () => {
     const wrapper = mountDetail()
 

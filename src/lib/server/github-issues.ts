@@ -32,6 +32,8 @@ const MAX_RETRIES = 2
 const RETRY_DELAY_MS = 500
 
 export interface CreatedIssue {
+  /** Cuerpo con el que se creó la issue; el enricher lo sobrescribe después. */
+  body: string
   number: number
   url: string
 }
@@ -294,6 +296,6 @@ export function createIssueFromWebReport(
       })
     }
 
-    return { number: issueNumber, url: issueUrl }
+    return { number: issueNumber, url: issueUrl, body: baseRequestBody.body }
   })
 }

@@ -21,10 +21,17 @@ async function recordSubmissionSql(
   userId: string,
   issueNumber: number,
   submittedAt: string,
+  originalBody?: string,
 ): Promise<boolean> {
   const inserted = await db
     .insert(issueReports)
-    .values({ userId, issueNumber, submittedAt, lastSeenAt: submittedAt })
+    .values({
+      userId,
+      issueNumber,
+      submittedAt,
+      lastSeenAt: submittedAt,
+      originalBody: originalBody ?? null,
+    })
     .onConflictDoNothing()
     .returning({ id: issueReports.id })
   return inserted.length > 0

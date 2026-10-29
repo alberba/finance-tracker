@@ -28,6 +28,7 @@ interface FakeIssue {
   duplicateOf?: FakeIssue | null
   comments?: FakeComment[]
   statusChangedAt?: string
+  body?: string
 }
 
 interface FakeGithub {
@@ -143,7 +144,10 @@ function installFakeGithub(state: FakeGithub): void {
           return json({
             data: {
               repository: {
-                issue: { comments: { ...page, nodes: commentNodes(page.nodes) } },
+                issue: {
+                  body: state.issues.get(number)?.body ?? '',
+                  comments: { ...page, nodes: commentNodes(page.nodes) },
+                },
               },
             },
           })
@@ -261,12 +265,13 @@ async function record(
   userId: string,
   issueNumber: number,
   submittedAt = '2026-10-01T00:00:00.000Z',
+  originalBody?: string,
 ) {
   const { issueReportsRepository } = await import('../../../../src/db/repositories')
   const { runWithDb } = await import('../../../../src/db/database')
   await runWithDb(
     currentDb,
-    issueReportsRepository.recordSubmission(userId, issueNumber, submittedAt),
+    issueReportsRepository.recordSubmission(userId, issueNumber, submittedAt, originalBody),
   )
 }
 
@@ -703,6 +708,114 @@ describe('/api/reports', () => {
     expect(body.detail.threadIssue.number).toBe(20)
     expect(body.detail.thread.map((item) => item.id)).toEqual([1, 4])
     expect(body.detail.thread[1]).toMatchObject({ kind: 'reporter', text: 'mía', editable: true })
+  })
+
+  describe('descripciones del detalle', () => {
+    const original = [
+      '## Reporte desde la web',
+      '',
+      '### Resumen',
+      'Faltan campos',
+      '',
+      '### Problema o solicitud',
+      'Quiero ver mi descripción',
+      '',
+      '### Contexto de ejecución',
+      '- Navegador: Chrome',
+      '',
+      '### Reportero',
+      '- Email: a@example.com',
+    ].join('\n')
+
+    async function detailOf(number: string) {
+      const { GET } = await import('../../../../src/pages/api/reports/[number]/index')
+      const response = await GET(context(userA.id, { number }))
+      return (await response.json()) as {
+        detail: { original: string | null; issueDescription: string | null }
+      }
+    }
+
+    it('muestra la descripción original y la enriquecida sin contexto ni reportero', async () => {
+      await record(userA.id, 10, undefined, original)
+      state.issues.set(10, {
+        number: 10,
+        title: 'Abierta',
+        state: 'OPEN',
+        stateReason: null,
+        body: [
+          '## Qué se pide',
+          'Mostrar la descripción inicial y la enriquecida.',
+          '',
+          '### Contexto de ejecución',
+          '- Navegador: Chrome',
+          '',
+          '### Reportero',
+          '- Email: a@example.com',
+        ].join('\n'),
+      })
+
+      const { detail } = await detailOf('10')
+      expect(detail.original).toBe(
+        '### Resumen\nFaltan campos\n\n### Problema o solicitud\nQuiero ver mi descripción',
+      )
+      expect(detail.issueDescription).toBe(
+        '## Qué se pide\nMostrar la descripción inicial y la enriquecida.',
+      )
+    })
+
+    it('no repite la descripción cuando la issue no se enriqueció', async () => {
+      await record(userA.id, 10, undefined, original)
+      state.issues.set(10, {
+        number: 10,
+        title: 'Abierta',
+        state: 'OPEN',
+        stateReason: null,
+        body: original,
+      })
+
+      const { detail } = await detailOf('10')
+      expect(detail.original).toContain('Faltan campos')
+      expect(detail.issueDescription).toBeNull()
+    })
+
+    it('en un reporte anterior sin original conserva solo la descripción de la issue', async () => {
+      await record(userA.id, 10)
+      state.issues.set(10, {
+        number: 10,
+        title: 'Abierta',
+        state: 'OPEN',
+        stateReason: null,
+        body: original,
+      })
+
+      const { detail } = await detailOf('10')
+      expect(detail.original).toBeNull()
+      expect(detail.issueDescription).toContain('Faltan campos')
+      expect(detail.issueDescription).not.toContain('a@example.com')
+    })
+
+    it('no expone el cuerpo de la principal que se sigue', async () => {
+      await record(userA.id, 10, undefined, original)
+      state.issues.set(10, {
+        number: 10,
+        title: 'Original',
+        state: 'CLOSED',
+        stateReason: 'DUPLICATE',
+        body: original,
+        duplicateOf: { number: 20, title: 'Principal', state: 'OPEN', stateReason: null },
+      })
+      state.issues.set(20, {
+        number: 20,
+        title: 'Principal',
+        state: 'OPEN',
+        stateReason: null,
+        body: 'Texto de otra persona',
+      })
+
+      const { detail } = await detailOf('10')
+      expect(detail.original).toContain('Faltan campos')
+      expect(detail.issueDescription).toBeNull()
+    })
   })
 
   it('rechaza comentar en un hilo cerrado con 409', async () => {

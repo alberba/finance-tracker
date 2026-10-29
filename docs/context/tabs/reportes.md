@@ -33,7 +33,8 @@ Identificadores clave en UI:
    páginas de 20 entradas con «Cargar más reportes». Los cierres asíncronos del workflow aparecen en la
    siguiente carga, sin sondeos ni caché de estado.
 4. Al abrir un detalle se pide `GET /api/reports/:n`, que resuelve la cadena de duplicadas y lee el
-   hilo de la issue seguida. El cliente marca la lectura con `POST /api/reports/:n/seen`.
+   hilo de la issue seguida, y devuelve `original` (el cuerpo del alta, sin contexto ni reportero) e
+   `issueDescription` (el cuerpo actual de la issue propia si difiere; `null` al seguir una principal). El cliente marca la lectura con `POST /api/reports/:n/seen`.
 5. Las aclaraciones propias se publican, editan y borran con `POST`/`PATCH`/`DELETE` sobre
    `/api/reports/:n/comments`. Solo se permiten con el hilo abierto.
 
@@ -81,8 +82,8 @@ Identificadores clave en UI:
 
 ## Persistencia
 
-- Tabla `issue_reports` (`user_id`, `issue_number`, `submitted_at`, `last_seen_at`), única por
-  `(user_id, issue_number)`. Migración `migrations-v2/0016_issue_reports.sql`.
+- Tabla `issue_reports` (`user_id`, `issue_number`, `submitted_at`, `last_seen_at`, `original_body`, nulo en altas anteriores a #401), única por
+  `(user_id, issue_number)`. Migraciones `0016_issue_reports.sql` y `0017_issue_reports_original_body.sql`.
 - Repositorio `src/db/repositories/issue-reports.ts`; todas las funciones reciben `userId`.
 - `submittedAt` se toma del servidor al crear; en el backfill, de `created_at` de GitHub.
 - `pnpm reports:backfill` recupera los reportes anteriores leyendo el bloque `### Reportero`. Simula

@@ -51,6 +51,7 @@ export const POST: APIRoute = async ({ request, locals }) =>
             principal.userId,
             created.number,
             new Date().toISOString(),
+            created.body,
           ),
         )
       } catch (error) {

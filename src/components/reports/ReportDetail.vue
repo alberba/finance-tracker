@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, useTemplateRef, watch } from 'vue'
 
 import type { ReportDetail } from '../../domain/reports/report-entry'
 import { formatLongDate } from '../../lib/format'
@@ -11,6 +11,7 @@ import DocumentSurface from '../ui/DocumentSurface.vue'
 import KickerLabel from '../ui/KickerLabel.vue'
 import NumberedBlock from '../ui/NumberedBlock.vue'
 import ReportComposer from './ReportComposer.vue'
+import ReportMarkdown from './ReportMarkdown.vue'
 import ReportStatus from './ReportStatus.vue'
 import ReportThread from './ReportThread.vue'
 
@@ -35,6 +36,11 @@ defineEmits<{
 
 const demo = isDemoMode()
 const heading = useTemplateRef<HTMLElement>('heading')
+
+// Los bloques opcionales desplazan la numeración de los siguientes.
+const issueDescriptionShown = computed(() => Boolean(props.detail?.issueDescription))
+const threadNumber = computed(() => (issueDescriptionShown.value ? '04' : '03'))
+const composerNumber = computed(() => (issueDescriptionShown.value ? '05' : '04'))
 
 watch(
   () => props.status,
@@ -117,7 +123,24 @@ watch(
           <ReportStatus :entry="props.detail.report" />
         </NumberedBlock>
 
-        <NumberedBlock number="02" title="Hilo" title-id="report-thread-title">
+        <NumberedBlock number="02" title="Tu descripción" title-id="report-original-title">
+          <ReportMarkdown v-if="props.detail.original" :source="props.detail.original" />
+          <p v-else class="bg-subtle text-text-muted rounded-md px-4 py-3 text-sm" role="note">
+            Tu descripción original no se conserva en los reportes anteriores.
+          </p>
+        </NumberedBlock>
+
+        <NumberedBlock
+          v-if="props.detail.issueDescription"
+          number="03"
+          title="Descripción en GitHub"
+          title-id="report-issue-description-title"
+          description="Es el texto actual de la issue; la automatización puede haberlo reformulado."
+        >
+          <ReportMarkdown :source="props.detail.issueDescription" />
+        </NumberedBlock>
+
+        <NumberedBlock :number="threadNumber" title="Hilo" title-id="report-thread-title">
           <ReportThread
             :items="props.detail.thread"
             :can-comment="props.detail.canComment"
@@ -130,7 +153,11 @@ watch(
           />
         </NumberedBlock>
 
-        <NumberedBlock number="03" title="Nueva aclaración" title-id="report-composer-title">
+        <NumberedBlock
+          :number="composerNumber"
+          title="Nueva aclaración"
+          title-id="report-composer-title"
+        >
           <ReportComposer
             v-if="props.detail.canComment || demo"
             :pending="props.pending"
