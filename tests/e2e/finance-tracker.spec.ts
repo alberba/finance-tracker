@@ -629,6 +629,7 @@ test.describe('Finance tracker E2E', () => {
           ok: true,
           issueNumber: 321,
           issueUrl: 'https://github.com/example/repo/issues/321',
+          tracked: true,
         }),
       })
     })
@@ -639,10 +640,16 @@ test.describe('Finance tracker E2E', () => {
       description: 'Después de guardar no persiste el estado.',
     })
 
-    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
-    await expect(tracker.issueReportStatus().locator('a')).toHaveAttribute(
+    const status = tracker.issueReportStatus()
+    await expect(status).toContainText('Reporte creado:')
+    await expect(status.getByRole('link', { name: '#321' })).toHaveAttribute(
       'href',
       'https://github.com/example/repo/issues/321',
     )
+    await expect(status.getByRole('link', { name: 'Ver en Mis reportes' })).toHaveAttribute(
+      'href',
+      '/reportes',
+    )
+    await expect(status).not.toContainText('No pudimos añadirlo a Mis reportes todavía')
   })
 })
