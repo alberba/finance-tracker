@@ -216,10 +216,11 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    texto del reporte se declara dato no fiable. Ese paso no recibe `GH_TOKEN` ni `GITHUB_TOKEN` y no
    tiene shell: la skill analiza el código y deja el resultado en `.scratch/enricher/body.md`,
    `comment.md` y `labels.txt`. Un paso posterior, también sin OpenCode, publica esos ficheros con
-   `gh`: reemplaza el cuerpo si existe `body.md`, comenta `comment.md` y añade solo labels que ya
-   existan en el repositorio (validados contra `gh label list` y una expresión regular estricta, con
-   límites de tamaño). No hay agente propio ni plantilla, y el agente no puede publicar ni crear
-   labels o issues por sí mismo.
+   `gh`: si existe `body.md`, quita cualquier `### Reportero` que venga del agente, añade el bloque
+   auténtico del cuerpo original y recupera los adjuntos, imágenes y contexto que falten; comenta
+   `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
+   `gh label list` y una expresión regular estricta, con límites de tamaño). No hay agente propio ni
+   plantilla, y el agente no puede publicar ni crear labels o issues por sí mismo.
 5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
    comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
    como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
@@ -245,11 +246,12 @@ con su prueba.
 
 Riesgo residual: `OPENCODE_GO_API_KEY` está en el proceso de OpenCode; sin shell y sin lectura fuera
 del checkout no hay una vía conocida para leerla. El `GH_TOKEN` solo existe en los pasos previo y
-posterior, es efímero y tiene `issues:write` en este repositorio. El bloque `### Reportero` se
-excluye del JSON y del prompt; el cuerpo original se conserva salvo que el agente escriba
-`body.md`, que entonces reemplaza el cuerpo y debe mantener el contenido útil y los adjuntos. El
-código del repositorio y el contenido del reporte se envían al proveedor al leerlos durante el
-análisis.
+posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo original (incluido
+`### Reportero`) se guarda fuera del workspace y solo lo usa el script de publicación; el agente no
+lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
+al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
+`pnpm reports:backfill` sigue leyendo el identificador correcto. El código del repositorio y el
+contenido del reporte se envían al proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 

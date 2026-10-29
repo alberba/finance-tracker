@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, lstatSync, readFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -34,6 +34,89 @@ export function selectLabels(labels, existing) {
   return { accepted, rejected }
 }
 
+function sectionEnd(lines, start) {
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^###\s/.test(lines[index].trim())) return index
+  }
+  return lines.length
+}
+
+/** Última aparición: buildIssueBody escribe el bloque real al final. */
+export function extractSection(body, heading) {
+  const lines = body.split(/\r?\n/)
+  const start = lines.findLastIndex((line) => line.trim() === heading)
+  if (start < 0) return null
+  return lines.slice(start, sectionEnd(lines, start)).join('\n').trim()
+}
+
+function stripSection(body, heading) {
+  const lines = body.split(/\r?\n/)
+  const kept = []
+  for (let index = 0; index < lines.length; index += 1) {
+    if (lines[index].trim() === heading) {
+      index = sectionEnd(lines, index) - 1
+      continue
+    }
+    kept.push(lines[index])
+  }
+  return kept
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function appendSection(body, section) {
+  return `${body.trimEnd()}\n\n${section.trim()}\n`
+}
+
+function imageUrls(section) {
+  return [...section.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)].map((match) => match[1])
+}
+
+function mergeAttachments(body, originalBody) {
+  const original = extractSection(originalBody, '### Adjuntos')
+  if (!original) return body
+  const current = extractSection(body, '### Adjuntos')
+  if (!current) return appendSection(body, original)
+
+  const present = new Set(imageUrls(current))
+  const missing = imageUrls(original).filter((url) => !present.has(url))
+  if (missing.length === 0) return body
+
+  const lines = body.split(/\r?\n/)
+  const start = lines.findLastIndex((line) => line.trim() === '### Adjuntos')
+  const end = sectionEnd(lines, start)
+  const missingLines = missing.flatMap((url) => {
+    const line = original.split(/\r?\n/).find((candidate) => candidate.includes(url))
+    return line ? [line.trim()] : []
+  })
+  lines.splice(end, 0, ...missingLines)
+  return lines.join('\n')
+}
+
+function mergeContext(body, originalBody) {
+  if (extractSection(body, '### Contexto de ejecución')) return body
+  const original = extractSection(originalBody, '### Contexto de ejecución')
+  return original ? appendSection(body, original) : body
+}
+
+/**
+ * Compone el cuerpo publicado: quita cualquier ### Reportero que venga del
+ * agente o del texto del reporte, conserva adjuntos/contexto del original y
+ * añade al final el bloque ### Reportero auténtico (el último de la issue).
+ */
+export function composeEnrichedBody(body, originalBody) {
+  let result = stripSection(body, '### Reportero')
+  const marker = /^\s*<!-- web-report-enriched -->\s*$/m.exec(originalBody)?.[0]?.trim()
+  if (marker && !result.includes(marker)) result = `${marker}\n\n${result}`
+
+  result = mergeAttachments(result, originalBody)
+  result = mergeContext(result, originalBody)
+  const reporter = extractSection(originalBody, '### Reportero')
+  if (reporter) result = appendSection(result, reporter)
+  return result
+}
+
 function readOptional(root, name, maxBytes) {
   const file = resolve(root, name)
   if (!existsSync(file)) return null
@@ -42,6 +125,16 @@ function readOptional(root, name, maxBytes) {
   if (stat.size > maxBytes) throw new Error(`${name} supera ${maxBytes} bytes.`)
   const text = readFileSync(file, 'utf8')
   return text.trim() ? { file, text } : null
+}
+
+function readOriginalBody(originalBodyPath) {
+  if (!originalBodyPath || !existsSync(originalBodyPath)) {
+    throw new Error('Falta el cuerpo original de la issue.')
+  }
+  const stat = lstatSync(originalBodyPath)
+  if (!stat.isFile()) throw new Error('El cuerpo original no es un fichero regular.')
+  if (stat.size > MAX_BODY_BYTES) throw new Error('El cuerpo original supera el límite.')
+  return readFileSync(originalBodyPath, 'utf8')
 }
 
 function defaultGh(args) {
@@ -56,12 +149,21 @@ export function publishReport({
   repository,
   issueNumber,
   root = '.scratch/enricher',
+  originalBodyPath = process.env.ORIGINAL_BODY_PATH,
   gh = defaultGh,
 }) {
   const body = readOptional(root, 'body.md', MAX_BODY_BYTES)
   const comment = readOptional(root, 'comment.md', MAX_COMMENT_BYTES)
   const labelsFile = readOptional(root, 'labels.txt', MAX_LABELS_BYTES)
   const labels = labelsFile ? parseLabels(labelsFile.text) : []
+
+  if (body) {
+    const composed = composeEnrichedBody(body.text, readOriginalBody(originalBodyPath))
+    if (Buffer.byteLength(composed, 'utf8') > MAX_BODY_BYTES) {
+      throw new Error(`body.md compuesto supera ${MAX_BODY_BYTES} bytes.`)
+    }
+    writeFileSync(body.file, composed)
+  }
 
   let accepted = []
   let rejected = []
