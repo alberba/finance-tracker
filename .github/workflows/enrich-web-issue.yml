@@ -50,11 +50,11 @@ jobs:
           gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,labels,comments > "$RUNNER_TEMP/report-raw.json"
           jq '{
                 title,
-                body: ((.body // "") | split("\n### Reportero")[0] | rtrimstr("\n")),
+                body: ((.body // "") | gsub("<!-- finance-tracker:reporter-comment user=[^>]* -->\\r?\\n?"; "") | split("\n### Reportero")[0] | rtrimstr("\n")),
                 labels: [.labels[].name],
-                comments: [.comments[] | { author: ((.author // {}).login // ""), body: (.body // "") }]
+                comments: [.comments[] | { body: ((.body // "") | gsub("<!-- finance-tracker:reporter-comment user=[^>]* -->\\r?\\n?"; "")) }]
               }' "$RUNNER_TEMP/report-raw.json" > .scratch/enricher/issue.json
-          jq -r '.body // ""' "$RUNNER_TEMP/report-raw.json" > "$RUNNER_TEMP/original-body.md"
+          jq -j '.body // ""' "$RUNNER_TEMP/report-raw.json" > "$RUNNER_TEMP/original-body.md"
       - name: Install OpenCode
         run: npm install --global @opencode/cli@2.2.0
       - name: Analyze with create-issue
@@ -75,7 +75,7 @@ jobs:
               'Deja el resultado en ficheros fijos con la herramienta de escritura:' \
               '- .scratch/enricher/body.md: cuerpo enriquecido de la issue (opcional; incluye los adjuntos, imágenes y contexto de ejecución del reporte original, pero no un bloque ### Reportero: lo añade el workflow).' \
               '- .scratch/enricher/comment.md: Agent Brief o comentario que se publicará (obligatorio si hay algo que publicar).' \
-              '- .scratch/enricher/labels.txt: labels finales, uno por línea (opcional; solo labels que ya existan en el repositorio).' \
+              '- .scratch/enricher/labels.txt: labels finales, uno por línea (opcional; solo labels que ya existan en el repositorio; prefija con - el que deba quitarse).' \
               'No pidas confirmación.'
           } > "$RUNNER_TEMP/prompt.md"
           opencode run --standalone "$(cat "$RUNNER_TEMP/prompt.md")"

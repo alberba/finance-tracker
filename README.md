@@ -219,8 +219,12 @@ Este repo permite enviar reportes desde la web y convertirlos en issues de GitHu
    `gh`: si existe `body.md`, quita cualquier `### Reportero` que venga del agente, añade el bloque
    auténtico del cuerpo original y recupera los adjuntos, imágenes y contexto que falten; comenta
    `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
-   `gh label list` y una expresión regular estricta, con límites de tamaño). No hay agente propio ni
-   plantilla, y el agente no puede publicar ni crear labels o issues por sí mismo.
+   `gh label list` y una expresión regular estricta, con límites de tamaño). Antes de editar el
+   cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Sanea imágenes
+   y enlaces externos y menciones de `body.md`/`comment.md`, y limita los labels a la allowlist
+   documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el estado/tipo
+   anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente no puede
+   publicar ni crear labels o issues por sí mismo.
 5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
    comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
    como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
@@ -240,9 +244,11 @@ modelo, no concede shell y limita la lectura al checkout (`/*` deny, `{GITHUB_WO
 `..`, `~`, `.git`, `.env` y `.dev.vars` denegados); `grep`/`glob` rechazan `/*`, `~*` y `*..*`, y la
 escritura solo permite `.scratch/enricher/`. El prompt fija `body.md`, `comment.md` y `labels.txt`.
 El token de GitHub solo se expone a los pasos previo y posterior; el paso de OpenCode únicamente
-recibe `OPENCODE_GO_API_KEY`. La tabla ALLOW/DENY vive en
-`tests/unit/opencode-permissions.test.ts` y la publicación en `.github/scripts/publish-web-report.mjs`
-con su prueba.
+recibe `OPENCODE_GO_API_KEY`. `issue.json` elimina los marcadores
+`<!-- finance-tracker:reporter-comment user=... -->` y los logins de los comentarios. La tabla
+ALLOW/DENY vive en `tests/unit/opencode-permissions.test.ts` y la publicación en
+`.github/scripts/publish-web-report.mjs` con sus pruebas; el workflow se comprueba en
+`tests/unit/enrich-workflow.test.ts`.
 
 Riesgo residual: `OPENCODE_GO_API_KEY` está en el proceso de OpenCode; sin shell y sin lectura fuera
 del checkout no hay una vía conocida para leerla. El `GH_TOKEN` solo existe en los pasos previo y
@@ -250,8 +256,12 @@ posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo ori
 `### Reportero`) se guarda fuera del workspace y solo lo usa el script de publicación; el agente no
 lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
 al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
-`pnpm reports:backfill` sigue leyendo el identificador correcto. El código del repositorio y el
-contenido del reporte se envían al proveedor al leerlos durante el análisis.
+`pnpm reports:backfill` sigue leyendo el identificador correcto. El script neutraliza imágenes y
+enlaces externos y menciones: solo permite enlaces al repositorio y `user-attachments` que ya
+estaban en el cuerpo original. Los labels se limitan a la allowlist de triage, tipo y `ui-change`;
+`ready-for-agent` se mantiene porque es el resultado esperado del flujo, y el estado/tipo anterior
+del mismo eje se sustituye. El código del repositorio y el contenido del reporte se envían al
+proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 

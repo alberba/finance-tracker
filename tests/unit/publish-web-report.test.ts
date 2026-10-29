@@ -6,12 +6,14 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   composeEnrichedBody,
   MAX_BODY_BYTES,
-  parseLabels,
+  parseLabelChanges,
+  planLabelChanges,
   publishReport,
-  selectLabels,
+  sanitizeMarkdown,
 } from '../../.github/scripts/publish-web-report.mjs'
 import { parseReporterId } from '../../scripts/lib/reports-backfill-plan'
 
+const REPO = 'org/repo'
 const ATTACHMENT = 'https://github.com/user-attachments/assets/captura'
 const ORIGINAL_BODY = [
   '## Reporte desde la web',
@@ -41,6 +43,31 @@ function writeOriginal(root: string, body = ORIGINAL_BODY): string {
   const file = join(root, 'original-body.md')
   writeFileSync(file, body)
   return file
+}
+
+function fakeGithub(
+  options: {
+    body?: string
+    labels?: string[]
+    existing?: string[]
+  } = {},
+) {
+  const calls: string[][] = []
+  const existing = options.existing ?? ['feature', 'ready-for-agent', 'needs-triage']
+  const gh = vi.fn((args: string[]) => {
+    calls.push(args)
+    if (args[0] === 'issue' && args[1] === 'view') {
+      return JSON.stringify({
+        body: options.body ?? ORIGINAL_BODY,
+        labels: (options.labels ?? ['needs-triage', 'source:web-report']).map((name) => ({ name })),
+      })
+    }
+    if (args[0] === 'label' && args[1] === 'list') {
+      return JSON.stringify(existing.map((name) => ({ name })))
+    }
+    return ''
+  })
+  return { gh, calls }
 }
 
 describe('composeEnrichedBody', () => {
@@ -141,46 +168,140 @@ describe('composeEnrichedBody', () => {
   })
 })
 
-describe('parseLabels y selectLabels', () => {
-  it('recorta, elimina vacíos y deduplica', () => {
-    expect(parseLabels(' feature\n\nneeds-triage\nfeature\n')).toEqual(['feature', 'needs-triage'])
+describe('sanitizeMarkdown', () => {
+  it('elimina imágenes y enlaces externos y conserva el texto', () => {
+    const text = [
+      '![externa](https://evil.example/a.png)',
+      '[enlace](https://evil.example/path)',
+      'texto https://evil.example/suelto',
+      '![referencia][img]',
+      '  [img]: https://evil.example/ref.png',
+    ].join('\n')
+
+    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+
+    expect(sanitized).not.toContain('evil.example')
+    expect(sanitized).toContain('externa')
+    expect(sanitized).toContain('enlace')
+    expect(sanitized).toContain('[enlace omitido]')
+  })
+
+  it('permite el repositorio propio y los adjuntos del cuerpo original', () => {
+    const text = [
+      `![captura](${ATTACHMENT})`,
+      '[issue](https://github.com/org/repo/issues/1)',
+      '[otro repo](https://github.com/otro/repo/issues/1)',
+      `![otro adjunto](https://github.com/user-attachments/assets/otro)`,
+      '[ancla](#descripción)',
+      '[ruta](/org/repo/issues/2)',
+      '[traversal](https://github.com/org/repo/%2e%2e/evil)',
+      '[backslash](https://github.com/org/repo\\evil)',
+    ].join('\n')
+
+    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+
+    expect(sanitized).toContain(ATTACHMENT)
+    expect(sanitized).toContain('https://github.com/org/repo/issues/1')
+    expect(sanitized).not.toContain('https://github.com/otro/repo/issues/1')
+    expect(sanitized).not.toContain('user-attachments/assets/otro')
+    expect(sanitized).toContain('#descripción')
+    expect(sanitized).toContain('/org/repo/issues/2')
+    expect(sanitized).not.toContain('%2e%2e')
+    expect(sanitized).not.toContain('\\evil')
+  })
+
+  it('neutraliza menciones, imágenes HTML y comentarios HTML', () => {
+    const text = '<img src="https://evil.example/x.png"> Hola @ana <!-- oculto -->'
+    const sanitized = sanitizeMarkdown(text, { repository: REPO, originalBody: ORIGINAL_BODY })
+
+    expect(sanitized).not.toContain('<img')
+    expect(sanitized).not.toContain('evil.example')
+    expect(sanitized).toContain('@\u200bana')
+    expect(sanitized).not.toContain('<!-- oculto -->')
+  })
+})
+
+describe('parseLabelChanges y planLabelChanges', () => {
+  it('separa altas y bajas', () => {
+    expect(parseLabelChanges('feature\n-ready-for-agent\n\nneeds-triage\n')).toEqual({
+      add: ['feature', 'needs-triage'],
+      remove: ['ready-for-agent'],
+    })
   })
 
   it('rechaza más de 50 labels', () => {
     expect(() =>
-      parseLabels(Array.from({ length: 51 }, (_, i) => `label-${i}`).join('\n')),
+      parseLabelChanges(Array.from({ length: 51 }, (_, i) => `label-${i}`).join('\n')),
     ).toThrow('50')
   })
 
-  it('solo acepta labels con forma válida y existentes', () => {
-    expect(selectLabels(['feature', 'missing', 'bad;label'], new Set(['feature']))).toEqual({
-      accepted: ['feature'],
-      rejected: ['missing', 'bad;label'],
+  it('solo acepta la allowlist y sustituye el estado de triage anterior', () => {
+    expect(
+      planLabelChanges({
+        changes: { add: ['ready-for-agent', 'source:web-report'], remove: [] },
+        current: ['needs-triage', 'source:web-report'],
+        existing: ['ready-for-agent', 'needs-triage', 'source:web-report'],
+      }),
+    ).toEqual({
+      added: ['ready-for-agent'],
+      removed: ['needs-triage'],
+      rejected: ['source:web-report'],
     })
+  })
+
+  it('sustituye el tipo anterior y respeta las bajas explícitas', () => {
+    expect(
+      planLabelChanges({
+        changes: { add: ['feature'], remove: ['needs-info'] },
+        current: ['bug', 'needs-triage', 'needs-info'],
+        existing: ['feature', 'bug', 'needs-info'],
+      }),
+    ).toEqual({
+      added: ['feature'],
+      removed: ['needs-info', 'bug'],
+      rejected: [],
+    })
+  })
+
+  it('rechaza labels desconocidos y bajas que no están en la issue', () => {
+    expect(
+      planLabelChanges({
+        changes: { add: ['P1'], remove: ['wontfix'] },
+        current: ['needs-triage'],
+        existing: ['P1', 'wontfix'],
+      }),
+    ).toEqual({ added: [], removed: [], rejected: ['P1', 'wontfix'] })
   })
 })
 
 describe('publicación de los ficheros del agente', () => {
-  it('publica body compuesto, comment y solo los labels existentes', () => {
+  it('publica body saneado, comment saneado y solo los labels permitidos', () => {
     const { root, enricher } = workspace()
     const originalBodyPath = writeOriginal(root)
     const bodyFile = join(enricher, 'body.md')
     writeFileSync(
       bodyFile,
-      '## Descripción\n\nCuerpo enriquecido.\n\n### Reportero\n- Email: inyectado@example.com',
+      [
+        '## Descripción',
+        '',
+        'Cuerpo enriquecido.',
+        '![externa](https://evil.example/a.png)',
+        'hola @ana',
+        '',
+        '### Reportero',
+        '- Email: inyectado@example.com',
+      ].join('\n'),
     )
-    writeFileSync(join(enricher, 'comment.md'), '## Agent Brief\n\n- [ ] Criterio.')
-    writeFileSync(join(enricher, 'labels.txt'), 'feature\nmissing\nbad;label\nready-for-agent\n')
-    const calls: string[][] = []
-    const gh = vi.fn((args: string[]) => {
-      calls.push(args)
-      if (args[0] === 'label')
-        return JSON.stringify([{ name: 'feature' }, { name: 'ready-for-agent' }])
-      return ''
-    })
+    const commentFile = join(enricher, 'comment.md')
+    writeFileSync(commentFile, '## Agent Brief\n\n- [ ] Criterio.\n\n@ana')
+    writeFileSync(
+      join(enricher, 'labels.txt'),
+      'feature\nready-for-agent\nmissing\n-source:web-report\n',
+    )
+    const { gh, calls } = fakeGithub()
 
     const result = publishReport({
-      repository: 'org/repo',
+      repository: REPO,
       issueNumber: 12,
       root: enricher,
       originalBodyPath,
@@ -190,42 +311,121 @@ describe('publicación de los ficheros del agente', () => {
     expect(result).toEqual({
       body: true,
       comment: true,
+      bodyAsComment: false,
       labels: ['feature', 'ready-for-agent'],
-      rejected: ['missing', 'bad;label'],
+      removed: ['needs-triage'],
+      rejected: ['missing', 'source:web-report'],
     })
     expect(calls).toEqual([
-      ['label', 'list', '--repo', 'org/repo', '--limit', '1000', '--json', 'name'],
-      ['issue', 'edit', '12', '--repo', 'org/repo', '--body-file', bodyFile],
-      ['issue', 'comment', '12', '--repo', 'org/repo', '--body-file', join(enricher, 'comment.md')],
+      ['issue', 'view', '12', '--repo', REPO, '--json', 'body,labels'],
+      ['label', 'list', '--repo', REPO, '--limit', '1000', '--json', 'name'],
+      ['issue', 'edit', '12', '--repo', REPO, '--body-file', bodyFile],
+      ['issue', 'comment', '12', '--repo', REPO, '--body-file', commentFile],
       [
         'issue',
         'edit',
         '12',
         '--repo',
-        'org/repo',
+        REPO,
         '--add-label',
         'feature',
         '--add-label',
         'ready-for-agent',
+        '--remove-label',
+        'needs-triage',
       ],
     ])
-    expect(calls.flat()).not.toContain('--body')
-    expect(calls.flat()).not.toContain('--title')
 
-    const published = readFileSync(bodyFile, 'utf8')
-    expect(published).toContain('- Identificador: user-1')
-    expect(published).toContain(ATTACHMENT)
-    expect(published).not.toContain('inyectado@example.com')
-    expect(published.match(/^### Reportero$/gm)).toHaveLength(1)
+    const publishedBody = readFileSync(bodyFile, 'utf8')
+    expect(publishedBody).toContain('- Identificador: user-1')
+    expect(publishedBody).toContain(ATTACHMENT)
+    expect(publishedBody).not.toContain('evil.example')
+    expect(publishedBody).not.toContain('inyectado@example.com')
+    expect(publishedBody).toContain('@\u200bana')
+    expect(publishedBody.match(/^### Reportero$/gm)).toHaveLength(1)
+
+    const publishedComment = readFileSync(commentFile, 'utf8')
+    expect(publishedComment).toContain('@\u200bana')
+  })
+
+  it('si el cuerpo cambió lo publica como comentario y no lo sobrescribe', () => {
+    const { root, enricher } = workspace()
+    const originalBodyPath = writeOriginal(root)
+    const bodyFile = join(enricher, 'body.md')
+    writeFileSync(bodyFile, '## Descripción\n\nTexto nuevo.')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { gh, calls } = fakeGithub({ body: 'Editado por la persona' })
+
+    const result = publishReport({
+      repository: REPO,
+      issueNumber: 12,
+      root: enricher,
+      originalBodyPath,
+      gh,
+    })
+
+    expect(result.bodyAsComment).toBe(true)
+    expect(
+      calls.some(
+        (args) => args[0] === 'issue' && args[1] === 'edit' && args.includes('--body-file'),
+      ),
+    ).toBe(false)
+    expect(
+      calls.some(
+        (args) => args[0] === 'issue' && args[1] === 'comment' && args.includes('--body-file'),
+      ),
+    ).toBe(true)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('cuerpo cambió'))
+    warn.mockRestore()
+  })
+
+  it('no considera cambiado el cuerpo por un salto de línea final', () => {
+    const { root, enricher } = workspace()
+    const originalBodyPath = writeOriginal(root, `${ORIGINAL_BODY}\n`)
+    const bodyFile = join(enricher, 'body.md')
+    writeFileSync(bodyFile, '## Descripción\n\nTexto.')
+    const { gh, calls } = fakeGithub()
+
+    const result = publishReport({
+      repository: REPO,
+      issueNumber: 12,
+      root: enricher,
+      originalBodyPath,
+      gh,
+    })
+
+    expect(result.bodyAsComment).toBe(false)
+    expect(
+      calls.some(
+        (args) => args[0] === 'issue' && args[1] === 'edit' && args.includes('--body-file'),
+      ),
+    ).toBe(true)
+  })
+
+  it('permite quitar un label sin añadir ninguno', () => {
+    const { enricher } = workspace()
+    writeFileSync(join(enricher, 'labels.txt'), '-needs-triage\n')
+    const { gh, calls } = fakeGithub()
+
+    expect(publishReport({ repository: REPO, issueNumber: 12, root: enricher, gh })).toMatchObject({
+      labels: [],
+      removed: ['needs-triage'],
+    })
+    expect(calls).toEqual([
+      ['issue', 'view', '12', '--repo', REPO, '--json', 'body,labels'],
+      ['issue', 'edit', '12', '--repo', REPO, '--remove-label', 'needs-triage'],
+    ])
   })
 
   it('no llama a gh si no hay ficheros', () => {
     const { enricher } = workspace()
     const gh = vi.fn()
-    expect(publishReport({ repository: 'org/repo', issueNumber: 12, root: enricher, gh })).toEqual({
+    expect(publishReport({ repository: REPO, issueNumber: 12, root: enricher, gh })).toEqual({
       body: false,
       comment: false,
+      bodyAsComment: false,
       labels: [],
+      removed: [],
       rejected: [],
     })
     expect(gh).not.toHaveBeenCalled()
@@ -235,9 +435,9 @@ describe('publicación de los ficheros del agente', () => {
     const { enricher } = workspace()
     writeFileSync(join(enricher, 'body.md'), '## Descripción\n\nTexto.')
     const gh = vi.fn()
-    expect(() =>
-      publishReport({ repository: 'org/repo', issueNumber: 12, root: enricher, gh }),
-    ).toThrow('cuerpo original')
+    expect(() => publishReport({ repository: REPO, issueNumber: 12, root: enricher, gh })).toThrow(
+      'cuerpo original',
+    )
     expect(gh).not.toHaveBeenCalled()
   })
 
@@ -245,28 +445,25 @@ describe('publicación de los ficheros del agente', () => {
     const { enricher } = workspace()
     writeFileSync(join(enricher, 'body.md'), 'a'.repeat(MAX_BODY_BYTES + 1))
     const gh = vi.fn()
-    expect(() =>
-      publishReport({ repository: 'org/repo', issueNumber: 12, root: enricher, gh }),
-    ).toThrow('supera')
+    expect(() => publishReport({ repository: REPO, issueNumber: 12, root: enricher, gh })).toThrow(
+      'supera',
+    )
     expect(gh).not.toHaveBeenCalled()
   })
 
   it('no publica labels si todos se rechazan', () => {
     const { enricher } = workspace()
     writeFileSync(join(enricher, 'labels.txt'), 'missing\nbad;label\n')
-    const gh = vi.fn((args: string[]) => {
-      if (args[0] === 'label') return JSON.stringify([{ name: 'feature' }])
-      return ''
-    })
-    const result = publishReport({ repository: 'org/repo', issueNumber: 12, root: enricher, gh })
-    expect(result).toEqual({
-      body: false,
-      comment: false,
+    const { gh, calls } = fakeGithub()
+
+    expect(publishReport({ repository: REPO, issueNumber: 12, root: enricher, gh })).toMatchObject({
       labels: [],
+      removed: [],
       rejected: ['missing', 'bad;label'],
     })
-    expect(gh.mock.calls.map(([args]) => args)).toEqual([
-      ['label', 'list', '--repo', 'org/repo', '--limit', '1000', '--json', 'name'],
+    expect(calls).toEqual([
+      ['issue', 'view', '12', '--repo', REPO, '--json', 'body,labels'],
+      ['label', 'list', '--repo', REPO, '--limit', '1000', '--json', 'name'],
     ])
   })
 })
