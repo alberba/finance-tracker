@@ -32,7 +32,7 @@ const MAX_RETRIES = 2
 const RETRY_DELAY_MS = 500
 
 export interface CreatedIssue {
-  /** Cuerpo con el que se creó la issue; el enricher lo sobrescribe después. */
+  /** Lo que escribió la persona; el enricher sobrescribe el cuerpo de la issue después. */
   body: string
   number: number
   url: string
@@ -89,14 +89,12 @@ function attachmentLines(outcomes: AttachmentOutcome[]): string[] {
   return [...lines, '']
 }
 
-export function buildIssueBody(
+/** Lo que escribió la persona (resumen, descripción y adjuntos), sin contexto ni reportero. */
+function reportContentLines(
   payload: IssueReportPayload,
-  reporter: IssueReporter,
-  attachments: AttachmentOutcome[] = [],
-): string {
-  const reportType = canonicalReportType(payload.type)
-  const githubType = getGithubIssueType(payload.type)
-  const lines = ['## Reporte desde la web', '', '### Resumen', payload.summary, '']
+  attachments: AttachmentOutcome[],
+): string[] {
+  const lines = ['### Resumen', payload.summary, '']
 
   // Sin descripción no se escribe el encabezado: una sección vacía ensucia la issue.
   if (payload.description) {
@@ -106,6 +104,25 @@ export function buildIssueBody(
   if (attachments.length > 0) {
     lines.push(...attachmentLines(attachments))
   }
+  return lines
+}
+
+/** Lo que se guarda como «Tu descripción» (#401): nada del contexto ni de quien reporta. */
+export function buildOriginalReportBody(
+  payload: IssueReportPayload,
+  attachments: AttachmentOutcome[] = [],
+): string {
+  return reportContentLines(payload, attachments).join('\n').trim()
+}
+
+export function buildIssueBody(
+  payload: IssueReportPayload,
+  reporter: IssueReporter,
+  attachments: AttachmentOutcome[] = [],
+): string {
+  const reportType = canonicalReportType(payload.type)
+  const githubType = getGithubIssueType(payload.type)
+  const lines = ['## Reporte desde la web', '', ...reportContentLines(payload, attachments)]
 
   lines.push(
     '### Contexto de ejecución',
@@ -296,6 +313,6 @@ export function createIssueFromWebReport(
       })
     }
 
-    return { number: issueNumber, url: issueUrl, body: baseRequestBody.body }
+    return { number: issueNumber, url: issueUrl, body: buildOriginalReportBody(payload, outcomes) }
   })
 }

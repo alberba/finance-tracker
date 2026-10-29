@@ -135,7 +135,7 @@ watch(
           number="03"
           title="Descripción en GitHub"
           title-id="report-issue-description-title"
-          description="Es el texto actual de la issue; la automatización puede haberlo reformulado."
+          description="Es el texto actual de la issue en GitHub."
         >
           <ReportMarkdown :source="props.detail.issueDescription" />
         </NumberedBlock>

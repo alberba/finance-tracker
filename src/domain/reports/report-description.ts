@@ -17,7 +17,8 @@ function visibleBody(body: string): string {
   let skipping = false
   for (const line of lines) {
     const trimmed = line.trim()
-    if (/^###\s/.test(trimmed)) skipping = PRIVATE_HEADINGS.has(trimmed)
+    // Un encabezado de nivel ≤ 3 cierra la sección privada, sea `##` o `###`.
+    if (/^#{1,3}\s/.test(trimmed)) skipping = PRIVATE_HEADINGS.has(trimmed)
     if (skipping || TITLE_LINE.test(trimmed) || AUTOMATION_MARKER_LINE.test(line)) continue
     kept.push(line)
   }

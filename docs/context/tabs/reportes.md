@@ -33,7 +33,7 @@ Identificadores clave en UI:
    páginas de 20 entradas con «Cargar más reportes». Los cierres asíncronos del workflow aparecen en la
    siguiente carga, sin sondeos ni caché de estado.
 4. Al abrir un detalle se pide `GET /api/reports/:n`, que resuelve la cadena de duplicadas y lee el
-   hilo de la issue seguida, y devuelve `original` (el cuerpo del alta, sin contexto ni reportero) e
+   hilo de la issue seguida, y devuelve `original` (lo que escribió la persona al crear el reporte) e
    `issueDescription` (el cuerpo actual de la issue propia si difiere; `null` al seguir una principal). El cliente marca la lectura con `POST /api/reports/:n/seen`.
 5. Las aclaraciones propias se publican, editan y borran con `POST`/`PATCH`/`DELETE` sobre
    `/api/reports/:n/comments`. Solo se permiten con el hilo abierto.

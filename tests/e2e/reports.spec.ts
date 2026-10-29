@@ -747,6 +747,8 @@ test.describe('Mis reportes E2E', () => {
     )
     await page.locator('[data-report-entry="901"]').click()
     await expect(page.getByText('En la demo no se envían comentarios.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Tu descripción' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Descripción en GitHub' })).toBeVisible()
     expect(apiCalls).toEqual([])
   })
 

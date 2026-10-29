@@ -2,6 +2,7 @@ import { Effect } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildIssueBody,
+  buildOriginalReportBody,
   createIssueFromWebReport as createIssueFromWebReportEffect,
   type GithubIssueClient,
   type IssueReporter,
@@ -300,6 +301,16 @@ describe('github issues service', () => {
       ),
     ).rejects.toThrow(/GITHUB_ISSUE_TOKEN o GITHUB_TOKEN/)
     expect(fakeFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('buildOriginalReportBody', () => {
+  it('guarda lo que escribió la persona sin contexto de ejecución ni reportero', () => {
+    const body = buildOriginalReportBody({ ...payload, description: 'Detalle' })
+
+    expect(body).toBe(`### Resumen\n${payload.summary}\n\n### Problema o solicitud\nDetalle`)
+    expect(body).not.toContain('Contexto de ejecución')
+    expect(body).not.toContain('Reportero')
   })
 })
 
