@@ -32,7 +32,7 @@ export interface IssueCandidates {
   status: 'searched' | 'partial' | 'unavailable'
 }
 
-/** Fallo de la búsqueda; el enricher decide si degrada a «unavailable». */
+/** Fallo de la búsqueda; el alta de reportes decide si degrada a «unavailable». */
 export class IssueCandidatesError extends Data.TaggedError('IssueCandidatesError')<{
   message: string
   status?: number

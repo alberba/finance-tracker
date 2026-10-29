@@ -150,6 +150,9 @@ export function normalizeBotLogin(login: string): string {
 function isAutomation(comment: RawComment): boolean {
   const author = comment.author
   if (author?.type === 'Bot' || author?.__typename === 'Bot') return true
+  // El flujo web comenta con `github-actions[bot]`; el sufijo cubre payloads sin
+  // `type`/`__typename` y cualquier otra GitHub App.
+  if (/\[bot\]$/i.test(author?.login ?? '')) return true
   return AUTOMATION_MARKERS.some((marker) => comment.body.includes(marker))
 }
 

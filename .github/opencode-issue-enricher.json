@@ -2,17 +2,45 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode-go/deepseek-v4.1-flash",
   "enabled_providers": ["opencode-go"],
-  "provider": {
+  "providers": {
     "opencode-go": {
-      "options": {
+      "settings": {
         "apiKey": "{env:OPENCODE_GO_API_KEY}"
       }
     }
   },
-  "autoupdate": false,
+  "update": "disable",
   "share": "disabled",
-  "snapshot": false,
-  "permission": {
-    "*": "deny"
-  }
+  "snapshots": false,
+  "agents": {
+    "build": {
+      "steps": 25,
+      "permissions": [{ "action": "question", "resource": "*", "effect": "deny" }]
+    }
+  },
+  "permissions": [
+    { "action": "*", "resource": "*", "effect": "deny" },
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.dev.vars*", "effect": "deny" },
+    { "action": "read", "resource": ".git/*", "effect": "deny" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "skill", "resource": "create-issue", "effect": "allow" },
+    { "action": "edit", "resource": ".scratch/*", "effect": "allow" },
+    { "action": "edit", "resource": "/tmp/*", "effect": "allow" },
+    { "action": "shell", "resource": "gh issue view *", "effect": "allow" },
+    { "action": "shell", "resource": "gh issue list *", "effect": "allow" },
+    { "action": "shell", "resource": "gh issue comment *", "effect": "allow" },
+    { "action": "shell", "resource": "gh issue edit *", "effect": "allow" },
+    { "action": "shell", "resource": "gh label list *", "effect": "allow" },
+    { "action": "shell", "resource": "gh label create *", "effect": "allow" },
+    { "action": "shell", "resource": "git remote -v", "effect": "allow" },
+    { "action": "shell", "resource": "mktemp *", "effect": "allow" },
+    { "action": "shell", "resource": "rm /tmp/*", "effect": "allow" },
+    { "action": "shell", "resource": "rm .scratch/*", "effect": "allow" },
+    { "action": "shell", "resource": "gh issue create *", "effect": "deny" },
+    { "action": "shell", "resource": "gh issue create --help", "effect": "allow" }
+  ]
 }

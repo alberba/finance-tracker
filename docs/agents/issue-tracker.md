@@ -13,6 +13,12 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Reportes web
+
+El workflow de reportes web parte de una issue que ya existe (`source:web-report`). Ahí «publicar»
+significa comentar el contexto y ajustar sus labels y estado de triage en esa misma issue, nunca
+crear otra.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

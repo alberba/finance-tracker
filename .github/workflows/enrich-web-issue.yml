@@ -9,10 +9,6 @@ on:
         description: Número del reporte web que se quiere analizar o reintentar
         type: number
         required: true
-      reprocess:
-        description: Reevaluar una issue ya enriquecida después de responder sus decisiones pendientes
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -29,7 +25,6 @@ jobs:
     timeout-minutes: 15
     env:
       ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
-      REPROCESS_REPORT: ${{ inputs.reprocess && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -37,21 +32,15 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Install OpenCode
         run: npm install --global @opencode/cli@2.2.0
-      - name: Fetch report and candidate issues
-        id: prepare
+      - name: Add context to the existing issue
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node .github/scripts/enrich-web-issue.mjs prepare
-      - name: Analyze code with DeepSeek and create-issue
-        if: steps.prepare.outputs.skip != 'true'
-        env:
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/opencode-issue-enricher.json
         run: |
           test -n "$OPENCODE_GO_API_KEY" || { echo 'Falta el secret OPENCODE_GO_API_KEY'; exit 1; }
-          node .github/scripts/enrich-web-issue.mjs analyze
-      - name: Publish body and Agent Brief
-        if: steps.prepare.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node .github/scripts/enrich-web-issue.mjs publish
+          {
+            printf '@create-issue Añade contexto a la issue https://github.com/%s/issues/%s, que ya existe, y actualiza sus labels y estado de triage; no crees una issue nueva.\n\n' "$GITHUB_REPOSITORY" "$ISSUE_NUMBER"
+            gh issue view "$ISSUE_NUMBER" --json title,body --jq '"Título: " + .title + "\n\nDescripción:\n\n" + .body' | sed '/^### Reportero$/,$d'
+          } > "$RUNNER_TEMP/prompt.md"
+          opencode run --standalone "$(cat "$RUNNER_TEMP/prompt.md")"

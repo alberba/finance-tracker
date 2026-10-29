@@ -56,7 +56,8 @@ Identificadores clave en UI:
   `<!-- finance-tracker:reporter-comment user=<userId> -->` más la cabecera visible.
 - Solo son editables si el marcador coincide con el principal **y** el autor es el login del bot
   (`GITHUB_BOT_LOGIN` o `GET /user`). Un marcador con otro autor se oculta.
-- La automatización (`<!-- web-report-agent-brief -->`, `<!-- web-report-enriched -->` o autor bot)
+- La automatización (cualquier autor `*[bot]`, como `github-actions[bot]`, o los marcadores históricos
+  `<!-- web-report-agent-brief -->` y `<!-- web-report-enriched -->`)
   y las aclaraciones de otras personas no salen del servidor. Un comentario sin marcador solo cuenta
   como mantenedor si `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`; los de terceros se
   ocultan. El login del bot se compara normalizado (`app[bot]` en REST, `app` en GraphQL).

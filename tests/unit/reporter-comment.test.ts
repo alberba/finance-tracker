@@ -116,6 +116,15 @@ describe('classifyComment', () => {
     expect(classifyComment(comment(body, 'someone'), context)).toBe('automation')
   })
 
+  it('clasifica el bot de Actions aunque el payload no traiga el tipo Bot', () => {
+    expect(
+      classifyComment(
+        comment('## Agent Brief\n\nContexto del reporte.', 'github-actions[bot]'),
+        context,
+      ),
+    ).toBe('automation')
+  })
+
   it('considera propia solo la aclaración con marcador propio y autor bot', () => {
     const body = buildReporterCommentBody({ userId: USER, text: 'mía' })
     expect(classifyComment(comment(body), context)).toBe('mine')

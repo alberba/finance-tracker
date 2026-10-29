@@ -205,12 +205,12 @@ Reglas:
   existe), y separa adjuntos por la última aparición de `REPORTER_ATTACHMENTS_MARKER`. Cada línea de
   adjunto debe ser `![alt]\(url\)` con URL `https://` de un host permitido (`github.com/user-attachments/`,
   `*.githubusercontent.com`); las demás se descartan. Máximo 3.
-- `classifyComment` (orden): `automation` si `author.type === 'Bot'` o el cuerpo contiene algún
-  `AUTOMATION_MARKERS`; si empieza por el marcador de reportero: `mine` solo si `userId` coincide
-  **y** `author.login === botLogin` [D1], si no `hidden`; el resto solo es `maintainer` si
-  `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`. Un comentario de terceros se oculta: no
-  es una respuesta del mantenedor. El login del bot se compara normalizado (`app[bot]` de REST y
-  `app` de GraphQL son la misma cuenta).
+- `classifyComment` (orden): `automation` si `author.type === 'Bot'`, el login termina en `[bot]`
+  o el cuerpo contiene algún `AUTOMATION_MARKERS`; si empieza por el marcador de reportero: `mine`
+  solo si `userId` coincide **y** `author.login === botLogin` [D1], si no `hidden`; el resto solo es
+  `maintainer` si `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`. Un comentario de terceros
+  se oculta: no es una respuesta del mantenedor. El login del bot se compara normalizado (`app[bot]`
+  de REST y `app` de GraphQL son la misma cuenta).
 - Al editar, el servidor reconstruye el cuerpo completo con `buildReporterCommentBody` (reponiendo el
   marcador con el `userId` **del principal**, nunca el parseado).
 
@@ -836,8 +836,9 @@ Eliminar (no dejar código muerto):
 - `src/lib/server/issue-duplicate-checker.ts` y `tests/unit/issue-duplicate-checker.test.ts`.
 - En `github-issues.ts`: `checkDuplicate`, `findDuplicate`, imports de `IssueDuplicate*`, `duplicate` de
   `CreatedIssue` y `GithubIssueClient`.
-- `src/lib/server/issue-duplicates.ts` **se mantiene**; pasa a **definir** `IssueDuplicateInput`
-  (hoy vive en el checker eliminado) y el enricher sigue importándolo igual.
+- `src/lib/server/issue-duplicates.ts` **se mantiene**: define `IssueDuplicateInput` (hoy vive en
+  el checker eliminado) y lo consume el enricher. Cuando el enricher pasa a `@create-issue`, el
+  módulo se conserva para la búsqueda de candidatas del alta de reportes.
 - `RuntimeEnv.OPENCODE_GO_API_KEY` (el servidor ya no la usa; el secret de Actions es independiente),
   `.dev.vars.example` (línea 22), `README.md` (línea 253 y el párrafo que la distingue de la de Actions),
   `docs/operations/self-hosting.md` (mención en `.env`).
@@ -873,8 +874,8 @@ Regla: capa más baja posible, un fallo por razón.
   cerrada `COMPLETED` (se muestra su estado), título/labels «duplicate» sin efecto, hop intermedio roto.
 - `reporter-comment.test.ts`: build/parse ida y vuelta (con y sin adjuntos), marcador no anclado ⇒ `null`,
   `userId` inválido, `<!--` y `@mención` neutralizados (y revertidos al parsear), host de adjunto no
-  permitido descartado, `classifyComment` (automatización por marcador y por `Bot`; `mine` solo con
-  autor = bot; marcador ajeno; marcador con autor distinto ⇒ `hidden`; mantenedor).
+  permitido descartado, `classifyComment` (automatización por marcador, por `Bot` y por login `[bot]`;
+  `mine` solo con autor = bot; marcador ajeno; marcador con autor distinto ⇒ `hidden`; mantenedor).
 - `report-updates.test.ts`: umbrales, comentarios propios/automatización no cuentan, cambio de estado de
   original vs seguida.
 - `report-markdown.test.ts`: `<script>`, `<img onerror>`, `javascript:`/`data:` en enlaces e imágenes,
@@ -939,8 +940,10 @@ TDD en 1–4 (`tdd` skill). Cada paso deja `pnpm check` y los tests del paso en 
    tests existentes en verde) → `issue-reports/github.ts` → `service.ts` → rutas `/api/reports/**` →
    tests de ruta e integración.
 4. **Alta**: retirar el checker y `duplicate`, registrar propiedad, `tracked`, limpieza de env/docs/tests
-   (§10). Comprobar que `.github/scripts/enrich-web-issue.mjs` sigue importando
-   `findIssueCandidates` (test `enrich-web-issue.test.ts` en verde).
+   (§10). Comprobar que el enricher conserva `findIssueCandidates` mientras exista.
+   > Nota posterior: el workflow pasó a ejecutar `@create-issue` directamente; se eliminaron
+   > `.github/scripts/enrich-web-issue.mjs` y `.opencode/agents/issue-enricher.md`.
+   > `src/lib/server/issue-duplicates.ts` se conserva para el alta de reportes.
 5. **Backfill**: plan puro + CLI + `package.json` + prueba de integración + docs de operaciones.
 6. **Cliente base**: `reports-api.ts`, `stores/reports.ts`, `useReportsRoute`, `useReportThread`,
    ruta Astro, shell/UI store/popstate, `useSectionNavigation.navigateToReports`.

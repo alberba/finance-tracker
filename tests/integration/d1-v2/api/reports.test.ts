@@ -658,11 +658,11 @@ describe('/api/reports', () => {
         },
         {
           id: 2,
-          body: '<!-- web-report-agent-brief --> brief',
+          body: '## Agent Brief\n\nContexto añadido por la skill.',
           issueNumber: 20,
           createdAt: '2026-10-02T01:00:00.000Z',
           updatedAt: '2026-10-02T01:00:00.000Z',
-          login: 'github-actions',
+          login: 'github-actions[bot]',
         },
         {
           id: 3,
