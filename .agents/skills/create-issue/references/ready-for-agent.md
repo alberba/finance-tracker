@@ -2,46 +2,57 @@
 
 Una issue está `ready-for-agent` cuando un agente puede empezar sin pedir decisiones de producto o alcance y puede comprobar cuándo ha terminado. No exige causa raíz ni implementación prescrita si el problema y el resultado pedido están definidos.
 
-## Reporte y brief
+## Cuerpo autocontenido
 
-El **cuerpo** lo lee una persona en un minuto. Sigue el template del repo y cuenta el **problema** y la **solución** en pocas líneas, más lo **fuera de alcance** si alguien podría discutirlo y las decisiones pendientes si las hay. Criterios, interfaces, evidencia y notas de implementación van solo en el brief.
-
-- **bug:** el problema es el efecto para el usuario con un caso actual/esperado y el estado de verificación; la solución, el resultado pedido.
-- **feature:** el problema es la necesidad del usuario; la solución, el resultado pedido y las decisiones abiertas.
-- **task/epic:** el problema que se resuelve y el cambio que lo resuelve.
-
-Distingue impacto reportado de alcance comprobado, conserva los adjuntos y termina con el enlace al brief publicado.
-
-El comentario **Agent Brief** es la especificación autosuficiente y el contrato de implementación; el reporte y la discusión aportan contexto. Su extensión la marca lo necesario para implementar y validar, no un límite de palabras, y retoma del cuerpo los hechos que necesite para entenderse solo.
+El cuerpo es la única especificación: una persona lo entiende leyendo las primeras secciones y un agente lo ejecuta sin reconstruir la conversación. Su extensión la marca lo necesario para implementar y validar; si pide mucho más de 400 palabras, suele ser señal de dividir la issue.
 
 ```markdown
-## Agent Brief
+## Problema
+Efecto para el usuario o necesidad, en pocas líneas.
 
-**Categoría:** tipo de tarea según el tracker.
-**Resumen:** resultado que debe conseguirse.
+## Resultado
+Qué debe ocurrir tras el cambio, con los casos límite y errores del alcance.
+**Sin cambios:** comportamiento vecino que debe seguir igual.
 
-**Comportamiento actual:**
-Qué ocurre, con el caso y la evidencia. Distinguir verificado, reportado e hipótesis.
+## Decisiones
+- Decisión tomada, con su motivo.
 
-**Comportamiento deseado:**
-Qué debe ocurrir tras el cambio, con los casos límite y errores del alcance acordado.
+## Decisiones pendientes
+- Pregunta concreta, con el contexto para contestarla.
 
-**Interfaces clave:**
-Conceptos, tipos, funciones o configuración implicados y sus contratos.
+## Para implementar
+**Objetivo:** dónde se actúa: partner, fuente, pantalla, comando, modelo o concepto exactos.
 
-**Criterios de aceptación:**
+**Terminado cuando:**
+- [ ] Resultado concreto, completo y verificable por separado.
 
-- [ ] Resultados concretos, completos y verificables por separado.
+**Evidencia:** hechos con fecha y estado (verificado, reportado o hipótesis).
 
-**Fuera de alcance:**
-Trabajo adyacente excluido.
+**Dónde mirar:** conceptos, tipos y símbolos que se pueden buscar.
+
+**Fuera de alcance:** trabajo adyacente excluido.
 ```
 
-Describir comportamiento y contratos, y dejar la implementación al agente. Nombrar interfaces y tipos que orienten aunque el código cambie, en vez de rutas, números de línea o estructura interna.
+`## Decisiones` y `## Decisiones pendientes` aparecen solo si tienen contenido; `**Evidencia:**` y `**Dónde mirar:**`, cuando aportan algo.
 
-Conservar las decisiones de la conversación, la reproducción y la evidencia necesarias para ejecutar sin reconstruir la discusión. Añadir dependencias y accesos que condicionen empezar o validar, y enlazar las guías operativas existentes. Los hallazgos adyacentes no amplían el alcance.
+- **bug:** el problema es el efecto con un caso actual/esperado y su estado de verificación; el resultado, el comportamiento corregido; **Sin cambios**, las regresiones que vigilar.
+- **feature:** el problema es la necesidad del usuario; el resultado, lo pedido y sus casos límite.
+- **task/epic:** el problema que se resuelve y el cambio que lo resuelve.
 
-Si el repo exige otra estructura de brief o una firma, seguirla. Al actualizarlo, editar el comentario vigente y mantener el enlace del cuerpo.
+El **Objetivo** nombra el blanco exacto: ante un blanco ambiguo, un agente elige uno plausible en vez de preguntar. **Terminado cuando** es la condición de cierre: cada criterio se comprueba solo, sin interpretar el resto.
+
+La issue guarda lo que el código no cuenta: decisiones y su motivo, evidencia externa fechada (producción, ERP, reportes), reproducción, dependencias y accesos que condicionan empezar o validar, y enlaces a guías existentes. Lo que el agente obtiene leyendo el código (rutas, números de línea, recuentos, estructura actual) lo calcula al implementar; en la issue se nombra el concepto o el símbolo. Los hallazgos adyacentes no amplían el alcance.
+
+## Revisión de huecos
+
+Antes de recomendar `ready-for-agent`, releer el borrador como el agente que lo implementará sin la conversación:
+
+- ¿El Objetivo admite más de un blanco?
+- ¿Cada criterio de **Terminado cuando** se puede comprobar?
+- ¿Algún dato del cuerpo es una foto del código que caducará?
+- ¿Falta una decisión que cambie el resultado, el alcance o la validación?
+
+Resolver con contexto y código lo que se pueda; lo que dependa del usuario pasa a `## Decisiones pendientes`.
 
 ## Cerrar pendientes
 
@@ -49,15 +60,19 @@ Reutilizar decisiones ya tomadas; en issues existentes, leer body, comentarios y
 
 En bugs, verificar el caso con evidencia existente o una reproducción de solo lectura dentro del alcance autorizado, y registrar si queda confirmado, no reproducido o sin datos. Un reporte suficiente deja lista la investigación sin acceso a producción; si ese acceso es indispensable para empezar, explicitar el bloqueo.
 
-Si queda una decisión de producto o alcance que impida empezar, escribirla en `## Decisiones pendientes` del cuerpo como pregunta concreta, con el contexto necesario para contestar. El brief puede explicar sus consecuencias técnicas, pero no es el único lugar donde aparecen las preguntas. Mantener separadas las propuestas y las decisiones confirmadas; una propuesta del agente no resuelve por sí sola un pendiente.
-
-Revisar los comentarios de la propia issue antes de actualizar ese bloque. Cuando el usuario resuelva una decisión, incorporarla al reporte y al brief, retirar la pregunta resuelta y reevaluar el estado. Las elecciones de implementación que el agente pueda tomar con el código no se convierten en decisiones de producto ni en preguntas al usuario.
+Mantener separadas las propuestas y las decisiones confirmadas; una propuesta del agente no resuelve por sí sola un pendiente. Las elecciones de implementación que el agente pueda tomar con el código no se convierten en preguntas al usuario.
 
 Si el usuario prefiere registrar la issue antes de resolver las preguntas, conservar lo establecido y los pendientes visibles en el cuerpo, bajo el estado que corresponda.
 
+## Actualizar una issue existente
+
+La especificación vigente vive en un solo sitio. Cuando el usuario cambia o resuelve una decisión, editar ese sitio: la sección afectada del cuerpo (Resultado, Decisiones, **Terminado cuando**, **Fuera de alcance**), retirar la pregunta resuelta y reevaluar el estado. La evidencia nueva de un reporte duplicado va en un comentario.
+
+Si el cuerpo no tiene `## Para implementar` y hay un comentario `## Agent Brief`, la especificación es el último de esos comentarios: editarlo y dejar el cuerpo como está. Si el repo documenta otra estructura o una firma para la especificación separada, seguirla en las issues nuevas.
+
 ## Estado
 
-Tener un Agent Brief no implica estar lista. Aplicar `ready-for-agent` solo tras verificar el brief y comprobar que no quedan decisiones que impidan empezar. Mapear a las convenciones locales y mantener un único estado de triage:
+Aplicar `ready-for-agent` solo tras la revisión de huecos, sin decisiones que impidan empezar. Mapear a las convenciones locales y mantener un único estado de triage:
 
 - `ready-for-agent`: especificación suficiente, ejecutable por un agente.
 - `needs-info`: falta un dato concreto del reportador.
