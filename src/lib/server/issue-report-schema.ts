@@ -19,13 +19,48 @@ const ISSUE_TYPES = ['bug', 'feature', 'enhancement'] as const
 const MAX_ATTACHMENT_BASE64_LENGTH = Math.ceil(ISSUE_ATTACHMENT_MAX_BYTES / 3) * 4
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
 
-const attachmentInputSchema = z.object({
+export const attachmentInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
   contentType: z.string().trim().max(64),
   data: z.string().max(MAX_ATTACHMENT_BASE64_LENGTH),
 })
 
-type AttachmentInput = z.output<typeof attachmentInputSchema>
+export type AttachmentInput = z.output<typeof attachmentInputSchema>
+
+/**
+ * Validación definitiva de una lista de adjuntos: tipo declarado, base64 bien
+ * formado, tamaño real y cabecera coherente. La comparten el alta del reporte y
+ * las aclaraciones.
+ */
+export function refineAttachments(
+  attachments: AttachmentInput[] | undefined,
+  ctx: z.RefinementCtx,
+  pathPrefix: Array<string | number> = ['attachments'],
+): void {
+  attachments?.forEach((attachment, index) => {
+    const path = [...pathPrefix, index]
+    if (!isIssueAttachmentType(attachment.contentType)) {
+      ctx.addIssue({ code: 'custom', path, message: 'Formato de adjunto no admitido.' })
+      return
+    }
+    if (!BASE64_PATTERN.test(attachment.data) || attachment.data.length % 4 !== 0) {
+      ctx.addIssue({ code: 'custom', path, message: 'Adjunto con base64 mal formado.' })
+      return
+    }
+    const bytes = decodeBase64(attachment.data)
+    if (bytes.byteLength > ISSUE_ATTACHMENT_MAX_BYTES) {
+      ctx.addIssue({ code: 'custom', path, message: 'Adjunto por encima del límite de tamaño.' })
+      return
+    }
+    if (sniffImageType(bytes) !== attachment.contentType) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: 'El contenido del adjunto no coincide con su tipo.',
+      })
+    }
+  })
+}
 
 export const issueReportSchema = z
   .object({
@@ -42,31 +77,7 @@ export const issueReportSchema = z
     }),
     attachments: z.array(attachmentInputSchema).max(ISSUE_ATTACHMENT_MAX_COUNT).optional(),
   })
-  .superRefine((report, ctx) => {
-    report.attachments?.forEach((attachment, index) => {
-      const path = ['attachments', index]
-      if (!isIssueAttachmentType(attachment.contentType)) {
-        ctx.addIssue({ code: 'custom', path, message: 'Formato de adjunto no admitido.' })
-        return
-      }
-      if (!BASE64_PATTERN.test(attachment.data) || attachment.data.length % 4 !== 0) {
-        ctx.addIssue({ code: 'custom', path, message: 'Adjunto con base64 mal formado.' })
-        return
-      }
-      const bytes = decodeBase64(attachment.data)
-      if (bytes.byteLength > ISSUE_ATTACHMENT_MAX_BYTES) {
-        ctx.addIssue({ code: 'custom', path, message: 'Adjunto por encima del límite de tamaño.' })
-        return
-      }
-      if (sniffImageType(bytes) !== attachment.contentType) {
-        ctx.addIssue({
-          code: 'custom',
-          path,
-          message: 'El contenido del adjunto no coincide con su tipo.',
-        })
-      }
-    })
-  })
+  .superRefine((report, ctx) => refineAttachments(report.attachments, ctx))
   .transform((parsed) => ({
     ...parsed,
     type: parsed.type === 'enhancement' ? ('feature' as const) : parsed.type,
@@ -100,7 +111,7 @@ function sanitizeText(value: string): string {
   return removeControlCharacters(value).replace(/\r\n/g, '\n').trim()
 }
 
-function sanitizeMultilineText(value: string): string {
+export function sanitizeMultilineText(value: string): string {
   return removeControlCharacters(value.replace(/\r\n?/g, '\n'), true).trim()
 }
 
@@ -123,6 +134,11 @@ function resolveAttachment(attachment: AttachmentInput): ResolvedAttachment {
     contentType: attachment.contentType,
     bytes: decodeBase64(attachment.data),
   }
+}
+
+/** Decodifica los adjuntos ya validados por `attachmentInputSchema`/`issueReportSchema`. */
+export function resolveAttachments(attachments: AttachmentInput[] = []): ResolvedAttachment[] {
+  return attachments.map(resolveAttachment)
 }
 
 export function parseIssueReportPayload(input: unknown): IssueReportPayload {

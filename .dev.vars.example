@@ -17,9 +17,12 @@ COINGECKO_API_PLAN=demo
 # [vars] ni en ningún entorno desplegado — solo aquí y en CI efímero.
 TEST_AUTH_ENABLED=true
 
-# Opcional: comprobar duplicadas con DeepSeek antes de crear la issue.
-# El análisis de código usa el secret homónimo de GitHub Actions.
-OPENCODE_GO_API_KEY=
+# GitHub: alta de reportes y seguimiento en «Mis reportes».
+GITHUB_ISSUE_TOKEN=
+GITHUB_OWNER=
+GITHUB_REPO=
+# Opcional: login del bot cuando el token es de una GitHub App (no puede leer /user).
+GITHUB_BOT_LOGIN=
 
 # Autenticación integrada (#275).
 BETTER_AUTH_URL=http://localhost:4321

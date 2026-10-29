@@ -15,4 +15,6 @@ export * from './integrations'
 export * from './bitvavo'
 export * from './sync'
 
+export * from './reports'
+
 export * from './authentication'

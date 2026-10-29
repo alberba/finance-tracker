@@ -49,11 +49,17 @@ function createDefaultUiState(): UiState {
 
 export const useUiStore = defineStore('ui', () => {
   const ui = reactive<UiState>(createDefaultUiState())
+  /** Página montada por el shell: una sección normal o «Mis reportes» (#340). */
+  const page = ref<'section' | 'reports'>('section')
   const settingsTab = ref('accounts')
   const setupAction = ref<'account' | 'movement' | null>(null)
 
   function setActiveSection(sectionId: SectionId): void {
     ui.activeSection = sectionId
+  }
+
+  function setPage(nextPage: 'section' | 'reports'): void {
+    page.value = nextPage
   }
 
   function setDashboardMonth(month: Month): void {
@@ -66,9 +72,11 @@ export const useUiStore = defineStore('ui', () => {
 
   return {
     ui,
+    page,
     settingsTab,
     setupAction,
     setActiveSection,
+    setPage,
     setDashboardMonth,
     replaceUiState,
   }

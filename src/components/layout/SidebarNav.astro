@@ -4,39 +4,37 @@ import type { SectionId } from '../../scripts/types'
 import NavIcon from './NavIcon.astro'
 
 export interface Props {
-  activeSection: SectionId
+  activeSection: SectionId | null
 }
 
 const { activeSection } = Astro.props
 ---
 
 <nav class="flex w-full flex-col gap-1" aria-label="Secciones del tracker">
-  {
-    APP_SECTIONS.map((section) => {
-      const isActive = section.id === activeSection
+  {APP_SECTIONS.map((section) => {
+    const isActive = section.id === activeSection
 
-      return (
-        <button
-          type="button"
-          class="group text-ink-muted hover:bg-ink-text/6 hover:text-ink-text aria-[current=page]:bg-primary-fill aria-[current=page]:text-on-primary focus-visible:outline-primary sidebar-collapsed:min-h-10 sidebar-collapsed:justify-center sidebar-collapsed:px-0 relative flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.9375rem] font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 aria-[current=page]:font-bold"
-          data-nav-item
-          data-section={section.id}
-          aria-controls={section.id}
-          aria-current={isActive ? 'page' : undefined}
-          aria-label={section.label}
+    return (
+      <button
+        type="button"
+        class="group text-ink-muted hover:bg-ink-text/6 hover:text-ink-text aria-[current=page]:bg-primary-fill aria-[current=page]:text-on-primary focus-visible:outline-primary sidebar-collapsed:min-h-10 sidebar-collapsed:justify-center sidebar-collapsed:px-0 relative flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-[0.9375rem] font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 aria-[current=page]:font-bold"
+        data-nav-item
+        data-section={section.id}
+        aria-controls={section.id}
+        aria-current={isActive ? 'page' : undefined}
+        aria-label={section.label}
+      >
+        <span class="size-4.5 shrink-0 [&>svg]:size-full" aria-hidden="true">
+          <NavIcon sectionId={section.id} />
+        </span>
+        {/* Collapsed, the label turns into a tooltip beside the icon. */}
+        <span
+          class="sidebar-collapsed:pointer-events-none sidebar-collapsed:absolute sidebar-collapsed:left-[calc(100%+0.75rem)] sidebar-collapsed:z-50 sidebar-collapsed:rounded-sm sidebar-collapsed:bg-ink sidebar-collapsed:px-3 sidebar-collapsed:py-1.5 sidebar-collapsed:text-sm sidebar-collapsed:font-semibold sidebar-collapsed:text-ink-text sidebar-collapsed:opacity-0 sidebar-collapsed:shadow-pop sidebar-collapsed:group-hover:opacity-100 sidebar-collapsed:group-focus-visible:opacity-100 truncate"
+          aria-hidden="true"
         >
-          <span class="size-4.5 shrink-0 [&>svg]:size-full" aria-hidden="true">
-            <NavIcon sectionId={section.id} />
-          </span>
-          {/* Collapsed, the label turns into a tooltip beside the icon. */}
-          <span
-            class="sidebar-collapsed:pointer-events-none sidebar-collapsed:absolute sidebar-collapsed:left-[calc(100%+0.75rem)] sidebar-collapsed:z-50 sidebar-collapsed:rounded-sm sidebar-collapsed:bg-ink sidebar-collapsed:px-3 sidebar-collapsed:py-1.5 sidebar-collapsed:text-sm sidebar-collapsed:font-semibold sidebar-collapsed:text-ink-text sidebar-collapsed:opacity-0 sidebar-collapsed:shadow-pop sidebar-collapsed:group-hover:opacity-100 sidebar-collapsed:group-focus-visible:opacity-100 truncate"
-            aria-hidden="true"
-          >
-            {section.label}
-          </span>
-        </button>
-      )
-    })
-  }
+          {section.label}
+        </span>
+      </button>
+    )
+  })}
 </nav>

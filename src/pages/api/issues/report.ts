@@ -1,41 +1,15 @@
 import type { APIRoute } from 'astro'
 import { ZodError } from 'zod'
-import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
-import { reportApiRouteFailure } from '../../../lib/server/error-tracking'
-import { createIssueFromWebReport } from '../../../lib/server/github-issues'
-import { runHttp } from '../../../lib/server/runtime'
-import { parseIssueReportPayload } from '../../../lib/server/issue-report-schema'
+
+import { getDb } from '../../../db/client'
+import * as issueReportsRepository from '../../../db/repositories/issue-reports'
 import { requirePrincipal, withApiErrorHandling } from '../../../lib/server/api-auth'
-
-type Bucket = {
-  count: number
-  windowStart: number
-}
-
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_REQUESTS = 5
-const buckets = new Map<string, Bucket>()
-
-function now(): number {
-  return Date.now()
-}
-
-function consumeRateLimit(key: string): boolean {
-  const currentTime = now()
-  const current = buckets.get(key)
-  if (!current || currentTime - current.windowStart > RATE_LIMIT_WINDOW_MS) {
-    buckets.set(key, { count: 1, windowStart: currentTime })
-    return true
-  }
-
-  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false
-  }
-
-  current.count += 1
-  buckets.set(key, current)
-  return true
-}
+import { getRuntimeEnvFromLocals } from '../../../lib/server/cloudflare-env'
+import { reportApiRouteFailure, reportReportSideFailure } from '../../../lib/server/error-tracking'
+import { createIssueFromWebReport } from '../../../lib/server/github-issues'
+import { parseIssueReportPayload } from '../../../lib/server/issue-report-schema'
+import { reportSubmissionLimiter } from '../../../lib/server/rate-limit'
+import { runHttp, runServer } from '../../../lib/server/runtime'
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -50,7 +24,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
 export const POST: APIRoute = async ({ request, locals }) =>
   withApiErrorHandling('/api/issues/report', async () => {
     const principal = requirePrincipal(locals)
-    if (!consumeRateLimit(principal.userId)) {
+    if (!reportSubmissionLimiter.consume(principal.userId)) {
       return jsonResponse({ ok: false, error: 'Rate limit excedido. Intenta en un minuto.' }, 429)
     }
 
@@ -66,14 +40,33 @@ export const POST: APIRoute = async ({ request, locals }) =>
         name: principal.name ?? null,
       }
       const created = await runHttp(createIssueFromWebReport(payload, reporter, env))
+
+      // La propiedad es lo único que guarda el servidor; si falla, la issue ya
+      // existe y el acuse lo dice sin reintentar la creación ([D7]).
+      let tracked = true
+      try {
+        await runServer(
+          getDb(locals),
+          issueReportsRepository.recordSubmission(
+            principal.userId,
+            created.number,
+            new Date().toISOString(),
+          ),
+        )
+      } catch (error) {
+        tracked = false
+        console.error('[issues/report] No se pudo registrar la propiedad del reporte', error)
+        reportReportSideFailure({ stage: 'track', reason: 'db' })
+      }
+
       return jsonResponse(
         {
           ok: true,
           issueNumber: created.number,
           issueUrl: created.url,
-          ...(created.duplicate ? { duplicate: true } : {}),
+          tracked,
         },
-        created.duplicate ? 200 : 201,
+        201,
       )
     } catch (error) {
       if (error instanceof ZodError) {

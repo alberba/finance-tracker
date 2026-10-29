@@ -1,257 +1,161 @@
-# Contexto de la pestaña Reportes
+# Contexto de «Mis reportes»
 
 ## Resumen
 
-La pestaña `Reportes` permite crear reportes web que terminan como issues de GitHub.
-El flujo es crear un reporte simple; no hay automatización asociada.
+«Mis reportes» convierte el acuse momentáneo del alta en una página de seguimiento (`/reportes`).
+Cada cuenta ve sus reportes con el estado nativo de GitHub, el hilo de aclaraciones y avisos de
+novedades. GitHub es la fuente de verdad; la app solo guarda propiedad y última lectura.
 
-Ruta pública:
+Rutas:
 
-- `/reportes`
+- `/reportes` — lista de la cuenta.
+- `/reportes?reporte=<n>` — detalle e hilo de un reporte.
+- El alta sigue viviendo en el panel lateral (`#global-report-dialog`) y en la hoja «Más» móvil.
 
 Identificadores clave en UI:
 
 - sección raíz: `#reports`
-- formulario: `#issue-report-form`
-- estado: `#issue-report-status`
-- checkbox opcional Claude: `#issue-report-mention-claude`
+- título: `reports-title`
+- filas de lista: `[data-report-entry="<n>"]`
+- detalle: `[data-report-detail]`, `[data-thread-item="<id>"]`
+- «Nuevo»: `PillTag` dentro de la fila
+- avisos: `[data-reports-updates]` (botón flotante), `[data-reports-badge]` y
+  `[data-reports-badge-dot]` (hoja «Más»)
+- acuse del panel: `#issue-report-status`, `[data-report-tracking-link]`
 
-## Objetivo funcional actual
+## Flujo funcional
 
-- Permitir enviar errores o mejoras desde la UI.
-- Crear una issue en GitHub con contexto técnico básico.
+1. La persona envía un reporte desde el panel. `POST /api/issues/report` crea siempre la issue
+   (ya no hay comprobación previa de duplicadas) y registra la propiedad en `issue_reports`.
+2. El acuse muestra `Reporte creado: #N` y un enlace «Ver en Mis reportes». Si el registro falló,
+   muestra que aparecerá en cuanto se recupere y el POST responde `tracked: false`.
+3. `/reportes` pide `GET /api/reports`: consultas GraphQL con alias por número (≤50 por petición) y
+   páginas de 20 entradas con «Cargar más reportes». Los cierres asíncronos del workflow aparecen en la
+   siguiente carga, sin sondeos ni caché de estado.
+4. Al abrir un detalle se pide `GET /api/reports/:n`, que resuelve la cadena de duplicadas y lee el
+   hilo de la issue seguida. El cliente marca la lectura con `POST /api/reports/:n/seen`.
+5. Las aclaraciones propias se publican, editan y borran con `POST`/`PATCH`/`DELETE` sobre
+   `/api/reports/:n/comments`. Solo se permiten con el hilo abierto.
+
+## Estados
+
+- Abierto (incluida reapertura), cerrado completado, cerrado no planificado y cerrado sin motivo.
+- `CLOSED` + `DUPLICATE` + `duplicateOf`: la entrada sigue a la principal, hasta tres saltos. Se
+  muestra «Se sigue en #N» con el estado de la principal y el `#original` como secundario.
+- Principal inaccesible, de otro repositorio o cadena cíclica: se conserva el estado original y se
+  avisa de que el enlace no está disponible.
+- Issue borrada, transferida o inaccesible: la entrada queda con número, fecha y «Este reporte ya no
+  está disponible en GitHub», sin hilo.
+- Solo los campos nativos producen duplicadas; un título o label «duplicate» no hace nada.
+- La UI distingue carga, lista vacía, error y 404 uniforme («No encontramos este reporte en tu
+  cuenta»). El 404 de un número ajeno no llama a GitHub.
+
+## Aclaraciones
+
+- Se publican con el token del bot y un marcador oculto
+  `<!-- finance-tracker:reporter-comment user=<userId> -->` más la cabecera visible.
+- Solo son editables si el marcador coincide con el principal **y** el autor es el login del bot
+  (`GITHUB_BOT_LOGIN` o `GET /user`). Un marcador con otro autor se oculta.
+- La automatización (cualquier autor `*[bot]`, como `github-actions[bot]`, o los marcadores históricos
+  `<!-- web-report-agent-brief -->` y `<!-- web-report-enriched -->`)
+  y las aclaraciones de otras personas no salen del servidor. Un comentario sin marcador solo cuenta
+  como mantenedor si `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`; los de terceros se
+  ocultan. El login del bot se compara normalizado (`app[bot]` en REST, `app` en GraphQL).
+- Los adjuntos comparten límites y validación con el alta (`src/domain/reports/issue-attachments.ts`)
+  y se enlazan tras un segundo marcador. Quitar uno de la aclaración no lo borra de GitHub; la UI lo
+  avisa.
+- El texto se sanea (comentarios HTML y menciones) y el Markdown se renderiza por AST, sin `v-html`.
+  Enlaces solo `http(s)`; imágenes solo de hosts de GitHub.
+- Con el hilo cerrado, el compositor se sustituye por un aviso de solo lectura.
+- Un fallo de GitHub se muestra como error y conserva el texto y los adjuntos del borrador.
+
+## Novedades
+
+- Cuentan un cambio de estado y un comentario nuevo del mantenedor en la issue seguida. No cuentan
+  los comentarios propios ni los de la automatización.
+- El store arranca en `GlobalReportLauncher` (una carga por app) y `ReportsPage` fuerza otra al
+  entrar. Sin `setInterval` ni `visibilitychange`.
+- El aviso aparece en el punto del botón flotante, en el contador y el punto de la hoja «Más» y en
+  la etiqueta «Nuevo» de la entrada. Se apaga al abrir el detalle (`lastSeenAt`), también si el POST
+  falla (estado local hasta la próxima carga).
+
+## Persistencia
+
+- Tabla `issue_reports` (`user_id`, `issue_number`, `submitted_at`, `last_seen_at`), única por
+  `(user_id, issue_number)`. Migración `migrations-v2/0016_issue_reports.sql`.
+- Repositorio `src/db/repositories/issue-reports.ts`; todas las funciones reciben `userId`.
+- `submittedAt` se toma del servidor al crear; en el backfill, de `created_at` de GitHub.
+- `pnpm reports:backfill` recupera los reportes anteriores leyendo el bloque `### Reportero`. Simula
+  por defecto, escribe con `--execute`, es idempotente y lista las issues que no puede asociar. Se
+  documenta en `docs/operations/self-hosting.md`.
 
 ## Archivos principales
 
-### UI
+### Dominio
 
-- `src/components/reports/GlobalReportLauncher.vue`: botón flotante «Reportar» (escritorio)
-- `src/components/reports/IssueReportPanel.vue`: el formulario en un panel lateral
-- `src/components/layout/MobileNavigation.astro`: «Crear reporte» en la hoja «Más» (móvil)
+- `src/domain/reports/report-entry.ts` — contrato compartido.
+- `src/domain/reports/report-status.ts` — `resolveFollowed` y textos de estado.
+- `src/domain/reports/reporter-comment.ts` — marcadores, saneado y clasificación.
+- `src/domain/reports/report-updates.ts` — cálculo de novedades.
+- `src/domain/reports/report-markdown.ts` — parser Markdown a AST.
+- `src/domain/reports/demo-reports.ts` — fixtures de la demo.
 
-### Lógica frontend
+### Servidor
 
-- `src/services/issue-report-api.ts`
-- `src/scripts/types.ts`
+- `src/lib/server/github-api.ts` — configuración y cabeceras compartidas.
+- `src/lib/server/rate-limit.ts` — limitador de ventana fija por cuenta, con purga de claves
+  caducadas (5/min altas, 10/min comentarios, 30/min lecturas de la lista).
+- `src/lib/server/issue-reports/github.ts` — GraphQL de estado/hilo y REST de comentarios.
+- `src/lib/server/issue-reports/service.ts` — casos de uso.
+- `src/lib/server/issue-reports/errors.ts` — errores y respuestas.
+- `src/pages/api/reports/**` — rutas de lista, detalle, visto y comentarios.
+- `src/lib/server/issue-report-schema.ts` y `issue-reports/comment-schema.ts` — validación.
+- `src/lib/server/github-issues.ts` — alta de la issue.
 
-### Backend/API
+### Cliente
 
-- `src/pages/api/issues/report.ts`
-- `src/lib/server/issue-report-schema.ts`
-- `src/lib/server/github-issues.ts`
-- `src/lib/server/issue-attachments.ts`: sube los adjuntos a `uploads.github.com`
-- `src/lib/server/issue-duplicate-checker.ts`: comprobación semántica previa con DeepSeek
-- `.github/workflows/enrich-web-issue.yml`: análisis asíncrono con OpenCode
-- `.github/scripts/enrich-web-issue.mjs`: contexto, validación y publicación del análisis
-- `src/lib/server/cloudflare-env.ts`
+- `src/services/reports-api.ts`, `src/stores/reports.ts`
+- `src/composables/useReportThread.ts`, `src/composables/useReportsRoute.ts`
+- `src/components/reports/ReportsPage.vue` y subcomponentes (`ReportList`, `ReportListItem`,
+  `ReportStatus`, `ReportDetail`, `ReportThread`, `ReportComposer`, `ReportMarkdown`)
+- `src/scripts/app/reports-badge.ts`
+- `src/pages/reportes.astro`, `src/components/FinanceWorkspace.vue`,
+  `src/components/FinanceTrackerShell.astro`, `src/scripts/app/shell-navigation.ts`
 
-### Dominio compartido
+### Backfill
 
-- `src/domain/reports/issue-attachments.ts`: límites, tipos admitidos y detección por cabecera,
-  compartidos por el panel y el servidor
+- `scripts/reports-backfill.ts` (CLI) y `scripts/lib/reports-backfill-plan.ts` (plan puro).
 
-### Tests relacionados
+## Demo
 
-- `tests/e2e/reports.spec.ts`
-- `tests/e2e/finance-tracker.spec.ts`
-- `tests/e2e/pages/FinanceTrackerPage.ts`
-- `tests/unit/issue-report-schema.test.ts`
-- `tests/unit/issue-report-domain.test.ts`
-- `tests/unit/issue-report-route.test.ts`
-- `tests/unit/issue-attachments.test.ts`: reglas de adjuntos (dominio y esquema)
-- `tests/unit/github-issues.test.ts`
-- `tests/unit/github-issue-attachments.test.ts`: subida de adjuntos y lectura del id del repositorio
-- `tests/unit/issue-duplicate-checker.test.ts`: duplicadas, plazo, errores y clave ausente
-- `tests/unit/enrich-web-issue.test.ts`: JSON del agente, metadatos, publicación y reintentos
+`/demo` y `?demo=1` muestran dos reportes ficticios: uno abierto con respuesta del mantenedor y una
+aclaración, y otro cerrado como duplicado de una principal ficticia. No hay llamadas a
+`/api/reports`; el compositor aparece desactivado con «En la demo no se envían comentarios». Las
+fechas son constantes y sirven de fixtures para la E2E.
 
-### Documentación/utilidades relacionadas
+## Tests
 
-- `README.md`
-- `.github/scripts/issue-context.mjs`
-- `tests/unit/issue-context.test.ts`
-
-## Composición
-
-No es una sección propia: `FinanceWorkspace.vue` monta `GlobalReportLauncher`, que abre
-`IssueReportPanel` (panel lateral con tipo, resumen, descripción opcional, el aviso de publicación
-en repositorio público y el estado del envío). En móvil lo abre la hoja «Más».
-
-## Flujo técnico
-
-1. El usuario abre `/reportes`.
-2. `src/components/reports/IssueReportPanel.vue` envía el formulario con `src/services/issue-report-api.ts`.
-3. Se construye un payload con:
-   - `type`
-   - `summary`
-   - `description`
-   - `section`
-   - `context.userAgent`
-   - `context.pathname`
-   - `context.timestamp`
-   - `description` solo si la persona escribió algo
-4. El frontend hace `POST` a `/api/issues/report`.
-5. `issue-report-schema.ts` valida y normaliza el payload. Los campos retirados
-   (`expectedResult`, `actualResult`, `stepsToReproduce`) y cualquier dato de reportero que traiga
-   el payload se descartan.
-6. `github-issues.ts` crea la issue contra GitHub API. El reportero (`userId`, `email`, `name`) sale
-   siempre del principal autenticado que resuelve la ruta, nunca del payload.
-7. La UI muestra:
-   - issue nueva: `Reporte creado: #...`
-   - duplicada abierta: `Este reporte ya existe: #...`, con enlace y sin otra publicación
-   - error: `No se pudo crear la issue: ...`
-
-## Defaults y comportamiento actual
-
-- El botón principal usa lenguaje de producto: `Crear reporte`.
-
-## Contrato del payload
-
-Campos esperados por backend:
-
-- `type`: `"bug"` | `"feature"` (`"enhancement"` se acepta como alias antiguo)
-- `summary`: string, 5-140
-- `description?`: string, opcional y sin mínimo; máximo 8000 (sin descripción el backend deja `""`)
-- `section`: string
-- `context.userAgent`: string
-- `context.pathname`: string
-- `context.timestamp`: string
-- `attachments?`: hasta 3 imágenes, cada una `{ name, contentType, data }` con `data` en base64.
-  Tipos admitidos: PNG, JPEG, WebP y GIF; máximo 2 MB decodificados por imagen. El servidor
-  comprueba el tipo por la cabecera real del fichero, no solo por el declarado. Los límites viven
-  en `src/domain/reports/issue-attachments.ts`, compartidos por el panel y el servidor.
-
-Campos retirados del contrato: `expectedResult`, `actualResult` y `stepsToReproduce`. Los
-clientes antiguos que los envíen siguen funcionando porque se ignoran.
-
-## Labels y cuerpo de la issue
-
-Labels base:
-
-- `source:web-report`
-- `needs-triage`
-- `bug` o `feature`
-
-El backend también intenta asignar el tipo estructurado `Bug` o `Feature`.
-Si GitHub no admite tipos estructurados, crea la issue igualmente con sus labels.
-
-La API conserva el reporte original y comprueba duplicadas antes de crear cuando tiene
-`OPENCODE_GO_API_KEY`: consulta hasta 20 candidatas abiertas y cerradas y pide una decisión breve
-a DeepSeek. Solo una coincidencia del mismo problema y alcance con una abierta devuelve su enlace
-sin crear otra issue ni subir adjuntos (`200`, `duplicate: true`). Se descartan números inventados
-y candidatas con cuerpo truncado. La búsqueda tiene un plazo de 3 s; el modelo, de 8 s. Sin clave
-o ante fallos se crea igualmente el reporte. La comprobación es limitada y puede omitir coincidencias.
-
-Después de crear, el workflow **Analyze web report** ejecuta OpenCode con DeepSeek en un checkout.
-Carga `.agents/skills/create-issue/SKILL.md`, explora el código y lee hasta 10 candidatas con hasta
-10 comentarios por candidata. Prepara el cuerpo según el template (sin template: `## Descripción`
-y `## Notas técnicas`) y un Agent Brief con hechos contrastados, hipótesis y pendientes. Las
-referencias a cerradas se interpretan como posibles recurrencias. La decisión `duplicate` del
-agente contiene el número de una candidata abierta y un motivo contrastado. El script revalida
-la candidata y cierra el reporte con `state: closed`, `state_reason: duplicate` y
-`duplicate_issue_id` (id de base de datos de la principal, no su número). Es el cierre nativo de
-GitHub; no se sustituye por texto en la descripción ni por un label. Verifica la relación con
-GraphQL (`state`, `stateReason`, `duplicateOf`); ante dudas o contexto insuficiente no cierra.
-
-El script de publicación exige JSON válido, carga de la skill, lectura de código y fin del análisis.
-Conserva el bloque de adjuntos y los metadatos del reporte, que no se pasan al agente; reemplaza
-el cuerpo, publica el brief enlazado y verifica el resultado. Los reintentos reutilizan el comentario
-del bot y omiten issues ya enriquecidas. Si detecta una edición humana antes de sustituir el cuerpo,
-interrumpe la publicación. El agente devuelve `category`, `triage` y `pendingDecisions`: el publicador corrige los labels de
-categoría, retira estados anteriores (incluido `status:triage`) y conserva los demás labels.
-Aplica `ready-for-agent` solo con decisiones resueltas y brief verificado; `needs-info` y
-`ready-for-human` requieren preguntas o acciones bloqueantes explícitas. Si no está listo, el
-cuerpo contiene `## Decisiones pendientes` con esas preguntas. Las features visuales reciben
-`ui-change`. Las duplicadas cerradas no reciben un estado de implementación pendiente.
-El seguimiento de reportes de #340 debe detectar `CLOSED` + `DUPLICATE` y leer `duplicateOf`
-para mostrar «Cerrado como duplicado de #N», conservando la identidad y el hilo del reporte
-original. Debe respetar reaperturas y cambios manuales posteriores consultando el estado nativo
-actual, sin inferirlo de comentarios, labels ni cierres como completado o no planificado.
-
-El secret de Actions `OPENCODE_GO_API_KEY` se configura aparte del entorno del servidor. El workflow
-necesita estar en la rama por defecto; se puede reintentar con `workflow_dispatch` e `issue_number`.
-Con `reprocess: true` se puede reevaluar una issue ya enriquecida cuando cambie su discusión:
-reutiliza el brief del bot, evita enlaces duplicados y retira preguntas resueltas. El contexto
-incluye los comentarios de la propia issue y las candidatas en archivos separados; se exige
-lectura de la discusión y se comprueba que no haya cambiado antes de aplicar el triage.
-La configuración, los permisos y los límites están documentados en [Reportes web](../../../README.md#reportes-web).
-
-Secciones del cuerpo inicial que publica la API:
-
-- `### Resumen`
-- `### Problema o solicitud`: solo si hay descripción, con el texto tal cual lo escribió la persona
-- `### Adjuntos`: solo si hay capturas. Cada imagen subida aparece como referencia de imagen Markdown con su nombre y la URL devuelta; si una
-  subida falla, la línea dice que ese adjunto no se pudo subir y la issue se crea igualmente.
-  Las imágenes se suben antes de crear la issue, al endpoint de adjuntos de usuario de GitHub
-  (`uploads.github.com/user-attachments/assets`) con el mismo token.
-- `### Contexto de ejecución`: tipo, sección, ruta, navegador y fecha cliente
-- `### Reportero`: nombre, email e identificador de la cuenta, tomados del principal autenticado
-
-El formulario avisa, antes de enviar, de que el reporte se publica en un repositorio público con
-esos datos de cuenta.
-
-## Issue #29: revisión relevante para esta pestaña
-
-Issue revisada:
-
-- `#29`
-- título: `Mejorar vista de Presupuesto`
-
-Conclusión:
-
-- La issue no describe un problema de la pestaña `Reportes`.
-- Es una petición funcional para `Presupuesto`.
-- Sin embargo, la issue fue creada desde `Reportes`, por eso quedó con estos metadatos:
-  - `Sección: reports`
-  - `Ruta: /reportes`
-
-Lectura técnica:
-
-- El sistema registra la pestaña activa desde la que se envía el reporte.
-- No detecta automáticamente cuál es la pestaña realmente afectada por el contenido del texto.
-
-Implicación para futuros cambios:
-
-- Si quieres que las issues reflejen el área real afectada, hará falta añadir un campo explícito tipo `área afectada` o `sección afectada`.
-- Mientras eso no exista, `section` y `pathname` significan "desde dónde se envió", no necesariamente "qué módulo está afectado".
+- `tests/unit/report-status.test.ts`, `reporter-comment.test.ts`, `report-updates.test.ts`,
+  `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `issue-report-route.test.ts`.
+- `tests/integration/d1-v2/repositories/issue-reports.test.ts`, `api/reports.test.ts`,
+  `migrations/issue-reports.test.ts`, `reports-backfill.test.ts`.
+- `tests/component/ReportStatus.test.ts`, `ReportMarkdown.test.ts`, `ReportThread.test.ts`.
+- `tests/e2e/reports.spec.ts`: acuse y recarga, cierre como duplicada, hilo completo, solo lectura,
+  error que conserva el texto, demo sin API y lista vacía real.
 
 ## Riesgos y puntos sensibles
 
-- El copy de la pestaña puede cambiar con facilidad, pero los selectores de tests deben mantenerse estables.
-- Si cambia el contrato del payload, hay que actualizar:
-  - `src/services/issue-report-api.ts`
-  - `src/lib/server/issue-report-schema.ts`
-  - `src/pages/api/issues/report.ts`
-  - unit tests y E2E
-- Si se cambia el destino de GitHub issue a otra persistencia, esta pestaña dejará de ser solo una fachada de creación y necesitará nuevo estado local/servidor.
+- El contrato de la API y los tipos de `report-entry.ts` deben cambiar juntos; el cliente nunca
+  envía `userId`, URL de issue ni de comentario.
+- El token del bot necesita `GITHUB_BOT_LOGIN` si es una GitHub App; sin login resoluble, la lista y el
+  detalle fallan cerrados con un error visible en vez de perder avisos.
+- La lista pagina de 20 en 20 con «Cargar más reportes»; el contador de novedades cubre todas las
+  entradas de la cuenta.
+- El cuerpo de la issue nunca se edita desde la app.
 
-## Tests que protegen esta pestaña
+## Documentación relacionada
 
-`tests/e2e/reports.spec.ts` cubre:
-
-- render principal de la pestaña
-- flujo de creación del reporte
-- validación mínima de formulario
-- manejo de error del endpoint
-
-`tests/unit/issue-report-schema.test.ts` cubre:
-
-- normalización y validación del payload
-
-`tests/unit/github-issues.test.ts` cubre:
-
-- creación de issue
-- reintentos transitorios
-- labels correctas según el tipo
-
-## Checklist para futuras issues sobre Reportes
-
-Antes de tocar esta pestaña, revisar:
-
-1. `src/components/reports/*`
-2. `src/services/issue-report-api.ts`
-3. `src/pages/api/issues/report.ts`
-4. `src/lib/server/issue-report-schema.ts`
-5. `src/lib/server/github-issues.ts`
-6. `tests/e2e/reports.spec.ts`
-7. `tests/e2e/pages/FinanceTrackerPage.ts`
-8. `README.md`
+- `README.md` (§ «Reportes web»)
+- `docs/architecture/frontend.md`
+- `docs/operations/self-hosting.md`
+- `docs/playwright.md`

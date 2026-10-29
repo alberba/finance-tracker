@@ -522,6 +522,57 @@ test.describe('Finance tracker E2E', () => {
     ).toBeFocused()
   })
 
+  test('nuevo movimiento vuelve al inicio del panel tras guardar', async ({ page, tracker }) => {
+    await tracker.openTransactions()
+    const newMovement = tracker.transactionsSection.getByRole('button', {
+      name: 'Nuevo movimiento',
+    })
+    const panel = tracker.transactionPanel
+
+    await newMovement.click()
+    await expect(panel).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+    await panel.getByLabel('Importe').fill('12')
+    await panel.getByLabel('Descripción').fill('reabrir-panel')
+
+    await tracker.scrollTransactionPanelToBottom()
+    await panel.getByRole('button', { name: 'Guardar movimiento' }).click()
+    await expect(page.getByRole('status')).toContainText('Movimiento guardado.')
+    await expect(panel).toBeHidden()
+
+    await newMovement.click()
+    await expect(panel).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+  })
+
+  test('editar movimiento vuelve al inicio del panel en cada apertura', async ({ tracker }) => {
+    await tracker.openTransactions()
+    const newMovement = tracker.transactionsSection.getByRole('button', {
+      name: 'Nuevo movimiento',
+    })
+    const panel = tracker.transactionPanel
+
+    await newMovement.click()
+    await panel.getByLabel('Importe').fill('12')
+    await panel.getByLabel('Descripción').fill('editar-panel')
+    await panel.getByRole('button', { name: 'Guardar movimiento' }).click()
+    await expect(panel).toBeHidden()
+
+    await tracker.revealOlderTransactions()
+    const edit = tracker.transactionRow('editar-panel').getByRole('button', { name: /^Editar/ })
+    await edit.click()
+    await expect(panel.getByRole('heading', { name: 'Editar movimiento' })).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+
+    await tracker.scrollTransactionPanelToBottom()
+    await panel.getByRole('button', { name: 'Cancelar' }).click()
+    await expect(panel).toBeHidden()
+
+    await edit.click()
+    await expect(panel.getByRole('heading', { name: 'Editar movimiento' })).toBeVisible()
+    await tracker.expectTransactionPanelAtTop()
+  })
+
   test('movimientos cierra el panel lateral con Escape y con Cancelar', async ({
     page,
     tracker,
@@ -578,6 +629,7 @@ test.describe('Finance tracker E2E', () => {
           ok: true,
           issueNumber: 321,
           issueUrl: 'https://github.com/example/repo/issues/321',
+          tracked: true,
         }),
       })
     })
@@ -588,10 +640,16 @@ test.describe('Finance tracker E2E', () => {
       description: 'Después de guardar no persiste el estado.',
     })
 
-    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
-    await expect(tracker.issueReportStatus().locator('a')).toHaveAttribute(
+    const status = tracker.issueReportStatus()
+    await expect(status).toContainText('Reporte creado:')
+    await expect(status.getByRole('link', { name: '#321' })).toHaveAttribute(
       'href',
       'https://github.com/example/repo/issues/321',
     )
+    await expect(status.getByRole('link', { name: 'Ver en Mis reportes' })).toHaveAttribute(
+      'href',
+      '/reportes',
+    )
+    await expect(status).not.toContainText('No pudimos añadirlo a Mis reportes todavía')
   })
 })

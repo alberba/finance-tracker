@@ -57,6 +57,23 @@ describe('SidePanel', () => {
     wrapper.unmount()
   })
 
+  it('vuelve al inicio del cuerpo al abrirse de nuevo', async () => {
+    const wrapper = mountPanel(true)
+    await nextTick()
+    const body = wrapper.get('[data-side-panel-body]').element as HTMLElement
+    body.scrollTop = 240
+    expect(body.scrollTop).toBe(240)
+
+    await wrapper.setProps({ open: false } as Record<string, unknown>)
+    await nextTick()
+    await wrapper.setProps({ open: true } as Record<string, unknown>)
+    await nextTick()
+    await nextTick()
+
+    expect(body.scrollTop).toBe(0)
+    wrapper.unmount()
+  })
+
   it('devuelve el foco a quien lo abrió al cerrarse', async () => {
     const opener = document.createElement('button')
     document.body.append(opener)

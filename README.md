@@ -200,46 +200,78 @@ flujos de navegador están en [`docs/playwright.md`](docs/playwright.md).
 
 Este repo permite enviar reportes desde la web y convertirlos en issues de GitHub:
 
-1. Desde la sección **Reportes** puedes enviar un reporte (`error` o `mejora`).
+1. Desde el lanzador **Reportar** (o la hoja «Más» en móvil) puedes enviar un reporte (`error` o
+   `mejora`).
 2. El backend crea una issue en GitHub con labels base:
    - `source:web-report`
    - `needs-triage`
    - `bug` o `feature`
 3. El backend intenta asignar también el tipo estructurado de GitHub (`Bug` o `Feature`).
    Si el repositorio no lo admite, la issue se crea igualmente con sus labels.
-4. Antes de crear, la API puede comprobar duplicadas con DeepSeek: busca por palabras del
-   reporte en issues abiertas y cerradas y compara hasta 20 candidatas. Una coincidencia con el
-   mismo problema y alcance en una issue abierta devuelve su enlace sin crear otra ni subir
-   adjuntos. La búsqueda tarda como máximo 3 segundos y el modelo tiene un plazo de 8 segundos.
-   Sin clave, sin candidatas o ante un fallo, se crea el reporte original.
-5. Al abrirse una issue con `source:web-report`, **Analyze web report** ejecuta OpenCode con
-   DeepSeek V4.1 Flash en GitHub Actions. Carga la skill `create-issue`, lee el código
-   del checkout y las convenciones del repo, y compara hasta 10 candidatas con sus comentarios
-   (hasta 10 comentarios por candidata). La búsqueda es limitada y sus fallos o truncamientos
-   quedan en el contexto del análisis; las cerradas pueden ser recurrencias.
-6. El agente prepara el cuerpo principal y un Agent Brief. El script valida el JSON y que se haya
-   cargado la skill y leído código antes de publicar. Reemplaza el cuerpo sin añadir un campo de
-   enriquecimiento, conserva adjuntos y metadatos, publica el brief como comentario enlazado y
-   verifica el resultado. Una edición humana detectada durante el análisis impide sustituir el cuerpo.
-   Si el agente decide que es duplicada de una candidata abierta, la cierra con el motivo nativo
-   `duplicate` y el `duplicate_issue_id` de la principal, conservando cuerpo y adjuntos. Verifica
-   después `state: CLOSED`, `stateReason: DUPLICATE` y `duplicateOf` mediante GraphQL. No usa
-   texto en la descripción ni labels como sustituto del cierre nativo. Las cerradas se mantienen
-   como posibles recurrencias y las coincidencias dudosas solo como relacionadas. No aplica
-   `ready-for-agent` mientras haya decisiones pendientes. El agente clasifica el reporte por su
-   intención (`bug`, `feature`, `task` o `epic`) y el script sustituye el tipo y el estado de triage
-   anteriores tras verificar el brief. Si está listo, aplica `ready-for-agent`; si falta una
-   decisión, publica `## Decisiones pendientes` en el cuerpo y aplica `needs-info` (u otro estado
-   de triage justificado). Añade `ui-change` a las features visuales. Un fallo previo a
-   publicar deja el reporte original disponible.
+4. Al abrirse una issue con `source:web-report`, **Analyze web report** separa lectura, análisis y
+   publicación. Un paso previo, sin OpenCode, lee la issue con `gh issue view` (título, cuerpo sin el
+   bloque `### Reportero`, labels y comentarios) y escribe `.scratch/enricher/issue.json`. Después,
+   OpenCode ejecuta `opencode run` con DeepSeek V4.1 Flash y un mensaje que empieza por
+   `@create-issue`, identifica la issue por número y repositorio y añade su título y descripción; el
+   texto del reporte se declara dato no fiable. Ese paso no recibe `GH_TOKEN` ni `GITHUB_TOKEN` y no
+   tiene shell: la skill analiza el código y deja el resultado en `.scratch/enricher/body.md`,
+   `comment.md` y `labels.txt`. Un paso posterior, también sin OpenCode, publica esos ficheros con
+   `gh`: si existe `body.md`, quita cualquier `### Reportero` que venga del agente, añade el bloque
+   auténtico del cuerpo original y recupera los adjuntos, imágenes y contexto que falten; comenta
+   `comment.md` y añade solo labels que ya existan en el repositorio (validados contra
+   `gh label list` y una expresión regular estricta, con límites de tamaño). Antes de editar el
+   cuerpo vuelve a leer la issue y, si cambió, publica el resultado como comentario. Escapa toda
+   sintaxis de imagen y HTML en todo el texto, también en código, insertando U+200B; después
+   reinserta solo las imágenes inline exactas del cuerpo original cuya URL sea
+   `user-attachments` o `assets` del repositorio, nunca imágenes de referencia. Neutraliza menciones
+   en todo el texto, también en código (por eso un identificador como `@types/node` conserva un
+   U+200B invisible), salvo correos y URLs con host válido; los enlaces normales, incluidos
+   `localhost`, se conservan, y `<details>` o `<https://...>` se muestran como texto. Limita los
+   labels a la
+   allowlist documentada (triage, tipo y `ui-change`); las líneas `-label` quitan labels y el
+   estado/tipo anterior del mismo eje se sustituye. No hay agente propio ni plantilla, y el agente
+   no puede publicar ni crear labels o issues por sí mismo.
+5. La skill aplica los labels y el estado de triage según las convenciones del tracker. El
+   comentario lo publica el token de Actions (`github-actions[bot]`), que «Mis reportes» clasifica
+   como automatización por ser un bot y no muestra en el hilo. Sin `gh` en el paso de OpenCode, la
+   skill no busca duplicadas ni cierra la issue; solo prepara el cuerpo, el brief y los labels.
+
+El alta guarda una fila de propiedad en `issue_reports` y el acuse enlaza a **Mis reportes**
+(`/reportes`). Esa página lista los reportes de la cuenta con el estado nativo de GitHub, sigue a la
+principal cuando el reporte se cierra como duplicada (hasta tres saltos) y permite añadir, editar y
+borrar aclaraciones propias con adjuntos. GitHub sigue siendo la fuente de verdad del estado; no hay
+sondeos ni caché de estado en el servidor. Un fallo al registrar la propiedad devuelve `201` con
+`tracked: false` y el reporte se recupera con `pnpm reports:backfill`.
 
 La skill `create-issue` se instala con `npx skills` en `.agents/skills/create-issue/` (fijada en
 `skills-lock.json`) y OpenCode la descubre desde ahí. Para adoptar cambios de la skill, actualízala
-con `npx skills`. El agente usa `.opencode/agents/issue-enricher.md` y la configuración restringida de
-`.github/opencode-issue-enricher.json`: lectura y búsqueda, sin shell, escritura ni subagentes.
-El token de GitHub solo está disponible en los pasos de consulta y publicación; los datos de cuenta
-se conservan fuera del contexto que se entrega al agente. El código del repositorio sí se envía al
-proveedor al leerlo durante el análisis.
+con `npx skills`. La configuración restringida de `.github/opencode-issue-enricher.json` fija el
+modelo, no concede shell y limita la lectura al checkout (`/*` deny, `{GITHUB_WORKSPACE}*` allow,
+`..`, `~`, `.git`, `.env` y `.dev.vars` denegados); `grep`/`glob` rechazan `/*`, `~*` y `*..*`, y la
+escritura solo permite `.scratch/enricher/`. El prompt fija `body.md`, `comment.md` y `labels.txt`.
+El token de GitHub solo se expone a los pasos previo y posterior; el paso de OpenCode únicamente
+recibe `OPENCODE_GO_API_KEY`. `issue.json` elimina los marcadores
+`<!-- finance-tracker:reporter-comment user=... -->` y los logins de los comentarios. La tabla
+ALLOW/DENY vive en `tests/unit/opencode-permissions.test.ts` y la publicación en
+`.github/scripts/publish-web-report.mjs` con sus pruebas; el workflow se comprueba en
+`tests/unit/enrich-workflow.test.ts`.
+
+Riesgo residual: `OPENCODE_GO_API_KEY` está en el proceso de OpenCode; sin shell y sin lectura fuera
+del checkout no hay una vía conocida para leerla. El `GH_TOKEN` solo existe en los pasos previo y
+posterior, es efímero y tiene `issues:write` en este repositorio. El cuerpo original (incluido
+`### Reportero`) se guarda fuera del workspace y solo lo usa el script de publicación; el agente no
+lo ve. Si el agente escribe `body.md`, el script elimina cualquier `### Reportero` inyectado, añade
+al final el bloque auténtico y completa los adjuntos, imágenes y contexto que falten, de modo que
+`pnpm reports:backfill` sigue leyendo el identificador correcto. El script escapa imágenes y HTML
+en todo el texto, también en código; solo reinserta imágenes inline exactas del cuerpo original con
+URL `user-attachments` o `assets` del repositorio, nunca referencias, y no reescribe los enlaces
+normales (incluidos `localhost`, enlaces del reportero y `user-attachments`). Las menciones se
+neutralizan en todo el texto, también en código: el coste es un U+200B invisible en identificadores
+como `@types/node`, mientras correos y URLs con host válido se respetan. `<details>` y
+`<https://...>` se muestran como texto. Los labels se limitan a la allowlist de triage, tipo y
+`ui-change`; `ready-for-agent` se mantiene porque es el resultado esperado del flujo, y el
+estado/tipo anterior del mismo eje se sustituye. El código del repositorio y el contenido del
+reporte se envían al proveedor al leerlos durante el análisis.
 
 ### Variables y secrets requeridos
 
@@ -250,23 +282,20 @@ En el runtime (`locals.runtime.env`; en producción, el `.env` del servidor):
   no dispara este workflow automáticamente.
 - `GITHUB_OWNER`
 - `GITHUB_REPO`
-- `OPENCODE_GO_API_KEY` (opcional): habilita la comprobación semántica previa de duplicadas.
+- `GITHUB_BOT_LOGIN` (opcional): login de la cuenta que publica las aclaraciones. Necesario si el
+  token es de una GitHub App, porque `/user` no está disponible para ellas.
 
 En GitHub → Settings → Secrets and variables → Actions:
 
-- `OPENCODE_GO_API_KEY`: clave de OpenCode Go usada por el agente con DeepSeek. Es independiente
-  de la variable homónima del servidor: hay que configurarla también como secret de Actions.
+- `OPENCODE_GO_API_KEY`: clave de OpenCode Go usada por el análisis con DeepSeek en Actions. El
+  servidor ya no la usa; solo se configura como secret del workflow.
 - El token para publicar lo proporciona GitHub con `issues: write`; no requiere otro secret.
 
 El workflow tiene que estar en la rama por defecto para recibir `issues.opened`. Para reintentar un
 fallo o procesar un reporte anterior, ejecuta **Analyze web report** con `issue_number` desde Actions,
 o `gh workflow run enrich-web-issue.yml --repo alberba/finance-tracker -f issue_number=123`.
-Los reintentos reutilizan el brief del bot; si ya se publicó el cuerpo, omiten el análisis.
-Para reevaluar una issue después de responder sus decisiones pendientes, activa `reprocess` en
-Run workflow o añade `-f reprocess=true` al comando. Se leen los comentarios de la propia issue,
-se actualiza el brief vigente y se retiran las preguntas y estados resueltos. Los comentarios y
-las candidatas se entregan en archivos separados para que el agente pueda leerlos por partes.
-La versión de OpenCode está fijada en el workflow; cada análisis tiene hasta 25 pasos y 8 minutos.
+Cada ejecución vuelve a analizar la issue con la skill; no hay un estado de «ya enriquecida» que
+omita el análisis. La versión de OpenCode está fijada en el workflow.
 
 ### Labels recomendadas en GitHub
 

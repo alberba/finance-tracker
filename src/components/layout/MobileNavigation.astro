@@ -5,7 +5,7 @@ import NavIcon from './NavIcon.astro'
 import ThemeSwitcher from './ThemeSwitcher.vue'
 
 export interface Props {
-  activeSection: SectionId
+  activeSection: SectionId | null
 }
 
 const { activeSection } = Astro.props
@@ -38,31 +38,29 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
   class="bg-panel/96 border-line shadow-pop desk:hidden fixed inset-x-2.5 bottom-3.5 z-50 grid grid-cols-5 rounded-lg border p-1.5 pb-[calc(6px+env(safe-area-inset-bottom))]"
   aria-label="Navegación principal"
 >
-  {
-    primarySections.map((section) => {
-      const isActive = section.id === activeSection
+  {primarySections.map((section) => {
+    const isActive = section.id === activeSection
 
-      return (
-        <button
-          type="button"
-          class="text-text-muted hover:text-text-main aria-[current=page]:bg-primary-fill aria-[current=page]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 aria-[current=page]:font-bold"
-          data-nav-item
-          data-section={section.id}
-          aria-controls={section.id}
-          aria-current={isActive ? 'page' : undefined}
-          aria-label={section.label}
-        >
-          <span class="size-5 [&>svg]:size-full" aria-hidden="true">
-            <NavIcon sectionId={section.id} />
-          </span>
-          <span class="max-w-full truncate">{section.label}</span>
-        </button>
-      )
-    })
-  }
+    return (
+      <button
+        type="button"
+        class="text-text-muted hover:text-text-main aria-[current=page]:bg-primary-fill aria-[current=page]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 aria-[current=page]:font-bold"
+        data-nav-item
+        data-section={section.id}
+        aria-controls={section.id}
+        aria-current={isActive ? 'page' : undefined}
+        aria-label={section.label}
+      >
+        <span class="size-5 [&>svg]:size-full" aria-hidden="true">
+          <NavIcon sectionId={section.id} />
+        </span>
+        <span class="max-w-full truncate">{section.label}</span>
+      </button>
+    )
+  })}
   <button
     type="button"
-    class="text-text-muted hover:text-text-main data-[active=true]:bg-primary-fill data-[active=true]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 data-[active=true]:font-bold"
+    class="text-text-muted hover:text-text-main relative data-[active=true]:bg-primary-fill data-[active=true]:text-on-primary focus-visible:outline-primary flex min-h-13 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[0.625rem] font-semibold tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 data-[active=true]:font-bold"
     data-mobile-more-trigger
     data-active={isSecondarySectionActive ? 'true' : 'false'}
     aria-label="Más secciones"
@@ -76,6 +74,12 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
       <circle cx="19" cy="12" r="1.8"></circle>
     </svg>
     <span>Más</span>
+    <span
+      data-reports-badge-dot
+      class="bg-accent ring-panel absolute end-3 top-2 hidden size-2.5 rounded-full ring-2"
+      aria-hidden="true"
+      hidden
+    ></span>
   </button>
 </nav>
 
@@ -88,7 +92,9 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
   <header class="mb-4.5 flex items-start justify-between gap-3">
     <div class="grid gap-1">
       <p class="text-primary font-mono text-xs tracking-[0.16em] uppercase">Tu espacio</p>
-      <h2 id="mobile-more-title" class="font-display text-[1.375rem] font-bold">Más secciones</h2>
+      <h2 id="mobile-more-title" class="font-display text-[1.375rem] font-bold">
+        Más secciones
+      </h2>
     </div>
     <button
       type="button"
@@ -111,28 +117,26 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
   </header>
 
   <div class="border-line grid grid-cols-2 border-t">
-    {
-      secondarySections.map((section) => {
-        const isActive = section.id === activeSection
+    {secondarySections.map((section) => {
+      const isActive = section.id === activeSection
 
-        return (
-          <button
-            type="button"
-            class="border-line text-text-main aria-[current=page]:text-primary flex min-h-14 items-center gap-3 border-b px-1 text-left text-[0.9375rem] font-semibold even:border-l even:pl-4 aria-[current=page]:font-bold focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
-            data-nav-item
-            data-section={section.id}
-            aria-controls={section.id}
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={section.label}
-          >
-            <span class="text-text-muted size-5 shrink-0 [&>svg]:size-full" aria-hidden="true">
-              <NavIcon sectionId={section.id} />
-            </span>
-            <span>{section.label}</span>
-          </button>
-        )
-      })
-    }
+      return (
+        <button
+          type="button"
+          class="border-line text-text-main aria-[current=page]:text-primary flex min-h-14 items-center gap-3 border-b px-1 text-left text-[0.9375rem] font-semibold even:border-l even:pl-4 aria-[current=page]:font-bold focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
+          data-nav-item
+          data-section={section.id}
+          aria-controls={section.id}
+          aria-current={isActive ? 'page' : undefined}
+          aria-label={section.label}
+        >
+          <span class="text-text-muted size-5 shrink-0 [&>svg]:size-full" aria-hidden="true">
+            <NavIcon sectionId={section.id} />
+          </span>
+          <span>{section.label}</span>
+        </button>
+      )
+    })}
   </div>
 
   <section class="mt-4.5 grid gap-2.5" aria-labelledby="mobile-theme-title">
@@ -163,14 +167,42 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
         stroke-linejoin="round"
         aria-hidden="true"
       >
-        <path
-          d="M3.5 4.75A2.25 2.25 0 0 1 5.75 2.5h8.5a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H9.5l-3.75 2.75V13.2a2.25 2.25 0 0 1-2.25-2.2z"
-        ></path>
+        <path d="M3.5 4.75A2.25 2.25 0 0 1 5.75 2.5h8.5a2.25 2.25 0 0 1 2.25 2.25v6.5a2.25 2.25 0 0 1-2.25 2.25H9.5l-3.75 2.75V13.2a2.25 2.25 0 0 1-2.25-2.2z"></path>
         <path d="M6.75 7h6.5M6.75 9.75h3.75"></path>
       </svg>
       <span class="grid gap-0.5">
         <span class="text-[0.9375rem] font-semibold">Crear reporte</span>
         <small class="text-text-muted text-sm">Enviar una mejora o un error</small>
+      </span>
+    </button>
+    <button
+      type="button"
+      class="border-line flex min-h-15 items-center gap-3.5 border-b px-1 text-left focus-visible:outline-primary focus-visible:outline-2 focus-visible:outline-offset-2"
+      data-reports-open
+    >
+      <svg
+        class="text-text-muted size-5 shrink-0"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.7"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 3.5h12v13H4z"></path>
+        <path d="M7 7h6M7 10h6M7 13h4"></path>
+      </svg>
+      <span class="grid gap-0.5">
+        <span class="text-[0.9375rem] font-semibold">
+          Mis reportes
+          <span
+            data-reports-badge
+            class="bg-accent/15 text-text-main ms-2 rounded-sm px-1.5 py-0.5 font-mono text-xs tabular-nums"
+            hidden
+          ></span>
+        </span>
+        <small class="text-text-muted text-sm">Estado y aclaraciones de tus reportes</small>
       </span>
     </button>
     <button
@@ -192,10 +224,12 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
         <circle cx="10" cy="10" r="2.1"></circle>
       </svg>
       <span class="grid gap-0.5">
-        <span class="text-[0.9375rem] font-semibold" data-demo-mode-label>Activar modo demo</span>
-        <small class="text-text-muted text-sm" data-demo-mode-description
-          >Usar únicamente datos ficticios</small
-        >
+        <span class="text-[0.9375rem] font-semibold" data-demo-mode-label>
+          Activar modo demo
+        </span>
+        <small class="text-text-muted text-sm" data-demo-mode-description>
+          Usar únicamente datos ficticios
+        </small>
       </span>
     </button>
     <button

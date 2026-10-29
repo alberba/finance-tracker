@@ -10,6 +10,7 @@ import WelcomeLauncher from './onboarding/WelcomeLauncher.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
 
 const sectionLoaders = {
+  reports: () => import('./reports/ReportsPage.vue'),
   budget: () => import('./sections/BudgetSection.vue'),
   goals: () => import('./sections/GoalsSection.vue'),
   data: () => import('./sections/DataSection.vue'),
@@ -18,6 +19,8 @@ const sectionLoaders = {
   wealth: () => import('./sections/WealthSection.vue'),
   investment: () => import('./sections/InvestmentSection.vue'),
 }
+
+const ReportsPage = defineAsyncComponent(sectionLoaders.reports)
 
 const sectionComponents = {
   dashboard: DashboardSection,
@@ -59,13 +62,15 @@ onMounted(() => {
 const props = withDefaults(
   defineProps<{
     activeSection?: SectionId
+    page?: 'section' | 'reports'
   }>(),
-  { activeSection: 'dashboard' },
+  { activeSection: 'dashboard', page: 'section' },
 )
 
 const uiStore = useUiStore()
 const stockEventsStore = useStockEventsStore()
 uiStore.setActiveSection(props.activeSection)
+uiStore.setPage(props.page)
 
 onMounted(() => {
   void stockEventsStore.initializeCredential()
@@ -73,13 +78,15 @@ onMounted(() => {
 
 const currentSection = computed(() => uiStore.ui.activeSection)
 const activeSectionComponent = computed(() => sectionComponents[currentSection.value])
+const isReportsPage = computed(() => uiStore.page === 'reports')
 const isReportDialogOpen = shallowRef(false)
 </script>
 
 <template>
   <div class="contents" data-finance-workspace>
     <WelcomeLauncher />
-    <component :is="activeSectionComponent" :key="currentSection" :is-active="true" />
+    <ReportsPage v-if="isReportsPage" />
+    <component :is="activeSectionComponent" v-else :key="currentSection" :is-active="true" />
     <GlobalReportLauncher v-model:open="isReportDialogOpen" />
   </div>
 </template>

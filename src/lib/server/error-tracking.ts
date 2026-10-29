@@ -61,7 +61,7 @@ export function initServerErrorTracking(dsn: string | undefined): void {
 
 /** Fallo de un servicio auxiliar del reporte que no impide crear la issue. */
 export interface ReportSideFailure {
-  stage: 'duplicate' | 'upload'
+  stage: 'track' | 'upload'
   /** Motivo corto y fijo (`http-401`, `timeout`, `shape`, `network`...); nunca texto ajeno. */
   reason: string
 }

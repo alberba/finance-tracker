@@ -10,7 +10,7 @@
 
 import { and, eq } from 'drizzle-orm'
 import { lift } from '../database'
-import { users, userIdentities } from '../schema'
+import { issueReports, users, userIdentities } from '../schema'
 import { normalizeEmail, nowIso, type Db } from './shared'
 
 export type UserRow = typeof users.$inferSelect
@@ -79,6 +79,9 @@ async function removeSql(db: Db, id: string): Promise<boolean> {
   if (!existing) {
     return false
   }
+  // `issue_reports` referencia `users` sin cascada: se borra antes para que la
+  // baja de la cuenta no falle por la FK ni deje filas huérfanas ([D10]).
+  await db.delete(issueReports).where(eq(issueReports.userId, id))
   await db.delete(users).where(eq(users.id, id))
   return true
 }

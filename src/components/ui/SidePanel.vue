@@ -16,7 +16,12 @@ defineProps<{
 
 const open = defineModel<boolean>('open', { required: true })
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
+const scrollArea = useTemplateRef<HTMLElement>('scrollArea')
 let opener: HTMLElement | null = null
+
+function resetScroll(): void {
+  if (scrollArea.value) scrollArea.value.scrollTop = 0
+}
 
 function sync(shouldOpen: boolean): void {
   const element = dialog.value
@@ -24,6 +29,9 @@ function sync(shouldOpen: boolean): void {
   if (shouldOpen && !element.open) {
     opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     element.showModal?.()
+    // The closed dialog stays mounted, so every opening starts at the top of
+    // the form instead of inheriting the previous scroll position.
+    resetScroll()
   } else if (!shouldOpen && element.open) {
     element.close()
     opener?.focus()
@@ -60,7 +68,11 @@ function onCancel(event: Event): void {
         </div>
         <IconButton label="Cerrar" icon="close" @click="open = false" />
       </header>
-      <div class="grid flex-1 content-start gap-6 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+      <div
+        ref="scrollArea"
+        data-side-panel-body
+        class="grid flex-1 content-start gap-6 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6"
+      >
         <slot />
       </div>
       <footer

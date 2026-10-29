@@ -74,6 +74,29 @@ export class FinanceTrackerPage {
     return this.page.getByRole('dialog', { name: /^(Nuevo|Editar) movimiento$/ })
   }
 
+  /** The scrolling body of the movement side panel. */
+  get transactionPanelBody(): Locator {
+    return this.transactionPanel.locator('[data-side-panel-body]')
+  }
+
+  /** Scrolls the movement panel body to its end. */
+  async scrollTransactionPanelToBottom() {
+    const body = this.transactionPanelBody
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  }
+
+  /** Asserts the movement panel opened at the top of the form. */
+  async expectTransactionPanelAtTop() {
+    await expect(this.transactionPanelBody).toHaveJSProperty('scrollTop', 0)
+    await expect(
+      this.transactionPanel.getByRole('group', { name: 'Tipo de movimiento' }),
+    ).toBeInViewport()
+    await expect(this.transactionPanel.getByLabel('Importe')).toBeInViewport()
+  }
+
   /** Ledger rows of the registry, every month shown. */
   get transactionRows(): Locator {
     return this.transactionsSection.locator('[data-tx-ledger] tr[data-tx-id]')
@@ -101,6 +124,19 @@ export class FinanceTrackerPage {
 
   get issueReportDialog(): Locator {
     return this.page.getByRole('dialog', { name: 'Crear reporte' })
+  }
+
+  get reportsPage(): Locator {
+    return this.page.locator('#reports')
+  }
+
+  /** Abre «Mis reportes» por su ruta real (fuera de las secciones). */
+  async openReports(issueNumber?: number) {
+    await this.page.goto(`/reportes${issueNumber ? `?reporte=${issueNumber}` : ''}`)
+    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await expect(
+      this.reportsPage.getByRole('heading', { name: 'Mis reportes', exact: true }),
+    ).toBeVisible()
   }
 
   async goto() {
@@ -313,6 +349,31 @@ export class FinanceTrackerPage {
   async open(sectionId: FinanceSectionId) {
     const sectionConfig = SECTION_CONFIG[sectionId]
     await this.openSection(sectionConfig.buttonLabel, sectionId, sectionConfig.headingText)
+  }
+
+  /** Clicks a section's nav entry even when that section is already active. */
+  async clickNav(sectionId: FinanceSectionId) {
+    await this.clickNavButton(SECTION_CONFIG[sectionId].buttonLabel, sectionId)
+  }
+
+  /** Scrolls the document to the bottom, as reading a long section does. */
+  async scrollToPageBottom() {
+    await this.scrollToPageY(await this.maxScrollY())
+  }
+
+  /** Highest vertical offset the current section's document can reach. */
+  async maxScrollY(): Promise<number> {
+    return this.page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
+  }
+
+  async scrollToPageY(top: number) {
+    await this.page.evaluate((offset) => {
+      window.scrollTo(0, offset)
+    }, top)
+  }
+
+  async scrollY(): Promise<number> {
+    return this.page.evaluate(() => window.scrollY)
   }
 
   section(sectionId: FinanceSectionId): Locator {

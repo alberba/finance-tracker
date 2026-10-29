@@ -11,5 +11,12 @@ export function useSectionNavigation() {
     window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
-  return { navigateTo }
+  /** «Mis reportes» vive fuera de `APP_SECTIONS`: su ruta la resuelve el shell. */
+  function navigateToReports(issueNumber?: number): void {
+    const query = issueNumber ? `?reporte=${issueNumber}` : ''
+    window.history.pushState(null, '', `/reportes${query}`)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
+  return { navigateTo, navigateToReports }
 }

@@ -2,6 +2,7 @@ import { type SectionId } from '../types'
 import {
   getPathFromSection,
   getSectionFromPath,
+  isReportsPath,
   normalizeSectionId,
 } from './dashboard-section-routing'
 import { pinia } from '../../stores/pinia'
@@ -9,6 +10,15 @@ import type { Month } from '../../lib/month'
 import { useUiStore } from '../../stores/ui'
 
 const MOBILE_PRIMARY_SECTIONS: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
+
+/**
+ * Secciones cuyo clic de navegación devuelve la vista al inicio (#383).
+ *
+ * Solo Movimientos: su registro largo esconde la cabecera y el alta al
+ * revisar meses anteriores. El resto de secciones mantiene su navegación
+ * actual, que el alcance de la issue deja explícitamente fuera.
+ */
+const SECTIONS_THAT_RETURN_TO_START_ON_NAV: readonly SectionId[] = ['transactions']
 
 interface DashboardNavigationUi {
   activeSection: SectionId
@@ -36,20 +46,44 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
       if (!section) {
         return
       }
-      switchSection(section)
+      switchSection(section, { returnToStart: true })
     })
 
     window.addEventListener('popstate', () => {
+      if (isReportsPath(window.location.pathname)) {
+        uiStore.setPage('reports')
+        clearActiveNavigation()
+        return
+      }
+      uiStore.setPage('section')
       const sectionId = getSectionFromPath(window.location.pathname)
       switchSection(sectionId, { updateHistory: false })
     })
   }
 
-  function switchSection(sectionId: SectionId | string, options: { updateHistory?: boolean } = {}) {
-    const { updateHistory = true } = options
+  /** Quita la marca de la sección activa: en `/reportes` no hay ninguna. */
+  function clearActiveNavigation() {
+    Array.from(el.navTabs.querySelectorAll<HTMLElement>('[data-nav-item]')).forEach((button) => {
+      button.removeAttribute('aria-current')
+    })
+    const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
+    if (mobileMoreTrigger) mobileMoreTrigger.dataset.active = 'false'
+  }
+
+  /**
+   * Cambia la sección activa, sus marcas y la ruta. El arranque y `popstate`
+   * lo llaman sin `returnToStart`, así que conservan la posición del documento;
+   * solo el clic de navegación del usuario lo activa (#383).
+   */
+  function switchSection(
+    sectionId: SectionId | string,
+    options: { updateHistory?: boolean; returnToStart?: boolean } = {},
+  ) {
+    const { updateHistory = true, returnToStart = false } = options
     const normalizedSectionId = normalizeSectionId(sectionId)
     ui.activeSection = normalizedSectionId
     uiStore.setActiveSection(normalizedSectionId)
+    uiStore.setPage('section')
 
     Array.from(el.navTabs.querySelectorAll<HTMLElement>('[data-nav-item]')).forEach((button) => {
       const isActive = button.dataset.section === normalizedSectionId
@@ -72,6 +106,10 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
       if (window.location.pathname !== nextPath) {
         window.history.pushState(null, '', nextPath)
       }
+    }
+
+    if (returnToStart && SECTIONS_THAT_RETURN_TO_START_ON_NAV.includes(normalizedSectionId)) {
+      window.scrollTo({ top: 0, behavior: 'auto' })
     }
   }
 

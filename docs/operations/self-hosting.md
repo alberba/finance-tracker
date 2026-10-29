@@ -50,6 +50,35 @@ El correo de verificación, OTP y recuperación requiere `RESEND_API_KEY` y
 `RESEND_FROM` en `.env.selfhost`. Google/GitHub necesitan credenciales propias y
 callbacks para este origen. Las passkeys se pueden usar en `localhost`.
 
+## Recuperar reportes anteriores tras desplegar la migración
+
+La migración `0016_issue_reports.sql` crea la tabla de propiedad de «Mis reportes». Las issues
+enviadas antes no tienen fila y no aparecen hasta recuperarlas una vez. Hazlo con una copia de
+`finance.sqlite` (o sobre el volumen inmediatamente después de la copia diaria) y con las mismas
+variables de GitHub que usa el servidor (`GITHUB_ISSUE_TOKEN` o `GITHUB_TOKEN`, `GITHUB_OWNER`,
+`GITHUB_REPO`).
+
+```sh
+# 1) Simulación: no escribe nada. Revisa el recuento y las issues saltadas.
+pnpm reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite
+
+# 2) Aplicación: inserta solo las filas que faltan.
+pnpm reports:backfill --v2-sqlite=/ruta/a/finance-tracker-v2.sqlite --execute
+
+# 3) Opcional: deja el SQL para aplicarlo a D1 con wrangler.
+pnpm reports:backfill --execute --remote-sql-out=.data/reports-backfill.sql
+```
+
+En el paso 3 la lista de usuarios contra la que se valida el plan sigue siendo la de
+`--v2-sqlite`, no la de D1. Usa una copia reciente de producción. Además, cada `INSERT`
+del fichero lleva una guarda `WHERE EXISTS (SELECT 1 FROM users …)`: si una cuenta ya no
+existe en D1, esa fila se omite en lugar de romper la clave foránea y abortar el resto.
+
+El comando es idempotente y puede repetirse. Lee las issues con label `source:web-report` paginando
+la API REST (nunca el buscador) y se salta, listándolas al final, las que no tienen bloque
+`### Reportero`, lo tienen modificado o cuyo `Identificador` no corresponde a ninguna cuenta. Se
+lanza una sola vez tras el despliegue; las altas posteriores se registran solas.
+
 ## Diferencia con preview
 
 `pnpm preview` prueba la compilación de Cloudflare mediante workerd. Este despliegue
@@ -98,8 +127,7 @@ expone la app a Internet.
   externo `finance-data` con `finance.sqlite`. `docker.service` arranca después de `tailscaled`
   (drop-in de systemd) para que el puerto enlace tras un reinicio.
 - **`.env`** (chmod 600): las variables públicas, los secretos (`BETTER_AUTH_SECRET`,
-  `DATA_ENCRYPTION_KEY`, claves de Google/GitHub/Resend/mercado y, opcional,
-  `OPENCODE_GO_API_KEY` para el análisis de los reportes web) y
+  `DATA_ENCRYPTION_KEY`, claves de Google/GitHub/Resend/mercado) y
   `BETTER_AUTH_URL=https://<dominio>`. Con `LOCAL_ADMIN_EMAIL` ya presente en la base, el
   arranque no crea otro administrador. `TEST_AUTH_ENABLED` no debe existir nunca.
 - **NPM**: proxy host `<dominio>` → `http://<ip-tailscale>:4321`, certificado Let's Encrypt,

@@ -1,0 +1,609 @@
+/**
+ * Cliente de GitHub del seguimiento de reportes (#340).
+ *
+ * GraphQL para estado nativo (`state`, `stateReason`, `duplicateOf`) e hilo;
+ * REST para leer, crear, editar y borrar comentarios. Todas las llamadas tienen
+ * un plazo de 8 s; solo se reintentan las lecturas.
+ */
+
+import { Duration, Effect } from 'effect'
+
+import type { IssueNode, IssueState, IssueStateReason } from '../../../domain/reports/report-entry'
+import type { RawComment } from '../../../domain/reports/reporter-comment'
+import { GITHUB_API_BASE, githubHeaders, type GithubConfig } from '../github-api'
+import { Http } from '../http'
+import { ReportsGithubError } from './errors'
+
+const REQUEST_TIMEOUT_MS = 8_000
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 500
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
+
+export interface GraphIssueNode extends IssueNode {
+  statusChangedAt: string | null
+  recentComments: RawComment[]
+  commentsPage: { hasPreviousPage: boolean; startCursor: string | null }
+}
+
+interface GraphIssuePayload {
+  number?: number
+  url?: string
+  title?: string
+  state?: string
+  stateReason?: string | null
+  repository?: { nameWithOwner?: string } | null
+  timelineItems?: { nodes?: Array<{ __typename?: string; createdAt?: string }> }
+  comments?: RawCommentsPayload | null
+  duplicateOf?: GraphIssuePayload | null
+}
+
+interface RawCommentsPayload {
+  totalCount?: number
+  pageInfo?: { hasPreviousPage?: boolean; startCursor?: string | null } | null
+  nodes?: RawCommentPayload[]
+}
+
+interface RawCommentPayload {
+  databaseId?: number
+  createdAt?: string
+  updatedAt?: string
+  body?: string
+  author?: { __typename?: string; login?: string } | null
+  authorAssociation?: string | null
+}
+
+interface GraphqlBody {
+  data?: { repository?: Record<string, GraphIssuePayload | null> | null } | null
+  errors?: Array<{ type?: string; path?: Array<string | number>; message?: string }>
+}
+
+/** Una página de hilo: tamaño máximo que acepta GraphQL y cursor hacia atrás. */
+const COMMENTS_PAGE_SIZE = 100
+/** Alias por consulta: acota el coste de una sola petición GraphQL. */
+const MAX_ISSUES_PER_QUERY = 50
+/** Comentarios por alias en la consulta de novedades; el resto se pide paginado. */
+const RECENT_COMMENTS_PAGE_SIZE = 25
+
+const ISSUE_FIELDS = `number url title state stateReason
+  repository { nameWithOwner }
+  timelineItems(last: 1, itemTypes: [CLOSED_EVENT, REOPENED_EVENT]) {
+    nodes { __typename ... on ClosedEvent { createdAt } ... on ReopenedEvent { createdAt } }
+  }`
+
+const RECENT_COMMENTS = `comments(last: ${RECENT_COMMENTS_PAGE_SIZE}) {
+    totalCount
+    pageInfo { hasPreviousPage startCursor }
+    nodes { databaseId createdAt body authorAssociation author { __typename login } }
+  }`
+
+function graphqlError(message: string, status?: number): ReportsGithubError {
+  return new ReportsGithubError({ message, ...(status === undefined ? {} : { status }) })
+}
+
+function rawComments(payload: RawCommentsPayload | null | undefined): RawComment[] {
+  return (payload?.nodes ?? [])
+    .filter((comment) => typeof comment.databaseId === 'number' && typeof comment.body === 'string')
+    .map((comment) => ({
+      databaseId: comment.databaseId as number,
+      createdAt: comment.createdAt ?? '',
+      updatedAt: comment.updatedAt,
+      body: comment.body as string,
+      author: comment.author?.login
+        ? { login: comment.author.login, __typename: comment.author.__typename }
+        : null,
+      authorAssociation: comment.authorAssociation ?? null,
+    }))
+}
+
+function issueNode(payload: GraphIssuePayload | null): GraphIssueNode | null {
+  if (!payload || typeof payload.number !== 'number' || !payload.url) return null
+  const pageInfo = payload.comments?.pageInfo
+  return {
+    number: payload.number,
+    url: payload.url,
+    title: payload.title ?? '',
+    state: (payload.state === 'CLOSED' ? 'CLOSED' : 'OPEN') as IssueState,
+    stateReason: (payload.stateReason as IssueStateReason) ?? null,
+    repository: payload.repository?.nameWithOwner
+      ? { nameWithOwner: payload.repository.nameWithOwner }
+      : null,
+    statusChangedAt: payload.timelineItems?.nodes?.[0]?.createdAt ?? null,
+    recentComments: rawComments(payload.comments),
+    commentsPage: {
+      hasPreviousPage: Boolean(pageInfo?.hasPreviousPage) && Boolean(pageInfo?.startCursor),
+      startCursor: pageInfo?.startCursor ?? null,
+    },
+    ...(payload.duplicateOf ? { duplicateOf: issueNode(payload.duplicateOf) } : {}),
+  }
+}
+
+/** Ignora los `NOT_FOUND` propios de un alias: significan «issue inaccesible». */
+function hasUnexpectedGraphqlError(errors: NonNullable<GraphqlBody['errors']>): boolean {
+  return errors.some((error) => {
+    const expected =
+      error.type === 'NOT_FOUND' && Boolean(error.path?.some((part) => /^i\d+$/.test(String(part))))
+    return !expected
+  })
+}
+
+function withTimeout(request: typeof fetch, url: string, init: RequestInit): Promise<Response> {
+  return request(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+}
+
+/** Una lectura: reintenta solo los estados transitorios que GitHub documenta. */
+function readWithRetry(
+  request: typeof fetch,
+  url: string,
+  init: RequestInit,
+): Effect.Effect<Response, ReportsGithubError> {
+  return Effect.gen(function* () {
+    const run = Effect.tryPromise({
+      try: () => withTimeout(request, url, init),
+      catch: () => graphqlError('No se pudo contactar con GitHub.'),
+    })
+    let response = yield* run
+    let attempt = 0
+    while (attempt < MAX_RETRIES && RETRYABLE_STATUS.has(response.status)) {
+      yield* Effect.sleep(Duration.millis(RETRY_DELAY_MS * (attempt + 1)))
+      response = yield* run
+      attempt += 1
+    }
+    return response
+  })
+}
+
+function write(
+  request: typeof fetch,
+  url: string,
+  init: RequestInit,
+): Effect.Effect<Response, ReportsGithubError> {
+  return Effect.tryPromise({
+    try: () => withTimeout(request, url, init),
+    catch: () => graphqlError('No se pudo contactar con GitHub.'),
+  })
+}
+
+function logFailure(context: string, status: number, body: string): void {
+  console.error(`[reports] ${context} devolvió ${status}`, body.slice(0, 500))
+}
+
+function issueFields(comments: boolean, depth: number): string {
+  const fields = `...F ${comments ? '...C' : ''}`
+  if (depth <= 0) return `{ ${fields} }`
+  return `{ ${fields} duplicateOf ${issueFields(comments, depth - 1)} }`
+}
+
+/** Resuelve el login del bot una vez por token (`/user` no existe para GitHub Apps). */
+export function resolveBotLogin(
+  config: GithubConfig,
+  configuredLogin: string | undefined,
+): Effect.Effect<string, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const trimmed = configuredLogin?.trim()
+    if (trimmed) return trimmed
+    const cached = botLogins.get(config.token)
+    if (cached) return cached
+
+    const http = yield* Http
+    const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/user`, {
+      headers: githubHeaders(config.token),
+    })
+    if (!response.ok) {
+      const body = yield* Effect.promise(() => response.text().catch(() => ''))
+      logFailure('GET /user', response.status, body)
+      return yield* graphqlError('No se pudo resolver la cuenta del bot.', response.status)
+    }
+    const data = yield* Effect.promise(
+      () => response.json().catch(() => null) as Promise<{ login?: string } | null>,
+    )
+    const login = data?.login?.trim()
+    if (!login) return yield* graphqlError('GitHub no devolvió la cuenta del bot.')
+    botLogins.set(config.token, login)
+    return login
+  })
+}
+
+const botLogins = new Map<string, string>()
+
+/**
+ * Lectura GraphQL de la lista: un alias por issue. Se parte en consultas de
+ * `MAX_ISSUES_PER_QUERY` para que el coste de una petición quede acotado.
+ */
+export function fetchIssueChain(
+  config: GithubConfig,
+  numbers: number[],
+  options: { comments: boolean },
+): Effect.Effect<Map<number, GraphIssueNode | null>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const result = new Map<number, GraphIssueNode | null>()
+    for (let start = 0; start < numbers.length; start += MAX_ISSUES_PER_QUERY) {
+      const chunk = numbers.slice(start, start + MAX_ISSUES_PER_QUERY)
+      const page = yield* fetchIssueChainPage(config, chunk, options)
+      for (const [number, node] of page) result.set(number, node)
+    }
+    return result
+  })
+}
+
+function fetchIssueChainPage(
+  config: GithubConfig,
+  numbers: number[],
+  options: { comments: boolean },
+): Effect.Effect<Map<number, GraphIssueNode | null>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    if (numbers.length === 0) return new Map()
+    const http = yield* Http
+    const aliases = numbers
+      .map((number) => `i${number}: issue(number: ${number}) ${issueFields(options.comments, 3)}`)
+      .join('\n')
+    const fragments = `fragment F on Issue { ${ISSUE_FIELDS} }${
+      options.comments ? `\nfragment C on Issue { ${RECENT_COMMENTS} }` : ''
+    }`
+    const query = `query ($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+${aliases}
+  }
+}
+${fragments}`
+
+    const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
+      method: 'POST',
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { owner: config.owner, name: config.repo } }),
+    })
+
+    const raw = yield* Effect.promise(() => response.text().catch(() => ''))
+    if (!response.ok) {
+      logFailure('POST /graphql', response.status, raw)
+      return yield* graphqlError('GitHub rechazó la consulta.', response.status)
+    }
+
+    const parsed = yield* Effect.try({
+      try: () => JSON.parse(raw) as GraphqlBody,
+      catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
+    })
+
+    if (hasUnexpectedGraphqlError(parsed.errors ?? [])) {
+      console.error(
+        '[reports] GraphQL devolvió errores',
+        (parsed.errors ?? []).map((error) => error.message),
+      )
+      return yield* graphqlError('GitHub devolvió un error al consultar las issues.')
+    }
+    if (!parsed.data?.repository) {
+      return yield* graphqlError('GitHub no devolvió el repositorio.')
+    }
+
+    const result = new Map<number, GraphIssueNode | null>()
+    for (const number of numbers) {
+      result.set(number, issueNode(parsed.data.repository[`i${number}`] ?? null))
+    }
+    return result
+  })
+}
+
+export interface IssueCommentsPage {
+  comments: RawComment[]
+  hasPreviousPage: boolean
+  startCursor: string | null
+}
+
+export interface OlderCommentsRequest {
+  /** Issue cuyo hilo se sigue. */
+  number: number
+  /** `startCursor` de la página más antigua que ya se leyó. */
+  before: string
+}
+
+/**
+ * Clave de una página anterior. Dos reportes que siguen la misma issue comparten
+ * `number`, pero pueden estar en puntos distintos del hilo: la clave incluye el
+ * cursor para no confundir sus páginas.
+ */
+export function olderCommentsKey(number: number, before: string): string {
+  return `${number}|${before}`
+}
+
+/**
+ * Página anterior del hilo de cada issue, en una sola consulta con alias. Es la
+ * continuación de `recentComments`: solo se pide cuando la ventana de novedades
+ * no llegó a un comentario anterior a `lastSeenAt`.
+ *
+ * Las peticiones idénticas se deduplican antes de construir la consulta: dos
+ * filas que siguen la misma principal no pueden repetir variable ni alias
+ * GraphQL (GitHub rechazaría la consulta entera).
+ */
+export function fetchOlderComments(
+  config: GithubConfig,
+  requests: OlderCommentsRequest[],
+): Effect.Effect<Map<string, IssueCommentsPage>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const unique = new Map<string, OlderCommentsRequest>()
+    for (const request of requests) {
+      unique.set(olderCommentsKey(request.number, request.before), request)
+    }
+    const pending = [...unique.values()]
+    const result = new Map<string, IssueCommentsPage>()
+    for (let start = 0; start < pending.length; start += MAX_ISSUES_PER_QUERY) {
+      const chunk = pending.slice(start, start + MAX_ISSUES_PER_QUERY)
+      const page = yield* fetchOlderCommentsPage(config, chunk)
+      for (const [key, comments] of page) result.set(key, comments)
+    }
+    return result
+  })
+}
+
+function fetchOlderCommentsPage(
+  config: GithubConfig,
+  requests: OlderCommentsRequest[],
+): Effect.Effect<Map<string, IssueCommentsPage>, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    if (requests.length === 0) return new Map()
+    const http = yield* Http
+    // Alias y variables por índice, no por número de issue: dos peticiones de la
+    // misma issue con cursores distintos no colisionan.
+    const declarations = requests.map((_, index) => `$c${index}: String!`).join(', ')
+    const aliases = requests
+      .map(
+        (request, index) =>
+          `i${index}: issue(number: ${request.number}) { comments(last: ${COMMENTS_PAGE_SIZE}, before: $c${index}) { totalCount pageInfo { hasPreviousPage startCursor } nodes { databaseId createdAt body authorAssociation author { __typename login } } } }`,
+      )
+      .join('\n')
+    const variables: Record<string, unknown> = { owner: config.owner, name: config.repo }
+    requests.forEach((request, index) => {
+      variables[`c${index}`] = request.before
+    })
+
+    const query = `query ($owner: String!, $name: String!, ${declarations}) {
+  repository(owner: $owner, name: $name) {
+${aliases}
+  }
+}`
+
+    const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
+      method: 'POST',
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables }),
+    })
+    const raw = yield* Effect.promise(() => response.text().catch(() => ''))
+    if (!response.ok) {
+      logFailure('POST /graphql (comentarios anteriores)', response.status, raw)
+      return yield* graphqlError('GitHub rechazó la consulta del hilo.', response.status)
+    }
+    const parsed = yield* Effect.try({
+      try: () =>
+        JSON.parse(raw) as GraphqlBody & {
+          data?: {
+            repository?: Record<string, { comments?: RawCommentsPayload | null } | null> | null
+          }
+        },
+      catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
+    })
+    if (hasUnexpectedGraphqlError(parsed.errors ?? [])) {
+      console.error(
+        '[reports] GraphQL de comentarios devolvió errores',
+        (parsed.errors ?? []).map((error) => error.message),
+      )
+      return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
+    }
+    const result = new Map<string, IssueCommentsPage>()
+    requests.forEach((request, index) => {
+      const comments = parsed.data?.repository?.[`i${index}`]?.comments
+      if (!comments) return
+      result.set(olderCommentsKey(request.number, request.before), {
+        comments: rawComments(comments),
+        hasPreviousPage:
+          Boolean(comments.pageInfo?.hasPreviousPage) && Boolean(comments.pageInfo?.startCursor),
+        startCursor: comments.pageInfo?.startCursor ?? null,
+      })
+    })
+    return result
+  })
+}
+
+/** Hilo completo: se recorren todas las páginas hacia atrás, sin recortar. */
+export function fetchIssueThread(
+  config: GithubConfig,
+  number: number,
+): Effect.Effect<RawComment[], ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    let comments: RawComment[] = []
+    let before: string | undefined
+
+    for (;;) {
+      const query = `query ($owner: String!, $name: String!, $number: Int!${
+        before ? ', $before: String!' : ''
+      }) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      comments(last: ${COMMENTS_PAGE_SIZE}${before ? ', before: $before' : ''}) {
+        totalCount
+        pageInfo { hasPreviousPage startCursor }
+        nodes { databaseId createdAt updatedAt body authorAssociation author { __typename login } }
+      }
+    }
+  }
+}`
+      const response = yield* readWithRetry(http.request, `${GITHUB_API_BASE}/graphql`, {
+        method: 'POST',
+        headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          variables: {
+            owner: config.owner,
+            name: config.repo,
+            number,
+            ...(before ? { before } : {}),
+          },
+        }),
+      })
+      const raw = yield* Effect.promise(() => response.text().catch(() => ''))
+      if (!response.ok) {
+        logFailure('POST /graphql (hilo)', response.status, raw)
+        return yield* graphqlError('GitHub rechazó la consulta del hilo.', response.status)
+      }
+      const parsed = yield* Effect.try({
+        try: () =>
+          JSON.parse(raw) as GraphqlBody & {
+            data?: {
+              repository?: { issue?: { comments?: RawCommentsPayload | null } | null } | null
+            }
+          },
+        catch: () => graphqlError('GitHub devolvió una respuesta inválida.'),
+      })
+      const page = parsed.data?.repository?.issue?.comments
+      if (!page) {
+        if (parsed.errors?.length) {
+          console.error('[reports] GraphQL del hilo devolvió errores', parsed.errors)
+          return yield* graphqlError('GitHub devolvió un error al consultar el hilo.')
+        }
+        break
+      }
+      comments = [...rawComments(page), ...comments]
+      const cursor = page.pageInfo?.startCursor ?? null
+      if (!page.pageInfo?.hasPreviousPage || !cursor || cursor === before) break
+      before = cursor
+    }
+
+    return comments
+  })
+}
+
+export interface GithubComment {
+  databaseId: number
+  body: string
+  issueNumber: number
+  createdAt: string
+  updatedAt: string
+  author: { login: string; type?: string } | null
+  authorAssociation?: string | null
+}
+
+interface RestCommentPayload {
+  id?: number
+  body?: string
+  issue_url?: string
+  created_at?: string
+  updated_at?: string
+  author_association?: string | null
+  user?: { login?: string; type?: string } | null
+}
+
+function restComment(payload: RestCommentPayload): GithubComment | null {
+  if (typeof payload.id !== 'number' || typeof payload.body !== 'string') return null
+  const issueNumber = Number(payload.issue_url?.split('/').pop())
+  if (!Number.isFinite(issueNumber)) return null
+  return {
+    databaseId: payload.id,
+    body: payload.body,
+    issueNumber,
+    createdAt: payload.created_at ?? '',
+    updatedAt: payload.updated_at ?? payload.created_at ?? '',
+    author: payload.user?.login ? { login: payload.user.login, type: payload.user.type } : null,
+    authorAssociation: payload.author_association ?? null,
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T
+  } catch {
+    return null
+  }
+}
+
+export function fetchComment(
+  config: GithubConfig,
+  commentId: number,
+): Effect.Effect<GithubComment | null, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* readWithRetry(
+      http.request,
+      `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+      { headers: githubHeaders(config.token) },
+    )
+    if (response.status === 404) return null
+    if (!response.ok) {
+      const body = yield* Effect.promise(() => response.text().catch(() => ''))
+      logFailure('GET comment', response.status, body)
+      return yield* graphqlError('No se pudo leer el comentario.', response.status)
+    }
+    const data = yield* Effect.promise(() => readJson<RestCommentPayload>(response))
+    return data ? restComment(data) : null
+  })
+}
+
+function mutateComment(
+  config: GithubConfig,
+  method: 'POST' | 'PATCH',
+  url: string,
+  body: string,
+  failureMessage: string,
+): Effect.Effect<GithubComment, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* write(http.request, url, {
+      method,
+      headers: { ...githubHeaders(config.token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    })
+    if (!response.ok) {
+      const text = yield* Effect.promise(() => response.text().catch(() => ''))
+      logFailure(`${method} comment`, response.status, text)
+      return yield* graphqlError(failureMessage, response.status)
+    }
+    const data = yield* Effect.promise(() => readJson<RestCommentPayload>(response))
+    const comment = data ? restComment(data) : null
+    if (!comment) return yield* graphqlError(failureMessage, response.status)
+    return comment
+  })
+}
+
+export function createComment(
+  config: GithubConfig,
+  issueNumber: number,
+  body: string,
+): Effect.Effect<GithubComment, ReportsGithubError, Http> {
+  return mutateComment(
+    config,
+    'POST',
+    `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments`,
+    body,
+    'No se pudo publicar la aclaración.',
+  )
+}
+
+export function updateComment(
+  config: GithubConfig,
+  commentId: number,
+  body: string,
+): Effect.Effect<GithubComment, ReportsGithubError, Http> {
+  return mutateComment(
+    config,
+    'PATCH',
+    `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+    body,
+    'No se pudo guardar la aclaración.',
+  )
+}
+
+export function deleteComment(
+  config: GithubConfig,
+  commentId: number,
+): Effect.Effect<void, ReportsGithubError, Http> {
+  return Effect.gen(function* () {
+    const http = yield* Http
+    const response = yield* write(
+      http.request,
+      `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+      { method: 'DELETE', headers: githubHeaders(config.token) },
+    )
+    if (!response.ok) {
+      const text = yield* Effect.promise(() => response.text().catch(() => ''))
+      logFailure('DELETE comment', response.status, text)
+      return yield* graphqlError('No se pudo borrar la aclaración.', response.status)
+    }
+  })
+}

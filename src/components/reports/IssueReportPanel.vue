@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, reactive, shallowRef } from 'vue'
+import { computed, onBeforeUnmount, reactive, shallowRef } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
-import {
-  encodeBase64,
-  getAttachmentError,
-  ISSUE_ATTACHMENT_MAX_BYTES,
-  ISSUE_ATTACHMENT_MAX_COUNT,
-  ISSUE_ATTACHMENT_TYPES,
-} from '../../domain/reports/issue-attachments'
+import { useSectionNavigation } from '../../composables/useSectionNavigation'
+import { getAttachmentError, ISSUE_ATTACHMENT_TYPES } from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
 import {
   submitIssueReport,
@@ -22,6 +17,8 @@ import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
 import { FIELD_CONTROL, FIELD_LABEL } from '../ui/field'
 import PanelSectionTitle from '../ui/PanelSectionTitle.vue'
+import AttachmentList from './AttachmentList.vue'
+import { ATTACHMENT_LIMITS, encodeAttachmentFile } from './report-form'
 import SegmentedControl, { type SegmentedOption } from '../ui/SegmentedControl.vue'
 import SidePanel from '../ui/SidePanel.vue'
 
@@ -31,7 +28,7 @@ import SidePanel from '../ui/SidePanel.vue'
 interface SuccessStatus {
   issueNumber: number
   issueUrl: string
-  duplicate?: boolean
+  tracked: boolean
 }
 
 const open = defineModel<boolean>('open', { required: true })
@@ -43,10 +40,16 @@ const TYPE_OPTIONS: SegmentedOption<ReportType>[] = [
 
 const TEXTAREA = `${FIELD_CONTROL} resize-y py-2.5 text-base`
 const ATTACHMENT_ACCEPT = ISSUE_ATTACHMENT_TYPES.join(',')
-const ATTACHMENT_LIMITS = `Hasta ${ISSUE_ATTACHMENT_MAX_COUNT} imágenes de ${ISSUE_ATTACHMENT_MAX_BYTES / (1024 * 1024)} MB: PNG, JPEG, WebP o GIF.`
 
 const uiStore = useUiStore()
 const { getIssueReportContext } = useIssueReportContext()
+const { navigateToReports } = useSectionNavigation()
+
+/** Cierra el panel antes de navegar: el detalle se monta en la página. */
+function openReportFromAck(issueNumber: number): void {
+  open.value = false
+  navigateToReports(issueNumber)
+}
 
 const form = reactive({
   type: 'bug' as ReportType,
@@ -62,6 +65,14 @@ interface DraftAttachment {
 
 const attachments = shallowRef<DraftAttachment[]>([])
 let nextAttachmentId = 0
+
+const attachmentRows = computed(() =>
+  attachments.value.map((item) => ({
+    id: item.id,
+    name: item.file.name,
+    previewUrl: item.previewUrl,
+  })),
+)
 
 const statusMessage = shallowRef('')
 const successStatus = shallowRef<SuccessStatus | null>(null)
@@ -109,13 +120,7 @@ function removeAttachment(id: number): void {
 }
 
 async function encodeAttachments(): Promise<ReportAttachment[]> {
-  return Promise.all(
-    attachments.value.map(async ({ file }) => ({
-      name: file.name,
-      contentType: file.type,
-      data: encodeBase64(new Uint8Array(await file.arrayBuffer())),
-    })),
-  )
+  return Promise.all(attachments.value.map(({ file }) => encodeAttachmentFile(file)))
 }
 
 function resetForm(): void {
@@ -165,7 +170,7 @@ async function onSubmit(): Promise<void> {
     successStatus.value = {
       issueNumber: result.issueNumber,
       issueUrl: result.issueUrl,
-      duplicate: result.duplicate,
+      tracked: result.tracked,
     }
     resetForm()
   } catch (error) {
@@ -187,6 +192,17 @@ async function onSubmit(): Promise<void> {
   >
     <p class="text-text-muted leading-relaxed">
       Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.
+    </p>
+
+    <p class="text-sm">
+      <a
+        class="text-primary focus-visible:outline-primary font-bold underline-offset-4 hover:underline focus-visible:outline-2"
+        href="/reportes"
+        data-report-tracking-link
+        @click.prevent="navigateToReports()"
+        >Mis reportes</a
+      >
+      <span class="text-text-muted"> · estado y aclaraciones de lo que ya has enviado.</span>
     </p>
 
     <form
@@ -244,28 +260,17 @@ async function onSubmit(): Promise<void> {
           />
           <p class="text-text-muted text-sm">{{ ATTACHMENT_LIMITS }}</p>
         </div>
-        <ul
-          v-if="attachments.length > 0"
+        <AttachmentList
           id="issue-report-attachment-list"
-          class="grid gap-2"
-          aria-label="Capturas adjuntas"
+          :items="attachmentRows"
+          label="Capturas adjuntas"
         >
-          <li
-            v-for="item in attachments"
-            :key="item.id"
-            class="bg-subtle flex items-center gap-3 rounded-md p-2"
-          >
-            <img
-              :src="item.previewUrl"
-              :alt="`Vista previa de ${item.file.name}`"
-              class="size-14 shrink-0 rounded-md object-cover"
-            />
-            <span class="text-text-main min-w-0 flex-1 truncate text-sm">{{ item.file.name }}</span>
-            <BaseButton variant="ghost" @click="removeAttachment(item.id)">
-              Quitar {{ item.file.name }}
+          <template #action="{ item }">
+            <BaseButton variant="ghost" @click="removeAttachment(Number(item.id))">
+              Quitar {{ item.name }}
             </BaseButton>
-          </li>
-        </ul>
+          </template>
+        </AttachmentList>
       </fieldset>
 
       <p id="issue-report-notice" class="text-text-muted text-sm leading-relaxed">
@@ -280,15 +285,28 @@ async function onSubmit(): Promise<void> {
       role="status"
       aria-live="polite"
     >
-      <template v-if="successStatus"
-        >{{ successStatus.duplicate ? 'Este reporte ya existe:' : 'Reporte creado:' }}
-        <a
-          class="text-primary font-bold hover:underline"
-          :href="successStatus.issueUrl"
-          target="_blank"
-          rel="noreferrer"
-          >#{{ successStatus.issueNumber }}</a
-        >
+      <template v-if="successStatus">
+        <template v-if="successStatus.tracked">
+          Reporte creado:
+          <a
+            class="text-primary font-bold hover:underline"
+            :href="successStatus.issueUrl"
+            target="_blank"
+            rel="noreferrer"
+            >#{{ successStatus.issueNumber }}</a
+          >
+          ·
+          <a
+            class="text-primary font-bold underline-offset-4 hover:underline"
+            href="/reportes"
+            data-report-tracking-link
+            @click.prevent="openReportFromAck(successStatus.issueNumber)"
+            >Ver en Mis reportes</a
+          >
+        </template>
+        <template v-else>
+          No pudimos añadirlo a Mis reportes todavía; aparecerá en cuanto se recupere.
+        </template>
       </template>
       <template v-else>{{ statusMessage }}</template>
     </p>
