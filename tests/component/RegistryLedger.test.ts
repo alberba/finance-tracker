@@ -57,9 +57,6 @@ describe('RegistryLedger', () => {
       search: '',
       types: [],
       accountIds: [],
-      date: '',
-      amountMin: '',
-      amountMax: '',
     }
 
     return { financialStore, uiStore }

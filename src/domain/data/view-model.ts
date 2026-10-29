@@ -50,7 +50,12 @@ export function buildDataSummaryViewModel(state: State): DataSummaryViewModel {
 }
 
 export function buildTransactionsCsv(state: State): string {
-  const rows = state.transactions.map((item: Transaction) => [
+  return transactionsToCsv(state.transactions)
+}
+
+/** The CSV of any list of movements, with the header the full export uses. */
+export function transactionsToCsv(transactions: Transaction[]): string {
+  const rows = transactions.map((item: Transaction) => [
     item.id,
     item.date,
     item.month,

@@ -252,26 +252,42 @@ test.describe('Finance tracker E2E', () => {
     await expect(headerCells.nth(6)).toHaveText(/^\s*acciones\s*$/i)
   })
 
-  test('movimientos guarda los filtros de importe y fecha tras un botón', async ({
-    page,
-    tracker,
-  }) => {
+  test('movimientos exporta el informe de un periodo como PDF y CSV', async ({ page, tracker }) => {
     await page.goto('/movimientos')
     await expect(
       tracker.transactionsSection.getByRole('heading', { name: 'Movimientos', exact: true }),
     ).toBeVisible()
+    await expect(
+      tracker.transactionsSection.getByRole('button', { name: 'Importe y fecha' }),
+    ).toHaveCount(0)
 
-    const toggle = tracker.transactionsSection.getByRole('button', {
-      name: 'Importe y fecha',
-    })
-    const extra = tracker.transactionsSection.locator('#tx-extra-filters')
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(extra).toBeHidden()
+    await tracker.transactionsSection.getByRole('button', { name: 'Exportar' }).click()
+    const panel = page.getByRole('dialog', { name: 'Informe mensual' })
+    await expect(panel).toBeVisible()
 
-    await toggle.click()
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(extra.getByLabel('Importe mín.')).toBeVisible()
-    await expect(extra.getByLabel('Fecha exacta')).toBeVisible()
+    await panel.getByLabel('Desde').fill('2026-02-01')
+    await panel.getByLabel('Hasta').fill('2026-02-28')
+    const summary = panel.locator('[data-report-summary]')
+    await expect(summary).toContainText('13 movimientos')
+    await expect(summary).toContainText(/Ingresos 2\.085,00/)
+    await expect(summary).toContainText(/Gastos 404,77/)
+
+    await panel.getByLabel('Hasta').fill('2999-01-01')
+    await expect(panel.locator('[data-report-error]')).toContainText('futura')
+    await expect(panel.getByRole('button', { name: 'Descargar PDF' })).toBeDisabled()
+    await panel.getByLabel('Hasta').fill('2026-02-28')
+
+    const pdfDownload = page.waitForEvent('download')
+    await panel.getByRole('button', { name: 'Descargar PDF' }).click()
+    const pdf = await pdfDownload
+    expect(pdf.suggestedFilename()).toBe('Informe 2026-02-01 - 2026-02-28.pdf')
+    const pdfPath = await pdf.path()
+    const header = (await import('node:fs')).readFileSync(pdfPath).subarray(0, 5).toString()
+    expect(header).toBe('%PDF-')
+
+    const csvDownload = page.waitForEvent('download')
+    await panel.getByRole('button', { name: 'Descargar CSV' }).click()
+    expect((await csvDownload).suggestedFilename()).toBe('movimientos-2026-02-01-2026-02-28.csv')
   })
 
   test('movimientos muestra el neto del mes y su desglose por categoría', async ({

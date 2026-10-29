@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 import BaseButton from '../ui/BaseButton.vue'
 import BaseInput from '../ui/BaseInput.vue'
@@ -10,13 +10,13 @@ import { TRANSACTION_TYPES, type TransactionType } from '../../scripts/types'
 import { useMovementsStore } from '../../stores/movements'
 import { useUiStore } from '../../stores/ui'
 
-// Narrows the registry: year, free text, type chips, account, and the
-// amount and date filters behind a disclosure.
+// Narrows the registry: year, free text, type chips and account. «Exportar»
+// asks the registry to open the report for what the filters leave.
 const movementsStore = useMovementsStore()
 const ui = useUiStore().ui
 const filters = ui.txFilters
 
-const showMore = ref(false)
+const emit = defineEmits<{ export: [] }>()
 
 const yearOptions = computed(() =>
   movementsStore.years.map((year) => ({ value: year, label: String(year) })),
@@ -35,9 +35,6 @@ const account = computed({
     filters.accountIds = value ? [value] : []
   },
 })
-const extraFilterCount = computed(
-  () => [filters.date, filters.amountMin, filters.amountMax].filter(Boolean).length,
-)
 
 function isOn(type: TransactionType): boolean {
   return filters.types.includes(type)
@@ -49,12 +46,6 @@ function setType(type: TransactionType, on: boolean): void {
   const chosen = filters.types.filter((item) => item !== type)
   if (on) chosen.push(type)
   filters.types = TRANSACTION_TYPES.filter((item) => chosen.includes(item))
-}
-
-function clearExtra(): void {
-  filters.date = ''
-  filters.amountMin = ''
-  filters.amountMax = ''
 }
 </script>
 
@@ -103,49 +94,31 @@ function clearExtra(): void {
           @update:model-value="setType(type, $event)"
         />
       </div>
-      <BaseSelect
-        v-model="account"
-        class="w-48"
-        label="Cuenta"
-        hide-label
-        name="txAccount"
-        :options="accountOptions"
-      />
-      <BaseButton
-        variant="ghost"
-        :aria-expanded="showMore"
-        aria-controls="tx-extra-filters"
-        @click="showMore = !showMore"
-      >
-        Importe y fecha
-        <span v-if="extraFilterCount" class="text-primary tabular-nums"
-          >· {{ extraFilterCount }}</span
-        >
-      </BaseButton>
-    </div>
-    <div
-      v-show="showMore"
-      id="tx-extra-filters"
-      class="bg-subtle flex flex-wrap items-end gap-3 rounded-md p-3"
-    >
-      <BaseInput v-model="filters.date" class="w-44" label="Fecha exacta" type="date" />
-      <BaseInput
-        v-model="filters.amountMin"
-        class="w-36"
-        label="Importe mín."
-        inputmode="decimal"
-        suffix="€"
-      />
-      <BaseInput
-        v-model="filters.amountMax"
-        class="w-36"
-        label="Importe máx."
-        inputmode="decimal"
-        suffix="€"
-      />
-      <BaseButton variant="ghost" :disabled="!extraFilterCount" @click="clearExtra"
-        >Limpiar</BaseButton
-      >
+      <div class="flex w-full items-end gap-3 sm:w-auto">
+        <BaseSelect
+          v-model="account"
+          class="min-w-0 flex-1 sm:w-48 sm:flex-none"
+          label="Cuenta"
+          hide-label
+          name="txAccount"
+          :options="accountOptions"
+        />
+        <BaseButton id="tx-export" variant="ghost" class="shrink-0" @click="emit('export')">
+          <svg
+            class="size-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+          </svg>
+          Exportar
+        </BaseButton>
+      </div>
     </div>
   </div>
 </template>

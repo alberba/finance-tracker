@@ -1,5 +1,5 @@
 import type { Month } from '../../lib/month'
-import { parseDecimal, round2 } from '../../lib/number'
+import { round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
 import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../scripts/types'
 
@@ -55,9 +55,6 @@ export interface RegistryFilters {
   search: string
   types: string[]
   accountIds: string[]
-  date: string
-  amountMin: string
-  amountMax: string
 }
 
 /**
@@ -86,17 +83,10 @@ export function signedAmount(tx: Pick<Transaction, 'type' | 'amount'>): number {
   return tx.type === 'income' ? amount : -amount
 }
 
-function bound(value: string): number | null {
-  const parsed = parseDecimal(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function matcher(filters: RegistryFilters): (tx: Transaction) => boolean {
+/** Whether a movement passes the search, type and account filters. */
+export function registryMatcher(filters: RegistryFilters): (tx: Transaction) => boolean {
   const search = filters.search.trim().toLowerCase()
-  const min = bound(filters.amountMin)
-  const max = bound(filters.amountMax)
   return (tx) => {
-    const amount = Number(tx.amount || 0)
     if (filters.types.length && !filters.types.includes(tx.type)) return false
     if (
       filters.accountIds.length &&
@@ -104,9 +94,6 @@ function matcher(filters: RegistryFilters): (tx: Transaction) => boolean {
       !(tx.destinationAccountId && filters.accountIds.includes(tx.destinationAccountId))
     )
       return false
-    if (filters.date && tx.date !== filters.date) return false
-    if (min !== null && amount < min) return false
-    if (max !== null && amount > max) return false
     if (!search) return true
     return [tx.description, tx.category].some((text) =>
       String(text || '')
@@ -131,7 +118,7 @@ export function buildMonthGroups(
   filters: RegistryFilters,
   sort: TransactionSort,
 ): MonthGroup[] {
-  const matches = matcher(filters)
+  const matches = registryMatcher(filters)
   const byMonth = new Map<Month, Transaction[]>()
   transactions.forEach((tx) => {
     if (accountingYear(tx) !== year || !matches(tx)) return
