@@ -412,9 +412,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(accountSelect).toHaveCSS('min-height', '44px')
     await descriptionInput.fill('Compra VWCE editada')
     await pendingItem.getByLabel('Precio por título').fill('105')
-    await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
-    await expect(liveMarket.pendingPanel).toContainText('Compra VWCE editada')
-    await liveMarket.confirmFirstPending()
+    await pendingItem.getByRole('button', { name: 'Guardar y confirmar' }).click()
+    await expect(liveMarket.pendingEditPanel).not.toBeVisible()
     await expect(
       liveMarket.pendingPanel.getByRole('heading', { name: /Pendientes de revisar\s*2$/ }),
     ).toBeVisible()
@@ -476,15 +475,19 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       fee: 1.5,
       time: '10:30',
     })
-    await expect(liveMarket.pendingPanel).toContainText('212,50 €')
-    await expect(liveMarket.pendingPanel).toContainText('2 × 105.5 VWCE')
+    await expect(liveMarket.pendingPanel).not.toBeVisible()
 
-    await liveMarket.confirmFirstPending()
     // See the note above: the movement lands in July (pinned engine clock),
     // while the table filter defaults to the real month.
     await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Aportación VWCE')
     await expect(tracker.transactionsSection).toContainText('212,50')
+
+    await tracker.openInvestmentMovementsTab()
+    const editedMovement = tracker.investmentMovementRow('VWCE')
+    await expect(editedMovement).toContainText('2,0000 × 105,50')
+    await expect(editedMovement).toContainText('212,50')
+    await expect(editedMovement).toContainText('10:30')
   })
 
   test('permite reclasificar un pendiente de gasto a inversión con cuenta y categoría dinámica', async ({
@@ -545,12 +548,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await pendingItem.getByLabel('Comisiones').fill('2')
     await pendingItem.getByLabel('Hora').fill('11:00')
 
-    await pendingItem.getByRole('button', { name: 'Guardar edición' }).click()
+    await pendingItem.getByRole('button', { name: 'Guardar y confirmar' }).click()
 
-    await expect(liveMarket.pendingPanel).toContainText('182,00 €')
-    await expect(liveMarket.pendingPanel).toContainText('2 × 90 IWDA')
-
-    await liveMarket.confirmFirstPending()
+    await expect(liveMarket.pendingEditPanel).not.toBeVisible()
     await tracker.filterTransactionsMonth('JULIO')
     await expect(tracker.transactionsSection).toContainText('Suscripción convertible')
     await expect(tracker.transactionsSection).toContainText('182,00')

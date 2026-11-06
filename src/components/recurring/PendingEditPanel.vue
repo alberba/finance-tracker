@@ -9,12 +9,13 @@ import SidePanel from '../ui/SidePanel.vue'
 import { TYPE_OPTIONS, categorySelectOptions } from '../transactions/transaction-types'
 import { getCategoriesForType } from '../../domain/transactions/categories'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { parseDecimal, round2 } from '../../lib/number'
+import { parseDecimal } from '../../lib/number'
+import { computeInvestmentMovement } from '../../scripts/investment-movements'
 import type { InvestmentSide, PendingMovement, TransactionType } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 
-// Edits a pending movement before it is confirmed. An investment pending
+// Edits a pending movement and confirms it in one step. An investment pending
 // movement also carries its operation (symbol, units, price, fees).
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
@@ -44,12 +45,18 @@ const isSaving = computed(() => draft.type === 'saving')
 const destinationAccounts = computed(() =>
   financialStateStore.accounts.filter((account) => account.id !== draft.accountId),
 )
-const investmentTotal = computed(() =>
-  round2(
-    (parseDecimal(draft.units) || 0) * (parseDecimal(draft.unitPrice) || 0) +
-      (parseDecimal(draft.fee) || 0),
-  ),
-)
+// The panel previews the amount the movement will record: gross for a purchase,
+// net of fees for a sale. The store recomputes it with the same function.
+const investmentTotal = computed(() => {
+  const computed = computeInvestmentMovement({
+    side: draft.side,
+    symbol: draft.symbol,
+    units: parseDecimal(draft.units) || 0,
+    unitPrice: parseDecimal(draft.unitPrice) || 0,
+    fee: parseDecimal(draft.fee) || 0,
+  })
+  return Math.abs(computed.signedAmount)
+})
 
 const categories = computed(() => getCategoriesForType(financialStateStore.state, draft.type))
 const categoryOptions = computed(() => categorySelectOptions(categories.value, draft.category))
@@ -114,7 +121,7 @@ function openFor(item: PendingMovement): void {
 }
 
 function save(): void {
-  const saved = recurringStore.editPending(editingId.value, {
+  const saved = recurringStore.confirmPending(editingId.value, {
     type: draft.type,
     date: draft.date,
     accountId: draft.accountId,
@@ -140,7 +147,7 @@ defineExpose({ openFor })
     id="pending-edit-panel"
     v-model:open="open"
     kicker="Pendiente"
-    title="Editar antes de confirmar"
+    title="Editar y confirmar"
     title-id="pending-edit-title"
   >
     <form id="pending-edit-form" class="grid gap-6" @submit.prevent="save">
@@ -263,7 +270,7 @@ defineExpose({ openFor })
     <template #footer>
       <BaseButton variant="ghost" @click="open = false">Cancelar edición</BaseButton>
       <BaseButton variant="primary" type="submit" form="pending-edit-form"
-        >Guardar edición</BaseButton
+        >Guardar y confirmar</BaseButton
       >
     </template>
   </SidePanel>

@@ -140,7 +140,7 @@ const columns: LedgerColumn<PendingMovement>[] = [
           </BaseButton>
           <IconButton
             icon="edit"
-            :label="`Editar ${row.description} antes de confirmar`"
+            :label="`Editar y confirmar ${row.description}`"
             @click="editPanel?.openFor(row)"
           />
           <IconButton
