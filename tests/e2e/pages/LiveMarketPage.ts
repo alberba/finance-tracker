@@ -193,13 +193,6 @@ export class LiveMarketPage {
     await this.instrument(currentSymbol).getByRole('button', { name: 'Guardar símbolos' }).click()
   }
 
-  async editFirstPending(description: string, amount: number): Promise<void> {
-    const item = await this.openFirstPendingEdit()
-    await item.getByLabel('Descripción').fill(description)
-    await item.getByLabel('Importe').fill(String(amount))
-    await item.getByRole('button', { name: 'Guardar edición' }).click()
-  }
-
   async openFirstPendingEdit(): Promise<Locator> {
     const item = this.pendingPanel.locator('[data-pending-item]').first()
     await item.getByRole('button', { name: /^Editar/ }).click()
@@ -221,15 +214,8 @@ export class LiveMarketPage {
       await item.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await item.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await item.getByLabel('Hora').fill(params.time)
-    await item.getByRole('button', { name: 'Guardar edición' }).click()
-  }
-
-  async confirmFirstPending(): Promise<void> {
-    await this.pendingPanel
-      .locator('[data-pending-item]')
-      .first()
-      .getByRole('button', { name: /^Confirmar/ })
-      .click()
+    await item.getByRole('button', { name: 'Guardar y confirmar' }).click()
+    await expect(this.pendingEditPanel).not.toBeVisible()
   }
 
   async expectPendingCount(count: number): Promise<void> {

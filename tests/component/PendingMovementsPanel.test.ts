@@ -52,7 +52,7 @@ describe('PendingMovementsPanel', () => {
     return { financialStore, recurringStore: useRecurringStore() }
   }
 
-  // Editar opens the side panel; its form is where the pending movement changes.
+  // Editar opens the side panel, where the pending is edited and confirmed.
   async function openEditForm(wrapper: ReturnType<typeof mount>) {
     await wrapper.get('button[aria-label^="Editar"]').trigger('click')
     await nextTick()
@@ -99,8 +99,8 @@ describe('PendingMovementsPanel', () => {
     expect(accountSelect).toBeDefined()
   })
 
-  it('submits updated investment fields to recurring store', async () => {
-    const { recurringStore } = setupState()
+  it('saves the edited investment fields into the confirmed movement', async () => {
+    const { financialStore, recurringStore } = setupState()
     const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
     const form = await openEditForm(wrapper)
 
@@ -129,15 +129,143 @@ describe('PendingMovementsPanel', () => {
 
     await form.trigger('submit')
 
-    const updated = recurringStore.openPendingMovements[0]
-    expect(updated).toMatchObject({
+    expect(recurringStore.pendingCount).toBe(0)
+    expect(financialStore.transactions).toHaveLength(1)
+    expect(financialStore.transactions[0]).toMatchObject({
       type: 'investment',
       accountId: 'asset-broker',
       category: 'Fondos Indexados',
       symbol: 'VWCE',
       units: 10,
       unitPrice: 100,
+      amount: 1000,
     })
+  })
+
+  it('previews the net amount of an investment sale', async () => {
+    const { financialStore } = setupState()
+    financialStore.commitState((draft) => {
+      draft.pendingMovements = [
+        {
+          id: 'pm-sell',
+          occurrenceKey: 'rule-inv:2026-02-01',
+          ruleId: 'rule-inv',
+          occurrenceDate: '2026-02-01',
+          type: 'investment',
+          accountId: 'asset-broker',
+          category: 'Cripto',
+          description: 'Venta Cripto',
+          amount: 199,
+          symbol: 'ETH',
+          side: 'sell',
+          units: 2,
+          unitPrice: 100,
+          fee: 1,
+          status: 'pending',
+          createdAt: '2026-02-01T00:00:00.000Z',
+          updatedAt: '2026-02-01T00:00:00.000Z',
+          transactionId: null,
+        },
+      ]
+    })
+
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
+    const form = await openEditForm(wrapper)
+
+    expect(form.text()).toMatch(/199,00\s€/)
+    wrapper.unmount()
+  })
+
+  it('saves the edit and confirms the pending in a single step', async () => {
+    const { financialStore, recurringStore } = setupState()
+    financialStore.commitState((draft) => {
+      draft.pendingMovements.push({
+        id: 'pm-2',
+        occurrenceKey: 'rule-2:2026-02-01',
+        ruleId: 'rule-2',
+        occurrenceDate: '2026-02-01',
+        type: 'expense',
+        accountId: 'acc-cash',
+        category: 'Suscripciones',
+        description: 'Otro pendiente',
+        amount: 20,
+        status: 'pending',
+        createdAt: '2026-02-01T00:00:00.000Z',
+        updatedAt: '2026-02-01T00:00:00.000Z',
+        transactionId: null,
+      })
+    })
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
+    const form = await openEditForm(wrapper)
+    const descriptionInput = form
+      .findAll<HTMLInputElement>('input')
+      .find((input) => input.element.labels?.[0]?.textContent?.includes('Descripción'))
+    const amountInput = form
+      .findAll<HTMLInputElement>('input')
+      .find((input) => input.element.labels?.[0]?.textContent?.includes('Importe'))
+
+    await descriptionInput!.setValue('Gasto mensual editado')
+    await amountInput!.setValue(450)
+    await form.trigger('submit')
+    await nextTick()
+
+    expect(recurringStore.pendingCount).toBe(1)
+    expect(recurringStore.openPendingMovements[0].id).toBe('pm-2')
+    expect(financialStore.transactions).toHaveLength(1)
+    expect(financialStore.transactions[0]).toMatchObject({
+      description: 'Gasto mensual editado',
+      amount: 450,
+    })
+    expect((wrapper.get('#pending-edit-panel').element as HTMLDialogElement).open).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the pending open and unconfirmed when the edit is invalid', async () => {
+    const { financialStore, recurringStore } = setupState()
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
+    const form = await openEditForm(wrapper)
+    const amountInput = form
+      .findAll<HTMLInputElement>('input')
+      .find((input) => input.element.labels?.[0]?.textContent?.includes('Importe'))
+
+    await amountInput!.setValue(0)
+    await form.trigger('submit')
+    await nextTick()
+
+    expect((wrapper.get('#pending-edit-panel').element as HTMLDialogElement).open).toBe(true)
+    expect(recurringStore.pendingCount).toBe(1)
+    expect(recurringStore.openPendingMovements[0]).toMatchObject({
+      description: 'Gasto mensual',
+      amount: 500,
+      status: 'pending',
+    })
+    expect(financialStore.transactions).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('leaves the pending untouched when the edit is cancelled', async () => {
+    const { financialStore, recurringStore } = setupState()
+    const wrapper = mount(PendingMovementsPanel, { attachTo: document.body })
+    const form = await openEditForm(wrapper)
+    const descriptionInput = form
+      .findAll<HTMLInputElement>('input')
+      .find((input) => input.element.labels?.[0]?.textContent?.includes('Descripción'))
+
+    await descriptionInput!.setValue('No debería guardarse')
+    await wrapper
+      .get('#pending-edit-panel')
+      .findAll('button')
+      .find((button) => button.text() === 'Cancelar edición')!
+      .trigger('click')
+    await nextTick()
+
+    expect(recurringStore.pendingCount).toBe(1)
+    expect(recurringStore.openPendingMovements[0]).toMatchObject({
+      description: 'Gasto mensual',
+      status: 'pending',
+    })
+    expect(financialStore.transactions).toHaveLength(0)
+    wrapper.unmount()
   })
 
   it('renders and preserves existing investment pending movement fields on edit', async () => {
@@ -220,7 +348,8 @@ describe('PendingMovementsPanel', () => {
 
     await form.trigger('submit')
 
-    expect(recurringStore.openPendingMovements[0].category).toBe('Categoría Antigua Desconocida')
+    expect(recurringStore.openPendingMovements).toHaveLength(0)
+    expect(financialStore.transactions[0].category).toBe('Categoría Antigua Desconocida')
   })
 
   it('asks before discarding a pending movement', async () => {
