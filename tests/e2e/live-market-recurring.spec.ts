@@ -371,6 +371,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(row).toContainText('1 por vincular')
     await liveMarket.linkExistingMovements('AGED.MI')
     await expect(row).toContainText('1 vinculados')
+    await tracker.waitForSync()
+    await tracker.reload()
+    await liveMarket.openQuotes()
+    await expect(liveMarket.instrument('AGED.MI')).toContainText('1 vinculados')
   })
 
   test('crea, edita, confirma pendientes y evita duplicados al recargar', async ({
