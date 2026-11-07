@@ -129,6 +129,9 @@ Los visuales se reparten por caso entre tres shards, cada uno con SQLite tempora
 layout mantienen su propio `fixedTime` y las fuentes reales.
 El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render. Las
 fuentes se sirven desde el propio dominio y el helper espera fuentes/scroll sin volver a abrir la app.
+Los rails de pestañas fijan su posición antes de capturar; no heredan el scroll del clic ni del
+cambio de fuente. Los visuales conservan diff y trace, con vídeo desactivado para que el cursor
+de diagnóstico no contamine los píxeles del retry.
 
 El artifact `playwright-report` combina los blob reports cuando falla funcional, visual o sync.
 Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conservan siete días.

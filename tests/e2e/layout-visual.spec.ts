@@ -628,7 +628,8 @@ async function openSectionForLayout(
 }
 
 /** Fixed "today" for snapshots: the default month and dates otherwise drift monthly. */
-test.use({ snapshotTime: '2026-09-15T10:00:00+02:00' })
+// Action cursors used by diagnostic video must never enter a pixel comparison.
+test.use({ snapshotTime: '2026-09-15T10:00:00+02:00', video: 'off' })
 
 /**
  * Settings snapshots: the tab rail can overflow on mobile, so the selected tab
@@ -650,6 +651,23 @@ async function centerSelectedSettingsTab(page: Page): Promise<void> {
     const tabRect = tab.getBoundingClientRect()
     const railRect = rail.getBoundingClientRect()
     rail.scrollLeft += tabRect.left + tabRect.width / 2 - (railRect.left + railRect.width / 2)
+  })
+}
+
+async function alignInvestmentTabs(page: Page): Promise<void> {
+  const selected = page
+    .getByRole('tablist', { name: 'Subsecciones de inversión', includeHidden: true })
+    .getByRole('tab', { selected: true, includeHidden: true })
+  await selected.evaluate((tab) => {
+    const rail = tab.closest<HTMLElement>('[role="tablist"]')
+    if (!rail) throw new Error('Selected investment tab is not inside a tablist')
+    // Keep the start visible unless the selected tab needs the rail's end.
+    // Font changes and click auto-scrolling otherwise leave different offsets.
+    rail.scrollLeft = 0
+    rail.scrollLeft = Math.max(
+      0,
+      tab.getBoundingClientRect().right - rail.getBoundingClientRect().right,
+    )
   })
 }
 
@@ -702,6 +720,7 @@ async function expectViewSnapshot(
     }
   }, focus)
   if (isSettingsSnapshot(name)) await centerSelectedSettingsTab(page)
+  if (name.startsWith('page-investment')) await alignInvestmentTabs(page)
   await expect(page).toHaveScreenshot(name, {
     animations: 'disabled',
     caret: 'hide',
