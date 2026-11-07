@@ -110,6 +110,7 @@ Fuente: `docs/playwright.md`.
 - Para comprobar persistencia, espera la respuesta del comando concreto antes de recargar.
   «Sincronizado» puede estar en reposo mientras otro módulo todavía construye un comando.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
+- Los switches con input oculto se pulsan por su etiqueta visible; no se fuerzan clics sobre el input.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.
 - Los snapshots Linux se actualizan a mano tras revisar el resultado:
   `pnpm test:e2e:visual --update-snapshots`.

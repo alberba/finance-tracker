@@ -1,6 +1,7 @@
 import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
+import { setSwitch } from './pages/controls'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({
@@ -31,7 +32,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     const rule = tab.locator('tr[data-settings-rule-id="legacy-expense-rule"]')
     await expect(rule).toBeVisible()
     const toggle = rule.getByRole('switch', { name: 'Regla Alquiler histórico activa' })
-    await toggle.uncheck({ force: true })
+    await setSwitch(toggle, false)
     await expect(toggle).not.toBeChecked()
     await rule.getByRole('button', { name: 'Editar la regla Alquiler histórico' }).click()
     const panel = page.locator('#settings-recurring-panel')

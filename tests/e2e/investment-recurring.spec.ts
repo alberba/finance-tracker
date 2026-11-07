@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
+import { setSwitch } from './pages/controls'
 
 const RULE = {
   account: 'Revolut',
@@ -63,14 +64,14 @@ test.describe('inversión · compras recurrentes', () => {
       name: 'Regla VWCE · Compra mensual activa',
     })
     await expect(toggle).toBeChecked()
-    await toggle.uncheck({ force: true })
+    await setSwitch(toggle, false)
     await expect(toggle).not.toBeChecked()
     await expect(summary).not.toContainText('300,00 €')
     await expect(liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')).toContainText(
       'Pausada',
     )
 
-    await toggle.check({ force: true })
+    await setSwitch(toggle, true)
     await expect(toggle).toBeChecked()
     await expect(summary).toContainText('300,00 €')
 

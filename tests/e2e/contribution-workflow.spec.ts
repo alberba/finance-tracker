@@ -1,5 +1,6 @@
 import { readScenarioState, editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
+import { setSwitch } from './pages/controls'
 
 test.describe('recorrido guiado de aportes', () => {
   test('fecha inicial del aporte es hoy', async ({ tracker, page }) => {
@@ -264,11 +265,12 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 125.5)
 
     const modal = page.locator('#contribution-workflow-dialog')
-    await modal
-      .getByRole('switch', {
+    await setSwitch(
+      modal.getByRole('switch', {
         name: 'Añadir las asignaciones al efectivo de Stock Events',
-      })
-      .check({ force: true })
+      }),
+      true,
+    )
     await tracker.contributionWorkflowSave()
 
     await expect
@@ -290,12 +292,12 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowGoToAllocationStep()
     await tracker.contributionWorkflowSetTotal(150.5)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 150.5)
-    await page
-      .locator('#contribution-workflow-dialog')
-      .getByRole('switch', {
+    await setSwitch(
+      page.locator('#contribution-workflow-dialog').getByRole('switch', {
         name: 'Añadir las asignaciones al efectivo de Stock Events',
-      })
-      .check({ force: true })
+      }),
+      true,
+    )
     await tracker.contributionWorkflowSave()
 
     await expect.poll(() => syncedTransactions).toHaveLength(2)
