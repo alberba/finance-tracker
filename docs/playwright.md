@@ -171,6 +171,8 @@ Los runtimes de navegador corren en paralelo, con puertos, bases, builds y cach�
 La suite completa detectó además una vinculación de movimientos que solo se guardaba localmente:
 `market.linkExistingMovements` ahora encola el comando compartido después de confirmar la identidad
 del símbolo recién creado. El round-trip comprueba el reinicio y el E2E existente verifica la recarga.
+Ese E2E espera la respuesta del comando de vinculación: el estado global «Sincronizado» no confirma
+una operación que otro módulo todavía está construyendo.
 
 Las fusiones de #416 conservan esta cobertura:
 

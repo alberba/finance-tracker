@@ -107,6 +107,8 @@ Fuente: `docs/playwright.md`.
 - Cada escenario autenticado usa un usuario aislado, inicializa su espacio por la API y persiste
   mediante sync v2; cada shard de CI tiene su propia D1.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
+- Para comprobar persistencia, espera la respuesta del comando concreto antes de recargar.
+  «Sincronizado» puede estar en reposo mientras otro módulo todavía construye un comando.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.
 - Los snapshots Linux se actualizan a mano tras revisar el resultado:
