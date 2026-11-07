@@ -2,6 +2,7 @@ import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 import { setSwitch } from './pages/controls'
+import { expectSyncCommand } from './pages/sync'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({
@@ -370,20 +371,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const row = liveMarket.instrument('AGED.MI')
     await expect(row).toContainText('1 por vincular')
-    const linked = page.waitForResponse((response) => {
-      if (!response.url().endsWith('/api/sync') || response.request().method() !== 'POST')
-        return false
-      const body = response.request().postDataJSON() as {
-        commands: Array<{ entityType?: string; patch?: { operation?: { instrumentId?: string } } }>
-      }
-      return body.commands.some(
-        (command) => command.entityType === 'transaction' && command.patch?.operation?.instrumentId,
-      )
-    })
+    const linked = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
+    )
     await liveMarket.linkExistingMovements('AGED.MI')
-    const confirmation = await linked
-    expect(confirmation.ok()).toBe(true)
-    expect((await confirmation.json()).results[0].status).toBe('applied')
+    await linked
     await expect(row).toContainText('1 vinculados')
     await tracker.reload()
     await liveMarket.openQuotes()

@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { expectSyncCommand } from './sync'
 
 export class LiveMarketPage {
   constructor(private readonly page: Page) {}
@@ -121,8 +122,16 @@ export class LiveMarketPage {
       await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
+    const saved = expectSyncCommand(
+      this.page,
+      (command) =>
+        command.action === 'create' &&
+        command.entityType === 'recurringRule' &&
+        command.data.name === params.description,
+    )
     await form.getByRole('button', { name: 'Crear regla' }).click()
     await expect(form).toBeHidden()
+    await saved
   }
 
   /**
