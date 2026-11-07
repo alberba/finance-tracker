@@ -374,6 +374,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.waitForSync()
     await tracker.reload()
     await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
     await expect(liveMarket.instrument('AGED.MI')).toContainText('1 vinculados')
   })
 
