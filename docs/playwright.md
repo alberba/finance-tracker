@@ -1,12 +1,15 @@
 # Playwright
 
 La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y escenarios
-especializados de sync v2. Todo cliente autenticado usa sync v2; todos los grupos corren sobre Astro
-dev (`playwright.shared.ts`), en local y en CI; ninguno sirve el build de Wrangler.
+especializados de sync v2. Todo cliente autenticado usa sync v2. Funcional y visual ejecutan el
+build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1 local, y autenticación
+ejecuta otro Worker compilado con proveedores simulados. `playwright.shared.ts` configura los dos primeros
+runtimes. Los tres conservan usuarios aislados y las APIs reales de inicialización/importación.
 
 ## Comandos
 
 ```bash
+pnpm test:all               # Vitest + funcional + visual + sync-v2 + auth; máximo 360 s
 pnpm test:e2e:install       # instala Chromium una vez
 pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
 pnpm test:e2e               # funcional, sin snapshots visuales
@@ -17,9 +20,25 @@ pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
 pnpm test:e2e:shard 1/4    # shard funcional equilibrado por tiempos históricos
 pnpm test:e2e:visual        # layout y regresión visual
 pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
-pnpm test:e2e:headed        # navegador visible sobre Astro dev
+pnpm test:e2e:headed        # navegador visible sobre el build Node
 pnpm test:e2e:ui            # interfaz interactiva de Playwright
 ```
+
+`test:all` ejecuta Vitest en el host y los navegadores en la imagen Linux oficial de Playwright,
+con la versión instalada de `@playwright/test`. El runner y los servidores permanecen en el host,
+con su Node y sus addons nativos; Playwright conecta Chromium por WebSocket y expone solo la red
+loopback del cliente. Así macOS y Linux comparan los mismos píxeles sin sustituir el addon SQLite
+del desarrollador. Requiere dependencias instaladas y Docker arrancado;
+descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equivalente a instalar
+Chromium): `docker pull mcr.microsoft.com/playwright:v1.64.1-noble`. La descarga inicial no es una
+medición de la suite. En CI usa directamente el contenedor del job.
+
+El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado y los tiempos
+por fase en `.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
+También conserva un JSON fechado por invocación para demostrar ejecuciones consecutivas.
+No incluye lint/typecheck: para el gate de contribución sigue aplicando `pnpm gate`.
+Los comandos acotados sirven para iterar; la comparación de píxeles usa la imagen Linux para fijar
+fuentes y controles de fecha nativos, también en distribuciones Linux distintas de Ubuntu.
 
 Para probar una URL ya arrancada:
 
@@ -40,11 +59,12 @@ comparten los escenarios de desktop; los visuales solo mantienen baselines de Ch
 ## Estabilidad
 
 - Cada escenario crea un usuario aislado, inicializa su espacio por la API y carga los datos de
-  prueba mediante el formato de backup v2. Los runners de CI tienen bases D1 independientes.
+  prueba mediante el formato de backup v2. Los runners de CI tienen bases SQLite/D1 independientes.
 - La navegación espera `html[data-finance-ready="true"]`, que señala hidratación y bindings completos.
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
-- Cada runner usa un worker, con corte temprano, trace del primer fallo y vídeo en el primer retry.
-  Los shards visuales reparten escenarios por duración.
+- Funcional/visual paralelizan escenarios sobre usuarios y contextos propios. Autenticación conserva
+  un worker porque sus pruebas modifican la política global; sync-v2 conserva su planificación serial.
+  Trace y vídeo conservan su función diagnóstica. Los shards visuales distribuyen casos con Playwright.
 - En CI, un caso que solo pasa al reintentarlo también falla el gate (`failOnFlakyTests`).
   El reintento conserva su función diagnóstica; no convierte una carrera en un resultado verde.
 - Los vídeos del runtime compartido se graban a 30 fps con cursor, resaltado del objetivo y título
@@ -79,7 +99,7 @@ la imagen Docker del commit mezclado antes de recrear el contenedor. El desplieg
 el CI verde del push (validación reutilizada o checks de respaldo), sin repetir navegadores.
 Una ejecución manual de **CI** ejecuta calidad y build y no dispara despliegue.
 
-**Browser regression** (`browser-regression.yml`) ejecuta auth completa, funcional en cuatro
+**Browser regression** (`browser-regression.yml`) ejecuta Vitest, autenticación, funcional en cuatro
 shards, sync-v2 y visual en tres shards, los lunes a las 05:00 UTC y bajo demanda con
 `workflow_dispatch` sobre la rama seleccionada. No forma parte del gate de entrega ni dispara
 el despliegue. Para cambios de riesgo, ejecuta este workflow en la rama de la PR antes de mezclar;
@@ -90,9 +110,11 @@ Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.m
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
 Los jobs de navegador corren dentro de la imagen oficial de Playwright
-(`mcr.microsoft.com/playwright:v1.64.0-noble`), que ya trae Chromium y sus librerías: sin
+(`mcr.microsoft.com/playwright:v1.64.1-noble`), que ya trae Chromium y sus librerías: sin
 `apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
-común (pnpm, Node e install con lockfile) vive en `.github/actions/setup`.
+común (pnpm, Node e install con lockfile, incluido el addon SQLite precompilado) vive en
+`.github/actions/setup`. El job final comprueba el tiempo desde el inicio del workflow, incluida
+la preparación y espera de runners, contra el presupuesto de 360 segundos.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
 Los cuatro shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial
@@ -102,7 +124,7 @@ specs actuales con Playwright y estima los nuevos con la media por caso, de modo
 spec no requiere registrarlo para que corra. Para recalibrar, combina los blob reports con
 `pnpm exec playwright merge-reports --reporter json <directorio>` y actualiza los totales por spec.
 
-Los visuales se reparten por caso entre tres shards, cada uno en una D1 independiente. Los casos
+Los visuales se reparten por caso entre tres shards, cada uno con SQLite temporal independiente. Los casos
 `@snapshot` fijan `snapshotTime` en el fixture antes de la primera navegación; los controles de
 layout mantienen su propio `fixedTime` y las fuentes reales.
 El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render. Las
@@ -125,11 +147,9 @@ pnpm test:e2e:visual:linux --update-snapshots   # regenera
 pnpm test:e2e:visual:linux tests/e2e/layout-visual.spec.ts --project=mobile-chrome
 ```
 
-El script (`scripts/e2e-visual-linux.sh`) necesita Docker en marcha y falla al principio si no
-responde. Arranca un dev server propio de este worktree en `VISUAL_PORT` (por defecto, uno derivado
-de la ruta del worktree; el log queda en `.wrangler/visual-dev-server.log`) y lo para al terminar.
-`pnpm-workspace.yaml` instala también los binarios nativos de Linux
-(`supportedArchitectures`) para que `node_modules` funcione dentro del contenedor.
+El script (`scripts/e2e-visual-linux.sh`) necesita Docker en marcha y conecta al mismo Chromium
+Linux que `test:all`. El servidor de la app corre en el host; no modifica `dist/`, `.dev.vars` ni
+las dependencias nativas del desarrollador.
 `pnpm test:e2e:visual` sin `:linux` en macOS compara contra snapshots de otra plataforma y genera
 `*-darwin.png`, que no se versionan.
 
@@ -141,6 +161,39 @@ render, y no dependen de la descarga de fuentes. El resto de capturas (fallos, c
 un diseño) usa las fuentes reales, servidas desde el propio dominio: el fixture ya no necesita
 interceptar Google Fonts.
 
+## Mantener el presupuesto
+
+Antes de añadir escenarios, aplica los [criterios E2E de los estándares](../CODING_STANDARDS.md#e2e).
+El coste dominante era repetir preparación y arranque: D1 emulada añade un intercambio entre
+procesos a cada consulta y la importación hace muchas. Los recorridos de producto ahora usan
+SQLite transaccional del runtime de producción; Worker/D1 sigue cubierto por sync y auth.
+Los runtimes de navegador corren en paralelo, con puertos, bases, builds y cachés independientes.
+La suite completa detectó además una vinculación de movimientos que solo se guardaba localmente:
+`market.linkExistingMovements` ahora encola el comando compartido después de confirmar la identidad
+del símbolo recién creado. El round-trip comprueba el reinicio y el E2E existente verifica la recarga.
+
+Las fusiones de #416 conservan esta cobertura:
+
+- 51 chequeos de layout móvil pasan al escenario que ya abre esa misma vista para capturarla.
+  Se escanea con las fuentes reales antes de hacer scroll de captura; para los píxeles se restaura
+  Arial. Las geometrías de escritorio mantienen casos propios. Las capturas mantienen fecha e
+  identidad. Solo se corrigen los dos baselines de «Más», desfasados respecto a «Mis reportes».
+- Las 48 parejas claro/oscuro de vistas de producto se capturan en el mismo escenario. Cambiar el
+  medio de color no exige importar datos ni abrir otra app. Los menús del shell conservan casos
+  separados porque muestran la identidad del usuario.
+- El panel de edición recurrente conserva geometría móvil y desktop. Su formulario comparte
+  estructura con el panel de creación, cuyo snapshot claro/oscuro sigue activo; editar y persistir
+  se comprueba en `investment-recurring.spec.ts`. Se retiran sus dos capturas redundantes,
+  que además retenían el scroll anterior al arreglo #382.
+- Los diez contratos de autenticación sin variación responsive se ejecutan en desktop. Móvil
+  conserva los tres smoke: acceso protegido, fuentes y alta por invitación. Política, sesiones,
+  recuperación, OAuth y passkeys no necesitan repetir la misma prueba por viewport.
+
+Después de cambiar la infraestructura, ejecuta tres veces `pnpm test:all` y tres veces Browser
+regression sobre el mismo commit. Guarda resultados, duración y enlaces de CI; un retry exitoso
+no cuenta como estabilidad. Si se excede el presupuesto, revisa primero los arranques repetidos,
+la capa de prueba y el aislamiento antes de modificar concurrencia.
+
 ## Worktrees
 
 - Antes de probar un worktree nuevo o después de cambiar de rama/lockfile, ejecuta
@@ -149,11 +202,13 @@ interceptar Google Fonts.
   Sin `TEST_AUTH_ENABLED`, las llamadas de autenticación de test no inicializan el usuario aislado.
   Las identidades de prueba no tienen privilegios especiales de propietario.
 - `pnpm test:e2e` arranca su propio servidor (`reuseExistingServer: false`) en un puerto derivado
-  de la ruta del worktree, así que varios worktrees no chocan. En CI usa 4321 (4322 para sync-v2).
-  Para usar un servidor ya arrancado, pásalo con `PLAYWRIGHT_BASE_URL`.
-- Astro admite un solo dev server por worktree, sea cual sea el puerto. Los servidores de test
-  arrancan con `--ignore-lock` para convivir con el `pnpm dev` del usuario; para uno propio a mano,
-  `pnpm dev --port <n> --ignore-lock`. No pares el `pnpm dev` del usuario.
+  de la ruta del worktree. En CI usa 4321 (4322 para sync-v2). Para un servidor ya arrancado,
+  pásalo con `PLAYWRIGHT_BASE_URL`.
+- Las compilaciones y las cachés Vite de los tests viven en `.scratch/`, separadas de `dist/` y
+  del dev server del usuario. Las bases de datos son temporales por invocación y se borran al salir.
+  D1 usa tmpfs en Linux para evitar fsync por fila al preparar datos; los contenedores reservan 1 GiB
+  de memoria compartida. `PLAYWRIGHT_STORAGE_DIR` permite elegir otro directorio temporal.
+- El Worker de auth tiene su propia caché y compilación. No pares el `pnpm dev` del usuario.
 
 Para saber si un fallo ya existía, lanza el spec en un worktree de `main`; `git stash` usa una
 pila compartida entre worktrees y no se toca:

@@ -252,7 +252,10 @@ test.describe('Finance tracker E2E', () => {
     await expect(headerCells.nth(6)).toHaveText(/^\s*acciones\s*$/i)
   })
 
-  test('movimientos exporta el informe de un periodo como PDF y CSV', async ({ page, tracker }) => {
+  test('movimientos exporta el informe de un periodo como PDF y CSV', async ({
+    page,
+    tracker,
+  }, testInfo) => {
     await page.goto('/movimientos')
     await expect(
       tracker.transactionsSection.getByRole('heading', { name: 'Movimientos', exact: true }),
@@ -281,7 +284,8 @@ test.describe('Finance tracker E2E', () => {
     await panel.getByRole('button', { name: 'Descargar PDF' }).click()
     const pdf = await pdfDownload
     expect(pdf.suggestedFilename()).toBe('Informe 2026-02-01 - 2026-02-28.pdf')
-    const pdfPath = await pdf.path()
+    const pdfPath = testInfo.outputPath('report.pdf')
+    await pdf.saveAs(pdfPath)
     const header = (await import('node:fs')).readFileSync(pdfPath).subarray(0, 5).toString()
     expect(header).toBe('%PDF-')
 

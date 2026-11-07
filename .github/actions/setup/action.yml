@@ -5,8 +5,8 @@ inputs:
   playwright:
     description: >-
       'true' installs Chromium and its system dependencies on the runner;
-      'container' assumes the job runs in the official Playwright image and
-      installs without native build scripts (the image has no toolchain).
+      'container' assumes the job runs in the official Playwright image;
+      only SQLite's prebuilt native addon is installed for the Node runtime.
     default: 'false'
 
 runs:
@@ -27,6 +27,10 @@ runs:
       if: ${{ inputs.playwright == 'container' }}
       shell: bash
       run: pnpm install --frozen-lockfile --ignore-scripts
+    - name: Install SQLite native addon
+      if: ${{ inputs.playwright == 'container' }}
+      shell: bash
+      run: pnpm rebuild better-sqlite3
     - name: Cache Chromium
       if: ${{ inputs.playwright == 'true' }}
       id: chromium-cache

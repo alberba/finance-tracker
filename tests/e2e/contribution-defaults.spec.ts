@@ -2,6 +2,7 @@ import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
 
 test.describe('contribution defaults from wealth', () => {
+  test.use({ fixedTime: '2026-03-15T12:00:00Z' })
   test.beforeEach(async ({ page, tracker }) => {
     await editScenarioState(page, (state) => {
       state.year = 2026
@@ -12,7 +13,7 @@ test.describe('contribution defaults from wealth', () => {
       state.transactions = []
       state.contributions = []
       state.snapshots = {
-        1: { month: 1, investments: { fund: 0 }, accounts: {}, liabilities: {} },
+        2: { month: 2, investments: { fund: 0 }, accounts: {}, liabilities: {} },
       }
     })
     await tracker.reload()

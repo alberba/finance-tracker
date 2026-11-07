@@ -35,7 +35,7 @@ function executeSql(sql: string) {
       'finance-auth-e2e',
       '--local',
       '--persist-to',
-      resolve('.scratch/auth/state'),
+      process.env.AUTH_TEST_STATE_PATH!,
       '--config',
       resolve('.scratch/auth/wrangler.toml'),
       '--command',

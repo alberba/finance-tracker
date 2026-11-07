@@ -33,6 +33,7 @@ const oauthNetworkAliases =
 
 export default defineConfig({
   output: 'server',
+  outDir: process.env.PLAYWRIGHT_BUILD_DIR,
 
   devToolbar: {
     enabled: false,
@@ -53,6 +54,8 @@ export default defineConfig({
   },
 
   vite: {
+    // Test builds/auth dev must not invalidate the developer's running Vite cache.
+    cacheDir: process.env.PLAYWRIGHT_VITE_CACHE_DIR,
     // Discovering these during hydration replaces Vue's shared chunks mid-page.
     optimizeDeps: {
       include: [

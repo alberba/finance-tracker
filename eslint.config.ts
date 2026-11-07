@@ -34,9 +34,12 @@ export default defineConfig([
       'coverage/**',
       '.astro/**',
       '.wrangler/**',
+      '.scratch/**',
       'node_modules/**',
       'playwright-report/**',
+      'playwright-report-*/**',
       'test-results/**',
+      'test-results-*/**',
       // Nested git worktrees under `.claude/worktrees/**` each carry their
       // own `tsconfig.json`, which confuses typescript-eslint's automatic
       // project-root detection (it sees two candidate `tsconfigRootDir`s and

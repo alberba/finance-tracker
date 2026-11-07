@@ -47,6 +47,7 @@ export const test = base.extend<Fixtures>({
       await page.addInitScript((styles) => {
         const insert = () => {
           const style = document.createElement('style')
+          style.dataset.snapshotFonts = ''
           style.textContent = styles
           document.documentElement.append(style)
         }

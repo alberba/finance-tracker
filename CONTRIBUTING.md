@@ -62,7 +62,8 @@ sin repetir checks. Si difieren, es un push directo o no se puede verificar la e
 lint/tipos, Vitest y migraciones D1. El build de CI solo corre en PR y ejecuciones manuales:
 el despliegue construye la imagen Docker del commit mezclado. La evidencia caduca a los siete días;
 su ausencia siempre activa los checks de respaldo.
-La regresión extensa (auth completa, funcional, visual y sync-v2) vive en **Browser regression**:
+La suite completa (Vitest, auth, funcional, visual y sync-v2) se ejecuta con `pnpm test:all`.
+**Browser regression** comprueba las mismas capas en CI:
 se ejecuta los lunes a las 05:00 UTC o a mano sobre la rama elegida. No bloquea entregas ni dispara
 despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.
 

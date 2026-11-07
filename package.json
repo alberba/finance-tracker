@@ -21,6 +21,7 @@
     "gate": "pnpm check:deps && pnpm lint && pnpm check && pnpm test",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
+    "test:all": "node scripts/test-all.mjs",
     "test:watch": "vitest",
     "test:unit": "vitest run --project unit",
     "test:unit:watch": "vitest --project unit",
