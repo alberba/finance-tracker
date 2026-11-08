@@ -25,6 +25,8 @@ test.describe('Diseño nuevo por defecto', () => {
   test.use({ storageState: NO_COOKIE })
 
   test('sin cookie se ve el diseño nuevo con su marco de escritorio', async ({ page, tracker }) => {
+    // The sidebar carries the «Apuntar» button: it needs the height to keep the bottom group apart.
+    await page.setViewportSize({ width: 1280, height: 900 })
     await expect(html(page)).toHaveAttribute('data-ui', 'neon')
 
     await expect

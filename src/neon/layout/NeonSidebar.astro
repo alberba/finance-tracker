@@ -3,6 +3,7 @@ import { APP_SECTIONS } from '../../config/app-sections'
 import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
 import DesignToggle from './DesignToggle.vue'
+import NeonApuntarButton from './NeonApuntarButton.vue'
 import NeonNavItem from './NeonNavItem.astro'
 import NeonUserMenu from './NeonUserMenu.astro'
 
@@ -46,6 +47,7 @@ const bottom = BOTTOM.map((id) => APP_SECTIONS.find((section) => section.id === 
   </nav>
 
   <div class="flex flex-col gap-3">
+    <NeonApuntarButton client:only="vue" />
     <DesignToggle client:only="vue" design={design} />
     <NeonUserMenu />
   </div>

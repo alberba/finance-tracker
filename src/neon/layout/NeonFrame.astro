@@ -2,6 +2,7 @@
 import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
 import NeonBottomBar from './NeonBottomBar.astro'
+import NeonEntrySheet from '../entry/NeonEntrySheet.vue'
 import NeonFab from './NeonFab.vue'
 import NeonMoreSheet from './NeonMoreSheet.astro'
 import NeonSidebar from './NeonSidebar.astro'
@@ -36,6 +37,7 @@ const { activeSection, design } = Astro.props
     <NeonMoreSheet activeSection={activeSection} design={design} />
   </div>
   <NeonFab client:only="vue" />
+  <NeonEntrySheet client:only="vue" />
 
   <div class="flex min-w-0 flex-col">
     <slot name="banner" />

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { useAccountRequirement } from '../../composables/useAccountRequirement'
-import { useSetupNavigation } from '../../composables/useSetupNavigation'
+import { useEntrySheet } from '../../composables/useEntrySheet'
 
-// «Apuntar» button of the mobile frame (DESIGN.md, FAB). Until the new entry
-// sheet ships it runs the existing action: it opens the movement panel in
-// Movimientos, as the dashboard's «Nuevo movimiento» does.
+// «Apuntar» button of the mobile frame (DESIGN.md, FAB): opens the entry sheet.
 const { needsAccount } = useAccountRequirement()
-const { createMovement } = useSetupNavigation()
+const { openEntrySheet } = useEntrySheet()
 </script>
 
 <template>
@@ -15,7 +13,7 @@ const { createMovement } = useSetupNavigation()
     class="bg-accent text-on-accent font-display outline-text frame:hidden fixed inset-e-4 inset-be-[calc(118px+env(safe-area-inset-bottom,0px))] z-40 flex h-14 items-center gap-2.5 rounded-[16px] ps-4 pe-[22px] text-[15px] font-bold [filter:drop-shadow(0_10px_18px_oklch(0%_0_none/0.45))] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:enabled:active:scale-[0.97]"
     :disabled="needsAccount"
     data-fab-apuntar
-    @click="createMovement"
+    @click="openEntrySheet"
   >
     <svg
       class="size-6"
