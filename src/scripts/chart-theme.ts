@@ -1,12 +1,12 @@
 /**
- * Chart theme read from the design tokens in global.css, so every chart
+ * Chart theme read from the design tokens in src/styles/legacy.css, so every chart
  * shares palette, axis typography and grid, and follows light/dark mode
  * (charts re-render on theme switch and read the tokens again).
  */
 
 type TokenReader = (name: string) => string
 
-/** Series palette size: `--chart-series-1` … `--chart-series-N` in global.css. */
+/** Series palette size: `--chart-series-1` … `--chart-series-N` in legacy.css. */
 export const CHART_SERIES_COUNT = 10
 
 const NEUTRAL = '#8693a4'

@@ -26,7 +26,7 @@ export const REPORT_FONT_FILES = {
   DMMono: { normal: 'DMMono-Regular.ttf', bold: 'DMMono-Regular.ttf' },
 } as const
 
-/** The light theme's tokens (`global.css`): the PDF is read on paper, whatever the app's theme. */
+/** The light theme's tokens (`src/styles/legacy.css`): the PDF is read on paper, whatever the app's theme. */
 const INK = '#0d1626'
 const MUTED = '#5a6678'
 const LINE = '#e4e8f1'

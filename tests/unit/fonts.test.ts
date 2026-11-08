@@ -3,13 +3,13 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * The three families the design language uses ship with the app (#404):
- * `global.css` declares them, `public/fonts` holds the latin woff2 files and
+ * `src/styles/common.css` declares them, `public/fonts` holds the latin woff2 files and
  * the service worker precaches them so the app keeps its typography offline.
  * Vendoring the OFL licenses is part of the redistribution terms.
  */
 
 const root = new URL('../../', import.meta.url)
-const globalCss = readFileSync(new URL('src/styles/global.css', root), 'utf8')
+const commonCss = readFileSync(new URL('src/styles/common.css', root), 'utf8')
 const serviceWorker = readFileSync(new URL('public/sw.js', root), 'utf8')
 const fontPreloads = readFileSync(new URL('src/components/layout/FontPreloads.astro', root), 'utf8')
 
@@ -20,7 +20,7 @@ type FontFace = {
   source: string
 }
 
-const fontFaces: FontFace[] = [...globalCss.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(
+const fontFaces: FontFace[] = [...commonCss.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(
   ([, body]) => {
     const field = (name: string) => body.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1].trim()
     return {

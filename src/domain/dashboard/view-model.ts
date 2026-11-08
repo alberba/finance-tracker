@@ -23,7 +23,7 @@ import {
 import { getCategoriesForType } from '../transactions/categories'
 import { getInvestmentBuckets } from '../investment/buckets'
 import { buildGoalsViewModel } from '../goals/view-model'
-import type { Tone } from '../../components/ui/tone'
+import type { Tone } from '../../lib/tone'
 
 export type DashboardHeroRange = '1m' | '6m' | '1a'
 export type DashboardTone = 'neutral' | 'good' | 'bad'

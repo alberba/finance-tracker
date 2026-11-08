@@ -39,8 +39,8 @@ Fuente: `docs/architecture/frontend.md`.
   orden en el shell.
 - El comportamiento global del shell vive en `src/scripts`, no en bloques inline grandes dentro de
   Astro. Solo queda inline lo crítico antes del primer render, como la selección inicial del tema.
-- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes (Syne, DM
-  Sans y DM Mono) viven en `public/fonts` y se sirven desde el propio dominio.
+- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes
+  autoalojadas viven en `public/fonts` y se sirven desde el propio dominio.
 - Tailwind entra por `src/styles/global.css` con `@import "tailwindcss"` y el plugin Vite
   `@tailwindcss/vite`.
 - Los datos semilla generados desde Excel viven en `src/data/seed.json`; `src/data/seed.ts` es solo
@@ -70,9 +70,16 @@ Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md`.
 - `<style scoped>` solo para animaciones, selectores estructurales o pseudo-elementos,
   `::backdrop`, internos de gráficos o librerías y `v-bind()`. Siempre con variables de tema
   (`var(--…)`) y sin `@apply`.
-- El CSS global (`src/styles/global.css`) solo lleva tokens claro y oscuro, reset, tipografía base
-  y shell, sin clases. Es la única hoja de estilos: ni hojas nuevas ni capas propias, solo las de
-  Tailwind. `tests/unit/styles-guards.test.ts` lo comprueba.
+- El CSS global son tres partes que importa `src/styles/global.css`: `common.css` (fuentes, reset,
+  variante `neon:`; sin tokens), `legacy.css` (tokens y shell del diseño antiguo, congelado) y
+  `src/neon/styles/neon.css` (tokens nuevos, todos bajo `[data-ui="neon"]`). Sin clases, sin hojas
+  nuevas ni capas propias, solo las de Tailwind. `tests/unit/styles-guards.test.ts` y
+  `tests/unit/style-isolation.test.ts` lo comprueban.
+- Dos diseños conviven (ADR 0010). Lo nuevo vive en `src/neon/`; no importa de `src/components/` ni
+  de `src/styles/`, ni al revés, y el código compartido (`domain`, `lib`, `stores`, `config`)
+  no importa de ninguno. Solo cruzan los puntos de unión con nombre de
+  `scripts/lib/eslint-design-boundary.ts`. El diseño antiguo está congelado: solo correcciones de
+  errores. En `src/neon/` no se usan Syne, DM Sans ni DM Mono: manda `DESIGN.md`.
 - El tema oscuro va por tokens: los colores de `@theme` apuntan a variables que cambian con
   `[data-theme=dark]`. Cuando haga falta una variante, `dark:` está ligada a ese atributo, no a
   `prefers-color-scheme`.

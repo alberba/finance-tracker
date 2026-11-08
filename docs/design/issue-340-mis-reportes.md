@@ -1,12 +1,16 @@
 # Diseño #340: «Mis reportes» (seguimiento de reportes)
 
-| Dato          | Valor                                                                          |
-| ------------- | ------------------------------------------------------------------------------ |
-| Issue         | #340 «Seguimiento de reporte» (+ Agent Brief, único documento de requisitos)   |
-| Base          | `origin/main` @ `2f30dd018bec9965c87ac2c557da5a7fe28ec799`                     |
-| Rama          | `alberba/issue-340-reports`                                                    |
-| Fase          | Diseño y plan para el implementador. No hay código de producción en este diff. |
-| Siguiente paso | Implementar siguiendo §12 (pasos y orden), con TDD donde se indica.           |
+> Documento histórico, hecho con el lenguaje v2 (diseño antiguo). Para código nuevo manda
+> [DESIGN.md](../../DESIGN.md); Syne, DM Sans y DM Mono no se usan fuera del diseño antiguo
+> ([ADR 0010](../adr/0010-migracion-con-convivencia-aislada.md)).
+
+| Dato           | Valor                                                                          |
+| -------------- | ------------------------------------------------------------------------------ |
+| Issue          | #340 «Seguimiento de reporte» (+ Agent Brief, único documento de requisitos)   |
+| Base           | `origin/main` @ `2f30dd018bec9965c87ac2c557da5a7fe28ec799`                     |
+| Rama           | `alberba/issue-340-reports`                                                    |
+| Fase           | Diseño y plan para el implementador. No hay código de producción en este diff. |
+| Siguiente paso | Implementar siguiendo §12 (pasos y orden), con TDD donde se indica.            |
 
 Este documento **no sustituye** al Agent Brief: lo concreta. Si hay conflicto, manda el brief; las
 decisiones que el brief deja abiertas están marcadas **[D#]** en §1 y son vinculantes para el
@@ -68,22 +72,22 @@ Decididas aquí (el brief no las fija):
 
 ## 2. Trazabilidad criterio → diseño → prueba
 
-| Criterio del brief                                         | Diseño                         | Prueba principal                                        |
-| ---------------------------------------------------------- | ------------------------------ | ------------------------------------------------------- |
-| Acuse, cerrar panel, recargar, `/reportes` lo muestra      | §4, §6.1, §8.2                 | E2E «acuse → Mis reportes → recarga»                    |
-| POST siempre crea; sin `duplicate`                         | §6.1, §10                      | unit ruta + schema; borrado de tests del checker        |
-| Solo reportes de la cuenta; otro número no devuelve nada   | §5.5, §5.6                     | integración multi-usuario + unit ruta                   |
-| `CLOSED+DUPLICATE+duplicateOf` sigue a la principal (3)    | §5.3 `resolveFollowed`         | unit `report-status`                                    |
-| `COMPLETED`/`NOT_PLANNED` no duplicada; reapertura; falsos | §5.3                           | unit `report-status` (tabla)                            |
-| Cierre asíncrono visible en la siguiente carga             | §5.4 (sin caché de estado)     | E2E con mock que cambia entre dos cargas                |
-| Principal inaccesible / issue inaccesible                  | §5.3, §9.4                     | unit + E2E                                              |
-| Añadir/editar/borrar aclaraciones, adjuntos, ajenos        | §5.6, §5.7                     | unit `reporter-comment`, integración servicio, E2E hilo |
-| Ocultar automatización y otros reporteros; sanear Markdown | §5.6, §8.5                     | unit `classifyComment`, `report-markdown`, componente   |
-| Fallo de GitHub: error, conserva texto                     | §5.9, §8.4                     | componente hilo + E2E                                   |
-| Avisos en botón, «Más» y entrada; desaparecen al abrir     | §5.9, §8.6                     | componente + E2E                                        |
-| `reports:backfill`                                         | §7                             | unit plan + integración sobre SQLite                    |
-| Demo con 2 reportes y caja desactivada                     | §8.7                           | E2E demo + visual                                       |
-| `pnpm check` + tests dirigidos                             | §11                            | CI                                                      |
+| Criterio del brief                                         | Diseño                     | Prueba principal                                        |
+| ---------------------------------------------------------- | -------------------------- | ------------------------------------------------------- |
+| Acuse, cerrar panel, recargar, `/reportes` lo muestra      | §4, §6.1, §8.2             | E2E «acuse → Mis reportes → recarga»                    |
+| POST siempre crea; sin `duplicate`                         | §6.1, §10                  | unit ruta + schema; borrado de tests del checker        |
+| Solo reportes de la cuenta; otro número no devuelve nada   | §5.5, §5.6                 | integración multi-usuario + unit ruta                   |
+| `CLOSED+DUPLICATE+duplicateOf` sigue a la principal (3)    | §5.3 `resolveFollowed`     | unit `report-status`                                    |
+| `COMPLETED`/`NOT_PLANNED` no duplicada; reapertura; falsos | §5.3                       | unit `report-status` (tabla)                            |
+| Cierre asíncrono visible en la siguiente carga             | §5.4 (sin caché de estado) | E2E con mock que cambia entre dos cargas                |
+| Principal inaccesible / issue inaccesible                  | §5.3, §9.4                 | unit + E2E                                              |
+| Añadir/editar/borrar aclaraciones, adjuntos, ajenos        | §5.6, §5.7                 | unit `reporter-comment`, integración servicio, E2E hilo |
+| Ocultar automatización y otros reporteros; sanear Markdown | §5.6, §8.5                 | unit `classifyComment`, `report-markdown`, componente   |
+| Fallo de GitHub: error, conserva texto                     | §5.9, §8.4                 | componente hilo + E2E                                   |
+| Avisos en botón, «Más» y entrada; desaparecen al abrir     | §5.9, §8.6                 | componente + E2E                                        |
+| `reports:backfill`                                         | §7                         | unit plan + integración sobre SQLite                    |
+| Demo con 2 reportes y caja desactivada                     | §8.7                       | E2E demo + visual                                       |
+| `pnpm check` + tests dirigidos                             | §11                        | CI                                                      |
 
 ---
 
@@ -137,7 +141,10 @@ export interface ThreadItem {
   attachments: ThreadAttachment[] // solo reporter
   editable: boolean // reporter && hilo abierto && !demo
 }
-export interface ThreadAttachment { name: string; url: string }
+export interface ThreadAttachment {
+  name: string
+  url: string
+}
 
 export interface ReportDetail {
   report: AvailableReportEntry
@@ -159,15 +166,15 @@ o se toma del campo `url` de GraphQL; **nunca** del cliente.
 - `describeReportStatus(entry): { headline, secondary?, state: ReportIssueRef, tone, warning? }`
   — única fuente de los textos, usada por lista, detalle y demo:
 
-| Caso                                    | Titular («estado»)                  | Secundario                              | Aviso                                         |
-| --------------------------------------- | ----------------------------------- | --------------------------------------- | --------------------------------------------- |
-| OPEN (incl. `REOPENED`)                 | `Abierto`                           | —                                       | —                                             |
-| CLOSED `COMPLETED`                      | `Cerrado · Completado`              | —                                       | —                                             |
-| CLOSED `NOT_PLANNED`                    | `Cerrado · No planificado`          | —                                       | —                                             |
-| CLOSED sin motivo (`null`)              | `Cerrado`                           | —                                       | —                                             |
-| `followed`                              | `Se sigue en #N` + estado de #N     | `#orig · Cerrado como duplicado`        | —                                             |
-| DUPLICATE sin principal utilizable      | `Cerrado como duplicado`            | —                                       | `El enlace a la principal no está disponible.` |
-| `unavailable`                           | `Reporte #N` + fecha de envío       | —                                       | `Este reporte ya no está disponible en GitHub` |
+| Caso                               | Titular («estado»)              | Secundario                       | Aviso                                          |
+| ---------------------------------- | ------------------------------- | -------------------------------- | ---------------------------------------------- |
+| OPEN (incl. `REOPENED`)            | `Abierto`                       | —                                | —                                              |
+| CLOSED `COMPLETED`                 | `Cerrado · Completado`          | —                                | —                                              |
+| CLOSED `NOT_PLANNED`               | `Cerrado · No planificado`      | —                                | —                                              |
+| CLOSED sin motivo (`null`)         | `Cerrado`                       | —                                | —                                              |
+| `followed`                         | `Se sigue en #N` + estado de #N | `#orig · Cerrado como duplicado` | —                                              |
+| DUPLICATE sin principal utilizable | `Cerrado como duplicado`        | —                                | `El enlace a la principal no está disponible.` |
+| `unavailable`                      | `Reporte #N` + fecha de envío   | —                                | `Este reporte ya no está disponible en GitHub` |
 
 Tonos: abierto = `warn`, completado = `gain`, el resto `neutral` (ver §9.2).
 
@@ -245,7 +252,9 @@ export const issueReports = sqliteTable(
   'issue_reports',
   {
     id: idColumn(),
-    userId: text('user_id').notNull().references(() => users.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
     issueNumber: integer('issue_number').notNull(),
     submittedAt: text('submitted_at').notNull(),
     lastSeenAt: text('last_seen_at').notNull(),
@@ -282,14 +291,14 @@ Repositorio `src/db/repositories/issue-reports.ts` (patrón `audit-events.ts`: `
 `export const x = lift(xSql)`; exportar en `repositories/index.ts` como `issueReportsRepository`).
 **Todas las funciones reciben `userId` y filtran por él.**
 
-| Función                                  | Contrato                                                                                       |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `recordSubmission(userId, n, at)`        | `INSERT … ON CONFLICT DO NOTHING`; `submittedAt = lastSeenAt = at`. Devuelve `boolean` insertada. |
-| `listByUser(userId)`                     | Todas las filas de la cuenta ordenadas `submitted_at DESC, issue_number DESC`; la paginación se hace en el servicio con `nextCursor`. |
-| `getByUserAndNumber(userId, n)`          | Fila o `undefined`. Es **la** comprobación de propiedad.                                        |
-| `markSeen(userId, n, seenAtIso)`         | `UPDATE … SET last_seen_at = max(last_seen_at, ?)` (el servicio normaliza a ISO con milisegundos: comparar texto solo es válido con el mismo formato). Devuelve `boolean`. |
-| `insertManyIfMissing(rows)`              | Solo backfill: `INSERT … ON CONFLICT DO NOTHING`, `chunkIds`-style por el límite de variables (`MAX_SQL_VARIABLES_PER_STATEMENT`). |
-| `listIssueNumbersByUser(userId)` / `listAll()` | Backfill (existentes).                                                                       |
+| Función                                        | Contrato                                                                                                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recordSubmission(userId, n, at)`              | `INSERT … ON CONFLICT DO NOTHING`; `submittedAt = lastSeenAt = at`. Devuelve `boolean` insertada.                                                                          |
+| `listByUser(userId)`                           | Todas las filas de la cuenta ordenadas `submitted_at DESC, issue_number DESC`; la paginación se hace en el servicio con `nextCursor`.                                      |
+| `getByUserAndNumber(userId, n)`                | Fila o `undefined`. Es **la** comprobación de propiedad.                                                                                                                   |
+| `markSeen(userId, n, seenAtIso)`               | `UPDATE … SET last_seen_at = max(last_seen_at, ?)` (el servicio normaliza a ISO con milisegundos: comparar texto solo es válido con el mismo formato). Devuelve `boolean`. |
+| `insertManyIfMissing(rows)`                    | Solo backfill: `INSERT … ON CONFLICT DO NOTHING`, `chunkIds`-style por el límite de variables (`MAX_SQL_VARIABLES_PER_STATEMENT`).                                         |
+| `listIssueNumbersByUser(userId)` / `listAll()` | Backfill (existentes).                                                                                                                                                     |
 
 `submittedAt` en el alta: `nowIso()` del servidor tras crear la issue (no `created_at` de GitHub);
 en el backfill: `created_at` de la issue de GitHub.
@@ -302,20 +311,20 @@ No se toca `wipe-user-data.ts` [D10].
 
 ### 5.1 Módulos (nuevos salvo indicación)
 
-| Fichero                                          | Responsabilidad                                                                                         |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `src/lib/server/github-api.ts`                   | **Extraído** de `github-issues.ts`: `GITHUB_API_BASE`, `githubHeaders`, `githubConfig(env)` (Effect con `token/owner/repo`), `fetchRepositoryId`, `once`. `github-issues.ts` lo importa. |
-| `src/lib/server/rate-limit.ts`                   | `createRateLimiter({ windowMs, max })` → `{ consume(key) }`. `report.ts` lo usa con los valores actuales. |
-| `src/lib/server/issue-reports/github.ts`         | Cliente GitHub de seguimiento (§5.2): GraphQL de estados/hilo, REST de comentarios, `resolveBotLogin`.   |
-| `src/lib/server/issue-reports/service.ts`        | Casos de uso `Effect<…, ReportsError, Database \| Http>` (§5.4–5.7). Sin `Response`.                    |
-| `src/lib/server/issue-reports/comment-schema.ts` | Zod de las peticiones de comentario (reutiliza la validación de adjuntos).                               |
-| `src/pages/api/reports/index.ts`                 | `GET` lista.                                                                                            |
-| `src/pages/api/reports/[number]/index.ts`        | `GET` detalle.                                                                                          |
-| `src/pages/api/reports/[number]/seen.ts`         | `POST`.                                                                                                 |
-| `src/pages/api/reports/[number]/comments/index.ts` | `POST` alta.                                                                                          |
-| `src/pages/api/reports/[number]/comments/[commentId].ts` | `PATCH`, `DELETE`.                                                                              |
-| `src/lib/server/issue-report-schema.ts`          | **Refactor**: exportar `attachmentsSchema`/`resolveAttachments` y `sanitizeMultilineText` para no duplicarlos. |
-| `src/lib/server/cloudflare-env.ts`               | Añadir `GITHUB_BOT_LOGIN?: string` (opcional, [D1]); retirar `OPENCODE_GO_API_KEY` (§10).               |
+| Fichero                                                  | Responsabilidad                                                                                                                                                                          |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/server/github-api.ts`                           | **Extraído** de `github-issues.ts`: `GITHUB_API_BASE`, `githubHeaders`, `githubConfig(env)` (Effect con `token/owner/repo`), `fetchRepositoryId`, `once`. `github-issues.ts` lo importa. |
+| `src/lib/server/rate-limit.ts`                           | `createRateLimiter({ windowMs, max })` → `{ consume(key) }`. `report.ts` lo usa con los valores actuales.                                                                                |
+| `src/lib/server/issue-reports/github.ts`                 | Cliente GitHub de seguimiento (§5.2): GraphQL de estados/hilo, REST de comentarios, `resolveBotLogin`.                                                                                   |
+| `src/lib/server/issue-reports/service.ts`                | Casos de uso `Effect<…, ReportsError, Database \| Http>` (§5.4–5.7). Sin `Response`.                                                                                                     |
+| `src/lib/server/issue-reports/comment-schema.ts`         | Zod de las peticiones de comentario (reutiliza la validación de adjuntos).                                                                                                               |
+| `src/pages/api/reports/index.ts`                         | `GET` lista.                                                                                                                                                                             |
+| `src/pages/api/reports/[number]/index.ts`                | `GET` detalle.                                                                                                                                                                           |
+| `src/pages/api/reports/[number]/seen.ts`                 | `POST`.                                                                                                                                                                                  |
+| `src/pages/api/reports/[number]/comments/index.ts`       | `POST` alta.                                                                                                                                                                             |
+| `src/pages/api/reports/[number]/comments/[commentId].ts` | `PATCH`, `DELETE`.                                                                                                                                                                       |
+| `src/lib/server/issue-report-schema.ts`                  | **Refactor**: exportar `attachmentsSchema`/`resolveAttachments` y `sanitizeMultilineText` para no duplicarlos.                                                                           |
+| `src/lib/server/cloudflare-env.ts`                       | Añadir `GITHUB_BOT_LOGIN?: string` (opcional, [D1]); retirar `OPENCODE_GO_API_KEY` (§10).                                                                                                |
 
 Errores (`Data.TaggedError`): `ReportsGithubError { message, status? }` (→ 502),
 `ReportNotFoundError` (→ 404), `ReportClosedError` (→ 409), `CommentForbiddenError` (→ 403),
@@ -340,24 +349,62 @@ validados de la base de datos (`i123`), nunca de entrada del cliente:
 
 ```graphql
 fragment F on Issue {
-  number url title state stateReason
-  repository { nameWithOwner }
+  number
+  url
+  title
+  state
+  stateReason
+  repository {
+    nameWithOwner
+  }
   timelineItems(last: 1, itemTypes: [CLOSED_EVENT, REOPENED_EVENT]) {
-    nodes { __typename ... on ClosedEvent { createdAt } ... on ReopenedEvent { createdAt } }
+    nodes {
+      __typename
+      ... on ClosedEvent {
+        createdAt
+      }
+      ... on ReopenedEvent {
+        createdAt
+      }
+    }
   }
 }
-fragment C on Issue {   # solo en la lista
+fragment C on Issue {
+  # solo en la lista
   comments(last: 25) {
     totalCount
-    pageInfo { hasPreviousPage startCursor }
-    nodes { databaseId createdAt body author { __typename login } }
+    pageInfo {
+      hasPreviousPage
+      startCursor
+    }
+    nodes {
+      databaseId
+      createdAt
+      body
+      author {
+        __typename
+        login
+      }
+    }
   }
 }
 query ($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     i340: issue(number: 340) {
-      ...F ...C
-      duplicateOf { ...F ...C duplicateOf { ...F ...C duplicateOf { ...F ...C } } }
+      ...F
+      ...C
+      duplicateOf {
+        ...F
+        ...C
+        duplicateOf {
+          ...F
+          ...C
+          duplicateOf {
+            ...F
+            ...C
+          }
+        }
+      }
     }
     # … un alias por reporte
   }
@@ -407,7 +454,7 @@ duplicateLinkUnavailable = linkBroken
 ### 5.4 Lista — `GET /api/reports`
 
 1. `rows = listByUser(userId)`; sin filas ⇒ `{ reports: [], hasMore:false, nextCursor:null,
-   unseenCount:0, fetchedAt }` **sin llamar a GitHub**. `pageStartIndex` recorta la página pedida por
+unseenCount:0, fetchedAt }` **sin llamar a GitHub**. `pageStartIndex` recorta la página pedida por
    `?cursor=` (20 entradas).
 2. Consultas GraphQL con alias (≤50 por petición) para las filas que toca escanear. Para cada fila:
    `resolveFollowed` → entrada (`unavailable` si el alias es `null`).
@@ -437,8 +484,7 @@ clasificar y mapear (`ThreadItem`; `editable = kind==='reporter' && canComment`)
 Cuerpo `{ text, attachments? }` (validado: `text` 1–4000 tras `sanitizeMultilineText`; ≤3 adjuntos con las
 mismas reglas de tipo/tamaño/cabecera que el reporte). Secuencia:
 
-1. rate limit [D8] (429) → propiedad (404) → cadena (§5.5, consulta 1) → `threadIssue` (si `unavailable`,
-   404) → `state === 'OPEN'` o **409** «El reporte está cerrado: el hilo es de solo lectura.».
+1. rate limit [D8] (429) → propiedad (404) → cadena (§5.5, consulta 1) → `threadIssue` (si `unavailable`, 404) → `state === 'OPEN'` o **409** «El reporte está cerrado: el hilo es de solo lectura.».
 2. Subir adjuntos (secuencial, `repositoryId` una vez con `once`). **Si uno falla ⇒ 502 y no se
    publica nada** (a diferencia del alta del reporte, que sigue; aquí «nunca finge éxito»).
 3. `POST issues/{threadIssue.number}/comments` con `buildReporterCommentBody({ userId: principal.userId, … })`.
@@ -473,17 +519,17 @@ pueda adelantar la marca y silenciar novedades).
 
 ### 5.9 Resumen de códigos
 
-| Caso                              | Código | Cuerpo                                 |
-| --------------------------------- | ------ | -------------------------------------- |
-| Sin sesión                        | 401    | `withApiErrorHandling`                 |
-| Número ajeno / inexistente        | 404    | `Reporte no encontrado.`               |
-| Payload inválido                  | 400    | `Payload inválido.` + `details` (zod)  |
-| Adjunto demasiado grande          | 413    | mensaje del esquema                    |
-| Hilo cerrado                      | 409    | texto fijo                             |
-| Comentario de otro reporte        | 404    | `Reporte no encontrado.`               |
-| Comentario no editable            | 403    | texto fijo                             |
-| Límite de uso                     | 429    | como el POST actual                    |
-| GitHub falla (lectura o escritura)| 502    | `No se pudo consultar/publicar en GitHub. Inténtalo de nuevo.` |
+| Caso                               | Código | Cuerpo                                                         |
+| ---------------------------------- | ------ | -------------------------------------------------------------- |
+| Sin sesión                         | 401    | `withApiErrorHandling`                                         |
+| Número ajeno / inexistente         | 404    | `Reporte no encontrado.`                                       |
+| Payload inválido                   | 400    | `Payload inválido.` + `details` (zod)                          |
+| Adjunto demasiado grande           | 413    | mensaje del esquema                                            |
+| Hilo cerrado                       | 409    | texto fijo                                                     |
+| Comentario de otro reporte         | 404    | `Reporte no encontrado.`                                       |
+| Comentario no editable             | 403    | texto fijo                                                     |
+| Límite de uso                      | 429    | como el POST actual                                            |
+| GitHub falla (lectura o escritura) | 502    | `No se pudo consultar/publicar en GitHub. Inténtalo de nuevo.` |
 
 ### 5.10 Seguridad (checklist)
 
@@ -562,18 +608,19 @@ copia o el `finance.sqlite` del volumen con la copia diaria ya hecha; primero si
 ## 8. Cliente
 
 ### 8.1 Piezas y responsabilidades (respetando `component-boundaries.test.ts`: ningún `fetch` ni
+
 `localStorage` en `.vue`)
 
-| Fichero                                            | Responsabilidad                                                                          |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/services/reports-api.ts`                      | `Effect` + `requestApiJson` (patrón `issue-report-api.ts`): `fetchReports`, `fetchReportDetail`, `markReportSeen`, `postReportComment`, `patchReportComment`, `deleteReportComment`. En demo devuelve `demo-reports` sin red; las escrituras en demo devuelven `{ ok:false, error:'En la demo no se envían comentarios.' }`. |
-| `src/stores/reports.ts`                            | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `nextCursor`, `unseenCount` (del servidor), `loadingMore`, `loadMoreError`, `refresh({ force })` y `loadMore()` (deduplican una petición en curso), `markSeenLocally(n, seenAt, hadUpdates)`. Acciones llaman `runClientHttp`. |
-| `src/composables/useReportThread.ts`               | Ciclo de vida del detalle (carga, `markSeen`, alta/edición/borrado, borradores, estados `pending`/`error`). Conserva el texto ante error. |
-| `src/composables/useReportsRoute.ts`               | Adaptador de `window`: lee/escribe `?reporte=<n>`, `popstate`. Es el único que toca `location`/`history` en esta zona. |
-| `src/composables/useSectionNavigation.ts`          | Añadir `navigateToReports(n?)` (push de `/reportes[?reporte=n]` + `popstate`).            |
-| `src/components/reports/ReportsPage.vue`           | Página (§9).                                                                             |
-| `src/components/reports/ReportList.vue`, `ReportListItem.vue`, `ReportStatus.vue`, `ReportDetail.vue`, `ReportThread.vue`, `ReportComposer.vue`, `ReportMarkdown.vue` | Subcomponentes presentacionales (props/emits). |
-| `src/scripts/app/reports-badge.ts`                 | Sincroniza `[data-reports-badge]` (Astro, hoja «Más») con `unseenCount` del store.       |
+| Fichero                                                                                                                                                               | Responsabilidad                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/services/reports-api.ts`                                                                                                                                         | `Effect` + `requestApiJson` (patrón `issue-report-api.ts`): `fetchReports`, `fetchReportDetail`, `markReportSeen`, `postReportComment`, `patchReportComment`, `deleteReportComment`. En demo devuelve `demo-reports` sin red; las escrituras en demo devuelven `{ ok:false, error:'En la demo no se envían comentarios.' }`. |
+| `src/stores/reports.ts`                                                                                                                                               | Pinia: `reports`, `status: 'idle'\|'loading'\|'ready'\|'error'`, `error`, `hasMore`, `nextCursor`, `unseenCount` (del servidor), `loadingMore`, `loadMoreError`, `refresh({ force })` y `loadMore()` (deduplican una petición en curso), `markSeenLocally(n, seenAt, hadUpdates)`. Acciones llaman `runClientHttp`.          |
+| `src/composables/useReportThread.ts`                                                                                                                                  | Ciclo de vida del detalle (carga, `markSeen`, alta/edición/borrado, borradores, estados `pending`/`error`). Conserva el texto ante error.                                                                                                                                                                                    |
+| `src/composables/useReportsRoute.ts`                                                                                                                                  | Adaptador de `window`: lee/escribe `?reporte=<n>`, `popstate`. Es el único que toca `location`/`history` en esta zona.                                                                                                                                                                                                       |
+| `src/composables/useSectionNavigation.ts`                                                                                                                             | Añadir `navigateToReports(n?)` (push de `/reportes[?reporte=n]` + `popstate`).                                                                                                                                                                                                                                               |
+| `src/components/reports/ReportsPage.vue`                                                                                                                              | Página (§9).                                                                                                                                                                                                                                                                                                                 |
+| `src/components/reports/ReportList.vue`, `ReportListItem.vue`, `ReportStatus.vue`, `ReportDetail.vue`, `ReportThread.vue`, `ReportComposer.vue`, `ReportMarkdown.vue` | Subcomponentes presentacionales (props/emits).                                                                                                                                                                                                                                                                               |
+| `src/scripts/app/reports-badge.ts`                                                                                                                                    | Sincroniza `[data-reports-badge]` (Astro, hoja «Más») con `unseenCount` del store.                                                                                                                                                                                                                                           |
 
 ### 8.2 Ruta, shell y navegación
 
@@ -791,38 +838,38 @@ se modificó ningún otro worktree. El implementador debe releer las entradas ci
 
 Aplicado, con la sintaxis del proyecto (Tailwind 4.3 con tokens de `@theme`):
 
-| Entrada de la skill                          | Decisión en este diseño                                                                                         |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Sidebar that wraps on its own                | Lista/detalle por `flex-wrap` con `basis` + `grow`, sin `desk:grid-cols` (§9.3).                                  |
-| Container queries                            | La página es el contenedor; el modo de un solo panel depende de su ancho, no del viewport (§9.3). `container-type` solo en el `<section>`, que no es shrink-to-fit. |
-| Logical properties                           | Utilidades lógicas en código nuevo: `mbs-`, `pbs-`, `pis-`, `inset-bs-`, `border-s-2` (filete lateral del hilo). Nada de `mt-`/`pl-`/`left-`. |
-| Space between siblings set by the parent     | Pilas con `grid gap-*`/`flex flex-col gap-*`; el Markdown renderizado usa la forma de margen (`[&>*]:mbs-0 [&>*+*]:mbs-3`) porque su contenido no se controla. |
-| Long text that wraps, truncates or clamps    | Cuerpo de comentarios: `wrap-break-word`, **nunca truncado** (el lector debe poder leerlo). Título en lista: `line-clamp-2` (el detalle lo muestra completo). `min-w-0` en cada flex intermedio. |
-| Image box that holds any upload              | Miniaturas de adjuntos: caja `aspect-4/3 object-cover` con fondo `bg-subtle`, `inline-size` fijo y `flex-none`; `object-contain` en la vista ampliada. |
-| Tabular numbers                              | `tabular-nums` en `#N`, fechas y contadores («9+», «n/4000»).                                                  |
-| Icon sized by the text beside it             | Icono de aviso/«Nuevo»: `size-[1cap]` (arbitrario justificado: no existe token) con `flex-none`; avisos multilínea con `1lh`. |
-| One focus ring with `:focus-visible`         | Filas, acciones y compositor usan `focus-visible:outline-2 outline-primary` (como el resto del shell). Nunca `outline-none`. |
-| Hover only where hover exists + `:active`    | Solo variantes `hover:` de Tailwind v4 (ya envuelven `(hover: hover)`) y `active:` en filas, «Editar», «Borrar» y botón de la hoja «Más». |
-| Hit area larger than the visual              | «Editar»/«Borrar»/«Quitar» y el cerrar de adjuntos con área ≥ 44 px (`::after` ampliado o `min-h-11`).         |
-| Textarea that grows with its content         | Compositor y edición: `field-sizing-content min-h-[3lh] max-h-[12lh] resize-none` **sin** observer ni animación (la skill: sin fallback, el textarea queda fijo y con scroll en navegadores sin soporte; hoy `BaseInput`/textarea del panel usa `resize-y`, aquí se sustituye por esto). |
-| Form feedback with `:user-invalid`           | El compositor no valida con clases «touched»: el único error de campo (texto vacío) se muestra con texto en `role="alert"` y `aria-invalid`; no se añade script de blur. |
-| `:has()` for parent state                    | `has-[…]` para el resaltado de la fila seleccionada; el bloqueo de scroll tras `ConfirmDialog`/panel ya lo resuelven `dialog` modal y la hoja global. |
-| Concentric nested radius                     | Miniatura dentro de la carta del hilo: radio interior = `rounded-md`, exterior = interior + padding (`rounded-lg` con `p-2` cuando se enmarca). |
-| Section spacing / push with auto margin      | Cabecera del hilo con autor a la izquierda y acciones con `ms-auto`; sin separadores espaciadores.              |
-| `overflow: clip` over `hidden`               | `overflow-clip` en contenedores de recorte (filas con `line-clamp`); `hidden` solo en lo que un script desplaza (ninguno). |
-| Opt-in motion / motion tokens                | Ninguna transición nueva; si el implementador añade una (p. ej. el punto del botón flotante), con propiedades nombradas dentro de `motion-safe:` y sin `ease-in` ni `transition: all`. |
+| Entrada de la skill                       | Decisión en este diseño                                                                                                                                                                                                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sidebar that wraps on its own             | Lista/detalle por `flex-wrap` con `basis` + `grow`, sin `desk:grid-cols` (§9.3).                                                                                                                                                                                                         |
+| Container queries                         | La página es el contenedor; el modo de un solo panel depende de su ancho, no del viewport (§9.3). `container-type` solo en el `<section>`, que no es shrink-to-fit.                                                                                                                      |
+| Logical properties                        | Utilidades lógicas en código nuevo: `mbs-`, `pbs-`, `pis-`, `inset-bs-`, `border-s-2` (filete lateral del hilo). Nada de `mt-`/`pl-`/`left-`.                                                                                                                                            |
+| Space between siblings set by the parent  | Pilas con `grid gap-*`/`flex flex-col gap-*`; el Markdown renderizado usa la forma de margen (`[&>*]:mbs-0 [&>*+*]:mbs-3`) porque su contenido no se controla.                                                                                                                           |
+| Long text that wraps, truncates or clamps | Cuerpo de comentarios: `wrap-break-word`, **nunca truncado** (el lector debe poder leerlo). Título en lista: `line-clamp-2` (el detalle lo muestra completo). `min-w-0` en cada flex intermedio.                                                                                         |
+| Image box that holds any upload           | Miniaturas de adjuntos: caja `aspect-4/3 object-cover` con fondo `bg-subtle`, `inline-size` fijo y `flex-none`; `object-contain` en la vista ampliada.                                                                                                                                   |
+| Tabular numbers                           | `tabular-nums` en `#N`, fechas y contadores («9+», «n/4000»).                                                                                                                                                                                                                            |
+| Icon sized by the text beside it          | Icono de aviso/«Nuevo»: `size-[1cap]` (arbitrario justificado: no existe token) con `flex-none`; avisos multilínea con `1lh`.                                                                                                                                                            |
+| One focus ring with `:focus-visible`      | Filas, acciones y compositor usan `focus-visible:outline-2 outline-primary` (como el resto del shell). Nunca `outline-none`.                                                                                                                                                             |
+| Hover only where hover exists + `:active` | Solo variantes `hover:` de Tailwind v4 (ya envuelven `(hover: hover)`) y `active:` en filas, «Editar», «Borrar» y botón de la hoja «Más».                                                                                                                                                |
+| Hit area larger than the visual           | «Editar»/«Borrar»/«Quitar» y el cerrar de adjuntos con área ≥ 44 px (`::after` ampliado o `min-h-11`).                                                                                                                                                                                   |
+| Textarea that grows with its content      | Compositor y edición: `field-sizing-content min-h-[3lh] max-h-[12lh] resize-none` **sin** observer ni animación (la skill: sin fallback, el textarea queda fijo y con scroll en navegadores sin soporte; hoy `BaseInput`/textarea del panel usa `resize-y`, aquí se sustituye por esto). |
+| Form feedback with `:user-invalid`        | El compositor no valida con clases «touched»: el único error de campo (texto vacío) se muestra con texto en `role="alert"` y `aria-invalid`; no se añade script de blur.                                                                                                                 |
+| `:has()` for parent state                 | `has-[…]` para el resaltado de la fila seleccionada; el bloqueo de scroll tras `ConfirmDialog`/panel ya lo resuelven `dialog` modal y la hoja global.                                                                                                                                    |
+| Concentric nested radius                  | Miniatura dentro de la carta del hilo: radio interior = `rounded-md`, exterior = interior + padding (`rounded-lg` con `p-2` cuando se enmarca).                                                                                                                                          |
+| Section spacing / push with auto margin   | Cabecera del hilo con autor a la izquierda y acciones con `ms-auto`; sin separadores espaciadores.                                                                                                                                                                                       |
+| `overflow: clip` over `hidden`            | `overflow-clip` en contenedores de recorte (filas con `line-clamp`); `hidden` solo en lo que un script desplaza (ninguno).                                                                                                                                                               |
+| Opt-in motion / motion tokens             | Ninguna transición nueva; si el implementador añade una (p. ej. el punto del botón flotante), con propiedades nombradas dentro de `motion-safe:` y sin `ease-in` ni `transition: all`.                                                                                                   |
 
 **Desviaciones deliberadas** (la skill manda en CSS, pero `CODING_STANDARDS.md` es autoritativo en este repo):
 
-1. *Content grid with breakouts*: la skill pide sustituir cada contenedor centrado `max-width`. Todas las
+1. _Content grid with breakouts_: la skill pide sustituir cada contenedor centrado `max-width`. Todas las
    secciones de v2 usan `mx-auto grid w-full max-w-5xl` sobre el `<main>` del shell y no hay hijos que
    rompan el ancho, así que esta página mantiene `mx-auto max-w-6xl` (consistencia con el shell; el
    rediseño del contenedor global es otro cambio).
-2. *OKLCH/`clamp()` y `light-dark()`*: los colores y escalas ya salen de los tokens de `@theme` en
+2. _OKLCH/`clamp()` y `light-dark()`_: los colores y escalas ya salen de los tokens de `@theme` en
    `global.css`; **no** se escribe ningún color nuevo (`CODING_STANDARDS.md` prohíbe valores arbitrarios si
    existe token). Cualquier token de texto nuevo exigiría entrar en los pares del test de contraste.
-3. *The reset*: no se toca `global.css` ni se añade hoja de estilos (`styles-guards.test.ts`).
-4. *Support*: `field-sizing` (Chrome 123, Safari 26.2, Firefox 152) y `line-clamp` con `overflow: clip`
+3. _The reset_: no se toca `global.css` ni se añade hoja de estilos (`styles-guards.test.ts`).
+4. _Support_: `field-sizing` (Chrome 123, Safari 26.2, Firefox 152) y `line-clamp` con `overflow: clip`
    (Safari 27/Chrome 150; la skill indica `hidden` como alternativa) pueden faltar en navegadores
    antiguos; son mejoras progresivas y la página funciona sin ellas. Tailwind `@container`/`@max-*`
    exigen Tailwind 4, ya en uso.
