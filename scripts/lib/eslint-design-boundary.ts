@@ -18,14 +18,14 @@ import type { Rule } from 'eslint'
  */
 
 /** Repo-relative POSIX prefixes. A trailing `/` means "everything under it". */
-export const NEW_DESIGN = ['src/neon/']
-export const OLD_DESIGN = ['src/components/', 'src/styles/']
+const NEW_DESIGN = ['src/neon/']
+const OLD_DESIGN = ['src/components/', 'src/styles/']
 
 /**
  * Entry points that wire the app together (routes, API handlers). They sit
  * above both designs and may import any of them.
  */
-export const ENTRY_POINTS = ['src/pages/']
+const ENTRY_POINTS = ['src/pages/']
 
 /**
  * The named seams: files allowed to cross the boundary, importing from and

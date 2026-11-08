@@ -1,6 +1,7 @@
 # Fuentes
 
-Syne, DM Sans y DM Mono se sirven desde este directorio, no desde Google Fonts. Se descargaron
+Syne, DM Sans y DM Mono (las fuentes del diseño antiguo; el nuevo usa Unbounded y Manrope, ver
+`DESIGN.md`) se sirven desde este directorio, no desde Google Fonts. Se descargaron
 el 2026-10-29 del subconjunto **latin** de Google Fonts (woff2), con los pesos que usa el tema:
 
 | Familia | Fichero                           | Pesos              |

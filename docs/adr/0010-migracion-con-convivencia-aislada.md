@@ -56,6 +56,10 @@ Consecuencias que no se ven en el código:
 - La ADR [0004](0004-estilos-hibridos-tailwind-y-componentes-base.md) sigue vigente (utilidades en
   la plantilla, componentes base, `scoped` solo estructural) para cada árbol. Solo cambia que el
   CSS global ya no es una hoja, sino tres.
+- `src/pages/` (las rutas de Astro) queda por encima de los dos diseños y no está sujeto a la regla:
+  solo monta el shell. No es un quinto punto de unión, es la raíz de la aplicación.
+- Los pares de contraste AA del test de estilos cubren los tokens del diseño antiguo. El guard de
+  contraste de los tokens nuevos llega en su propio ticket de la épica #419.
 - La regla de lint solo mira imports relativos dentro de `src/`; el proyecto no usa alias de
   rutas. Si se añadiera uno, hay que enseñárselo a la regla.
 - Los E2E del diseño antiguo se reducen a una prueba de humo por sección, y los del nuevo prueban
