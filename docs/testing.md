@@ -29,12 +29,15 @@ pnpm test:coverage           # informe conjunto y umbrales
 
 ## Configuración
 
-`vitest.config.ts` registra los proyectos unit, component e integration. Cada proyecto conserva su
+`vitest.config.ts` registra los proyectos unit, component, integration e integration-cli. Cada proyecto conserva su
 propio entorno y patrones de inclusión:
 
 - `vitest.unit.config.ts`: Node para lógica sin DOM.
 - `vitest.component.config.ts`: Vue Test Utils y happy-dom.
 - `vitest.integration.config.ts`: procesos aislados para SQLite real.
+- `vitest.cli.config.ts`: los casos de reparación que arrancan subprocesos CLI, después de los
+  demás proyectos. Así su arranque no compite con las transformaciones de toda la suite. Siguen
+  siendo integración y se ejecutan tanto con `pnpm test` como con `pnpm test:integration`.
 
 El informe de coverage incluye componentes, composables, dominio, librerías, servicios y stores. Los
 umbrales representan el mínimo actual y deben subir con código nuevo; no se deben excluir módulos
