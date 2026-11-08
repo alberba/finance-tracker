@@ -131,26 +131,27 @@ test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
 
   const editSheet = (page: Page) => page.getByRole('dialog', { name: 'Editar y confirmar' })
 
-  async function openPendingEdit(page: Page): Promise<void> {
+  async function openPendingEdit(page: Page, description: string): Promise<void> {
     await page.locator('[data-pending-trigger]').click()
     await page
       .getByRole('dialog', { name: 'Por confirmar' })
       .locator('[data-pending-item]')
+      .filter({ hasText: description })
       .getByRole('button')
       .click()
     await page
-      .getByRole('dialog', { name: 'Alquiler' })
+      .getByRole('dialog', { name: description })
       .getByRole('button', { name: 'Editar' })
       .click()
     await expect(editSheet(page)).toBeVisible()
   }
 
-  test('cancelar deja el pendiente como estaba; guardar lo confirma con el importe nuevo', async ({
+  test('cancelar deja el pendiente como estaba; guardar lo confirma con los datos nuevos', async ({
     page,
     tracker,
   }) => {
     await page.setViewportSize(MOBILE)
-    // The recurring engine reads this clock: one monthly due date, 1 July.
+    // The recurring engine reads this clock: one monthly due date per rule, 1 July.
     await page.addInitScript(() => {
       ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
     })
@@ -170,12 +171,32 @@ test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
         lastExecutionDate: null,
         nextOccurrenceDate: '2026-07-01',
       })
+      state.recurringRules.push({
+        id: 'vwce-rule',
+        type: 'investment',
+        accountId: state.accounts[0].id,
+        category: 'Fondos Indexados',
+        description: 'Compra VWCE',
+        amount: 100,
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-07-01',
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: '2026-07-01',
+        symbol: 'VWCE',
+        side: 'buy',
+        units: 1,
+        unitPrice: 100,
+        fee: 0,
+      })
     })
     await expect(page.locator('[data-pending-trigger]')).toHaveAccessibleName(
-      'Por confirmar, 1 pendientes',
+      'Por confirmar, 2 pendientes',
     )
 
-    await openPendingEdit(page)
+    await openPendingEdit(page, 'Alquiler')
     const amount = editSheet(page).getByRole('textbox', { name: 'Importe' })
     await expect(amount).toHaveValue('900')
     await expect(editSheet(page).getByLabel('Descripción')).toHaveValue('Alquiler')
@@ -183,23 +204,33 @@ test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
     await editSheet(page).getByRole('button', { name: 'Cancelar' }).click()
     await expect(editSheet(page)).toBeHidden()
 
-    await openPendingEdit(page)
+    await openPendingEdit(page, 'Alquiler')
     await expect(amount).toHaveValue('900')
     const pendingAfterCancel = (await readScenarioState(page)).pendingMovements.find(
       (item) => item.ruleId === 'rent-rule',
     )
     expect(pendingAfterCancel).toMatchObject({ status: 'pending', amount: 900 })
 
-    const confirmed = expectSyncCommand(
-      page,
-      (command) =>
-        command.action === 'update' &&
-        command.entityType === 'pendingMovement' &&
-        command.patch.status === 'confirmed',
-    )
+    const isConfirmation = (command: Parameters<Parameters<typeof expectSyncCommand>[1]>[0]) =>
+      command.action === 'update' &&
+      command.entityType === 'pendingMovement' &&
+      command.patch.status === 'confirmed'
+    const confirmed = expectSyncCommand(page, isConfirmation)
     await amount.fill('950')
     await editSheet(page).getByRole('button', { name: 'Guardar y confirmar' }).click()
     await confirmed
+    await expect(editSheet(page)).toBeHidden()
+
+    // An investment shows its operation instead of the amount; the total follows it.
+    await openPendingEdit(page, 'Compra VWCE')
+    await expect(editSheet(page).getByLabel('Símbolo')).toHaveValue('VWCE')
+    await editSheet(page).getByLabel('Títulos').fill('2')
+    await editSheet(page).getByLabel('Precio por título').fill('105')
+    await editSheet(page).getByLabel('Comisiones').fill('1')
+    await expect(editSheet(page).locator('[data-pending-total]')).toHaveText('211,00 €')
+    const investmentConfirmed = expectSyncCommand(page, isConfirmation)
+    await editSheet(page).getByRole('button', { name: 'Guardar y confirmar' }).click()
+    await investmentConfirmed
     await expect(editSheet(page)).toBeHidden()
 
     await tracker.reload()
@@ -211,6 +242,17 @@ test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
     })
     expect(state.transactions.filter((tx) => tx.description === 'Alquiler')).toEqual([
       expect.objectContaining({ amount: 950, date: '2026-07-01', type: 'expense' }),
+    ])
+    expect(state.transactions.filter((tx) => tx.description === 'Compra VWCE')).toEqual([
+      expect.objectContaining({
+        amount: 211,
+        type: 'investment',
+        symbol: 'VWCE',
+        side: 'buy',
+        units: 2,
+        unitPrice: 105,
+        fee: 1,
+      }),
     ])
   })
 })
