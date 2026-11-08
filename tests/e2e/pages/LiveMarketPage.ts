@@ -77,8 +77,13 @@ export class LiveMarketPage {
         .locator(`[data-provider="${params.provider}"]`)
         .click()
     }
+    const saved = expectSyncCommand(
+      this.page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
     await expect(this.instrument(params.symbol.toUpperCase())).toBeVisible()
+    await saved
     if (!params.keepOpen) await this.closeQuote()
   }
 
@@ -146,6 +151,14 @@ export class LiveMarketPage {
     await this.page.evaluate(pin, today)
     const start = new Date(`${today}T00:00:00Z`)
     start.setUTCDate(start.getUTCDate() - 2)
+    const pending = expectSyncCommand(
+      this.page,
+      (command) =>
+        command.action === 'create' &&
+        command.entityType === 'pendingMovement' &&
+        command.data.description === 'Compra VWCE recurrente',
+      3,
+    )
     await this.createRecurringRule({
       account: 'Revolut',
       category: 'Fondos Indexados',
@@ -157,6 +170,7 @@ export class LiveMarketPage {
       units: 1,
       unitPrice: 100,
     })
+    await pending
   }
 
   async linkExistingMovements(symbol: string): Promise<void> {
@@ -199,7 +213,12 @@ export class LiveMarketPage {
   }
 
   async saveSourceSymbol(currentSymbol: string): Promise<void> {
+    const saved = expectSyncCommand(
+      this.page,
+      (command) => command.action === 'update' && command.entityType === 'userInstrument',
+    )
     await this.instrument(currentSymbol).getByRole('button', { name: 'Guardar símbolos' }).click()
+    await saved
   }
 
   async openFirstPendingEdit(): Promise<Locator> {

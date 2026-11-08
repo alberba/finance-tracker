@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
+import { expectSyncCommand } from './pages/sync'
 
 test.describe('Dashboard section', () => {
   test(
@@ -160,17 +161,41 @@ test.describe('Dashboard section', () => {
     await expect(items).toHaveCount(3)
     await expect(pending.getByRole('heading', { name: 'Pendientes 3' })).toBeVisible()
 
+    const firstConfirmed = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'update' &&
+        command.entityType === 'pendingMovement' &&
+        command.patch.status === 'confirmed',
+    )
     await items.first().getByRole('button', { name: 'Confirmar Compra VWCE recurrente' }).click()
+    await firstConfirmed
     await expect(items).toHaveCount(2)
+    const skipped = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'update' &&
+        command.entityType === 'pendingMovement' &&
+        command.patch.status === 'skipped',
+    )
     await items
       .first()
       .getByRole('button', { name: 'Saltar este vencimiento de Compra VWCE recurrente' })
       .click()
+    await skipped
     await expect(items).toHaveCount(1)
+    const lastConfirmed = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'update' &&
+        command.entityType === 'pendingMovement' &&
+        command.patch.status === 'confirmed',
+    )
     await items
       .first()
       .getByRole('button', { name: /^Confirmar/ })
       .click()
+    await lastConfirmed
 
     await expect(items).toHaveCount(0)
     await expect(pending.locator('[data-pending-empty]')).toBeVisible()
