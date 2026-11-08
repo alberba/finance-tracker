@@ -31,3 +31,9 @@ export function serializeDesignCookie(design: Design, secure: boolean): string {
     ...(secure ? ['Secure'] : []),
   ].join('; ')
 }
+
+/** The two choices of the toggle, in the order both frames show them. */
+export const DESIGN_OPTIONS: ReadonlyArray<{ value: Design; label: string; name: string }> = [
+  { value: 'neon', label: 'Nuevo', name: 'Diseño nuevo' },
+  { value: 'legacy', label: 'Antiguo', name: 'Diseño antiguo' },
+]

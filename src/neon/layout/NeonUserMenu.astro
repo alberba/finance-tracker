@@ -5,13 +5,13 @@
  * binds to (same contract as the old design's menu).
  */
 const ITEM =
-  'rounded-field outline-accent flex min-h-11 w-full items-start gap-3 px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.98]'
+  'rounded-field outline-accent flex min-h-11 w-full items-start gap-3 px-3 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]'
 ---
 
 <div id="sidebar-user-menu-root" class="relative w-full">
   <button
     id="sidebar-user-menu-toggle"
-    class="group rounded-field outline-accent flex min-h-13 w-full items-center gap-2.5 px-2.5 py-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 aria-expanded:bg-panel2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.98]"
+    class="group rounded-field outline-accent flex min-h-13 w-full items-center gap-2.5 px-2.5 py-2 text-start focus-visible:outline-2 focus-visible:outline-offset-2 aria-expanded:bg-panel2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]"
     type="button"
     aria-label="Abrir menú de usuario"
     aria-haspopup="menu"
@@ -28,7 +28,7 @@ const ITEM =
       <span id="sidebar-user-email" class="text-text truncate text-sm font-bold">
         Usuario
       </span>
-      <span id="save-status" class="text-muted truncate text-[13px]">
+      <span id="save-status" class="text-muted truncate text-meta">
         Sincronizado
       </span>
     </span>
@@ -48,14 +48,14 @@ const ITEM =
 
   <div
     id="sidebar-user-menu"
-    class="bg-panel border-line rounded-popover shadow-float absolute inset-s-0 bottom-full z-30 mb-2 grid w-[min(300px,calc(100vw-32px))] gap-1 border p-2"
+    class="bg-panel border-line rounded-popover shadow-float absolute inset-s-0 inset-be-full z-30 mbe-2 grid w-[min(300px,calc(100vw-32px))] gap-1 border p-2"
     role="menu"
     aria-label="Menú de usuario"
     hidden
   >
     <span
       id="sidebar-sync-status"
-      class="text-muted border-line block border-b px-3 pt-2 pb-3 text-[13px]"
+      class="text-muted border-line block border-b px-3 pt-2 pb-3 text-meta"
       data-sync-status
       hidden
     >
@@ -69,7 +69,7 @@ const ITEM =
       role="menuitem"
     >
       <svg
-        class="text-muted mt-0.5 size-5 shrink-0"
+        class="text-muted mbs-0.5 size-5 shrink-0"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -85,7 +85,7 @@ const ITEM =
         <span class="text-text text-[15px] font-bold" data-demo-mode-label>
           Activar modo demo
         </span>
-        <span class="text-muted text-[13px]" data-demo-mode-description>
+        <span class="text-muted text-meta" data-demo-mode-description>
           Usar únicamente datos ficticios
         </span>
       </span>
@@ -98,7 +98,7 @@ const ITEM =
       role="menuitem"
     >
       <svg
-        class="text-muted mt-0.5 size-5 shrink-0"
+        class="text-muted mbs-0.5 size-5 shrink-0"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -113,7 +113,7 @@ const ITEM =
       </svg>
       <span class="grid">
         <span class="text-text text-[15px] font-bold">Cerrar sesión</span>
-        <span class="text-muted text-[13px]">Borra la caché local de este dispositivo</span>
+        <span class="text-muted text-meta">Borra la caché local de este dispositivo</span>
       </span>
     </button>
   </div>

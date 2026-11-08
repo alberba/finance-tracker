@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import { switchDesign } from '../../lib/client/design'
-import type { Design } from '../../lib/design'
+import { DESIGN_OPTIONS, type Design } from '../../lib/design'
 
 // «Diseño nuevo / antiguo» toggle of the old frame: in the desktop sidebar (on
 // the ink surface) and in the mobile "Más" sheet. A seam of ADR 0010: the new
 // frame has its own copy in src/neon/layout/DesignToggle.vue.
 defineProps<{ design: Design; variant: 'sidebar' | 'sheet' }>()
-
-const OPTIONS: Array<{ value: Design; label: string; name: string }> = [
-  { value: 'neon', label: 'Nuevo', name: 'Diseño nuevo' },
-  { value: 'legacy', label: 'Antiguo', name: 'Diseño antiguo' },
-]
 
 const STYLES = {
   sidebar: {
@@ -37,7 +32,7 @@ const STYLES = {
     data-design-toggle
   >
     <button
-      v-for="option in OPTIONS"
+      v-for="option in DESIGN_OPTIONS"
       :key="option.value"
       type="button"
       class="focus-visible:outline-primary min-w-0 flex-1 rounded-sm px-2 font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"

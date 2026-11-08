@@ -53,6 +53,34 @@ test.describe('Diseño nuevo por defecto', () => {
     expect(await tracker.dashboardSection.isVisible()).toBe(true)
   })
 
+  test('sigue al sistema: oscuro suave en oscuro, claro melocotón en claro', async ({
+    page,
+    tracker,
+  }) => {
+    const canvas = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await tracker.reload()
+    await expect.poll(canvas).toBe('rgb(27, 26, 24)') // #1B1A18
+
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect.poll(canvas).toBe('rgb(247, 235, 226)') // #F7EBE2
+  })
+
+  test('el menú de usuario se ve entero, sin recortarlo el sidebar', async ({ page, tracker }) => {
+    await tracker.reload()
+    await page.locator('#sidebar-user-menu-toggle').click()
+    const menu = page.locator('#sidebar-user-menu')
+    await expect(menu).toBeVisible()
+
+    const box = (await menu.boundingBox())!
+    const covered = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('#sidebar-user-menu') !== null,
+      { x: box.x + box.width - 8, y: box.y + 8 },
+    )
+    expect(covered).toBe(true)
+  })
+
   test('pinta su tipografía autoalojada', async ({ page, tracker }) => {
     await tracker.reload()
     const fonts = await page.evaluate(async () => {
