@@ -10,7 +10,8 @@
 - Sync changes or adding/changing a movement type: read [sync-v2](docs/architecture/sync-v2.md) for
   store-to-D1 field paths, the shared movement command conversion and the type checklist.
 - UI or `/design`: read [design-language](docs/architecture/design-language.md) for v2 components
-  and design rules.
+  and design rules; read [DESIGN.md](DESIGN.md) for the "neón de garaje" direction (tokens, themes,
+  mobile) when the canvas is «nueva dirección».
 - Frontend behavior: read [frontend](docs/architecture/frontend.md) for startup, navigation and section entry points.
 - Run, log in locally or deploy: read [self-hosting](docs/operations/self-hosting.md) for Docker,
   SQLite and production on Oracle; [authentication](docs/operations/authentication.md) for Better Auth.
