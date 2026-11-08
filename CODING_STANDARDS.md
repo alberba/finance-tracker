@@ -125,10 +125,11 @@ Fuente: `docs/playwright.md`.
   escenarios separados para estados o recorridos independientes y no compartas usuarios mutables
   para ahorrar preparación. Las combinaciones de viewport, tema y sección requieren una
   diferencia de comportamiento concreta; un contrato de API idéntico no se repite por viewport.
-- El presupuesto de la suite completa es de seis minutos de reloj: `pnpm test:all` lo comprueba.
-  Los cambios de infraestructura de tests registran tres ejecuciones consecutivas locales y de
-  Browser regression, con duración y resultado. No se reduce la cobertura ni se relajan
-  aserciones para conseguir ese tiempo; toda fusión o eliminación identifica la cobertura que queda.
+- El presupuesto de la suite completa es de seis minutos de reloj: `pnpm test:all` y el job
+  `budget` de Browser regression lo comprueban. Los cambios de infraestructura de tests registran
+  una ejecución local y una de Browser regression, con duración y resultado. No se reduce la
+  cobertura ni se relajan aserciones para conseguir ese tiempo; toda fusión o eliminación
+  identifica la cobertura que queda.
 
 ## Verificación de un cambio
 

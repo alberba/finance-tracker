@@ -137,12 +137,12 @@ procesos a cada consulta y la importación hace muchas. Los recorridos de produc
 SQLite transaccional del runtime de producción; Worker/D1 sigue cubierto por sync y auth.
 Los runtimes de navegador corren en paralelo, con puertos, bases, builds y cachés independientes.
 
-Después de cambiar la infraestructura, ejecuta tres veces `pnpm test:all` y tres veces Browser
-regression sobre el mismo commit. Guarda resultados, duración y enlaces de CI; un retry exitoso
-no cuenta como estabilidad. Los 360 s son de reloj: ejecuta las tres locales con la máquina libre
-(otra sesión corriendo Vitest basta para romperlas) y comprueba la carga que anota el informe. Si
-local y CI discrepan, manda CI, cuyo runner no comparte CPU. Si se excede el presupuesto, revisa
-primero los arranques repetidos, la capa de prueba y el aislamiento antes de modificar concurrencia.
+Después de cambiar la infraestructura, ejecuta una vez `pnpm test:all` y una vez Browser regression
+sobre el mismo commit. Guarda resultados, duración y enlace de CI; un retry exitoso no cuenta como
+estabilidad. Los 360 s son de reloj: ejecuta la local con la máquina libre (otra sesión corriendo
+Vitest basta para romperla) y comprueba la carga que anota el informe. Si local y CI discrepan,
+manda CI, cuyo runner no comparte CPU. Si se excede el presupuesto, revisa primero los arranques
+repetidos, la capa de prueba y el aislamiento antes de modificar concurrencia.
 
 ## Worktrees
 
