@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { formatDayMonth, formatDueLabel } from '../../lib/format'
@@ -27,6 +27,7 @@ const triggerLabel = computed(() => {
 })
 
 const menuOpen = ref(false)
+const triggerButton = useTemplateRef<HTMLButtonElement>('triggerButton')
 // The picked movement is kept as a copy so the panel still reads it while it
 // slides out after confirming or skipping removed it from the list.
 const detail = ref<PendingMovement | null>(null)
@@ -45,6 +46,9 @@ function accountName(item: PendingMovement): string {
 
 function openDetail(item: PendingMovement): void {
   detail.value = { ...item }
+  // The row that was pressed unmounts with the popover, so the panel would
+  // have nowhere to give the focus back to: it goes to the trigger instead.
+  triggerButton.value?.focus()
   menuOpen.value = false
   detailOpen.value = true
 }
@@ -66,8 +70,9 @@ function skip(): void {
   <NeonPopover v-model:open="menuOpen" label="Por confirmar">
     <template #trigger="{ toggle, expanded, panelId }">
       <button
+        ref="triggerButton"
         type="button"
-        class="text-soft outline-accent relative grid size-11 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+        class="text-soft outline-accent relative grid size-12 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
         :aria-label="triggerLabel"
         aria-haspopup="dialog"
         :aria-expanded="expanded"

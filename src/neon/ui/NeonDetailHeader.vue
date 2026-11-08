@@ -17,7 +17,7 @@ defineProps<{
   <div class="flex min-w-0 items-center gap-1">
     <a
       :href="backHref"
-      class="text-soft outline-accent grid size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+      class="text-soft outline-accent grid size-12 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
       :aria-label="`Volver a ${backLabel}`"
     >
       <svg

@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { nextTick, onMounted, useId, useTemplateRef, watch } from 'vue'
 
-import { dragOffset, FRAME_QUERY, releaseVelocity, shouldCloseSheet } from './sheet-drag'
+import {
+  dragOffset,
+  FLICK_WINDOW_MS,
+  FRAME_QUERY,
+  releaseVelocity,
+  shouldCloseSheet,
+} from './sheet-drag'
 
 // Detail panel of the new design (DESIGN.md, Panel de detalle): the detail or
 // edit view of one element of a section. A modal <dialog>: a full-height side
@@ -42,10 +48,10 @@ async function animateOut(element: HTMLDialogElement): Promise<void> {
   const keyframes = { opacity: [1, 0] }
   try {
     element.animate(keyframes, { ...options, pseudoElement: '::backdrop' })
-    await element.animate(
-      { transform: ['translateY(0)', 'translateY(48px)'], opacity: [1, 0] },
-      options,
-    ).finished
+    // From where a drag left it (inline transform), or from its place.
+    const from = element.style.transform || 'translateY(0)'
+    await element.animate({ transform: [from, 'translateY(48px)'], opacity: [1, 0] }, options)
+      .finished
   } catch {
     // An interrupted animation (the panel opened again) is not an error.
   }
@@ -106,8 +112,13 @@ function onDragEnd(event: PointerEvent): void {
   const element = dialog.value
   if (!dragStart || !element || !previousSample || !lastSample) return
   const offset = Math.max(dragOffset(event.clientY - dragStart.y), 0)
-  const velocity = releaseVelocity(previousSample, lastSample)
-  const close = shouldCloseSheet(offset, element.getBoundingClientRect().height, velocity)
+  // A finger that stopped before lifting is not a flick: only the last, fresh
+  // segment counts. A cancelled gesture (the system took it) never closes.
+  const fresh = event.timeStamp - lastSample.at <= FLICK_WINDOW_MS
+  const velocity = fresh ? releaseVelocity(previousSample, lastSample) : 0
+  const close =
+    event.type !== 'pointercancel' &&
+    shouldCloseSheet(offset, element.getBoundingClientRect().height, velocity)
   dragStart = lastSample = previousSample = null
   if (close) {
     element.style.transition = ''
@@ -122,7 +133,7 @@ function onDragEnd(event: PointerEvent): void {
 <template>
   <dialog
     ref="dialog"
-    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)]"
+    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
     :aria-labelledby="titleId"
     @cancel="onCancel"
     @click="onScrimClick"

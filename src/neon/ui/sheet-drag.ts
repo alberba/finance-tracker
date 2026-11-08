@@ -11,6 +11,9 @@ export const CLOSE_FRACTION = 0.3
 /** Release speed (px/ms) that closes the sheet whatever the distance. */
 export const CLOSE_VELOCITY = 0.11
 
+/** A flick counts only if the last movement was this recent (ms) when the finger lifted. */
+export const FLICK_WINDOW_MS = 100
+
 /** Upward drag resistance: the offset grows with the square root of the pull. */
 const UPWARD_RESISTANCE = 4
 

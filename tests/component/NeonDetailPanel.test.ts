@@ -172,6 +172,34 @@ describe('NeonDetailPanel', () => {
       expect(dialog.open).toBe(true)
     })
 
+    it('un dedo que se paró antes de levantarse no es un tirón', async () => {
+      const { wrapper, dialog } = mountPanel(true)
+      await nextTick()
+      stubHeight(dialog)
+      const handle = wrapper.get('[data-sheet-handle]').element
+
+      handle.dispatchEvent(pointer('pointerdown', 100, 0))
+      handle.dispatchEvent(pointer('pointermove', 140, 100)) // 0,4 px/ms…
+      handle.dispatchEvent(pointer('pointerup', 140, 900)) // …but it lifted 800ms later
+      await nextTick()
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
+
+    it('un gesto cancelado por el sistema no la cierra', async () => {
+      const { wrapper, dialog } = mountPanel(true)
+      await nextTick()
+      stubHeight(dialog)
+      const handle = wrapper.get('[data-sheet-handle]').element
+
+      handle.dispatchEvent(pointer('pointerdown', 100, 0))
+      handle.dispatchEvent(pointer('pointermove', 300, 50))
+      handle.dispatchEvent(pointer('pointercancel', 300, 60))
+      await nextTick()
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    })
+
     it('arrastrar hacia arriba nunca la cierra', async () => {
       const { wrapper, dialog } = mountPanel(true)
       await nextTick()

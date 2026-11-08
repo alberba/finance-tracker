@@ -36,7 +36,12 @@ watch(
   open,
   (isOpen) => {
     if (isOpen) {
-      opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      // Safari does not focus a button on click, so fall back to the trigger.
+      const active = document.activeElement
+      opener =
+        active instanceof HTMLElement && active !== document.body
+          ? active
+          : (root.value?.querySelector<HTMLElement>('button, a[href]') ?? null)
       document.addEventListener('pointerdown', onPointerDown)
       document.addEventListener('keydown', onKeyDown)
     } else {

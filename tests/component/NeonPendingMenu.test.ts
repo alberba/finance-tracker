@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
 import NeonPendingMenu from '../../src/neon/layout/NeonPendingMenu.vue'
@@ -136,5 +136,18 @@ describe('NeonPendingMenu', () => {
 
     expect(recurringStore.openPendingMovements).toHaveLength(0)
     expect(useFinancialStateStore().transactions).toHaveLength(0)
+  })
+
+  it('al cerrar el detalle el foco vuelve al botón de «Por confirmar»', async () => {
+    const { wrapper } = setup([pendingMovement('p1', 'Alquiler', 500)])
+    await openMenu(wrapper)
+    await wrapper.get('[data-pending-item="p1"] button').trigger('click')
+    await nextTick()
+    const panel = wrapper.get('dialog').element as HTMLDialogElement
+
+    await wrapper.get('dialog button[aria-label="Cerrar"]').trigger('click')
+    await vi.waitFor(() => expect(panel.open).toBe(false))
+
+    expect(document.activeElement).toBe(trigger(wrapper).element)
   })
 })
