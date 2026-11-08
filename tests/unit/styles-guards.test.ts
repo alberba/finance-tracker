@@ -242,3 +242,62 @@ describe('tokens below AA', () => {
     expect(textUses).toEqual([])
   })
 })
+
+/**
+ * Contrast of the new design's tokens (DESIGN.md, Temas): every text token
+ * reaches AA on every surface of its theme, in the four themes.
+ */
+const neonCss = readSrc('neon/styles/neon.css')
+
+const NEON_THEMES = {
+  'oscuro-suave': "[data-ui='neon'],",
+  'oscuro-fuerte': "[data-ui='neon'][data-theme='oscuro-fuerte']",
+  'claro-hueso': "[data-ui='neon'][data-theme='claro-hueso']",
+  'claro-melocoton': "[data-ui='neon'][data-theme='claro-melocoton']",
+} as const
+
+function neonTokens(selector: string): Record<string, string> {
+  const start = neonCss.indexOf(selector)
+  if (start === -1) throw new Error(`neon.css has no "${selector}" token block`)
+  const body = neonCss.slice(neonCss.indexOf('{', start), neonCss.indexOf('}', start))
+  return Object.fromEntries(
+    [...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
+  )
+}
+
+const NEON_SURFACES = ['--color-bg', '--color-side', '--color-panel', '--color-panel2']
+const NEON_TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
+  {
+    text: '--color-text',
+    surfaces: NEON_SURFACES,
+  },
+  { text: '--color-soft', surfaces: NEON_SURFACES },
+  { text: '--color-muted', surfaces: NEON_SURFACES },
+  { text: '--color-faint', surfaces: NEON_SURFACES },
+  { text: '--color-accent-text', surfaces: NEON_SURFACES },
+  { text: '--color-gain', surfaces: NEON_SURFACES },
+  { text: '--color-loss', surfaces: NEON_SURFACES },
+  { text: '--color-on-accent', surfaces: ['--color-accent'] },
+  { text: '--color-nav-active-text', surfaces: ['--color-nav-active-bg'] },
+  { text: '--color-sel-text', surfaces: ['--color-sel-bg'] },
+]
+
+describe('new design token contrast (WCAG AA, normal text)', () => {
+  for (const [theme, selector] of Object.entries(NEON_THEMES)) {
+    const tokens = neonTokens(selector)
+    for (const { text, surfaces } of NEON_TEXT_PAIRS) {
+      for (const surface of surfaces) {
+        it(`${theme} ${text} on ${surface} meets AA`, () => {
+          for (const name of [text, surface]) {
+            if (!/^#[0-9a-f]{6}$/i.test(tokens[name] ?? '')) {
+              throw new Error(`${name} in ${theme} must be a #rrggbb literal`)
+            }
+          }
+          expect(contrastRatio(tokens[text], tokens[surface])).toBeGreaterThanOrEqual(
+            AA_NORMAL_TEXT,
+          )
+        })
+      }
+    }
+  }
+})

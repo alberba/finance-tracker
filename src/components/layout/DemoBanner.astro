@@ -1,0 +1,25 @@
+---
+/** Strip above the content while the demo mode is on (src/scripts/shell.ts shows it). Shared by both frames. */
+---
+
+<div
+  id="demo-banner"
+  class="bg-notice text-notice-text border-notice-line border-b"
+  role="status"
+  hidden
+>
+  <div class="mx-auto flex max-w-7xl items-center gap-3 py-1.5 pr-2 pl-4 md:px-[clamp(16px,3vw,40px)]">
+    <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true"></span>
+    <p class="min-w-0 flex-1 text-sm">
+      <span class="font-mono text-xs font-medium tracking-[0.14em] uppercase">Modo demo</span>
+      {' · '}datos ficticios
+    </p>
+    <button
+      id="demo-banner-exit"
+      class="border-notice-line hover:bg-notice-line min-h-11 shrink-0 rounded-sm px-3 text-sm font-bold md:min-h-9 md:border"
+      type="button"
+    >
+      Salir<span class="max-md:hidden"> del modo demo</span>
+    </button>
+  </div>
+</div>

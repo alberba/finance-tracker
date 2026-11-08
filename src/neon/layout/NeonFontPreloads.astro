@@ -1,0 +1,22 @@
+---
+/**
+ * Preloads the faces of the new design (src/styles/common.css, public/fonts):
+ * Unbounded for titles and figures, Manrope for text. Mounted by the shell
+ * instead of the old design's preloads, so each design downloads only its own.
+ */
+---
+
+<link
+  rel="preload"
+  href="/fonts/unbounded-latin-wght.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin="anonymous"
+/>
+<link
+  rel="preload"
+  href="/fonts/manrope-latin-wght.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin="anonymous"
+/>
