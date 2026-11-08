@@ -34,9 +34,11 @@ descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equival
 Chromium): `docker pull mcr.microsoft.com/playwright:v1.64.1-noble`. La descarga inicial no es una
 medición de la suite. En CI usa directamente el contenedor del job.
 
-El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado y los tiempos
-por fase en `.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
-También conserva un JSON fechado por invocación para demostrar ejecuciones consecutivas.
+El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado, los tiempos
+por fase, las fases fallidas y la carga media de la máquina (al empezar y al acabar) en
+`.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
+También conserva un JSON fechado por invocación para demostrar ejecuciones consecutivas y, junto a
+él, la salida completa de cada fase (`<fecha>-<fase>.log`): un fallo se diagnostica desde ahí.
 No incluye lint/typecheck: para el gate de contribución sigue aplicando `pnpm gate`.
 Los comandos acotados sirven para iterar.
 
@@ -134,16 +136,13 @@ El coste dominante era repetir preparación y arranque: D1 emulada añade un int
 procesos a cada consulta y la importación hace muchas. Los recorridos de producto ahora usan
 SQLite transaccional del runtime de producción; Worker/D1 sigue cubierto por sync y auth.
 Los runtimes de navegador corren en paralelo, con puertos, bases, builds y cachés independientes.
-La suite completa detectó además una vinculación de movimientos que solo se guardaba localmente:
-`market.linkExistingMovements` ahora encola el comando compartido después de confirmar la identidad
-del símbolo recién creado. El round-trip comprueba el reinicio y el E2E existente verifica la recarga.
-Ese E2E espera la respuesta del comando de vinculación: el estado global «Sincronizado» no confirma
-una operación que otro módulo todavía está construyendo.
 
 Después de cambiar la infraestructura, ejecuta tres veces `pnpm test:all` y tres veces Browser
 regression sobre el mismo commit. Guarda resultados, duración y enlaces de CI; un retry exitoso
-no cuenta como estabilidad. Si se excede el presupuesto, revisa primero los arranques repetidos,
-la capa de prueba y el aislamiento antes de modificar concurrencia.
+no cuenta como estabilidad. Los 360 s son de reloj: ejecuta las tres locales con la máquina libre
+(otra sesión corriendo Vitest basta para romperlas) y comprueba la carga que anota el informe. Si
+local y CI discrepan, manda CI, cuyo runner no comparte CPU. Si se excede el presupuesto, revisa
+primero los arranques repetidos, la capa de prueba y el aislamiento antes de modificar concurrencia.
 
 ## Worktrees
 
