@@ -9,7 +9,7 @@ import LedgerTable, { type LedgerColumn, type LedgerGroup } from '../ui/LedgerTa
 import { TONE_TEXT } from '../ui/tone'
 import { TYPE_LABEL, TYPE_TAG, seriesColor } from './transaction-types'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
-import { hasTypeRestriction } from '../../domain/transactions/registry'
+import { foldMonthGroups, hasTypeRestriction } from '../../domain/transactions/registry'
 import { formatDayMonth, formatMonthName, formatMonthYear } from '../../lib/format'
 import { decorateCategoryLabel } from '../../scripts/category-emoji'
 import type { Transaction, TxSortColumn } from '../../scripts/types'
@@ -53,20 +53,14 @@ const filtering = computed(() => {
   return Boolean(filters.search || hasTypeRestriction(filters.types) || filters.accountIds.length)
 })
 
-// The band's month shows (or the latest month with movements, when that month
-// has none); older ones wait behind a button. While filtering, every match shows.
-const split = computed(() => {
-  const groups = movementsStore.monthGroups
-  if (filtering.value || showOlder.value) return { shown: groups, hidden: [] }
-  const cutoff = Math.min(ui.txFilterMonth, groups[0]?.month ?? 0)
-  return {
-    shown: groups.filter((group) => group.month >= cutoff),
-    hidden: groups.filter((group) => group.month < cutoff),
-  }
-})
+// The band's month shows, or the latest month with movements when that month
+// has none; older ones wait behind a button. While filtering, every match shows.
+const monthFold = computed(() =>
+  foldMonthGroups(movementsStore.monthGroups, ui.txFilterMonth, filtering.value || showOlder.value),
+)
 
 const groups = computed<LedgerGroup<Transaction>[]>(() =>
-  split.value.shown.map((group) => ({
+  monthFold.value.shown.map((group) => ({
     key: String(group.month),
     title: formatMonthYear(group.month, ui.txYear),
     summary: `${group.count} ${group.count === 1 ? 'movimiento' : 'movimientos'} · neto ${formatSignedMoney(group.net)}`,
@@ -75,7 +69,7 @@ const groups = computed<LedgerGroup<Transaction>[]>(() =>
 )
 
 const olderLabel = computed(() => {
-  const hidden = split.value.hidden
+  const hidden = monthFold.value.hidden
   if (!hidden.length) return ''
   const count = hidden.reduce((sum, group) => sum + group.count, 0)
   return `Ver ${formatMonthName(hidden[0].month).toLowerCase()} y anteriores · ${count} movimientos`
