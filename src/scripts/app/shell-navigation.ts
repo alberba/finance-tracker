@@ -96,9 +96,10 @@ export function setupShellNavigation(deps: DashboardNavigationDeps) {
 
     const mobileMoreTrigger = el.navTabs.querySelector<HTMLElement>('[data-mobile-more-trigger]')
     if (mobileMoreTrigger) {
-      mobileMoreTrigger.dataset.active = String(
-        !MOBILE_PRIMARY_SECTIONS.includes(normalizedSectionId),
-      )
+      // A frame whose bar shows other sections says which in the trigger.
+      const barSections =
+        mobileMoreTrigger.dataset.primarySections?.split(',') ?? MOBILE_PRIMARY_SECTIONS
+      mobileMoreTrigger.dataset.active = String(!barSections.includes(normalizedSectionId))
     }
 
     if (updateHistory) {
