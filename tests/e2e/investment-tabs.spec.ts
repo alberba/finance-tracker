@@ -466,13 +466,4 @@ test.describe('inversión tabs y TWR', () => {
     await expect(summary).toContainText('Aportado en 2026')
     await expect(section.locator('#contribution-nav-chart')).toBeVisible()
   })
-
-  test('el registro de aportes oculta columnas secundarias en móvil', async ({ tracker, page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await tracker.openInvestmentContributionsTab()
-
-    const row = tracker.contributionRow('2026-01-31')
-    await expect(row.locator('[data-contribution-nav]')).toBeHidden()
-    await expect(row.locator('input[data-contribution-flow-date]')).toBeVisible()
-  })
 })

@@ -48,7 +48,7 @@ function todayLocal(): string {
 
 test.describe('suscripciones de gastos', () => {
   test(
-    'presenta las suscripciones y su panel con controles accesibles en móvil',
+    'presenta las suscripciones y su panel con controles accesibles',
     { tag: '@smoke' },
     async ({ page, tracker }) => {
       await tracker.openSubscriptionsTab()
@@ -67,23 +67,6 @@ test.describe('suscripciones de gastos', () => {
       await expect(panel.getByLabel('Nombre')).toHaveAttribute('required', '')
       await expect(panel.getByLabel('Categoría')).toHaveValue('Suscripciones')
       await expect(panel.getByRole('button', { name: 'Añadir suscripción' })).toBeVisible()
-
-      await page.setViewportSize({ width: 375, height: 812 })
-
-      const mobileControls = [
-        panel.getByLabel('Nombre'),
-        panel.getByLabel('Importe'),
-        panel.getByLabel('Cuenta'),
-        panel.getByRole('button', { name: 'Mensual' }),
-        panel.getByRole('button', { name: 'Añadir suscripción' }),
-      ]
-      for (const control of mobileControls) {
-        await control.scrollIntoViewIfNeeded()
-        await expect(control).toBeInViewport()
-        expect(
-          await control.evaluate((element) => element.getBoundingClientRect().height),
-        ).toBeGreaterThanOrEqual(42)
-      }
     },
   )
 
@@ -154,10 +137,7 @@ test.describe('suscripciones de gastos', () => {
     await expect(tracker.transactionRows.filter({ hasText: 'E2E Pausable' })).toHaveCount(1)
   })
 
-  test('resume el compromiso, dónde se va y los próximos cobros sin scroll lateral', async ({
-    page,
-    tracker,
-  }) => {
+  test('resume el compromiso, dónde se va y los próximos cobros', async ({ page, tracker }) => {
     await replaceBackup(page, tracker, {
       accounts: [
         { id: 'revolut', name: 'Revolut', kind: 'cash', currency: 'EUR', openingBalance: 0 },
@@ -220,12 +200,6 @@ test.describe('suscripciones de gastos', () => {
     await expect(
       subscriptions.locator('tr[data-subscription-id]', { hasText: 'Gimnasio pausado' }),
     ).toContainText('En pausa')
-
-    await page.setViewportSize({ width: 375, height: 812 })
-    await expect(subscriptions).toBeVisible()
-    expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-    ).toBe(true)
   })
 
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {

@@ -64,20 +64,16 @@ un test sobrevive a un rediseño o refactor, y la estética se revisa a mano.
 ## Cuarentena de tests inestables (#233)
 
 [Issue #233](https://github.com/alberba/finance-tracker/issues/233) permite poner en cuarentena los
-casos afectados mientras se investiga su sincronización. Se conservan las aserciones y no se
-aumentan timeouts ni se cambian workers:
-
-- `finance-tracker.spec.ts`: solo el caso «home no muestra bloque legacy de filtros en movimientos»
-  usa `test.fixme`. Falló buscando `#transactions` tras un `page.goto('/')` que no espera la señal
-  `data-finance-ready`. Astro dev registró además un error de hidratación de Vue:
-  `Cannot define property sectionEl, object is not extensible`. No se ha demostrado que ese error
-  explique los fallos históricos de la issue.
+casos afectados mientras se investiga su sincronización. Un caso en cuarentena usa `test.fixme`,
+conserva sus aserciones y no aumenta timeouts ni cambia workers. Ahora no hay ninguno: el último,
+«home no muestra bloque legacy de filtros en movimientos», se borró en #421 porque comprobaba un
+detalle del diseño antiguo, no un comportamiento.
 
 Los escenarios autenticados usan identidad y estado aislados preparados por el runtime de
 pruebas. Para ejecutar la suite completa y mantener su presupuesto, consulta
 [Playwright](playwright.md#mantener-el-presupuesto).
 
-Para levantar la cuarentena, retirar los marcadores, corregir la espera de finalización o el
-aislamiento en la capa que corresponda y verificar diez ejecuciones consecutivas de `pnpm test`
-y `pnpm test:e2e` con los casos afectados activos, como exige #233. Una ejecución aislada en verde
-no basta para demostrar estabilidad bajo carga.
+Para levantar una cuarentena, retira el marcador, corrige la espera de finalización o el
+aislamiento en la capa que corresponda y verifica diez ejecuciones consecutivas de `pnpm test`
+y `pnpm test:e2e` con el caso activo, como exige #233. Una ejecución aislada en verde no basta
+para demostrar estabilidad bajo carga.

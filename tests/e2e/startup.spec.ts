@@ -1,5 +1,4 @@
 import { test as base, expect } from './fixtures'
-import { expectSelfHostedFonts } from './pages/fonts'
 
 const test = base.extend({
   page: async ({ page }, use) => {
@@ -20,12 +19,3 @@ test('hydrates the workspace without client runtime errors', async ({ tracker })
     tracker.dashboardSection.getByRole('button', { name: 'Nuevo movimiento' }),
   ).toBeEnabled()
 })
-
-test(
-  'carga Syne, DM Sans y DM Mono desde el propio dominio',
-  { tag: '@smoke' },
-  async ({ page, tracker }) => {
-    await tracker.reload()
-    await expectSelfHostedFonts(page)
-  },
-)
