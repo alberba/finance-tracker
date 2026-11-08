@@ -32,7 +32,7 @@ test.describe('Data E2E', () => {
     page,
     tracker,
     testUserEmail,
-  }) => {
+  }, testInfo) => {
     await tracker.addAccount({ name: 'Cuenta de copia' })
     await tracker.addCustomTransaction({
       date: '2026-08-12',
@@ -54,7 +54,8 @@ test.describe('Data E2E', () => {
     const downloadPromise = page.waitForEvent('download')
     await dataSection.getByRole('button', { name: 'Exportar JSON' }).click()
     const download = await downloadPromise
-    const path = await download.path()
+    const path = testInfo.outputPath('backup.json')
+    await download.saveAs(path)
 
     const reset = await page.request.post('/api/state/reset', {
       data: {},

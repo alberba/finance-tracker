@@ -5,6 +5,7 @@ import { createPlaywrightRuntime } from './playwright.shared'
 export default defineConfig(
   createPlaywrightRuntime({
     port: 4321,
+    runtime: 'node',
     htmlOutputFolder: 'playwright-report',
     blobOutputDir: 'blob-report',
     tag: '@sync-v2',
@@ -12,7 +13,6 @@ export default defineConfig(
   {
     // A scenario owns its isolated user; each CI shard has its own D1.
     fullyParallel: true,
-    workers: 1,
     projects: [
       ...[
         { name: 'chromium', device: 'Desktop Chrome' },

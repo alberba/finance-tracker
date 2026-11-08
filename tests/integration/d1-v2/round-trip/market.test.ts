@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as marketRepository from '../../../../src/db/repositories/market'
+import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { seedUser } from '../repositories/fixtures'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useSettingsStore } from '../../../../src/stores/settings'
@@ -12,16 +13,64 @@ describe('configuración de cotizaciones persistente', () => {
   let trip: RoundTrip
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(db, accountsRepository.create(userId, {
-        legacyId: 'crypto',
-        name: 'Crypto',
-        kind: 'investment',
-        currency: 'EUR',
-        openingBalance: 0,
-      }))
+      await runWithDb(
+        db,
+        accountsRepository.create(userId, {
+          legacyId: 'crypto',
+          name: 'Crypto',
+          kind: 'investment',
+          currency: 'EUR',
+          openingBalance: 0,
+        }),
+      )
     })
   })
   afterEach(() => trip.cleanup())
+
+  it('persiste la vinculación de un movimiento sin símbolo al recargar', async () => {
+    const cash = await runWithDb(
+      trip.testDb.db,
+      accountsRepository.create(trip.userId, {
+        name: 'Broker',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }),
+    )
+    const category = await runWithDb(
+      trip.testDb.db,
+      accountsRepository.createCategory(trip.userId, {
+        name: 'Crypto',
+        kind: 'investment',
+      }),
+    )
+    await runWithDb(
+      trip.testDb.db,
+      transactionsRepository.create(trip.userId, {
+        accountId: cash.id,
+        categoryId: category.id,
+        type: 'investment',
+        date: '2026-01-15',
+        amount: -100,
+        currency: 'EUR',
+        operation: { symbol: null, side: 'buy', units: 2, unitPrice: 50, fee: 0 },
+      }),
+    )
+    await trip.reload()
+    useMarketStore().addInstrument({
+      investmentAssetId: 'crypto',
+      type: 'crypto',
+      symbol: 'BTC',
+      market: '',
+      currency: 'EUR',
+      provider: 'yahoo',
+    })
+    const market = useMarketStore()
+    const id = market.instruments[0].id
+    expect(market.matchingMovementCount(id)).toBe(1)
+    expect(market.linkExistingMovements(id)).toBe(1)
+    expect((await trip.reload()).transactions[0].instrumentId).toBe(id)
+  })
 
   it('conserva el símbolo, proveedor y títulos al reiniciar el cliente', async () => {
     let market = useMarketStore()
@@ -76,20 +125,25 @@ describe('configuración de cotizaciones persistente', () => {
     const other = await seedUser(trip.testDb.db, 'other-quote-user@example.com')
     const account = (await runWithDb(trip.testDb.db, accountsRepository.listByUser(trip.userId)))[0]
     await expect(
-      runWithDb(trip.testDb.db, marketRepository.createUserInstrument(other.id, {
-        instrumentId: 'unmaterialized',
-        alias: account.id,
-        quoteConfig: {
-          type: 'crypto',
-          symbol: 'BTC-EUR',
-          provider: 'yahoo',
-          market: '',
-          currency: 'EUR',
-          active: true,
-        },
-      })),
+      runWithDb(
+        trip.testDb.db,
+        marketRepository.createUserInstrument(other.id, {
+          instrumentId: 'unmaterialized',
+          alias: account.id,
+          quoteConfig: {
+            type: 'crypto',
+            symbol: 'BTC-EUR',
+            provider: 'yahoo',
+            market: '',
+            currency: 'EUR',
+            active: true,
+          },
+        }),
+      ),
     ).rejects.toThrow()
-    expect(await runWithDb(trip.testDb.db, marketRepository.listUserInstrumentsByUser(other.id))).toEqual([])
+    expect(
+      await runWithDb(trip.testDb.db, marketRepository.listUserInstrumentsByUser(other.id)),
+    ).toEqual([])
   })
 
   it('elimina también la configuración al borrar su agrupación', async () => {

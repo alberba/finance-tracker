@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -26,13 +27,24 @@ env:
 # Keep this image aligned with @playwright/test in package.json.
 # These jobs never trigger production deployment.
 jobs:
+  vitest:
+    name: Unit, component and integration
+    if: ${{ !inputs.update_snapshots }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm test --maxWorkers=4
+
   e2e:
     name: Full E2E shard ${{ matrix.shard }}/4
     if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --shm-size=1g
     strategy:
       fail-fast: false
       matrix:
@@ -60,9 +72,10 @@ jobs:
     name: Visual E2E shard ${{ matrix.shard }}/3
     if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 6
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --shm-size=1g
     strategy:
       fail-fast: false
       matrix:
@@ -92,7 +105,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --shm-size=1g
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -120,7 +134,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --shm-size=1g
     permissions:
       contents: write
     steps:
@@ -148,9 +163,10 @@ jobs:
     name: Better Auth Worker and browser contracts
     if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 6
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --shm-size=1g
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -166,6 +182,24 @@ jobs:
           path: playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+
+  budget:
+    name: Full suite within six minutes
+    if: ${{ !inputs.update_snapshots }}
+    needs: [vitest, e2e, visual, sync, authentication-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo,
+              run_id: context.runId,
+            })
+            const seconds = (Date.now() - Date.parse(run.run_started_at)) / 1000
+            await core.summary.addRaw(`Full suite: ${seconds.toFixed(1)}s / 360s`).write()
+            if (seconds > 360) core.setFailed('Full suite exceeded six minutes')
 
   e2e-report:
     name: Merge failed Playwright report

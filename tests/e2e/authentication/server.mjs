@@ -1,9 +1,10 @@
 import { generateKeyPair, exportJWK, SignJWT } from 'jose'
 import { createServer } from 'node:http'
 import { spawnSync, spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+process.on('exit', () => rmSync(process.env.AUTH_TEST_STATE_PATH, { recursive: true, force: true }))
 const port = Number(process.env.AUTH_TEST_PORT ?? 4466)
 const mailPort = port + 1
 const mail = new Map()
@@ -105,24 +106,43 @@ const migration = spawnSync(
     'finance-auth-e2e',
     '--local',
     '--persist-to',
-    resolve('.scratch/auth/state'),
+    process.env.AUTH_TEST_STATE_PATH,
     '--config',
     config,
   ],
   { stdio: 'inherit' },
 )
 if (migration.status !== 0) process.exit(migration.status ?? 1)
-const app = spawn('pnpm', ['dev', '--host', '127.0.0.1', '--port', String(port), '--ignore-lock'], {
-  stdio: 'inherit',
-  env: {
-    ...process.env,
-    CLOUDFLARE_CONFIG_PATH: config,
-    CLOUDFLARE_PERSIST_PATH: resolve('.scratch/auth/state'),
-    AUTH_E2E_NETWORK: 'true',
-    AUTH_TEST_PORT: String(port),
-    ASTRO_DEV_BACKGROUND: '0',
-  },
-})
+const buildDirectory = resolve('.scratch/auth/build')
+const appEnv = {
+  ...process.env,
+  CLOUDFLARE_CONFIG_PATH: config,
+  CLOUDFLARE_PERSIST_PATH: process.env.AUTH_TEST_STATE_PATH,
+  AUTH_E2E_NETWORK: 'true',
+  AUTH_TEST_PORT: String(port),
+  PLAYWRIGHT_VITE_CACHE_DIR: resolve('.scratch/auth/vite'),
+  PLAYWRIGHT_BUILD_DIR: buildDirectory,
+}
+const build = spawnSync('pnpm', ['build'], { stdio: 'inherit', env: appEnv })
+if (build.status !== 0) process.exit(build.status ?? 1)
+const app = spawn(
+  'pnpm',
+  [
+    'exec',
+    'wrangler',
+    'dev',
+    '--config',
+    resolve(buildDirectory, 'server/wrangler.json'),
+    '--ip',
+    '127.0.0.1',
+    '--port',
+    String(port),
+    '--persist-to',
+    process.env.AUTH_TEST_STATE_PATH,
+    '--local',
+  ],
+  { stdio: 'inherit', env: appEnv },
+)
 for (const signal of ['SIGTERM', 'SIGINT'])
   process.on(signal, () => {
     app.kill(signal)

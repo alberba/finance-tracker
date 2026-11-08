@@ -513,18 +513,14 @@ describe('v2 repair execution', () => {
     try {
       if (existsSync(dbPath)) rmSync(dbPath)
 
-      const staging = openLocalV2Db(dbPath)
-      const fixtureIds = seedRepairFixture({
-        db: staging.db,
-        sqlite: staging.sqlite,
-        close: staging.close,
-      })
-      staging.close()
+      // Export the migrated in-memory fixture once; keep real file persistence
+      // without replaying every migration as a separate disk transaction.
+      writeFileSync(dbPath, testDb.sqlite.serialize())
 
       const simResult = await runRepairCli([
         `--backup=${backupPath}`,
         `--v2-sqlite=${dbPath}`,
-        `--user-id=${fixtureIds.userId}`,
+        `--user-id=${fixture.userId}`,
       ])
       expect(simResult.executed).toBe(false)
       expect(simResult.plan.categoryMerges).toHaveLength(1)
@@ -533,7 +529,7 @@ describe('v2 repair execution', () => {
       const check = openLocalV2Db(dbPath)
       const catCount = check.sqlite
         .prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?')
-        .get(fixtureIds.userId) as { count: number }
+        .get(fixture.userId) as { count: number }
       expect(catCount.count).toBe(2)
       check.close()
     } finally {
@@ -545,7 +541,6 @@ describe('v2 repair execution', () => {
   it('keeps stdout as a single JSON document when --json is passed', async () => {
     const { mkdirSync, writeFileSync, rmSync, existsSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const { openLocalV2Db } = await import('../../../../scripts/lib/local-v2-db')
 
     mkdirSync('.scratch', { recursive: true })
     const backupPath = resolve('.scratch/test-repair-backup-json.json')
@@ -561,18 +556,14 @@ describe('v2 repair execution', () => {
     try {
       if (existsSync(dbPath)) rmSync(dbPath)
 
-      const staging = openLocalV2Db(dbPath)
-      const fixtureIds = seedRepairFixture({
-        db: staging.db,
-        sqlite: staging.sqlite,
-        close: staging.close,
-      })
-      staging.close()
+      // Export the migrated in-memory fixture once; keep real file persistence
+      // without replaying every migration as a separate disk transaction.
+      writeFileSync(dbPath, testDb.sqlite.serialize())
 
       const result = await runRepairCli([
         `--backup=${backupPath}`,
         `--v2-sqlite=${dbPath}`,
-        `--user-id=${fixtureIds.userId}`,
+        `--user-id=${fixture.userId}`,
         '--json',
       ])
       expect(result.executed).toBe(false)
@@ -602,18 +593,14 @@ describe('v2 repair execution', () => {
     try {
       if (existsSync(dbPath)) rmSync(dbPath)
 
-      const staging = openLocalV2Db(dbPath)
-      const fixtureIds = seedRepairFixture({
-        db: staging.db,
-        sqlite: staging.sqlite,
-        close: staging.close,
-      })
-      staging.close()
+      // Export the migrated in-memory fixture once; keep real file persistence
+      // without replaying every migration as a separate disk transaction.
+      writeFileSync(dbPath, testDb.sqlite.serialize())
 
       const execResult = await runRepairCli([
         `--backup=${backupPath}`,
         `--v2-sqlite=${dbPath}`,
-        `--user-id=${fixtureIds.userId}`,
+        `--user-id=${fixture.userId}`,
         '--execute',
       ])
       expect(execResult.executed).toBe(true)
@@ -622,11 +609,11 @@ describe('v2 repair execution', () => {
       const check = openLocalV2Db(dbPath)
       const catCount = check.sqlite
         .prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?')
-        .get(fixtureIds.userId) as { count: number }
+        .get(fixture.userId) as { count: number }
       expect(catCount.count).toBe(1)
       const accountKind = check.sqlite
         .prepare('SELECT kind FROM accounts WHERE id = ?')
-        .get(fixtureIds.accountId) as { kind: string }
+        .get(fixture.accountId) as { kind: string }
       expect(accountKind.kind).toBe('cash')
       check.close()
     } finally {

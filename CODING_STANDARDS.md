@@ -107,10 +107,24 @@ Fuente: `docs/playwright.md`.
 - Cada escenario autenticado usa un usuario aislado, inicializa su espacio por la API y persiste
   mediante sync v2; cada shard de CI tiene su propia D1.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
+- Para comprobar persistencia, espera la respuesta del comando concreto antes de recargar.
+  «Sincronizado» puede estar en reposo mientras otro módulo todavía construye un comando.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
+- Los switches con input oculto se pulsan por su etiqueta visible; no se fuerzan clics sobre el input.
 - `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.
 - Los snapshots Linux se actualizan a mano tras revisar el resultado:
   `pnpm test:e2e:visual --update-snapshots`.
+- Antes de añadir un E2E, identifica qué comportamiento observable no cubre ya otro caso.
+  Añade aserciones al recorrido existente cuando comparta preparación y estado. Las combinaciones
+  de viewport, tema y sección requieren una diferencia de comportamiento o de layout concreta;
+  un contrato de API idéntico no se repite por viewport.
+- Una vista visual comprueba geometría y píxeles en el mismo escenario cuando usa el mismo
+  estado. Conserva escenarios separados para estados o recorridos independientes; no compartas
+  usuarios mutables para ahorrar preparación.
+- El presupuesto de la suite completa es de seis minutos de reloj: `pnpm test:all` lo comprueba.
+  Los cambios de infraestructura de tests registran tres ejecuciones consecutivas locales y de
+  Browser regression, con duración y resultado. No se reduce la cobertura ni se relajan umbrales
+  visuales para conseguir ese tiempo; toda fusión o eliminación identifica la cobertura que queda.
 
 ## Verificación de un cambio
 

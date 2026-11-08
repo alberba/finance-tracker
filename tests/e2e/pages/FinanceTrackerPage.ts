@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
+import { setSwitch } from './controls'
 
 /** `--breakpoint-desk` in src/styles/global.css (61.3125rem): sidebar and floating launcher from here up. */
 const DESK_BREAKPOINT_PX = 981
@@ -519,14 +520,14 @@ export class FinanceTrackerPage {
       }
     }
 
-    // The switches are visually hidden under their drawn tracks.
-    await section
-      .getByRole('switch', { name: 'Ya está declarado' })
-      .setChecked(Boolean(params.declared), { force: true })
+    await setSwitch(
+      section.getByRole('switch', { name: 'Ya está declarado' }),
+      Boolean(params.declared),
+    )
 
     const stockEventsCashInput = section.getByRole('switch', { name: /efectivo en Stock Events/ })
     if (params.stockEventsCash && (await stockEventsCashInput.count()) > 0) {
-      await stockEventsCashInput.check({ force: true })
+      await setSwitch(stockEventsCashInput, true)
     }
 
     await section.getByRole('button', { name: 'Guardar movimiento' }).click()
@@ -552,8 +553,7 @@ export class FinanceTrackerPage {
       name: `${accountName} es liquidez de la cartera`,
     })
     if ((await toggle.isChecked()) !== enabled) {
-      // The checkbox is visually hidden under its drawn track.
-      await toggle.setChecked(enabled, { force: true })
+      await setSwitch(toggle, enabled)
       await expect(this.page.getByRole('status')).toContainText('Configuración TWR actualizada.')
     }
     await expect(toggle).toBeChecked({ checked: enabled })
@@ -994,9 +994,7 @@ export class FinanceTrackerPage {
       await panel.locator('#investment-movement-currency').fill(payload.movementCurrency)
     }
     if (typeof payload.declared === 'boolean') {
-      await panel
-        .getByRole('switch', { name: 'Ya está declarado' })
-        .setChecked(payload.declared, { force: true })
+      await setSwitch(panel.getByRole('switch', { name: 'Ya está declarado' }), payload.declared)
     }
 
     await panel.getByRole('button', { name: 'Guardar cambios' }).click()

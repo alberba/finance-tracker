@@ -2,13 +2,16 @@ import type { PlaywrightTestConfig } from '@playwright/test'
 import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { unstable_getVarsForDev, unstable_readConfig } from 'wrangler'
+import { browserConnectionOptions, snapshotPathTemplate } from './playwright.browser'
 
 type PlaywrightRuntimeOptions = {
   port: number
   htmlOutputFolder: string
   blobOutputDir: string
   tag: string
+  runtime?: 'node' | 'worker'
   env?: Record<string, string>
 }
 
@@ -84,29 +87,42 @@ export function createPlaywrightRuntime({
   blobOutputDir,
   tag,
   env,
+  runtime = 'worker',
 }: PlaywrightRuntimeOptions): PlaywrightTestConfig {
   const serverPort = isCI ? port : port + worktreeOffset()
   const localBaseURL = `http://127.0.0.1:${serverPort}`
   const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
-  // --ignore-lock: Astro allows one dev server per project root, and the user's
-  // `pnpm dev` in this worktree must keep running alongside the test server.
-  const serverCommand = `pnpm d1:migrate:local:v2 && ASTRO_DEV_BACKGROUND=0 pnpm dev --host 127.0.0.1 --port ${serverPort} --ignore-lock`
+  // D1 is disposable per invocation; Linux tmpfs avoids fsync for every fixture row.
+  const persistPath = resolve(
+    process.env.PLAYWRIGHT_STORAGE_DIR ??
+      (process.platform === 'linux' && existsSync('/dev/shm') ? '/dev/shm' : tmpdir()),
+    `finance-e2e-${workerConfigId}-${port}`,
+  )
+  if (!externalBaseURL) process.env.PLAYWRIGHT_PERSIST_PATH = persistPath
+  const workerConfigPath = externalBaseURL ? undefined : localWorkerConfig(serverPort, localBaseURL)
+  if (workerConfigPath) process.env.PLAYWRIGHT_WRANGLER_CONFIG = workerConfigPath
+  const serverCommand = `node scripts/e2e-server.mjs ${serverPort}`
 
   return {
     tag,
     testDir: './tests/e2e',
+    snapshotPathTemplate,
+    outputDir: `test-results-${port}`,
     fullyParallel: false,
     globalSetup: './scripts/check-installed-dependencies.mjs',
     forbidOnly: isCI,
     failOnFlakyTests: isCI,
     retries: isCI ? 1 : 0,
-    workers: 1,
+    workers: process.env.CI ? 2 : 4,
     maxFailures: isCI ? 10 : 1,
     reporter: isCI
       ? [['dot'], ['blob', { outputDir: blobOutputDir }]]
       : [['list'], ['html', { open: 'never', outputFolder: htmlOutputFolder }]],
     use: {
+      connectOptions: browserConnectionOptions,
       baseURL: externalBaseURL ?? localBaseURL,
+      locale: 'en-US',
+      timezoneId: 'UTC',
       extraHTTPHeaders: {
         'X-Test-User-Email': 'developer@e2e.test',
       },
@@ -136,8 +152,9 @@ export function createPlaywrightRuntime({
           gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
           env: {
             ...env,
-            CLOUDFLARE_CONFIG_PATH: localWorkerConfig(serverPort, localBaseURL),
-            CLOUDFLARE_PERSIST_PATH: resolve('.wrangler/state'),
+            PLAYWRIGHT_RUNTIME: runtime,
+            CLOUDFLARE_CONFIG_PATH: workerConfigPath!,
+            CLOUDFLARE_PERSIST_PATH: persistPath,
           },
         },
   }

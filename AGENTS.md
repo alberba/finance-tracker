@@ -17,7 +17,7 @@
 - Coding and review: [CODING_STANDARDS.md](CODING_STANDARDS.md) is authoritative, including the
   Standards axis of `/code-review`. Report conflicting narrative docs as drift.
 - Setup, branches, commits and PRs: read [CONTRIBUTING.md](CONTRIBUTING.md).
-- CI or browser failures, E2E runs and snapshot regeneration: read
+- Adding or changing E2E cases, CI or browser failures, E2E runs and snapshot regeneration: read
   [playwright](docs/playwright.md).
 
 ## Execution

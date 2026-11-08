@@ -8,7 +8,10 @@
     "dist",
     "coverage",
     "playwright-report",
+    "playwright-report-*",
     "test-results",
+    "test-results-*",
+    ".scratch",
     "node_modules",
     "worker-configuration.d.ts"
   ]

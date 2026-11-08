@@ -12,6 +12,7 @@ import type { Instrument, InstrumentType } from '../scripts/types'
 import { todayISO } from '../scripts/utils'
 import { newId } from '../lib/client/ids'
 import { resolveEntityId, syncCreate, syncUpdate, syncRemove } from '../lib/client/command-mapping'
+import { syncMovements } from '../lib/client/movement-commands'
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
@@ -201,12 +202,14 @@ export const useMarketStore = defineStore('market', () => {
   }
 
   function linkExistingMovements(instrumentId: string): number {
+    const ownerId = syncStore.userId
     const instrument = instruments.value.find((item) => item.id === instrumentId)
     if (!instrument) return 0
     const assetName = financialStateStore.investmentAssets.find(
       (asset) => asset.id === instrument.investmentAssetId,
     )?.name
     let linkedCount = 0
+    const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       const draftInstrument = draft.instruments.find((item) => item.id === instrumentId)
       draft.transactions.forEach((transaction) => {
@@ -226,7 +229,28 @@ export const useMarketStore = defineStore('market', () => {
       }
     })
     const updated = instruments.value.find((item) => item.id === instrumentId)
-    if (linkedCount && updated) persistConfiguration(updated)
+    if (linkedCount && updated) {
+      const after = financialStateStore.transactions
+      const currency = financialStateStore.currency
+      persistConfiguration(updated)
+      configurationWrites = configurationWrites
+        .then(async () => {
+          if (!ownerId || syncStore.userId !== ownerId || isReadOnlyDemoActive()) return
+          // A newly configured symbol gets its catalog id on the server.
+          // Confirm that write before resolving the movement's operation.
+          await syncStore.syncNow()
+          if (syncStore.userId !== ownerId) return
+          if (!(await syncStore.getInstrumentId(instrumentId))) {
+            throw new Error('Sincroniza la cotización antes de vincular movimientos.')
+          }
+          if ((await syncMovements(before, after, currency)) === false) {
+            throw new Error('No se pudieron guardar los movimientos vinculados.')
+          }
+        })
+        .catch((error) => {
+          errorMessage.value = error instanceof Error ? error.message : String(error)
+        })
+    }
     return linkedCount
   }
 
