@@ -48,6 +48,8 @@ function executeSql(sql: string) {
 test('private pages and financial APIs require a Better Auth session @smoke', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
+  // The mode buttons only respond once the form has hydrated.
+  await new AuthenticationPage(page).ready()
   await expect(page.getByRole('button', { name: 'Verificar mi correo', exact: true })).toHaveCount(
     0,
   )

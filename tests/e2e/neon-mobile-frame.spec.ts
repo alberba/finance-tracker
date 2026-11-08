@@ -8,6 +8,8 @@ const NO_COOKIE = { cookies: [], origins: [] }
 const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
 const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })
+// The desktop sidebar has its own «Apuntar»: the mobile frame is told apart by the FAB.
+const fab = (page: Page) => page.locator('[data-fab-apuntar]')
 const current = (page: Page) => page.locator('#nav-tabs [aria-current="page"]:visible')
 
 const BAR_SECTIONS: Array<[FinanceSectionId, string]> = [
@@ -87,12 +89,6 @@ test.describe('Marco móvil nuevo', () => {
     await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
   })
 
-  test('«Apuntar» abre el alta de movimiento', async ({ page, tracker }) => {
-    await page.getByRole('button', { name: 'Apuntar' }).click()
-    await expect(tracker.section('transactions')).toBeVisible()
-    await expect(tracker.transactionPanel).toBeVisible()
-  })
-
   test('«Por confirmar» abre un popover que cierra con Escape y al pulsar fuera', async ({
     page,
   }) => {
@@ -146,12 +142,12 @@ test.describe('Marco móvil nuevo', () => {
     await page.setViewportSize({ width: 1200, height: 800 })
     await expect(page.getByRole('complementary')).toBeVisible()
     await expect(bottomBar(page)).toBeHidden()
-    await expect(page.getByRole('button', { name: 'Apuntar' })).toBeHidden()
+    await expect(fab(page)).toBeHidden()
 
     await page.setViewportSize({ width: 900, height: 800 })
     await expect(page.getByRole('complementary')).toBeHidden()
     await expect(bottomBar(page)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Apuntar' })).toBeVisible()
+    await expect(fab(page)).toBeVisible()
     await tracker.open('dashboard')
   })
 })
