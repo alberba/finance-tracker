@@ -120,11 +120,11 @@ Oscuro fuerte es la variante de alto contraste: el nav activo y la caja de alta 
 | nota               | Manrope   | 400      | 14px                                     | 1.45        | —              | `--text-note`         |
 | meta               | Manrope   | 400      | 13px                                     | 1.45        | —              | `--text-meta`         |
 | delta              | Manrope   | 800      | 14px                                     | 1.45        | —              | `--text-delta`        |
-| nav móvil          | Manrope   | 800      | 11px                                     | —           | —              | `--text-tab`          |
+| nav móvil          | Manrope   | 700–800  | 12px                                     | —           | —              | `--text-tab`          |
 | cifra de fila      | Unbounded | 600      | 16px (15–17px)                           | 1.2         | normal         | `--text-figure-row`   |
 | cifra de bloque    | Unbounded | 600      | 20–22px                                  | 1.2         | -0.02em        | `--text-figure-block` |
 | cifra principal    | Unbounded | 600      | `clamp(34px, 3.4cqi, 44px)`              | 1           | -0.04em        | `--text-figure-lg`    |
-| cifra protagonista | Unbounded | 700      | 56px (móvil 38px)                        | 1.05        | -0.035em       | `--text-figure-hero`  |
+| cifra protagonista | Unbounded | 700      | 56px (móvil 52px)                        | 1.05        | -0.035em       | `--text-figure-hero`  |
 | céntimos           | (hereda)  | (hereda) | 0.42em                                   | —           | -0.02em        | `--text-cents`        |
 
 ## Tokens — Espaciado y formas
@@ -160,7 +160,7 @@ Oscuro fuerte es la variante de alto contraste: el nav activo y la caja de alta 
 | tile relleno                                | 18px  |
 | campos, item de nav, tile de categoría      | 14px  |
 | caja de icono, ticker, badge de mes         | 8px   |
-| hoja inferior (arriba)                      | 24px  |
+| hoja inferior (arriba)                      | 28px  |
 | icono circular, avatar, punto               | 50%   |
 
 ### Layout
@@ -204,7 +204,9 @@ Círculo (`border-radius: 50%`) solo con icono, sin texto: 64px en móvil, bajo 
 
 **Role:** «Apuntar» en móvil
 
-Círculo de 58px, fondo `--color-accent`, `box-shadow: 0 0 0 5px var(--color-bg)` para recortarlo sobre la barra inferior.
+Botón extendido de 56px de alto con radio 16px, `padding: 0 22px 0 16px`, fondo `--color-accent`, icono «+» de 24px y la palabra «Apuntar» en Unbounded 700 a 15px, con `gap: 10px`. Flota a 16px del borde derecho y a 118px del inferior (por encima de la barra), con `filter: drop-shadow(0 10px 18px oklch(0% 0 none / 0.45))`.
+
+Se pliega al desplazar: al bajar más de 6px se recorta con `clip-path` a un cuadrado de 56px y la palabra se desvanece; al subir, o junto al borde superior, vuelve a su ancho. Pulsado, `scale(0.97)`. Con un aviso visible sube 64px para no taparlo.
 
 ### Item de nav lateral
 
@@ -216,7 +218,21 @@ Círculo de 58px, fondo `--color-accent`, `box-shadow: 0 0 0 5px var(--color-bg)
 
 **Role:** navegación de secciones en móvil
 
-`padding: 8px 8px 14px`, fondo `--color-bg`; cada ítem `min-height: 52px; gap: 3px`, icono encima y etiqueta Manrope 800 a 11px. El activo se pinta en `--color-accent-text`.
+Alto de 80px, fondo `--color-panel`, cuatro columnas iguales con `padding: 0 8px`. Cada ítem: icono de 22px dentro de una píldora de 56×32px, etiqueta encima de 12px debajo del icono con `gap: 4px`. En reposo, texto `--color-muted` y peso 700. El activo va en `--color-text` con peso 800 y `aria-current="page"`, y su píldora se pinta con `color-mix(in oklch, var(--color-accent) 24%, transparent)`. Los ítems se pulsan con `scale(0.97)`.
+
+### Barra superior móvil
+
+**Role:** marca y acciones; cede el sitio a la cifra al desplazar
+
+Alto de 64px, `padding: 0 8px 0 20px`, fondo `--color-bg`. Marca `finanzas.` a la izquierda y, a la derecha, botones circulares de 48px sin fondo: confirmar pendientes (con un contador de 18px en `--color-accent` cuando hay pendientes) y buscar. Pasados 120px de scroll, la barra pasa a `--color-panel`, la marca sube 6px y se desvanece, y en su lugar entra «Te quedan» con la cifra en Unbounded 600; vuelve al subir. Ambos cambios son de `opacity` y `transform` en 200ms con `--ease-out`.
+
+La barra de estado, la de gestos y el marco del dispositivo que dibujan los artboards son del lienzo, no del producto: no se construyen.
+
+### Aviso con deshacer
+
+**Role:** confirmar lo hecho y ofrecer revertirlo
+
+Caja de 52px de alto como mínimo, radio 14px, fondo `--color-text` y texto `--color-bg` (invertido), a 16px de los bordes laterales y a 118px del inferior, con `box-shadow: 0 12px 30px -10px oklch(0% 0 none / 0.6)`. Texto de 15px, peso 700; a la derecha, «Deshacer» como botón de texto de 44px de alto mínimo, peso 800, en `color-mix(in oklch, var(--color-accent), black 30%)`. Dura 4s. Entra desde 16px por debajo con `opacity` y `transform` en 260ms y sale por el mismo sitio 8px más abajo.
 
 ### Tarjeta
 
@@ -234,7 +250,7 @@ Fondo `--color-panel`, `1px solid --color-line`, `border-radius: 20px`, `padding
 
 **Role:** alta y edición de un movimiento
 
-Escritorio: panel lateral de 380px. Móvil: hoja inferior con radio superior de 24px, agarre de 44×5px en `--color-line`, velo `oklch(0% none none / 0.42)`. Entra con `anim-sheet`. El importe va en Unbounded 700 a 32px sobre un subrayado de `2px solid --color-ctrl-line`; el resto de campos son cajas.
+Escritorio: panel lateral de 380px. Móvil: hoja inferior con radio superior de 28px, a 22px del borde inferior, agarre de 36×4px en `--color-ctrl-line`, velo `oklch(0% none none / 0.55)` y sombra `--shadow-sheet`. Entra con `anim-sheet` y sale en 200ms con `--ease-out`, por donde entró. Se cierra arrastrando el agarre y la cabecera: sigue al dedo, hacia arriba cede cada vez menos (raíz cuadrada) y cierra al pasar el 30% de su alto o con un tirón de velocidad superior a 0,11 px/ms; si no, vuelve en 320ms con `--ease-drawer`. Escape y el velo también la cierran. El importe va en Unbounded 700 a 32px sobre un subrayado de `2px solid --color-ctrl-line`; el resto de campos son cajas.
 
 **Edición de un movimiento.** En móvil el detalle de un movimiento no se despliega en la lista: abre esta misma hoja como formulario (selector Compra/Venta, fecha, títulos, precio, comisión, cuenta y nota) con el total recalculado en la cabecera. Los campos van en dos columnas, con el `gap` justo, y los botones Eliminar, Cancelar y Guardar en una sola fila; Guardar es el primario. La fecha se escribe `DD/MM/AAAA`, con ese mismo texto como ayuda y `inputmode="numeric"`. Se cierra con el botón, tocando el velo o con Escape.
 
@@ -262,7 +278,7 @@ Pista `display: flex; padding: 3px; gap: 3px; background: --color-panel2; border
 
 **Role:** variación junto a una cifra
 
-Texto sin fondo: Manrope 800 a 14px en `--color-gain` o `--color-loss`, con signo explícito (`+18,4 %`, `−2,1 %`). Va en la misma línea que la cifra, separado 12px.
+Texto sin fondo: Manrope 800 a 14px en `--color-gain` o `--color-loss`, con signo explícito (`+18,4 %`, `−2,1 %`). Va en la misma línea que la cifra, separado 12px. La única excepción es la cifra protagonista del móvil, centrada en su diapositiva: ahí el delta va debajo, centrado, porque a 52px no caben los dos en una línea.
 
 ### Etiqueta
 
@@ -329,7 +345,7 @@ Línea `stroke: --color-accent; stroke-width: 2.5; stroke-linecap: round; stroke
 ### Don't
 
 - No uses negro puro ni blanco puro como texto o lienzo oscuro: el lienzo es carbón cálido y el texto es hueso
-- No añadas sombra a las tarjetas; la sombra es solo para lo que flota (popover, hoja)
+- No añadas sombra a las tarjetas; la sombra es solo para lo que flota (popover, hoja, FAB, aviso)
 - No uses el naranja como fondo de bloque ni para decorar: un segundo uso compite con la acción principal
 - No pongas cifras en Manrope ni títulos de bloque en Unbounded: Unbounded es para H1 y números
 - No metas la variación en una pastilla: el delta es texto de color junto a la cifra
@@ -351,8 +367,9 @@ Valores del tema por defecto; los demás temas mantienen los mismos niveles.
 ## Elevation
 
 - **Popover / hoja:** `var(--shadow-float)` (oscuro suave: `0 24px 60px rgba(0, 0, 0, 0.5)`)
-- **Hoja inferior (móvil):** `0 -20px 60px -20px rgb(0 0 0 / 0.6)`
-- **FAB sobre la barra:** `0 0 0 5px var(--color-bg)` (anillo de recorte, no sombra)
+- **Hoja inferior (móvil):** `0 -20px 60px oklch(0% 0 none / 0.5)`
+- **FAB:** `drop-shadow(0 10px 18px oklch(0% 0 none / 0.45))`
+- **Aviso con deshacer:** `0 12px 30px -10px oklch(0% 0 none / 0.6)`
 - **Fila seleccionada:** `inset 3px 0 0 var(--color-accent)`
 
 ## Iconografía
@@ -361,7 +378,9 @@ Iconos de línea propios, sin relleno: `viewBox="0 0 24 24"`, `fill="none"`, `st
 
 ## Layout
 
-Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el punto en naranja, secciones arriba, Datos y Configuración abajo) y el área principal fluida con `max-width: 1640px` centrado. Cada sección abre con la etiqueta de fecha, H1 en Unbounded y una línea de lede; debajo, una rejilla de dos columnas (contenido principal y aside de resumen) con `gap: 20px`. La raíz es `container-type: inline-size` y los tamaños fluidos usan `cqi`; no hay breakpoints por ancho: la vista la decide el dispositivo (`escritorio` / `movil`). Móvil: cabecera con título, contenido en una columna, barra inferior con FAB central y hojas inferiores para alta y detalle.
+Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el punto en naranja, secciones arriba, Datos y Configuración abajo) y el área principal fluida con `max-width: 1640px` centrado. Cada sección abre con la etiqueta de fecha, H1 en Unbounded y una línea de lede; debajo, una rejilla de dos columnas (contenido principal y aside de resumen) con `gap: 20px`. La raíz es `container-type: inline-size` y los tamaños fluidos usan `cqi`; no hay breakpoints por ancho: la vista la decide el dispositivo (`escritorio` / `movil`). Móvil: barra superior, contenido en una columna, barra inferior de cuatro columnas con el FAB «Apuntar» flotando aparte, abajo a la derecha (ver **FAB**), y hojas inferiores para alta, detalle y «Por confirmar».
+
+**Inicio en escritorio.** La rejilla de dos columnas coloca arriba lo del mes: «Te quedan» como cifra protagonista a la izquierda y «Por confirmar» en el aside, a la vista sin desplazar; debajo, Patrimonio con Inversiones, y Movimientos con Gasto por categoría y Objetivos.
 
 **Cabecera de detalle.** Al abrir un elemento de una sección (un activo), la barra superior queda solo con la flecha y el símbolo («‹ VWCE»), en móvil y en escritorio; la flecha vuelve a la sección. No lleva título de sección ni controles a la derecha, ni dentro de la pantalla se repite la fila de volver, símbolo y nombre.
 
@@ -369,7 +388,7 @@ Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el pu
 
 - Dinero: `−1.234,56 €` (U+2212, punto de miles, coma decimal, espacio y €, dos decimales siempre).
 - Porcentaje: `+18,4 %`, siempre con signo y un decimal.
-- En cifras grandes los céntimos bajan a 0.42em en `--color-muted`.
+- En cifras grandes los céntimos bajan a 0.42em en `--color-muted` (0.4em en la cifra protagonista del móvil, que lleva tracking -0.045em).
 - Columnas de importes alineadas a la derecha con `tabular-nums`.
 - Fecha en formularios: `DD/MM/AAAA` (`06/10/2026`).
 
@@ -403,6 +422,8 @@ Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el pu
 | `anim-fade`  | `opacity: 0`                               | 260ms    | `ease-out`                       | Velos                                              |
 | `anim-fresh` | `background-color: var(--flash)`           | 1800ms   | `ease-out`                       | Fila recién apuntada                               |
 | `.press`     | `scale(0.96)` al pulsar                    | 140ms    | `ease-out`                       | Todo control pulsable                              |
+
+**Móvil nativo.** Curvas `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)` y `--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1)`. Pulsar: `scale(0.97)` en 160ms con `--ease-out`. Entrada de bloques: 420ms con 50ms de escalonado, solo la primera vez que se abre la pantalla. Hoja: entra con `anim-sheet` y sale en 200ms; velo: 240ms al entrar, 200ms al salir. FAB: `clip-path` y `transform` en 260ms. Aviso: `opacity` 180ms y `transform` 260ms. Las salidas son más rápidas que las entradas.
 
 Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline: 2px solid var(--color-accent)` en `:focus-visible`. Hover solo en `@media (hover: hover) and (pointer: fine)`.
 
@@ -568,7 +589,7 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --text-note: 14px;
   --text-meta: 13px;
   --text-delta: 14px;
-  --text-tab: 11px;
+  --text-tab: 12px;
   --text-figure-row: 16px;
   --text-figure-block: 22px;
   --tracking-figure-block: -0.02em;
@@ -616,11 +637,11 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --radius-tile: 18px;
   --radius-popover: 20px;
   --radius-card: 22px;
-  --radius-sheet: 24px;
+  --radius-sheet: 28px;
   --radius-pill: 999px;
 
   /* Elevation */
-  --shadow-sheet: 0 -20px 60px -20px rgb(0 0 0 / 0.6);
+  --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
 
   /* Icons */
   --icon-stroke: 2;
@@ -684,7 +705,7 @@ Los valores de `@theme` son los del tema por defecto. Las utilidades de Tailwind
   --text-note: 14px;
   --text-meta: 13px;
   --text-delta: 14px;
-  --text-tab: 11px;
+  --text-tab: 12px;
   --text-figure-row: 16px;
   --text-figure-block: 22px;
   --text-figure-block--letter-spacing: -0.02em;
@@ -703,11 +724,11 @@ Los valores de `@theme` son los del tema por defecto. Las utilidades de Tailwind
   --radius-tile: 18px;
   --radius-popover: 20px;
   --radius-card: 22px;
-  --radius-sheet: 24px;
+  --radius-sheet: 28px;
   --radius-pill: 999px;
 
   /* Shadows */
   --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
-  --shadow-sheet: 0 -20px 60px -20px rgb(0 0 0 / 0.6);
+  --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
 }
 ```
