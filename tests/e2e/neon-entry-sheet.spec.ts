@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { editScenarioState, readScenarioState } from './seed-sync-v2'
+import { expectSyncCommand } from './pages/sync'
 
 /** Hoja de alta del diseño nuevo (#426). No cookie: el diseño nuevo es el de por defecto. */
 const NO_COOKIE = { cookies: [], origins: [] }
@@ -121,5 +123,94 @@ test.describe('Hoja de alta nueva', () => {
 
     await expect(page.locator('#toast')).toHaveText('El importe debe ser mayor que 0.')
     await expect(sheet(page)).toBeVisible()
+  })
+})
+
+test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
+  test.use({ storageState: NO_COOKIE })
+
+  const editSheet = (page: Page) => page.getByRole('dialog', { name: 'Editar y confirmar' })
+
+  async function openPendingEdit(page: Page): Promise<void> {
+    await page.locator('[data-pending-trigger]').click()
+    await page
+      .getByRole('dialog', { name: 'Por confirmar' })
+      .locator('[data-pending-item]')
+      .getByRole('button')
+      .click()
+    await page
+      .getByRole('dialog', { name: 'Alquiler' })
+      .getByRole('button', { name: 'Editar' })
+      .click()
+    await expect(editSheet(page)).toBeVisible()
+  }
+
+  test('cancelar deja el pendiente como estaba; guardar lo confirma con el importe nuevo', async ({
+    page,
+    tracker,
+  }) => {
+    await page.setViewportSize(MOBILE)
+    // The recurring engine reads this clock: one monthly due date, 1 July.
+    await page.addInitScript(() => {
+      ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = '2026-07-10'
+    })
+    await editScenarioState(page, (state) => {
+      state.recurringRules.push({
+        id: 'rent-rule',
+        type: 'expense',
+        accountId: state.accounts[0].id,
+        category: state.expenseCategories[0],
+        description: 'Alquiler',
+        amount: 900,
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-07-01',
+        endDate: null,
+        active: true,
+        lastExecutionDate: null,
+        nextOccurrenceDate: '2026-07-01',
+      })
+    })
+    await expect(page.locator('[data-pending-trigger]')).toHaveAccessibleName(
+      'Por confirmar, 1 pendientes',
+    )
+
+    await openPendingEdit(page)
+    const amount = editSheet(page).getByRole('textbox', { name: 'Importe' })
+    await expect(amount).toHaveValue('900')
+    await expect(editSheet(page).getByLabel('Descripción')).toHaveValue('Alquiler')
+    await amount.fill('950')
+    await editSheet(page).getByRole('button', { name: 'Cancelar' }).click()
+    await expect(editSheet(page)).toBeHidden()
+
+    await openPendingEdit(page)
+    await expect(amount).toHaveValue('900')
+    const pendingAfterCancel = (await readScenarioState(page)).pendingMovements.find(
+      (item) => item.ruleId === 'rent-rule',
+    )
+    expect(pendingAfterCancel).toMatchObject({ status: 'pending', amount: 900 })
+
+    const confirmed = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'update' &&
+        command.entityType === 'pendingMovement' &&
+        command.patch.status === 'confirmed',
+    )
+    await amount.fill('950')
+    await editSheet(page).getByRole('button', { name: 'Guardar y confirmar' }).click()
+    await confirmed
+    await expect(editSheet(page)).toBeHidden()
+
+    await tracker.reload()
+    await expect(page.locator('[data-pending-trigger]')).toHaveAccessibleName('Por confirmar')
+    const state = await readScenarioState(page)
+    expect(state.pendingMovements.find((item) => item.ruleId === 'rent-rule')).toMatchObject({
+      status: 'confirmed',
+      amount: 950,
+    })
+    expect(state.transactions.filter((tx) => tx.description === 'Alquiler')).toEqual([
+      expect.objectContaining({ amount: 950, date: '2026-07-01', type: 'expense' }),
+    ])
   })
 })

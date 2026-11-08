@@ -2,14 +2,18 @@
 import { computed, nextTick, onMounted, reactive, ref, useTemplateRef, watch } from 'vue'
 
 import { useEntrySheet } from '../../composables/useEntrySheet'
+import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import { useToast } from '../../composables/useToast'
 import { formatMonthName } from '../../lib/format'
 import { ALL_MONTHS, monthFromDate } from '../../lib/month'
 import { parseDecimal } from '../../lib/number'
-import type { TransactionType } from '../../scripts/types'
+import { computeInvestmentMovement } from '../../scripts/investment-movements'
+import type { InvestmentSide, PendingMovement, TransactionType } from '../../scripts/types'
 import { monthFromISO, todayISO } from '../../scripts/utils'
+import { useFinancialStateStore } from '../../stores/financial-state'
 import { useMovementsStore } from '../../stores/movements'
+import { useRecurringStore } from '../../stores/recurring'
 import { useUiStore } from '../../stores/ui'
 import { ENTRY_TYPES } from './entry-types'
 
@@ -17,12 +21,21 @@ import { ENTRY_TYPES } from './entry-types'
 // side panel from the `frame:` breakpoint up, a bottom sheet below it. Saving
 // goes through the movements store, so the validations and the toast errors
 // are the ones of the old panel. Every opening starts empty and at the top.
+//
+// Opened on a pending movement (from «Por confirmar») it is «Editar y
+// confirmar»: the form starts with the pending movement's data and saving
+// confirms it with the changes in one step, as the old pending panel does. An
+// investment pending movement also shows its operation (symbol, units, price,
+// fees), since there is no other place to change it before confirming.
 const EXIT_MS = 200
 const DRAG_CLOSE_RATIO = 0.3
 const DRAG_CLOSE_VELOCITY = 0.11
 
-const { open, closeEntrySheet } = useEntrySheet()
+const { open, pending, closeEntrySheet, takeReturnFocus } = useEntrySheet()
 const movementsStore = useMovementsStore()
+const recurringStore = useRecurringStore()
+const financialStateStore = useFinancialStateStore()
+const { formatMoney } = useMoneyFormatter()
 const uiStore = useUiStore()
 const { showToast } = useToast()
 const { navigateTo } = useSectionNavigation()
@@ -41,35 +54,92 @@ const form = reactive({
   destinationAccountId: '',
   date: '',
   month: monthFromDate(new Date()),
+  side: 'buy' as InvestmentSide,
+  symbol: '',
+  units: '',
+  unitPrice: '',
+  fee: '',
+  time: '',
 })
 
+const editing = computed(() => pending.value !== null)
 const isSaving = computed(() => form.type === 'saving')
+const showOperation = computed(() => editing.value && form.type === 'investment')
 const monthOptions = ALL_MONTHS.map((month) => ({ value: month, label: formatMonthName(month) }))
+const SIDE_OPTIONS: ReadonlyArray<{ value: InvestmentSide; label: string }> = [
+  { value: 'buy', label: 'Compra' },
+  { value: 'sell', label: 'Venta' },
+]
 const accountOptions = computed(() =>
   movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
+const assetOptions = computed(() =>
+  financialStateStore.investmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+)
+// The amount an investment operation records: gross for a purchase, net of
+// fees for a sale. The store recomputes it with the same function.
+const investmentTotal = computed(() => {
+  const operation = computeInvestmentMovement({
+    side: form.side,
+    symbol: form.symbol,
+    units: parseDecimal(form.units) || 0,
+    unitPrice: parseDecimal(form.unitPrice) || 0,
+    fee: parseDecimal(form.fee) || 0,
+  })
+  return Math.abs(operation.signedAmount)
+})
 // A saving never lands in the account it leaves.
 const destinationOptions = computed(() =>
   accountOptions.value.filter((option) => option.value !== form.accountId),
 )
 const categoryOptions = computed(() => {
   const names = movementsStore.orderedCategories(form.type)
+  // A pending movement keeps its category even if it is no longer in the list.
+  const original = pending.value
+  if (original && original.type === form.type && original.category) {
+    if (!names.includes(original.category)) return [original.category, ...names]
+  }
   return names.length ? names : ['Sin categoría']
 })
 
+// While the form is filled from a pending movement the watchers below stay
+// quiet: they would replace the pending movement's own account and category.
+let filling = false
+
 watch(
   () => form.type,
-  () => {
+  (type, previous) => {
+    if (filling) return
     if (!categoryOptions.value.includes(form.category)) {
       form.category = categoryOptions.value[0] ?? ''
     }
+    if (editing.value) adaptAccountToType(type, previous)
     ensureDestination()
   },
 )
 watch(() => form.accountId, ensureDestination)
 
+// Editing a pending movement, an investment may sit in an investment asset and
+// any other type only in a cash account. Leaving an investment keeps the
+// figure its operation came to.
+function adaptAccountToType(type: TransactionType, previous: TransactionType): void {
+  const assets = assetOptions.value
+  const accounts = accountOptions.value
+  if (type === 'investment') {
+    const known = [...assets, ...accounts].some((option) => option.value === form.accountId)
+    if (!known) form.accountId = assets[0]?.value ?? accounts[0]?.value ?? ''
+    return
+  }
+  if (previous === 'investment' && investmentTotal.value > 0) {
+    form.amount = String(investmentTotal.value)
+  }
+  if (assets.some((option) => option.value === form.accountId)) {
+    form.accountId = accounts[0]?.value ?? ''
+  }
+}
+
 function ensureDestination(): void {
-  if (!isSaving.value) return
+  if (filling || !isSaving.value) return
   if (!destinationOptions.value.some((option) => option.value === form.destinationAccountId)) {
     form.destinationAccountId = destinationOptions.value[0]?.value ?? ''
   }
@@ -92,7 +162,28 @@ function resetForm(): void {
   ensureDestination()
 }
 
+function fillFromPending(item: PendingMovement): void {
+  filling = true
+  form.type = item.type || 'expense'
+  form.amount = String(item.amount)
+  form.description = item.description
+  form.category = item.category
+  form.accountId = item.accountId
+  form.destinationAccountId = item.destinationAccountId ?? ''
+  form.date = item.occurrenceDate
+  onDateChange()
+  form.side = item.side ?? 'buy'
+  form.symbol = item.symbol ?? ''
+  form.units = String(item.units ?? 0)
+  form.unitPrice = String(item.unitPrice ?? 0)
+  form.fee = String(item.fee ?? 0)
+  form.time = item.time ?? ''
+  // The type watcher runs in the next flush; it must still see the flag.
+  void nextTick(() => (filling = false))
+}
+
 function save(): void {
+  if (pending.value) return confirmPending(pending.value.id)
   const amount = parseDecimal(form.amount)
   const added = movementsStore.addTransaction({
     date: form.date || todayISO(),
@@ -106,6 +197,39 @@ function save(): void {
   })
   if (!added) return
   showToast('Movimiento guardado.')
+  closeEntrySheet()
+}
+
+function confirmPending(id: string): void {
+  if (!recurringStore.openPendingMovements.some((item) => item.id === id)) {
+    showToast('Este movimiento ya no está por confirmar.')
+    closeEntrySheet()
+    return
+  }
+  const amount = parseDecimal(form.amount)
+  const confirmed = recurringStore.confirmPending(id, {
+    type: form.type,
+    date: form.date,
+    accountId: form.accountId,
+    destinationAccountId: form.destinationAccountId,
+    category: form.category,
+    description: form.description,
+    amount: Number.isFinite(amount) ? amount : 0,
+    symbol: form.symbol,
+    side: form.side,
+    units: parseDecimal(form.units) || 0,
+    unitPrice: parseDecimal(form.unitPrice) || 0,
+    fee: parseDecimal(form.fee) || 0,
+    time: form.time,
+  })
+  if (!confirmed) {
+    showToast(
+      showOperation.value
+        ? 'Revisa la descripción, la fecha, el símbolo, los títulos y el precio.'
+        : 'Revisa la descripción, la fecha y que el importe sea mayor que 0.',
+    )
+    return
+  }
   closeEntrySheet()
 }
 
@@ -130,14 +254,23 @@ function present(): void {
   clearTimeout(closeTimer)
   element.removeAttribute('data-closing')
   resetDrag()
-  // Always empty, even when reopened while the exit animation still runs.
-  resetForm()
+  // Always empty (or the pending movement's data), even when reopened while
+  // the exit animation still runs.
+  if (pending.value) fillFromPending(pending.value)
+  else resetForm()
+  const returnTo = takeReturnFocus()
   if (!element.open) {
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    opener =
+      returnTo ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     element.showModal?.()
+  } else if (returnTo) {
+    opener = returnTo
   }
   if (scrollArea.value) scrollArea.value.scrollTop = 0
-  amountInput.value?.focus({ preventScroll: true })
+  void nextTick(() => {
+    const first = amountInput.value ?? scrollArea.value?.querySelector<HTMLElement>('input')
+    first?.focus({ preventScroll: true })
+  })
 }
 
 function dismiss(): void {
@@ -179,9 +312,7 @@ let velocity = 0
 function setOffset(offset: number, animated: boolean): void {
   const element = dialog.value
   if (!element) return
-  element.style.transition = animated
-    ? 'transform 320ms var(--ease-drawer)'
-    : 'none'
+  element.style.transition = animated ? 'transform 320ms var(--ease-drawer)' : 'none'
   element.style.transform = offset ? `translateY(${offset}px)` : ''
 }
 
@@ -253,12 +384,17 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           aria-hidden="true"
         ></div>
         <header class="mbe-3 flex items-center justify-between gap-3">
-          <h2
-            id="neon-entry-title"
-            class="font-display text-h1-detail tracking-h1 leading-[1.15] font-bold"
-          >
-            Apuntar
-          </h2>
+          <div class="grid min-w-0 gap-1">
+            <p v-if="editing" class="text-muted text-label tracking-label font-extrabold uppercase">
+              Por confirmar
+            </p>
+            <h2
+              id="neon-entry-title"
+              class="font-display text-h1-detail tracking-h1 leading-[1.15] font-bold"
+            >
+              {{ editing ? 'Editar y confirmar' : 'Apuntar' }}
+            </h2>
+          </div>
           <button
             type="button"
             class="border-ctrl-line text-soft outline-accent grid size-11 shrink-0 place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
@@ -309,7 +445,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           </button>
         </div>
 
-        <label class="grid grid-cols-[minmax(0,1fr)] gap-1.5">
+        <label v-if="!showOperation" class="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <span :class="labelClass">Importe</span>
           <span class="border-ctrl-line flex items-baseline gap-2 border-b-2 pbe-1.5">
             <input
@@ -331,7 +467,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
             v-model="form.description"
             name="description"
             maxlength="140"
-            placeholder="Opcional"
+            :placeholder="editing ? '' : 'Opcional'"
             :class="fieldClass"
           />
         </label>
@@ -346,9 +482,27 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           <label :class="labelClass">
             {{ isSaving ? 'Cuenta origen' : 'Cuenta' }}
             <select v-model="form.accountId" name="accountId" :class="fieldClass">
-              <option v-for="option in accountOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
+              <template v-if="showOperation">
+                <optgroup v-if="assetOptions.length" label="Activos de inversión">
+                  <option v-for="option in assetOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </optgroup>
+                <optgroup v-if="accountOptions.length" label="Cuentas de efectivo">
+                  <option
+                    v-for="option in accountOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}
+                  </option>
+                </optgroup>
+              </template>
+              <template v-else>
+                <option v-for="option in accountOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </template>
             </select>
           </label>
           <label v-if="isSaving" :class="[labelClass, 'col-span-full']">
@@ -367,7 +521,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
               </option>
             </select>
           </label>
-          <label :class="labelClass">
+          <label :class="[labelClass, editing && 'col-span-full']">
             Fecha
             <input
               v-model="form.date"
@@ -377,7 +531,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
               @change="onDateChange"
             />
           </label>
-          <label :class="labelClass">
+          <label v-if="!editing" :class="labelClass">
             Cuenta en el mes
             <select v-model="form.month" name="month" :class="fieldClass">
               <option v-for="option in monthOptions" :key="option.value" :value="option.value">
@@ -387,7 +541,68 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           </label>
         </div>
 
-        <p v-if="form.type === 'investment'" class="text-muted text-[13px]">
+        <fieldset
+          v-if="showOperation"
+          class="grid min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-3"
+          data-pending-operation
+        >
+          <legend :class="[labelClass, 'mbe-1.5']">Operación</legend>
+          <div
+            class="bg-panel2 rounded-pill col-span-full flex gap-[3px] p-[3px]"
+            role="radiogroup"
+            aria-label="Operación"
+          >
+            <button
+              v-for="option in SIDE_OPTIONS"
+              :key="option.value"
+              type="button"
+              role="radio"
+              :aria-checked="form.side === option.value"
+              class="outline-accent rounded-pill min-h-9 flex-1 px-2 text-[14px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+              :class="form.side === option.value ? 'bg-sel-bg text-sel-text' : 'text-soft'"
+              @click="form.side = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <label :class="labelClass">
+            Símbolo
+            <input v-model="form.symbol" name="symbol" placeholder="VWCE" :class="fieldClass" />
+          </label>
+          <label :class="labelClass">
+            Hora
+            <input v-model="form.time" name="time" type="time" :class="fieldClass" />
+          </label>
+          <label :class="labelClass">
+            Títulos
+            <input v-model="form.units" name="units" inputmode="decimal" :class="fieldClass" />
+          </label>
+          <label :class="labelClass">
+            Precio por título
+            <input
+              v-model="form.unitPrice"
+              name="unitPrice"
+              inputmode="decimal"
+              :class="fieldClass"
+            />
+          </label>
+          <label :class="labelClass">
+            Comisiones
+            <input v-model="form.fee" name="fee" inputmode="decimal" :class="fieldClass" />
+          </label>
+          <div class="grid min-w-0 content-end gap-1.5">
+            <span class="text-muted text-[13px] font-bold">Importe total</span>
+            <output
+              class="font-display flex min-h-[46px] items-center text-[18px] font-bold tabular-nums"
+              aria-live="polite"
+              data-pending-total
+            >
+              {{ formatMoney(investmentTotal) }}
+            </output>
+          </div>
+        </fieldset>
+
+        <p v-if="!editing && form.type === 'investment'" class="text-muted text-[13px]">
           ¿Compras o vendes títulos? Regístralo en
           <a
             href="/inversion"
@@ -403,7 +618,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
             type="submit"
             class="bg-accent text-on-accent font-display outline-text rounded-pill min-h-11 w-full border-0 px-[22px] text-[14px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
           >
-            Guardar
+            {{ editing ? 'Guardar y confirmar' : 'Guardar' }}
           </button>
           <button
             type="button"

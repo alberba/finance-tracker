@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
 
+import { useEntrySheet } from '../../composables/useEntrySheet'
 import { useMoneyFormatter } from '../../composables/useMoneyFormatter'
 import { formatDayMonth, formatDueLabel } from '../../lib/format'
 import type { PendingMovement } from '../../scripts/types'
@@ -14,11 +15,13 @@ import NeonPopover from '../ui/NeonPopover.vue'
 // «Por confirmar» in the top bar of the mobile frame, the first use of the
 // shared popover, empty state and detail panel: the movements still waiting
 // for a yes (recurring ones that came due) as a short list. Picking one opens
-// its detail, where it is confirmed or skipped. The dashboard ticket brings the
+// its detail, where it is confirmed or skipped, or edited in the entry sheet
+// and confirmed there in one step. The dashboard ticket brings the
 // full «Por confirmar» block; until then this is the way to reach them.
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
 const { formatMovementAmount } = useMoneyFormatter()
+const { openPendingEdit } = useEntrySheet()
 
 const pending = computed(() => recurringStore.openPendingMovements)
 const triggerLabel = computed(() => {
@@ -56,6 +59,14 @@ function openDetail(item: PendingMovement): void {
 function confirm(): void {
   if (!detail.value) return
   recurringStore.confirmPending(detail.value.id)
+  detailOpen.value = false
+}
+
+function edit(): void {
+  if (!detail.value) return
+  // The detail slides out while the sheet comes in; the focus goes back to the
+  // trigger once the sheet closes, as the pressed button leaves with the panel.
+  openPendingEdit(detail.value, triggerButton.value)
   detailOpen.value = false
 }
 
@@ -160,6 +171,14 @@ function skip(): void {
         @click="skip"
       >
         Saltar
+      </button>
+      <button
+        type="button"
+        class="text-text outline-accent rounded-pill min-h-11 px-4 text-sm font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+        data-pending-edit
+        @click="edit"
+      >
+        Editar
       </button>
       <button
         type="button"
