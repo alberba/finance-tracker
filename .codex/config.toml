@@ -9,7 +9,7 @@
 # - finance_domain_engineer: reglas, calculos y modelos financieros.
 # - frontend_engineer: Astro, Vue, Pinia, estilos y migracion del runtime legacy.
 # - cloudflare_backend_engineer: API, D1, proveedores externos y runtime Cloudflare.
-# - e2e_quality_engineer: Playwright, POM, fixtures y regresion visual.
+# - e2e_quality_engineer: Playwright, POM, fixtures y recorridos de usuario.
 # - finance_tracker_reviewer: revision final transversal y de solo lectura.
 #
 # Mantener una sola capa de delegacion evita fan-out recursivo y conflictos de

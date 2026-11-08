@@ -4,8 +4,8 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
-# Keep the native binaries for the Playwright Linux image too: macOS regenerates
-# the committed `*-linux.png` snapshots inside it (scripts/e2e-visual-linux.sh).
+# Keep the native binaries for the Playwright Linux image too: `pnpm test:all`
+# runs the browsers inside it (scripts/run-browser-linux.mjs).
 supportedArchitectures:
   os:
     - current
