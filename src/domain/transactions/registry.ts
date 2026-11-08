@@ -111,6 +111,34 @@ function comparator(sort: TransactionSort): (a: Transaction, b: Transaction) => 
   return (a, b) => String(a.date).localeCompare(String(b.date)) * direction
 }
 
+export interface MonthFold {
+  /** Months from the selected one (or the latest with movements) to the newest. */
+  shown: MonthGroup[]
+  /** Older months, folded away until asked for. */
+  hidden: MonthGroup[]
+}
+
+/**
+ * The months the ledger shows, from groups sorted newest month first: the
+ * selected month, or the latest month with movements when the selected one has
+ * none, plus any newer ones. Older months fold away behind a reveal. When
+ * asked for everything (the filters are active or the user revealed the older
+ * months), nothing folds.
+ */
+export function foldMonthGroups(
+  groups: MonthGroup[],
+  selectedMonth: Month,
+  revealAll = false,
+): MonthFold {
+  if (revealAll) return { shown: groups, hidden: [] }
+  const newest = groups[0]?.month ?? selectedMonth
+  const cutoff = Math.min(selectedMonth, newest)
+  return {
+    shown: groups.filter((group) => group.month >= cutoff),
+    hidden: groups.filter((group) => group.month < cutoff),
+  }
+}
+
 /** The year's movements that match the filters, grouped by month, newest month first. */
 export function buildMonthGroups(
   transactions: Transaction[],
