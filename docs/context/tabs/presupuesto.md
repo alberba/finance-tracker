@@ -50,7 +50,6 @@ El estado que consume la UI guarda el plan en `state.budget[type][category][mont
 - `tests/unit/budget-store-sync.test.ts`: edición y encolado desde el store.
 - `tests/integration/d1-v2/round-trip/budget.test.ts`: persistencia con el store real y SQLite,
   incluida la primera edición, el mes y el aislamiento entre años.
-- `tests/e2e/layout-visual.spec.ts`: presentación de Presupuesto en escritorio y móvil.
 
 Los locators usan roles y etiquetas, además de `data-budget-type`, `data-budget-months`,
 `data-budget-row` y `data-budget-cell`. Revisa los Page Objects al cambiar esas superficies.

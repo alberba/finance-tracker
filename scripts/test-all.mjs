@@ -5,7 +5,7 @@ const started = performance.now()
 const phases = []
 const commands = [
   ['unit/component/integration', ['test']],
-  ['functional/visual', ['exec', 'playwright', 'test', '--max-failures=0']],
+  ['functional', ['exec', 'playwright', 'test', '--max-failures=0']],
   ['sync-v2', ['test:e2e:sync-v2']],
   ['authentication', ['test:e2e:auth']],
 ]
@@ -19,7 +19,6 @@ async function run([name, args, executable = 'pnpm']) {
   phases.push({ name, seconds: (performance.now() - start) / 1000, status })
   return status === 0
 }
-// Canonical Linux fonts and native date controls are part of the pixel baseline.
 // Vitest stays native; browser tests use the same image as CI on every desktop OS.
 const browserOnly = process.argv.includes('--browser-only')
 const native = Boolean(process.env.CI) || browserOnly

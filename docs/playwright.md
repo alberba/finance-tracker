@@ -1,24 +1,25 @@
 # Playwright
 
-La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y escenarios
-especializados de sync v2. Todo cliente autenticado usa sync v2. Funcional y visual ejecutan el
-build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1 local, y autenticación
-ejecuta otro Worker compilado con proveedores simulados. `playwright.shared.ts` configura los dos primeros
-runtimes. Los tres conservan usuarios aislados y las APIs reales de inicialización/importación.
+La suite de navegador se divide en recorridos funcionales, smoke y escenarios especializados de
+sync v2. Cada E2E prueba un recorrido; las reglas están en los
+[criterios E2E de los estándares](../CODING_STANDARDS.md#e2e). Todo cliente autenticado usa sync v2.
+Funcional ejecuta el build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1
+local, y autenticación ejecuta otro Worker compilado con proveedores simulados.
+`playwright.shared.ts` configura los dos primeros runtimes. Los tres conservan usuarios aislados y
+las APIs reales de inicialización/importación.
 
 ## Comandos
 
 ```bash
-pnpm test:all               # Vitest + funcional + visual + sync-v2 + auth; máximo 360 s
+pnpm test:all               # Vitest + funcional + sync-v2 + auth; máximo 360 s
 pnpm test:e2e:install       # instala Chromium una vez
 pnpm test:e2e:smoke         # recorridos críticos etiquetados @smoke
-pnpm test:e2e               # funcional, sin snapshots visuales
+pnpm test:e2e               # funcional
 pnpm test:e2e:shuffle       # funcional, en orden aleatorio; imprime la semilla
 pnpm test:e2e:install:all   # instala también Firefox y WebKit
 pnpm test:e2e:cross-browser # smoke opcional en Firefox y WebKit
 pnpm test:e2e:webmcp       # herramientas de la app, en Chromium experimental
 pnpm test:e2e:shard 1/4    # shard funcional equilibrado por tiempos históricos
-pnpm test:e2e:visual        # layout y regresión visual
 pnpm test:e2e:sync-v2       # offline, multiusuario y comandos de sync
 pnpm test:e2e:headed        # navegador visible sobre el build Node
 pnpm test:e2e:ui            # interfaz interactiva de Playwright
@@ -27,7 +28,7 @@ pnpm test:e2e:ui            # interfaz interactiva de Playwright
 `test:all` ejecuta Vitest en el host y los navegadores en la imagen Linux oficial de Playwright,
 con la versión instalada de `@playwright/test`. El runner y los servidores permanecen en el host,
 con su Node y sus addons nativos; Playwright conecta Chromium por WebSocket y expone solo la red
-loopback del cliente. Así macOS y Linux comparan los mismos píxeles sin sustituir el addon SQLite
+loopback del cliente. Así macOS y Linux ejecutan el mismo Chromium sin sustituir el addon SQLite
 del desarrollador. Requiere dependencias instaladas y Docker arrancado;
 descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equivalente a instalar
 Chromium): `docker pull mcr.microsoft.com/playwright:v1.64.1-noble`. La descarga inicial no es una
@@ -37,8 +38,7 @@ El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resulta
 por fase en `.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
 También conserva un JSON fechado por invocación para demostrar ejecuciones consecutivas.
 No incluye lint/typecheck: para el gate de contribución sigue aplicando `pnpm gate`.
-Los comandos acotados sirven para iterar; la comparación de píxeles usa la imagen Linux para fijar
-fuentes y controles de fecha nativos, también en distribuciones Linux distintas de Ubuntu.
+Los comandos acotados sirven para iterar.
 
 Para probar una URL ya arrancada:
 
@@ -53,7 +53,7 @@ acotar la comprobación a smoke: `pnpm test:e2e:smoke --shuffle 271828182`.
 Firefox y WebKit están configurados con `default: false`: las ejecuciones habituales conservan
 Chromium y Pixel 5. Tras instalar los navegadores con `pnpm test:e2e:install:all`, selecciona uno
 con `pnpm test:e2e --project=firefox` o `pnpm test:e2e --project=webkit`. Los proyectos opcionales
-comparten los escenarios de desktop; los visuales solo mantienen baselines de Chromium y Pixel 5.
+comparten los escenarios de desktop.
 `pnpm test:e2e --project='*'` incluye todos los proyectos.
 
 ## Estabilidad
@@ -62,16 +62,16 @@ comparten los escenarios de desktop; los visuales solo mantienen baselines de Ch
   prueba mediante el formato de backup v2. Los runners de CI tienen bases SQLite/D1 independientes.
 - La navegación espera `html[data-finance-ready="true"]`, que señala hidratación y bindings completos.
   Para recargar, `tracker.reload()`; lint rechaza `page.reload()` en los specs.
-- Funcional/visual paralelizan escenarios sobre usuarios y contextos propios. Autenticación conserva
+- Funcional paraleliza escenarios sobre usuarios y contextos propios. Autenticación conserva
   un worker porque sus pruebas modifican la política global; sync-v2 conserva su planificación serial.
-  Trace y vídeo conservan su función diagnóstica. Los shards visuales distribuyen casos con Playwright.
+  Trace y vídeo conservan su función diagnóstica.
 - En CI, un caso que solo pasa al reintentarlo también falla el gate (`failOnFlakyTests`).
   El reintento conserva su función diagnóstica; no convierte una carrera en un resultado verde.
 - Los vídeos del runtime compartido se graban a 30 fps con cursor, resaltado del objetivo y título
   de acción. Firefox y WebKit capturan hasta 25 fps. En local, añade `--retries=1` para grabar el
   reintento de un fallo.
-- `@smoke` identifica recorridos críticos. `@visual` se ejecuta como gate independiente.
-- Desktop cubre los flujos funcionales. Pixel 5 cubre móvil, layout y snapshots una sola vez.
+- `@smoke` identifica recorridos críticos.
+- Desktop cubre los flujos funcionales. Pixel 5 cubre el smoke móvil una sola vez.
 - No uses `waitForTimeout`; espera una respuesta, URL, locator o señal explícita de la aplicación.
 
 Si una prueba falla, abre `playwright-report/index.html`. Las trazas se inspeccionan con:
@@ -100,11 +100,10 @@ el CI verde del push (validación reutilizada o checks de respaldo), sin repetir
 Una ejecución manual de **CI** ejecuta calidad y build y no dispara despliegue.
 
 **Browser regression** (`browser-regression.yml`) ejecuta Vitest, autenticación, funcional en cuatro
-shards, sync-v2 y visual en tres shards, los lunes a las 05:00 UTC y bajo demanda con
+shards y sync-v2, los lunes a las 05:00 UTC y bajo demanda con
 `workflow_dispatch` sobre la rama seleccionada. No forma parte del gate de entrega ni dispara
 el despliegue. Para cambios de riesgo, ejecuta este workflow en la rama de la PR antes de mezclar;
 los fallos programados quedan visibles en Actions y en las notificaciones de GitHub del workflow.
-Los snapshots siguen requiriendo inspección visual antes de actualizarse.
 
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
@@ -124,45 +123,9 @@ specs actuales con Playwright y estima los nuevos con la media por caso, de modo
 spec no requiere registrarlo para que corra. Para recalibrar, combina los blob reports con
 `pnpm exec playwright merge-reports --reporter json <directorio>` y actualiza los totales por spec.
 
-Los visuales se reparten por caso entre tres shards, cada uno con SQLite temporal independiente. Los casos
-`@snapshot` fijan `snapshotTime` en el fixture antes de la primera navegación; los controles de
-layout mantienen su propio `fixedTime` y las fuentes reales.
-El fixture de captura aplica Arial (también al token que lee canvas) antes del primer render. Las
-fuentes se sirven desde el propio dominio y el helper espera fuentes/scroll sin volver a abrir la app.
-Los rails de pestañas fijan su posición antes de capturar; no heredan el scroll del clic ni del
-cambio de fuente. Los visuales conservan diff y trace, con vídeo desactivado para que el cursor
-de diagnóstico no contamine los píxeles del retry.
-
-El artifact `playwright-report` combina los blob reports cuando falla funcional, visual o sync.
+El artifact `playwright-report` combina los blob reports cuando falla funcional o sync.
 Las ejecuciones anteriores de la misma rama se cancelan y los artifacts se conservan siete días.
-Una ejecución manual con `update_snapshots` solo regenera y commitea los snapshots Linux; no
-vuelve a ejecutar calidad, funcional ni sync-v2.
-
 El despliegue usa un workflow independiente: ver `docs/operations/self-hosting.md`.
-
-Los snapshots versionados son `*-linux.png`, la plataforma de CI. En macOS se comparan y
-actualizan dentro de la imagen Linux de Playwright con Docker, después de revisar el resultado
-visual:
-
-```bash
-pnpm test:e2e:visual:linux                      # compara
-pnpm test:e2e:visual:linux --update-snapshots   # regenera
-pnpm test:e2e:visual:linux tests/e2e/layout-visual.spec.ts --project=mobile-chrome
-```
-
-El script (`scripts/e2e-visual-linux.sh`) necesita Docker en marcha y conecta al mismo Chromium
-Linux que `test:all`. El servidor de la app corre en el host; no modifica `dist/`, `.dev.vars` ni
-las dependencias nativas del desarrollador.
-`pnpm test:e2e:visual` sin `:linux` en macOS compara contra snapshots de otra plataforma y genera
-`*-darwin.png`, que no se versionan.
-
-Sin Docker, los snapshots se regeneran en CI: Actions → Browser regression → _Run workflow_ sobre la rama, con
-`update_snapshots` marcado. El job visual regenera los `*-linux.png` y los commitea en esa rama.
-
-Los snapshots fuerzan Arial a propósito (`tests/e2e/screenshot-stable.css`), desde el primer
-render, y no dependen de la descarga de fuentes. El resto de capturas (fallos, comparaciones con
-un diseño) usa las fuentes reales, servidas desde el propio dominio: el fixture ya no necesita
-interceptar Google Fonts.
 
 ## Mantener el presupuesto
 
@@ -176,23 +139,6 @@ La suite completa detectó además una vinculación de movimientos que solo se g
 del símbolo recién creado. El round-trip comprueba el reinicio y el E2E existente verifica la recarga.
 Ese E2E espera la respuesta del comando de vinculación: el estado global «Sincronizado» no confirma
 una operación que otro módulo todavía está construyendo.
-
-Las fusiones de #416 conservan esta cobertura:
-
-- 51 chequeos de layout móvil pasan al escenario que ya abre esa misma vista para capturarla.
-  Se escanea con las fuentes reales antes de hacer scroll de captura; para los píxeles se restaura
-  Arial. Las geometrías de escritorio mantienen casos propios. Las capturas mantienen fecha e
-  identidad. Solo se corrigen los dos baselines de «Más», desfasados respecto a «Mis reportes».
-- Las 48 parejas claro/oscuro de vistas de producto se capturan en el mismo escenario. Cambiar el
-  medio de color no exige importar datos ni abrir otra app. Los menús del shell conservan casos
-  separados porque muestran la identidad del usuario.
-- El panel de edición recurrente conserva geometría móvil y desktop. Su formulario comparte
-  estructura con el panel de creación, cuyo snapshot claro/oscuro sigue activo; editar y persistir
-  se comprueba en `investment-recurring.spec.ts`. Se retiran sus dos capturas redundantes,
-  que además retenían el scroll anterior al arreglo #382.
-- Los diez contratos de autenticación sin variación responsive se ejecutan en desktop. Móvil
-  conserva los tres smoke: acceso protegido, fuentes y alta por invitación. Política, sesiones,
-  recuperación, OAuth y passkeys no necesitan repetir la misma prueba por viewport.
 
 Después de cambiar la infraestructura, ejecuta tres veces `pnpm test:all` y tres veces Browser
 regression sobre el mismo commit. Guarda resultados, duración y enlaces de CI; un retry exitoso
@@ -225,8 +171,7 @@ pnpm test:e2e tests/e2e/<spec>.spec.ts
 
 Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile del repositorio
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
-ejecuta `pnpm install --frozen-lockfile`. El script Linux comprueba dependencias antes de elegir
-la imagen de Playwright, para que Chromium coincida con CI.
+ejecuta `pnpm install --frozen-lockfile`.
 
 ## WebMCP
 

@@ -110,11 +110,5 @@ export default defineConfig([
       ],
     },
   },
-  {
-    files: ['tests/e2e/screenshot-stable.css'],
-    rules: {
-      'css/no-important': 'off',
-    },
-  },
   prettierConfig,
 ])

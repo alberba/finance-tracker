@@ -4,11 +4,6 @@ on:
   schedule:
     - cron: '0 5 * * 1'
   workflow_dispatch:
-    inputs:
-      update_snapshots:
-        description: Regenerate the Linux visual snapshots and commit them to this branch
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -29,7 +24,6 @@ env:
 jobs:
   vitest:
     name: Unit, component and integration
-    if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
@@ -39,7 +33,6 @@ jobs:
 
   e2e:
     name: Full E2E shard ${{ matrix.shard }}/4
-    if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     container:
@@ -68,40 +61,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  visual:
-    name: Visual E2E shard ${{ matrix.shard }}/3
-    if: ${{ !inputs.update_snapshots }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 6
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --shm-size=1g
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Run visual regression tests
-        run: pnpm test:e2e:visual --shard=${{ matrix.shard }}/3
-      - name: Upload visual blob report
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-blob-visual-${{ matrix.shard }}
-          path: blob-report/
-          if-no-files-found: ignore
-          retention-days: 7
-
   sync:
     name: Sync v2 E2E
-    if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
@@ -128,40 +89,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  snapshots:
-    name: Regenerate Linux snapshots
-    if: ${{ inputs.update_snapshots }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --shm-size=1g
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-        with:
-          playwright: container
-      - name: Enable the test auth shim
-        run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
-      - name: Regenerate and commit Linux snapshots
-        run: |
-          pnpm test:e2e:visual --update-snapshots
-          git add 'tests/e2e/**/*-linux.png'
-          if git diff --cached --quiet; then
-            echo "Snapshots unchanged"
-          else
-            git config --global --add safe.directory "$GITHUB_WORKSPACE"
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'test(e2e): regenerate the Linux visual snapshots'
-            git push
-          fi
-
   authentication-e2e:
     name: Better Auth Worker and browser contracts
-    if: ${{ !inputs.update_snapshots }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     container:
@@ -185,8 +114,7 @@ jobs:
 
   budget:
     name: Full suite within six minutes
-    if: ${{ !inputs.update_snapshots }}
-    needs: [vitest, e2e, visual, sync, authentication-e2e]
+    needs: [vitest, e2e, sync, authentication-e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -206,9 +134,9 @@ jobs:
     if: >-
       ${{
         always() &&
-        (needs.e2e.result == 'failure' || needs.visual.result == 'failure' || needs.sync.result == 'failure')
+        (needs.e2e.result == 'failure' || needs.sync.result == 'failure')
       }}
-    needs: [e2e, visual, sync]
+    needs: [e2e, sync]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

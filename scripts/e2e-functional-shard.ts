@@ -19,7 +19,7 @@ const historical = Object.values(history)
 const defaultDuration =
   historical.reduce((sum, item) => sum + item.durationMs, 0) /
   historical.reduce((sum, item) => sum + item.tests, 0)
-const command = ['exec', 'playwright', 'test', '--grep-invert', '@visual']
+const command = ['exec', 'playwright', 'test']
 const listing = spawnSync('pnpm', [...command, '--list', '--reporter=json'], { encoding: 'utf8' })
 if (listing.status !== 0) {
   process.stderr.write(listing.stderr || listing.stdout)

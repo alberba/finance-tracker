@@ -47,6 +47,9 @@ solo para mejorar el porcentaje. El HTML se escribe en `coverage/`.
 
 ## Criterios para tests nuevos
 
+La regla única y las de recorridos E2E están en [CODING_STANDARDS](../CODING_STANDARDS.md#tests):
+un test sobrevive a un rediseño o refactor, y la estética se revisa a mano.
+
 1. Prueba la regla en la capa más baja que pueda representarla de forma fiable.
 2. Un test debe fallar por una sola razón observable.
 3. Usa datos y nombres deterministas; no dependas del orden global de la suite.

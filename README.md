@@ -178,8 +178,7 @@ pnpm test:e2e
 # Smoke rápido durante desarrollo
 pnpm test:e2e:smoke
 
-# Regresión visual y sincronización v2
-pnpm test:e2e:visual
+# Sincronización v2
 pnpm test:e2e:sync-v2
 ```
 

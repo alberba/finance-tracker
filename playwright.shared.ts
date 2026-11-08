@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { unstable_getVarsForDev, unstable_readConfig } from 'wrangler'
-import { browserConnectionOptions, snapshotPathTemplate } from './playwright.browser'
+import { browserConnectionOptions } from './playwright.browser'
 
 type PlaywrightRuntimeOptions = {
   port: number
@@ -106,7 +106,6 @@ export function createPlaywrightRuntime({
   return {
     tag,
     testDir: './tests/e2e',
-    snapshotPathTemplate,
     outputDir: `test-results-${port}`,
     fullyParallel: false,
     globalSetup: './scripts/check-installed-dependencies.mjs',

@@ -82,12 +82,16 @@ Fuente: `docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md`.
   en los pares del test de contraste. Los pares heredados por debajo de AA están listados en ese
   test; la lista solo encoge y no admite entradas nuevas.
 - Nada de `style="…"` en línea salvo valores de datos dinámicos (anchos de barra, colores de serie).
-- Los tests localizan por rol, etiqueta, texto o `data-*`, nunca por clases de estilo.
 
 ## Tests
 
 Fuente: `docs/testing.md`.
 
+- Un test existe si **falla cuando el comportamiento se rompe** y **sobrevive a un rediseño o
+  refactor**. Si cambiar colores, tipografía, tamaños o posición lo rompe, probaba diseño: la
+  estética se revisa a mano y ningún test compara píxeles.
+- Los tests localizan por rol y nombre accesible, etiqueta, texto o un hook `data-*` de datos,
+  nunca por clases de estilo.
 - Tres capas, cada una en su sitio: `tests/unit/` (Node, dominio/servicios/stores/utilidades puras),
   `tests/component/` (happy-dom, props/eventos/estados visibles de componentes Vue),
   `tests/integration/` (Node + SQLite real, repositorios/migraciones/restricciones/aislamiento).
@@ -104,6 +108,10 @@ Fuente: `docs/testing.md`.
 
 Fuente: `docs/playwright.md`.
 
+- Un E2E prueba un **recorrido**: qué hace el usuario y qué obtiene (dato guardado y sincronizado,
+  URL, texto o cifra).
+- Lo que el E2E deja de afirmar tiene casa: el cálculo, en el unit del view-model; la
+  microinteracción con lógica, en un test de componente; la estética, en la revisión manual.
 - Cada escenario autenticado usa un usuario aislado, inicializa su espacio por la API y persiste
   mediante sync v2; cada shard de CI tiene su propia D1.
 - La navegación espera `html[data-finance-ready="true"]`, no un tiempo.
@@ -111,20 +119,16 @@ Fuente: `docs/playwright.md`.
   «Sincronizado» puede estar en reposo mientras otro módulo todavía construye un comando.
 - Nunca `waitForTimeout`: espera una respuesta, una URL, un locator o una señal explícita de la app.
 - Los switches con input oculto se pulsan por su etiqueta visible; no se fuerzan clics sobre el input.
-- `@smoke` marca recorridos críticos; `@visual` corre como gate independiente.
-- Los snapshots Linux se actualizan a mano tras revisar el resultado:
-  `pnpm test:e2e:visual --update-snapshots`.
+- `@smoke` marca recorridos críticos.
 - Antes de añadir un E2E, identifica qué comportamiento observable no cubre ya otro caso.
-  Añade aserciones al recorrido existente cuando comparta preparación y estado. Las combinaciones
-  de viewport, tema y sección requieren una diferencia de comportamiento o de layout concreta;
-  un contrato de API idéntico no se repite por viewport.
-- Una vista visual comprueba geometría y píxeles en el mismo escenario cuando usa el mismo
-  estado. Conserva escenarios separados para estados o recorridos independientes; no compartas
-  usuarios mutables para ahorrar preparación.
+  Añade aserciones al recorrido existente cuando comparta preparación y estado; conserva
+  escenarios separados para estados o recorridos independientes y no compartas usuarios mutables
+  para ahorrar preparación. Las combinaciones de viewport, tema y sección requieren una
+  diferencia de comportamiento concreta; un contrato de API idéntico no se repite por viewport.
 - El presupuesto de la suite completa es de seis minutos de reloj: `pnpm test:all` lo comprueba.
   Los cambios de infraestructura de tests registran tres ejecuciones consecutivas locales y de
-  Browser regression, con duración y resultado. No se reduce la cobertura ni se relajan umbrales
-  visuales para conseguir ese tiempo; toda fusión o eliminación identifica la cobertura que queda.
+  Browser regression, con duración y resultado. No se reduce la cobertura ni se relajan
+  aserciones para conseguir ese tiempo; toda fusión o eliminación identifica la cobertura que queda.
 
 ## Verificación de un cambio
 
