@@ -180,7 +180,7 @@ function setOffset(offset: number, animated: boolean): void {
   const element = dialog.value
   if (!element) return
   element.style.transition = animated
-    ? 'transform 320ms var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1))'
+    ? 'transform 320ms var(--ease-drawer)'
     : 'none'
   element.style.transform = offset ? `translateY(${offset}px)` : ''
 }
@@ -421,7 +421,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 <style scoped>
 @media (prefers-reduced-motion: no-preference) {
   .neon-entry[data-closing] {
-    animation: neon-entry-out 200ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) forwards;
+    animation: neon-entry-out 200ms var(--ease-out) forwards;
   }
 }
 
