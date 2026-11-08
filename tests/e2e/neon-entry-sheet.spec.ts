@@ -91,6 +91,27 @@ test.describe('Hoja de alta nueva', () => {
     await expect(tracker.transactionsSection.getByText('Cancelado')).toHaveCount(0)
   })
 
+  test('el panel de escritorio queda pegado a la derecha y no desborda', async ({
+    page,
+    tracker,
+  }) => {
+    await page.setViewportSize(DESKTOP)
+    await tracker.goto()
+    await page.locator('[data-sidebar-apuntar]').click()
+    await expect(sheet(page)).toBeVisible()
+
+    const box = await sheet(page).evaluate((dialog) => {
+      const rect = dialog.getBoundingClientRect()
+      const form = dialog.querySelector('form')!
+      return {
+        right: rect.right,
+        width: rect.width,
+        overflows: form.scrollWidth > form.clientWidth,
+      }
+    })
+    expect(box).toEqual({ right: DESKTOP.width, width: 380, overflows: false })
+  })
+
   test('un importe vacío da el mismo error que el panel antiguo', async ({ page, tracker }) => {
     await page.setViewportSize(MOBILE)
     await tracker.goto()

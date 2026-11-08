@@ -29,7 +29,6 @@ const { navigateTo } = useSectionNavigation()
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const scrollArea = useTemplateRef<HTMLElement>('scrollArea')
-const sheet = useTemplateRef<HTMLElement>('sheet')
 const grip = useTemplateRef<HTMLElement>('grip')
 const amountInput = useTemplateRef<HTMLInputElement>('amountInput')
 
@@ -178,7 +177,7 @@ let lastMove: { y: number; time: number } | null = null
 let velocity = 0
 
 function setOffset(offset: number, animated: boolean): void {
-  const element = sheet.value
+  const element = dialog.value
   if (!element) return
   element.style.transition = animated
     ? 'transform 320ms var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1))'
@@ -216,7 +215,7 @@ function onDragMove(event: PointerEvent): void {
 function onDragEnd(event: PointerEvent): void {
   if (!dragStart) return
   const delta = event.clientY - dragStart.y
-  const height = sheet.value?.offsetHeight ?? 0
+  const height = dialog.value?.offsetHeight ?? 0
   dragStart = null
   lastMove = null
   if (delta > height * DRAG_CLOSE_RATIO || velocity > DRAG_CLOSE_VELOCITY) {
@@ -227,23 +226,20 @@ function onDragEnd(event: PointerEvent): void {
 }
 
 const fieldClass =
-  'bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] w-full border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
-const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
+  'min-w-0 bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] w-full border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
+const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 </script>
 
 <template>
   <dialog
     id="neon-entry-sheet"
     ref="dialog"
-    class="neon-entry text-text m-0 h-auto max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-[oklch(0%_none_none/0.55)]"
+    class="neon-entry bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[380px] frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 flex-col overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex"
     aria-labelledby="neon-entry-title"
     @cancel="onCancel"
     @click="onScrimClick"
   >
-    <div
-      ref="sheet"
-      class="bg-panel rounded-t-sheet shadow-sheet frame:rounded-none frame:border-line frame:border-s frame:shadow-float frame:h-dvh frame:max-h-dvh frame:w-[380px] frame:fixed frame:inset-bs-0 frame:inset-e-0 motion-safe:animate-sheet-in fixed inset-s-0 inset-e-0 inset-be-0 mx-auto flex max-h-[88%] w-full max-w-140 flex-col overflow-hidden"
-    >
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <div
         class="frame:px-6 frame:pbs-6 touch-none px-4 pbs-2.5"
         @pointerdown="onDragStart"
@@ -288,7 +284,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
       <form
         id="neon-entry-form"
         ref="scrollArea"
-        class="frame:px-6 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto overscroll-contain px-4 pbe-[calc(22px+env(safe-area-inset-bottom,0px))]"
+        class="frame:px-6 grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-y-auto overscroll-contain px-4 pbe-[calc(22px+env(safe-area-inset-bottom,0px))]"
         autocomplete="off"
         novalidate
         @submit.prevent="save"
@@ -313,7 +309,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
           </button>
         </div>
 
-        <label class="grid gap-1.5">
+        <label class="grid grid-cols-[minmax(0,1fr)] gap-1.5">
           <span :class="labelClass">Importe</span>
           <span class="border-ctrl-line flex items-baseline gap-2 border-b-2 pbe-1.5">
             <input
@@ -340,7 +336,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
           />
         </label>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
           <label :class="labelClass">
             Categoría
             <select v-model="form.category" name="category" :class="fieldClass">
@@ -355,7 +351,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
               </option>
             </select>
           </label>
-          <label v-if="isSaving" :class="[labelClass, 'col-span-2']">
+          <label v-if="isSaving" :class="[labelClass, 'col-span-full']">
             Cuenta destino
             <select
               v-model="form.destinationAccountId"
@@ -424,7 +420,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
 
 <style scoped>
 @media (prefers-reduced-motion: no-preference) {
-  .neon-entry[data-closing] > div {
+  .neon-entry[data-closing] {
     animation: neon-entry-out 200ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) forwards;
   }
 }
