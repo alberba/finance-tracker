@@ -1,0 +1,120 @@
+---
+/**
+ * User menu at the foot of the sidebar: who is signed in, sync status, demo
+ * mode and logout. The ids and data attributes are what src/scripts/shell.ts
+ * binds to (same contract as the old design's menu).
+ */
+const ITEM =
+  'rounded-field outline-accent flex min-h-11 w-full items-start gap-3 px-3 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]'
+---
+
+<div id="sidebar-user-menu-root" class="relative w-full">
+  <button
+    id="sidebar-user-menu-toggle"
+    class="group rounded-field outline-accent flex min-h-13 w-full items-center gap-2.5 px-2.5 py-2 text-start focus-visible:outline-2 focus-visible:outline-offset-2 aria-expanded:bg-panel2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]"
+    type="button"
+    aria-label="Abrir menú de usuario"
+    aria-haspopup="menu"
+    aria-expanded="false"
+    aria-controls="sidebar-user-menu"
+  >
+    <span
+      class="bg-panel2 text-text grid size-9 shrink-0 place-items-center rounded-full text-sm font-extrabold"
+      aria-hidden="true"
+    >
+      U
+    </span>
+    <span class="grid min-w-0 flex-1">
+      <span id="sidebar-user-email" class="text-text truncate text-sm font-bold">
+        Usuario
+      </span>
+      <span id="save-status" class="text-muted truncate text-meta">
+        Sincronizado
+      </span>
+    </span>
+    <svg
+      class="text-muted size-4 shrink-0 group-aria-expanded:rotate-180 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m7 14 5-5 5 5"></path>
+    </svg>
+  </button>
+
+  <div
+    id="sidebar-user-menu"
+    class="bg-panel border-line rounded-popover shadow-float absolute inset-s-0 inset-be-full z-30 mbe-2 grid w-[min(300px,calc(100vw-32px))] gap-1 border p-2"
+    role="menu"
+    aria-label="Menú de usuario"
+    hidden
+  >
+    <span
+      id="sidebar-sync-status"
+      class="text-muted border-line block border-b px-3 pt-2 pb-3 text-meta"
+      data-sync-status
+      hidden
+    >
+      Sincronizado
+    </span>
+    <button
+      id="demo-mode-menu-action"
+      class={ITEM}
+      data-demo-mode-action
+      type="button"
+      role="menuitem"
+    >
+      <svg
+        class="text-muted mbs-0.5 size-5 shrink-0"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+      <span class="grid">
+        <span class="text-text text-[15px] font-bold" data-demo-mode-label>
+          Activar modo demo
+        </span>
+        <span class="text-muted text-meta" data-demo-mode-description>
+          Usar únicamente datos ficticios
+        </span>
+      </span>
+    </button>
+    <button
+      id="sidebar-logout-action"
+      class={ITEM}
+      data-logout-action
+      type="button"
+      role="menuitem"
+    >
+      <svg
+        class="text-muted mbs-0.5 size-5 shrink-0"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 3H5a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h4"></path>
+        <path d="m16 17 5-5-5-5"></path>
+        <path d="M21 12H9"></path>
+      </svg>
+      <span class="grid">
+        <span class="text-text text-[15px] font-bold">Cerrar sesión</span>
+        <span class="text-muted text-meta">Borra la caché local de este dispositivo</span>
+      </span>
+    </button>
+  </div>
+</div>

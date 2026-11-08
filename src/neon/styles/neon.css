@@ -3,15 +3,18 @@
    the toggle sets), so none of it reaches the old design; the guard in
    tests/unit/styles-guards.test.ts fails on a rule outside that scope.
    Four themes: the unmarked block is «oscuro suave», the default; the others
-   are picked with `data-theme`. Which theme applies to whom (system dark or
-   light, the stored choice) is decided by the theme ticket, not here.
+   are picked with `data-theme`. Until the theme ticket adds the picker, the
+   theme follows the app's light/dark attribute (the system unless the user
+   chose one): dark paints «oscuro suave» and light paints «claro melocotón».
+   The four named values stay selectable for that ticket.
 
    Names this file shares with the old @theme (--color-panel, --color-line,
    --color-accent, --color-gain, --color-loss, --font-*) are redefined inside
    the new scope, so a utility such as `bg-panel` paints the new value there
    and the old one everywhere else. A utility whose name is new (`bg-panel2`)
-   is registered in @theme by the first ticket that uses it. Self-hosted
-   Unbounded and Manrope arrive with the frame ticket (fonts.test.ts). */
+   is registered in @theme by the first ticket that uses it (the block at the
+   end). The faces Unbounded and Manrope are declared in common.css
+   (fonts.test.ts). */
 
 @layer base {
   [data-ui='neon'],
@@ -28,7 +31,7 @@
     --color-text: #e6e1d7;
     --color-soft: #c4beb3;
     --color-muted: #9b958a;
-    --color-faint: #8a857c;
+    --color-faint: #969186;
     --color-accent: #e8703f;
     --color-on-accent: #1b1a18;
     --color-accent-text: #e8703f;
@@ -61,7 +64,7 @@
     --color-text: #f2eee6;
     --color-soft: #cfcac0;
     --color-muted: #a39e94;
-    --color-faint: #8c877e;
+    --color-faint: #8f8a80;
     --color-accent: #ff5a1f;
     --color-on-accent: #121110;
     --color-accent-text: #ff5a1f;
@@ -94,7 +97,7 @@
     --color-text: #1c1b19;
     --color-soft: #3f3c37;
     --color-muted: #6b665d;
-    --color-faint: #736e65;
+    --color-faint: #716c63;
     --color-accent: #e8703f;
     --color-on-accent: #1c1b19;
     --color-accent-text: #a8431a;
@@ -115,7 +118,8 @@
     color-scheme: light;
   }
 
-  [data-ui='neon'][data-theme='claro-melocoton'] {
+  [data-ui='neon'][data-theme='claro-melocoton'],
+  [data-ui='neon'][data-theme='light'] {
     --color-bg: #f7ebe2;
     --color-side: #f7ebe2;
     --color-side-line: #ebd8cb;
@@ -127,7 +131,7 @@
     --color-text: #2a1a12;
     --color-soft: #4d3a30;
     --color-muted: #7a6458;
-    --color-faint: #7f6a5f;
+    --color-faint: #7d675c;
     --color-accent: #f0652b;
     --color-on-accent: #2a1a12;
     --color-accent-text: #a8401a;
@@ -236,4 +240,54 @@
     --duration-pop: 220ms;
     --stagger: 70ms;
   }
+}
+
+/* Page base of the new design: canvas, text and font. Scoped, so the old
+   body rule keeps painting the old design. */
+@layer base {
+  [data-ui='neon'] body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+  }
+}
+
+/* Utilities with names the old design doesn't have (bg-side, text-soft,
+   rounded-pill…), registered by the frame ticket, the first to use them. The
+   values are the default theme's; `[data-ui="neon"]` above redefines them per
+   theme at runtime. `--breakpoint-frame` is the one media query of the frame:
+   sidebar from here up, bars below (same width as the old `desk`). Names the
+   old @theme also has (--color-panel, --color-line, --color-accent…) are not
+   repeated here: the guard in style-isolation.test.ts forbids it. */
+@theme {
+  --breakpoint-frame: 61.3125rem;
+
+  --color-bg: #1b1a18;
+  --color-side: #171614;
+  --color-side-line: #2b2926;
+  --color-panel2: #2c2b28;
+  --color-ctrl-line: #47443f;
+  --color-text: #e6e1d7;
+  --color-soft: #c4beb3;
+  --color-muted: #9b958a;
+  --color-faint: #969186;
+  --color-on-accent: #1b1a18;
+  --color-accent-text: #e8703f;
+  --color-nav-active-bg: #2c2b28;
+  --color-nav-active-text: #e8703f;
+  --color-sel-bg: #e6e1d7;
+  --color-sel-text: #1b1a18;
+
+  --text-brand: 24px;
+  --tracking-brand: -0.03em;
+  --text-meta: 13px;
+
+  --radius-field: 14px;
+  --radius-popover: 20px;
+  --radius-card: 22px;
+  --radius-pill: 999px;
+
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
 }

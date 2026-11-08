@@ -2,13 +2,16 @@
 import { APP_SECTIONS } from '../../config/app-sections'
 import type { SectionId } from '../../scripts/types'
 import NavIcon from './NavIcon.astro'
+import type { Design } from '../../lib/design'
+import DesignToggle from './DesignToggle.vue'
 import ThemeSwitcher from './ThemeSwitcher.vue'
 
 export interface Props {
   activeSection: SectionId | null
+  design: Design
 }
 
-const { activeSection } = Astro.props
+const { activeSection, design } = Astro.props
 const primarySectionIds: SectionId[] = ['dashboard', 'transactions', 'budget', 'investment']
 const primarySections = APP_SECTIONS.filter((section) => primarySectionIds.includes(section.id))
 const secondarySections = APP_SECTIONS.filter((section) => !primarySectionIds.includes(section.id))
@@ -148,6 +151,18 @@ const isSecondarySectionActive = secondarySections.some((section) => section.id 
     </h3>
     <div class="min-h-13">
       <ThemeSwitcher client:only="vue" variant="sheet" />
+    </div>
+  </section>
+
+  <section class="mt-4.5 grid gap-2.5" aria-labelledby="mobile-design-title">
+    <h3
+      id="mobile-design-title"
+      class="text-text-muted font-mono text-xs tracking-[0.16em] uppercase"
+    >
+      Diseño
+    </h3>
+    <div class="min-h-13">
+      <DesignToggle client:only="vue" design={design} variant="sheet" />
     </div>
   </section>
 

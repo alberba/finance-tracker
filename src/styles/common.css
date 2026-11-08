@@ -10,8 +10,8 @@
    and DM Sans are variable; DM Mono ships its two weights. The service worker
    precaches the same files (public/sw.js) so the app keeps its typography
    offline. Keep this list and public/fonts in sync (tests/unit/fonts.test.ts).
-   The faces of the new design (Unbounded, Manrope) join this list with the
-   ticket that ships them. */
+   Unbounded (titles and figures) and Manrope (text) are the new design's
+   faces; both are variable. */
 @font-face {
   font-family: 'Syne';
   font-style: normal;
@@ -62,6 +62,28 @@
   font-weight: 500;
   font-display: swap;
   src: url('/fonts/dm-mono-latin-500.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Unbounded';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('/fonts/unbounded-latin-wght.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/manrope-latin-wght.woff2') format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
