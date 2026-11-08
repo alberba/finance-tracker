@@ -109,7 +109,6 @@ const design = parseDesign(Astro.cookies.get(DESIGN_COOKIE)?.value)
     {
       design === 'neon' ? (
         <NeonFrame activeSection={activeSection} design={design}>
-          <MobileNavigation slot="mobile" activeSection={activeSection} design={design} />
           <DemoBanner slot="banner" />
           <FinanceWorkspace
             activeSection={activeSection ?? undefined}

@@ -283,11 +283,28 @@
   --text-brand: 24px;
   --tracking-brand: -0.03em;
   --text-meta: 13px;
+  --text-tab: 12px;
+  --text-label: 12px;
+  --tracking-label: 0.08em;
+  --text-h1-detail: 22px;
+  --tracking-h1: -0.03em;
 
+  --radius-sheet: 28px;
   --radius-field: 14px;
   --radius-popover: 20px;
   --radius-card: 22px;
   --radius-pill: 999px;
 
   --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
+
+  /* Bottom sheets arrive from below (DESIGN.md, `anim-sheet`). */
+  --animate-sheet-in: neon-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes neon-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
 }

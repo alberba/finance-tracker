@@ -1,0 +1,75 @@
+---
+import { APP_SECTIONS } from '../../config/app-sections'
+import type { SectionId } from '../../scripts/types'
+import { BAR_SECTION_IDS } from './mobile-sections'
+import NavIcon from './NavIcon.astro'
+
+/**
+ * Bottom bar of the mobile frame (DESIGN.md, «Barra inferior móvil»): three
+ * sections and «Más», four equal columns. `data-primary-sections` tells the
+ * shell's navigation script which sections the bar already shows, so «Más»
+ * lights up for every other one.
+ */
+export interface Props {
+  activeSection: SectionId | null
+}
+
+const { activeSection } = Astro.props
+const sections = BAR_SECTION_IDS.map((id) => APP_SECTIONS.find((section) => section.id === id)!)
+const moreIsActive = activeSection !== null && !BAR_SECTION_IDS.includes(activeSection)
+
+const ITEM =
+  'group text-muted aria-[current=page]:text-text data-[active=true]:text-text outline-accent flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 text-tab font-bold aria-[current=page]:font-extrabold data-[active=true]:font-extrabold focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]'
+const PILL =
+  'grid h-8 w-14 place-items-center rounded-pill group-aria-[current=page]:bg-[color-mix(in_oklch,var(--color-accent)_24%,transparent)] group-data-[active=true]:bg-[color-mix(in_oklch,var(--color-accent)_24%,transparent)] motion-safe:transition-colors motion-safe:duration-140 motion-safe:ease-out'
+---
+
+<nav
+  class="bg-panel frame:hidden fixed inset-s-0 inset-e-0 inset-be-0 z-30 grid h-[calc(80px+env(safe-area-inset-bottom,0px))] grid-cols-4 px-2 pbe-[env(safe-area-inset-bottom,0px)]"
+  aria-label="Navegación principal"
+>
+  {sections.map((section) => (
+    <button
+      type="button"
+      class={ITEM}
+      data-nav-item
+      data-section={section.id}
+      aria-controls={section.id}
+      aria-current={section.id === activeSection ? 'page' : undefined}
+    >
+      <span class={PILL}>
+        <span class="size-5.5 [&>svg]:size-full">
+          <NavIcon sectionId={section.id} />
+        </span>
+      </span>
+      <span class="max-w-full truncate">{section.label}</span>
+    </button>
+  ))}
+  <button
+    type="button"
+    class={ITEM}
+    data-mobile-more-trigger
+    data-primary-sections={BAR_SECTION_IDS.join(',')}
+    data-active={moreIsActive ? 'true' : 'false'}
+    aria-label="Más secciones"
+    aria-haspopup="dialog"
+    aria-controls="mobile-more-menu"
+    aria-expanded="false"
+  >
+    <span class={PILL}>
+      <svg
+        class="size-5.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M5 12h.01M12 12h.01M19 12h.01" />
+      </svg>
+    </span>
+    <span class="max-w-full truncate">Más</span>
+  </button>
+</nav>

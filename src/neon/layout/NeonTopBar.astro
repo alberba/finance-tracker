@@ -1,0 +1,23 @@
+---
+/**
+ * Top bar of the mobile frame (DESIGN.md, «Barra superior móvil»): the brand
+ * on the left. Its actions (pending movements, search) and the scroll
+ * behaviour belong to the tickets of those features. Below the frame
+ * breakpoint only; the desktop frame has the sidebar instead.
+ */
+---
+
+<header
+  class="bg-bg frame:hidden sticky inset-bs-0 z-30 flex min-h-[calc(64px+env(safe-area-inset-top,0px))] items-center pe-2 ps-5 pbs-[env(safe-area-inset-top,0px)]"
+  data-mobile-app-bar
+>
+  <p
+    class="font-display text-text text-[20px] leading-none font-extrabold tracking-brand"
+    aria-label="finanzas"
+  >
+    finanzas
+    <span class="text-accent-text" aria-hidden="true">
+      .
+    </span>
+  </p>
+</header>

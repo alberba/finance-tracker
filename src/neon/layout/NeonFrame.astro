@@ -1,13 +1,17 @@
 ---
 import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
+import NeonBottomBar from './NeonBottomBar.astro'
+import NeonFab from './NeonFab.vue'
+import NeonMoreSheet from './NeonMoreSheet.astro'
 import NeonSidebar from './NeonSidebar.astro'
+import NeonTopBar from './NeonTopBar.astro'
 
 /**
  * Desktop frame of the new design (DESIGN.md, Layout): the 236px sidebar and a
  * fluid main area, `max-width: 1640px` and centred. One media query decides the
- * frame (`frame:`); below it the old mobile bars still stand in until the
- * mobile frame ships, so they come in through the `mobile` slot. `banner` is the
+ * frame (`frame:`): from it up the sidebar shows, below it the mobile frame
+ * (top bar, bottom bar, «Más» sheet and the «Apuntar» button). `banner` is the
  * strip above the content.
  */
 export interface Props {
@@ -27,8 +31,11 @@ const { activeSection, design } = Astro.props
 <div class="frame:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] grid min-h-dvh grid-cols-1 overflow-x-clip">
   <div id="nav-tabs" class="contents">
     <NeonSidebar activeSection={activeSection} design={design} />
-    <slot name="mobile" />
+    <NeonTopBar />
+    <NeonBottomBar activeSection={activeSection} />
+    <NeonMoreSheet activeSection={activeSection} design={design} />
   </div>
+  <NeonFab client:only="vue" />
 
   <div class="flex min-w-0 flex-col">
     <slot name="banner" />
