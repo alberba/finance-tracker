@@ -180,7 +180,9 @@ let velocity = 0
 function setOffset(offset: number, animated: boolean): void {
   const element = sheet.value
   if (!element) return
-  element.style.transition = animated ? 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)' : 'none'
+  element.style.transition = animated
+    ? 'transform 320ms var(--ease-drawer, cubic-bezier(0.32, 0.72, 0, 1))'
+    : 'none'
   element.style.transform = offset ? `translateY(${offset}px)` : ''
 }
 
@@ -223,8 +225,6 @@ function onDragEnd(event: PointerEvent): void {
     setOffset(0, true)
   }
 }
-
-const monthLabel = (month: number) => formatMonthName(month as (typeof ALL_MONTHS)[number])
 
 const fieldClass =
   'bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] w-full border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
@@ -314,7 +314,7 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
         </div>
 
         <label class="grid gap-1.5">
-          <span class="text-muted text-[13px] font-bold">Importe</span>
+          <span :class="labelClass">Importe</span>
           <span class="border-ctrl-line flex items-baseline gap-2 border-b-2 pbe-1.5">
             <input
               ref="amountInput"
@@ -423,8 +423,10 @@ const labelClass = 'text-muted grid gap-1.5 text-[13px] font-bold'
 </template>
 
 <style scoped>
-.neon-entry[data-closing] > div {
-  animation: neon-entry-out 200ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+@media (prefers-reduced-motion: no-preference) {
+  .neon-entry[data-closing] > div {
+    animation: neon-entry-out 200ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) forwards;
+  }
 }
 
 @keyframes neon-entry-out {
