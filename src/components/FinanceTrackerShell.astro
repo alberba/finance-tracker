@@ -1,9 +1,13 @@
 ---
 import '../styles/global.css'
 import AppSidebar from './layout/AppSidebar.astro'
+import DemoBanner from './layout/DemoBanner.astro'
 import FontPreloads from './layout/FontPreloads.astro'
 import MobileNavigation from './layout/MobileNavigation.astro'
+import NeonFontPreloads from '../neon/layout/NeonFontPreloads.astro'
+import NeonFrame from '../neon/layout/NeonFrame.astro'
 import FinanceWorkspace from './FinanceWorkspace.vue'
+import { DESIGN_COOKIE, parseDesign } from '../lib/design'
 import { getSectionFromPath } from '../scripts/app/dashboard-section-routing'
 
 export interface Props {
@@ -14,10 +18,13 @@ const { page = 'section' } = Astro.props
 const canonicalUrl = new URL('/', Astro.url).toString()
 // «Mis reportes» no es una sección: ninguna entrada del menú queda activa.
 const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.pathname)
+// The design comes from a per-device cookie the server reads, so the page
+// arrives with the chosen frame and never paints the other one first (ADR 0010).
+const design = parseDesign(Astro.cookies.get(DESIGN_COOKIE)?.value)
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang="es" data-ui={design}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -92,62 +99,55 @@ const activeSection = page === 'reports' ? null : getSectionFromPath(Astro.url.p
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <FontPreloads mono />
+    {design === 'neon' ? <NeonFontPreloads /> : <FontPreloads mono />}
     <script>
       import '../scripts/app'
       import '../scripts/shell'
     </script>
   </head>
   <body>
-    <a
-      class="bg-primary-fill text-on-primary fixed top-3 left-3 z-1000 -translate-y-20 rounded-md px-3.5 py-2 text-sm font-bold focus:translate-y-0"
-      href="#app-main"
-    >
-      Saltar al contenido
-    </a>
-    <div class="sidebar-collapsed:desk:grid-cols-[72px_minmax(0,1fr)] desk:grid-cols-[256px_minmax(0,1fr)] grid min-h-screen grid-cols-1 overflow-x-clip">
-      <div id="nav-tabs" class="contents">
-        <AppSidebar activeSection={activeSection} />
-        <MobileNavigation activeSection={activeSection} />
-      </div>
-
-      <div class="flex min-w-0 flex-col">
-        <div
-          id="demo-banner"
-          class="bg-notice text-notice-text border-notice-line border-b"
-          role="status"
-          hidden
-        >
-          <div class="mx-auto flex max-w-7xl items-center gap-3 py-1.5 pr-2 pl-4 md:px-[clamp(16px,3vw,40px)]">
-            <span class="bg-accent size-2 shrink-0 rounded-full" aria-hidden="true"></span>
-            <p class="min-w-0 flex-1 text-sm">
-              <span class="font-mono text-xs font-medium tracking-[0.14em] uppercase">
-                Modo demo
-              </span>
-              {' · '}datos ficticios
-            </p>
-            <button
-              id="demo-banner-exit"
-              class="border-notice-line hover:bg-notice-line min-h-11 shrink-0 rounded-sm px-3 text-sm font-bold md:min-h-9 md:border"
-              type="button"
-            >
-              Salir<span class="max-md:hidden"> del modo demo</span>
-            </button>
-          </div>
-        </div>
-
-        <main
-          id="app-main"
-          class="desk:pb-14 grid min-w-0 content-start gap-5 px-3.25 pt-4.5 pb-[calc(104px+env(safe-area-inset-bottom))] md:px-[clamp(16px,3vw,40px)] md:pt-7.5"
-        >
+    {
+      design === 'neon' ? (
+        <NeonFrame activeSection={activeSection} design={design}>
+          <DemoBanner slot="banner" />
           <FinanceWorkspace
             activeSection={activeSection ?? undefined}
             page={page}
             client:only="vue"
           />
-        </main>
-      </div>
-    </div>
+        </NeonFrame>
+      ) : (
+        <>
+          <a
+            class="bg-primary-fill text-on-primary fixed top-3 left-3 z-1000 -translate-y-20 rounded-md px-3.5 py-2 text-sm font-bold focus:translate-y-0"
+            href="#app-main"
+          >
+            Saltar al contenido
+          </a>
+          <div class="sidebar-collapsed:desk:grid-cols-[72px_minmax(0,1fr)] desk:grid-cols-[256px_minmax(0,1fr)] grid min-h-screen grid-cols-1 overflow-x-clip">
+            <div id="nav-tabs" class="contents">
+              <AppSidebar activeSection={activeSection} design={design} />
+              <MobileNavigation activeSection={activeSection} design={design} />
+            </div>
+
+            <div class="flex min-w-0 flex-col">
+              <DemoBanner />
+
+              <main
+                id="app-main"
+                class="desk:pb-14 grid min-w-0 content-start gap-5 px-3.25 pt-4.5 pb-[calc(104px+env(safe-area-inset-bottom))] md:px-[clamp(16px,3vw,40px)] md:pt-7.5"
+              >
+                <FinanceWorkspace
+                  activeSection={activeSection ?? undefined}
+                  page={page}
+                  client:only="vue"
+                />
+              </main>
+            </div>
+          </div>
+        </>
+      )
+    }
 
     <!-- A manual popover, so it renders in the top layer above an open side
          panel or confirmation (both modal dialogs). top/margin/size undo the

@@ -19,3 +19,10 @@ tokens y duplican lo que Tailwind ya resuelve.
 
 Con la 2.0.0 la hoja heredada desapareció: lo que quedaba (reset y tipografía) pasó a
 `global.css`, que es ya la única hoja de estilos.
+
+Con la migración al diseño «neón de garaje» ([ADR 0010](0010-migracion-con-convivencia-aislada.md))
+`global.css` pasa a ser solo la entrada de tres hojas: `common.css` (fuentes, reset, variante
+`neon:`), `legacy.css` (tokens y `@theme` del diseño antiguo, congelados) y
+`src/neon/styles/neon.css` (tokens nuevos bajo `[data-ui="neon"]`). La decisión de esta ADR no
+cambia: sigue sin haber hoja de reglas de pantalla, y cada árbol estila con utilidades, componentes
+base y `scoped` estructural.

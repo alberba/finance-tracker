@@ -3,24 +3,38 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Guards for the style architecture of ADR 0004
- * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md): global.css
- * is the only stylesheet and imports nothing but Tailwind (the legacy sheet is
- * gone and can't come back under any name), the text/surface token pairs keep
- * AA contrast in both themes, and every CSS variable the code reads is defined
- * somewhere.
+ * (docs/adr/0004-estilos-hibridos-tailwind-y-componentes-base.md) and ADR 0010:
+ * the app has exactly the sheets below (the hand-written legacy sheet is gone
+ * and can't come back under any name), the text/surface token pairs of the old
+ * design keep AA contrast in both themes, and every CSS variable the code reads
+ * is defined somewhere. That the new design's CSS can't leak into the old one
+ * is tests/unit/style-isolation.test.ts.
  */
 
-const globalCss = readFileSync(new URL('../../src/styles/global.css', import.meta.url), 'utf8')
+const readSrc = (path: string) =>
+  readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8')
+
+/** `global.css` is the entry; the other three are its parts (ADR 0010). */
+const STYLESHEETS = [
+  'neon/styles/neon.css',
+  'styles/common.css',
+  'styles/global.css',
+  'styles/legacy.css',
+]
+
+const globalCss = readSrc('styles/global.css')
+/** The old design's token values, @theme and base typography. */
+const legacyCss = readSrc('styles/legacy.css')
 
 const srcDir = new URL('../../src/', import.meta.url)
 const sourcePaths = readdirSync(srcDir, { recursive: true }) as string[]
 
 describe('global stylesheet', () => {
-  it('is the only stylesheet in src/', () => {
+  it('has no stylesheet in src/ beside its three parts', () => {
     // New styles go in components: utilities, base components or scoped styles.
-    const stylesheets = sourcePaths.filter((path) => /\.(css|scss|sass|less)$/.test(path))
+    const stylesheets = sourcePaths.filter((path) => /\.(css|scss|sass|less)$/.test(path)).sort()
 
-    expect(stylesheets).toEqual(['styles/global.css'])
+    expect(stylesheets).toEqual(STYLESHEETS)
   })
 
   it('has no global <style> blocks beside it', () => {
@@ -46,20 +60,35 @@ describe('global stylesheet', () => {
     expect(stylesheets).toEqual([])
   })
 
-  it('imports only Tailwind', () => {
+  it('imports only Tailwind and its own three parts, in that order', () => {
+    // The new tokens come last so they win over the old @theme names inside
+    // [data-ui="neon"].
     const imports = [...globalCss.matchAll(/^@import\s+([^;]+);/gm)].map(([, target]) =>
       target.trim(),
     )
 
-    expect(imports).toEqual(["'tailwindcss'"])
+    expect(imports).toEqual([
+      "'tailwindcss'",
+      "'./common.css'",
+      "'./legacy.css'",
+      "'../neon/styles/neon.css'",
+    ])
+  })
+
+  it('imports nothing from the parts themselves', () => {
+    for (const path of STYLESHEETS.filter((path) => path !== 'styles/global.css')) {
+      expect(readSrc(path), path).not.toMatch(/^@import\b/m)
+    }
   })
 
   it('declares no cascade layer of its own', () => {
     // Tailwind's theme, base, components and utilities are the whole order;
     // a layer for old rules is how the legacy sheet lived.
     // Block (`@layer base {`) and statement (`@layer theme, legacy;`) forms.
-    const layers = [...globalCss.matchAll(/@layer\s+([^{;]+)/g)].flatMap(([, names]) =>
-      names.split(',').map((name) => name.trim()),
+    const layers = STYLESHEETS.flatMap((path) =>
+      [...readSrc(path).matchAll(/@layer\s+([^{;]+)/g)].flatMap(([, names]) =>
+        names.split(',').map((name) => name.trim()),
+      ),
     )
 
     expect(
@@ -71,9 +100,9 @@ describe('global stylesheet', () => {
 type Theme = 'light' | 'dark'
 
 function tokenBlock(selector: string): Record<string, string> {
-  const start = globalCss.indexOf(`${selector} {`)
-  if (start === -1) throw new Error(`global.css has no "${selector}" token block`)
-  const body = globalCss.slice(start, globalCss.indexOf('}', start))
+  const start = legacyCss.indexOf(`${selector} {`)
+  if (start === -1) throw new Error(`legacy.css has no "${selector}" token block`)
+  const body = legacyCss.slice(start, legacyCss.indexOf('}', start))
   return Object.fromEntries(
     [...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
   )
@@ -212,4 +241,63 @@ describe('tokens below AA', () => {
 
     expect(textUses).toEqual([])
   })
+})
+
+/**
+ * Contrast of the new design's tokens (DESIGN.md, Temas): every text token
+ * reaches AA on every surface of its theme, in the four themes.
+ */
+const neonCss = readSrc('neon/styles/neon.css')
+
+const NEON_THEMES = {
+  'oscuro-suave': "[data-ui='neon'],",
+  'oscuro-fuerte': "[data-ui='neon'][data-theme='oscuro-fuerte']",
+  'claro-hueso': "[data-ui='neon'][data-theme='claro-hueso']",
+  'claro-melocoton': "[data-ui='neon'][data-theme='claro-melocoton']",
+} as const
+
+function neonTokens(selector: string): Record<string, string> {
+  const start = neonCss.indexOf(selector)
+  if (start === -1) throw new Error(`neon.css has no "${selector}" token block`)
+  const body = neonCss.slice(neonCss.indexOf('{', start), neonCss.indexOf('}', start))
+  return Object.fromEntries(
+    [...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
+  )
+}
+
+const NEON_SURFACES = ['--color-bg', '--color-side', '--color-panel', '--color-panel2']
+const NEON_TEXT_PAIRS: Array<{ text: string; surfaces: string[] }> = [
+  {
+    text: '--color-text',
+    surfaces: NEON_SURFACES,
+  },
+  { text: '--color-soft', surfaces: NEON_SURFACES },
+  { text: '--color-muted', surfaces: NEON_SURFACES },
+  { text: '--color-faint', surfaces: NEON_SURFACES },
+  { text: '--color-accent-text', surfaces: NEON_SURFACES },
+  { text: '--color-gain', surfaces: NEON_SURFACES },
+  { text: '--color-loss', surfaces: NEON_SURFACES },
+  { text: '--color-on-accent', surfaces: ['--color-accent'] },
+  { text: '--color-nav-active-text', surfaces: ['--color-nav-active-bg'] },
+  { text: '--color-sel-text', surfaces: ['--color-sel-bg'] },
+]
+
+describe('new design token contrast (WCAG AA, normal text)', () => {
+  for (const [theme, selector] of Object.entries(NEON_THEMES)) {
+    const tokens = neonTokens(selector)
+    for (const { text, surfaces } of NEON_TEXT_PAIRS) {
+      for (const surface of surfaces) {
+        it(`${theme} ${text} on ${surface} meets AA`, () => {
+          for (const name of [text, surface]) {
+            if (!/^#[0-9a-f]{6}$/i.test(tokens[name] ?? '')) {
+              throw new Error(`${name} in ${theme} must be a #rrggbb literal`)
+            }
+          }
+          expect(contrastRatio(tokens[text], tokens[surface])).toBeGreaterThanOrEqual(
+            AA_NORMAL_TEXT,
+          )
+        })
+      }
+    }
+  }
 })

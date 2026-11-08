@@ -8,6 +8,7 @@ import { defineConfig } from 'eslint/config'
 import { tailwind4 } from 'tailwind-csstree'
 import tseslint from 'typescript-eslint'
 
+import { designBoundary } from './scripts/lib/eslint-design-boundary'
 import { withVueStyleBlocks } from './scripts/lib/eslint-vue-style-blocks'
 
 const sharedGlobals = {
@@ -96,6 +97,13 @@ export default defineConfig([
       // are consumed across files; the rule can't resolve them cross-file.
       'css/no-invalid-properties': ['error', { allowUnknownVariables: true }],
     },
+  },
+  {
+    // ADR 0010: the new design (src/neon), the frozen old one and shared code
+    // never import each other, except at the named seams.
+    files: ['src/**/*.{js,mjs,cjs,ts,mts,cts,vue,astro}'],
+    plugins: { 'design-boundary': designBoundary },
+    rules: { 'design-boundary/no-cross-design-imports': 'error' },
   },
   {
     files: ['tests/e2e/**/*.spec.ts'],

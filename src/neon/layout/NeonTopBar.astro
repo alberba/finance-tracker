@@ -1,0 +1,45 @@
+---
+import NeonDetailHeader from '../ui/NeonDetailHeader.vue'
+import NeonPendingMenu from './NeonPendingMenu.vue'
+
+/**
+ * Top bar of the mobile frame (DESIGN.md, «Barra superior móvil»): the brand on
+ * the left and «Por confirmar» on the right. Search and the scroll behaviour
+ * belong to the tickets of those features. Below the frame breakpoint only; the
+ * desktop frame has the sidebar instead.
+ *
+ * Inside the detail of an element (an asset) the bar keeps only the arrow back
+ * and the symbol, «‹ VWCE» (DESIGN.md, «Cabecera de detalle»): pass `detail`.
+ */
+export interface Props {
+  detail?: { label: string; backHref: string; backLabel: string }
+}
+
+const { detail } = Astro.props
+---
+
+<header
+  class="bg-bg frame:hidden sticky inset-bs-0 z-30 flex min-h-[calc(64px+env(safe-area-inset-top,0px))] items-center justify-between gap-2 pe-2 ps-5 pbs-[env(safe-area-inset-top,0px)]"
+  data-mobile-app-bar
+>
+  {detail ? (
+    <NeonDetailHeader
+      label={detail.label}
+      backHref={detail.backHref}
+      backLabel={detail.backLabel}
+    />
+  ) : (
+    <>
+      <p
+        class="font-display text-text text-[20px] leading-none font-extrabold tracking-brand"
+        aria-label="finanzas"
+      >
+        finanzas
+        <span class="text-accent-text" aria-hidden="true">
+          .
+        </span>
+      </p>
+      <NeonPendingMenu client:only="vue" />
+    </>
+  )}
+</header>

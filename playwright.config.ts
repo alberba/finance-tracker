@@ -26,6 +26,7 @@ export default defineConfig(
           'authentication.spec.ts',
           'bitvavo.spec.ts',
           'mobile-smoke.spec.ts',
+          'neon-mobile-frame.spec.ts',
           'multi-user-isolation.spec.ts',
           'offline-sync.spec.ts',
           'onboarding.spec.ts',
@@ -36,7 +37,7 @@ export default defineConfig(
       {
         name: 'mobile-chrome',
         use: { ...devices['Pixel 5'] },
-        testMatch: ['mobile-smoke.spec.ts'],
+        testMatch: ['mobile-smoke.spec.ts', 'neon-mobile-frame.spec.ts'],
       },
     ],
   },

@@ -1,6 +1,7 @@
-const CACHE_VERSION = 'finance-tracker-v4'
+const CACHE_VERSION = 'finance-tracker-v5'
 // The self-hosted faces are part of the shell: once installed, the app keeps
-// Syne, DM Sans and DM Mono offline even before the page requests them.
+// Syne, DM Sans and DM Mono (old design), Unbounded and Manrope (new design)
+// offline even before the page requests them.
 const APP_SHELL = [
   '/manifest.webmanifest',
   '/favicon.svg',
@@ -12,6 +13,8 @@ const APP_SHELL = [
   '/fonts/dm-sans-latin-wght-italic.woff2',
   '/fonts/dm-mono-latin-400.woff2',
   '/fonts/dm-mono-latin-500.woff2',
+  '/fonts/unbounded-latin-wght.woff2',
+  '/fonts/manrope-latin-wght.woff2',
 ]
 
 // Cache reads ignore `Vary`: static assets can answer `Vary: Origin` (the

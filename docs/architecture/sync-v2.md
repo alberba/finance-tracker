@@ -74,7 +74,7 @@ el compilador no siempre marca. Tras `pnpm check`, busca el tipo con `grep -rn` 
 - `src/domain/transactions/registry.ts` y `src/components/transactions/`: etiquetas, formulario
   y `TransactionPanel.vue`.
 - `src/stores/recurring.ts` y `src/domain/recurring/pending.ts`: reglas y pendientes.
-- `src/data/demo-seed.ts`, `src/lib/client/webmcp.ts` y `src/styles/global.css` (color del tipo,
+- `src/data/demo-seed.ts`, `src/lib/client/webmcp.ts` y `src/styles/legacy.css` (color del tipo,
   vigilado por `tests/unit/styles-guards.test.ts`).
 - `tests/unit/finance-core.test.ts` y `tests/unit/dashboard-view-model.test.ts`.
 

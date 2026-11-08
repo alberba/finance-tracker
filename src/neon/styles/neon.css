@@ -1,0 +1,328 @@
+/* New design, «neón de garaje»: token values with the final names of DESIGN.md.
+   Everything here sits under `[data-ui="neon"]` (the attribute on <html> that
+   the toggle sets), so none of it reaches the old design; the guard in
+   tests/unit/styles-guards.test.ts fails on a rule outside that scope.
+   Four themes: the unmarked block is «oscuro suave», the default; the others
+   are picked with `data-theme`. Until the theme ticket adds the picker, the
+   theme follows the app's light/dark attribute (the system unless the user
+   chose one): dark paints «oscuro suave» and light paints «claro melocotón».
+   The four named values stay selectable for that ticket.
+
+   Names this file shares with the old @theme (--color-panel, --color-line,
+   --color-accent, --color-gain, --color-loss, --font-*) are redefined inside
+   the new scope, so a utility such as `bg-panel` paints the new value there
+   and the old one everywhere else. A utility whose name is new (`bg-panel2`)
+   is registered in @theme by the first ticket that uses it (the block at the
+   end). The faces Unbounded and Manrope are declared in common.css
+   (fonts.test.ts). */
+
+@layer base {
+  [data-ui='neon'],
+  [data-ui='neon'][data-theme='oscuro-suave'] {
+    /* Colors */
+    --color-bg: #1b1a18;
+    --color-side: #171614;
+    --color-side-line: #2b2926;
+    --color-panel: #232220;
+    --color-panel2: #2c2b28;
+    --color-line: #33312e;
+    --color-grid: #3a3834;
+    --color-ctrl-line: #47443f;
+    --color-text: #e6e1d7;
+    --color-soft: #c4beb3;
+    --color-muted: #9b958a;
+    --color-faint: #969186;
+    --color-accent: #e8703f;
+    --color-on-accent: #1b1a18;
+    --color-accent-text: #e8703f;
+    --color-gain: #86cfa5;
+    --color-loss: #e99383;
+    --color-lilac: #aba0e6;
+    --color-lilac2: #867bcb;
+    --color-lilac3: #625aa0;
+    --color-peach: #e8b79c;
+    --color-neutral-bar: #6f6a62;
+    --color-nav-active-bg: #2c2b28;
+    --color-nav-active-text: #e8703f;
+    --color-sel-bg: #e6e1d7;
+    --color-sel-text: #1b1a18;
+    --color-sel-border: #e6e1d7;
+    --area-opacity: 0.12;
+    --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  [data-ui='neon'][data-theme='oscuro-fuerte'] {
+    --color-bg: #121110;
+    --color-side: #0b0a09;
+    --color-side-line: #2a2825;
+    --color-panel: #1c1b19;
+    --color-panel2: #262421;
+    --color-line: #2c2a26;
+    --color-grid: #2f2d29;
+    --color-ctrl-line: #3a3833;
+    --color-text: #f2eee6;
+    --color-soft: #cfcac0;
+    --color-muted: #a39e94;
+    --color-faint: #8f8a80;
+    --color-accent: #ff5a1f;
+    --color-on-accent: #121110;
+    --color-accent-text: #ff5a1f;
+    --color-gain: #6edc9f;
+    --color-loss: #ff8875;
+    --color-lilac: #b7a3ff;
+    --color-lilac2: #8c76f0;
+    --color-lilac3: #5e4bb8;
+    --color-peach: #ffb896;
+    --color-neutral-bar: #8c877e;
+    --color-nav-active-bg: #ff5a1f;
+    --color-nav-active-text: #121110;
+    --color-sel-bg: #f2eee6;
+    --color-sel-text: #121110;
+    --color-sel-border: #f2eee6;
+    --area-opacity: 0.14;
+    --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+
+  [data-ui='neon'][data-theme='claro-hueso'] {
+    --color-bg: #f1eee8;
+    --color-side: #f1eee8;
+    --color-side-line: #e2ddd3;
+    --color-panel: #ffffff;
+    --color-panel2: #f5f2ec;
+    --color-line: #ece7df;
+    --color-grid: #e6e1d8;
+    --color-ctrl-line: #d6d0c5;
+    --color-text: #1c1b19;
+    --color-soft: #3f3c37;
+    --color-muted: #6b665d;
+    --color-faint: #716c63;
+    --color-accent: #e8703f;
+    --color-on-accent: #1c1b19;
+    --color-accent-text: #a8431a;
+    --color-gain: #1f7a4c;
+    --color-loss: #b8392a;
+    --color-lilac: #6a5bc4;
+    --color-lilac2: #9c91dc;
+    --color-lilac3: #4c3f99;
+    --color-peach: #f2bc9c;
+    --color-neutral-bar: #c9c3b8;
+    --color-nav-active-bg: #fbe1d3;
+    --color-nav-active-text: #8e3510;
+    --color-sel-bg: #fbe1d3;
+    --color-sel-text: #8e3510;
+    --color-sel-border: #f2c2a8;
+    --area-opacity: 0.16;
+    --shadow-float: 0 20px 50px rgba(60, 40, 20, 0.14);
+    color-scheme: light;
+  }
+
+  [data-ui='neon'][data-theme='claro-melocoton'],
+  [data-ui='neon'][data-theme='light'] {
+    --color-bg: #f7ebe2;
+    --color-side: #f7ebe2;
+    --color-side-line: #ebd8cb;
+    --color-panel: #fffdfb;
+    --color-panel2: #fbf1ea;
+    --color-line: #f1e2d7;
+    --color-grid: #edddd1;
+    --color-ctrl-line: #e3cdbf;
+    --color-text: #2a1a12;
+    --color-soft: #4d3a30;
+    --color-muted: #7a6458;
+    --color-faint: #7d675c;
+    --color-accent: #f0652b;
+    --color-on-accent: #2a1a12;
+    --color-accent-text: #a8401a;
+    --color-gain: #1e7a4e;
+    --color-loss: #b8392a;
+    --color-lilac: #6a5bc4;
+    --color-lilac2: #a196e0;
+    --color-lilac3: #4c3f99;
+    --color-peach: #f7bc98;
+    --color-neutral-bar: #d9c4b6;
+    --color-nav-active-bg: #f0652b;
+    --color-nav-active-text: #2a1a12;
+    --color-sel-bg: #ffe0ce;
+    --color-sel-text: #8e3510;
+    --color-sel-border: #f7c3a6;
+    --area-opacity: 0.18;
+    --shadow-float: 0 22px 50px rgba(140, 70, 30, 0.16);
+    color-scheme: light;
+  }
+
+  [data-ui='neon'] {
+    /* Typography — Font Families */
+    --font-display: 'Unbounded', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* Typography — Scale */
+    --text-brand: 24px;
+    --tracking-brand: -0.03em;
+    --text-h1: clamp(30px, 3.2cqi, 44px);
+    --leading-h1: 1.1;
+    --tracking-h1: -0.03em;
+    --text-h1-detail: 22px;
+    --text-lede: 16px;
+    --text-block-title: 18px;
+    --text-label: 12px;
+    --tracking-label: 0.08em;
+    --text-body: 16px;
+    --leading-body: 1.45;
+    --text-row: 16px;
+    --text-note: 14px;
+    --text-meta: 13px;
+    --text-delta: 14px;
+    --text-tab: 12px;
+    --text-figure-row: 16px;
+    --text-figure-block: 22px;
+    --tracking-figure-block: -0.02em;
+    --text-figure-lg: clamp(34px, 3.4cqi, 44px);
+    --tracking-figure-lg: -0.04em;
+    --text-figure-hero: 56px;
+    --leading-figure-hero: 1.05;
+    --tracking-figure-hero: -0.035em;
+    --text-cents: 0.42em;
+
+    /* Typography — Weights */
+    --font-weight-regular: 400;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+
+    /* Spacing */
+    --space-2: 2px;
+    --space-4: 4px;
+    --space-6: 6px;
+    --space-8: 8px;
+    --space-10: 10px;
+    --space-12: 12px;
+    --space-14: 14px;
+    --space-16: 16px;
+    --space-20: 20px;
+    --space-24: 24px;
+    --space-32: 32px;
+    --space-40: 40px;
+
+    /* Layout */
+    --page-max-width: 1640px;
+    --sidebar-width: 236px;
+    --column-gap: 20px;
+    --card-padding: 22px 24px;
+    --card-padding-mobile: 16px 12px;
+    --row-height: 64px;
+    --control-height: 44px;
+    --chip-height: 38px;
+    --segment-height: 36px;
+
+    /* Border Radius */
+    --radius-ticker: 8px;
+    --radius-field: 14px;
+    --radius-tile: 18px;
+    --radius-popover: 20px;
+    --radius-card: 22px;
+    --radius-sheet: 28px;
+    --radius-pill: 999px;
+
+    /* Elevation */
+    --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
+
+    /* Icons */
+    --icon-stroke: 2;
+
+    /* Motion */
+    --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-rise: 520ms;
+    --duration-sheet: 380ms;
+    --duration-pop: 220ms;
+    --stagger: 70ms;
+  }
+}
+
+/* Page base of the new design: canvas, text and font. Scoped, so the old
+   body rule keeps painting the old design. */
+@layer base {
+  [data-ui='neon'] body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--leading-body);
+  }
+}
+
+/* Utilities with names the old design doesn't have (bg-side, text-soft,
+   rounded-pill…), registered by the frame ticket, the first to use them. The
+   values are the default theme's; `[data-ui="neon"]` above redefines them per
+   theme at runtime. `--breakpoint-frame` is the one media query of the frame:
+   sidebar from here up, bars below (same width as the old `desk`). Names the
+   old @theme also has (--color-panel, --color-line, --color-accent…) are not
+   repeated here: the guard in style-isolation.test.ts forbids it. */
+@theme {
+  --breakpoint-frame: 61.3125rem;
+
+  --color-bg: #1b1a18;
+  --color-side: #171614;
+  --color-side-line: #2b2926;
+  --color-panel2: #2c2b28;
+  --color-ctrl-line: #47443f;
+  --color-text: #e6e1d7;
+  --color-soft: #c4beb3;
+  --color-muted: #9b958a;
+  --color-faint: #969186;
+  --color-on-accent: #1b1a18;
+  --color-accent-text: #e8703f;
+  --color-nav-active-bg: #2c2b28;
+  --color-nav-active-text: #e8703f;
+  --color-sel-bg: #e6e1d7;
+  --color-sel-text: #1b1a18;
+
+  --text-brand: 24px;
+  --tracking-brand: -0.03em;
+  --text-meta: 13px;
+  --text-tab: 12px;
+  --text-label: 12px;
+  --tracking-label: 0.08em;
+  --text-h1-detail: 22px;
+  --tracking-h1: -0.03em;
+
+  --radius-sheet: 28px;
+  --radius-field: 14px;
+  --radius-popover: 20px;
+  --radius-card: 22px;
+  --radius-pill: 999px;
+
+  --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 -20px 60px oklch(0% 0 none / 0.5);
+
+  /* Bottom sheets arrive from below (DESIGN.md, `anim-sheet`). */
+  --animate-sheet-in: neon-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* Popovers (`anim-pop`, origin top right) and scrims (`anim-fade`). */
+  --animate-pop-in: neon-pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: neon-fade-in 260ms ease-out;
+}
+
+@keyframes neon-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+@keyframes neon-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+  }
+}
+
+@keyframes neon-fade-in {
+  from {
+    opacity: 0;
+  }
+}

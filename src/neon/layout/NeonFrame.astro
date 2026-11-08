@@ -1,0 +1,57 @@
+---
+import type { Design } from '../../lib/design'
+import type { SectionId } from '../../scripts/types'
+import NeonBottomBar from './NeonBottomBar.astro'
+import NeonEntrySheet from '../entry/NeonEntrySheet.vue'
+import NeonFab from './NeonFab.vue'
+import NeonMoreSheet from './NeonMoreSheet.astro'
+import NeonSidebar from './NeonSidebar.astro'
+import NeonTopBar from './NeonTopBar.astro'
+import type { Props as NeonTopBarProps } from './NeonTopBar.astro'
+
+/**
+ * Desktop frame of the new design (DESIGN.md, Layout): the 236px sidebar and a
+ * fluid main area, `max-width: 1640px` and centred. One media query decides the
+ * frame (`frame:`): from it up the sidebar shows, below it the mobile frame
+ * (top bar, bottom bar, «Más» sheet and the «Apuntar» button). `banner` is the
+ * strip above the content; `detail` turns the mobile top bar into the detail
+ * header («‹ VWCE», see NeonTopBar).
+ */
+export interface Props {
+  activeSection: SectionId | null
+  design: Design
+  detail?: NeonTopBarProps['detail']
+}
+
+const { activeSection, design, detail } = Astro.props
+---
+
+<a
+  class="bg-accent text-on-accent rounded-field fixed inset-bs-3 inset-s-3 z-1000 -translate-y-20 px-3.5 py-2 text-sm font-extrabold focus-visible:translate-y-0"
+  href="#app-main"
+>
+  Saltar al contenido
+</a>
+<div class="frame:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] grid min-h-dvh grid-cols-1 overflow-x-clip">
+  <div id="nav-tabs" class="contents">
+    <NeonSidebar activeSection={activeSection} design={design} />
+    <NeonTopBar detail={detail} />
+    <NeonBottomBar activeSection={activeSection} />
+    <NeonMoreSheet activeSection={activeSection} design={design} />
+  </div>
+  <NeonFab client:only="vue" />
+  <NeonEntrySheet client:only="vue" />
+
+  <div class="flex min-w-0 flex-col">
+    <slot name="banner" />
+    <!-- Percent padding resolves against the column's width, so it scales like
+         the `cqi` of DESIGN.md without making a container (which would anchor
+         the fixed launcher and panels to it). -->
+    <main
+      id="app-main"
+      class="mx-auto grid w-full max-w-(--page-max-width) min-w-0 content-start gap-5 px-[clamp(16px,2.6%,40px)] pbs-[clamp(18px,2.6%,36px)] pbe-[calc(104px+env(safe-area-inset-bottom))] frame:pbe-10"
+    >
+      <slot />
+    </main>
+  </div>
+</div>

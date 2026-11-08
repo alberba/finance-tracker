@@ -42,6 +42,11 @@ También conserva un JSON fechado por invocación para demostrar ejecuciones con
 No incluye lint/typecheck: para el gate de contribución sigue aplicando `pnpm gate`.
 Los comandos acotados sirven para iterar.
 
+Mientras convivan los dos diseños (ADR 0010), `playwright.shared.ts` arranca todos los escenarios con
+la cookie `finance-design=legacy`, así que los specs escritos para el diseño antiguo siguen valiendo.
+Un spec del diseño nuevo la quita con `test.use({ storageState: { cookies: [], origins: [] } })`
+(ver `tests/e2e/design-toggle.spec.ts`).
+
 Para probar una URL ya arrancada:
 
 ```bash

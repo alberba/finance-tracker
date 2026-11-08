@@ -25,7 +25,7 @@ Valores del tema por defecto (oscuro suave). Los otros tres temas redefinen los 
 | Hueso              | `#E6E1D7`             | `--color-text`                                      | Texto principal                                                                                           |
 | Hueso suave        | `#C4BEB3`             | `--color-soft`                                      | Lede, texto de chip en reposo, texto de la barra lateral                                                  |
 | Gris piedra        | `#9B958A`             | `--color-muted`                                     | Etiquetas, metadatos, notas, ejes                                                                         |
-| Gris tenue         | `#8A857C`             | `--color-faint`                                     | Lo menos importante: pies de nota, línea de plan discontinua                                              |
+| Gris tenue         | `#969186`             | `--color-faint`                                     | Lo menos importante: pies de nota, línea de plan discontinua                                              |
 | Lámpara            | `#E8703F`             | `--color-accent`                                    | Acción principal, sección activa, línea de gráfico, foco, punto de la marca. El único color con intención |
 | Sobre lámpara      | `#1B1A18`             | `--color-on-accent`                                 | Texto sobre `--color-accent`                                                                              |
 | Lámpara como texto | `#E8703F`             | `--color-accent-text`                               | El acento cuando es texto (enlace, nav activo); en los temas claros se oscurece para contrastar           |
@@ -56,7 +56,7 @@ El usuario elige el tema; `oscuro-suave` es el por defecto y `claro-melocoton` e
 | `--color-text`            | `#E6E1D7`                     | `#F2EEE6`                      | `#1C1B19`                         | `#2A1A12`                          |
 | `--color-soft`            | `#C4BEB3`                     | `#CFCAC0`                      | `#3F3C37`                         | `#4D3A30`                          |
 | `--color-muted`           | `#9B958A`                     | `#A39E94`                      | `#6B665D`                         | `#7A6458`                          |
-| `--color-faint`           | `#8A857C`                     | `#8C877E`                      | `#736E65`                         | `#7F6A5F`                          |
+| `--color-faint`           | `#969186`                     | `#8F8A80`                      | `#716C63`                         | `#7D675C`                          |
 | `--color-accent`          | `#E8703F`                     | `#FF5A1F`                      | `#E8703F`                         | `#F0652B`                          |
 | `--color-on-accent`       | `#1B1A18`                     | `#121110`                      | `#1C1B19`                         | `#2A1A12`                          |
 | `--color-accent-text`     | `#E8703F`                     | `#FF5A1F`                      | `#A8431A`                         | `#A8401A`                          |
@@ -76,6 +76,8 @@ El usuario elige el tema; `oscuro-suave` es el por defecto y `claro-melocoton` e
 | `--shadow-float`          | `0 24px 60px rgba(0,0,0,0.5)` | `0 24px 60px rgba(0,0,0,0.55)` | `0 20px 50px rgba(60,40,20,0.14)` | `0 22px 50px rgba(140,70,30,0.16)` |
 
 Oscuro fuerte es la variante de alto contraste: el nav activo y la caja de alta rápida se rellenan de naranja con texto carbón.
+
+Todo texto de la tabla alcanza 4.5:1 (AA) sobre el lienzo, la barra lateral, el panel y el panel hundido de su tema; `tests/unit/styles-guards.test.ts` lo comprueba. Por eso `--color-faint` es un paso más claro (oscuros) o más oscuro (claros) que en las primeras versiones del canvas.
 
 ## Tokens — Tipografía
 
@@ -378,7 +380,7 @@ Iconos de línea propios, sin relleno: `viewBox="0 0 24 24"`, `fill="none"`, `st
 
 ## Layout
 
-Escritorio: fila con la barra lateral fija de 236px (marca `finanzas.` con el punto en naranja, secciones arriba, Datos y Configuración abajo) y el área principal fluida con `max-width: 1640px` centrado. Cada sección abre con la etiqueta de fecha, H1 en Unbounded y una línea de lede; debajo, una rejilla de dos columnas (contenido principal y aside de resumen) con `gap: 20px`. La raíz es `container-type: inline-size` y los tamaños fluidos usan `cqi`; no hay breakpoints por ancho: la vista la decide el dispositivo (`escritorio` / `movil`). Móvil: barra superior, contenido en una columna, barra inferior de cuatro columnas con el FAB «Apuntar» flotando aparte, abajo a la derecha (ver **FAB**), y hojas inferiores para alta, detalle y «Por confirmar».
+Escritorio (desde 981px, `--breakpoint-frame`): fila con la barra lateral fija de 236px (marca `finanzas.` con el punto en naranja, secciones arriba, Datos y Configuración abajo; al pie, el menú de usuario y, mientras dure la migración, el interruptor «Diseño nuevo / antiguo») y el área principal fluida con `max-width: 1640px` centrado. Cada sección abre con la etiqueta de fecha, H1 en Unbounded y una línea de lede; debajo, una rejilla de dos columnas (contenido principal y aside de resumen) con `gap: 20px`. La raíz es `container-type: inline-size` y los tamaños fluidos usan `cqi`. El marco (barra lateral o barras superior e inferior) cambia por ancho de ventana con **una sola media query**; el contenido no usa media queries, sino container queries sobre su propio contenedor; y el tamaño táctil de 44px va por `@media (pointer: coarse)` (`pointer-coarse:` en Tailwind), no por ancho. Nada se decide por user-agent ni por detección de dispositivo. Móvil: barra superior, contenido en una columna, barra inferior de cuatro columnas con el FAB «Apuntar» flotando aparte, abajo a la derecha (ver **FAB**), y hojas inferiores para alta, detalle y «Por confirmar».
 
 **Inicio en escritorio.** La rejilla de dos columnas coloca arriba lo del mes: «Te quedan» como cifra protagonista a la izquierda y «Por confirmar» en el aside, a la vista sin desplazar; debajo, Patrimonio con Inversiones, y Movimientos con Gasto por categoría y Objetivos.
 
@@ -446,7 +448,7 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --color-text: #e6e1d7;
   --color-soft: #c4beb3;
   --color-muted: #9b958a;
-  --color-faint: #8a857c;
+  --color-faint: #969186;
   --color-accent: #e8703f;
   --color-on-accent: #1b1a18;
   --color-accent-text: #e8703f;
@@ -479,7 +481,7 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --color-text: #f2eee6;
   --color-soft: #cfcac0;
   --color-muted: #a39e94;
-  --color-faint: #8c877e;
+  --color-faint: #8f8a80;
   --color-accent: #ff5a1f;
   --color-on-accent: #121110;
   --color-accent-text: #ff5a1f;
@@ -512,7 +514,7 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --color-text: #1c1b19;
   --color-soft: #3f3c37;
   --color-muted: #6b665d;
-  --color-faint: #736e65;
+  --color-faint: #716c63;
   --color-accent: #e8703f;
   --color-on-accent: #1c1b19;
   --color-accent-text: #a8431a;
@@ -545,7 +547,7 @@ Todo dentro de `@media (prefers-reduced-motion: no-preference)`. Foco: `outline:
   --color-text: #2a1a12;
   --color-soft: #4d3a30;
   --color-muted: #7a6458;
-  --color-faint: #7f6a5f;
+  --color-faint: #7d675c;
   --color-accent: #f0652b;
   --color-on-accent: #2a1a12;
   --color-accent-text: #a8401a;
@@ -674,7 +676,7 @@ Los valores de `@theme` son los del tema por defecto. Las utilidades de Tailwind
   --color-text: #e6e1d7;
   --color-soft: #c4beb3;
   --color-muted: #9b958a;
-  --color-faint: #8a857c;
+  --color-faint: #969186;
   --color-accent: #e8703f;
   --color-on-accent: #1b1a18;
   --color-accent-text: #e8703f;

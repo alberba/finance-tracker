@@ -23,7 +23,7 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - `src/lib/finance-core.ts`: lógica financiera tipada (TypeScript)
 - `src/data/seed.json`: datos semilla sintéticos y neutros
 - `src/data/seed.ts`: wrapper TypeScript para importar el seed desde cliente y servidor
-- `src/styles/global.css`: tokens de tema (claro y oscuro), `@theme` de Tailwind, reset y tipografía base; la única hoja de estilos
+- `src/styles/`: `global.css` (entrada), `common.css` (fuentes, reset), `legacy.css` (tokens y `@theme` del diseño antiguo); los tokens del diseño nuevo, en `src/neon/styles/neon.css`
 - `scripts/extract_excel_seed.py`: script para regenerar el seed desde un `.xlsx`
 
 ## Ejecutar en OrbStack (Docker)

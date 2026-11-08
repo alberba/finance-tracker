@@ -1,0 +1,54 @@
+---
+import { APP_SECTIONS } from '../../config/app-sections'
+import type { Design } from '../../lib/design'
+import type { SectionId } from '../../scripts/types'
+import DesignToggle from './DesignToggle.vue'
+import NeonApuntarButton from './NeonApuntarButton.vue'
+import NeonNavItem from './NeonNavItem.astro'
+import NeonUserMenu from './NeonUserMenu.astro'
+
+/** Desktop sidebar of the new frame (DESIGN.md, Layout): brand, sections, Datos and Configuración at the bottom, then the design toggle and the user menu. */
+export interface Props {
+  activeSection: SectionId | null
+  design: Design
+}
+
+const { activeSection, design } = Astro.props
+
+// Datos and Configuración sit at the bottom of the navigation, in that order.
+const BOTTOM: SectionId[] = ['data', 'settings']
+const top = APP_SECTIONS.filter((section) => !BOTTOM.includes(section.id))
+const bottom = BOTTOM.map((id) => APP_SECTIONS.find((section) => section.id === id)!)
+---
+
+<aside class="bg-side border-side-line frame:flex sticky inset-bs-0 z-20 hidden h-dvh w-(--sidebar-width) flex-col gap-8 border-e px-4 py-7">
+  <p
+    class="font-display text-brand text-text px-3.5 leading-none font-extrabold tracking-brand"
+    aria-label="finanzas"
+  >
+    finanzas
+    <span class="text-accent-text" aria-hidden="true">
+      .
+    </span>
+  </p>
+
+  <nav
+    class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain [scrollbar-width:none]"
+    aria-label="Secciones del tracker"
+  >
+    {top.map((section) => (
+      <NeonNavItem section={section} activeSection={activeSection} />
+    ))}
+    <div class="mbs-auto flex flex-col gap-1">
+      {bottom.map((section) => (
+        <NeonNavItem section={section} activeSection={activeSection} />
+      ))}
+    </div>
+  </nav>
+
+  <div class="flex flex-col gap-3">
+    <NeonApuntarButton client:only="vue" />
+    <DesignToggle client:only="vue" design={design} />
+    <NeonUserMenu />
+  </div>
+</aside>
