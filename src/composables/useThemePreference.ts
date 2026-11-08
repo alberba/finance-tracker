@@ -1,10 +1,11 @@
 import { computed, onBeforeUnmount, shallowRef } from 'vue'
 
-import type { SegmentedOption } from '../components/ui/SegmentedControl.vue'
 import { getThemeController, type ThemePreference } from '../lib/client/theme'
 
 /** A theme choice: its visible label, its name as an icon button and its icon path. */
-export interface ThemeOption extends SegmentedOption<ThemePreference> {
+export interface ThemeOption {
+  value: ThemePreference
+  label: string
   name: string
   icon: string
 }

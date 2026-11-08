@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { setSwitch } from './controls'
 
-/** `--breakpoint-desk` in src/styles/global.css (61.3125rem): sidebar and floating launcher from here up. */
+/** `--breakpoint-desk` in src/styles/legacy.css (61.3125rem): sidebar and floating launcher from here up. */
 const DESK_BREAKPOINT_PX = 981
 
 const SECTION_CONFIG = {

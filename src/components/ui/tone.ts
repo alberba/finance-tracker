@@ -1,9 +1,8 @@
-/** Gain or loss: the sign of a figure, always shown with its sign too. */
-export type Tone = 'gain' | 'loss'
+import type { Tone } from '../../lib/tone'
 
-export function toneOf(value: number): Tone {
-  return value >= 0 ? 'gain' : 'loss'
-}
+// The tone itself is shared (src/lib/tone.ts) so view-models can use it; the
+// class names below belong to this design.
+export { toneOf, type Tone } from '../../lib/tone'
 
 /** Text color of a tone on page surfaces. */
 export const TONE_TEXT: Record<Tone, string> = { gain: 'text-gain', loss: 'text-loss' }

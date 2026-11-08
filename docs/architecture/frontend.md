@@ -7,8 +7,9 @@ Esta app combina Astro, Vue, Tailwind y TypeScript. El objetivo es que cada capa
 - Astro renderiza el shell, rutas, secciones estaticas y markup que no necesita reactividad propia.
 - `FinanceTrackerShell.astro` solo compone layout, sidebar y secciones; la navegacion vive en componentes de `src/components/layout`.
 - Vue se usa para islas interactivas con estado local o UI compleja, siempre con Composition API y composables.
-- Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/global.css`. Lo que se repite entre ficheros se convierte en componente base (ADR 0004).
-- `src/styles/global.css` es la única hoja de estilos: tokens, reset, tipografía base y las variantes del shell. La hoja heredada desapareció en la 2.0.0 y `tests/unit/styles-guards.test.ts` impide recrearla.
+- Tailwind aporta las utilidades de la plantilla, con los tokens de `@theme` en `src/styles/legacy.css` (diseño antiguo) o `src/neon/styles/neon.css` (nuevo). Lo que se repite entre ficheros se convierte en componente base (ADR 0004).
+- `src/styles/global.css` solo importa las tres partes del CSS: `common.css` (fuentes, reset y la variante `neon:`, sin tokens), `legacy.css` (tokens, `@theme`, tipografía base y variantes del shell del diseño antiguo) y `src/neon/styles/neon.css` (tokens del diseño nuevo bajo `[data-ui="neon"]`). No hay otra hoja de estilos: `tests/unit/styles-guards.test.ts` impide recrear la heredada y `tests/unit/style-isolation.test.ts` vigila que lo nuevo no se cuele en lo antiguo.
+- Dos diseños conviven durante la migración «neón de garaje» ([ADR 0010](../adr/0010-migracion-con-convivencia-aislada.md)): lo nuevo vive en `src/neon/`, lo antiguo se queda en `src/components/` y `src/styles/`. Se importan solo a través de los puntos de unión con nombre de `scripts/lib/eslint-design-boundary.ts`; el código compartido no importa de ninguno.
 - Las secciones son componentes Vue (`src/components/sections/*Section.vue`); el mapa siguiente distingue su montaje, el arranque y la navegación.
 
 ## Puntos de entrada por responsabilidad
@@ -57,8 +58,8 @@ El informe mensual tampoco es una sección ni una página: «Exportar» en los f
 - La lista de secciones navegables vive en `src/config/app-sections.ts`; no se duplican labels ni orden en el shell.
 - Los scripts de comportamiento global del shell viven en `src/scripts`, no en bloques inline grandes dentro de Astro.
 - Solo se mantiene inline el codigo critico necesario antes del primer render, como la seleccion inicial del tema.
-- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes (Syne, DM Sans y DM Mono) viven en `public/fonts` y se sirven desde el propio dominio.
-- Tailwind debe entrar por `src/styles/global.css` con `@import "tailwindcss"` y por el plugin Vite `@tailwindcss/vite`.
+- Las dependencias cliente entran por npm y Vite. Nada de CDN en el shell: las fuentes autoalojadas viven en `public/fonts` y se sirven desde el propio dominio.
+- Tailwind debe entrar por `src/styles/global.css` (la entrada del CSS) con `@import "tailwindcss"` y por el plugin Vite `@tailwindcss/vite`.
 - Los estilos globales existentes se migran por zona tocada, evitando reescrituras masivas sin cobertura visual.
 
 ## Datos semilla

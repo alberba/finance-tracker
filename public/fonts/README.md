@@ -23,6 +23,6 @@ Las tres familias se distribuyen bajo la **SIL Open Font License 1.1**; el texto
 y su aviso de copyright están en `OFL-Syne.txt`, `OFL-DM-Sans.txt` y `OFL-DM-Mono.txt`, junto a
 los ficheros que cubren.
 
-Los `@font-face` viven en `src/styles/global.css`, los precarga
+Los `@font-face` viven en `src/styles/common.css`, los precarga
 `src/components/layout/FontPreloads.astro` y el service worker los guarda en la caché del shell
 (`public/sw.js`). `tests/unit/fonts.test.ts` comprueba que las tres listas coinciden.
