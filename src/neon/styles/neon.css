@@ -300,11 +300,27 @@
 
   /* Bottom sheets arrive from below (DESIGN.md, `anim-sheet`). */
   --animate-sheet-in: neon-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* Popovers (`anim-pop`, origin top right) and scrims (`anim-fade`). */
+  --animate-pop-in: neon-pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: neon-fade-in 260ms ease-out;
 }
 
 @keyframes neon-sheet-in {
   from {
     opacity: 0;
     transform: translateY(48px);
+  }
+}
+
+@keyframes neon-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+  }
+}
+
+@keyframes neon-fade-in {
+  from {
+    opacity: 0;
   }
 }

@@ -93,6 +93,26 @@ test.describe('Marco móvil nuevo', () => {
     await expect(tracker.transactionPanel).toBeVisible()
   })
 
+  test('«Por confirmar» abre un popover que cierra con Escape y al pulsar fuera', async ({
+    page,
+  }) => {
+    const trigger = page.getByRole('button', { name: /^Por confirmar/ })
+    const popover = page.getByRole('dialog', { name: 'Por confirmar' })
+
+    await trigger.click()
+    await expect(popover).toBeVisible()
+    await expect(popover.getByText('Todo al día')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(popover).toBeHidden()
+    await expect(trigger).toBeFocused()
+
+    await trigger.click()
+    await expect(popover).toBeVisible()
+    await page.mouse.click(10, 400)
+    await expect(popover).toBeHidden()
+  })
+
   test('todos los controles del marco miden al menos 44 px con puntero táctil', async ({
     page,
   }) => {
@@ -102,7 +122,7 @@ test.describe('Marco móvil nuevo', () => {
 
     const small = await page
       .locator(
-        'nav[aria-label="Navegación principal"] button, #mobile-more-menu button, [data-fab-apuntar]',
+        'nav[aria-label="Navegación principal"] button, #mobile-more-menu button, [data-fab-apuntar], [data-pending-trigger]',
       )
       .evaluateAll((buttons) =>
         buttons
