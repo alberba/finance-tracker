@@ -27,7 +27,7 @@
     "test:unit:watch": "vitest --project unit",
     "test:component": "vitest run --project component",
     "test:component:watch": "vitest --project component",
-    "test:integration": "vitest run --project integration --project integration-cli",
+    "test:integration": "vitest run --project integration",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test --grep-invert @visual",
     "test:e2e:smoke": "playwright test --grep @smoke",

@@ -225,7 +225,7 @@ pnpm test:e2e tests/e2e/<spec>.spec.ts
 
 Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile del repositorio
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
-ejecuta `pnpm install --frozen-lockfile`. El script Linux sincroniza dependencias antes de elegir
+ejecuta `pnpm install --frozen-lockfile`. El script Linux comprueba dependencias antes de elegir
 la imagen de Playwright, para que Chromium coincida con CI.
 
 ## WebMCP
