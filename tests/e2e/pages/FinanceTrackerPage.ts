@@ -838,18 +838,6 @@ export class FinanceTrackerPage {
     return Number(value.replace(/\./g, '').replace(',', '.'))
   }
 
-  async saveAccountSnapshot(params: { monthLabel: string; accountName: string; value: number }) {
-    await this.openWealth()
-    await this.selectWealthMonth(params.monthLabel)
-    await this.wealthSnapshotInput(params.accountName).fill(String(params.value).replace('.', ','))
-    await this.saveSnapshot()
-    await this.waitForSync()
-  }
-
-  async getAccountSnapshotValue(accountName: string): Promise<number> {
-    return this.readWealthSnapshot(accountName)
-  }
-
   wealthCalcPanel(): Locator {
     return this.page.getByRole('dialog', { name: 'Calcular saldo' })
   }

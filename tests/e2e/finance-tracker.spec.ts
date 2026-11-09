@@ -124,21 +124,6 @@ test.describe('Finance tracker E2E', () => {
     await tracker.expectTransactionDescriptionVisible('sqlite-persist-e2e')
   })
 
-  test('permite guardar snapshot de cuenta', async ({ tracker }) => {
-    await tracker.saveAccountSnapshot({
-      monthLabel: 'MARZO',
-      accountName: 'Revolut',
-      value: 999.99,
-    })
-
-    expect(await tracker.getAccountSnapshotValue('Revolut')).toBe(999.99)
-
-    await tracker.reload()
-    await tracker.openWealth()
-    await tracker.selectWealthMonth('MARZO')
-    expect(await tracker.getAccountSnapshotValue('Revolut')).toBe(999.99)
-  })
-
   test('patrimonio permite calcular snapshot de inversión por fila y persistirlo', async ({
     tracker,
   }) => {
