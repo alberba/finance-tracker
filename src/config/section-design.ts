@@ -8,7 +8,7 @@ import type { SectionId } from '../scripts/types'
  * inside the new frame. With «antiguo», every section is the old one. The
  * migration's last ticket deletes this file.
  */
-export const MIGRATED_SECTIONS: readonly SectionId[] = ['dashboard']
+export const MIGRATED_SECTIONS: readonly SectionId[] = ['dashboard', 'transactions']
 
 export function sectionDesign(section: SectionId, design: Design): Design {
   return design === 'neon' && MIGRATED_SECTIONS.includes(section) ? 'neon' : 'legacy'

@@ -23,6 +23,11 @@ const sectionLoaders = {
   investment: () => import('./sections/InvestmentSection.vue'),
 }
 
+/** Chunks of the new design's lazy migrated sections, warmed with the old ones. */
+const neonSectionLoaders = {
+  transactions: () => import('../neon/sections/transactions/NeonTransactionsSection.vue'),
+} satisfies Partial<Record<SectionId, () => Promise<unknown>>>
+
 const ReportsPage = defineAsyncComponent(sectionLoaders.reports)
 
 const sectionComponents = {
@@ -39,6 +44,7 @@ const sectionComponents = {
 /** The new design's version of each migrated section (src/config/section-design.ts). */
 const neonSectionComponents: Partial<Record<SectionId, Component>> = {
   dashboard: NeonDashboardSection,
+  transactions: defineAsyncComponent(neonSectionLoaders.transactions),
 }
 
 /**
@@ -55,7 +61,9 @@ const neonSectionComponents: Partial<Record<SectionId, Component>> = {
  */
 onMounted(() => {
   const prefetchSections = () => {
-    for (const load of Object.values(sectionLoaders)) {
+    const loaders =
+      props.design === 'neon' ? { ...sectionLoaders, ...neonSectionLoaders } : sectionLoaders
+    for (const load of Object.values(loaders)) {
       void load().catch(() => undefined)
     }
   }
