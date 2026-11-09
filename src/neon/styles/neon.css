@@ -253,6 +253,14 @@
     font-size: var(--text-body);
     line-height: var(--leading-body);
   }
+
+  /* The old base sets h1 and h2 in its display face; here a block title is
+     Manrope (DESIGN.md) and a page title asks for Unbounded with its class. */
+  [data-ui='neon'] h1,
+  [data-ui='neon'] h2 {
+    font-family: inherit;
+    letter-spacing: inherit;
+  }
 }
 
 /* Utilities with names the old design doesn't have (bg-side, text-soft,
