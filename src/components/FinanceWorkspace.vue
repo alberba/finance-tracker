@@ -2,6 +2,9 @@
 import { computed, defineAsyncComponent, onMounted, shallowRef } from 'vue'
 import type { Component } from 'vue'
 
+import { sectionDesign } from '../config/section-design'
+import type { Design } from '../lib/design'
+import NeonDashboardSection from '../neon/dashboard/NeonDashboardSection.vue'
 import type { SectionId } from '../scripts/types'
 import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
@@ -33,6 +36,11 @@ const sectionComponents = {
   investment: defineAsyncComponent(sectionLoaders.investment),
 } satisfies Record<SectionId, Component>
 
+/** The new design's version of each migrated section (src/config/section-design.ts). */
+const neonSectionComponents: Partial<Record<SectionId, Component>> = {
+  dashboard: NeonDashboardSection,
+}
+
 /**
  * Warm every section chunk once the browser goes idle.
  *
@@ -63,8 +71,9 @@ const props = withDefaults(
   defineProps<{
     activeSection?: SectionId
     page?: 'section' | 'reports'
+    design?: Design
   }>(),
-  { activeSection: 'dashboard', page: 'section' },
+  { activeSection: 'dashboard', page: 'section', design: 'legacy' },
 )
 
 const uiStore = useUiStore()
@@ -77,7 +86,11 @@ onMounted(() => {
 })
 
 const currentSection = computed(() => uiStore.ui.activeSection)
-const activeSectionComponent = computed(() => sectionComponents[currentSection.value])
+const activeSectionComponent = computed(() => {
+  const section = currentSection.value
+  const neon = neonSectionComponents[section]
+  return neon && sectionDesign(section, props.design) === 'neon' ? neon : sectionComponents[section]
+})
 const isReportsPage = computed(() => uiStore.page === 'reports')
 const isReportDialogOpen = shallowRef(false)
 </script>

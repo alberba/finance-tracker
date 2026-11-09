@@ -5,7 +5,8 @@ import { setSwitch } from './controls'
 const DESK_BREAKPOINT_PX = 981
 
 const SECTION_CONFIG = {
-  dashboard: { buttonLabel: 'Dashboard', headingText: /^Dashboard$/ },
+  // The old dashboard is titled «Dashboard»; the new one names the month («Así va octubre»).
+  dashboard: { buttonLabel: 'Dashboard', headingText: /^(Dashboard|Así (va|fue) \S+)$/ },
   transactions: {
     buttonLabel: 'Movimientos',
     headingText: /^Movimientos$/,
@@ -145,10 +146,7 @@ export class FinanceTrackerPage {
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await this.dismissWelcomeIfNeeded()
     await expect(
-      this.dashboardSection.getByRole('heading', {
-        name: 'Dashboard',
-        exact: true,
-      }),
+      this.dashboardSection.getByRole('heading', { name: SECTION_CONFIG.dashboard.headingText }),
     ).toBeVisible()
   }
 
@@ -915,10 +913,6 @@ export class FinanceTrackerPage {
     }
     const amountText = (await row.first().locator('[data-summary-amount]').innerText()).trim()
     return this.parseMoneyText(amountText)
-  }
-
-  async dashboardIncomeText(): Promise<string> {
-    return this.dashboardSection.locator('#kpi-income').innerText()
   }
 
   /**
