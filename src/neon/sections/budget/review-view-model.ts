@@ -93,7 +93,7 @@ function ceilToStep(value: number, step: number): number {
   return Math.ceil(round2(value) / step - 1e-9) * step
 }
 
-function whole(value: number): string {
+function wholeEuros(value: number): string {
   return `${formatNumber(Math.round(value))} €`
 }
 
@@ -105,7 +105,7 @@ export function suggest(plan: number, average: number, overCount: number): Sugge
     return {
       mode: 'up',
       amount,
-      text: `Sugerencia: subir a ${whole(amount)}. Tu media (${whole(average)}) supera el presupuesto.`,
+      text: `Sugerencia: subir a ${wholeEuros(amount)}. Tu media (${wholeEuros(average)}) supera el presupuesto.`,
     }
   }
   if (average < plan * 0.8) {
@@ -113,7 +113,7 @@ export function suggest(plan: number, average: number, overCount: number): Sugge
     return {
       mode: 'down',
       amount,
-      text: `Sugerencia: bajar a ${whole(amount)}. Tu media (${whole(average)}) queda muy por debajo.`,
+      text: `Sugerencia: bajar a ${wholeEuros(amount)}. Tu media (${wholeEuros(average)}) queda muy por debajo.`,
     }
   }
   return {
@@ -134,8 +134,8 @@ export function deviationText(diff: number): string {
 
 export function insightText(overCount: number, months: number, average: number): string {
   return overCount === 0
-    ? `Ningún mes por encima del presupuesto. Media: ${whole(average)}.`
-    : `Por encima ${overCount} de ${months} meses. Media: ${whole(average)}.`
+    ? `Ningún mes por encima del presupuesto. Media: ${wholeEuros(average)}.`
+    : `Por encima ${overCount} de ${months} meses. Media: ${wholeEuros(average)}.`
 }
 
 /** Expense categories with a budget in the closed month, in the order of the categories list. */
