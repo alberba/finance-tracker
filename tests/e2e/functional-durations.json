@@ -15,10 +15,6 @@
     "durationMs": 12146,
     "tests": 6
   },
-  "dashboard-section.spec.ts": {
-    "durationMs": 13686,
-    "tests": 5
-  },
   "data.spec.ts": {
     "durationMs": 4047,
     "tests": 2

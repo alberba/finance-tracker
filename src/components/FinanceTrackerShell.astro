@@ -113,6 +113,7 @@ const design = parseDesign(Astro.cookies.get(DESIGN_COOKIE)?.value)
           <FinanceWorkspace
             activeSection={activeSection ?? undefined}
             page={page}
+            design={design}
             client:only="vue"
           />
         </NeonFrame>

@@ -281,6 +281,13 @@
   --color-nav-active-text: #e8703f;
   --color-sel-bg: #e6e1d7;
   --color-sel-text: #1b1a18;
+  /* The dashboard (#429): chart grid, series and data bars. */
+  --color-grid: #3a3834;
+  --color-lilac: #aba0e6;
+  --color-lilac2: #867bcb;
+  --color-lilac3: #625aa0;
+  --color-peach: #e8b79c;
+  --color-neutral-bar: #6f6a62;
 
   --text-brand: 24px;
   --tracking-brand: -0.03em;
@@ -290,6 +297,24 @@
   --tracking-label: 0.08em;
   --text-h1-detail: 22px;
   --tracking-h1: -0.03em;
+  /* The dashboard (#429): page title, lede, block titles and figures. */
+  --text-h1: clamp(30px, 3.2cqi, 44px);
+  --text-h1--line-height: 1.1;
+  --text-h1--letter-spacing: -0.03em;
+  --text-lede: 16px;
+  --text-block-title: 18px;
+  --text-note: 14px;
+  --text-delta: 14px;
+  --text-figure-row: 16px;
+  --text-figure-block: 22px;
+  --text-figure-block--line-height: 1.2;
+  --text-figure-block--letter-spacing: -0.02em;
+  --text-figure-lg: clamp(34px, 3.4cqi, 44px);
+  --text-figure-lg--line-height: 1;
+  --text-figure-lg--letter-spacing: -0.04em;
+  --text-figure-hero: 56px;
+  --text-figure-hero--line-height: 1.05;
+  --text-figure-hero--letter-spacing: -0.035em;
 
   --radius-sheet: 28px;
   --radius-field: 14px;
@@ -305,6 +330,15 @@
   /* Popovers (`anim-pop`, origin top right) and scrims (`anim-fade`). */
   --animate-pop-in: neon-pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-in: neon-fade-in 260ms ease-out;
+  /* Blocks rise 14px as they come in (`anim-rise`), staggered 70ms by the caller. */
+  --animate-rise: neon-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes neon-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
 }
 
 @keyframes neon-sheet-in {

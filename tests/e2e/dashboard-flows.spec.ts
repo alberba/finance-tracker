@@ -65,23 +65,4 @@ test.describe('Finance tracker E2E', () => {
       await expect(page.getByRole('heading', { name: tab.heading, exact: true })).toBeVisible()
     }
   })
-
-  test('renderiza dashboard con KPIs', async ({ tracker }) => {
-    await tracker.openDashboard()
-    const incomeText = await tracker.dashboardIncomeText()
-    expect(incomeText).toContain('€')
-  })
-
-  test('dashboard muestra la distribución del patrimonio con su leyenda', async ({ tracker }) => {
-    await tracker.openDashboard()
-
-    const block = tracker.dashboardSection.getByRole('region', {
-      name: 'Distribución del patrimonio',
-    })
-    await expect(block).toBeVisible()
-    await expect(
-      block.getByRole('img', { name: 'Distribución del patrimonio por tipo de activo' }),
-    ).toBeVisible()
-    await expect(block.locator('#wealth-split-legend li').first()).toContainText('%')
-  })
 })

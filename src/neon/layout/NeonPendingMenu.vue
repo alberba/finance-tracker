@@ -16,8 +16,8 @@ import NeonPopover from '../ui/NeonPopover.vue'
 // shared popover, empty state and detail panel: the movements still waiting
 // for a yes (recurring ones that came due) as a short list. Picking one opens
 // its detail, where it is confirmed or skipped, or edited in the entry sheet
-// and confirmed there in one step. The dashboard ticket brings the
-// full «Por confirmar» block; until then this is the way to reach them.
+// and confirmed there in one step. On desktop the dashboard has its own
+// «Por confirmar» block (src/neon/dashboard/DashboardPendingCard.vue).
 const recurringStore = useRecurringStore()
 const financialStateStore = useFinancialStateStore()
 const { formatMovementAmount } = useMoneyFormatter()
