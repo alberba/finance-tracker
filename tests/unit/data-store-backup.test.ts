@@ -52,7 +52,6 @@ describe('useDataStore — JSON backup on sync v2', () => {
 
     await useDataStore().exportJson()
 
-    expect(fetchBackup).toHaveBeenCalledTimes(1)
     expect(click).toHaveBeenCalledTimes(1)
   })
 

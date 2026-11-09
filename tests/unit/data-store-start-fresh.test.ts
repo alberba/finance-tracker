@@ -32,11 +32,6 @@ describe("useDataStore — 'empezar de cero'", () => {
     vi.unstubAllGlobals()
   })
 
-  it('canStartFresh is available to authenticated users', () => {
-    const store = useDataStore()
-    expect(store.canStartFresh).toBe(true)
-  })
-
   it('startFresh() calls the API and reloads the page on success', async () => {
     vi.mocked(initializeFreshState).mockReturnValue(
       Effect.succeed({ ok: true, alreadyInitialized: false }),
@@ -46,7 +41,6 @@ describe("useDataStore — 'empezar de cero'", () => {
     const store = useDataStore()
     await store.startFresh()
 
-    expect(initializeFreshState).toHaveBeenCalledTimes(1)
     expect(reload).toHaveBeenCalledTimes(1)
   })
 

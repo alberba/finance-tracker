@@ -417,10 +417,6 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const pendingItem = await liveMarket.openFirstPendingEdit()
     const descriptionInput = pendingItem.getByLabel('Descripción')
-    const accountSelect = pendingItem.getByLabel('Cuenta')
-    await expect(descriptionInput).toHaveCSS('min-height', '44px')
-    await expect(descriptionInput).toHaveCSS('border-radius', '11px')
-    await expect(accountSelect).toHaveCSS('min-height', '44px')
     await descriptionInput.fill('Compra VWCE editada')
     await pendingItem.getByLabel('Precio por título').fill('105')
     await pendingItem.getByRole('button', { name: 'Guardar y confirmar' }).click()

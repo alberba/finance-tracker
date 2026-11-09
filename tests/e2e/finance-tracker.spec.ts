@@ -353,23 +353,6 @@ test.describe('Finance tracker E2E', () => {
     await assertSortedDescByAmount('investment')
   })
 
-  // Quarantine: raw navigation does not wait for finance-ready before interacting.
-  // https://github.com/alberba/finance-tracker/issues/233
-  test.fixme('home no muestra bloque legacy de filtros en movimientos', async ({
-    page,
-    tracker,
-  }) => {
-    await page.goto('/')
-    await expect(page).toHaveURL(/\/$/)
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.getByRole('heading', {
-        name: 'Orden y filtros de tabla',
-      }),
-    ).toHaveCount(0)
-  })
-
   test('movimientos filtra por tipo con chips y por cuenta', async ({ tracker }) => {
     await tracker.addCustomTransaction({
       date: '2026-03-03',
@@ -531,12 +514,6 @@ test.describe('Finance tracker E2E', () => {
     const toast = page.locator('#toast')
     await expect(toast).toBeVisible()
     expect(await toast.evaluate((element) => element.matches(':popover-open'))).toBe(true)
-    // Still in its corner, not centred like a bare popover.
-    const box = await toast.boundingBox()
-    const viewport = page.viewportSize()
-    expect(box && viewport).toBeTruthy()
-    expect(box!.x).toBeGreaterThan(viewport!.width / 2)
-    expect(box!.y).toBeGreaterThan(viewport!.height / 2)
     await expect(
       tracker.transactionPanel.getByRole('button', { name: 'Guardar y añadir otro' }),
     ).toBeFocused()

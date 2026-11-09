@@ -35,10 +35,6 @@
     "durationMs": 8481,
     "tests": 3
   },
-  "investment-charts.spec.ts": {
-    "durationMs": 19288,
-    "tests": 9
-  },
   "investment-recurring.spec.ts": {
     "durationMs": 9075,
     "tests": 3
@@ -70,10 +66,6 @@
   "settings.spec.ts": {
     "durationMs": 20181,
     "tests": 8
-  },
-  "sidebar-toggle.spec.ts": {
-    "durationMs": 22166,
-    "tests": 10
   },
   "subscriptions.spec.ts": {
     "durationMs": 14786,

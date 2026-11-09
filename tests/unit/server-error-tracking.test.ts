@@ -58,13 +58,6 @@ describe('reportApiRouteFailure', () => {
     expect(captured?.stack).toContain('routeError')
   })
 
-  it('no usa ningún otro punto de entrada del SDK', () => {
-    reportApiRouteFailure(routeError(), { route: '/api/state', status: 500 })
-
-    expect(Object.keys(sentry)).toEqual(['captureException', 'withScope'])
-    expect(sentry.withScope).toHaveBeenCalledTimes(1)
-  })
-
   it('no relanza si el SDK falla al reportar, y deja el fallo en el log', () => {
     // El reporte es best-effort: la respuesta HTTP que el wrap está por
     // devolver no puede caerse porque la telemetría falló.

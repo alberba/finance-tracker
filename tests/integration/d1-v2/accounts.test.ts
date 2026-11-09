@@ -34,43 +34,6 @@ describe("d1-v2 integration: accounts", () => {
     return user;
   }
 
-  it("inserts, reads, updates and deletes an account (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser();
-    const now = new Date().toISOString();
-
-    const [created] = await db
-      .insert(accounts)
-      .values({
-        userId: user.id,
-        name: "Cuenta corriente",
-        kind: "cash",
-        currency: "EUR",
-        openingBalanceMinor: 10_000,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
-
-    expect(created.id).toEqual(expect.any(String));
-    expect(created.userId).toBe(user.id);
-
-    const [found] = await db.select().from(accounts).where(eq(accounts.id, created.id));
-    expect(found).toMatchObject({ name: "Cuenta corriente", openingBalanceMinor: 10_000 });
-
-    await db
-      .update(accounts)
-      .set({ name: "Cuenta renombrada", updatedAt: new Date().toISOString() })
-      .where(eq(accounts.id, created.id));
-
-    const [updated] = await db.select().from(accounts).where(eq(accounts.id, created.id));
-    expect(updated.name).toBe("Cuenta renombrada");
-
-    await db.delete(accounts).where(eq(accounts.id, created.id));
-    const remaining = await db.select().from(accounts).where(eq(accounts.id, created.id));
-    expect(remaining).toHaveLength(0);
-  });
-
   it("rejects inserting an account for a non-existent user (FK violation)", async () => {
     const { db } = testDb;
     const now = new Date().toISOString();

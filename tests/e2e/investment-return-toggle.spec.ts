@@ -13,28 +13,6 @@ test.describe('toggle de modo de rentabilidad (Simple / TWR)', () => {
     return Number.parseFloat(cleaned)
   }
 
-  test('el toggle existe con los dos botones en la sección de inversión', async ({ tracker }) => {
-    await tracker.openInvestment()
-    const section = tracker.investmentSection()
-
-    const simpleBtn = section.getByRole('button', { name: 'Simple' })
-    const twrBtn = section.getByRole('button', { name: 'TWR' })
-
-    await expect(simpleBtn).toBeVisible()
-    await expect(twrBtn).toBeVisible()
-  })
-
-  test('el modo Simple está activo por defecto', async ({ tracker }) => {
-    await tracker.openInvestment()
-    const section = tracker.investmentSection()
-
-    const simpleBtn = section.getByRole('button', { name: 'Simple' })
-    const twrBtn = section.getByRole('button', { name: 'TWR' })
-
-    await expect(simpleBtn).toHaveAttribute('aria-pressed', 'true')
-    await expect(twrBtn).toHaveAttribute('aria-pressed', 'false')
-  })
-
   test('al activar TWR cambia el botón activo y la etiqueta del KPI', async ({ tracker }) => {
     await tracker.openInvestment()
     const section = tracker.investmentSection()

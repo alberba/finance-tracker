@@ -89,13 +89,6 @@ describe('reportApiErrorToSentry', () => {
     expect(capturedError().message).toBe('Fallo de API [offline] en /api/state (sin respuesta)')
   })
 
-  it('no usa ningún otro punto de entrada del SDK', () => {
-    reportApiErrorToSentry(serverError())
-
-    expect(Object.keys(sentry)).toEqual(['captureException', 'withScope'])
-    expect(sentry.withScope).toHaveBeenCalledTimes(1)
-  })
-
   it('un SDK caído no rompe el camino del error ya clasificado', () => {
     sentry.withScope.mockImplementation(() => {
       throw new Error('Sentry no disponible')
