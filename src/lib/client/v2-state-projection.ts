@@ -264,6 +264,10 @@ export function projectSyncV2State(
           name: String(goal.name || ''),
           targetAmount: Number(goal.targetAmount || 0),
           category,
+          // normalizeState keeps the plan only when it is whole and valid.
+          ...(goal.targetYear != null && { targetYear: Number(goal.targetYear) }),
+          ...(goal.targetMonth != null && { targetMonth: Number(goal.targetMonth) }),
+          ...(goal.monthlyAmount != null && { monthlyAmount: Number(goal.monthlyAmount) }),
         })
       }
       continue

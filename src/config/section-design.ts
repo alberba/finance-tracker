@@ -14,6 +14,7 @@ export const MIGRATED_SECTIONS: readonly SectionId[] = [
   'budget',
   'wealth',
   'investment',
+  'goals',
 ]
 
 export function sectionDesign(section: SectionId, design: Design): Design {

@@ -245,6 +245,9 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     categoryId: savingCategory.id,
     name: 'Colchón',
     targetAmount: 3000,
+    targetYear: 2027,
+    targetMonth: 6,
+    monthlyAmount: 125.5,
     currency: 'EUR',
   }))
   await runWithDb(db, goalsRepository.create(userId, {

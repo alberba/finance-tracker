@@ -742,9 +742,32 @@ function normalizeSavingGoals(list: unknown): SavingGoal[] {
         name,
         targetAmount: round2(Math.max(parseFloatSafe(raw.targetAmount, 0), 0)),
         category,
+        ...normalizeSavingGoalPlan(raw),
       },
     ]
   })
+}
+
+/** A deadline needs both a year and a month (1-12); a monthly amount, a non-negative number. */
+function normalizeSavingGoalPlan(
+  raw: Record<string, unknown>,
+): Pick<SavingGoal, 'targetYear' | 'targetMonth' | 'monthlyAmount'> {
+  const year = Number(raw.targetYear)
+  const month = Number(raw.targetMonth)
+  const amount = Number(raw.monthlyAmount)
+  const hasDeadline =
+    raw.targetYear != null &&
+    raw.targetMonth != null &&
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    month >= 1 &&
+    month <= 12
+  return {
+    ...(hasDeadline && { targetYear: year, targetMonth: month }),
+    ...(raw.monthlyAmount != null &&
+      Number.isFinite(amount) &&
+      amount >= 0 && { monthlyAmount: round2(amount) }),
+  }
 }
 
 function normalizeGoals(goals: unknown, year: number): Record<GoalKey, Goal> {

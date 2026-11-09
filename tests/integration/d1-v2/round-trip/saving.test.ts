@@ -229,7 +229,10 @@ describe('round trip: ahorro', () => {
     await addSaving()
     await trip.reload()
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
-    const rows = await runWithDb(trip.testDb.db as never, accountsRepository.listByUser(trip.userId))
+    const rows = await runWithDb(
+      trip.testDb.db as never,
+      accountsRepository.listByUser(trip.userId),
+    )
     const hucha = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
@@ -276,19 +279,25 @@ describe('round trip: ahorro', () => {
     const goalsRepository = await import('../../../../src/db/repositories/goals')
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
     const db = trip.testDb.db as never
-    const expense = await runWithDb(db, accountsRepository.createCategory(trip.userId, {
-      name: 'Comida',
-      kind: 'expense',
-    }))
+    const expense = await runWithDb(
+      db,
+      accountsRepository.createCategory(trip.userId, {
+        name: 'Comida',
+        kind: 'expense',
+      }),
+    )
 
     await expect(
-      runWithDb(db, goalsRepository.create(trip.userId, {
-        key: 'saving:x',
-        categoryId: expense.id,
-        name: 'No',
-        targetAmount: 10,
-        currency: 'EUR',
-      })),
+      runWithDb(
+        db,
+        goalsRepository.create(trip.userId, {
+          key: 'saving:x',
+          categoryId: expense.id,
+          name: 'No',
+          targetAmount: 10,
+          currency: 'EUR',
+        }),
+      ),
     ).rejects.toThrow(/categoría de ahorro/)
   })
 
@@ -341,6 +350,57 @@ describe('round trip: ahorro', () => {
     expect(removed.savingGoals).toHaveLength(0)
   })
 
+  it('keeps the deadline and the monthly amount of a savings goal through sync', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    await createSavingCategory(trip, 'Fondo de emergencia')
+    useGoalsStore().addSavingGoal({
+      name: 'Viaje a Japón',
+      category: 'Fondo de emergencia',
+      targetAmount: 4500,
+      targetYear: 2027,
+      targetMonth: 3,
+      monthlyAmount: 250,
+    })
+    await settled()
+    const created = await trip.reload()
+    expect(created.savingGoals).toMatchObject([
+      { name: 'Viaje a Japón', targetYear: 2027, targetMonth: 3, monthlyAmount: 250 },
+    ])
+    const id = created.savingGoals[0].id
+
+    useGoalsStore().setSavingGoalMonthlyAmounts({ [id]: 310.5 })
+    await settled()
+    expect((await trip.reload()).savingGoals[0].monthlyAmount).toBe(310.5)
+
+    // An edit that does not carry the plan (the old design's panel) keeps it.
+    useGoalsStore().updateSavingGoal(id, {
+      name: 'Japón',
+      category: 'Fondo de emergencia',
+      targetAmount: 5000,
+    })
+    await settled()
+    expect((await trip.reload()).savingGoals).toMatchObject([
+      { name: 'Japón', targetAmount: 5000, targetYear: 2027, targetMonth: 3, monthlyAmount: 310.5 },
+    ])
+  })
+
+  it('creates a savings goal together with a saving category of its own', async () => {
+    const { useGoalsStore } = await import('../../../../src/stores/goals')
+    expect(
+      useGoalsStore().addSavingGoal(
+        { name: 'Viaje a Islandia', category: 'Viaje a Islandia', targetAmount: 3600 },
+        { newCategory: true },
+      ),
+    ).toBe(true)
+    await settled()
+
+    const reloaded = await trip.reload()
+    expect(reloaded.savingCategories.filter((name) => name === 'Viaje a Islandia')).toHaveLength(1)
+    expect(reloaded.savingGoals).toMatchObject([
+      { name: 'Viaje a Islandia', category: 'Viaje a Islandia', targetAmount: 3600 },
+    ])
+  })
+
   it('refuses a saving rule or pending without a destination on the server', async () => {
     const rulesRepository = await import('../../../../src/db/repositories/recurring-rules')
     const pendingRepository = await import('../../../../src/db/repositories/pending-movements')
@@ -351,35 +411,44 @@ describe('round trip: ahorro', () => {
     const destination = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
-      runWithDb(db, rulesRepository.create(trip.userId, {
-        name: 'Ahorro sin destino',
+      runWithDb(
+        db,
+        rulesRepository.create(trip.userId, {
+          name: 'Ahorro sin destino',
+          type: 'saving',
+          accountId: origin.id,
+          amount: 100,
+          currency: 'EUR',
+          frequency: 'monthly',
+        }),
+      ),
+    ).rejects.toThrow(/cuenta destino/)
+
+    const rule = await runWithDb(
+      db,
+      rulesRepository.create(trip.userId, {
+        name: 'Ahorro mensual',
         type: 'saving',
         accountId: origin.id,
+        destinationAccountId: destination.id,
         amount: 100,
         currency: 'EUR',
         frequency: 'monthly',
-      })),
-    ).rejects.toThrow(/cuenta destino/)
-
-    const rule = await runWithDb(db, rulesRepository.create(trip.userId, {
-      name: 'Ahorro mensual',
-      type: 'saving',
-      accountId: origin.id,
-      destinationAccountId: destination.id,
-      amount: 100,
-      currency: 'EUR',
-      frequency: 'monthly',
-    }))
+      }),
+    )
 
     await expect(
-      runWithDb(db, pendingRepository.create(trip.userId, {
-        recurringRuleId: rule.id,
-        type: 'saving',
-        accountId: origin.id,
-        amount: 100,
-        currency: 'EUR',
-        dueDate: '2026-10-01',
-      })),
+      runWithDb(
+        db,
+        pendingRepository.create(trip.userId, {
+          recurringRuleId: rule.id,
+          type: 'saving',
+          accountId: origin.id,
+          amount: 100,
+          currency: 'EUR',
+          dueDate: '2026-10-01',
+        }),
+      ),
     ).rejects.toThrow(/cuenta destino/)
 
     await expect(

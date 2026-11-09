@@ -60,7 +60,8 @@ _Avoid_: transferencia, traspaso, inversión de bajo riesgo
 
 **Objetivo de ahorro**:
 Un objetivo creado por el usuario cuyo progreso es la suma de los ahorros de una categoría de
-ahorro, incluidos los anteriores a su creación. Los objetivos de patrimonio (corto, medio y largo
+ahorro, incluidos los anteriores a su creación. Puede tener un mes límite y una aportación
+mensual prevista, que fija «Repartir el ahorro»; con ellos se calcula cuándo llega. Los objetivos de patrimonio (corto, medio y largo
 plazo) se siguen midiendo contra el patrimonio y no se ligan a una categoría.
 _Avoid_: meta de ahorro, objetivo ligado a una cuenta
 

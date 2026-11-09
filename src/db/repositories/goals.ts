@@ -13,8 +13,12 @@ import {
   versionGuard,
 } from './shared'
 
-export type GoalRow = Omit<typeof goals.$inferSelect, 'targetAmountMinor'> & {
+export type GoalRow = Omit<
+  typeof goals.$inferSelect,
+  'targetAmountMinor' | 'monthlyAmountMinor'
+> & {
   targetAmount: number
+  monthlyAmount: number | null
 }
 
 export interface CreateGoalInput {
@@ -26,6 +30,9 @@ export interface CreateGoalInput {
   categoryId?: string | null
   name: string
   targetYear?: number | null
+  /** A savings goal's deadline month (1-12) and planned monthly amount. */
+  targetMonth?: number | null
+  monthlyAmount?: number | null
   targetAmount: number
   currency: string
 }
@@ -34,12 +41,23 @@ export interface UpdateGoalInput {
   categoryId?: string | null
   name?: string
   targetYear?: number | null
+  targetMonth?: number | null
+  monthlyAmount?: number | null
   targetAmount?: number
   currency?: string
 }
 
-function toRow(row: typeof goals.$inferSelect): GoalRow {
-  return { ...row, targetAmount: fromMinorUnits(row.targetAmountMinor, row.currency) }
+function toRow({ monthlyAmountMinor, ...row }: typeof goals.$inferSelect): GoalRow {
+  return {
+    ...row,
+    targetAmount: fromMinorUnits(row.targetAmountMinor, row.currency),
+    monthlyAmount:
+      monthlyAmountMinor === null ? null : fromMinorUnits(monthlyAmountMinor, row.currency),
+  }
+}
+
+function monthlyMinor(amount: number | null | undefined, currency: string): number | null {
+  return amount === null || amount === undefined ? null : toMinorUnits(amount, currency)
 }
 
 export const listByUser = (userId: string) =>
@@ -90,6 +108,8 @@ export const create = (userId: string, input: CreateGoalInput) =>
         categoryId: input.categoryId ?? null,
         name: input.name,
         targetYear: input.targetYear ?? null,
+        targetMonth: input.targetMonth ?? null,
+        monthlyAmountMinor: monthlyMinor(input.monthlyAmount, input.currency),
         targetAmountMinor: toMinorUnits(input.targetAmount, input.currency),
         currency: input.currency,
         createdAt: now,
@@ -112,6 +132,8 @@ export const update = (
     }
     const nextCurrency = input.currency ?? existing.currency
     const nextTargetAmount = input.targetAmount ?? existing.targetAmount
+    const nextMonthlyAmount =
+      input.monthlyAmount === undefined ? existing.monthlyAmount : input.monthlyAmount
     return yield* query(async (db): Promise<GoalRow | undefined> => {
       await assertSavingCategory(db, userId, input.categoryId)
       const [row] = await db
@@ -120,6 +142,8 @@ export const update = (
           categoryId: input.categoryId === undefined ? existing.categoryId : input.categoryId,
           name: input.name ?? existing.name,
           targetYear: input.targetYear === undefined ? existing.targetYear : input.targetYear,
+          targetMonth: input.targetMonth === undefined ? existing.targetMonth : input.targetMonth,
+          monthlyAmountMinor: monthlyMinor(nextMonthlyAmount, nextCurrency),
           targetAmountMinor: toMinorUnits(nextTargetAmount, nextCurrency),
           currency: nextCurrency,
           updatedAt: nowIso(),
@@ -174,6 +198,8 @@ export const bulkInsert = (userId: string, inputs: CreateGoalInput[]) =>
           key: input.key,
           name: input.name,
           targetYear: input.targetYear ?? null,
+          targetMonth: input.targetMonth ?? null,
+          monthlyAmountMinor: monthlyMinor(input.monthlyAmount, input.currency),
           targetAmountMinor: toMinorUnits(input.targetAmount, input.currency),
           currency: input.currency,
           createdAt: now,

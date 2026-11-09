@@ -29,6 +29,7 @@ const neonSectionLoaders = {
   budget: () => import('../neon/sections/budget/NeonBudgetSection.vue'),
   wealth: () => import('../neon/sections/wealth/NeonWealthSection.vue'),
   investment: () => import('../neon/sections/investment/NeonInvestmentSection.vue'),
+  goals: () => import('../neon/sections/goals/NeonGoalsSection.vue'),
 } satisfies Partial<Record<SectionId, () => Promise<unknown>>>
 
 const ReportsPage = defineAsyncComponent(sectionLoaders.reports)
@@ -51,6 +52,7 @@ const neonSectionComponents: Partial<Record<SectionId, Component>> = {
   budget: defineAsyncComponent(neonSectionLoaders.budget),
   wealth: defineAsyncComponent(neonSectionLoaders.wealth),
   investment: defineAsyncComponent(neonSectionLoaders.investment),
+  goals: defineAsyncComponent(neonSectionLoaders.goals),
 }
 
 /**
