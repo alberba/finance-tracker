@@ -1,8 +1,4 @@
 {
-  "budget.spec.ts": {
-    "durationMs": 24232,
-    "tests": 5
-  },
   "contribution-defaults.spec.ts": {
     "durationMs": 26044,
     "tests": 5
@@ -54,6 +50,10 @@
   "mobile-smoke.spec.ts": {
     "durationMs": 21028,
     "tests": 8
+  },
+  "neon-budget.spec.ts": {
+    "durationMs": 21400,
+    "tests": 3
   },
   "reports.spec.ts": {
     "durationMs": 15839,

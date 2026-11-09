@@ -43,9 +43,12 @@ El estado que consume la UI guarda el plan en `state.budget[type][category][mont
 
 ## Pruebas y puntos sensibles
 
-- `tests/e2e/budget.spec.ts`: pestañas, ventana de meses, rango recordado, edición persistida
-  tras recarga, rechazo de texto inválido y guardado del plan anual.
-- `tests/e2e/pages/FinanceTrackerPage.ts`: helpers de navegación, rango, celdas y panel.
+- `tests/e2e/neon-budget.spec.ts` (diseño nuevo): fijar el límite de una categoría y ver lo que
+  queda, una categoría pasada tras apuntar un gasto y el plan anual desde su panel.
+- `tests/e2e/legacy-design-smoke.spec.ts`: el diseño antiguo abre la sección.
+- `tests/unit/neon-budget-month-view-model.test.ts`, `neon-budget-review-view-model.test.ts`,
+  `neon-budget-prepare-view-model.test.ts` y `neon-budget-year-view-model.test.ts`: cifras,
+  estados y etiquetas de «Este mes», Revisar, Preparar y El año.
 - `tests/unit/budget-view-model.test.ts`: estados de mes, tonos, ventanas y barras.
 - `tests/unit/budget-store-sync.test.ts`: edición y encolado desde el store.
 - `tests/integration/d1-v2/round-trip/budget.test.ts`: persistencia con el store real y SQLite,

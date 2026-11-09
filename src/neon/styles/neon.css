@@ -291,6 +291,11 @@
   --color-sel-border: #e6e1d7;
   --color-peach: #e8b79c;
   --color-neutral-bar: #6f6a62;
+  /* Presupuesto (#433): chart baselines and empty rings, and the saving and
+     investment hues of the month's split. */
+  --color-grid: #3a3834;
+  --color-lilac2: #867bcb;
+  --color-lilac3: #625aa0;
 
   --text-brand: 24px;
   --tracking-brand: -0.03em;
