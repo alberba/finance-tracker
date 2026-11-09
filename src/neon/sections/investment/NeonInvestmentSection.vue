@@ -36,7 +36,7 @@ import {
   type CardRow,
   type SortDirection,
   type SortKey,
-  type Tone,
+  TONE_TEXT,
 } from './view-model'
 
 // Inversión in the new design (artboard «Inversión · 2560 px», #437): the
@@ -104,7 +104,7 @@ const cards = computed<Array<{ id: string; title: string; rows: CardRow[] }>>(()
   },
 ])
 
-const METHOD_GROUPS = computed<ChoiceGroup<string>[]>(() => [
+const METHOD_GROUPS = computed<ChoiceGroup<ReturnMode>[]>(() => [
   {
     key: 'method',
     value: method.value,
@@ -118,17 +118,12 @@ const METHOD_GROUPS = computed<ChoiceGroup<string>[]>(() => [
     ],
   },
 ])
-const PERIOD_GROUPS = computed<ChoiceGroup<number>[]>(() => [
+const PERIOD_GROUPS = computed<ChoiceGroup<Month>[]>(() => [
   { key: 'month', value: month.value, options: periods.value },
 ])
 
 const ICON_METHOD = 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4'
 const ICON_PERIOD = 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
-const TONE_TEXT: Record<Tone, string> = {
-  gain: 'text-gain',
-  loss: 'text-loss',
-  neutral: 'text-text',
-}
 
 // The panel keeps the last position while it slides out.
 const openId = ref<string | null>(null)
@@ -213,14 +208,14 @@ function sortBy(key: SortKey, direction: SortDirection): void {
           label="Periodo"
           :icon="ICON_PERIOD"
           :groups="PERIOD_GROUPS"
-          @select="(_, value) => investmentStore.setMonth(value as Month)"
+          @select="(_, value) => investmentStore.setMonth(value)"
         />
         <NeonChoiceMenu
           :text="method === 'twr' ? 'Rentabilidad TWR' : 'Rentabilidad simple'"
           label="Cómo medir la rentabilidad"
           :icon="ICON_METHOD"
           :groups="METHOD_GROUPS"
-          @select="(_, value) => investmentStore.setReturnMode(value as ReturnMode)"
+          @select="(_, value) => investmentStore.setReturnMode(value)"
         />
       </div>
 
@@ -254,7 +249,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
           >
             {{ figure.value }}
           </span>
-          <span class="min-h-[1.4em] text-[14px] font-extrabold" :class="TONE_TEXT[figure.tone]">
+          <span class="text-note min-h-[1.4em] font-extrabold" :class="TONE_TEXT[figure.tone]">
             {{ figure.sub }}
           </span>
         </div>
@@ -280,9 +275,9 @@ function sortBy(key: SortKey, direction: SortDirection): void {
               :key="row.label"
               class="border-line flex items-baseline justify-between gap-3 border-t py-2.5"
             >
-              <span class="text-[16px] font-bold">{{ row.label }}</span>
+              <span class="text-row font-bold">{{ row.label }}</span>
               <span
-                class="font-display flex-none text-[16px] font-semibold whitespace-nowrap tabular-nums"
+                class="font-display text-figure-row flex-none font-semibold whitespace-nowrap tabular-nums"
                 :class="TONE_TEXT[row.tone]"
               >
                 {{ row.value }}

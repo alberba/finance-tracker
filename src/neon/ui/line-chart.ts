@@ -27,7 +27,8 @@ export interface LabelledLineChart extends LineChartGeometry {
   label: string
 }
 
-function niceStep(raw: number): number {
+/** The round step (1, 2, 2.5, 5 × 10ⁿ) nearest above `raw`, for grid lines. */
+export function niceStep(raw: number): number {
   const power = 10 ** Math.floor(Math.log10(raw))
   const scaled = raw / power
   const nice = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 2.5 ? 2.5 : scaled <= 5 ? 5 : 10

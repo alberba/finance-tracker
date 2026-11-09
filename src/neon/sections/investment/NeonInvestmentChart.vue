@@ -91,7 +91,7 @@ defineProps<{ chart: PortfolioChart }>()
         aria-hidden="true"
       >
         <span class="text-xs font-bold">{{ end.name }}</span>
-        <span class="font-display text-[16px] font-semibold tracking-[-0.02em]">
+        <span class="font-display text-figure-row font-semibold tracking-[-0.02em]">
           {{ end.figure }}
         </span>
       </span>

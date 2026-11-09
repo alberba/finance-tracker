@@ -26,6 +26,7 @@ import {
 } from '../../../lib/finance-core'
 import { ALL_MONTHS, YEAR_START, type Month, type MonthOrStart } from '../../../lib/month'
 import { toSnapshotDate } from '../../../scripts/contribution-workflow'
+import { niceStep } from '../../ui/line-chart'
 import type { State } from '../../../scripts/types'
 import { round2 } from '../../../scripts/utils'
 
@@ -39,6 +40,13 @@ export type Tone = 'gain' | 'loss' | 'neutral'
 /** Gain, loss or neither: a cent either way is still nothing. */
 export function toneOf(value: number): Tone {
   return value > 0.005 ? 'gain' : value < -0.005 ? 'loss' : 'neutral'
+}
+
+/** The text colour of each tone. */
+export const TONE_TEXT: Record<Tone, string> = {
+  gain: 'text-gain',
+  loss: 'text-loss',
+  neutral: 'text-text',
 }
 
 /** «+17,5 %»: the cover's percentages carry one decimal and always a sign. */
@@ -150,13 +158,6 @@ export interface PortfolioChart {
   drop: { x: number; y: number; left: number; top: number; text: string } | null
   /** What the chart says, for screen readers. */
   label: string
-}
-
-function niceStep(raw: number): number {
-  const power = 10 ** Math.floor(Math.log10(raw))
-  const scaled = raw / power
-  const nice = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 2.5 ? 2.5 : scaled <= 5 ? 5 : 10
-  return nice * power
 }
 
 const round1 = (value: number) => Math.round(value * 10) / 10

@@ -12,6 +12,7 @@ import {
   type SortDirection,
   type SortKey,
   type Tone,
+  TONE_TEXT,
 } from './view-model'
 
 // The positions of the cover, one ledger row each: ticker and name, units and
@@ -28,11 +29,6 @@ const emit = defineEmits<{
   sort: [key: SortKey, direction: SortDirection]
 }>()
 
-const TONE_TEXT: Record<Tone, string> = {
-  gain: 'text-gain',
-  loss: 'text-loss',
-  neutral: 'text-text',
-}
 const TONE_STROKE: Record<Tone, string> = {
   gain: 'var(--color-gain)',
   loss: 'var(--color-loss)',
@@ -41,7 +37,7 @@ const TONE_STROKE: Record<Tone, string> = {
 const COLUMNS = 'grid-cols-[minmax(220px,1fr)_120px_170px_150px_150px_220px]'
 const SORT_ICON = 'M4 7h16M7 12h10M10 17h4'
 
-function sortGroups(): ChoiceGroup<string>[] {
+function sortGroups(): ChoiceGroup<SortKey | SortDirection>[] {
   return [
     { key: 'by', options: SORT_OPTIONS, value: props.sortKey },
     { key: 'direction', options: DIRECTION_OPTIONS, value: props.sortDirection },
@@ -52,9 +48,12 @@ function sortGroups(): ChoiceGroup<string>[] {
 // one keeps its place so the names stay aligned.
 const hasTickers = computed(() => props.rows.some((row) => row.symbol))
 
-function onSort(group: string, value: string): void {
-  if (group === 'by') emit('sort', value as SortKey, props.sortDirection)
-  else emit('sort', props.sortKey, value as SortDirection)
+const isDirection = (value: SortKey | SortDirection): value is SortDirection =>
+  value === 'asc' || value === 'desc'
+
+function onSort(_group: string, value: SortKey | SortDirection): void {
+  if (isDirection(value)) emit('sort', props.sortKey, value)
+  else emit('sort', value, props.sortDirection)
 }
 </script>
 
@@ -97,21 +96,21 @@ function onSort(group: string, value: string): void {
         >
           <span
             v-if="hasTickers"
-            class="bg-panel2 w-16 flex-none rounded-[8px] px-2 py-0.5 text-center font-mono text-[13px] font-bold tracking-[0.04em]"
+            class="bg-panel2 text-meta w-16 flex-none rounded-[8px] px-2 py-0.5 text-center font-mono font-bold tracking-[0.04em]"
             :class="row.symbol ? '' : 'invisible'"
           >
             {{ row.symbol ?? '·' }}
           </span>
-          <span class="truncate text-[16px] font-bold">{{ row.name }}</span>
+          <span class="text-row truncate font-bold">{{ row.name }}</span>
         </button>
         <span class="min-w-0 text-end">
           <template v-if="row.units">
             <span
-              class="font-display block text-[16px] font-semibold whitespace-nowrap tabular-nums"
+              class="font-display text-figure-row block font-semibold whitespace-nowrap tabular-nums"
             >
               {{ row.units }}
             </span>
-            <span class="text-muted block text-[13px] whitespace-nowrap">{{ row.price }}</span>
+            <span class="text-muted text-meta block whitespace-nowrap">{{ row.price }}</span>
           </template>
           <span v-else class="text-muted">—</span>
         </span>
@@ -122,23 +121,23 @@ function onSort(group: string, value: string): void {
               :style="{ width: `${row.weightPct}%` }"
             ></span>
           </span>
-          <span class="text-soft min-w-[52px] flex-none text-end text-[14px] font-bold">
+          <span class="text-soft text-note min-w-[52px] flex-none text-end font-bold">
             {{ row.weight }}
           </span>
         </span>
         <span
-          class="font-display text-end text-[16px] font-semibold whitespace-nowrap tabular-nums"
+          class="font-display text-figure-row text-end font-semibold whitespace-nowrap tabular-nums"
         >
           {{ row.value }}
         </span>
         <span class="flex flex-col items-end gap-px text-end">
           <span
-            class="font-display text-[16px] font-semibold whitespace-nowrap tabular-nums"
+            class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
             :class="TONE_TEXT[row.tone]"
           >
             {{ row.gain }}
           </span>
-          <span class="text-[14px] font-extrabold whitespace-nowrap" :class="TONE_TEXT[row.tone]">
+          <span class="text-note font-extrabold whitespace-nowrap" :class="TONE_TEXT[row.tone]">
             {{ row.ret }}
           </span>
         </span>
@@ -160,7 +159,7 @@ function onSort(group: string, value: string): void {
             />
           </svg>
           <span
-            class="min-w-16 flex-none text-end text-[14px] font-extrabold whitespace-nowrap"
+            class="text-note min-w-16 flex-none text-end font-extrabold whitespace-nowrap"
             :class="TONE_TEXT[row.changeTone]"
           >
             {{ row.change }}

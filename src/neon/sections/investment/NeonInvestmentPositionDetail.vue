@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
-import type { PositionDetail, Tone } from './view-model'
+import { TONE_TEXT, type PositionDetail } from './view-model'
 
 // A position opened from the cover, in the shared detail panel: its figures
 // and its latest operations, newest first. The full asset page («‹ VWCE») is
@@ -8,12 +8,6 @@ import type { PositionDetail, Tone } from './view-model'
 defineProps<{ title: string; kicker: string; detail: PositionDetail | null }>()
 
 const open = defineModel<boolean>('open', { required: true })
-
-const TONE_TEXT: Record<Tone, string> = {
-  gain: 'text-gain',
-  loss: 'text-loss',
-  neutral: 'text-text',
-}
 </script>
 
 <template>
@@ -21,9 +15,9 @@ const TONE_TEXT: Record<Tone, string> = {
     <template v-if="detail">
       <dl class="m-0 grid grid-cols-2 gap-x-5 gap-y-4" aria-label="Cifras de la posición">
         <div v-for="figure in detail.figures" :key="figure.label" class="grid min-w-0 gap-0.5">
-          <dt class="text-muted text-[13px]">{{ figure.label }}</dt>
+          <dt class="text-muted text-meta">{{ figure.label }}</dt>
           <dd
-            class="font-display m-0 truncate text-[16px] font-semibold tabular-nums"
+            class="font-display text-figure-row m-0 truncate font-semibold tabular-nums"
             :class="TONE_TEXT[figure.tone]"
           >
             {{ figure.value }}
@@ -44,10 +38,10 @@ const TONE_TEXT: Record<Tone, string> = {
             class="border-line flex min-h-16 items-center justify-between gap-3 border-t py-2.5"
           >
             <span class="grid min-w-0 gap-0.5">
-              <span class="truncate text-[16px] font-bold">{{ movement.title }}</span>
-              <span class="text-muted truncate text-[13px]">{{ movement.meta }}</span>
+              <span class="text-row truncate font-bold">{{ movement.title }}</span>
+              <span class="text-muted text-meta truncate">{{ movement.meta }}</span>
             </span>
-            <span class="font-display flex-none text-[16px] font-semibold tabular-nums">
+            <span class="font-display text-figure-row flex-none font-semibold tabular-nums">
               {{ movement.amount }}
             </span>
           </li>

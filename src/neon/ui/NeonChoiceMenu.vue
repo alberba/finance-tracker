@@ -19,20 +19,15 @@ export interface ChoiceGroup<V> {
   value: V
 }
 
-withDefaults(
-  defineProps<{
-    /** What the pill shows: the current choice. */
-    text: string
-    /** Accessible name of the list («Cómo medir la rentabilidad»). */
-    label: string
-    /** `d` of the pill's 24×24 icon. */
-    icon: string
-    groups: ReadonlyArray<ChoiceGroup<T>>
-    /** Where the list opens; `above` for a pill at the bottom of a chart. */
-    placement?: 'below' | 'above'
-  }>(),
-  { placement: 'below' },
-)
+defineProps<{
+  /** What the pill shows: the current choice. */
+  text: string
+  /** Accessible name of the list («Cómo medir la rentabilidad»). */
+  label: string
+  /** `d` of the pill's 24×24 icon. */
+  icon: string
+  groups: ReadonlyArray<ChoiceGroup<T>>
+}>()
 
 const emit = defineEmits<{ select: [key: string, value: T] }>()
 
@@ -82,7 +77,7 @@ onBeforeUnmount(stopListening)
     <button
       ref="trigger"
       type="button"
-      class="rounded-pill outline-accent inline-flex min-h-[38px] items-center gap-2 border px-3.5 text-[13px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+      class="rounded-pill outline-accent text-meta inline-flex min-h-[38px] items-center gap-2 border px-3.5 font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
       :class="
         open
           ? 'bg-sel-bg text-sel-text border-sel-border'
@@ -112,12 +107,7 @@ onBeforeUnmount(stopListening)
       :id="menuId"
       role="menu"
       :aria-label="label"
-      class="bg-panel border-line rounded-popover shadow-float text-text motion-safe:animate-pop-in absolute inset-e-0 z-40 grid w-max max-w-[min(340px,calc(100vw-24px))] min-w-[190px] border p-1.5"
-      :class="
-        placement === 'above'
-          ? 'inset-be-full mbe-2.5 origin-bottom-right'
-          : 'inset-bs-full mbs-2.5 origin-top-right'
-      "
+      class="bg-panel border-line rounded-popover shadow-float text-text motion-safe:animate-pop-in absolute inset-e-0 inset-bs-full z-40 mbs-2.5 grid w-max max-w-[min(340px,calc(100vw-24px))] min-w-[190px] origin-top-right border p-1.5"
     >
       <template v-for="(group, index) in groups" :key="group.key">
         <span v-if="index > 0" class="bg-line mx-2 my-1.5 block h-px" aria-hidden="true"></span>
@@ -127,7 +117,7 @@ onBeforeUnmount(stopListening)
           type="button"
           role="menuitemradio"
           :aria-checked="option.value === group.value"
-          class="outline-accent flex min-h-11 w-full items-start gap-2.5 rounded-[10px] px-3 py-2.5 text-start text-[14px] font-bold focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="outline-accent text-note flex min-h-11 w-full items-start gap-2.5 rounded-[10px] px-3 py-2.5 text-start font-bold focus-visible:outline-2 focus-visible:-outline-offset-2"
           :class="
             option.value === group.value ? 'bg-panel2 text-text' : 'text-soft hover:bg-panel2'
           "
@@ -140,7 +130,7 @@ onBeforeUnmount(stopListening)
           ></span>
           <span class="grid gap-0.5">
             <span>{{ option.label }}</span>
-            <span v-if="option.hint" class="text-muted text-[13px] font-semibold">
+            <span v-if="option.hint" class="text-muted text-meta font-semibold">
               {{ option.hint }}
             </span>
           </span>
