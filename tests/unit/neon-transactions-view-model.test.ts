@@ -4,6 +4,7 @@ import type { MonthGroup } from '../../src/domain/transactions/registry'
 import type { Month } from '../../src/lib/month'
 import {
   buildLedgerMonths,
+  bulkCategoryType,
   categoryBreakdown,
   dayLabel,
   extraMatcher,
@@ -13,6 +14,8 @@ import {
   narrowMonthGroups,
   NO_EXTRA_FILTERS,
   olderMonthsLabel,
+  selectionSummary,
+  shownIds,
   toggleTypeChip,
 } from '../../src/neon/sections/transactions/registry-view-model'
 import {
@@ -243,6 +246,32 @@ describe('movement detail', () => {
       { label: 'Tipo', value: 'Ahorro' },
       { label: 'Cuenta en el mes', value: 'Octubre' },
     ])
+  })
+})
+
+describe('selection', () => {
+  const rows = [
+    tx('cena', '2026-10-09', 'expense', 48.6),
+    tx('nomina', '2026-10-08', 'income', 3420, { category: 'Nómina' }),
+  ]
+
+  it('selects every row the ledger shows, in its order', () => {
+    const months = buildLedgerMonths([group(10, rows, 3371.4)], LEDGER)
+    expect(shownIds(months)).toEqual(['cena', 'nomina'])
+  })
+
+  it('counts the selection and signs its sum', () => {
+    expect(selectionSummary(rows, 'EUR')).toEqual({
+      count: '2 seleccionados',
+      sum: '+3.371,40\u00a0€',
+    })
+    expect(selectionSummary(rows.slice(0, 1), 'EUR').count).toBe('1 seleccionado')
+  })
+
+  it('offers the categories of the new type, or of the type every row shares', () => {
+    expect(bulkCategoryType(rows, '')).toBeNull()
+    expect(bulkCategoryType(rows, 'investment')).toBe('investment')
+    expect(bulkCategoryType(rows.slice(0, 1), '')).toBe('expense')
   })
 })
 

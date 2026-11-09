@@ -6,16 +6,33 @@ import NeonButton from '../../ui/NeonButton.vue'
 // The registry's ledger (DESIGN.md, «Fila de libro mayor»): one card per month
 // shown, its rows grouped by day with the day's net. Each row is a button that
 // opens the movement's detail; the open one carries the selected inset line.
-// Older months fold behind one button (the domain's folding rule).
-defineProps<{
+// Older months fold behind one button (the domain's folding rule). While
+// selecting, each row is a checkbox and its icon turns into the check.
+const props = defineProps<{
   months: LedgerMonthView[]
   /** The unfold button's text, or empty when nothing is folded. */
   olderLabel: string
   /** The movement whose detail is open. */
   openId: string | null
+  /** Selecting rows for a bulk action: a row toggles instead of opening. */
+  selecting?: boolean
+  selectedIds?: readonly string[]
 }>()
 
-const emit = defineEmits<{ open: [id: string, trigger: HTMLElement]; showOlder: [] }>()
+const emit = defineEmits<{
+  open: [id: string, trigger: HTMLElement]
+  toggle: [id: string]
+  showOlder: []
+}>()
+
+function isSelected(id: string): boolean {
+  return Boolean(props.selecting && props.selectedIds?.includes(id))
+}
+
+function press(id: string, trigger: HTMLElement): void {
+  if (props.selecting) emit('toggle', id)
+  else emit('open', id, trigger)
+}
 
 const TONE: Record<AmountTone, string> = {
   gain: 'text-gain',
@@ -66,16 +83,42 @@ const CHIP_TONE: Record<string, string> = {
           type="button"
           class="neon-ledger-row border-line text-text outline-accent grid min-h-16 w-full items-center gap-3 border-t px-6 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-colors"
           :class="
-            openId === row.id
+            openId === row.id || isSelected(row.id)
               ? 'bg-panel2 shadow-[inset_3px_0_0_var(--color-accent)]'
               : 'hover:bg-panel2/60'
           "
           :aria-label="row.label"
-          aria-haspopup="dialog"
+          :role="selecting ? 'checkbox' : undefined"
+          :aria-checked="selecting ? isSelected(row.id) : undefined"
+          :aria-haspopup="selecting ? undefined : 'dialog'"
           :data-tx-id="row.id"
-          @click="emit('open', row.id, $event.currentTarget as HTMLElement)"
+          @click="press(row.id, $event.currentTarget as HTMLElement)"
         >
           <span
+            v-if="selecting"
+            class="grid size-10 place-items-center rounded-full border-2"
+            :class="
+              isSelected(row.id)
+                ? 'bg-accent border-accent text-on-accent'
+                : 'border-ctrl-line text-transparent'
+            "
+            aria-hidden="true"
+            data-tx-check
+          >
+            <svg
+              class="size-[18px]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>
+          </span>
+          <span
+            v-else
             class="bg-panel2 grid size-10 place-items-center rounded-full"
             :class="CHIP_TONE[row.type]"
             aria-hidden="true"

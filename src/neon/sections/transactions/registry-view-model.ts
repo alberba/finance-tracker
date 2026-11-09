@@ -418,3 +418,45 @@ export function movementDetail(
     same,
   }
 }
+
+// --- Selection and bulk actions ---------------------------------------------
+
+/** Ids of every row the ledger shows, in order: what «Seleccionar todo» picks. */
+export function shownIds(months: readonly LedgerMonthView[]): string[] {
+  return months.flatMap((month) => month.days.flatMap((day) => day.rows.map((row) => row.id)))
+}
+
+/** The bulk bar's count and the signed sum of the selection. */
+export function selectionSummary(
+  selected: readonly Transaction[],
+  currency: string,
+): { count: string; sum: string } {
+  const sum = round2(selected.reduce((total, tx) => total + signedAmount(tx), 0))
+  return {
+    count: plural(selected.length, 'seleccionado', 'seleccionados'),
+    sum: formatSignedMoney(sum, currency),
+  }
+}
+
+/**
+ * Types a selection can change to. Not «Ahorro»: a saving needs a destination
+ * account, so it is edited one by one.
+ */
+export const BULK_TYPES: ReadonlyArray<{ value: TransactionType; label: string }> = [
+  { value: 'expense', label: 'Gasto' },
+  { value: 'income', label: 'Ingreso' },
+  { value: 'investment', label: 'Inversión' },
+]
+
+/**
+ * The type whose categories the bulk bar offers: the new type, or the one every
+ * selected movement shares; null when they mix types and none is chosen.
+ */
+export function bulkCategoryType(
+  selected: readonly Transaction[],
+  newType: TransactionType | '',
+): TransactionType | null {
+  if (newType) return newType
+  const types = new Set(selected.map((tx) => tx.type))
+  return types.size === 1 ? [...types][0] : null
+}

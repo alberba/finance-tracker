@@ -15,7 +15,8 @@ import {
 // «Buscar y filtrar» of the registry: the search pill, the type segment (one
 // type at a time) and «Más filtros» (account, exact day and amount range).
 // Search, type and account are the registry's shared filters; the day and the
-// amounts only exist in the new design and come in as `extra`.
+// amounts only exist in the new design and come in as `extra`. The registry's
+// own actions (select, export) go at the end of the row.
 const extra = defineModel<ExtraFilters>('extra', { required: true })
 const emit = defineEmits<{ clear: [] }>()
 
@@ -108,6 +109,9 @@ const fieldClass =
       >
         {{ moreLabel }}
       </NeonButton>
+      <div class="ms-auto flex shrink-0 items-center gap-1">
+        <slot name="actions" />
+      </div>
     </div>
 
     <div

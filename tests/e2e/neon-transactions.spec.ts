@@ -173,4 +173,83 @@ test.describe('Movimientos en el diseño nuevo', () => {
 
     await expect(row(page, 'e2e-alta-cabecera').locator('[data-tx-amount]')).toHaveText('−8,20 €')
   })
+
+  test('exporta el informe de un periodo como PDF y CSV', async ({ page, tracker }) => {
+    await page.goto('/movimientos')
+    await tracker.open('transactions')
+
+    await section(page).getByRole('button', { name: 'Exportar' }).click()
+    const panel = page.getByRole('dialog', { name: 'Informe mensual' })
+    await expect(panel).toBeVisible()
+
+    await panel.getByLabel('Desde').fill('2026-02-01')
+    await panel.getByLabel('Hasta').fill('2026-02-28')
+    const summary = panel.locator('[data-report-summary]')
+    await expect(summary).toContainText('13 movimientos')
+    await expect(summary).toContainText(/Ingresos\s*2\.085,00/)
+    await expect(summary).toContainText(/Gastos\s*404,77/)
+
+    await panel.getByLabel('Hasta').fill('2999-01-01')
+    await expect(panel.locator('[data-report-error]')).toContainText('futura')
+    await expect(panel.getByRole('button', { name: 'Descargar PDF' })).toBeDisabled()
+    await panel.getByLabel('Hasta').fill('2026-02-28')
+
+    const pdf = page.waitForEvent('download')
+    await panel.getByRole('button', { name: 'Descargar PDF' }).click()
+    expect((await pdf).suggestedFilename()).toBe('Informe 2026-02-01 - 2026-02-28.pdf')
+
+    const csv = page.waitForEvent('download')
+    await panel.getByRole('button', { name: 'Descargar CSV' }).click()
+    expect((await csv).suggestedFilename()).toBe('movimientos-2026-02-01-2026-02-28.csv')
+  })
+
+  test('selecciona varios movimientos, los cambia de golpe y los borra tras confirmar', async ({
+    page,
+    tracker,
+  }) => {
+    await addMovements(page, tracker, [
+      { id: 'e2e-lote-a', type: 'expense', amount: 11, date: '2026-03-11' },
+      { id: 'e2e-lote-b', type: 'expense', amount: 12, date: '2026-03-12' },
+    ])
+    await search(page).fill('e2e-lote')
+
+    await section(page).getByRole('button', { name: 'Seleccionar', exact: true }).click()
+    const bar = section(page).getByRole('region', { name: 'Acciones sobre la selección' })
+    await ledger(page)
+      .getByRole('checkbox', { name: /^e2e-lote-a/ })
+      .click()
+    await ledger(page)
+      .getByRole('checkbox', { name: /^e2e-lote-b/ })
+      .click()
+    await expect(bar).toContainText('2 seleccionados')
+    await expect(bar).toContainText('−23,00 €')
+
+    await bar.getByLabel('Cambiar tipo').selectOption('investment')
+    await bar.getByLabel('Cambiar categoría').selectOption('Fondos Indexados')
+    await bar.getByRole('button', { name: 'Aplicar' }).click()
+    await expect(row(page, 'Fondos Indexados')).toHaveCount(2)
+    await expect(bar).toContainText('2 seleccionados')
+
+    // The change stays after reloading.
+    await tracker.reload()
+    await search(page).fill('e2e-lote')
+    await expect(row(page, 'Fondos Indexados')).toHaveCount(2)
+    await section(page).getByRole('button', { name: 'Seleccionar', exact: true }).click()
+    await section(page).getByRole('button', { name: 'Seleccionar todo' }).click()
+
+    await bar.getByRole('button', { name: 'Eliminar', exact: true }).click()
+    const confirm = bar.getByRole('alertdialog', { name: /¿Eliminar 2 movimientos\?/ })
+    await expect(confirm).toContainText('No se puede deshacer')
+    const removed = expectSyncCommand(
+      page,
+      (command) => command.action === 'remove' && command.entityType === 'transaction',
+    )
+    await confirm.getByRole('button', { name: 'Eliminar 2 movimientos' }).click()
+    await removed
+    await expect(ledger(page)).toHaveCount(0)
+
+    await tracker.reload()
+    await search(page).fill('e2e-lote')
+    await expect(ledger(page)).toHaveCount(0)
+  })
 })

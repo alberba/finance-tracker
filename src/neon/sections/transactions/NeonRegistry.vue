@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import { foldMonthGroups, hasTypeRestriction } from '../../../domain/transactions/registry'
 import { formatMonthYear } from '../../../lib/format'
@@ -12,10 +12,12 @@ import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import NeonUndoToast from '../../ui/NeonUndoToast.vue'
+import NeonBulkBar from './NeonBulkBar.vue'
 import NeonLedger from './NeonLedger.vue'
 import NeonMovementDetail from './NeonMovementDetail.vue'
 import NeonRegistryAside from './NeonRegistryAside.vue'
 import NeonRegistryFilters from './NeonRegistryFilters.vue'
+import NeonReportPanel from './NeonReportPanel.vue'
 import {
   buildLedgerMonths,
   categoryBreakdown,
@@ -26,6 +28,7 @@ import {
   narrowMonthGroups,
   NO_EXTRA_FILTERS,
   olderMonthsLabel,
+  shownIds,
   type ExtraFilters,
 } from './registry-view-model'
 
@@ -33,7 +36,8 @@ import {
 // from the aside's month to the newest (older months fold away, as the domain
 // rule says, and every match shows while filtering), the month's summary in
 // the aside, the detail of a movement in the shared panel and the undo notice
-// after deleting one.
+// after deleting one. «Seleccionar» turns the rows into checkboxes for the
+// bulk bar; «Exportar» opens the period report.
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
 const ui = useUiStore().ui
@@ -146,8 +150,8 @@ let deleted: Transaction | null = null
 
 function remove(movement: Transaction): void {
   if (!movementsStore.deleteTransaction(movement.id, { notify: false })) return
-  deleted = { ...movement }
   detailOpen.value = false
+  deleted = { ...movement }
   undoMessage.value = `Movimiento eliminado: ${movement.description || movement.category}`
   undoOpen.value = true
 }
@@ -161,19 +165,64 @@ function undo(): void {
 watch(undoOpen, (value) => {
   if (!value) deleted = null
 })
+
+// --- Selection and bulk actions ----------------------------------------------
+
+// The store drops the selection when the year or a shared filter changes; the
+// day and amount filters are this design's, so they drop it here. Either way
+// a bulk action never reaches a row out of sight.
+const selecting = ref(false)
+const shown = computed(() => shownIds(months.value))
+const allShownSelected = computed(
+  () => shown.value.length > 0 && shown.value.every((id) => ui.txSelectedIds.includes(id)),
+)
+
+watch(extra, () => movementsStore.clearSelection())
+
+function startSelecting(): void {
+  detailOpen.value = false
+  selecting.value = true
+}
+
+function stopSelecting(): void {
+  movementsStore.clearSelection()
+  selecting.value = false
+}
+
+function selectAllShown(): void {
+  ui.txSelectedIds = [...shown.value]
+}
+
+onBeforeUnmount(() => movementsStore.clearSelection())
+
+const reportOpen = ref(false)
 </script>
 
 <template>
   <div class="registry @container/registry grid min-w-0 gap-4">
     <div class="registry-body grid min-w-0 items-start gap-5">
       <div class="grid min-w-0 gap-4">
-        <NeonRegistryFilters v-model:extra="extra" @clear="clearFilters" />
+        <NeonRegistryFilters v-model:extra="extra" @clear="clearFilters">
+          <template #actions>
+            <NeonButton
+              :aria-pressed="selecting"
+              :disabled="!selecting && !months.length"
+              @click="selecting ? stopSelecting() : startSelecting()"
+            >
+              {{ selecting ? 'Listo' : 'Seleccionar' }}
+            </NeonButton>
+            <NeonButton @click="reportOpen = true">Exportar</NeonButton>
+          </template>
+        </NeonRegistryFilters>
         <NeonLedger
           v-if="months.length"
           :months="months"
           :older-label="olderLabel"
           :open-id="openId"
+          :selecting="selecting"
+          :selected-ids="ui.txSelectedIds"
           @open="openDetail"
+          @toggle="movementsStore.setSelected($event, !ui.txSelectedIds.includes($event))"
           @show-older="showOlder = true"
         />
         <NeonEmptyState v-else role="status">
@@ -182,6 +231,11 @@ watch(undoOpen, (value) => {
             <NeonButton @click="clearFilters">Limpiar filtros</NeonButton>
           </template>
         </NeonEmptyState>
+        <NeonBulkBar
+          v-if="selecting"
+          :all-shown-selected="allShownSelected"
+          @select-all="selectAllShown"
+        />
       </div>
       <NeonRegistryAside
         class="registry-aside"
@@ -198,6 +252,7 @@ watch(undoOpen, (value) => {
       :detail="detail"
       @delete="remove"
     />
+    <NeonReportPanel v-model:open="reportOpen" />
     <NeonUndoToast v-model:open="undoOpen" :message="undoMessage" @undo="undo" />
   </div>
 </template>
