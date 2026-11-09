@@ -31,10 +31,6 @@
     "durationMs": 9075,
     "tests": 3
   },
-  "investment-return-toggle.spec.ts": {
-    "durationMs": 14832,
-    "tests": 6
-  },
   "investment-tabs.spec.ts": {
     "durationMs": 56771,
     "tests": 17
