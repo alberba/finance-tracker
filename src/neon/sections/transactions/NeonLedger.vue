@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { categoryIcon } from './category-icons'
+import { categoryIcon } from '../../ui/category-icons'
 import type { AmountTone, LedgerMonthView } from './registry-view-model'
 import NeonButton from '../../ui/NeonButton.vue'
 

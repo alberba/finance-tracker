@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-
-import { useLiveQuotes } from '../../composables/useLiveQuotes'
-import { summarizeQuoteStatus } from '../../domain/investment/quote-status'
-import { formatTime } from '../../lib/format'
 import type { SectionId } from '../../scripts/types'
-import { useMarketStore } from '../../stores/market'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
 import NeonLineChart from '../ui/NeonLineChart.vue'
+import { useQuotesNote } from './quotes-note'
 import type { NeonDashboardViewModel } from './view-model'
 
 // Inversiones: the portfolio's value and total gain, how it is split and how
@@ -17,18 +12,7 @@ import type { NeonDashboardViewModel } from './view-model'
 defineProps<{ investments: NeonDashboardViewModel['investments'] }>()
 const emit = defineEmits<{ navigate: [section: SectionId] }>()
 
-const marketStore = useMarketStore()
-useLiveQuotes()
-const quotes = computed(() => {
-  const summary = summarizeQuoteStatus(marketStore.valuation.instruments)
-  if (!summary) return null
-  return summary.status === 'fresh'
-    ? {
-        text: `Cotizaciones de las ${formatTime(summary.latest)} · pueden ir con retraso`,
-        late: false,
-      }
-    : { text: `Cotizaciones retrasadas: se muestra el último precio válido`, late: true }
-})
+const quotes = useQuotesNote()
 
 const SWATCHES = ['bg-lilac', 'bg-lilac2', 'bg-peach', 'bg-lilac3', 'bg-neutral-bar'] as const
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' } as const

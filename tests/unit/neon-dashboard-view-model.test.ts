@@ -108,6 +108,12 @@ describe('the month the dashboard shows', () => {
 })
 
 describe('«Te quedan»', () => {
+  it('is named in the past once the month is closed', () => {
+    expect(build().month.leftLabel).toBe('Te quedan')
+    expect(build({ year: 2027 }).month.leftLabel).toBe('Te quedan')
+    expect(build({ year: 2025 }).month.leftLabel).toBe('Te quedaron')
+  })
+
   it('is what came in minus expenses and investment; a saving only moves money', () => {
     const vm = build({ transactions: OCTOBER })
     expect(vm.month.left).toEqual({ text: '1.233,55 €', tone: 'neutral' })

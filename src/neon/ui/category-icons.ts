@@ -1,4 +1,4 @@
-import type { TransactionType } from '../../../scripts/types'
+import type { TransactionType } from '../../scripts/types'
 
 // Line icons (24×24 paths, DESIGN.md «Iconografía») for the category circle of
 // a ledger row. Categories are the user's own, so a few usual names get their

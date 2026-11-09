@@ -5,8 +5,12 @@ import { setSwitch } from './controls'
 const DESK_BREAKPOINT_PX = 981
 
 const SECTION_CONFIG = {
-  // The old dashboard is titled «Dashboard»; the new one names the month («Así va octubre»).
-  dashboard: { buttonLabel: 'Dashboard', headingText: /^(Dashboard|Así (va|fue) \S+)$/ },
+  // The old dashboard is titled «Dashboard»; the new one names the month: «Así va octubre»
+  // on desktop, «Te quedan en octubre» over the figure in the mobile frame.
+  dashboard: {
+    buttonLabel: 'Dashboard',
+    headingText: /^(Dashboard|Así (va|fue) \S+|Te (quedan|quedaron) en \S+)$/,
+  },
   transactions: {
     buttonLabel: 'Movimientos',
     headingText: /^Movimientos$/,

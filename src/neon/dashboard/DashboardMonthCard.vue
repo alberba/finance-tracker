@@ -24,7 +24,9 @@ const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' }
     </template>
 
     <div class="flex flex-col gap-1.5">
-      <span class="text-muted text-label tracking-label font-extrabold uppercase">Te quedan</span>
+      <span class="text-muted text-label tracking-label font-extrabold uppercase">{{
+        month.leftLabel
+      }}</span>
       <NeonFigure
         :value="month.left.text"
         class="text-figure-hero font-bold"

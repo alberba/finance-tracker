@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, useId, useTemplateRef, watch } from 'vue'
+import { nextTick, onMounted, useTemplateRef, watch } from 'vue'
 
 import {
   dragOffset,
@@ -15,10 +15,16 @@ import {
 // button, Escape, the scrim and, as a sheet, by dragging the grip or the
 // header; focus goes back to what opened it. Every detail panel is the same
 // size, whatever the section.
-defineProps<{
+const props = defineProps<{
   title: string
   /** Small label over the title («Pendiente»). */
   kicker?: string
+  /**
+   * Where the focus goes back on close, when it is not what had it on open:
+   * a panel opened from another one (a list sheet) would hand it to a row
+   * that is already gone.
+   */
+  returnFocus?: HTMLElement | null
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -28,7 +34,6 @@ const RETURN_MS = 320
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)'
 const EASE_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
-const titleId = useId()
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const scrollArea = useTemplateRef<HTMLElement>('scrollArea')
 let opener: HTMLElement | null = null
@@ -61,7 +66,9 @@ async function sync(shouldOpen: boolean): Promise<void> {
   const element = dialog.value
   if (!element) return
   if (shouldOpen && !element.open) {
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    opener =
+      props.returnFocus ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     element.style.transform = ''
     element.showModal?.()
     if (scrollArea.value) scrollArea.value.scrollTop = 0
@@ -134,7 +141,7 @@ function onDragEnd(event: PointerEvent): void {
   <dialog
     ref="dialog"
     class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
-    :aria-labelledby="titleId"
+    :aria-label="title"
     @cancel="onCancel"
     @click="onScrimClick"
   >
@@ -157,7 +164,6 @@ function onDragEnd(event: PointerEvent): void {
               {{ kicker }}
             </p>
             <h2
-              :id="titleId"
               class="font-display text-h1-detail tracking-h1 leading-[1.15] font-bold break-words"
             >
               {{ title }}
