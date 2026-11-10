@@ -20,7 +20,8 @@ async function run([name, args, executable = 'pnpm']) {
   return status === 0
 }
 // Canonical Linux fonts and native date controls are part of the pixel baseline.
-// Vitest stays native; browser tests use the same image as CI on every desktop OS.
+// Vitest stays native; browser tests run Chromium in the Playwright image matching
+// the installed @playwright/test, which CI installs at the same version.
 const browserOnly = process.argv.includes('--browser-only')
 const native = Boolean(process.env.CI) || browserOnly
 const selected = browserOnly ? commands.slice(1) : [commands[0]]

@@ -100,13 +100,11 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    container:
-      image: mcr.microsoft.com/playwright:v1.65.0-noble
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
-          playwright: container
+          playwright: true
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run smoke E2E

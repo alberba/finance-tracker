@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Compare the committed Linux baselines using CI's browser/fonts and an isolated
-# build/database. Extra arguments are passed unchanged to Playwright.
+# Compare the committed Linux baselines with Playwright's Linux Chromium and an
+# isolated build/database. Extra arguments are passed unchanged to Playwright.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 pnpm check:deps
