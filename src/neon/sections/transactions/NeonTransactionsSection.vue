@@ -3,6 +3,7 @@ import { computed, useTemplateRef, watch } from 'vue'
 
 import { useAccountRequirement } from '../../../composables/useAccountRequirement'
 import { useEntrySheet } from '../../../composables/useEntrySheet'
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { formatWeekdayDate } from '../../../lib/format'
 import type { TransactionsSubTab } from '../../../scripts/types'
 import { todayISO } from '../../../scripts/utils'
@@ -10,6 +11,7 @@ import { useMovementsStore } from '../../../stores/movements'
 import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
 import NeonRegistry from './NeonRegistry.vue'
 import NeonSubscriptions from './NeonSubscriptions.vue'
 
@@ -17,6 +19,10 @@ import NeonSubscriptions from './NeonSubscriptions.vue'
 // date label, the title and its lede with the primary action, the two tabs
 // (Registro and Suscripciones) and each tab's content. A new movement opens
 // the shared entry sheet; a new subscription, the subscriptions panel.
+//
+// On the mobile frame (#432) the content is one column (container queries do
+// that) and «Apuntar» is the frame's FAB, so the header only keeps its button
+// on Suscripciones, where the FAB does not reach.
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const movementsStore = useMovementsStore()
@@ -24,6 +30,8 @@ const uiStore = useUiStore()
 const ui = uiStore.ui
 const { needsAccount } = useAccountRequirement()
 const { openEntrySheet } = useEntrySheet()
+const desktopFrame = useMediaQuery(FRAME_QUERY)
+const showCreate = computed(() => desktopFrame.value || ui.txTab === 'subscriptions')
 const subscriptions = useTemplateRef<InstanceType<typeof NeonSubscriptions>>('subscriptions')
 
 const dateLabel = formatWeekdayDate(todayISO())
@@ -83,11 +91,11 @@ watch(
         >
           Movimientos
         </h1>
-        <p class="text-soft text-[16px]">
+        <p class="text-soft text-[15px] @min-[560px]:text-[16px]">
           Lo que entra, lo que sale y lo que inviertes, mes a mes.
         </p>
       </div>
-      <NeonButton variant="primary" :disabled="needsAccount" @click="createNew">
+      <NeonButton v-if="showCreate" variant="primary" :disabled="needsAccount" @click="createNew">
         <svg
           class="size-4"
           viewBox="0 0 24 24"
@@ -123,7 +131,7 @@ watch(
           :aria-selected="ui.txTab === tab.id"
           :aria-controls="`transactions-tab-${tab.id}`"
           :tabindex="ui.txTab === tab.id ? 0 : -1"
-          class="outline-accent rounded-pill inline-flex min-h-[38px] items-center gap-2 px-4 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="outline-accent rounded-pill inline-flex min-h-[38px] items-center gap-2 px-4 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
           :class="ui.txTab === tab.id ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="pickTab(tab.id)"
         >

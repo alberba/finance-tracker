@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
+import { useMediaQuery } from '../../../composables/useMediaQuery'
+
 import type { TransactionType } from '../../../scripts/types'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useMovementsStore } from '../../../stores/movements'
 import NeonButton from '../../ui/NeonButton.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { BULK_TYPES, bulkCategoryType, selectionSummary } from './registry-view-model'
 
 // Bulk actions of the registry while selecting rows: the count and signed sum
 // of the selection, change its type, account or category, select every row
 // shown or delete it after confirming (it cannot be undone, as in the old
 // design). «Listo», next to the filters, ends the selection. Sticks to
-// the bottom of the ledger column while the ledger scrolls under it.
+// the bottom of the ledger column while the ledger scrolls under it. On the
+// mobile frame the filters scroll far out of reach, so the bar carries its
+// own «Listo».
 const props = defineProps<{ allShownSelected: boolean }>()
-const emit = defineEmits<{ selectAll: [] }>()
+const emit = defineEmits<{ selectAll: []; done: [] }>()
+
+const desktopFrame = useMediaQuery(FRAME_QUERY)
 
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
@@ -85,6 +92,7 @@ const selectClass =
         <NeonButton :disabled="props.allShownSelected" @click="emit('selectAll')">
           Seleccionar todo
         </NeonButton>
+        <NeonButton v-if="!desktopFrame" @click="emit('done')">Listo</NeonButton>
       </div>
     </div>
     <div

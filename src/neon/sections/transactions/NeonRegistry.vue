@@ -235,6 +235,7 @@ const reportOpen = ref(false)
           v-if="selecting"
           :all-shown-selected="allShownSelected"
           @select-all="selectAllShown"
+          @done="stopSelecting"
         />
       </div>
       <NeonRegistryAside
