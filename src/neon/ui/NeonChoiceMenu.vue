@@ -19,15 +19,27 @@ export interface ChoiceGroup<V> {
   value: V
 }
 
-defineProps<{
-  /** What the pill shows: the current choice. */
-  text: string
-  /** Accessible name of the list («Cómo medir la rentabilidad»). */
-  label: string
-  /** `d` of the pill's 24×24 icon. */
-  icon: string
-  groups: ReadonlyArray<ChoiceGroup<T>>
-}>()
+withDefaults(
+  defineProps<{
+    /** What the pill says: the current choice. */
+    text: string
+    /**
+     * A shorter text for a narrow pill («Marzo» for «Periodo · Marzo»): it is
+     * what shows, and `text` stays the accessible name.
+     */
+    shortText?: string
+    /** The pill fills its row instead of fitting its text. */
+    block?: boolean
+    /** Which edge of the pill the menu lines up with. */
+    placement?: 'start' | 'end'
+    /** Accessible name of the list («Cómo medir la rentabilidad»). */
+    label: string
+    /** `d` of the pill's 24×24 icon. */
+    icon: string
+    groups: ReadonlyArray<ChoiceGroup<T>>
+  }>(),
+  { shortText: undefined, block: false, placement: 'end' },
+)
 
 const emit = defineEmits<{ select: [key: string, value: T] }>()
 
@@ -77,12 +89,14 @@ onBeforeUnmount(stopListening)
     <button
       ref="trigger"
       type="button"
-      class="rounded-pill outline-accent text-meta inline-flex min-h-[38px] items-center gap-2 border px-3.5 font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]"
-      :class="
+      class="rounded-pill outline-accent text-meta inline-flex min-h-[38px] items-center gap-2 border px-3.5 font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97] pointer-coarse:min-h-11"
+      :class="[
         open
           ? 'bg-sel-bg text-sel-text border-sel-border'
-          : 'border-ctrl-line text-soft bg-transparent'
-      "
+          : 'border-ctrl-line text-soft bg-transparent',
+        block && 'w-full min-w-0',
+      ]"
+      :aria-label="shortText ? text : undefined"
       aria-haspopup="menu"
       :aria-expanded="open"
       :aria-controls="open ? menuId : undefined"
@@ -100,14 +114,15 @@ onBeforeUnmount(stopListening)
       >
         <path :d="icon" />
       </svg>
-      {{ text }}
+      <span :class="block && 'truncate'">{{ shortText ?? text }}</span>
     </button>
     <div
       v-if="open"
       :id="menuId"
       role="menu"
       :aria-label="label"
-      class="bg-panel border-line rounded-popover shadow-float text-text motion-safe:animate-pop-in absolute inset-e-0 inset-bs-full z-40 mbs-2.5 grid w-max max-w-[min(340px,calc(100vw-24px))] min-w-[190px] origin-top-right border p-1.5"
+      class="bg-panel border-line rounded-popover shadow-float text-text motion-safe:animate-pop-in absolute inset-bs-full z-40 mbs-2.5 grid w-max max-w-[min(340px,calc(100vw-24px))] min-w-[190px] border p-1.5"
+      :class="placement === 'end' ? 'inset-e-0 origin-top-right' : 'inset-s-0 origin-top-left'"
     >
       <template v-for="(group, index) in groups" :key="group.key">
         <span v-if="index > 0" class="bg-line mx-2 my-1.5 block h-px" aria-hidden="true"></span>

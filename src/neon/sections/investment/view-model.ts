@@ -173,6 +173,17 @@ function axisText(value: number, method: ReturnMode): string {
   return `${sign}${formatNumber(Math.abs(value), 0)}${NBSP}%`
 }
 
+/** What the chart draws: the portfolio and, in euros, what went into it. */
+function chartSeries(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  twr: readonly number[],
+): { value: readonly number[]; invested: readonly number[] | null } {
+  return method === 'simple'
+    ? { value: vm.valueSeries[0].values, invested: vm.valueSeries[1].values }
+    : { value: twr, invested: null }
+}
+
 /**
  * The evolution of the period. In euros, what the portfolio is worth against
  * what went into it (dashed); in TWR, the cumulative return (`twrSeries`) over
@@ -185,8 +196,7 @@ export function portfolioChart(
   drawdown: Drawdown | null,
 ): PortfolioChart {
   const isSimple = method === 'simple'
-  const value = isSimple ? vm.valueSeries[0].values : twr
-  const invested = isSimple ? vm.valueSeries[1].values : null
+  const { value, invested } = chartSeries(vm, method, twr)
   const all = [...value, ...(invested ?? []), ...(isSimple ? [] : [0])]
   let low = Math.min(...all)
   let high = Math.max(...all)
@@ -244,7 +254,6 @@ export function portfolioChart(
   // The fall is measured on the TWR index: on the line in euros, contributions
   // would hide it, so only the TWR view marks it.
   const trough = !isSimple && drawdown && drawdown.trough < count ? drawdown.trough : null
-  const date = formatShortDate(vm.asOf)
   return {
     viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
     lines,
@@ -272,9 +281,107 @@ export function portfolioChart(
             top: share(y(value[trough]) + 22, CHART_HEIGHT),
             text: signedPct(drawdown.depth * 100),
           },
-    label: isSimple
-      ? `Lo que vale tu cartera frente a lo que has puesto. A ${date} vale ${formatMoney(vm.portfolioValue)}.`
-      : `Rentabilidad TWR acumulada de tu cartera a ${date}: ${signedPct(value[last])}.`,
+    label: chartLabel(vm, method, value),
+  }
+}
+
+/** What the evolution chart says, for screen readers. */
+function chartLabel(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  value: readonly number[],
+): string {
+  const date = formatShortDate(vm.asOf)
+  return method === 'simple'
+    ? `Lo que vale tu cartera frente a lo que has puesto. A ${date} vale ${formatMoney(vm.portfolioValue)}.`
+    : `Rentabilidad TWR acumulada de tu cartera a ${date}: ${signedPct(value[value.length - 1])}.`
+}
+
+/**
+ * The mobile chart (DESIGN.md, «Gráfico de evolución · Móvil»): edge to edge,
+ * 266 px tall, the line thick over an area that fades out, with no gridlines
+ * and no figures beside it, and only months on the axis. Its view box is
+ * stretched to its box, so units are px of height and a fraction of the
+ * width (the line stops short of the right edge so today's dot isn't clipped); points that need to stay round (today's dot, the fall) are placed
+ * by share and drawn in HTML.
+ */
+export const COMPACT_WIDTH = 400
+export const COMPACT_HEIGHT = 266
+const COMPACT_PAD = { top: 22, bottom: 38, right: 12 }
+/** From this many months the axis writes every other one, so the labels don't touch. */
+const COMPACT_DENSE = 6
+
+export interface CompactChart {
+  viewBox: string
+  /** Back to front: the invested capital under the portfolio. */
+  lines: ChartLine[]
+  /** The portfolio line closed along the bottom, for the fading area. */
+  area: string
+  /** Month labels; `left` is the share of the width. */
+  months: Array<{ left: number; text: string }>
+  /** Today's point of the portfolio line, as shares of the width and the height. */
+  dot: { left: number; top: number }
+  /** The trough of the worst fall, with the fall written under it. */
+  drop: { left: number; top: number; text: string } | null
+  /** The dashed line needs a key; the TWR view has no second line. */
+  hasInvested: boolean
+  /** What the chart says, for screen readers. */
+  label: string
+}
+
+export function compactChart(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  twr: readonly number[],
+  drawdown: Drawdown | null,
+): CompactChart {
+  const isSimple = method === 'simple'
+  const { value, invested } = chartSeries(vm, method, twr)
+  const all = [...value, ...(invested ?? []), ...(isSimple ? [] : [0])]
+  const min = Math.min(...all)
+  const max = Math.max(...all)
+  const span = max - min || Math.abs(max) * 0.1 || 1
+  const low = isSimple ? Math.max(0, min - span * 0.15) : min - span * 0.15
+  const high = max + span * 0.1
+
+  const count = value.length
+  const x = (index: number) =>
+    round1((count > 1 ? index / (count - 1) : 1) * (COMPACT_WIDTH - COMPACT_PAD.right))
+  const y = (amount: number) =>
+    round1(
+      COMPACT_PAD.top +
+        (1 - (amount - low) / (high - low)) *
+          (COMPACT_HEIGHT - COMPACT_PAD.top - COMPACT_PAD.bottom),
+    )
+  const path = (values: readonly number[]) =>
+    values.map((amount, index) => `${index ? 'L' : 'M'}${x(index)} ${y(amount)}`).join(' ')
+  const wide = count - 1 > COMPACT_DENSE
+
+  const last = count - 1
+  const trough = !isSimple && drawdown && drawdown.trough < count ? drawdown.trough : null
+  const lines: ChartLine[] = []
+  if (invested) lines.push({ key: 'invested', d: path(invested), dashed: true })
+  lines.push({ key: 'value', d: path(value), dashed: false })
+  return {
+    viewBox: `0 0 ${COMPACT_WIDTH} ${COMPACT_HEIGHT}`,
+    lines,
+    area: `${path(value)} L${x(last)} ${COMPACT_HEIGHT} L0 ${COMPACT_HEIGHT} Z`,
+    months: value
+      .slice(1)
+      .map((_, index) => ({ index: index + 1, text: MONTH_ABBR[index] ?? '' }))
+      .filter(({ index }) => !wide || (last - index) % 2 === 0)
+      .map(({ index, text }) => ({ left: share(x(index), COMPACT_WIDTH), text })),
+    dot: { left: share(x(last), COMPACT_WIDTH), top: share(y(value[last]), COMPACT_HEIGHT) },
+    drop:
+      trough === null || !drawdown
+        ? null
+        : {
+            left: share(x(trough), COMPACT_WIDTH),
+            top: share(y(value[trough]), COMPACT_HEIGHT),
+            text: signedPct(drawdown.depth * 100),
+          },
+    hasInvested: invested !== null,
+    label: chartLabel(vm, method, value),
   }
 }
 

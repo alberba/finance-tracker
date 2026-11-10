@@ -40,3 +40,31 @@ export function releaseVelocity(previous: Sample, last: Sample): number {
   const elapsed = last.at - previous.at
   return elapsed > 0 ? (last.y - previous.y) / elapsed : 0
 }
+
+/** Travel (px) up to which a press on the grip is a tap, not a drag. */
+export const TAP_SLOP = 8
+
+/** Travel (px) that moves a list sheet between its two heights. */
+export const SNAP_DISTANCE = 48
+
+/**
+ * What a gesture on the grip of a list sheet (DESIGN.md, «Hoja arrastrable»)
+ * does. `delta` is the finger's travel in px (positive downwards) and
+ * `velocity` its release speed in px/ms (positive downwards). A tap flips the
+ * sheet; a drag up opens it to full height and a drag down brings it back,
+ * past `SNAP_DISTANCE` or with a flick; the other direction does nothing.
+ */
+export function listSheetGesture(
+  expanded: boolean,
+  delta: number,
+  velocity: number,
+): 'toggle' | 'expand' | 'collapse' | 'stay' {
+  if (Math.abs(delta) <= TAP_SLOP) return 'toggle'
+  if (!expanded && delta < 0 && (-delta > SNAP_DISTANCE || -velocity > CLOSE_VELOCITY)) {
+    return 'expand'
+  }
+  if (expanded && delta > 0 && (delta > SNAP_DISTANCE || velocity > CLOSE_VELOCITY)) {
+    return 'collapse'
+  }
+  return 'stay'
+}

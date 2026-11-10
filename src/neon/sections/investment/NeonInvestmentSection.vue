@@ -4,24 +4,27 @@ import { computed, ref } from 'vue'
 
 import { useEntrySheet } from '../../../composables/useEntrySheet'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { summarizeQuoteStatus } from '../../../domain/investment/quote-status'
 import {
   buildInvestmentDashboardViewModel,
   type ReturnMode,
 } from '../../../domain/investment/view-model'
-import type { Month } from '../../../lib/month'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useInvestmentStore } from '../../../stores/investment'
 import { useMarketStore } from '../../../stores/market'
 import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
-import NeonCard from '../../ui/NeonCard.vue'
-import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
+import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
+import NeonInvestmentControls from './NeonInvestmentControls.vue'
+import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
 import NeonInvestmentPositionDetail from './NeonInvestmentPositionDetail.vue'
 import NeonInvestmentPositions from './NeonInvestmentPositions.vue'
 import {
+  compactChart,
   dropRows,
   feeRows,
   maxDrawdown,
@@ -45,6 +48,12 @@ import {
 // and the fees. The header says how fresh the quotes are, and warns when some
 // are late. Return mode and month are the investment store's, shared with the
 // old design.
+//
+// The mobile frame gets its own composition (NeonInvestmentMobile, artboard
+// «Inversión · móvil · Pixel 10», #438) from the same view model: there
+// «Nueva operación» is the frame's «Apuntar» button and the positions live in
+// a draggable sheet. Which one shows follows the frame's own media query, as
+// in the dashboard.
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const financialStateStore = useFinancialStateStore()
@@ -78,6 +87,8 @@ const figures = computed(() =>
   }),
 )
 const chart = computed(() => portfolioChart(vm.value, method.value, twr.value, drawdown.value))
+const compact = computed(() => compactChart(vm.value, method.value, twr.value, drawdown.value))
+const desktopFrame = useMediaQuery(FRAME_QUERY)
 const notice = computed(() => quoteNotice(summarizeQuoteStatus(marketStore.valuation.instruments)))
 const empty = computed(() => vm.value.positions.length === 0)
 
@@ -103,27 +114,6 @@ const cards = computed<Array<{ id: string; title: string; rows: CardRow[] }>>(()
     rows: feeRows(state.value, month.value, vm.value.investedCapital),
   },
 ])
-
-const METHOD_GROUPS = computed<ChoiceGroup<ReturnMode>[]>(() => [
-  {
-    key: 'method',
-    value: method.value,
-    options: [
-      { value: 'simple', label: 'Simple', hint: 'Ganancia sobre lo que has puesto' },
-      {
-        value: 'twr',
-        label: 'TWR',
-        hint: 'Rentabilidad ponderada en el tiempo: no depende de cuándo aportas',
-      },
-    ],
-  },
-])
-const PERIOD_GROUPS = computed<ChoiceGroup<Month>[]>(() => [
-  { key: 'month', value: month.value, options: periods.value },
-])
-
-const ICON_METHOD = 'M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4'
-const ICON_PERIOD = 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4'
 
 // The panel keeps the last position while it slides out.
 const openId = ref<string | null>(null)
@@ -156,136 +146,128 @@ function sortBy(key: SortKey, direction: SortDirection): void {
     class="@container grid min-w-0 content-start gap-[26px]"
     aria-labelledby="investment-title"
   >
-    <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3.5">
-      <h1
-        id="investment-title"
-        tabindex="-1"
-        class="font-display text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
-      >
-        Inversión
-      </h1>
-      <div class="flex min-w-0 flex-col items-end gap-3">
-        <p
-          v-if="notice"
-          class="text-label tracking-label m-0 inline-flex items-center gap-2 text-end font-extrabold uppercase"
-          :class="notice.late ? 'text-soft' : 'text-muted'"
-          :role="notice.late ? 'status' : undefined"
-          :title="notice.title"
-          data-investment-quotes
-        >
-          <span
-            class="size-2 flex-none rounded-full"
-            :class="notice.late ? 'bg-peach' : 'bg-gain'"
-            aria-hidden="true"
-          ></span>
-          {{ notice.text }}
-        </p>
-        <NeonButton variant="primary" @click="openEntrySheet()">
-          <svg
-            class="size-[18px]"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.6"
-            stroke-linecap="round"
-            aria-hidden="true"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          Nueva operación
-        </NeonButton>
-      </div>
-    </header>
-
-    <NeonEmptyState v-if="empty">
-      Aún no tienes inversiones. Apunta una compra para empezar a seguir tu cartera.
-    </NeonEmptyState>
+    <NeonInvestmentMobile
+      v-if="!desktopFrame"
+      :empty="empty"
+      :notice="notice"
+      :figures="figures"
+      :chart="compact"
+      :periods="periods"
+      :month="month"
+      :method="method"
+      :rows="rows"
+      :sort-key="sortKey"
+      :sort-direction="sortDirection"
+      :cards="cards"
+      @open="openPosition"
+      @sort="sortBy"
+      @month="investmentStore.setMonth"
+      @method="investmentStore.setReturnMode"
+    />
 
     <template v-else>
-      <div class="flex flex-wrap justify-end gap-x-5 gap-y-3">
-        <NeonChoiceMenu
-          :text="`Periodo · ${period?.label ?? ''}`"
-          label="Periodo"
-          :icon="ICON_PERIOD"
-          :groups="PERIOD_GROUPS"
-          @select="(_, value) => investmentStore.setMonth(value)"
-        />
-        <NeonChoiceMenu
-          :text="method === 'twr' ? 'Rentabilidad TWR' : 'Rentabilidad simple'"
-          label="Cómo medir la rentabilidad"
-          :icon="ICON_METHOD"
-          :groups="METHOD_GROUPS"
-          @select="(_, value) => investmentStore.setReturnMode(value)"
-        />
-      </div>
-
-      <div
-        role="group"
-        aria-label="Cifras del periodo"
-        aria-live="polite"
-        class="grid min-w-0 grid-cols-3"
-        data-investment-figures
-      >
-        <div
-          v-for="(figure, index) in figures"
-          :key="figure.key"
-          class="grid min-w-0 content-start gap-1 px-5"
-          :class="index ? 'border-line border-s' : 'ps-0'"
-          :data-investment-figure="figure.key"
+      <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3.5">
+        <h1
+          id="investment-title"
+          tabindex="-1"
+          class="font-display text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
         >
-          <span
-            class="text-muted text-label tracking-label inline-flex items-center gap-2 font-extrabold uppercase"
+          Inversión
+        </h1>
+        <div class="flex min-w-0 flex-col items-end gap-3">
+          <p
+            v-if="notice"
+            class="text-label tracking-label m-0 inline-flex items-center gap-2 text-end font-extrabold uppercase"
+            :class="notice.late ? 'text-soft' : 'text-muted'"
+            :role="notice.late ? 'status' : undefined"
+            :title="notice.title"
+            data-investment-quotes
           >
             <span
-              v-if="index === 0"
-              class="bg-text size-2.5 flex-none rounded-full"
+              class="size-2 flex-none rounded-full"
+              :class="notice.late ? 'bg-peach' : 'bg-gain'"
               aria-hidden="true"
             ></span>
-            {{ figure.label }}
-          </span>
-          <span
-            class="font-display text-figure-lg truncate font-semibold whitespace-nowrap tabular-nums"
-            :class="TONE_TEXT[figure.tone]"
-          >
-            {{ figure.value }}
-          </span>
-          <span class="text-note min-h-[1.4em] font-extrabold" :class="TONE_TEXT[figure.tone]">
-            {{ figure.sub }}
-          </span>
-        </div>
-      </div>
-
-      <NeonInvestmentChart :chart="chart" />
-
-      <NeonInvestmentPositions
-        :rows="rows"
-        :sort-key="sortKey"
-        :sort-direction="sortDirection"
-        @open="openPosition"
-        @sort="sortBy"
-      />
-
-      <div
-        class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-14 gap-y-8"
-      >
-        <NeonCard v-for="card in cards" :key="card.id" :title="card.title" :title-id="card.id">
-          <ul class="m-0 list-none p-0">
-            <li
-              v-for="row in card.rows"
-              :key="row.label"
-              class="border-line flex items-baseline justify-between gap-3 border-t py-2.5"
+            {{ notice.text }}
+          </p>
+          <NeonButton variant="primary" @click="openEntrySheet()">
+            <svg
+              class="size-[18px]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              aria-hidden="true"
             >
-              <span class="text-row font-bold">{{ row.label }}</span>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Nueva operación
+          </NeonButton>
+        </div>
+      </header>
+
+      <NeonEmptyState v-if="empty">
+        Aún no tienes inversiones. Apunta una compra para empezar a seguir tu cartera.
+      </NeonEmptyState>
+
+      <template v-else>
+        <NeonInvestmentControls
+          :periods="periods"
+          :month="month"
+          :method="method"
+          @month="investmentStore.setMonth"
+          @method="investmentStore.setReturnMode"
+        />
+
+        <div
+          role="group"
+          aria-label="Cifras del periodo"
+          aria-live="polite"
+          class="grid min-w-0 grid-cols-3"
+          data-investment-figures
+        >
+          <div
+            v-for="(figure, index) in figures"
+            :key="figure.key"
+            class="grid min-w-0 content-start gap-1 px-5"
+            :class="index ? 'border-line border-s' : 'ps-0'"
+            :data-investment-figure="figure.key"
+          >
+            <span
+              class="text-muted text-label tracking-label inline-flex items-center gap-2 font-extrabold uppercase"
+            >
               <span
-                class="font-display text-figure-row flex-none font-semibold whitespace-nowrap tabular-nums"
-                :class="TONE_TEXT[row.tone]"
-              >
-                {{ row.value }}
-              </span>
-            </li>
-          </ul>
-        </NeonCard>
-      </div>
+                v-if="index === 0"
+                class="bg-text size-2.5 flex-none rounded-full"
+                aria-hidden="true"
+              ></span>
+              {{ figure.label }}
+            </span>
+            <span
+              class="font-display text-figure-lg truncate font-semibold whitespace-nowrap tabular-nums"
+              :class="TONE_TEXT[figure.tone]"
+            >
+              {{ figure.value }}
+            </span>
+            <span class="text-note min-h-[1.4em] font-extrabold" :class="TONE_TEXT[figure.tone]">
+              {{ figure.sub }}
+            </span>
+          </div>
+        </div>
+
+        <NeonInvestmentChart :chart="chart" />
+
+        <NeonInvestmentPositions
+          :rows="rows"
+          :sort-key="sortKey"
+          :sort-direction="sortDirection"
+          @open="openPosition"
+          @sort="sortBy"
+        />
+
+        <NeonInvestmentCards :cards="cards" />
+      </template>
     </template>
 
     <NeonInvestmentPositionDetail

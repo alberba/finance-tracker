@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { buildInvestmentDashboardViewModel } from '../../src/domain/investment/view-model'
 import type { Month } from '../../src/lib/month'
 import {
+  compactChart,
   dropRows,
   feeRows,
   periodOptions,
@@ -148,6 +149,50 @@ describe('portfolioChart', () => {
     })
     const [top, bottom] = portfolioChart(simple(state), 'simple', [], null).ends
     expect(bottom.top - top.top).toBeGreaterThanOrEqual(11)
+  })
+})
+
+describe('compactChart', () => {
+  it('en simple dibuja las dos líneas sobre el área, sin rejilla ni cifras, con los meses y el punto de hoy', () => {
+    const chart = compactChart(simple(), 'simple', [], null)
+    expect(chart.lines.map((line) => [line.key, line.dashed])).toEqual([
+      ['invested', true],
+      ['value', false],
+    ])
+    expect(chart.hasInvested).toBe(true)
+    expect(chart.area).toMatch(/Z$/)
+    expect(chart.months.map((month) => month.text)).toEqual(['ene', 'feb', 'mar'])
+    expect(chart.dot.left).toBeGreaterThan(90)
+    expect(chart.dot.left).toBeLessThan(100)
+    expect(chart.drop).toBeNull()
+    expect(chart.label).toBe(portfolioChart(simple(), 'simple', [], null).label)
+  })
+
+  it('en TWR dibuja una sola línea y marca el fondo de la peor caída', () => {
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
+    const twr = [0, 10, 4, 12]
+    const chart = compactChart(vm, 'twr', twr, maxDrawdown(twr))
+    expect(chart.lines.map((line) => line.key)).toEqual(['value'])
+    expect(chart.hasInvested).toBe(false)
+    expect(chart.drop?.text).toBe('−5,5\u00a0%')
+    expect(chart.drop?.left).toBeCloseTo(64.7, 1)
+  })
+
+  it('el punto de hoy queda dentro del alto, aunque la cartera valga lo mismo todo el periodo', () => {
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
+    const { dot } = compactChart(vm, 'twr', [0, 0, 0, 0], null)
+    expect(dot.top).toBeGreaterThan(0)
+    expect(dot.top).toBeLessThan(100)
+  })
+
+  it('con más de seis meses escribe uno sí y otro no, acabando siempre en el último', () => {
+    const state = portfolio({
+      snapshots: { '9': { month: 9, investments: { fondos: 2640, oro: 180 }, accounts: {} } },
+    })
+    const vm = buildInvestmentDashboardViewModel(state, 9, 'simple')
+    const { months } = compactChart(vm, 'simple', [], null)
+    expect(months.map((month) => month.text)).toEqual(['ene', 'mar', 'may', 'jul', 'sep'])
+    expect(months.at(-1)?.left).toBeGreaterThan(90)
   })
 })
 
