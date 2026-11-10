@@ -173,6 +173,17 @@ function axisText(value: number, method: ReturnMode): string {
   return `${sign}${formatNumber(Math.abs(value), 0)}${NBSP}%`
 }
 
+/** What the chart draws: the portfolio and, in euros, what went into it. */
+function chartSeries(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  twr: readonly number[],
+): { value: readonly number[]; invested: readonly number[] | null } {
+  return method === 'simple'
+    ? { value: vm.valueSeries[0].values, invested: vm.valueSeries[1].values }
+    : { value: twr, invested: null }
+}
+
 /**
  * The evolution of the period. In euros, what the portfolio is worth against
  * what went into it (dashed); in TWR, the cumulative return (`twrSeries`) over
@@ -185,8 +196,7 @@ export function portfolioChart(
   drawdown: Drawdown | null,
 ): PortfolioChart {
   const isSimple = method === 'simple'
-  const value = isSimple ? vm.valueSeries[0].values : twr
-  const invested = isSimple ? vm.valueSeries[1].values : null
+  const { value, invested } = chartSeries(vm, method, twr)
   const all = [...value, ...(invested ?? []), ...(isSimple ? [] : [0])]
   let low = Math.min(...all)
   let high = Math.max(...all)
@@ -244,7 +254,6 @@ export function portfolioChart(
   // The fall is measured on the TWR index: on the line in euros, contributions
   // would hide it, so only the TWR view marks it.
   const trough = !isSimple && drawdown && drawdown.trough < count ? drawdown.trough : null
-  const date = formatShortDate(vm.asOf)
   return {
     viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
     lines,
@@ -272,9 +281,151 @@ export function portfolioChart(
             top: share(y(value[trough]) + 22, CHART_HEIGHT),
             text: signedPct(drawdown.depth * 100),
           },
-    label: isSimple
-      ? `Lo que vale tu cartera frente a lo que has puesto. A ${date} vale ${formatMoney(vm.portfolioValue)}.`
-      : `Rentabilidad TWR acumulada de tu cartera a ${date}: ${signedPct(value[last])}.`,
+    label: chartLabel(vm, method, value),
+  }
+}
+
+/** What the evolution chart says, for screen readers. */
+function chartLabel(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  value: readonly number[],
+): string {
+  const date = formatShortDate(vm.asOf)
+  return method === 'simple'
+    ? `Lo que vale tu cartera frente a lo que has puesto. A ${date} vale ${formatMoney(vm.portfolioValue)}.`
+    : `Rentabilidad TWR acumulada de tu cartera a ${date}: ${signedPct(value[value.length - 1])}.`
+}
+
+/**
+ * The mobile chart (artboard «Inversión · móvil · Pixel 10»): edge to edge and
+ * 266 px tall, the portfolio as a thick line over an area that fades out and
+ * what went in as a dashed one, with no gridlines or figures beside it and
+ * only months on the axis. The top 40 px are left for the lead figure, which
+ * sits over it. The view box is stretched to its box, so units are px of
+ * height and a fraction of the width (the line stops short of the right edge
+ * so today's dot isn't clipped); the points that must stay round are placed
+ * by share and drawn in HTML.
+ */
+export const COMPACT_WIDTH = 400
+export const COMPACT_HEIGHT = 266
+const COMPACT_PAD = { top: 40, bottom: 34, right: 12 }
+/** From this many months the axis writes every other one, so the labels don't touch. */
+const COMPACT_DENSE = 6
+
+export interface CompactChart {
+  viewBox: string
+  /** Back to front: the invested capital under the portfolio. */
+  lines: ChartLine[]
+  /** The portfolio line closed along the bottom, for the fading area. */
+  area: string
+  /** Month labels; `left` is the share of the width. */
+  months: Array<{ left: number; text: string }>
+  /** Every point of the portfolio line, as shares of the width and the height from above. */
+  points: Array<{ left: number; top: number }>
+  /** What the chart says, for screen readers. */
+  label: string
+}
+
+export function compactChart(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  twr: readonly number[],
+): CompactChart {
+  const isSimple = method === 'simple'
+  const { value, invested } = chartSeries(vm, method, twr)
+  const all = [...value, ...(invested ?? []), ...(isSimple ? [] : [0])]
+  const min = Math.min(...all)
+  const max = Math.max(...all)
+  const margin = (max - min || Math.abs(max) * 0.1 || 1) * 0.02
+  const low = isSimple ? Math.max(0, min - margin) : min - margin
+  const high = max + margin
+
+  const count = value.length
+  const last = count - 1
+  const x = (index: number) =>
+    round1((count > 1 ? index / last : 1) * (COMPACT_WIDTH - COMPACT_PAD.right))
+  const y = (amount: number) =>
+    round1(
+      COMPACT_PAD.top +
+        (1 - (amount - low) / (high - low)) *
+          (COMPACT_HEIGHT - COMPACT_PAD.top - COMPACT_PAD.bottom),
+    )
+  const path = (values: readonly number[]) =>
+    values.map((amount, index) => `${index ? 'L' : 'M'}${x(index)} ${y(amount)}`).join(' ')
+  const wide = last > COMPACT_DENSE
+
+  const lines: ChartLine[] = []
+  if (invested) lines.push({ key: 'invested', d: path(invested), dashed: true })
+  lines.push({ key: 'value', d: path(value), dashed: false })
+  return {
+    viewBox: `0 0 ${COMPACT_WIDTH} ${COMPACT_HEIGHT}`,
+    lines,
+    area: `${path(value)} L${x(last)} ${COMPACT_HEIGHT} L0 ${COMPACT_HEIGHT} Z`,
+    months: value
+      .slice(1)
+      .map((_, index) => ({ index: index + 1, text: MONTH_ABBR[index] ?? '' }))
+      .filter(({ index }) => !wide || (last - index) % 2 === 0)
+      .map(({ index, text }) => ({ left: share(x(index), COMPACT_WIDTH), text })),
+    points: value.map((amount, index) => ({
+      left: share(x(index), COMPACT_WIDTH),
+      top: share(y(amount), COMPACT_HEIGHT),
+    })),
+    label: chartLabel(vm, method, value),
+  }
+}
+
+export interface LeadFigure {
+  /** What the portfolio is worth, in whole euros: «101.780 €». */
+  value: string
+  /** The gain in euros under the simple return; empty in TWR. */
+  gain: string
+  /** The return: simple over what went in, or the cumulative TWR. */
+  ret: string
+  tone: Tone
+  /** The gain as an arrow: up unless it is a loss. */
+  falling: boolean
+  /** The date of the point being looked at; null at today's. */
+  when: string | null
+}
+
+const wholeMoney = (value: number) => `${formatNumber(value, 0)}${NBSP}€`
+
+/**
+ * The lead figure of the mobile cover: what the portfolio is worth, and its
+ * gain and return. Idle (`index` null) it is the period's, as the figures of
+ * the desktop cover say them; looking at a point of the chart (`index`) it is
+ * that month's close: its value, and the return on what had gone in by then.
+ * Point 0 is the opening of the year.
+ */
+export function leadFigure(
+  vm: InvestmentDashboardViewModel,
+  method: ReturnMode,
+  twr: readonly number[],
+  year: number,
+  index: number | null,
+): LeadFigure {
+  const isSimple = method === 'simple'
+  const values = vm.valueSeries[0].values
+  const at = index === null ? null : Math.max(0, Math.min(values.length - 1, index))
+  const worth = at === null ? vm.portfolioValue : values[at]
+  let gain = vm.gain
+  let ret = isSimple ? vm.displayReturn : (twr.at(-1) ?? 0)
+  if (at !== null) {
+    const invested = vm.valueSeries[1].values[at]
+    gain = worth - invested
+    ret = isSimple ? (invested > 0 ? (gain / invested) * 100 : 0) : (twr[at] ?? 0)
+  }
+  const shown = isSimple ? gain : ret
+  return {
+    value: wholeMoney(worth),
+    gain: isSimple
+      ? `${gain > 0.005 ? '+' : gain < -0.005 ? MINUS : ''}${wholeMoney(Math.abs(gain))}`
+      : '',
+    ret: signedPct(ret),
+    tone: toneOf(shown),
+    falling: shown < -0.005,
+    when: at === null ? null : at === 0 ? `Inicio de ${year}` : `${MONTH_ABBR[at - 1]} ${year}`,
   }
 }
 
@@ -313,6 +464,13 @@ export interface CardRow {
   label: string
   value: string
   tone: Tone
+}
+
+/** A card under the positions: a title and its rows of label and figure. */
+export interface Card {
+  id: string
+  title: string
+  rows: readonly CardRow[]
 }
 
 /** «Caídas máximas»: the worst fall, what it meant in euros on the peak and its recovery. */

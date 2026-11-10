@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { dragOffset, releaseVelocity, shouldCloseSheet } from '../../src/neon/ui/sheet-drag'
+import {
+  dragOffset,
+  listSheetGesture,
+  releaseVelocity,
+  shouldCloseSheet,
+} from '../../src/neon/ui/sheet-drag'
 
 describe('reglas de arrastre de la hoja', () => {
   it('hacia abajo sigue al dedo y hacia arriba cede cada vez menos', () => {
@@ -32,5 +37,29 @@ describe('reglas de arrastre de la hoja', () => {
   it('calcula la velocidad entre dos muestras y es 0 sin tiempo transcurrido', () => {
     expect(releaseVelocity({ y: 100, at: 0 }, { y: 150, at: 250 })).toBe(0.2)
     expect(releaseVelocity({ y: 100, at: 10 }, { y: 150, at: 10 })).toBe(0)
+  })
+})
+
+describe('gesto de la hoja con lista', () => {
+  it('un toque la alterna, esté como esté', () => {
+    expect(listSheetGesture(false, -3, 0)).toBe('toggle')
+    expect(listSheetGesture(true, 4, 0)).toBe('toggle')
+  })
+
+  it('arrastrar hacia arriba la abre del todo, pasados 48 px o con un tirón', () => {
+    expect(listSheetGesture(false, -60, 0)).toBe('expand')
+    expect(listSheetGesture(false, -20, -0.2)).toBe('expand')
+    expect(listSheetGesture(false, -20, -0.05)).toBe('stay')
+  })
+
+  it('arrastrar hacia abajo la devuelve, pasados 48 px o con un tirón', () => {
+    expect(listSheetGesture(true, 60, 0)).toBe('collapse')
+    expect(listSheetGesture(true, 20, 0.2)).toBe('collapse')
+    expect(listSheetGesture(true, 20, 0.05)).toBe('stay')
+  })
+
+  it('arrastrar en el sentido que ya no puede ir no hace nada', () => {
+    expect(listSheetGesture(true, -80, -0.5)).toBe('stay')
+    expect(listSheetGesture(false, 80, 0.5)).toBe('stay')
   })
 })
