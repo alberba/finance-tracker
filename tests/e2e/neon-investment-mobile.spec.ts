@@ -20,9 +20,7 @@ test.beforeEach(async ({ tracker }) => {
 
 test('abre una posición desde la lista móvil y llega a su detalle', async ({ page }) => {
   await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
-  await expect(section(page).locator('[data-investment-figure="return"]')).toContainText(
-    'Tu cartera',
-  )
+  await expect(section(page).locator('[data-investment-value]')).toContainText('€')
 
   await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
   const detail = page.getByRole('dialog', { name: 'Fondos Indexados' })
@@ -55,18 +53,49 @@ test('la hoja de posiciones oculta el gráfico y los chips al abrirla y los devu
   await expect(method).toBeVisible()
 })
 
+test('recorrer el gráfico enseña el valor de ese mes y al soltar vuelve a hoy', async ({
+  page,
+}) => {
+  const figures = section(page).locator('[data-investment-figures]')
+  await expect(figures).toContainText('Vale hoy')
+
+  const slider = section(page).getByRole('slider', { name: 'Recorrer la evolución' })
+  const box = await slider.boundingBox()
+  if (!box) throw new Error('El gráfico no tiene caja')
+  await page.mouse.move(box.x + box.width * 0.35, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(figures).toContainText(/(Inicio de|ene|feb|mar) 2026/)
+  await expect(figures).not.toContainText('Vale hoy')
+
+  await page.mouse.up()
+  await page.mouse.move(box.x + box.width / 2, box.y - 40)
+  await expect(figures).toContainText('Vale hoy')
+})
+
 test('cambia la rentabilidad de importe a TWR desde los chips', async ({ page }) => {
-  const figure = section(page).locator('[data-investment-figure="return"]')
-  await expect(figure).toContainText('€')
+  const figures = section(page).locator('[data-investment-figures]')
+  await expect(figures).toContainText(/[+−]\d[\d.]*\s€/)
 
   await section(page).getByRole('button', { name: 'Rentabilidad simple' }).click()
   await page.getByRole('menuitemradio', { name: /^TWR/ }).click()
 
-  await expect(figure).toContainText('Tu cartera · TWR')
-  await expect(figure).not.toContainText('€')
+  await expect(section(page).getByRole('button', { name: 'Rentabilidad TWR' })).toBeVisible()
+  await expect(figures).not.toContainText(/[+−]\d[\d.]*\s€/)
   await expect(
     section(page).locator('[data-investment-chart]').getByRole('img'),
   ).toHaveAccessibleName(/^Rentabilidad TWR acumulada/)
+})
+
+test('las comisiones y las caídas se abren en su panel y se cierran', async ({ page }) => {
+  await section(page).getByRole('button', { name: 'Comisiones' }).click()
+  const fees = page.getByRole('dialog', { name: 'Comisiones' })
+  await expect(fees).toBeVisible()
+  await expect(fees.getByText('Sobre lo aportado')).toBeVisible()
+  await fees.getByRole('button', { name: 'Cerrar' }).click()
+  await expect(fees).toBeHidden()
+
+  await section(page).getByRole('button', { name: 'Caídas máximas' }).click()
+  await expect(page.getByRole('dialog', { name: 'Caídas máximas' })).toBeVisible()
 })
 
 test('todos los controles de la portada miden al menos 44 px con puntero táctil', async ({

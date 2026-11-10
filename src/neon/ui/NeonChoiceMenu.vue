@@ -28,8 +28,6 @@ withDefaults(
      * what shows, and `text` stays the accessible name.
      */
     shortText?: string
-    /** The pill fills its row instead of fitting its text. */
-    block?: boolean
     /** Which edge of the pill the menu lines up with. */
     placement?: 'start' | 'end'
     /** Accessible name of the list («Cómo medir la rentabilidad»). */
@@ -38,7 +36,7 @@ withDefaults(
     icon: string
     groups: ReadonlyArray<ChoiceGroup<T>>
   }>(),
-  { shortText: undefined, block: false, placement: 'end' },
+  { shortText: undefined, placement: 'end' },
 )
 
 const emit = defineEmits<{ select: [key: string, value: T] }>()
@@ -90,12 +88,11 @@ onBeforeUnmount(stopListening)
       ref="trigger"
       type="button"
       class="rounded-pill outline-accent text-meta inline-flex min-h-[38px] items-center gap-2 border px-3.5 font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97] pointer-coarse:min-h-11"
-      :class="[
+      :class="
         open
           ? 'bg-sel-bg text-sel-text border-sel-border'
-          : 'border-ctrl-line text-soft bg-transparent',
-        block && 'w-full min-w-0',
-      ]"
+          : 'border-ctrl-line text-soft bg-transparent'
+      "
       :aria-label="shortText ? text : undefined"
       aria-haspopup="menu"
       :aria-expanded="open"
@@ -114,7 +111,7 @@ onBeforeUnmount(stopListening)
       >
         <path :d="icon" />
       </svg>
-      <span :class="block && 'truncate'">{{ shortText ?? text }}</span>
+      {{ shortText ?? text }}
     </button>
     <div
       v-if="open"

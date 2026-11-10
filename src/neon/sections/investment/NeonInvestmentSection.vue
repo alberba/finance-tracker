@@ -27,6 +27,7 @@ import {
   compactChart,
   dropRows,
   feeRows,
+  leadFigure,
   maxDrawdown,
   periodFigures,
   periodOptions,
@@ -87,7 +88,9 @@ const figures = computed(() =>
   }),
 )
 const chart = computed(() => portfolioChart(vm.value, method.value, twr.value, drawdown.value))
-const compact = computed(() => compactChart(vm.value, method.value, twr.value, drawdown.value))
+const compact = computed(() => compactChart(vm.value, method.value, twr.value))
+const leadAt = (index: number | null) =>
+  leadFigure(vm.value, method.value, twr.value, state.value.year, index)
 const desktopFrame = useMediaQuery(FRAME_QUERY)
 const notice = computed(() => quoteNotice(summarizeQuoteStatus(marketStore.valuation.instruments)))
 const empty = computed(() => vm.value.positions.length === 0)
@@ -150,17 +153,15 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       v-if="!desktopFrame"
       :empty="empty"
       :notice="notice"
-      :figures="figures"
+      :value-label="figures[1].label"
+      :lead-at="leadAt"
       :chart="compact"
       :periods="periods"
       :month="month"
       :method="method"
       :rows="rows"
-      :sort-key="sortKey"
-      :sort-direction="sortDirection"
       :cards="cards"
       @open="openPosition"
-      @sort="sortBy"
       @month="investmentStore.setMonth"
       @method="investmentStore.setReturnMode"
     />

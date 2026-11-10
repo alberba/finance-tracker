@@ -8,8 +8,8 @@ import type { PeriodOption } from './view-model'
 
 // The two pills of the cover: the period the figures are measured at and how
 // the return is measured. On the desktop frame they sit at the end of a row;
-// on the mobile one (`compact`) they share a row half and half, with short
-// texts, and each menu opens toward the middle of the screen.
+// on the mobile one (`compact`) they sit side by side in the middle, with
+// short texts, and each menu opens toward the middle of the screen.
 const props = defineProps<{
   periods: readonly PeriodOption[]
   month: Month
@@ -43,11 +43,12 @@ const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
 </script>
 
 <template>
-  <div :class="compact ? 'grid grid-cols-2 gap-2' : 'flex flex-wrap justify-end gap-x-5 gap-y-3'">
+  <div
+    :class="compact ? 'flex justify-center gap-2' : 'flex flex-wrap justify-end gap-x-5 gap-y-3'"
+  >
     <NeonChoiceMenu
       :text="`Periodo · ${period?.label ?? ''}`"
       :short-text="compact ? period?.label : undefined"
-      :block="compact"
       :placement="compact ? 'start' : 'end'"
       label="Periodo"
       :icon="ICON_PERIOD"
@@ -57,7 +58,6 @@ const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
     <NeonChoiceMenu
       :text="method === 'twr' ? 'Rentabilidad TWR' : 'Rentabilidad simple'"
       :short-text="compact ? (method === 'twr' ? 'TWR' : 'Simple') : undefined"
-      :block="compact"
       label="Cómo medir la rentabilidad"
       :icon="ICON_METHOD"
       :groups="methodGroups"

@@ -6,6 +6,7 @@ import {
   compactChart,
   dropRows,
   feeRows,
+  leadFigure,
   periodOptions,
   quoteNotice,
   maxDrawdown,
@@ -153,36 +154,32 @@ describe('portfolioChart', () => {
 })
 
 describe('compactChart', () => {
-  it('en simple dibuja las dos líneas sobre el área, sin rejilla ni cifras, con los meses y el punto de hoy', () => {
-    const chart = compactChart(simple(), 'simple', [], null)
+  it('en simple dibuja las dos líneas sobre el área, sin rejilla ni cifras, con los meses y un punto por cierre', () => {
+    const chart = compactChart(simple(), 'simple', [])
     expect(chart.lines.map((line) => [line.key, line.dashed])).toEqual([
       ['invested', true],
       ['value', false],
     ])
-    expect(chart.hasInvested).toBe(true)
     expect(chart.area).toMatch(/Z$/)
     expect(chart.months.map((month) => month.text)).toEqual(['ene', 'feb', 'mar'])
-    expect(chart.dot.left).toBeGreaterThan(90)
-    expect(chart.dot.left).toBeLessThan(100)
-    expect(chart.drop).toBeNull()
+    expect(chart.points).toHaveLength(4)
+    expect(chart.points[0].left).toBe(0)
+    expect(chart.points.at(-1)?.left).toBeGreaterThan(90)
+    expect(chart.points.at(-1)?.left).toBeLessThan(100)
     expect(chart.label).toBe(portfolioChart(simple(), 'simple', [], null).label)
   })
 
-  it('en TWR dibuja una sola línea y marca el fondo de la peor caída', () => {
+  it('en TWR dibuja una sola línea', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
-    const twr = [0, 10, 4, 12]
-    const chart = compactChart(vm, 'twr', twr, maxDrawdown(twr))
-    expect(chart.lines.map((line) => line.key)).toEqual(['value'])
-    expect(chart.hasInvested).toBe(false)
-    expect(chart.drop?.text).toBe('−5,5\u00a0%')
-    expect(chart.drop?.left).toBeCloseTo(64.7, 1)
+    expect(compactChart(vm, 'twr', [0, 4, 9, 20]).lines.map((line) => line.key)).toEqual(['value'])
   })
 
-  it('el punto de hoy queda dentro del alto, aunque la cartera valga lo mismo todo el periodo', () => {
+  it('deja libres los 40 px de arriba para la cifra, aunque la cartera valga lo mismo todo el periodo', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
-    const { dot } = compactChart(vm, 'twr', [0, 0, 0, 0], null)
-    expect(dot.top).toBeGreaterThan(0)
-    expect(dot.top).toBeLessThan(100)
+    for (const { top } of compactChart(vm, 'twr', [0, 0, 0, 0]).points) {
+      expect(top).toBeGreaterThanOrEqual((40 / 266) * 100 - 0.1)
+      expect(top).toBeLessThan(100)
+    }
   })
 
   it('con más de seis meses escribe uno sí y otro no, acabando siempre en el último', () => {
@@ -190,9 +187,67 @@ describe('compactChart', () => {
       snapshots: { '9': { month: 9, investments: { fondos: 2640, oro: 180 }, accounts: {} } },
     })
     const vm = buildInvestmentDashboardViewModel(state, 9, 'simple')
-    const { months } = compactChart(vm, 'simple', [], null)
+    const { months } = compactChart(vm, 'simple', [])
     expect(months.map((month) => month.text)).toEqual(['ene', 'mar', 'may', 'jul', 'sep'])
     expect(months.at(-1)?.left).toBeGreaterThan(90)
+  })
+})
+
+describe('leadFigure', () => {
+  const twr = [0, 4, 9, 20]
+
+  it('en reposo es el valor de la cartera en euros enteros, con su ganancia y su rentabilidad', () => {
+    expect(leadFigure(simple(), 'simple', twr, 2026, null)).toEqual({
+      value: '2.820\u00a0€',
+      gain: '+420\u00a0€',
+      ret: '+17,5\u00a0%',
+      tone: 'gain',
+      falling: false,
+      when: null,
+    })
+  })
+
+  it('al mirar un cierre es su valor y lo ganado sobre lo que se había puesto a esa fecha', () => {
+    expect(leadFigure(simple(), 'simple', twr, 2026, 1)).toMatchObject({
+      value: '1.000\u00a0€',
+      gain: '0\u00a0€',
+      ret: '0,0\u00a0%',
+      tone: 'neutral',
+      when: 'ene 2026',
+    })
+    expect(leadFigure(simple(), 'simple', twr, 2026, 3)).toMatchObject({
+      value: '2.820\u00a0€',
+      gain: '+420\u00a0€',
+      ret: '+17,5\u00a0%',
+      when: 'mar 2026',
+    })
+  })
+
+  it('el primer punto es el inicio del año', () => {
+    expect(leadFigure(simple(), 'simple', twr, 2026, 0).when).toBe('Inicio de 2026')
+  })
+
+  it('en TWR la rentabilidad es la TWR y no hay ganancia en euros', () => {
+    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
+    expect(leadFigure(vm, 'twr', twr, 2026, null)).toMatchObject({ gain: '', ret: '+20,0\u00a0%' })
+    expect(leadFigure(vm, 'twr', twr, 2026, 1)).toMatchObject({ gain: '', ret: '+4,0\u00a0%' })
+  })
+
+  it('una pérdida lleva el tono de pérdida, el menos tipográfico y la flecha hacia abajo', () => {
+    const state = portfolio({
+      snapshots: { '3': { month: 3, investments: { fondos: 2000, oro: 100 }, accounts: {} } },
+    })
+    expect(leadFigure(simple(state), 'simple', twr, 2026, null)).toMatchObject({
+      gain: '−300\u00a0€',
+      ret: '−12,5\u00a0%',
+      tone: 'loss',
+      falling: true,
+    })
+  })
+
+  it('un punto fuera de la serie se queda en su extremo', () => {
+    expect(leadFigure(simple(), 'simple', twr, 2026, 99).when).toBe('mar 2026')
+    expect(leadFigure(simple(), 'simple', twr, 2026, -3).when).toBe('Inicio de 2026')
   })
 })
 
