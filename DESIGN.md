@@ -208,7 +208,7 @@ Círculo (`border-radius: 50%`) solo con icono, sin texto: 64px en móvil, bajo 
 
 Botón extendido de 56px de alto con radio 16px, `padding: 0 22px 0 16px`, fondo `--color-accent`, icono «+» de 24px y la palabra «Apuntar» en Unbounded 700 a 15px, con `gap: 10px`. Flota a 16px del borde derecho y a 118px del inferior (por encima de la barra), con `filter: drop-shadow(0 10px 18px oklch(0% 0 none / 0.45))`.
 
-Se pliega al desplazar: al bajar más de 6px se recorta con `clip-path` a un cuadrado de 56px y la palabra se desvanece; al subir, o junto al borde superior, vuelve a su ancho. Pulsado, `scale(0.97)`. Con un aviso visible sube 64px para no taparlo.
+Se pliega al desplazar: al bajar más de 6px se recorta con `clip-path` a un cuadrado de 56px y la palabra se desvanece; al subir, o junto al borde superior, vuelve a su ancho. Pulsado, `scale(0.97)`. Con un aviso visible sube 64px para no taparlo. Una pantalla que acopla su propia barra de acción abajo («Aplicar», «Guardar» en Presupuesto) la sustituye: el FAB se oculta mientras esa barra está en pantalla.
 
 ### Item de nav lateral
 
