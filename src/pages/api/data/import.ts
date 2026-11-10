@@ -379,6 +379,8 @@ export const POST: APIRoute = async ({ request, locals, url }) =>
             categoryId: categoryId ?? null,
             name: String(row.name ?? ''),
             targetYear: typeof row.targetYear === 'number' ? row.targetYear : null,
+            targetMonth: typeof row.targetMonth === 'number' ? row.targetMonth : null,
+            monthlyAmount: typeof row.monthlyAmount === 'number' ? row.monthlyAmount : null,
             targetAmount: typeof row.targetAmount === 'number' ? row.targetAmount : 0,
             currency: String(row.currency ?? 'EUR'),
           }),

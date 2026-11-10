@@ -50,6 +50,23 @@ export const useGoalsStore = defineStore('goals', () => {
       name: goal.name,
       targetAmount: goal.targetAmount,
       currency: financialStateStore.currency,
+      // The plan travels only once set, so a goal without it sends what it always did.
+      ...(goal.targetYear !== undefined && { targetYear: goal.targetYear }),
+      ...(goal.targetMonth !== undefined && { targetMonth: goal.targetMonth }),
+      ...(goal.monthlyAmount !== undefined && { monthlyAmount: goal.monthlyAmount }),
+    }
+  }
+
+  /** Deadline and monthly amount as given, rounded; what the input leaves out stays out. */
+  function savingGoalPlan(
+    input: Omit<SavingGoal, 'id'>,
+  ): Pick<SavingGoal, 'targetYear' | 'targetMonth' | 'monthlyAmount'> {
+    return {
+      ...(input.targetYear !== undefined && { targetYear: Math.trunc(input.targetYear) }),
+      ...(input.targetMonth !== undefined && { targetMonth: Math.trunc(input.targetMonth) }),
+      ...(input.monthlyAmount !== undefined && {
+        monthlyAmount: round2(Math.max(input.monthlyAmount, 0)),
+      }),
     }
   }
 
@@ -60,26 +77,40 @@ export const useGoalsStore = defineStore('goals', () => {
     showToast(message)
   }
 
-  function validSavingGoal(input: Omit<SavingGoal, 'id'>): boolean {
+  function validSavingGoal(input: Omit<SavingGoal, 'id'>, newCategory = false): boolean {
     return (
       Boolean(input.name.trim()) &&
-      Boolean(input.category) &&
-      financialStateStore.state.savingCategories.includes(input.category) &&
+      Boolean(input.category.trim()) &&
+      (newCategory || financialStateStore.state.savingCategories.includes(input.category)) &&
       Number.isFinite(input.targetAmount) &&
       input.targetAmount > 0
     )
   }
 
-  function addSavingGoal(input: Omit<SavingGoal, 'id'>): boolean {
-    if (!validSavingGoal(input)) return false
+  /**
+   * `newCategory` creates the saving category the goal sums along with it: the
+   * goal's own command mints it on the server, so the two never race.
+   */
+  function addSavingGoal(
+    input: Omit<SavingGoal, 'id'>,
+    { message = 'Objetivo de ahorro guardado.', newCategory = false } = {},
+  ): boolean {
+    if (!validSavingGoal(input, newCategory)) return false
+    const category = input.category.trim()
+    if (newCategory && !financialStateStore.state.savingCategories.includes(category)) {
+      financialStateStore.commitState((draft) => {
+        draft.savingCategories.push(category)
+      })
+    }
     commitSavingGoals((goals) => {
       goals.push({
         id: uid('saving-goal'),
         name: input.name.trim(),
-        category: input.category,
+        category,
         targetAmount: round2(input.targetAmount),
+        ...savingGoalPlan(input),
       })
-    }, 'Objetivo de ahorro guardado.')
+    }, message)
     return true
   }
 
@@ -91,8 +122,24 @@ export const useGoalsStore = defineStore('goals', () => {
       goal.name = input.name.trim()
       goal.category = input.category
       goal.targetAmount = round2(input.targetAmount)
+      Object.assign(goal, savingGoalPlan(input))
     }, 'Objetivo de ahorro guardado.')
     return true
+  }
+
+  /** The monthly amount planned for each goal, by id («Repartir el ahorro»). */
+  function setSavingGoalMonthlyAmounts(
+    amounts: Record<string, number>,
+    message = 'Aportación guardada.',
+  ): void {
+    commitSavingGoals((goals) => {
+      for (const goal of goals) {
+        const amount = amounts[goal.id]
+        if (amount !== undefined && Number.isFinite(amount)) {
+          goal.monthlyAmount = round2(Math.max(amount, 0))
+        }
+      }
+    }, message)
   }
 
   function removeSavingGoal(id: string): void {
@@ -109,6 +156,7 @@ export const useGoalsStore = defineStore('goals', () => {
     saveGoal,
     addSavingGoal,
     updateSavingGoal,
+    setSavingGoalMonthlyAmounts,
     removeSavingGoal,
   }
 })

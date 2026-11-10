@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { shallowRef } from 'vue'
+import { shallowRef, watch } from 'vue'
 
 import { useAccountRequirement } from '../../composables/useAccountRequirement'
 import { useEntrySheet } from '../../composables/useEntrySheet'
+import { useMediaQuery } from '../../composables/useMediaQuery'
+import { FRAME_QUERY } from '../ui/sheet-drag'
 import DashboardCategoriesCard from './DashboardCategoriesCard.vue'
 import DashboardGoalsCard from './DashboardGoalsCard.vue'
 import DashboardInvestmentsCard from './DashboardInvestmentsCard.vue'
+import DashboardMobile from './DashboardMobile.vue'
 import DashboardMonthCard from './DashboardMonthCard.vue'
 import DashboardPendingCard from './DashboardPendingCard.vue'
 import DashboardRecentCard from './DashboardRecentCard.vue'
@@ -19,6 +22,12 @@ import { useNeonDashboardStore } from './store'
 // scrolling; below, net worth with investments, and the latest movements with
 // spending by category and goals. Below the container's two-column width the
 // blocks stack in that same order.
+//
+// The mobile frame gets its own composition (DashboardMobile) from the same
+// view model: there «Apuntar» is the FAB, search and «Por confirmar» live in
+// the top bar, so the home is laid out around them. Which one shows follows
+// the frame's own media query, not the container: it is the frame that moves
+// those controls.
 defineProps<{ isActive?: boolean }>()
 
 const store = useNeonDashboardStore()
@@ -26,6 +35,15 @@ const { viewModel, range, recentFilter } = storeToRefs(store)
 const { needsAccount } = useAccountRequirement()
 const { openEntrySheet } = useEntrySheet()
 const query = shallowRef('')
+const desktopFrame = useMediaQuery(FRAME_QUERY)
+// The mobile home has no type chips: its list always shows every type.
+watch(
+  desktopFrame,
+  (desktop) => {
+    if (!desktop) recentFilter.value = 'all'
+  },
+  { immediate: true },
+)
 
 function search(): void {
   if (query.value.trim()) store.searchMovements(query.value)
@@ -39,7 +57,8 @@ function search(): void {
     aria-labelledby="dashboard-title"
     data-neon-section
   >
-    <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+    <DashboardMobile v-if="!desktopFrame" :view-model="viewModel" @navigate="store.navigate" />
+    <header v-else class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div class="flex flex-col gap-1">
         <p class="text-muted text-label tracking-label font-extrabold uppercase">
           {{ viewModel.date }}
@@ -102,6 +121,7 @@ function search(): void {
     </header>
 
     <div
+      v-if="desktopFrame"
       class="grid grid-cols-1 items-start gap-5 @4xl:grid-cols-[minmax(0,1.5fr)_minmax(380px,1fr)] @4xl:[grid-template-areas:'mes_pend'_'neto_inv'_'mov_cat'_'mov_obj']"
     >
       <DashboardMonthCard

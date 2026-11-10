@@ -62,6 +62,8 @@ export interface NeonDashboardViewModel {
   month: {
     name: string
     status: string
+    /** «Te quedan», or «Te quedaron» once the month is closed. */
+    leftLabel: string
     left: { text: string; tone: FigureTone }
     income: string
     pendingNote: string
@@ -212,6 +214,7 @@ export function buildNeonDashboardViewModel({
     month: {
       name: monthName,
       status: monthStatus(period, today),
+      leftLabel: period.phase === 'closed' ? 'Te quedaron' : 'Te quedan',
       left: { text: money(left), tone: left < 0 ? 'loss' : 'neutral' },
       income: money(totals.income),
       pendingNote: pendingCount ? `${signed(pendingTotal)} por confirmar` : 'nada por confirmar',

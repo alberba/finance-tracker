@@ -89,24 +89,24 @@ test.describe('Marco móvil nuevo', () => {
     await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
   })
 
-  test('«Por confirmar» abre un popover que cierra con Escape y al pulsar fuera', async ({
+  test('«Por confirmar» abre una hoja que cierra con Escape y al pulsar fuera', async ({
     page,
   }) => {
     const trigger = page.getByRole('button', { name: /^Por confirmar/ })
-    const popover = page.getByRole('dialog', { name: 'Por confirmar' })
+    const sheet = page.getByRole('dialog', { name: 'Por confirmar' })
 
     await trigger.click()
-    await expect(popover).toBeVisible()
-    await expect(popover.getByText('Todo al día')).toBeVisible()
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByText('No queda nada por confirmar')).toBeVisible()
 
     await page.keyboard.press('Escape')
-    await expect(popover).toBeHidden()
+    await expect(sheet).toBeHidden()
     await expect(trigger).toBeFocused()
 
     await trigger.click()
-    await expect(popover).toBeVisible()
-    await page.mouse.click(10, 400)
-    await expect(popover).toBeHidden()
+    await expect(sheet).toBeVisible()
+    await page.mouse.click(10, 100)
+    await expect(sheet).toBeHidden()
   })
 
   test('todos los controles del marco miden al menos 44 px con puntero táctil', async ({

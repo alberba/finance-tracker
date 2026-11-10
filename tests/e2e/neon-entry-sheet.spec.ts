@@ -137,7 +137,7 @@ test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
       .getByRole('dialog', { name: 'Por confirmar' })
       .locator('[data-pending-item]')
       .filter({ hasText: description })
-      .getByRole('button')
+      .getByRole('button', { name: /^Revisar/ })
       .click()
     await page
       .getByRole('dialog', { name: description })

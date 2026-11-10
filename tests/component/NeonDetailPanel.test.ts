@@ -72,6 +72,25 @@ afterEach(() => {
 })
 
 describe('NeonDetailPanel', () => {
+  it('cada panel se nombra por su título aunque viva en otra app de la página', () => {
+    // Two islands are two Vue apps: ids generated in each one repeat.
+    const first = mount(NeonDetailPanel, {
+      attachTo: document.body,
+      props: { open: false, title: 'Por confirmar' },
+    })
+    const second = mount(NeonDetailPanel, {
+      attachTo: document.body,
+      props: { open: false, title: 'Buscar movimientos' },
+    })
+    cleanups.push(
+      () => first.unmount(),
+      () => second.unmount(),
+    )
+
+    expect(first.get('dialog').attributes('aria-label')).toBe('Por confirmar')
+    expect(second.get('dialog').attributes('aria-label')).toBe('Buscar movimientos')
+  })
+
   it('es un diálogo modal con nombre que se abre al pedirlo', async () => {
     const { wrapper, dialog } = mountPanel()
     expect(dialog.open).toBe(false)
@@ -80,8 +99,8 @@ describe('NeonDetailPanel', () => {
     await nextTick()
 
     expect(dialog.open).toBe(true)
-    const titleId = dialog.getAttribute('aria-labelledby') as string
-    expect(wrapper.get(`#${titleId}`).text()).toBe('Alquiler')
+    expect(dialog.getAttribute('aria-label')).toBe('Alquiler')
+    expect(wrapper.get('h2').text()).toBe('Alquiler')
     expect(wrapper.text()).toContain('Pendiente')
     expect(wrapper.text()).toContain('Vence mañana')
     expect(wrapper.text()).toContain('Confirmar')

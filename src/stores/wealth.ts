@@ -25,7 +25,14 @@ export const useWealthStore = defineStore('wealth', () => {
     ui.snapshotMonth = month
   }
 
-  function saveSnapshot(edits: SnapshotCommitEdit[]): void {
+  /**
+   * Stores the month's balances and syncs them. `notify: false` leaves the
+   * notice to the caller (the new design words it as closing the month).
+   */
+  function saveSnapshot(
+    edits: SnapshotCommitEdit[],
+    { notify = true }: { notify?: boolean } = {},
+  ): void {
     const month = ui.snapshotMonth
     financialStateStore.commitState((draft) => {
       if (!draft.snapshots[String(month)]) {
@@ -49,7 +56,7 @@ export const useWealthStore = defineStore('wealth', () => {
     const year = financialStateStore.year
     const currency = financialStateStore.state.currency
     void syncSnapshotBalances(year, snapshot, currency)
-    showToast(`Snapshot de ${formatMonthName(month).toLowerCase()} guardado.`)
+    if (notify) showToast(`Snapshot de ${formatMonthName(month).toLowerCase()} guardado.`)
   }
 
   return {

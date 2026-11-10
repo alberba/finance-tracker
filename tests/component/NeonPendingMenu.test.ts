@@ -58,6 +58,18 @@ const trigger = (wrapper: ReturnType<typeof mount>) =>
 
 async function openMenu(wrapper: ReturnType<typeof mount>) {
   await trigger(wrapper).trigger('click')
+  await nextTick()
+}
+
+/** The open bottom sheet whose title is `title` (the list is «Por confirmar»; a detail, its description). */
+function openSheet(wrapper: ReturnType<typeof mount>, title = 'Por confirmar') {
+  const sheet = wrapper
+    .findAll('dialog')
+    .find(
+      (dialog) => (dialog.element as HTMLDialogElement).open && dialog.get('h2').text() === title,
+    )
+  if (!sheet) throw new Error(`No open sheet titled ${title}`)
+  return sheet
 }
 
 beforeEach(() => {
@@ -69,14 +81,15 @@ afterEach(() => {
 })
 
 describe('NeonPendingMenu', () => {
-  it('sin pendientes abre un popover con el estado vacío', async () => {
+  it('sin pendientes abre la hoja con el estado vacío', async () => {
     const { wrapper } = setup([])
 
     expect(trigger(wrapper).attributes('aria-label')).toBe('Por confirmar')
     await openMenu(wrapper)
 
-    expect(wrapper.get('[role="dialog"]').text()).toContain('Todo al día')
-    expect(wrapper.find('[data-empty-state]').exists()).toBe(true)
+    expect(openSheet(wrapper).text()).toContain('No queda nada por confirmar')
+    expect(openSheet(wrapper).find('[data-empty-state]').exists()).toBe(true)
+    expect(openSheet(wrapper).find('[data-pending-confirm-all]').exists()).toBe(false)
   })
 
   it('con pendientes cuenta cuántos hay y los lista', async () => {
@@ -88,7 +101,7 @@ describe('NeonPendingMenu', () => {
     expect(trigger(wrapper).attributes('aria-label')).toBe('Por confirmar, 2 pendientes')
     await openMenu(wrapper)
 
-    const items = wrapper.get('[role="dialog"]').findAll('[data-pending-item]')
+    const items = openSheet(wrapper).findAll('[data-pending-item]')
     expect(items.map((item) => item.text())).toEqual([
       expect.stringContaining('Alquiler'),
       expect.stringContaining('Internet'),
@@ -96,17 +109,47 @@ describe('NeonPendingMenu', () => {
     expect(wrapper.find('[data-empty-state]').exists()).toBe(false)
   })
 
-  it('elegir uno cierra el popover y abre su detalle', async () => {
+  it('confirma uno desde su fila, sin abrir el detalle', async () => {
+    const { wrapper, recurringStore } = setup([
+      pendingMovement('p1', 'Alquiler', 500),
+      pendingMovement('p2', 'Internet', 40),
+    ])
+    await openMenu(wrapper)
+
+    await openSheet(wrapper).get('button[aria-label="Confirmar Alquiler"]').trigger('click')
+    await nextTick()
+
+    expect(recurringStore.openPendingMovements.map((item) => item.description)).toEqual([
+      'Internet',
+    ])
+    expect(openSheet(wrapper).findAll('[data-pending-item]')).toHaveLength(1)
+  })
+
+  it('«Confirmar los N» los apunta todos y dice cuánto suman', async () => {
+    const { wrapper, recurringStore } = setup([
+      pendingMovement('p1', 'Alquiler', 500),
+      pendingMovement('p2', 'Internet', 40),
+    ])
+    await openMenu(wrapper)
+    const confirmAll = openSheet(wrapper).get('button[data-pending-confirm-all]')
+    expect(confirmAll.text().replace(/\s/g, ' ')).toBe('Confirmar los 2 · −540,00 €')
+
+    await confirmAll.trigger('click')
+    await nextTick()
+
+    expect(recurringStore.openPendingMovements).toHaveLength(0)
+    expect(useFinancialStateStore().transactions).toHaveLength(2)
+    expect(openSheet(wrapper).text()).toContain('No queda nada por confirmar')
+  })
+
+  it('elegir uno cierra la hoja y abre su detalle', async () => {
     const { wrapper } = setup([pendingMovement('p1', 'Alquiler', 500)])
     await openMenu(wrapper)
 
-    await wrapper.get('[data-pending-item="p1"] button').trigger('click')
-    await nextTick()
+    await wrapper.get('[data-pending-item="p1"] button[aria-label^="Revisar"]').trigger('click')
+    await vi.waitFor(() => expect(() => openSheet(wrapper)).toThrow())
 
-    expect(wrapper.find('[role="dialog"][aria-label="Por confirmar"]').exists()).toBe(false)
-    const panel = wrapper.get('dialog')
-    expect((panel.element as HTMLDialogElement).open).toBe(true)
-    expect(panel.text()).toContain('Alquiler')
+    const panel = openSheet(wrapper, 'Alquiler')
     expect(panel.text()).toContain('Cuenta Principal')
     expect(panel.text()).toContain('500,00')
   })
@@ -114,10 +157,10 @@ describe('NeonPendingMenu', () => {
   it('confirmar desde el detalle apunta el movimiento y lo quita de la lista', async () => {
     const { wrapper, recurringStore } = setup([pendingMovement('p1', 'Alquiler', 500)])
     await openMenu(wrapper)
-    await wrapper.get('[data-pending-item="p1"] button').trigger('click')
+    await wrapper.get('[data-pending-item="p1"] button[aria-label^="Revisar"]').trigger('click')
     await nextTick()
 
-    await wrapper.get('dialog button[data-pending-confirm]').trigger('click')
+    await openSheet(wrapper, 'Alquiler').get('button[data-pending-confirm]').trigger('click')
     await nextTick()
 
     expect(recurringStore.openPendingMovements).toHaveLength(0)
@@ -128,10 +171,10 @@ describe('NeonPendingMenu', () => {
   it('saltar desde el detalle descarta el vencimiento sin apuntar nada', async () => {
     const { wrapper, recurringStore } = setup([pendingMovement('p1', 'Alquiler', 500)])
     await openMenu(wrapper)
-    await wrapper.get('[data-pending-item="p1"] button').trigger('click')
+    await wrapper.get('[data-pending-item="p1"] button[aria-label^="Revisar"]').trigger('click')
     await nextTick()
 
-    await wrapper.get('dialog button[data-pending-skip]').trigger('click')
+    await openSheet(wrapper, 'Alquiler').get('button[data-pending-skip]').trigger('click')
     await nextTick()
 
     expect(recurringStore.openPendingMovements).toHaveLength(0)
@@ -141,12 +184,12 @@ describe('NeonPendingMenu', () => {
   it('al cerrar el detalle el foco vuelve al botón de «Por confirmar»', async () => {
     const { wrapper } = setup([pendingMovement('p1', 'Alquiler', 500)])
     await openMenu(wrapper)
-    await wrapper.get('[data-pending-item="p1"] button').trigger('click')
+    await wrapper.get('[data-pending-item="p1"] button[aria-label^="Revisar"]').trigger('click')
     await nextTick()
-    const panel = wrapper.get('dialog').element as HTMLDialogElement
+    const panel = openSheet(wrapper, 'Alquiler')
 
-    await wrapper.get('dialog button[aria-label="Cerrar"]').trigger('click')
-    await vi.waitFor(() => expect(panel.open).toBe(false))
+    await panel.get('button[aria-label="Cerrar"]').trigger('click')
+    await vi.waitFor(() => expect((panel.element as HTMLDialogElement).open).toBe(false))
 
     expect(document.activeElement).toBe(trigger(wrapper).element)
   })

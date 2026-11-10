@@ -42,6 +42,11 @@ export interface SavingGoal {
   targetAmount: number
   /** Name of the saving category it sums. */
   category: string
+  /** The month it is due (year and 1-12, ADR 0008); a goal without them has no deadline. */
+  targetYear?: number
+  targetMonth?: number
+  /** What the user plans to put into it each month; absent when never planned. */
+  monthlyAmount?: number
 }
 
 export interface Entity {

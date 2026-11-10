@@ -5,8 +5,12 @@ import { setSwitch } from './controls'
 const DESK_BREAKPOINT_PX = 981
 
 const SECTION_CONFIG = {
-  // The old dashboard is titled «Dashboard»; the new one names the month («Así va octubre»).
-  dashboard: { buttonLabel: 'Dashboard', headingText: /^(Dashboard|Así (va|fue) \S+)$/ },
+  // The old dashboard is titled «Dashboard»; the new one names the month: «Así va octubre»
+  // on desktop, «Te quedan en octubre» over the figure in the mobile frame.
+  dashboard: {
+    buttonLabel: 'Dashboard',
+    headingText: /^(Dashboard|Así (va|fue) \S+|Te (quedan|quedaron) en \S+)$/,
+  },
   transactions: {
     buttonLabel: 'Movimientos',
     headingText: /^Movimientos$/,
@@ -832,18 +836,6 @@ export class FinanceTrackerPage {
   async readWealthSnapshot(name: string): Promise<number> {
     const value = await this.wealthSnapshotInput(name).inputValue()
     return Number(value.replace(/\./g, '').replace(',', '.'))
-  }
-
-  async saveAccountSnapshot(params: { monthLabel: string; accountName: string; value: number }) {
-    await this.openWealth()
-    await this.selectWealthMonth(params.monthLabel)
-    await this.wealthSnapshotInput(params.accountName).fill(String(params.value).replace('.', ','))
-    await this.saveSnapshot()
-    await this.waitForSync()
-  }
-
-  async getAccountSnapshotValue(accountName: string): Promise<number> {
-    return this.readWealthSnapshot(accountName)
   }
 
   wealthCalcPanel(): Locator {

@@ -247,6 +247,8 @@ const entityCreateFields = {
     categoryId: optionalText,
     name: nonEmpty,
     targetYear: Schema.optional(Schema.NullOr(int)),
+    targetMonth: Schema.optional(Schema.NullOr(int)),
+    monthlyAmount: Schema.optional(nullableFinite),
     targetAmount: finite,
     currency: nonEmpty,
   },

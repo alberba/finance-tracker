@@ -665,7 +665,7 @@ describe('round trip: imported movement protections (#263)', () => {
     },
     {
       action: 'deleting from Movimientos',
-      expectedResult: undefined,
+      expectedResult: false,
       run: (id: string) => useMovementsStore().deleteTransaction(id),
     },
     {

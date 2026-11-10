@@ -38,7 +38,6 @@
     --color-gain: #86cfa5;
     --color-loss: #e99383;
     --color-lilac: #aba0e6;
-    --color-lilac2: #867bcb;
     --color-lilac3: #625aa0;
     --color-peach: #e8b79c;
     --color-neutral-bar: #6f6a62;
@@ -254,6 +253,14 @@
     font-size: var(--text-body);
     line-height: var(--leading-body);
   }
+
+  /* The old base sets h1 and h2 in its display face; here a block title is
+     Manrope (DESIGN.md) and a page title asks for Unbounded with its class. */
+  [data-ui='neon'] h1,
+  [data-ui='neon'] h2 {
+    font-family: inherit;
+    letter-spacing: inherit;
+  }
 }
 
 /* Utilities with names the old design doesn't have (bg-side, text-soft,
@@ -286,8 +293,15 @@
   --color-lilac: #aba0e6;
   --color-lilac2: #867bcb;
   --color-lilac3: #625aa0;
+  /* Movimientos (#431): the selected chip's border; it also uses the lilac
+     (investment) and peach (saving) hues and the neutral fill of data bars. */
+  --color-sel-border: #e6e1d7;
   --color-peach: #e8b79c;
   --color-neutral-bar: #6f6a62;
+  /* Presupuesto (#433): chart baselines and empty rings, and the saving hue
+     of the month's split. */
+  --color-grid: #3a3834;
+  --color-lilac3: #625aa0;
 
   --text-brand: 24px;
   --tracking-brand: -0.03em;
@@ -302,6 +316,7 @@
   --text-h1--line-height: 1.1;
   --text-h1--letter-spacing: -0.03em;
   --text-lede: 16px;
+  --text-row: 16px;
   --text-block-title: 18px;
   --text-note: 14px;
   --text-delta: 14px;

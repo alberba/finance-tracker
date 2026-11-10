@@ -60,6 +60,9 @@ export const goals = sqliteTable(
     categoryId: text("category_id").references(() => categories.id),
     name: text("name").notNull(),
     targetYear: integer("target_year"),
+    // A savings goal's deadline month (1-12) and planned monthly amount; null elsewhere.
+    targetMonth: integer("target_month"),
+    monthlyAmountMinor: integer("monthly_amount_minor"),
     targetAmountMinor: moneyMinorColumn("target_amount_minor"),
     currency: currencyColumn(),
     createdAt: createdAtColumn(),

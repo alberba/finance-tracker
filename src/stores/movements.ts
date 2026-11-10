@@ -334,15 +334,36 @@ export const useMovementsStore = defineStore('movements', () => {
     return true
   }
 
-  function deleteTransaction(id: string): void {
-    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
+  /**
+   * Deletes a movement. `notify: false` leaves the confirmation to the caller,
+   * as the new design's undo notice does. Returns whether it was deleted.
+   */
+  function deleteTransaction(id: string, { notify = true }: { notify?: boolean } = {}): boolean {
+    const target = financialStateStore.transactions.find((tx) => tx.id === id)
+    if (!target || target.remoteOperation) return false
     const before = financialStateStore.transactions
     financialStateStore.commitState((draft) => {
       draft.transactions = draft.transactions.filter((item) => item.id !== id)
     })
     void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     ui.txSelectedIds = ui.txSelectedIds.filter((itemId) => itemId !== id)
-    showToast('Movimiento eliminado.')
+    if (notify) showToast('Movimiento eliminado.')
+    return true
+  }
+
+  /**
+   * Puts back a movement deleted a moment ago (the undo of a delete), with all
+   * its data. It gets a new identity: the old one may already be deleted on the
+   * server, and a row is never created twice under the same id (ADR 0001).
+   */
+  function restoreTransaction(movement: Transaction): string {
+    const id = uid('tx')
+    const before = financialStateStore.transactions
+    financialStateStore.commitState((draft) => {
+      draft.transactions.push({ ...movement, id })
+    })
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
+    return id
   }
 
   function applyBulkChanges(changes: BulkTransactionChanges): void {
@@ -574,6 +595,7 @@ export const useMovementsStore = defineStore('movements', () => {
     addTransaction,
     saveEdit,
     deleteTransaction,
+    restoreTransaction,
     applyBulkChanges,
     deleteSelected,
     refreshSubscriptions,

@@ -75,7 +75,11 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
 
   it('calcula resultado y rentabilidad con el valor del snapshot', () => {
     const vm = buildInvestmentDashboardViewModel(
-      portfolio({ snapshots: { '3': { month: 3, accounts: {}, investments: { fondos: 2420 }, liabilities: {} } } }),
+      portfolio({
+        snapshots: {
+          '3': { month: 3, accounts: {}, investments: { fondos: 2420 }, liabilities: {} },
+        },
+      }),
       3,
       'simple',
     )
@@ -208,5 +212,21 @@ describe('buildInvestmentDashboardViewModel · series', () => {
 
   it('fecha el valor de la cartera al cierre del mes de análisis', () => {
     expect(buildInvestmentDashboardViewModel(portfolio(), 2, 'simple').asOf).toBe('2026-02-28')
+  })
+})
+
+describe('buildInvestmentDashboardViewModel · TWR', () => {
+  it('en TWR el valor de cartera suma la liquidez de las cuentas elegidas, y solo de esas', () => {
+    const state = portfolio({
+      accounts: [
+        { id: 'broker', name: 'Broker', openingBalance: 0 },
+        { id: 'cash', name: 'Liquidez', openingBalance: 500 },
+        { id: 'otra', name: 'Otra', openingBalance: 900 },
+      ],
+      twrLiquidityAccountIds: ['cash'],
+    })
+    const simple = buildInvestmentDashboardViewModel(state, 3, 'simple').portfolioValue
+    const twr = buildInvestmentDashboardViewModel(state, 3, 'twr').portfolioValue
+    expect(twr - simple).toBeCloseTo(500, 2)
   })
 })

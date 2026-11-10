@@ -1,8 +1,4 @@
 {
-  "budget.spec.ts": {
-    "durationMs": 24232,
-    "tests": 5
-  },
   "contribution-defaults.spec.ts": {
     "durationMs": 26044,
     "tests": 5
@@ -27,17 +23,9 @@
     "durationMs": 61964,
     "tests": 18
   },
-  "goals.spec.ts": {
-    "durationMs": 8481,
-    "tests": 3
-  },
   "investment-recurring.spec.ts": {
     "durationMs": 9075,
     "tests": 3
-  },
-  "investment-return-toggle.spec.ts": {
-    "durationMs": 14832,
-    "tests": 6
   },
   "investment-tabs.spec.ts": {
     "durationMs": 56771,
@@ -55,6 +43,18 @@
     "durationMs": 21028,
     "tests": 8
   },
+  "neon-budget.spec.ts": {
+    "durationMs": 21400,
+    "tests": 3
+  },
+  "neon-goals.spec.ts": {
+    "durationMs": 7500,
+    "tests": 2
+  },
+  "neon-wealth.spec.ts": {
+    "durationMs": 8600,
+    "tests": 2
+  },
   "reports.spec.ts": {
     "durationMs": 15839,
     "tests": 9
@@ -69,10 +69,6 @@
   },
   "theme.spec.ts": {
     "durationMs": 10922,
-    "tests": 4
-  },
-  "wealth.spec.ts": {
-    "durationMs": 6452,
     "tests": 4
   }
 }
