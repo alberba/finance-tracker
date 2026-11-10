@@ -309,3 +309,33 @@ export function applyPlan(rows: BudgetRow[], changes: ReviewChange[], from: Mont
     return [{ category: change.category, before, after }]
   })
 }
+
+/** «Septiembre cerró 45,68 € por debajo del presupuesto»: the closed month against its budget. */
+export function closeVerdict(categories: ReviewCategory[], monthName: string): string {
+  const diff = round2(categories.reduce((sum, category) => sum + category.diff, 0))
+  if (diff > 0.005) return `${monthName} cerró ${formatMoney(diff)} por encima del presupuesto`
+  if (diff < -0.005) return `${monthName} cerró ${formatMoney(-diff)} por debajo del presupuesto`
+  return `${monthName} cerró justo en el presupuesto`
+}
+
+/** «60 → 40 €»: what a suggestion would do to a budget. */
+export function suggestionChange(category: ReviewCategory): string {
+  return `${plainAmount(category.plan)} → ${plainAmount(category.suggestion.amount)} €`
+}
+
+/** How many suggestions the close card spells out before «y N más». */
+const LINE_LIMIT = 2
+
+/** «Salud: 60 → 40 €»: what the first suggestions that are a change would do, then how many more. */
+export function suggestionLine(categories: ReviewCategory[]): string {
+  const changes = categories.filter((category) => category.suggestion.mode !== 'keep')
+  const spelled = changes
+    .slice(0, LINE_LIMIT)
+    .map((category) => `${category.category}: ${suggestionChange(category)}`)
+  const more = changes.length - LINE_LIMIT
+  return (more > 0 ? [...spelled, `y ${more} más`] : spelled).join(' · ')
+}
+
+function plainAmount(value: number): string {
+  return String(round2(value)).replace('.', ',')
+}
