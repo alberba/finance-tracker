@@ -103,7 +103,7 @@
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.4",
     "effect": "4.1.2",
-    "jose": "^6.2.14",
+    "jose": "^6.2.15",
     "pdfmake": "0.3.13",
     "pinia": "^4.1.0",
     "prettier-plugin-tailwindcss": "^0.8.1",
