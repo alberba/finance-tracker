@@ -102,6 +102,8 @@ export interface EvolutionChart {
   ticks: { top: number; label: string }[]
   /** «+600,00 € desde enero. El último dato aún no está cerrado.» */
   note: string
+  /** The same move in whole euros, for a short line: «+600 €» «desde enero». */
+  delta: { text: string; since: string; tone: FigureTone } | null
   /** What the chart says, for a screen reader. */
   label: string
 }
@@ -141,7 +143,7 @@ export function evolution(
     period === 'month' ? true : month % 3 === 0 || month === last,
   )
   const values = shown.map((month) => monthTotals(view, month).net)
-  if (!shown.length) return { points: [], ticks: [], note: '', label: '' }
+  if (!shown.length) return { points: [], ticks: [], note: '', delta: null, label: '' }
 
   const { lo, hi, step } = scale(Math.min(...values), Math.max(...values), kind === 'bars')
   const y = (value: number) => 100 - ((value - lo) / (hi - lo)) * 100
@@ -170,6 +172,12 @@ export function evolution(
   const note =
     `${formatSignedMoney(latest.value - first.value)} desde ${firstName}.` +
     (latest.open ? ' El último dato aún no está cerrado.' : '')
+  const moved = round2(latest.value - first.value)
+  const delta = {
+    text: `${moved > 0 ? '+' : moved < 0 ? '−' : ''}${formatWholeAmount(Math.abs(moved))}\u00a0€`,
+    since: `desde ${firstName}`,
+    tone: figureTone(moved),
+  }
   const label =
     `Patrimonio por ${period === 'month' ? 'mes' : 'trimestre'}: ` +
     points
@@ -178,7 +186,7 @@ export function evolution(
         return `${name} ${formatMoney(point.value)}`
       })
       .join(', ')
-  return { points, ticks, note, label }
+  return { points, ticks, note, delta, label }
 }
 
 export type MixTone = 'lilac' | 'lilac2' | 'lilac3' | 'peach'
@@ -250,6 +258,8 @@ export interface HoldingRow {
   /** «Apuntado en marzo» or «Calculado con tus movimientos». */
   note: string
   value: string
+  /** The figure behind `value`; debt reads negative. */
+  amount: number
   /** Weight within its group. */
   share: string
   /** Nothing in it: the figure goes muted. */
@@ -283,6 +293,7 @@ export function holdings(view: WealthViewModel, month: Month): HoldingGroup[] {
         name: row.name,
         note: row.snapshot === null ? 'Calculado con tus movimientos' : `Apuntado en ${monthName}`,
         value: formatMoney(sign * values[i]),
+        amount: sign * values[i],
         share: share(values[i], total),
         empty: values[i] === 0,
       })),

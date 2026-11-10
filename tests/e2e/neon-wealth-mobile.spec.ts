@@ -79,7 +79,7 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
   expect(await tooSmall(`dialog[open] :is(${CONTROLS})`)).toEqual([])
   await page.keyboard.press('Escape')
 
-  await section(page).getByRole('button', { name: 'Cerrar marzo' }).click()
+  await section(page).getByRole('button', { name: 'Cerrar mes', exact: true }).click()
   await expect(
     section(page).getByRole('heading', { name: 'Balance por meses', level: 1 }),
   ).toBeVisible()

@@ -25,6 +25,7 @@ export interface MobileAccount {
   initial: string
   /** «Efectivo · 28 %»: its group and what it weighs in it. */
   note: string
+  /** In whole euros, as the artboard writes the list: «1.966 €». */
   value: string
   /** Nothing in it: the figure goes muted. */
   empty: boolean
@@ -45,7 +46,7 @@ export function mobileAccounts(
         name: row.name,
         initial: row.name.trim().charAt(0).toUpperCase(),
         note: `${group.title} · ${row.share}`,
-        value: row.value,
+        value: `${row.amount < 0 ? '−' : ''}${formatWholeAmount(Math.abs(row.amount))}\u00a0€`,
         empty: row.empty,
       })),
     )

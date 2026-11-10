@@ -63,14 +63,12 @@ describe('mobileAccounts', () => {
       ['Fondo', 'F', 'Inversión · 100\u00a0%'],
       ['Coche', 'C', 'Pasivos · 100\u00a0%'],
     ])
-    expect(rows[0]).toMatchObject({ id: 'bank', kind: 'accounts', value: '1.600,00 €' })
+    expect(rows[0]).toMatchObject({ id: 'bank', kind: 'accounts', value: '1.600 €' })
   })
 
   it('keeps only the group that was picked', () => {
     expect(mobileAccounts(vm(), 3, 'investments').map((row) => row.name)).toEqual(['Fondo'])
-    expect(mobileAccounts(vm(), 3, 'liabilities').map((row) => row.value)).toEqual([
-      '−500,00 €',
-    ])
+    expect(mobileAccounts(vm(), 3, 'liabilities').map((row) => row.value)).toEqual(['−500 €'])
   })
 
   it('offers the groups in the order of the cover', () => {

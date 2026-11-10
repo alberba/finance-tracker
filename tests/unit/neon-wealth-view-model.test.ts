@@ -105,6 +105,14 @@ describe('evolution', () => {
     expect(chart.note).toBe('+600,00\u00a0€ desde enero. El último dato aún no está cerrado.')
   })
 
+  it('reads the move since the first month in whole euros, with its tone', () => {
+    expect(evolution(vm(), 'month', 'line').delta).toEqual({
+      text: '+600\u00a0€',
+      since: 'desde enero',
+      tone: 'gain',
+    })
+  })
+
   it('rounds the scale to at most four steps around the values', () => {
     const chart = evolution(vm(), 'month', 'line')
 
