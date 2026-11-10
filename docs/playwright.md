@@ -116,7 +116,9 @@ código, configuración o contenido ejecutable requieren gate y smoke en secuenc
 Los jobs de navegador corren en `ubuntu-latest` e instalan con `playwright install --with-deps` el
 Chromium que corresponde a `@playwright/test` en el lockfile: no hay etiqueta de imagen que
 actualizar, así que un bump del paquete trae su navegador solo. Las fuentes de la interfaz se sirven
-desde `public/fonts`, así que el render no depende de las fuentes del sistema. El setup común (pnpm,
+desde `public/fonts`, así que el render no depende de las fuentes del sistema; los snapshots de la
+paleta de emoji toleran unos píxeles porque cada glifo lo dibuja la fuente de emoji del sistema y
+cambia entre versiones. El setup común (pnpm,
 Node, install con lockfile, incluido el addon SQLite precompilado, y la caché de Chromium por
 versión de Playwright) vive en `.github/actions/setup`. El job final comprueba el tiempo desde el
 inicio del workflow, incluida la preparación y espera de runners, contra el presupuesto de

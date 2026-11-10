@@ -671,6 +671,13 @@ async function alignInvestmentTabs(page: Page): Promise<void> {
   })
 }
 
+/**
+ * The emoji palette draws glyphs with the system emoji font, so a font update on
+ * the runner can redraw one (a bus, a coin) without the app changing. Only those
+ * snapshots tolerate a few pixels; everything else stays exact.
+ */
+const EMOJI_SNAPSHOT_MAX_DIFF_PIXELS = 120
+
 async function expectViewSnapshot(
   page: Page,
   open: () => Promise<void>,
@@ -726,6 +733,7 @@ async function expectViewSnapshot(
     caret: 'hide',
     scale: 'css',
     stylePath: './tests/e2e/screenshot-stable.css',
+    ...(name.includes('emoji') ? { maxDiffPixels: EMOJI_SNAPSHOT_MAX_DIFF_PIXELS } : {}),
   })
   // Theme changes do not require another user, import or browser context.
   // Shell captures retain separate identities because the user email is visible.
