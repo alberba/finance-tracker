@@ -182,21 +182,21 @@ const iconButton =
           </h1>
           <p class="text-soft max-w-[60ch] text-[16px]">{{ prepareLede(closedCount) }}</p>
         </div>
-        <div class="grid justify-items-end gap-1.5">
+        <div class="grid min-w-0 gap-1.5 @min-[720px]:justify-items-end">
           <span class="text-muted text-label tracking-label font-extrabold uppercase">
             Empezar desde
           </span>
           <div
             role="group"
             aria-label="Empezar desde"
-            class="bg-panel2 rounded-pill inline-flex max-w-full gap-[3px] p-[3px]"
+            class="bg-panel2 rounded-pill flex max-w-full gap-[3px] overflow-x-auto p-[3px]"
           >
             <button
               v-for="option in options"
               :key="option.mode"
               type="button"
               :aria-pressed="start === option.mode"
-              class="outline-accent rounded-pill min-h-9 px-3 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
+              class="outline-accent rounded-pill min-h-9 px-3 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
               :class="start === option.mode ? 'bg-sel-bg text-sel-text' : 'text-soft'"
               @click="pickStart(option.mode)"
             >
@@ -212,7 +212,7 @@ const iconButton =
             v-for="group in groups"
             :key="group.type"
             :aria-labelledby="`prepare-${group.id}`"
-            class="bg-panel border-line rounded-card grid min-w-0 border px-6 py-[22px]"
+            class="bg-panel border-line rounded-card grid min-w-0 border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px]"
           >
             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pb-3">
               <div class="flex min-w-0 items-baseline gap-2.5">
@@ -318,7 +318,7 @@ const iconButton =
 
         <aside
           aria-labelledby="prepare-split-title"
-          class="bg-panel border-line rounded-card sticky top-6 grid min-w-0 gap-[18px] border px-6 py-[22px]"
+          class="bg-panel border-line rounded-card grid min-w-0 gap-[18px] border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:sticky @min-[980px]:top-6"
         >
           <div class="flex items-baseline justify-between gap-3">
             <h2 id="prepare-split-title" class="text-[18px] font-extrabold">Reparto del mes</h2>

@@ -23,7 +23,7 @@ const previousTitle = computed(() => {
 <template>
   <section
     aria-labelledby="budget-spent-title"
-    class="bg-panel border-line grid min-w-0 gap-[18px] rounded-[22px] border px-6 py-[22px]"
+    class="bg-panel border-line grid min-w-0 gap-[18px] rounded-[22px] border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px]"
   >
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div class="grid min-w-0 gap-1">

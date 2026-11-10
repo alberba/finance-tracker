@@ -231,12 +231,12 @@ const detail = computed(() => {
 
   <section
     aria-label="Lo que queda este mes"
-    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-6 py-[22px] @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))]"
+    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-3 py-4 @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))] @min-[720px]:px-6 @min-[720px]:py-[22px]"
   >
-    <div class="grid min-w-0 gap-1 pe-6">
+    <div class="grid min-w-0 gap-1 @min-[720px]:pe-6">
       <span class="text-muted text-[14px]"> Libre para gastar hasta el {{ position.days }} </span>
       <span
-        class="font-display text-[56px] leading-[1.05] font-bold tracking-[-0.035em]"
+        class="font-display text-[52px] leading-[1.05] font-bold tracking-[-0.035em] @min-[720px]:text-[56px]"
         data-budget-free
       >
         <NeonCents :text="formatMoney(hero.free)" />
@@ -247,7 +247,7 @@ const detail = computed(() => {
       </span>
     </div>
     <div
-      class="border-line grid min-w-0 content-end gap-1.5 px-6 @max-[719px]:border-t @max-[719px]:px-0 @max-[719px]:pt-5 @min-[720px]:border-s"
+      class="border-line grid min-w-0 content-end gap-1.5 @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:border-s @min-[720px]:px-6"
     >
       <span class="text-muted text-[14px]">Gastado este mes</span>
       <span class="font-display text-[22px] font-semibold tracking-[-0.02em]">
@@ -256,7 +256,7 @@ const detail = computed(() => {
       <span class="text-muted text-[13px]">de {{ formatMoney(hero.planned) }} previstos</span>
     </div>
     <div
-      class="border-line grid min-w-0 content-center justify-items-center gap-1.5 px-6 text-center @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:border-s"
+      class="border-line grid min-w-0 content-center gap-1.5 @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:justify-items-center @min-[720px]:border-s @min-[720px]:px-6 @min-[720px]:text-center"
     >
       <span class="text-muted text-[14px]">Quedan</span>
       <span class="font-display text-[22px] font-semibold tracking-[-0.02em]">
@@ -280,7 +280,7 @@ const detail = computed(() => {
       <li v-for="category in categories" :key="category.category" class="grid min-w-0">
         <button
           type="button"
-          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-6 py-[22px] text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]"
+          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-3 py-4 text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97] @min-[720px]:px-6 @min-[720px]:py-[22px]"
           :class="openCategory === category.category ? 'border-text' : 'border-line'"
           aria-haspopup="dialog"
           :aria-expanded="openCategory === category.category"

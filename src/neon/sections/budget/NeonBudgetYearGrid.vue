@@ -47,11 +47,104 @@ function figureClass(tone: 'gain' | 'loss' | null, actual: number | null): strin
 <template>
   <section
     :aria-label="gridAria(type)"
-    class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-6 py-[22px]"
+    class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px]"
     data-budget-grid
   >
     <p class="text-muted text-[14px]">{{ gridLegend(type, view) }}</p>
-    <div class="overflow-x-auto">
+    <!-- Narrow: one block per category; the year's twelve months are edited in its plan sheet. -->
+    <ul class="@min-[720px]:hidden" :aria-label="gridAria(type)">
+      <li
+        v-for="row in grid.rows"
+        :key="row.category"
+        class="border-line grid min-w-0 gap-2 border-t py-1.5"
+      >
+        <div class="flex min-w-0 items-center justify-between gap-3">
+          <button
+            type="button"
+            class="text-text outline-accent flex min-h-11 min-w-11 items-center gap-1.5 text-left text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
+            :aria-label="`Plan de ${row.category} para el año`"
+            @click="emit('plan', row.category)"
+          >
+            <span class="truncate">{{ row.category }}</span>
+            <svg
+              class="text-faint size-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+          <span class="flex flex-none items-baseline gap-2">
+            <span
+              class="font-display text-[16px] font-bold tabular-nums"
+              :class="figureClass(row.total.tone, row.total.actual)"
+              >{{ row.total.actual === null ? '—' : whole(row.total.actual) }}</span
+            >
+            <span class="text-muted text-[14px] font-semibold whitespace-nowrap"
+              >de {{ whole(row.total.planDone) }}</span
+            >
+          </span>
+        </div>
+        <ul v-if="view === 'quarter'" class="grid grid-cols-3 gap-2">
+          <li
+            v-for="cell in row.cells"
+            :key="cell.month"
+            class="grid min-w-0 content-start justify-items-start gap-1 rounded-[14px] px-2 py-1.5"
+            :class="cell.current ? 'bg-panel2' : ''"
+          >
+            <span class="text-muted text-label tracking-label font-extrabold uppercase">{{
+              shortMonth(cell.month)
+            }}</span>
+            <span
+              class="font-display text-[16px] leading-[1.2] font-semibold tabular-nums"
+              :class="figureClass(cell.tone, cell.actual)"
+              >{{ cell.actual === null ? '—' : whole(cell.actual) }}</span
+            >
+            <NeonBudgetPlanEditor
+              v-if="editing === keyOf(row.category, cell.month)"
+              :plan="cell.plan"
+              :label="cell.editLabel"
+              :save-label="saveLabel(row.category, cell.month)"
+              @save="(value) => save(row.category, cell, value)"
+              @cancel="editing = null"
+            />
+            <button
+              v-else
+              type="button"
+              class="text-muted outline-accent min-h-8 cursor-text text-[14px] font-semibold whitespace-nowrap underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              :aria-label="cell.editLabel"
+              @click="editing = keyOf(row.category, cell.month)"
+            >
+              de {{ whole(cell.plan) }}
+            </button>
+            <NeonBudgetYearBar
+              class="w-full"
+              :bar="cell.bar"
+              :excess="type === 'income' ? 'gain' : 'loss'"
+            />
+          </li>
+        </ul>
+      </li>
+      <li class="border-grid flex min-h-11 items-center justify-between gap-3 border-t">
+        <span class="text-[16px] font-extrabold">Total</span>
+        <span class="flex flex-none items-baseline gap-2">
+          <span
+            class="font-display text-[16px] font-bold tabular-nums"
+            :class="figureClass(grid.total.tone, grid.total.actual)"
+            >{{ grid.total.actual === null ? '—' : whole(grid.total.actual) }}</span
+          >
+          <span class="text-muted text-[14px] font-semibold whitespace-nowrap"
+            >de {{ whole(grid.total.planDone) }}</span
+          >
+        </span>
+      </li>
+    </ul>
+    <div class="overflow-x-auto @max-[719px]:hidden">
       <table
         class="w-full table-fixed border-collapse text-left"
         :class="view === 'year' ? 'min-w-[1180px]' : 'min-w-[720px]'"
@@ -96,7 +189,7 @@ function figureClass(tone: 'gain' | 'loss' | null, actual: number | null): strin
             <th scope="row" class="py-3.5 ps-0 pe-3 text-left font-bold">
               <button
                 type="button"
-                class="text-text outline-accent flex min-h-10 min-w-0 items-center gap-1.5 text-left text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
+                class="text-text outline-accent flex min-h-10 min-w-0 items-center gap-1.5 text-left text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
                 :aria-label="`Plan de ${row.category} para el año`"
                 @click="emit('plan', row.category)"
               >
@@ -146,7 +239,7 @@ function figureClass(tone: 'gain' | 'loss' | null, actual: number | null): strin
                 <button
                   v-else
                   type="button"
-                  class="text-muted outline-accent min-h-8 cursor-text text-[14px] font-semibold whitespace-nowrap underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                  class="text-muted outline-accent min-h-8 cursor-text text-[14px] font-semibold whitespace-nowrap underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   :aria-label="cell.editLabel"
                   @click="editing = keyOf(row.category, cell.month)"
                 >

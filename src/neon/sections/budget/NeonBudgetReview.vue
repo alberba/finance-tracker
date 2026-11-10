@@ -167,13 +167,16 @@ const barLabel = (category: ReviewCategory) =>
       <div
         role="group"
         :aria-label="`${monthName} en cifras`"
-        class="grid min-w-0 grid-cols-4 gap-y-4"
+        class="grid min-w-0 grid-cols-2 gap-y-5 @min-[720px]:grid-cols-4"
       >
         <div
           v-for="(kpi, index) in strip"
           :key="kpi.label"
-          class="border-line grid min-w-0 content-start gap-1.5 px-6"
-          :class="index === 0 ? 'ps-0' : 'border-s'"
+          class="border-line grid min-w-0 content-start gap-1.5 px-4 @min-[720px]:px-6"
+          :class="[
+            index % 2 === 1 ? 'border-s' : 'ps-0',
+            index === 0 ? '@min-[720px]:ps-0' : '@min-[720px]:border-s @min-[720px]:ps-6',
+          ]"
         >
           <span class="text-muted text-sm">{{ kpi.label }}</span>
           <span
@@ -185,12 +188,12 @@ const barLabel = (category: ReviewCategory) =>
         </div>
       </div>
 
-      <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
+      <div class="grid min-w-0 items-start gap-5 @min-[980px]:grid-cols-[minmax(0,1fr)_400px]">
         <ol class="m-0 grid min-w-0 list-none gap-3 p-0">
           <li
             v-for="category in categories"
             :key="category.category"
-            class="bg-panel border-line rounded-card grid min-w-0 grid-cols-[minmax(200px,260px)_minmax(0,1fr)_minmax(300px,340px)] items-center gap-x-7 gap-y-4 border px-6 py-[22px]"
+            class="bg-panel border-line rounded-card grid min-w-0 items-center gap-x-7 gap-y-4 border px-3 py-4 @min-[720px]:grid-cols-[minmax(160px,220px)_minmax(0,1fr)] @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:grid-cols-[minmax(200px,260px)_minmax(0,1fr)_minmax(300px,340px)]"
           >
             <div class="grid min-w-0 gap-1">
               <h2 class="text-lg font-extrabold">{{ category.category }}</h2>
@@ -231,7 +234,7 @@ const barLabel = (category: ReviewCategory) =>
               <p class="text-soft text-sm">{{ category.insight }}</p>
             </div>
 
-            <div class="grid min-w-0 gap-2.5">
+            <div class="grid min-w-0 gap-2.5 @min-[720px]:col-span-2 @min-[980px]:col-span-1">
               <div
                 role="group"
                 :aria-label="`Qué hacer con el presupuesto de ${category.category}`"
@@ -242,7 +245,7 @@ const barLabel = (category: ReviewCategory) =>
                   :key="option.mode"
                   type="button"
                   :aria-pressed="isPressed(category, option.mode)"
-                  class="rounded-pill outline-accent min-h-9 min-w-0 flex-1 px-2 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+                  class="rounded-pill outline-accent min-h-9 min-w-0 flex-1 px-2 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
                   :class="
                     isPressed(category, option.mode) ? 'bg-sel-bg text-sel-text' : 'text-soft'
                   "
@@ -274,7 +277,7 @@ const barLabel = (category: ReviewCategory) =>
 
         <aside
           aria-labelledby="review-summary-title"
-          class="bg-panel border-line rounded-card sticky top-6 grid min-w-0 gap-4 border px-6 py-[22px]"
+          class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:sticky @min-[980px]:top-6"
         >
           <h2 id="review-summary-title" class="text-lg font-extrabold">
             <template v-if="from">Cambios para {{ applyRange(from) }}</template>
