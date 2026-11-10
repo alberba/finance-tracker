@@ -297,14 +297,6 @@ function chartLabel(
     : `Rentabilidad TWR acumulada de tu cartera a ${date}: ${signedPct(value[value.length - 1])}.`
 }
 
-/**
- * The mobile chart (DESIGN.md, «Gráfico de evolución · Móvil»): edge to edge,
- * 266 px tall, the line thick over an area that fades out, with no gridlines
- * and no figures beside it, and only months on the axis. Its view box is
- * stretched to its box, so units are px of height and a fraction of the
- * width (the line stops short of the right edge so today's dot isn't clipped); points that need to stay round (today's dot, the fall) are placed
- * by share and drawn in HTML.
- */
 export const COMPACT_WIDTH = 400
 export const COMPACT_HEIGHT = 266
 const COMPACT_PAD = { top: 22, bottom: 38, right: 12 }
@@ -329,6 +321,15 @@ export interface CompactChart {
   label: string
 }
 
+/**
+ * The mobile chart (DESIGN.md, «Gráfico de evolución · Móvil»): edge to edge,
+ * 266 px tall, the line thick over an area that fades out, with no gridlines
+ * and no figures beside it, and only months on the axis. Its view box is
+ * stretched to its box, so units are px of height and a fraction of the
+ * width (the line stops short of the right edge so today's dot isn't
+ * clipped); points that need to stay round (today's dot, the fall) are placed
+ * by share and drawn in HTML.
+ */
 export function compactChart(
   vm: InvestmentDashboardViewModel,
   method: ReturnMode,
@@ -420,6 +421,13 @@ export interface CardRow {
   label: string
   value: string
   tone: Tone
+}
+
+/** A card under the positions: a title and its rows of label and figure. */
+export interface Card {
+  id: string
+  title: string
+  rows: readonly CardRow[]
 }
 
 /** «Caídas máximas»: the worst fall, what it meant in euros on the peak and its recovery. */

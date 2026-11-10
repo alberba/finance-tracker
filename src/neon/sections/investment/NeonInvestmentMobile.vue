@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { ref } from 'vue'
 
 import type { ReturnMode } from '../../../domain/investment/view-model'
 import type { Month } from '../../../lib/month'
@@ -13,7 +13,7 @@ import {
   DIRECTION_OPTIONS,
   SORT_OPTIONS,
   sortLabel,
-  type CardRow,
+  type Card,
   type CompactChart,
   type PeriodFigure,
   type PeriodOption,
@@ -43,7 +43,7 @@ const props = defineProps<{
   rows: readonly PositionRow[]
   sortKey: SortKey
   sortDirection: SortDirection
-  cards: ReadonlyArray<{ id: string; title: string; rows: readonly CardRow[] }>
+  cards: readonly Card[]
 }>()
 
 const emit = defineEmits<{
@@ -85,9 +85,6 @@ function onCollapseEnd(event: TransitionEvent): void {
 function setExpanded(value: boolean): void {
   expanded.value = value
   clipped.value = true
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) clipped.value = value
-  // The sheet takes the screen: bring the header back under the top bar.
-  if (value) void nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
 }
 
 let press: { y: number; at: number } | null = null
@@ -129,11 +126,7 @@ function onGripClick(event: MouseEvent): void {
 <template>
   <div class="grid min-w-0 gap-5">
     <header class="grid gap-1.5 px-2 pbs-1">
-      <h1
-        id="investment-title"
-        tabindex="-1"
-        class="font-display text-[30px] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
-      >
+      <h1 id="investment-title" tabindex="-1" class="font-display text-h1 font-bold outline-none">
         Inversión
       </h1>
       <p
@@ -196,9 +189,7 @@ function onGripClick(event: MouseEvent): void {
             :data-investment-figure="figure.key"
           >
             <dt class="text-muted text-meta">{{ figure.label }}</dt>
-            <dd
-              class="font-display m-0 truncate text-[17px] font-semibold tracking-[-0.02em] tabular-nums"
-            >
+            <dd class="font-display text-figure-row m-0 truncate font-semibold tabular-nums">
               {{ figure.value }}
             </dd>
           </div>
@@ -206,12 +197,12 @@ function onGripClick(event: MouseEvent): void {
       </div>
 
       <div
-        class="grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+        class="grid min-w-0 transition-[grid-template-rows,opacity,visibility] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:duration-1"
         :class="expanded ? 'invisible grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr]'"
         :inert="expanded ? '' : undefined"
-        @transitionend="onCollapseEnd"
         :aria-hidden="expanded ? 'true' : undefined"
         data-investment-overview
+        @transitionend="onCollapseEnd"
       >
         <!-- Wider than the column by the page's padding, so the chart bleeds
              and the clipping of the collapse doesn't cut it. -->
@@ -284,7 +275,7 @@ function onGripClick(event: MouseEvent): void {
                 <span class="text-muted text-meta flex min-w-0 items-center gap-2 truncate">
                   <span
                     v-if="row.symbol"
-                    class="bg-panel2 text-text flex-none rounded-[8px] px-2 py-0.5 font-mono text-[12px] font-bold tracking-[0.04em]"
+                    class="bg-panel2 text-text text-label flex-none rounded-[8px] px-2 py-0.5 font-mono font-bold tracking-[0.04em]"
                   >
                     {{ row.symbol }}
                   </span>

@@ -36,7 +36,7 @@ import {
   quoteNotice,
   sortPositions,
   twrSeries,
-  type CardRow,
+  type Card,
   type SortDirection,
   type SortKey,
   TONE_TEXT,
@@ -102,7 +102,7 @@ const rows = computed(() =>
   ),
 )
 
-const cards = computed<Array<{ id: string; title: string; rows: CardRow[] }>>(() => [
+const cards = computed<Card[]>(() => [
   {
     id: 'investment-drops',
     title: 'Caídas máximas',

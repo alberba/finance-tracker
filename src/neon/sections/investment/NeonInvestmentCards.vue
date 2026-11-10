@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import NeonCard from '../../ui/NeonCard.vue'
-import { TONE_TEXT, type CardRow } from './view-model'
+import { TONE_TEXT, type Card } from './view-model'
 
 // The two figure cards under the positions: the worst fall and the fees. They
 // share a row when there is room and stack when there isn't.
-defineProps<{ cards: ReadonlyArray<{ id: string; title: string; rows: readonly CardRow[] }> }>()
+defineProps<{ cards: readonly Card[] }>()
 </script>
 
 <template>

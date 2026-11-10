@@ -37,7 +37,7 @@ const gradientId = `compact-area-${useId()}`
           :d="line.d"
           fill="none"
           :stroke="line.dashed ? 'var(--color-faint)' : 'var(--color-accent)'"
-          :stroke-width="line.dashed ? 1.5 : 3"
+          :stroke-width="line.dashed ? 1 : 3"
           :stroke-dasharray="line.dashed ? '4 4' : undefined"
           stroke-linejoin="round"
           stroke-linecap="round"
@@ -52,7 +52,7 @@ const gradientId = `compact-area-${useId()}`
       ></span>
       <span
         v-if="chart.drop"
-        class="text-loss pointer-events-none absolute -translate-x-1/2 translate-y-2.5 text-xs leading-none font-extrabold whitespace-nowrap"
+        class="text-loss text-label pointer-events-none absolute -translate-x-1/2 translate-y-2.5 leading-none font-extrabold whitespace-nowrap"
         :style="{ insetInlineStart: `${chart.drop.left}%`, insetBlockStart: `${chart.drop.top}%` }"
         aria-hidden="true"
       >
@@ -66,7 +66,7 @@ const gradientId = `compact-area-${useId()}`
       <span
         v-for="month in chart.months"
         :key="month.left"
-        class="text-muted pointer-events-none absolute inset-bs-[calc(100%-26px)] -translate-x-1/2 text-xs leading-none font-semibold"
+        class="text-muted text-label pointer-events-none absolute inset-bs-[calc(100%-26px)] -translate-x-1/2 leading-none font-semibold"
         :style="{ insetInlineStart: `${month.left}%` }"
         aria-hidden="true"
       >
