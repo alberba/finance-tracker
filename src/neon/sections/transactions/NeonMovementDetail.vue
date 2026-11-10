@@ -124,7 +124,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
               :key="name"
               type="button"
               :aria-pressed="form.category === name"
-              class="outline-accent rounded-pill min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+              class="outline-accent rounded-pill min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
               :class="
                 form.category === name
                   ? 'bg-sel-bg border-sel-border text-sel-text'

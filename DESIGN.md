@@ -208,7 +208,7 @@ Círculo (`border-radius: 50%`) solo con icono, sin texto: 64px en móvil, bajo 
 
 Botón extendido de 56px de alto con radio 16px, `padding: 0 22px 0 16px`, fondo `--color-accent`, icono «+» de 24px y la palabra «Apuntar» en Unbounded 700 a 15px, con `gap: 10px`. Flota a 16px del borde derecho y a 118px del inferior (por encima de la barra), con `filter: drop-shadow(0 10px 18px oklch(0% 0 none / 0.45))`.
 
-Se pliega al desplazar: al bajar más de 6px se recorta con `clip-path` a un cuadrado de 56px y la palabra se desvanece; al subir, o junto al borde superior, vuelve a su ancho. Pulsado, `scale(0.97)`. Con un aviso visible sube 64px para no taparlo.
+Se pliega al desplazar: al bajar más de 6px se recorta con `clip-path` a un cuadrado de 56px y la palabra se desvanece; al subir, o junto al borde superior, vuelve a su ancho. Pulsado, `scale(0.97)`. Con un aviso visible sube 64px para no taparlo. Una pantalla que acopla su propia barra de acción abajo («Aplicar», «Guardar» en Presupuesto) la sustituye: el FAB se oculta mientras esa barra está en pantalla.
 
 ### Item de nav lateral
 
@@ -227,6 +227,8 @@ Alto de 80px, fondo `--color-panel`, cuatro columnas iguales con `padding: 0 8px
 **Role:** marca y acciones; cede el sitio a la cifra al desplazar
 
 Alto de 64px, `padding: 0 8px 0 20px`, fondo `--color-bg`. Marca `finanzas.` a la izquierda y, a la derecha, botones circulares de 48px sin fondo: confirmar pendientes (con un contador de 18px en `--color-accent` cuando hay pendientes) y buscar. Pasados 120px de scroll, la barra pasa a `--color-panel`, la marca sube 6px y se desvanece, y en su lugar entra «Te quedan» con la cifra en Unbounded 600; vuelve al subir. Ambos cambios son de `opacity` y `transform` en 200ms con `--ease-out`.
+
+Una sección puede poner su título en el sitio de la marca (Patrimonio: «Patrimonio» en Unbounded 700, 30px, `tracking -0.03em`, en su portada): la marca se oculta mientras esté y el contenido no lo repite, aunque conserva el encabezado para lectores de pantalla y foco.
 
 La barra de estado, la de gestos y el marco del dispositivo que dibujan los artboards son del lienzo, no del producto: no se construyen.
 

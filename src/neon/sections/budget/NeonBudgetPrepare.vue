@@ -1,134 +1,51 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-
-import { formatMoney, formatMonthName } from '../../../lib/format'
-import { asMonth } from '../../../lib/month'
-import { formatDecimalInput, parseDecimal } from '../../../lib/number'
-import { useBudgetStore } from '../../../stores/budget'
+import { formatMoney } from '../../../lib/format'
+import { formatDecimalInput } from '../../../lib/number'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { useNeonBudgetScreens } from './budget-screens'
+import { usePrepareSession } from './prepare-session'
 import {
-  allRows,
   barLabel,
-  buildPrepareGroups,
-  cellsToWrite,
-  defaultStart,
-  freeFigures,
-  hasSavedPlan,
   prepareKicker,
   prepareLede,
-  prepareTarget,
-  repeatLabel,
   rowNote,
-  savedSummary,
-  seedValue,
   shareText,
   showUseAverage,
-  split,
-  startOptions,
   stepFor,
   stepValue,
-  type StartMode,
 } from './prepare-view-model'
 
 // «Hacer el presupuesto» (artboard «Presupuesto · 2560 px», #433): the plan of
 // next month, a stepper per category and the split of the income beside it.
-const budgetStore = useBudgetStore()
 const screens = useNeonBudgetScreens()
-
-const view = computed(() => budgetStore.viewModel)
-const target = computed(() => prepareTarget(view.value))
-const groups = computed(() => (target.value ? buildPrepareGroups(view.value, target.value) : []))
-const rows = computed(() => allRows(groups.value))
-const saved = computed(() => hasSavedPlan(groups.value))
-
-const chosenStart = ref<StartMode | null>(null)
-const start = computed<StartMode>(() => {
-  const chosen = chosenStart.value
-  return chosen && (chosen !== 'saved' || saved.value) ? chosen : defaultStart(groups.value)
-})
-// Values edited by hand over the seed, and the raw text of the field being typed.
-const edited = ref<Record<string, number>>({})
-const drafts = ref<Record<string, string>>({})
-const repeat = ref(false)
-const confirmation = ref('')
-
-const values = computed(() =>
-  Object.fromEntries(
-    rows.value.map((row) => [row.key, edited.value[row.key] ?? seedValue(row, start.value)]),
-  ),
-)
-const figure = computed(() => split(groups.value, values.value))
-const free = computed(() => freeFigures(figure.value.free))
-const currentMonth = computed(() => asMonth(view.value.currentMonth) ?? 1)
-const currentName = computed(() => formatMonthName(currentMonth.value))
-const targetName = computed(() => (target.value ? formatMonthName(target.value).toLowerCase() : ''))
-const closedCount = computed(() =>
-  rows.value.reduce((max, row) => Math.max(max, row.closedCount), 0),
-)
-const options = computed(() => startOptions(currentMonth.value, saved.value))
-const repeatText = computed(() => (target.value ? repeatLabel(target.value) : null))
-const spendLegend = computed(() =>
-  figure.value.groups.flatMap((g) => {
-    const def = groups.value.find((x) => x.type === g.type)
-    return def && !def.income ? [{ def, g }] : []
-  }),
-)
-const segments = computed(() =>
-  spendLegend.value
-    .filter(({ g }) => g.total > 0)
-    .map(({ def, g }) => ({ key: g.type, weight: g.total, swatch: def.swatch })),
-)
-const freeWeight = computed(() => Math.max(figure.value.free, 0))
-const freeShare = computed(() =>
-  figure.value.income > 0 ? Math.round((freeWeight.value / figure.value.income) * 100) : null,
-)
-
-function groupTotal(type: string) {
-  return figure.value.groups.find((g) => g.type === type)
-}
-
-function pickStart(mode: StartMode): void {
-  chosenStart.value = mode
-  edited.value = {}
-  drafts.value = {}
-  confirmation.value = ''
-}
-
-function setValue(key: string, value: number): void {
-  edited.value = { ...edited.value, [key]: value }
-  const next = { ...drafts.value }
-  delete next[key]
-  drafts.value = next
-  confirmation.value = ''
-}
-
-function onInput(key: string, event: Event): void {
-  const raw = (event.target as HTMLInputElement).value
-  drafts.value = { ...drafts.value, [key]: raw }
-  const number = raw.trim() === '' ? 0 : parseDecimal(raw)
-  if (Number.isFinite(number) && number >= 0) edited.value = { ...edited.value, [key]: number }
-  confirmation.value = ''
-}
-
-function onBlur(key: string): void {
-  const next = { ...drafts.value }
-  delete next[key]
-  drafts.value = next
-}
-
-function save(): void {
-  const month = target.value
-  if (!month) return
-  const withRepeat = repeat.value && month < 12
-  for (const write of cellsToWrite(view.value, groups.value, values.value, month, withRepeat)) {
-    budgetStore.updateBudgetValue(write.type, write.category, write.month, write.value)
-  }
-  const summary = savedSummary(month, withRepeat)
-  confirmation.value = `${summary}.`
-  screens.prepared = { month, summary }
-}
+const {
+  view,
+  target,
+  groups,
+  figure,
+  free,
+  start,
+  drafts,
+  repeat,
+  confirmation,
+  values,
+  currentName,
+  targetName,
+  closedCount,
+  options,
+  repeatText,
+  spendLegend,
+  segments,
+  freeWeight,
+  freeShare,
+  groupTotal,
+  pickStart,
+  setValue,
+  onInput,
+  onBlur,
+  save,
+} = usePrepareSession()
 
 const iconButton =
   'border-ctrl-line text-text outline-accent grid size-11 flex-none place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.93]'

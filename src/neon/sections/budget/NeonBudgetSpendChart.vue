@@ -7,7 +7,8 @@ import { chartLabel, deltaText, polyline, type SpendChart } from './month-view-m
 
 // «Gastado en octubre»: the month's expenses added up day by day, against the
 // month before (grey) when the year has one, with today marked on both lines.
-const props = defineProps<{ chart: SpendChart; day: number }>()
+// `bare` is the mobile composition: no card, a shorter chart and a smaller figure.
+const props = defineProps<{ chart: SpendChart; day: number; bare?: boolean }>()
 
 const { formatMoney } = useMoneyFormatter()
 
@@ -23,7 +24,11 @@ const previousTitle = computed(() => {
 <template>
   <section
     aria-labelledby="budget-spent-title"
-    class="bg-panel border-line grid min-w-0 gap-[18px] rounded-[22px] border px-6 py-[22px]"
+    :class="
+      bare
+        ? 'grid min-w-0 gap-[18px]'
+        : 'bg-panel border-line grid min-w-0 gap-[18px] rounded-[22px] border px-6 py-[22px]'
+    "
   >
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div class="grid min-w-0 gap-1">
@@ -31,7 +36,8 @@ const previousTitle = computed(() => {
           Gastado en {{ chart.monthName }}
         </h2>
         <span
-          class="font-display text-[clamp(34px,3.4cqi,44px)] leading-none font-semibold tracking-[-0.04em]"
+          :class="bare ? 'text-[34px]' : 'text-[clamp(34px,3.4cqi,44px)]'"
+          class="font-display leading-none font-semibold tracking-[-0.04em]"
         >
           <NeonCents :text="formatMoney(chart.total)" />
         </span>
@@ -59,7 +65,8 @@ const previousTitle = computed(() => {
       <div
         role="img"
         :aria-label="chartLabel(chart, day)"
-        class="border-grid relative h-[200px] border-b"
+        :class="bare ? 'h-[150px]' : 'h-[200px]'"
+        class="border-grid relative border-b"
       >
         <span
           class="border-line absolute inset-y-0 border-s border-dashed"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 
 import type { WealthViewModel } from '../../../domain/wealth/view-model'
 import type { Month } from '../../../lib/month'
@@ -30,6 +30,21 @@ const detail = computed(() =>
   props.target ? accountDetail(props.view, props.target.kind, props.target.id, picked.value) : null,
 )
 
+// With a finger, every bar is 44px wide and a long year scrolls: keep the
+// picked month in sight.
+const barsGroup = useTemplateRef<HTMLElement>('barsGroup')
+watch(
+  () => [open.value, picked.value, detail.value?.bars.length] as const,
+  async ([isOpen]) => {
+    if (!isOpen) return
+    await nextTick()
+    barsGroup.value
+      ?.querySelector<HTMLElement>('[aria-pressed="true"]')
+      ?.scrollIntoView?.({ inline: 'center', block: 'nearest' })
+  },
+  { flush: 'post' },
+)
+
 const TONE_CLASS: Record<FigureTone, string> = {
   gain: 'text-gain',
   loss: 'text-loss',
@@ -58,10 +73,13 @@ const TONE_CLASS: Record<FigureTone, string> = {
       </div>
 
       <div
+        ref="barsGroup"
         role="group"
         :aria-label="`Saldo de ${detail.name} mes a mes`"
-        class="bg-panel2 rounded-tile grid items-end gap-x-2 px-3 pt-3.5 pb-2.5"
-        :style="{ gridTemplateColumns: `repeat(${detail.bars.length}, minmax(0, 1fr))` }"
+        class="bg-panel2 rounded-tile grid items-end gap-x-2 overflow-x-auto px-3 pt-3.5 pb-2.5 [--bar-min:0px] pointer-coarse:[--bar-min:44px]"
+        :style="{
+          gridTemplateColumns: `repeat(${detail.bars.length}, minmax(var(--bar-min), 1fr))`,
+        }"
       >
         <button
           v-for="bar in detail.bars"
@@ -83,11 +101,11 @@ const TONE_CLASS: Record<FigureTone, string> = {
         </button>
       </div>
 
-      <div class="grid grid-cols-3 gap-2">
+      <div class="frame:grid-cols-3 grid grid-cols-1 gap-2">
         <div
           v-for="tile in detail.tiles"
           :key="tile.label"
-          class="bg-panel2 rounded-tile grid min-w-0 gap-0.5 p-3"
+          class="bg-panel2 rounded-tile frame:grid frame:gap-0.5 flex min-w-0 items-baseline justify-between gap-3 p-3"
         >
           <span class="text-muted text-meta">{{ tile.label }}</span>
           <span
