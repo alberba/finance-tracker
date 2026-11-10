@@ -212,7 +212,7 @@ const iconButton =
             v-for="group in groups"
             :key="group.type"
             :aria-labelledby="`prepare-${group.id}`"
-            class="bg-panel border-line rounded-card grid min-w-0 border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px]"
+            class="bg-panel border-line rounded-card grid min-w-0 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
           >
             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pb-3">
               <div class="flex min-w-0 items-baseline gap-2.5">
@@ -318,7 +318,7 @@ const iconButton =
 
         <aside
           aria-labelledby="prepare-split-title"
-          class="bg-panel border-line rounded-card grid min-w-0 gap-[18px] border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:sticky @min-[980px]:top-6"
+          class="bg-panel border-line rounded-card grid min-w-0 gap-[18px] border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4 @min-[980px]:sticky @min-[980px]:top-6"
         >
           <div class="flex items-baseline justify-between gap-3">
             <h2 id="prepare-split-title" class="text-[18px] font-extrabold">Reparto del mes</h2>

@@ -231,7 +231,7 @@ const detail = computed(() => {
 
   <section
     aria-label="Lo que queda este mes"
-    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-3 py-4 @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))] @min-[720px]:px-6 @min-[720px]:py-[22px]"
+    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4 @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))]"
   >
     <div class="grid min-w-0 gap-1 @min-[720px]:pe-6">
       <span class="text-muted text-[14px]"> Libre para gastar hasta el {{ position.days }} </span>
@@ -280,7 +280,7 @@ const detail = computed(() => {
       <li v-for="category in categories" :key="category.category" class="grid min-w-0">
         <button
           type="button"
-          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-3 py-4 text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97] @min-[720px]:px-6 @min-[720px]:py-[22px]"
+          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-6 py-[22px] text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97] @max-lg:px-3 @max-lg:py-4"
           :class="openCategory === category.category ? 'border-text' : 'border-line'"
           aria-haspopup="dialog"
           :aria-expanded="openCategory === category.category"

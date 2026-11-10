@@ -51,7 +51,7 @@ function toneClass(tone: 'gain' | 'loss' | null): string {
 <template>
   <section
     :aria-label="monthAria(type, month)"
-    class="bg-panel border-line rounded-card grid min-w-0 gap-4 overflow-x-auto border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px]"
+    class="bg-panel border-line rounded-card grid min-w-0 gap-4 overflow-x-auto border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
     data-budget-month
   >
     <p class="text-muted text-[14px]">

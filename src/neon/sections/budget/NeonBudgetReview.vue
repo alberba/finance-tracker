@@ -277,7 +277,7 @@ const barLabel = (category: ReviewCategory) =>
 
         <aside
           aria-labelledby="review-summary-title"
-          class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-3 py-4 @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:sticky @min-[980px]:top-6"
+          class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4 @min-[980px]:sticky @min-[980px]:top-6"
         >
           <h2 id="review-summary-title" class="text-lg font-extrabold">
             <template v-if="from">Cambios para {{ applyRange(from) }}</template>
