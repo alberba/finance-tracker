@@ -118,7 +118,7 @@ function pick(month: Month): void {
     >
       <section
         aria-labelledby="wealth-close-title"
-        class="bg-panel border-line rounded-card flex min-w-0 flex-col border px-6 py-[22px]"
+        class="bg-panel border-line rounded-card flex min-w-0 flex-col border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
       >
         <h2 id="wealth-close-title" class="text-block-title font-extrabold">
           Cerrar {{ monthLower }}
@@ -127,7 +127,7 @@ function pick(month: Month): void {
           Lo que dejes vacío toma el saldo calculado con tus movimientos.
         </p>
         <div
-          class="text-muted text-label tracking-label mt-5 grid grid-cols-[minmax(0,1fr)_120px_160px] items-end gap-4 font-extrabold uppercase"
+          class="text-muted text-label tracking-label mt-5 grid grid-cols-[minmax(0,1fr)_120px_160px] items-end gap-4 font-extrabold uppercase @max-lg:hidden"
           aria-hidden="true"
         >
           <span>Cuenta o activo</span>
@@ -151,7 +151,7 @@ function pick(month: Month): void {
           <div
             v-for="row in group.rows"
             :key="row.id"
-            class="border-line grid min-h-16 grid-cols-[minmax(0,1fr)_120px_160px] items-center gap-4 border-t"
+            class="border-line grid min-h-16 grid-cols-[minmax(0,1fr)_120px_160px] items-center gap-4 border-t @max-lg:grid-cols-[minmax(0,1fr)_140px] @max-lg:gap-x-3 @max-lg:py-1.5"
           >
             <span class="flex min-w-0 items-center gap-2.5">
               <span
@@ -159,10 +159,15 @@ function pick(month: Month): void {
                 :class="SWATCH[group.kind]"
                 aria-hidden="true"
               ></span>
-              <span class="truncate font-bold">{{ row.name }}</span>
+              <span class="grid min-w-0 gap-px">
+                <span class="truncate font-bold">{{ row.name }}</span>
+                <span class="text-muted text-meta truncate tabular-nums @min-lg:hidden">
+                  {{ previousName }} {{ row.prev }}
+                </span>
+              </span>
             </span>
             <span
-              class="font-display text-muted text-end text-[16px] font-semibold whitespace-nowrap"
+              class="font-display text-muted text-end text-[16px] font-semibold whitespace-nowrap @max-lg:hidden"
             >
               {{ row.prev }}
             </span>

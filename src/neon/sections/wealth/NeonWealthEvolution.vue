@@ -46,7 +46,7 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
           :key="option.value"
           type="button"
           :aria-pressed="period === option.value"
-          class="rounded-pill outline-accent text-note min-h-9 px-2 font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+          class="rounded-pill outline-accent text-note min-h-9 px-2 font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:px-3"
           :class="period === option.value ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="period = option.value"
         >
@@ -65,7 +65,7 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
           :aria-pressed="kind === option.value"
           :aria-label="option.label"
           :title="option.label"
-          class="rounded-pill outline-accent grid min-h-9 w-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2"
+          class="rounded-pill outline-accent grid min-h-9 w-10 place-items-center focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:w-11"
           :class="kind === option.value ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="kind = option.value"
         >
@@ -85,8 +85,10 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
       </div>
     </div>
 
-    <div class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3">
-      <div class="relative h-60 min-w-11" aria-hidden="true">
+    <div
+      class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 @max-lg:-mx-3 @max-lg:grid-cols-1"
+    >
+      <div class="relative h-60 min-w-11 @max-lg:hidden" aria-hidden="true">
         <span
           v-for="tick in chart.ticks"
           :key="tick.label"
@@ -95,11 +97,11 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
           >{{ tick.label }}</span
         >
       </div>
-      <div class="relative h-60 min-w-0" role="img" :aria-label="chart.label">
+      <div class="relative h-60 min-w-0 @max-lg:h-[266px]" role="img" :aria-label="chart.label">
         <span
           v-for="tick in chart.ticks"
           :key="tick.label"
-          class="border-grid absolute inset-x-0 border-t"
+          class="border-grid absolute inset-x-0 border-t @max-lg:hidden"
           :style="{ top: `${tick.top}%` }"
           aria-hidden="true"
         ></span>
@@ -152,7 +154,7 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
           ></span>
         </template>
       </div>
-      <span aria-hidden="true"></span>
+      <span class="@max-lg:hidden" aria-hidden="true"></span>
       <ul
         class="mt-2 grid min-w-0"
         :style="{ gridTemplateColumns: `repeat(${chart.points.length}, minmax(0, 1fr))` }"
@@ -168,9 +170,11 @@ const barWidth = computed(() => Math.min((100 / Math.max(props.chart.points.leng
             :class="point.open ? 'text-text' : 'text-soft'"
             >{{ point.label }}</span
           >
-          <span v-if="point.sub" class="text-muted text-xs whitespace-nowrap tabular-nums">{{
-            point.sub
-          }}</span>
+          <span
+            v-if="point.sub"
+            class="text-muted text-xs whitespace-nowrap tabular-nums @max-lg:hidden"
+            >{{ point.sub }}</span
+          >
         </li>
       </ul>
     </div>
