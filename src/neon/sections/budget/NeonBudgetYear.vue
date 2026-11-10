@@ -154,13 +154,11 @@ function savePlan(plan: number[]): void {
       </p>
     </header>
 
-    <div
-      class="grid min-w-0 gap-x-4 gap-y-3 @min-[720px]:flex @min-[720px]:flex-wrap @min-[720px]:items-center"
-    >
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
       <div
         role="tablist"
         aria-label="Tipo de presupuesto"
-        class="bg-panel2 rounded-pill flex max-w-full gap-[3px] overflow-x-auto p-[3px]"
+        class="bg-panel2 rounded-pill inline-flex max-w-full gap-[3px] p-[3px]"
         @keydown="onTypeKey"
       >
         <button
@@ -172,7 +170,7 @@ function savePlan(plan: number[]): void {
           :aria-selected="type === tab.id"
           :aria-controls="`budget-panel-${tab.id}`"
           :tabindex="type === tab.id ? 0 : -1"
-          class="outline-accent rounded-pill inline-flex min-h-[38px] items-center gap-2 px-4 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
+          class="outline-accent rounded-pill inline-flex min-h-[38px] items-center gap-2 px-4 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
           :class="type === tab.id ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="pickType(tab.id)"
         >
@@ -186,13 +184,17 @@ function savePlan(plan: number[]): void {
         </button>
       </div>
 
-      <div role="group" aria-label="Vista" class="bg-panel2 rounded-pill flex gap-[3px] p-[3px]">
+      <div
+        role="group"
+        aria-label="Vista"
+        class="bg-panel2 rounded-pill inline-flex gap-[3px] p-[3px]"
+      >
         <button
           v-for="id in VIEWS"
           :key="id"
           type="button"
           :aria-pressed="view === id"
-          class="outline-accent rounded-pill min-h-[38px] flex-1 px-4 text-[14px] font-extrabold focus-visible:outline-2 focus-visible:-outline-offset-2 @min-[720px]:flex-none pointer-coarse:min-h-11"
+          class="outline-accent rounded-pill min-h-[38px] px-4 text-[14px] font-extrabold focus-visible:outline-2 focus-visible:-outline-offset-2"
           :class="view === id ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="view = id"
         >
@@ -200,7 +202,7 @@ function savePlan(plan: number[]): void {
         </button>
       </div>
 
-      <div class="flex items-center justify-between gap-3 @min-[720px]:ms-auto">
+      <div class="ms-auto flex items-center gap-3">
         <div v-if="nav.arrows" class="flex items-center gap-2">
           <button
             type="button"
@@ -244,7 +246,7 @@ function savePlan(plan: number[]): void {
           </button>
         </div>
         <span
-          class="font-display text-[16px] font-semibold @min-[720px]:min-w-40 @min-[720px]:text-right"
+          class="font-display min-w-40 text-right text-[16px] font-semibold"
           aria-live="polite"
           >{{ nav.label }}</span
         >
@@ -265,20 +267,12 @@ function savePlan(plan: number[]): void {
       </NeonEmptyState>
 
       <template v-else>
-        <div
-          role="group"
-          aria-label="Resumen del año"
-          class="grid grid-cols-2 gap-y-5 @min-[720px]:grid-cols-4"
-          data-budget-summary
-        >
+        <div role="group" aria-label="Resumen del año" class="grid grid-cols-4" data-budget-summary>
           <div
             v-for="(figure, index) in summary"
             :key="figure.label"
-            class="border-line grid min-w-0 content-start gap-1.5 px-4 @min-[720px]:px-6"
-            :class="[
-              index % 2 === 1 ? 'border-s' : 'ps-0',
-              index === 0 ? '@min-[720px]:ps-0' : '@min-[720px]:border-s @min-[720px]:ps-6',
-            ]"
+            class="border-line grid min-w-0 gap-1.5 px-6"
+            :class="index === 0 ? 'ps-0' : 'border-s'"
           >
             <span class="text-muted text-[14px]">{{ figure.label }}</span>
             <span

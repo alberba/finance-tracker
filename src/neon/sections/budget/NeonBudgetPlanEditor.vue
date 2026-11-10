@@ -53,7 +53,7 @@ function onBlur(): void {
 <template>
   <span
     class="flex w-full items-center gap-1"
-    :class="wide ? 'max-w-[200px]' : 'ms-auto max-w-[150px] pointer-coarse:max-w-[190px]'"
+    :class="wide ? 'max-w-[200px]' : 'ms-auto max-w-[150px]'"
   >
     <input
       ref="input"
@@ -70,7 +70,7 @@ function onBlur(): void {
     />
     <button
       type="button"
-      class="bg-accent text-on-accent outline-text grid size-8 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:size-11"
+      class="bg-accent text-on-accent outline-text grid size-8 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2"
       :aria-label="saveLabel"
       @mousedown.prevent
       @click="commit"

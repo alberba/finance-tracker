@@ -30,16 +30,8 @@ function save(category: string, value: number): void {
 }
 
 // Same columns in the header, every row and the total.
-// Narrow: name and what is left on top, the bar under them, the figure and the
-// plan below; the header row only exists with the five columns.
 const COLUMNS =
-  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 @min-[720px]:grid-cols-[minmax(190px,250px)_150px_minmax(0,1fr)_190px_180px] @min-[720px]:gap-x-6 @min-[720px]:gap-y-0'
-const ROW = 'border-line border-t py-3 @min-[720px]:min-h-[68px] @min-[720px]:py-0'
-const NAME = 'order-1 @min-[720px]:order-none'
-const REMAINING = 'order-2 justify-self-end @min-[720px]:order-none'
-const BAR = 'order-3 col-span-2 @min-[720px]:order-none @min-[720px]:col-span-1'
-const ACTUAL = 'order-4 @min-[720px]:order-none'
-const PLAN = 'order-5 justify-self-end @min-[720px]:order-none @min-[720px]:justify-self-auto'
+  'grid grid-cols-[minmax(190px,250px)_150px_minmax(0,1fr)_190px_180px] items-center gap-x-6'
 
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss' } as const
 
@@ -51,16 +43,16 @@ function toneClass(tone: 'gain' | 'loss' | null): string {
 <template>
   <section
     :aria-label="monthAria(type, month)"
-    class="bg-panel border-line rounded-card grid min-w-0 gap-4 overflow-x-auto border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+    class="bg-panel border-line rounded-card grid min-w-0 gap-4 overflow-x-auto border px-6 py-[22px]"
     data-budget-month
   >
     <p class="text-muted text-[14px]">
       Ordenadas por lo cerca que están del presupuesto. Haz clic en el presupuesto para cambiarlo.
     </p>
-    <div class="@min-[720px]:min-w-[900px]">
+    <div class="min-w-[900px]">
       <div
         :class="COLUMNS"
-        class="text-muted text-label tracking-label pbe-4 font-extrabold uppercase @max-[719px]:hidden"
+        class="text-muted text-label tracking-label pbe-4 font-extrabold uppercase"
         aria-hidden="true"
       >
         <span>Categoría</span>
@@ -70,32 +62,27 @@ function toneClass(tone: 'gain' | 'loss' | null): string {
         <span class="text-right">{{ remainingHead(type) }}</span>
       </div>
       <ul>
-        <li v-for="line in list.lines" :key="line.category" :class="[COLUMNS, ROW]">
+        <li
+          v-for="line in list.lines"
+          :key="line.category"
+          :class="COLUMNS"
+          class="border-line min-h-[68px] border-t"
+        >
           <button
             type="button"
-            class="text-text outline-accent min-h-10 min-w-0 truncate text-left text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
-            :class="NAME"
+            class="text-text outline-accent min-h-10 min-w-0 truncate text-left text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
             :aria-label="`Plan de ${line.category} para el año`"
             @click="emit('plan', line.category)"
           >
             {{ line.category }}
           </button>
           <span
-            class="font-display flex items-baseline gap-2 text-[16px] font-semibold tabular-nums"
-            :class="[ACTUAL, line.actual === null ? 'text-muted' : toneClass(line.tone)]"
+            class="font-display text-[16px] font-semibold tabular-nums"
+            :class="line.actual === null ? 'text-muted' : toneClass(line.tone)"
+            >{{ line.actual === null ? '—' : whole(line.actual) }}</span
           >
-            <span class="text-muted font-body text-[13px] font-bold @min-[720px]:hidden">{{
-              PAST_LABEL[type]
-            }}</span>
-            {{ line.actual === null ? '—' : whole(line.actual) }}
-          </span>
-          <NeonBudgetYearBar
-            :class="BAR"
-            :bar="line.bar"
-            :excess="type === 'income' ? 'gain' : 'loss'"
-            large
-          />
-          <span class="min-w-0" :class="PLAN">
+          <NeonBudgetYearBar :bar="line.bar" :excess="type === 'income' ? 'gain' : 'loss'" large />
+          <span class="min-w-0">
             <NeonBudgetPlanEditor
               v-if="editing === line.category"
               wide
@@ -108,7 +95,7 @@ function toneClass(tone: 'gain' | 'loss' | null): string {
             <button
               v-else
               type="button"
-              class="text-muted outline-accent min-h-8 cursor-text text-[15px] font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+              class="text-muted outline-accent min-h-8 cursor-text text-[15px] font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
               :aria-label="line.editLabel"
               @click="editing = line.category"
             >
@@ -117,35 +104,28 @@ function toneClass(tone: 'gain' | 'loss' | null): string {
           </span>
           <span
             class="text-right text-[15px] font-bold whitespace-nowrap"
-            :class="[REMAINING, toneClass(line.remainingTone)]"
+            :class="toneClass(line.remainingTone)"
             >{{ line.remaining }}</span
           >
         </li>
-        <li
-          :class="COLUMNS"
-          class="border-grid border-t py-3 @min-[720px]:min-h-[68px] @min-[720px]:py-0"
-        >
-          <span class="text-[16px] font-extrabold" :class="NAME">Total</span>
+        <li :class="COLUMNS" class="border-grid min-h-[68px] border-t">
+          <span class="text-[16px] font-extrabold">Total</span>
           <span
             class="font-display text-[16px] font-bold tabular-nums"
-            :class="[
-              ACTUAL,
-              list.total.actual === null ? 'text-muted' : toneClass(list.total.tone),
-            ]"
+            :class="list.total.actual === null ? 'text-muted' : toneClass(list.total.tone)"
             >{{ list.total.actual === null ? '—' : whole(list.total.actual) }}</span
           >
           <NeonBudgetYearBar
-            :class="BAR"
             :bar="list.total.bar"
             :excess="type === 'income' ? 'gain' : 'loss'"
             large
           />
-          <span class="text-muted text-[15px] font-semibold" :class="PLAN"
+          <span class="text-muted text-[15px] font-semibold"
             >de {{ whole(list.total.plan) }} €</span
           >
           <span
             class="text-right text-[15px] font-extrabold whitespace-nowrap"
-            :class="[REMAINING, toneClass(list.total.remainingTone)]"
+            :class="toneClass(list.total.remainingTone)"
             >{{ list.total.remaining }}</span
           >
         </li>

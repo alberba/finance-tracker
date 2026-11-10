@@ -1,104 +1,45 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
-
 import { formatMoney, formatMonthName } from '../../../lib/format'
-import { MONTH_INITIALS } from './month-view-model'
 import { monthIndex } from '../../../lib/month'
-import { useBudgetStore } from '../../../stores/budget'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { useNeonBudgetScreens } from './budget-screens'
+import { MONTH_INITIALS } from './month-view-model'
 import {
-  applyPlan,
   applyRange,
   applyRangeProse,
   DECISION_OPTIONS,
-  defaultDraft,
-  reviewCategories,
-  reviewChanges,
-  reviewPosition,
-  reviewStrip,
-  reviewTotals,
-  type Decision,
-  type DecisionMode,
   type ReviewCategory,
 } from './review-view-model'
+import { useReviewSession } from './review-session'
 
 // «Revisar {mes}» in the new Presupuesto (artboard «Presupuesto · 2560 px»,
 // #433): the month that just closed, category by category, with a suggestion
 // and a decision (keep, raise or lower) for each, and the summary of the
 // changes that «Aplicar cambios» writes from the current month through December.
-const budgetStore = useBudgetStore()
 const screens = useNeonBudgetScreens()
-
-const position = computed(() => reviewPosition(budgetStore.viewModel))
-const rows = computed(() => budgetStore.viewModel.types.expense.rows)
-const categories = computed(() =>
-  position.value ? reviewCategories(rows.value, position.value) : [],
-)
-const monthName = computed(() => (position.value ? formatMonthName(position.value.closed) : ''))
-const monthLower = computed(() => monthName.value.toLowerCase())
-const from = computed(() => position.value?.applyFrom ?? null)
-
-const decisions = reactive<Record<string, Decision | undefined>>({})
-const totals = computed(() => reviewTotals(categories.value, decisions))
-const changes = computed(() => reviewChanges(categories.value, decisions))
-const strip = computed(() =>
-  position.value ? reviewStrip(categories.value, position.value.closed) : [],
-)
-const applied = computed(
-  () => !!position.value && screens.reviewed?.month === position.value.closed,
-)
-const canApply = computed(() => from.value !== null && changes.value.length > 0 && !applied.value)
-
-function pick(category: ReviewCategory, mode: DecisionMode): void {
-  decisions[category.category] = { mode, draft: defaultDraft(category, mode) }
-}
-
-function draftOf(category: ReviewCategory): string {
-  return decisions[category.category]?.draft ?? ''
-}
-
-function setDraft(category: ReviewCategory, value: string): void {
-  const current = decisions[category.category]
-  if (current) current.draft = value
-}
-
-function isPressed(category: ReviewCategory, mode: DecisionMode): boolean {
-  return decisions[category.category]?.mode === mode
-}
-
-function showAmount(category: ReviewCategory): boolean {
-  const mode = decisions[category.category]?.mode
-  return mode === 'up' || mode === 'down'
-}
+const {
+  position,
+  categories,
+  monthName,
+  monthLower,
+  from,
+  totals,
+  changes,
+  strip,
+  applied,
+  canApply,
+  pick,
+  draftOf,
+  setDraft,
+  isPressed,
+  showAmount,
+  apply,
+  undo,
+} = useReviewSession()
 
 function barClass(kind: 'over' | 'closed' | 'normal'): string {
   return kind === 'over' ? 'bg-loss' : kind === 'closed' ? 'bg-soft' : 'bg-neutral-bar'
-}
-
-function apply(): void {
-  const start = from.value
-  const current = position.value
-  if (!start || !current || !canApply.value) return
-  const writes = applyPlan(rows.value, changes.value, start)
-  for (const write of writes) {
-    budgetStore.saveBudgetPlan('expense', write.category, write.after, { notify: false })
-  }
-  screens.reviewed = {
-    month: current.closed,
-    summary: `Cambios aplicados a ${applyRange(start)}`,
-    undo() {
-      for (const write of writes) {
-        budgetStore.saveBudgetPlan('expense', write.category, write.before, { notify: false })
-      }
-      screens.reviewed = null
-    },
-  }
-}
-
-function undo(): void {
-  screens.reviewed?.undo()
 }
 
 const barLabel = (category: ReviewCategory) =>
@@ -167,16 +108,13 @@ const barLabel = (category: ReviewCategory) =>
       <div
         role="group"
         :aria-label="`${monthName} en cifras`"
-        class="grid min-w-0 grid-cols-2 gap-y-5 @min-[720px]:grid-cols-4"
+        class="grid min-w-0 grid-cols-4 gap-y-4"
       >
         <div
           v-for="(kpi, index) in strip"
           :key="kpi.label"
-          class="border-line grid min-w-0 content-start gap-1.5 px-4 @min-[720px]:px-6"
-          :class="[
-            index % 2 === 1 ? 'border-s' : 'ps-0',
-            index === 0 ? '@min-[720px]:ps-0' : '@min-[720px]:border-s @min-[720px]:ps-6',
-          ]"
+          class="border-line grid min-w-0 content-start gap-1.5 px-6"
+          :class="index === 0 ? 'ps-0' : 'border-s'"
         >
           <span class="text-muted text-sm">{{ kpi.label }}</span>
           <span
@@ -188,12 +126,12 @@ const barLabel = (category: ReviewCategory) =>
         </div>
       </div>
 
-      <div class="grid min-w-0 items-start gap-5 @min-[980px]:grid-cols-[minmax(0,1fr)_400px]">
+      <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
         <ol class="m-0 grid min-w-0 list-none gap-3 p-0">
           <li
             v-for="category in categories"
             :key="category.category"
-            class="bg-panel border-line rounded-card grid min-w-0 items-center gap-x-7 gap-y-4 border px-3 py-4 @min-[720px]:grid-cols-[minmax(160px,220px)_minmax(0,1fr)] @min-[720px]:px-6 @min-[720px]:py-[22px] @min-[980px]:grid-cols-[minmax(200px,260px)_minmax(0,1fr)_minmax(300px,340px)]"
+            class="bg-panel border-line rounded-card grid min-w-0 grid-cols-[minmax(200px,260px)_minmax(0,1fr)_minmax(300px,340px)] items-center gap-x-7 gap-y-4 border px-6 py-[22px]"
           >
             <div class="grid min-w-0 gap-1">
               <h2 class="text-lg font-extrabold">{{ category.category }}</h2>
@@ -234,7 +172,7 @@ const barLabel = (category: ReviewCategory) =>
               <p class="text-soft text-sm">{{ category.insight }}</p>
             </div>
 
-            <div class="grid min-w-0 gap-2.5 @min-[720px]:col-span-2 @min-[980px]:col-span-1">
+            <div class="grid min-w-0 gap-2.5">
               <div
                 role="group"
                 :aria-label="`Qué hacer con el presupuesto de ${category.category}`"
@@ -245,7 +183,7 @@ const barLabel = (category: ReviewCategory) =>
                   :key="option.mode"
                   type="button"
                   :aria-pressed="isPressed(category, option.mode)"
-                  class="rounded-pill outline-accent min-h-9 min-w-0 flex-1 px-2 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
+                  class="rounded-pill outline-accent min-h-9 min-w-0 flex-1 px-2 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
                   :class="
                     isPressed(category, option.mode) ? 'bg-sel-bg text-sel-text' : 'text-soft'
                   "
@@ -277,7 +215,7 @@ const barLabel = (category: ReviewCategory) =>
 
         <aside
           aria-labelledby="review-summary-title"
-          class="bg-panel border-line rounded-card grid min-w-0 gap-4 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4 @min-[980px]:sticky @min-[980px]:top-6"
+          class="bg-panel border-line rounded-card sticky top-6 grid min-w-0 gap-4 border px-6 py-[22px]"
         >
           <h2 id="review-summary-title" class="text-lg font-extrabold">
             <template v-if="from">Cambios para {{ applyRange(from) }}</template>

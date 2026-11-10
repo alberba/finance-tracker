@@ -1,118 +1,32 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
-
-import { useMoneyFormatter } from '../../../composables/useMoneyFormatter'
-import { formatMonthName } from '../../../lib/format'
-import { asMonth } from '../../../lib/month'
-import { useBudgetStore } from '../../../stores/budget'
-import { useFinancialStateStore } from '../../../stores/financial-state'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
-import { useNeonBudgetScreens } from './budget-screens'
 import NeonBudgetCategoryDetail from './NeonBudgetCategoryDetail.vue'
 import NeonBudgetSpendChart from './NeonBudgetSpendChart.vue'
 import NeonCents from './NeonCents.vue'
-import {
-  categoryAria,
-  categoryDetail,
-  daysText,
-  isWarning,
-  monthCategories,
-  monthHero,
-  monthKicker,
-  monthPosition,
-  spendChart,
-  STATUS_LABEL,
-  unbudgetedCategories,
-} from './month-view-model'
+import { ICON_PREPARE, ICON_REVIEW, useMonthCover } from './month-session'
+import { categoryAria, daysText, isWarning, monthKicker, STATUS_LABEL } from './month-view-model'
 
 // «Este mes», the cover of the new Presupuesto: the two things to do this
 // month (review the month just closed, prepare the next one), the month's
 // spending day by day, what is left to spend and each category's budget. A
 // category opens its detail, month by month.
-const budgetStore = useBudgetStore()
-const financialStateStore = useFinancialStateStore()
-const screens = useNeonBudgetScreens()
-const { reviewed, prepared } = storeToRefs(screens)
-const { viewModel } = storeToRefs(budgetStore)
-const { formatMoney } = useMoneyFormatter()
-
-const position = computed(() => monthPosition(viewModel.value, new Date()))
-const expenseRows = computed(() => viewModel.value.types.expense.rows)
-const categories = computed(() => monthCategories(expenseRows.value, position.value))
-const unbudgeted = computed(() => unbudgetedCategories(expenseRows.value, position.value))
-const hero = computed(() => monthHero(categories.value, position.value))
-const chart = computed(() => spendChart(financialStateStore.state.transactions, position.value))
-const monthName = computed(() => formatMonthName(position.value.month).toLowerCase())
-
-const ICON_REVIEW = 'M9 11l3 3 8-8M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11'
-const ICON_PREPARE = 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M9 15h6'
-
-interface Entry {
-  key: string
-  kicker: string
-  title: string
-  teaser: string
-  done: boolean
-  open: () => void
-  undo?: () => void
-  undoLabel?: string
-}
-
-// The month just closed exists from February on; the next month, until November.
-const entries = computed<Entry[]>(() => {
-  const current = viewModel.value.currentMonth
-  const list: Entry[] = []
-  const closed = current >= 2 && current <= 12 ? asMonth(current - 1) : null
-  if (closed) {
-    const name = formatMonthName(closed)
-    const done = reviewed.value?.month === closed ? reviewed.value : null
-    list.push({
-      key: 'review',
-      kicker: done ? 'Hecho' : `Pendiente · cierre de ${name.toLowerCase()}`,
-      title: done ? `${name} revisado` : `Revisar ${name.toLowerCase()}`,
-      teaser: done?.summary ?? '',
-      done: !!done,
-      open: () => screens.go('review'),
-      undo: done?.undo,
-      undoLabel: `Deshacer la revisión de ${name.toLowerCase()}`,
-    })
-  }
-  const next = current >= 1 && current <= 11 ? asMonth(current + 1) : null
-  if (next) {
-    const name = formatMonthName(next)
-    const done = prepared.value?.month === next ? prepared.value : null
-    list.push({
-      key: 'prepare',
-      kicker: done ? 'Hecho' : '',
-      title: done ? `${name} preparado` : `Preparar ${name.toLowerCase()}`,
-      teaser: done ? `${done.summary} · ver` : '',
-      done: !!done,
-      open: () => screens.go('prepare'),
-    })
-  }
-  return list
-})
-
-// The panel keeps the last category while it slides out.
-const openCategory = ref<string | null>(null)
-const shownCategory = ref<string | null>(null)
-const detailOpen = computed({
-  get: () => openCategory.value !== null,
-  set: (open) => {
-    if (!open) openCategory.value = null
-  },
-})
-
-function showCategory(category: string): void {
-  openCategory.value = shownCategory.value = category
-}
-
-const detail = computed(() => {
-  const row = expenseRows.value.find((candidate) => candidate.category === shownCategory.value)
-  return row ? categoryDetail(row, position.value) : null
-})
+const {
+  viewModel,
+  position,
+  categories,
+  unbudgeted,
+  hero,
+  chart,
+  monthName,
+  entries,
+  openCategory,
+  detailOpen,
+  showCategory,
+  detail,
+  formatMoney,
+  screens,
+} = useMonthCover()
 </script>
 
 <template>
@@ -231,12 +145,12 @@ const detail = computed(() => {
 
   <section
     aria-label="Lo que queda este mes"
-    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4 @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))]"
+    class="bg-panel border-line grid min-w-0 grid-cols-1 gap-y-5 rounded-[22px] border px-6 py-[22px] @min-[720px]:grid-cols-[minmax(0,1.5fr)_repeat(2,minmax(0,1fr))]"
   >
-    <div class="grid min-w-0 gap-1 @min-[720px]:pe-6">
+    <div class="grid min-w-0 gap-1 pe-6">
       <span class="text-muted text-[14px]"> Libre para gastar hasta el {{ position.days }} </span>
       <span
-        class="font-display text-[52px] leading-[1.05] font-bold tracking-[-0.035em] @min-[720px]:text-[56px]"
+        class="font-display text-[56px] leading-[1.05] font-bold tracking-[-0.035em]"
         data-budget-free
       >
         <NeonCents :text="formatMoney(hero.free)" />
@@ -247,7 +161,7 @@ const detail = computed(() => {
       </span>
     </div>
     <div
-      class="border-line grid min-w-0 content-end gap-1.5 @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:border-s @min-[720px]:px-6"
+      class="border-line grid min-w-0 content-end gap-1.5 px-6 @max-[719px]:border-t @max-[719px]:px-0 @max-[719px]:pt-5 @min-[720px]:border-s"
     >
       <span class="text-muted text-[14px]">Gastado este mes</span>
       <span class="font-display text-[22px] font-semibold tracking-[-0.02em]">
@@ -256,7 +170,7 @@ const detail = computed(() => {
       <span class="text-muted text-[13px]">de {{ formatMoney(hero.planned) }} previstos</span>
     </div>
     <div
-      class="border-line grid min-w-0 content-center gap-1.5 @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:justify-items-center @min-[720px]:border-s @min-[720px]:px-6 @min-[720px]:text-center"
+      class="border-line grid min-w-0 content-center justify-items-center gap-1.5 px-6 text-center @max-[719px]:border-t @max-[719px]:pt-5 @min-[720px]:border-s"
     >
       <span class="text-muted text-[14px]">Quedan</span>
       <span class="font-display text-[22px] font-semibold tracking-[-0.02em]">
@@ -280,7 +194,7 @@ const detail = computed(() => {
       <li v-for="category in categories" :key="category.category" class="grid min-w-0">
         <button
           type="button"
-          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-6 py-[22px] text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97] @max-lg:px-3 @max-lg:py-4"
+          class="bg-panel text-text outline-accent hover:bg-panel2 grid min-w-0 content-start gap-3 rounded-[22px] border px-6 py-[22px] text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]"
           :class="openCategory === category.category ? 'border-text' : 'border-line'"
           aria-haspopup="dialog"
           :aria-expanded="openCategory === category.category"
