@@ -31,7 +31,7 @@ const TONE_CLASS: Record<FigureTone, string> = {
 <template>
   <section
     aria-labelledby="wealth-history-title"
-    class="bg-panel border-line rounded-card flex min-w-0 flex-col border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+    class="bg-panel border-line rounded-card flex min-w-0 flex-col border px-6 py-[22px]"
   >
     <h2 id="wealth-history-title" class="text-block-title font-extrabold">Balance por meses</h2>
     <p class="text-soft mt-3 text-[16px]">
@@ -41,15 +41,15 @@ const TONE_CLASS: Record<FigureTone, string> = {
       <div
         role="table"
         aria-label="Saldo de cada cuenta por mes, en euros redondeados"
-        class="grid min-w-max gap-x-1.5 [--wealth-label-col:148px] @min-[640px]:[--wealth-label-col:minmax(180px,2fr)]"
+        class="grid min-w-max gap-x-1.5"
         :style="{
-          gridTemplateColumns: `var(--wealth-label-col) repeat(${table.months.length}, minmax(56px, 1fr))`,
+          gridTemplateColumns: `minmax(180px, 2fr) repeat(${table.months.length}, minmax(56px, 1fr))`,
         }"
       >
         <div role="row" class="col-span-full grid grid-cols-subgrid items-end pb-1.5">
           <span
             role="columnheader"
-            class="text-muted text-label tracking-label bg-panel sticky inset-s-0 z-[1] self-end font-extrabold uppercase"
+            class="text-muted text-label tracking-label self-end font-extrabold uppercase"
             >Cuenta o activo</span
           >
           <span
@@ -93,7 +93,7 @@ const TONE_CLASS: Record<FigureTone, string> = {
         >
           <span
             role="rowheader"
-            class="bg-panel sticky inset-s-0 z-[1] flex min-w-0 items-center gap-2.5 truncate text-[15px]"
+            class="flex min-w-0 items-center gap-2.5 truncate text-[15px]"
             :class="row.kind === 'item' ? 'ps-[22px] font-semibold' : 'font-extrabold'"
           >
             <span

@@ -21,7 +21,7 @@ const emit = defineEmits<{ open: [kind: SnapshotKind, id: string] }>()
         v-for="group in groups"
         :key="group.kind"
         :aria-label="group.title"
-        class="bg-panel border-line rounded-card grid min-w-0 content-start border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+        class="bg-panel border-line rounded-card grid min-w-0 content-start border px-6 py-[22px]"
         :data-wealth-group="group.kind"
       >
         <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 pbe-3.5">

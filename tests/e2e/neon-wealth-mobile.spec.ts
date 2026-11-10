@@ -28,6 +28,23 @@ test('abre el detalle de una cuenta en una hoja y vuelve', async ({ page, tracke
   await expect(row).toBeFocused()
 })
 
+test('abre un mes desde el historial y lee sus saldos', async ({ page, tracker }) => {
+  await tracker.openWealth()
+  await section(page).getByRole('button', { name: 'Por meses' }).click()
+  await expect(
+    section(page).getByRole('heading', { name: 'Balance por meses', level: 1 }),
+  ).toBeVisible()
+
+  await section(page)
+    .getByRole('button', { name: /^Febrero, cerrado: / })
+    .click()
+  await expect(section(page).getByRole('heading', { name: 'Saldos de febrero' })).toBeVisible()
+  await expect(section(page).locator('[data-wealth-status]')).toHaveText('Febrero cerrado')
+  await expect(
+    section(page).getByRole('textbox', { name: 'Saldo de Revolut en febrero' }),
+  ).toBeVisible()
+})
+
 test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil', async ({
   page,
   tracker,
@@ -50,6 +67,11 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
 
   expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
 
+  await section(page).getByRole('button', { name: 'Reparto' }).click()
+  await expect(section(page).getByRole('heading', { name: 'Dónde está' })).toBeVisible()
+  expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
+  await section(page).getByRole('button', { name: 'Cuentas', exact: true }).click()
+
   await section(page)
     .getByRole('button', { name: /^Revolut: / })
     .click()
@@ -61,5 +83,8 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
   await expect(
     section(page).getByRole('heading', { name: 'Balance por meses', level: 1 }),
   ).toBeVisible()
+  expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
+  await section(page).getByRole('button', { name: 'Historial' }).click()
+  await expect(section(page).getByRole('heading', { name: 'Cada mes' })).toBeVisible()
   expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
 })

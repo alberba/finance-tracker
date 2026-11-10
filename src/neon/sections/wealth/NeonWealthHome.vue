@@ -1,12 +1,4 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
-
-import { buildWealthViewModel } from '../../../domain/wealth/view-model'
-import { formatMonthName } from '../../../lib/format'
-import type { SnapshotKind } from '../../../scripts/types'
-import { useFinancialStateStore } from '../../../stores/financial-state'
-import { useWealthStore } from '../../../stores/wealth'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import NeonWealthAccountDetail from './NeonWealthAccountDetail.vue'
@@ -14,70 +6,38 @@ import NeonWealthEquation from './NeonWealthEquation.vue'
 import NeonWealthEvolution from './NeonWealthEvolution.vue'
 import NeonWealthHoldings from './NeonWealthHoldings.vue'
 import NeonWealthMix from './NeonWealthMix.vue'
-import {
-  balanceDate,
-  closeCard,
-  closeStatus,
-  composition,
-  coverMonth,
-  evolution,
-  holdings,
-  monthTotals,
-} from './view-model'
-import { useNeonWealthScreens } from './wealth-screens'
+import { useWealthCover } from './wealth-cover'
 
 // The cover of the new Patrimonio: the balance equation of the month, the
 // invitation to close it, how the net worth went this year, where the assets
 // are and what you have, group by group. A row opens that account's detail.
-const financialStateStore = useFinancialStateStore()
-const wealthStore = useWealthStore()
-const screens = useNeonWealthScreens()
-const { period, chartKind } = storeToRefs(screens)
-
-const month = computed(() => coverMonth(wealthStore.viewModel))
-// The shared view-model reads the rows at the month the snapshot editor is on;
-// the cover always reads them at its own month.
-const view = computed(() =>
-  wealthStore.snapshotMonth === month.value
-    ? wealthStore.viewModel
-    : buildWealthViewModel(financialStateStore.state, month.value),
-)
-
-const monthLower = computed(() => formatMonthName(month.value).toLowerCase())
-const needsAccount = computed(() => view.value.groups.every((group) => group.rows.length === 0))
-const totals = computed(() => monthTotals(view.value, month.value))
-const status = computed(() => closeStatus(view.value, month.value))
-const card = computed(() => closeCard(view.value, month.value))
-const chart = computed(() => evolution(view.value, period.value, chartKind.value))
-const mix = computed(() => composition(view.value, month.value))
-const groups = computed(() => holdings(view.value, month.value))
-const date = computed(() => balanceDate(financialStateStore.year, month.value, new Date()))
-
-function openMonths(): void {
-  wealthStore.setMonth(month.value)
-  screens.go('months')
-}
-
-// The panel keeps the last account while it slides out.
-const openAccount = ref<{ kind: SnapshotKind; id: string } | null>(null)
-const shownAccount = ref<{ kind: SnapshotKind; id: string } | null>(null)
-const detailOpen = computed({
-  get: () => openAccount.value !== null,
-  set: (open) => {
-    if (!open) openAccount.value = null
-  },
-})
-
-function showAccount(kind: SnapshotKind, id: string): void {
-  openAccount.value = shownAccount.value = { kind, id }
-}
+const {
+  year,
+  month,
+  view,
+  monthLower,
+  needsAccount,
+  totals,
+  status,
+  card,
+  chart,
+  mix,
+  groups,
+  date,
+  period,
+  chartKind,
+  openMonths,
+  shownAccount,
+  detailOpen,
+  showAccount,
+} = useWealthCover()
 </script>
 
 <template>
   <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
     <div class="grid min-w-0 gap-1">
       <p class="text-muted text-label tracking-label font-extrabold uppercase">
-        Balance patrimonial · {{ monthLower }} {{ financialStateStore.year }}
+        Balance patrimonial · {{ monthLower }} {{ year }}
       </p>
       <h1
         id="wealth-title"
@@ -109,7 +69,7 @@ function showAccount(kind: SnapshotKind, id: string): void {
         <span class="text-[18px] font-extrabold">{{ card.title }}</span>
         <span class="text-muted text-note">{{ card.note }}</span>
       </div>
-      <NeonButton variant="primary" @click="openMonths">{{ card.action }}</NeonButton>
+      <NeonButton variant="primary" @click="openMonths()">{{ card.action }}</NeonButton>
     </section>
 
     <NeonWealthEvolution

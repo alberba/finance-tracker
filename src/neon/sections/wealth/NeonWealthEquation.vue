@@ -14,37 +14,35 @@ defineProps<{
 <template>
   <section
     aria-label="Ecuación del balance"
-    class="border-line text-muted flex flex-wrap items-baseline gap-x-3 gap-y-2 border-y py-4 text-[16px] @max-lg:grid @max-lg:gap-y-1.5"
+    class="border-line text-muted flex flex-wrap items-baseline gap-x-3 gap-y-2 border-y py-4 text-[16px]"
     data-wealth-equation
   >
-    <span class="whitespace-nowrap @max-lg:flex @max-lg:items-baseline">
+    <span class="whitespace-nowrap">
       Efectivo
-      <b class="font-display text-text text-[16px] font-semibold tabular-nums @max-lg:ms-auto">{{
+      <b class="font-display text-text text-[16px] font-semibold tabular-nums">{{
         formatMoney(totals.accounts)
       }}</b>
     </span>
-    <span class="whitespace-nowrap @max-lg:flex @max-lg:items-baseline">
+    <span class="whitespace-nowrap">
       <span class="font-display me-2" aria-hidden="true">+</span>Inversión
-      <b class="font-display text-text text-[16px] font-semibold tabular-nums @max-lg:ms-auto">{{
+      <b class="font-display text-text text-[16px] font-semibold tabular-nums">{{
         formatMoney(totals.investments)
       }}</b>
     </span>
-    <span class="whitespace-nowrap @max-lg:flex @max-lg:items-baseline">
+    <span class="whitespace-nowrap">
       <span class="font-display me-2" aria-hidden="true">−</span>Pasivos
-      <b class="font-display text-text text-[16px] font-semibold tabular-nums @max-lg:ms-auto">{{
+      <b class="font-display text-text text-[16px] font-semibold tabular-nums">{{
         formatMoney(totals.liabilities)
       }}</b>
     </span>
-    <span class="whitespace-nowrap @max-lg:flex @max-lg:items-baseline">
+    <span class="whitespace-nowrap">
       <span class="font-display me-2" aria-hidden="true">=</span>Patrimonio
-      <b
-        class="font-display text-text text-[22px] font-bold tabular-nums @max-lg:ms-auto"
-        data-wealth-net
-        >{{ formatMoney(totals.net) }}</b
-      >
+      <b class="font-display text-text text-[22px] font-bold tabular-nums" data-wealth-net>{{
+        formatMoney(totals.net)
+      }}</b>
     </span>
     <span
-      class="text-soft text-note ms-auto flex items-center gap-2 font-bold whitespace-nowrap @max-lg:ms-0 @max-lg:justify-end"
+      class="text-soft text-note ms-auto flex items-center gap-2 font-bold whitespace-nowrap"
       data-wealth-status
     >
       <span
