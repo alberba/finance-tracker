@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, shallowRef } from 'vue'
 
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { parseDecimal } from '../../../lib/number'
 import type { Subscription, SubscriptionFrequency } from '../../../scripts/types'
 import { todayISO } from '../../../scripts/utils'
@@ -9,6 +10,7 @@ import { useMovementsStore } from '../../../stores/movements'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
 import {
   FREQUENCY_OPTIONS,
   subscriptionFields,
@@ -21,9 +23,14 @@ import {
 // A row opens its detail in the shared panel, where it is paused, resumed,
 // edited or deleted; «Nueva suscripción» opens the same panel as a form. All
 // changes go through the movements store, with its validations and toasts.
+//
+// On the mobile frame (artboard «Movimientos · móvil», #432) the two figures
+// lead as a pair of tiles (monthly and yearly), and the next 30 days follow
+// the list in a card of their own.
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
 const currency = computed(() => financialStateStore.currency || 'EUR')
+const desktopFrame = useMediaQuery(FRAME_QUERY)
 
 const rows = computed(() =>
   subscriptionRows(movementsStore.subscriptions, movementsStore.getAccountName, currency.value),
@@ -152,6 +159,28 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 <template>
   <div class="subscriptions @container/subscriptions grid min-w-0">
     <div class="subscriptions-body grid min-w-0 items-start gap-5">
+      <div
+        v-if="!desktopFrame"
+        class="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3"
+        aria-label="Lo que comprometen"
+        role="group"
+      >
+        <div
+          v-for="tile in [
+            { label: 'Comprometido al mes', value: summary.monthly },
+            { label: 'Proyección anual', value: summary.annual },
+          ]"
+          :key="tile.label"
+          class="bg-panel border-line rounded-card grid min-w-0 gap-1.5 border px-3.5 py-4"
+        >
+          <p class="text-muted text-[13px] font-bold">{{ tile.label }}</p>
+          <p
+            class="font-display text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] whitespace-nowrap tabular-nums"
+          >
+            {{ tile.value }}
+          </p>
+        </div>
+      </div>
       <section
         v-if="rows.length"
         aria-label="Tus suscripciones"
@@ -162,7 +191,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           v-for="row in rows"
           :key="row.id"
           type="button"
-          class="border-line text-text outline-accent hover:bg-panel2/60 flex min-h-16 w-full min-w-0 items-center justify-between gap-3 border-t px-6 py-2.5 text-start first:border-t-0 focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="border-line text-text outline-accent hover:bg-panel2/60 flex min-h-16 w-full min-w-0 items-center justify-between gap-3 border-t px-3.5 py-2.5 text-start first:border-t-0 focus-visible:outline-2 focus-visible:-outline-offset-2 @min-[560px]/subscriptions:px-6"
           aria-haspopup="dialog"
           :data-subscription-id="row.id"
           @click="openDetail(row.id)"
@@ -195,9 +224,9 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 
       <aside
         aria-label="Resumen de suscripciones"
-        class="subscriptions-aside bg-panel border-line rounded-card grid gap-5 self-start border px-6 py-[22px]"
+        class="subscriptions-aside bg-panel border-line rounded-card grid gap-5 self-start border px-3.5 py-4 @min-[560px]/subscriptions:px-6 @min-[560px]/subscriptions:py-[22px]"
       >
-        <div class="grid gap-2">
+        <div v-if="desktopFrame" class="grid gap-2">
           <p class="text-muted text-[14px] font-bold">Comprometido al mes</p>
           <p
             class="font-display text-[clamp(34px,3.4cqi,44px)] leading-none font-semibold tracking-[-0.04em] whitespace-nowrap tabular-nums"
@@ -206,7 +235,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
           </p>
           <p class="text-soft text-[15px]">{{ summary.line }}</p>
         </div>
-        <div class="border-line grid gap-1 border-t pbs-[18px]">
+        <div class="grid gap-1" :class="desktopFrame && 'border-line border-t pbs-[18px]'">
           <h3 class="mbe-1.5 text-[18px] font-extrabold">
             Próximos 30 días
             <span class="text-muted font-bold">· {{ summary.next30 }}</span>
