@@ -67,6 +67,8 @@ export interface UpcomingView {
 
 export interface SubscriptionsSummary {
   monthly: string
+  /** What the active ones commit in a year, the mobile tab's second figure. */
+  annual: string
   /** «Proyección anual 1.234,00 € · 6 activas». */
   line: string
   /** «3 cobros · 45,97 €», or «sin cobros». */
@@ -83,6 +85,7 @@ export function subscriptionsSummary(
   const count = analysis.next30DaysCount
   return {
     monthly: formatMoney(analysis.monthlyCommitment, currency),
+    annual: formatMoney(analysis.annualCommitment, currency),
     line: `Proyección anual ${formatMoney(analysis.annualCommitment, currency)} · ${analysis.activeCount} ${analysis.activeCount === 1 ? 'activa' : 'activas'}`,
     next30: count
       ? `${count} ${count === 1 ? 'cobro' : 'cobros'} · ${formatMoney(analysis.next30DaysAmount, currency)}`

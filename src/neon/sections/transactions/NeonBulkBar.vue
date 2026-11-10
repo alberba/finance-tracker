@@ -15,8 +15,8 @@ import { BULK_TYPES, bulkCategoryType, selectionSummary } from './registry-view-
 // shown or delete it after confirming (it cannot be undone, as in the old
 // design). «Listo», next to the filters, ends the selection. Sticks to
 // the bottom of the ledger column while the ledger scrolls under it. On the
-// mobile frame the filters scroll far out of reach, so the bar carries its
-// own «Listo».
+// mobile frame the month line scrolls far out of reach, so the bar carries
+// its own close button (artboard «Movimientos · móvil»).
 const props = defineProps<{ allShownSelected: boolean }>()
 const emit = defineEmits<{ selectAll: []; done: [] }>()
 
@@ -92,7 +92,26 @@ const selectClass =
         <NeonButton :disabled="props.allShownSelected" @click="emit('selectAll')">
           Seleccionar todo
         </NeonButton>
-        <NeonButton v-if="!desktopFrame" @click="emit('done')">Listo</NeonButton>
+        <button
+          v-if="!desktopFrame"
+          type="button"
+          class="border-ctrl-line text-soft outline-accent grid size-11 shrink-0 place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]"
+          aria-label="Terminar la selección"
+          @click="emit('done')"
+        >
+          <svg
+            class="size-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
       </div>
     </div>
     <div

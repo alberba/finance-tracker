@@ -47,7 +47,7 @@ async function addMovements(
   await tracker.open('transactions')
 }
 
-test('busca, filtra por tipo y por importe desde la hoja de filtros', async ({ page, tracker }) => {
+test('busca, filtra por tipo y por importe con «Más filtros»', async ({ page, tracker }) => {
   await addMovements(page, tracker, [
     { id: 'e2e-movil-ingreso', type: 'income', amount: 120, date: '2026-03-10' },
     { id: 'e2e-movil-gasto', type: 'expense', amount: 30, date: '2026-03-11' },
@@ -65,11 +65,7 @@ test('busca, filtra por tipo y por importe desde la hoja de filtros', async ({ p
   await section(page)
     .getByRole('button', { name: /^Más filtros/ })
     .click()
-  const filters = sheet(page, 'Más filtros')
-  await expect(filters).toBeVisible()
-  await filters.getByLabel('Importe mín.').fill('100')
-  await filters.getByRole('button', { name: 'Ver movimientos' }).click()
-  await expect(filters).toBeHidden()
+  await section(page).getByLabel('Importe mín.').fill('100')
 
   await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(1)
   await expect(row(page, 'e2e-movil-gasto-grande')).toBeVisible()
@@ -141,15 +137,8 @@ test('todos los controles de Movimientos miden al menos 44 px con puntero tácti
   await section(page)
     .getByRole('button', { name: /^Más filtros/ })
     .click()
-  await expect(sheet(page, 'Más filtros')).toBeVisible()
-  expect(await tooSmall(inSheet)).toEqual([])
-  await page.keyboard.press('Escape')
-  await expect(sheet(page, 'Más filtros')).toBeHidden()
-
-  await section(page).getByRole('button', { name: 'Por categoría' }).click()
-  await expect(sheet(page, 'Por categoría')).toBeVisible()
-  expect(await tooSmall(inSheet)).toEqual([])
-  await page.keyboard.press('Escape')
+  await expect(section(page).getByLabel('Importe mín.')).toBeVisible()
+  expect(await tooSmall(inSection)).toEqual([])
 
   await row(page, 'e2e-movil-tactil').click()
   const detail = sheet(page, 'e2e-movil-tactil')
@@ -162,7 +151,7 @@ test('todos los controles de Movimientos miden al menos 44 px con puntero tácti
   expect(await tooSmall(inSection)).toEqual([])
   await section(page)
     .getByRole('region', { name: 'Acciones sobre la selección' })
-    .getByRole('button', { name: 'Listo' })
+    .getByRole('button', { name: 'Terminar la selección' })
     .click()
   await expect(section(page).locator('[data-bulk-bar]')).toHaveCount(0)
 

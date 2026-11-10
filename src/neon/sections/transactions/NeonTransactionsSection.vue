@@ -115,7 +115,7 @@ watch(
       Crea una cuenta en Configuración para registrar movimientos y suscripciones.
     </NeonEmptyState>
 
-    <div class="flex">
+    <div class="flex justify-center @min-[560px]:justify-start">
       <div
         role="tablist"
         aria-label="Subsecciones de movimientos"

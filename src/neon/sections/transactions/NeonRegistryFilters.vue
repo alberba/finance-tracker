@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 
-import { useMediaQuery } from '../../../composables/useMediaQuery'
+import { useMovementsStore } from '../../../stores/movements'
 import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
-import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
-import { FRAME_QUERY } from '../../ui/sheet-drag'
-import NeonRegistryMoreFilters from './NeonRegistryMoreFilters.vue'
 import {
   chosenType,
   moreFiltersLabel,
@@ -19,21 +16,37 @@ import {
 // type at a time) and «Más filtros» (account, exact day and amount range).
 // Search, type and account are the registry's shared filters; the day and the
 // amounts only exist in the new design and come in as `extra`. The registry's
-// own actions (select, export) go at the end of the row.
-//
-// On the desktop frame «Más filtros» unfolds under the row; on the mobile one
-// it opens a bottom sheet (DESIGN.md, Layout: sheets for detail and forms),
-// where the filters apply as they change and «Ver movimientos» closes it.
+// own actions (select, export) go at the end of the row; on the mobile frame
+// the registry places them under the month instead (artboard «Movimientos ·
+// móvil»), so the slot may be empty.
 const extra = defineModel<ExtraFilters>('extra', { required: true })
 const emit = defineEmits<{ clear: [] }>()
 
+const movementsStore = useMovementsStore()
 const filters = useUiStore().ui.txFilters
-const desktopFrame = useMediaQuery(FRAME_QUERY)
 
 const moreOpen = ref(false)
 const moreId = useId()
 const type = computed(() => chosenType(filters.types))
 const moreLabel = computed(() => moreFiltersLabel(filters.accountIds, extra.value))
+const accountChips = computed(() => [
+  { value: '', label: 'Todas' },
+  ...movementsStore.accounts.map((account) => ({ value: account.id, label: account.name })),
+])
+const account = computed(() => filters.accountIds[0] ?? '')
+
+function setAccount(value: string): void {
+  filters.accountIds = value ? [value] : []
+}
+
+function setExtra(key: keyof ExtraFilters, value: string): void {
+  extra.value = { ...extra.value, [key]: value }
+}
+
+const chipClass =
+  'outline-accent rounded-pill pointer-coarse:min-h-11 min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2'
+const fieldClass =
+  'bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
 </script>
 
 <template>
@@ -94,37 +107,76 @@ const moreLabel = computed(() => moreFiltersLabel(filters.accountIds, extra.valu
           {{ chip.label }}
         </button>
       </div>
-      <div class="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-x-1 gap-y-2">
-        <NeonButton
-          :aria-expanded="moreOpen"
-          :aria-controls="desktopFrame ? moreId : undefined"
-          :aria-haspopup="desktopFrame ? undefined : 'dialog'"
-          class="shrink-0"
-          @click="moreOpen = !moreOpen"
-        >
-          {{ moreLabel }}
-        </NeonButton>
-        <div class="ms-auto flex shrink-0 items-center gap-1">
-          <slot name="actions" />
-        </div>
+      <NeonButton
+        :aria-expanded="moreOpen"
+        :aria-controls="moreId"
+        class="shrink-0"
+        @click="moreOpen = !moreOpen"
+      >
+        {{ moreLabel }}
+      </NeonButton>
+      <div v-if="$slots.actions" class="ms-auto flex shrink-0 items-center gap-1">
+        <slot name="actions" />
       </div>
     </div>
 
     <div
-      v-if="desktopFrame && moreOpen"
+      v-if="moreOpen"
       :id="moreId"
-      class="bg-panel border-line rounded-card motion-safe:animate-fade-in border px-6 py-[22px]"
+      class="bg-panel border-line rounded-card motion-safe:animate-fade-in grid gap-3.5 border px-3 py-4 @min-[560px]/registry:px-6 @min-[560px]/registry:py-[22px]"
     >
-      <NeonRegistryMoreFilters v-model:extra="extra">
-        <NeonButton class="justify-self-start" @click="emit('clear')">Limpiar filtros</NeonButton>
-      </NeonRegistryMoreFilters>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Cuenta">
+        <button
+          v-for="chip in accountChips"
+          :key="chip.value"
+          type="button"
+          :aria-pressed="account === chip.value"
+          :class="[
+            chipClass,
+            account === chip.value
+              ? 'bg-sel-bg border-sel-border text-sel-text'
+              : 'border-ctrl-line text-soft',
+          ]"
+          @click="setAccount(chip.value)"
+        >
+          {{ chip.label }}
+        </button>
+      </div>
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="text-muted grid gap-1.5 text-[13px] font-bold">
+          Fecha exacta
+          <input
+            type="date"
+            name="txDay"
+            :value="extra.date"
+            :class="fieldClass"
+            @input="setExtra('date', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label class="text-muted grid gap-1.5 text-[13px] font-bold">
+          Importe mín.
+          <input
+            inputmode="decimal"
+            name="txMin"
+            placeholder="0,00"
+            :value="extra.min"
+            :class="[fieldClass, 'w-[130px]']"
+            @input="setExtra('min', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label class="text-muted grid gap-1.5 text-[13px] font-bold">
+          Importe máx.
+          <input
+            inputmode="decimal"
+            name="txMax"
+            placeholder="0,00"
+            :value="extra.max"
+            :class="[fieldClass, 'w-[130px]']"
+            @input="setExtra('max', ($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <NeonButton @click="emit('clear')">Limpiar filtros</NeonButton>
+      </div>
     </div>
-    <NeonDetailPanel v-if="!desktopFrame" v-model:open="moreOpen" title="Más filtros">
-      <NeonRegistryMoreFilters v-model:extra="extra" />
-      <template #footer>
-        <NeonButton class="me-auto" @click="emit('clear')">Limpiar filtros</NeonButton>
-        <NeonButton variant="primary" @click="moreOpen = false">Ver movimientos</NeonButton>
-      </template>
-    </NeonDetailPanel>
   </section>
 </template>

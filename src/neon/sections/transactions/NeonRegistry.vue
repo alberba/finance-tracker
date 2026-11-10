@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { foldMonthGroups, hasTypeRestriction } from '../../../domain/transactions/registry'
 import { formatMonthYear } from '../../../lib/format'
 import { atMonth } from '../../../lib/month'
@@ -12,11 +13,13 @@ import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import NeonUndoToast from '../../ui/NeonUndoToast.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
 import NeonBulkBar from './NeonBulkBar.vue'
 import NeonLedger from './NeonLedger.vue'
 import NeonMovementDetail from './NeonMovementDetail.vue'
 import NeonRegistryAside from './NeonRegistryAside.vue'
 import NeonRegistryFilters from './NeonRegistryFilters.vue'
+import NeonRegistryMonthLine from './NeonRegistryMonthLine.vue'
 import NeonReportPanel from './NeonReportPanel.vue'
 import {
   buildLedgerMonths,
@@ -38,6 +41,10 @@ import {
 // the aside, the detail of a movement in the shared panel and the undo notice
 // after deleting one. «Seleccionar» turns the rows into checkboxes for the
 // bulk bar; «Exportar» opens the period report.
+//
+// On the mobile frame (artboard «Movimientos · móvil», #432) the aside gives
+// way to one centered month line between the filters and the ledger, and the
+// two actions turn into pills under it.
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
 const ui = useUiStore().ui
@@ -196,6 +203,10 @@ function selectAllShown(): void {
 onBeforeUnmount(() => movementsStore.clearSelection())
 
 const reportOpen = ref(false)
+const desktopFrame = useMediaQuery(FRAME_QUERY)
+
+const pillClass =
+  'outline-accent rounded-pill pointer-coarse:min-h-11 inline-flex min-h-[38px] items-center border px-4 text-[14px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]'
 </script>
 
 <template>
@@ -203,7 +214,7 @@ const reportOpen = ref(false)
     <div class="registry-body grid min-w-0 items-start gap-5">
       <div class="grid min-w-0 gap-4">
         <NeonRegistryFilters v-model:extra="extra" @clear="clearFilters">
-          <template #actions>
+          <template v-if="desktopFrame" #actions>
             <NeonButton
               :aria-pressed="selecting"
               :disabled="!selecting && !months.length"
@@ -214,6 +225,37 @@ const reportOpen = ref(false)
             <NeonButton @click="reportOpen = true">Exportar</NeonButton>
           </template>
         </NeonRegistryFilters>
+        <NeonRegistryMonthLine
+          v-if="!desktopFrame"
+          :month-title="monthTitle"
+          :is-latest-month="movementsStore.isLatestMonth"
+          :summary="summary"
+          @step="movementsStore.stepMonth"
+        >
+          <template #actions>
+            <button
+              type="button"
+              :class="[pillClass, 'border-ctrl-line text-text']"
+              @click="reportOpen = true"
+            >
+              Exportar
+            </button>
+            <button
+              type="button"
+              :aria-pressed="selecting"
+              :disabled="!selecting && !months.length"
+              :class="[
+                pillClass,
+                selecting
+                  ? 'bg-sel-bg border-sel-border text-sel-text'
+                  : 'border-ctrl-line text-text',
+              ]"
+              @click="selecting ? stopSelecting() : startSelecting()"
+            >
+              {{ selecting ? 'Listo' : 'Seleccionar' }}
+            </button>
+          </template>
+        </NeonRegistryMonthLine>
         <NeonLedger
           v-if="months.length"
           :months="months"
@@ -239,6 +281,7 @@ const reportOpen = ref(false)
         />
       </div>
       <NeonRegistryAside
+        v-if="desktopFrame"
         class="registry-aside"
         :month-title="monthTitle"
         :is-latest-month="movementsStore.isLatestMonth"

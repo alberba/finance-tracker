@@ -314,6 +314,7 @@ describe('subscriptions', () => {
   it('sums what the active ones commit each month and the next 30 days of charges', () => {
     expect(subscriptionsSummary(list, '2026-10-09')).toEqual({
       monthly: '23,99 €',
+      annual: '287,88 €',
       line: 'Proyección anual 287,88 € · 2 activas',
       next30: '1 cobro · 13,99 €',
       upcoming: [

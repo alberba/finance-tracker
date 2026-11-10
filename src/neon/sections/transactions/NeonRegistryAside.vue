@@ -1,18 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
-import { useMediaQuery } from '../../../composables/useMediaQuery'
-import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
-import { FRAME_QUERY } from '../../ui/sheet-drag'
-import NeonRegistryBreakdown from './NeonRegistryBreakdown.vue'
 import type { Breakdown, FilterSummary } from './registry-view-model'
 
 // «Resumen del filtro»: the month the registry starts from, with arrows to
 // move it, the figure of what the filters leave in that month and its split
 // by category (neutral bars, DESIGN.md «Barra de progreso»).
-//
-// On the mobile frame the summary leads the ledger, so it stays short: the
-// split hides behind a row with its title that opens it in a bottom sheet.
 defineProps<{
   monthTitle: string
   isLatestMonth: boolean
@@ -22,9 +13,6 @@ defineProps<{
 
 const emit = defineEmits<{ step: [delta: -1 | 1] }>()
 
-const desktopFrame = useMediaQuery(FRAME_QUERY)
-const breakdownOpen = ref(false)
-
 const arrowClass =
   'border-ctrl-line text-text outline-accent grid size-11 place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 aria-disabled:opacity-40 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]'
 </script>
@@ -32,7 +20,7 @@ const arrowClass =
 <template>
   <aside
     aria-label="Resumen del filtro"
-    class="bg-panel border-line rounded-card grid gap-5 self-start border px-3 py-4 @min-[560px]/registry:px-6 @min-[560px]/registry:py-[22px]"
+    class="bg-panel border-line rounded-card grid gap-5 self-start border px-6 py-[22px]"
     data-registry-aside
   >
     <div class="flex items-center justify-between gap-2">
@@ -84,34 +72,26 @@ const arrowClass =
       </p>
       <p class="text-soft text-[15px]">{{ summary.count }}</p>
     </div>
-    <div v-if="desktopFrame" class="border-line grid gap-3.5 border-t pbs-[18px]">
+    <div class="border-line grid gap-3.5 border-t pbs-[18px]">
       <h3 class="text-[18px] font-extrabold">{{ breakdown.title }}</h3>
-      <NeonRegistryBreakdown :breakdown="breakdown" />
+      <ul v-if="breakdown.rows.length" class="grid gap-3.5" data-tx-breakdown>
+        <li v-for="row in breakdown.rows" :key="row.name" class="grid min-w-0 gap-[7px]">
+          <div class="flex min-w-0 items-baseline justify-between gap-3 text-[15px]">
+            <span class="min-w-0 truncate font-semibold">{{ row.name }}</span>
+            <span class="font-bold whitespace-nowrap tabular-nums">
+              {{ row.amount }}
+              <span class="text-muted text-[13px] font-semibold">{{ row.share }}</span>
+            </span>
+          </div>
+          <div class="bg-line rounded-pill h-1.5 overflow-hidden" aria-hidden="true">
+            <span
+              class="bg-neutral-bar rounded-pill block h-full"
+              :style="{ width: `${row.width}%` }"
+            ></span>
+          </div>
+        </li>
+      </ul>
+      <p v-else class="text-muted text-[14px]">Nada que sumar con estos filtros.</p>
     </div>
-    <template v-else>
-      <button
-        type="button"
-        class="border-line text-text outline-accent -mbe-2 flex min-h-12 items-center justify-between gap-3 border-t pbs-2 text-start text-[16px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
-        aria-haspopup="dialog"
-        @click="breakdownOpen = true"
-      >
-        {{ breakdown.title }}
-        <svg
-          class="text-muted size-[18px] shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      </button>
-      <NeonDetailPanel v-model:open="breakdownOpen" :title="breakdown.title" :kicker="monthTitle">
-        <NeonRegistryBreakdown :breakdown="breakdown" />
-      </NeonDetailPanel>
-    </template>
   </aside>
 </template>
