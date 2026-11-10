@@ -4,9 +4,8 @@ description: pnpm, Node and frozen-lockfile install, with Chromium for Playwrigh
 inputs:
   playwright:
     description: >-
-      'true' installs Chromium and its system dependencies on the runner;
-      'container' assumes the job runs in the official Playwright image;
-      only SQLite's prebuilt native addon is installed for the Node runtime.
+      'true' installs the Chromium and system dependencies matching the
+      installed @playwright/test, restored from a cache keyed by its version.
     default: 'false'
 
 runs:
@@ -20,24 +19,22 @@ runs:
         node-version: 24
         cache: pnpm
     - name: Install dependencies
-      if: ${{ inputs.playwright != 'container' }}
       shell: bash
       run: pnpm install --frozen-lockfile
-    - name: Install dependencies (Playwright image)
-      if: ${{ inputs.playwright == 'container' }}
+    - name: Resolve the Playwright version
+      if: ${{ inputs.playwright == 'true' }}
+      id: playwright-version
       shell: bash
-      run: pnpm install --frozen-lockfile --ignore-scripts
-    - name: Install SQLite native addon
-      if: ${{ inputs.playwright == 'container' }}
-      shell: bash
-      run: pnpm rebuild better-sqlite3
+      run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
     - name: Cache Chromium
       if: ${{ inputs.playwright == 'true' }}
       id: chromium-cache
       uses: actions/cache@v6
       with:
         path: ~/.cache/ms-playwright
-        key: chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        # Only a new @playwright/test download invalidates the browser cache, so an
+        # unrelated dependency bump does not pay for Chromium again.
+        key: chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
     - name: Install Chromium
       if: ${{ inputs.playwright == 'true' && steps.chromium-cache.outputs.cache-hit != 'true' }}
       shell: bash

@@ -30,8 +30,12 @@ con su Node y sus addons nativos; Playwright conecta Chromium por WebSocket y ex
 loopback del cliente. Así macOS y Linux comparan los mismos píxeles sin sustituir el addon SQLite
 del desarrollador. Requiere dependencias instaladas y Docker arrancado;
 descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equivalente a instalar
-Chromium): `docker pull mcr.microsoft.com/playwright:v1.65.0-noble`. La descarga inicial no es una
-medición de la suite. En CI usa directamente el contenedor del job.
+Chromium) con la etiqueta que deriva el script de la versión instalada:
+
+`docker pull mcr.microsoft.com/playwright:v$(node -p 'require("@playwright/test/package.json").version')-noble`
+
+La descarga inicial no es una medición de la suite. En CI cada job instala el Chromium de la versión
+de `@playwright/test` del lockfile y lo restaura de una caché cuya clave es esa versión.
 
 El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado y los tiempos
 por fase en `.scratch/test-suite/last-run.json`; los tiempos de navegador están en `browser-run.json`.
@@ -109,12 +113,14 @@ Los snapshots siguen requiriendo inspección visual antes de actualizarse.
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
-Los jobs de navegador corren dentro de la imagen oficial de Playwright
-(`mcr.microsoft.com/playwright:v1.65.0-noble`), que ya trae Chromium y sus librerías: sin
-`apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
-común (pnpm, Node e install con lockfile, incluido el addon SQLite precompilado) vive en
-`.github/actions/setup`. El job final comprueba el tiempo desde el inicio del workflow, incluida
-la preparación y espera de runners, contra el presupuesto de 360 segundos.
+Los jobs de navegador corren en `ubuntu-latest` e instalan con `playwright install --with-deps` el
+Chromium que corresponde a `@playwright/test` en el lockfile: no hay etiqueta de imagen que
+actualizar, así que un bump del paquete trae su navegador solo. Las fuentes de la interfaz se sirven
+desde `public/fonts`, así que el render no depende de las fuentes del sistema. El setup común (pnpm,
+Node, install con lockfile, incluido el addon SQLite precompilado, y la caché de Chromium por
+versión de Playwright) vive en `.github/actions/setup`. El job final comprueba el tiempo desde el
+inicio del workflow, incluida la preparación y espera de runners, contra el presupuesto de
+360 segundos.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
 Los cuatro shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial
@@ -225,8 +231,9 @@ pnpm test:e2e tests/e2e/<spec>.spec.ts
 
 Playwright comprueba que `node_modules/.pnpm/lock.yaml` coincide con el lockfile del repositorio
 antes de lanzar tests. `pnpm check:deps` permite comprobarlo sin abrir un navegador; si falla,
-ejecuta `pnpm install --frozen-lockfile`. El script Linux comprueba dependencias antes de elegir
-la imagen de Playwright, para que Chromium coincida con CI.
+ejecuta `pnpm install --frozen-lockfile`. El script Linux comprueba dependencias antes de arrancar
+Chromium y deriva la etiqueta de la imagen de la versión instalada de `@playwright/test`, así que no
+hay que actualizarla a mano cuando sube el paquete.
 
 ## WebMCP
 
