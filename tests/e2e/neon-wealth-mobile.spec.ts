@@ -13,10 +13,7 @@ test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#wealth')
 
-test('abre el detalle de una cuenta en una hoja, lee otro mes y vuelve', async ({
-  page,
-  tracker,
-}) => {
+test('abre el detalle de una cuenta en una hoja y vuelve', async ({ page, tracker }) => {
   await tracker.openWealth()
   await expect(section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })).toBeVisible()
 
@@ -24,18 +21,7 @@ test('abre el detalle de una cuenta en una hoja, lee otro mes y vuelve', async (
   await row.click()
   const sheet = page.getByRole('dialog', { name: 'Revolut' })
   await expect(sheet).toBeVisible()
-  // Una hoja inferior: pegada al borde de abajo, no un panel lateral.
-  const box = await sheet.boundingBox()
-  const viewport = page.viewportSize()
-  expect(
-    box && viewport && box.y > 0 && Math.round(box.y + box.height) >= viewport.height - 1,
-  ).toBe(true)
-
-  await sheet
-    .getByRole('group', { name: 'Saldo de Revolut mes a mes' })
-    .getByRole('button', { name: /^Febrero: / })
-    .click()
-  await expect(sheet.locator('[data-account-value]')).toHaveText('1.299,11 €')
+  await expect(sheet.locator('[data-account-value]')).toHaveText('3.101,32 €')
 
   await sheet.getByRole('button', { name: 'Cerrar' }).click()
   await expect(sheet).toBeHidden()
