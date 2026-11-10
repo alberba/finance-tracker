@@ -30,7 +30,7 @@ con su Node y sus addons nativos; Playwright conecta Chromium por WebSocket y ex
 loopback del cliente. Así macOS y Linux comparan los mismos píxeles sin sustituir el addon SQLite
 del desarrollador. Requiere dependencias instaladas y Docker arrancado;
 descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equivalente a instalar
-Chromium): `docker pull mcr.microsoft.com/playwright:v1.64.1-noble`. La descarga inicial no es una
+Chromium): `docker pull mcr.microsoft.com/playwright:v1.65.0-noble`. La descarga inicial no es una
 medición de la suite. En CI usa directamente el contenedor del job.
 
 El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado y los tiempos
@@ -110,7 +110,7 @@ Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.m
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
 Los jobs de navegador corren dentro de la imagen oficial de Playwright
-(`mcr.microsoft.com/playwright:v1.64.1-noble`), que ya trae Chromium y sus librerías: sin
+(`mcr.microsoft.com/playwright:v1.65.0-noble`), que ya trae Chromium y sus librerías: sin
 `apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
 común (pnpm, Node e install con lockfile, incluido el addon SQLite precompilado) vive en
 `.github/actions/setup`. El job final comprueba el tiempo desde el inicio del workflow, incluida
