@@ -1,104 +1,45 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
-
 import { formatMoney, formatMonthName } from '../../../lib/format'
-import { MONTH_INITIALS } from './month-view-model'
 import { monthIndex } from '../../../lib/month'
-import { useBudgetStore } from '../../../stores/budget'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { useNeonBudgetScreens } from './budget-screens'
+import { MONTH_INITIALS } from './month-view-model'
 import {
-  applyPlan,
   applyRange,
   applyRangeProse,
   DECISION_OPTIONS,
-  defaultDraft,
-  reviewCategories,
-  reviewChanges,
-  reviewPosition,
-  reviewStrip,
-  reviewTotals,
-  type Decision,
-  type DecisionMode,
   type ReviewCategory,
 } from './review-view-model'
+import { useReviewSession } from './review-session'
 
 // «Revisar {mes}» in the new Presupuesto (artboard «Presupuesto · 2560 px»,
 // #433): the month that just closed, category by category, with a suggestion
 // and a decision (keep, raise or lower) for each, and the summary of the
 // changes that «Aplicar cambios» writes from the current month through December.
-const budgetStore = useBudgetStore()
 const screens = useNeonBudgetScreens()
-
-const position = computed(() => reviewPosition(budgetStore.viewModel))
-const rows = computed(() => budgetStore.viewModel.types.expense.rows)
-const categories = computed(() =>
-  position.value ? reviewCategories(rows.value, position.value) : [],
-)
-const monthName = computed(() => (position.value ? formatMonthName(position.value.closed) : ''))
-const monthLower = computed(() => monthName.value.toLowerCase())
-const from = computed(() => position.value?.applyFrom ?? null)
-
-const decisions = reactive<Record<string, Decision | undefined>>({})
-const totals = computed(() => reviewTotals(categories.value, decisions))
-const changes = computed(() => reviewChanges(categories.value, decisions))
-const strip = computed(() =>
-  position.value ? reviewStrip(categories.value, position.value.closed) : [],
-)
-const applied = computed(
-  () => !!position.value && screens.reviewed?.month === position.value.closed,
-)
-const canApply = computed(() => from.value !== null && changes.value.length > 0 && !applied.value)
-
-function pick(category: ReviewCategory, mode: DecisionMode): void {
-  decisions[category.category] = { mode, draft: defaultDraft(category, mode) }
-}
-
-function draftOf(category: ReviewCategory): string {
-  return decisions[category.category]?.draft ?? ''
-}
-
-function setDraft(category: ReviewCategory, value: string): void {
-  const current = decisions[category.category]
-  if (current) current.draft = value
-}
-
-function isPressed(category: ReviewCategory, mode: DecisionMode): boolean {
-  return decisions[category.category]?.mode === mode
-}
-
-function showAmount(category: ReviewCategory): boolean {
-  const mode = decisions[category.category]?.mode
-  return mode === 'up' || mode === 'down'
-}
+const {
+  position,
+  categories,
+  monthName,
+  monthLower,
+  from,
+  totals,
+  changes,
+  strip,
+  applied,
+  canApply,
+  pick,
+  draftOf,
+  setDraft,
+  isPressed,
+  showAmount,
+  apply,
+  undo,
+} = useReviewSession()
 
 function barClass(kind: 'over' | 'closed' | 'normal'): string {
   return kind === 'over' ? 'bg-loss' : kind === 'closed' ? 'bg-soft' : 'bg-neutral-bar'
-}
-
-function apply(): void {
-  const start = from.value
-  const current = position.value
-  if (!start || !current || !canApply.value) return
-  const writes = applyPlan(rows.value, changes.value, start)
-  for (const write of writes) {
-    budgetStore.saveBudgetPlan('expense', write.category, write.after, { notify: false })
-  }
-  screens.reviewed = {
-    month: current.closed,
-    summary: `Cambios aplicados a ${applyRange(start)}`,
-    undo() {
-      for (const write of writes) {
-        budgetStore.saveBudgetPlan('expense', write.category, write.before, { notify: false })
-      }
-      screens.reviewed = null
-    },
-  }
-}
-
-function undo(): void {
-  screens.reviewed?.undo()
 }
 
 const barLabel = (category: ReviewCategory) =>

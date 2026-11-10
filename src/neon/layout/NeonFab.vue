@@ -7,7 +7,8 @@ import { useWindowScroll } from '../../composables/useWindowScroll'
 
 // «Apuntar» button of the mobile frame (DESIGN.md, FAB): opens the entry sheet.
 // It folds to its icon while the page goes down and unfolds when it goes up
-// or comes back near the top.
+// or comes back near the top. A screen that docks its own bar at the bottom
+// (`data-bottom-dock`: «Aplicar», «Guardar») takes the place: the button hides.
 const { needsAccount } = useAccountRequirement()
 const { openEntrySheet } = useEntrySheet()
 
@@ -32,7 +33,7 @@ watch(scrollY, (y) => {
 <template>
   <button
     type="button"
-    class="group bg-accent text-on-accent font-display outline-text frame:hidden fixed inset-e-4 inset-be-[calc(118px+env(safe-area-inset-bottom,0px))] z-40 flex h-14 w-34 items-center gap-2.5 overflow-clip rounded-[16px] ps-4 text-[15px] font-bold whitespace-nowrap [filter:drop-shadow(0_10px_18px_oklch(0%_0_none/0.45))] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 data-[folded=true]:w-14 motion-safe:transition-[width,scale] motion-safe:duration-260 motion-safe:ease-out motion-safe:enabled:active:scale-[0.97]"
+    class="group bg-accent text-on-accent font-display outline-text frame:hidden fixed inset-e-4 inset-be-[calc(118px+env(safe-area-inset-bottom,0px))] z-40 flex h-14 w-34 items-center gap-2.5 overflow-clip rounded-[16px] ps-4 text-[15px] font-bold whitespace-nowrap [filter:drop-shadow(0_10px_18px_oklch(0%_0_none/0.45))] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 in-[:has([data-bottom-dock])]:hidden data-[folded=true]:w-14 motion-safe:transition-[width,scale] motion-safe:duration-260 motion-safe:ease-out motion-safe:enabled:active:scale-[0.97]"
     :disabled="needsAccount"
     :data-folded="folded"
     data-fab-apuntar

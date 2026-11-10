@@ -5,6 +5,7 @@ import {
   applyPlan,
   applyRange,
   applyRangeProse,
+  closeVerdict,
   decisionAmount,
   reviewCategories,
   reviewChanges,
@@ -12,8 +13,10 @@ import {
   reviewStrip,
   reviewTotals,
   suggest,
+  suggestionLine,
   type Decision,
 } from '../../src/neon/sections/budget/review-view-model'
+import { formatMoney } from '../../src/lib/format'
 import type { State } from '../../src/scripts/types'
 
 /** 3 October 2026: January to September are closed. */
@@ -183,5 +186,36 @@ describe('applyPlan', () => {
     expect(write.category).toBe('Súper')
     expect(write.before).toEqual(Array(12).fill(400))
     expect(write.after).toEqual([...Array(9).fill(400), 450, 450, 450])
+  })
+})
+
+describe('the close card', () => {
+  const view = build()
+  const position = reviewPosition(view)!
+  const categories = reviewCategories(view.types.expense.rows, position)
+
+  it('says how the closed month ended against its budget', () => {
+    // Súper spent 50 over, Salud 41.55 under: 8.45 over in all.
+    expect(closeVerdict(categories, 'Septiembre')).toBe(
+      `Septiembre cerró ${formatMoney(8.45)} por encima del presupuesto`,
+    )
+    expect(closeVerdict(categories.slice(0, 1), 'Septiembre')).toBe(
+      'Septiembre cerró justo en el presupuesto',
+    )
+    expect(closeVerdict([categories[2]], 'Septiembre')).toBe(
+      `Septiembre cerró ${formatMoney(41.55)} por debajo del presupuesto`,
+    )
+  })
+
+  it('lists the budget each suggestion would change, and only those', () => {
+    expect(suggestionLine(categories)).toBe('Súper: 400 → 480 € · Salud: 60 → 20 €')
+    expect(suggestionLine(categories.slice(0, 1))).toBe('')
+  })
+
+  it('spells out two and counts the rest', () => {
+    const [, souper, salud] = categories
+    expect(suggestionLine([souper, salud, souper, salud])).toBe(
+      'Súper: 400 → 480 € · Salud: 60 → 20 € · y 2 más',
+    )
   })
 })
