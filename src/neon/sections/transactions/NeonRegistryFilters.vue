@@ -16,7 +16,9 @@ import {
 // type at a time) and «Más filtros» (account, exact day and amount range).
 // Search, type and account are the registry's shared filters; the day and the
 // amounts only exist in the new design and come in as `extra`. The registry's
-// own actions (select, export) go at the end of the row.
+// own actions (select, export) go at the end of the row; on the mobile frame
+// the registry places them under the month instead (artboard «Movimientos ·
+// móvil»), so the slot may be empty.
 const extra = defineModel<ExtraFilters>('extra', { required: true })
 const emit = defineEmits<{ clear: [] }>()
 
@@ -42,13 +44,17 @@ function setExtra(key: keyof ExtraFilters, value: string): void {
 }
 
 const chipClass =
-  'outline-accent rounded-pill min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2'
+  'outline-accent rounded-pill pointer-coarse:min-h-11 min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2'
 const fieldClass =
   'bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
 </script>
 
 <template>
-  <section aria-label="Buscar y filtrar" class="grid min-w-0 gap-3" data-registry-filters>
+  <section
+    aria-label="Buscar y filtrar"
+    class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3"
+    data-registry-filters
+  >
     <div class="flex flex-wrap items-center gap-2.5">
       <label
         class="border-ctrl-line text-muted rounded-pill focus-within:outline-accent flex min-h-[46px] min-w-0 flex-[1_1_min(260px,100%)] items-center gap-2.5 border px-[18px] focus-within:outline-2 focus-within:outline-offset-2"
@@ -70,7 +76,7 @@ const fieldClass =
           type="search"
           name="txSearch"
           placeholder="Descripción o categoría"
-          class="text-text placeholder:text-faint w-full min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none"
+          class="text-text placeholder:text-faint w-full min-w-0 flex-1 self-stretch bg-transparent text-[16px] font-bold outline-none"
         />
       </label>
       <div
@@ -84,7 +90,7 @@ const fieldClass =
           type="button"
           :aria-pressed="type === chip.value"
           :data-type-chip="chip.value"
-          class="outline-accent rounded-pill inline-flex min-h-[38px] shrink-0 items-center gap-2 px-3.5 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="outline-accent rounded-pill inline-flex min-h-[38px] shrink-0 items-center gap-2 px-3.5 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
           :class="type === chip.value ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="filters.types = toggleTypeChip(filters.types, chip.value)"
         >
@@ -109,7 +115,7 @@ const fieldClass =
       >
         {{ moreLabel }}
       </NeonButton>
-      <div class="ms-auto flex shrink-0 items-center gap-1">
+      <div v-if="$slots.actions" class="ms-auto flex shrink-0 items-center gap-1">
         <slot name="actions" />
       </div>
     </div>
@@ -117,7 +123,7 @@ const fieldClass =
     <div
       v-if="moreOpen"
       :id="moreId"
-      class="bg-panel border-line rounded-card motion-safe:animate-fade-in grid gap-3.5 border px-6 py-[22px]"
+      class="bg-panel border-line rounded-card motion-safe:animate-fade-in grid gap-3.5 border px-3 py-4 @min-[560px]/registry:px-6 @min-[560px]/registry:py-[22px]"
     >
       <div class="flex flex-wrap gap-2" role="group" aria-label="Cuenta">
         <button

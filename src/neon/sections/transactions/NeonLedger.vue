@@ -58,7 +58,7 @@ const CHIP_TONE: Record<string, string> = {
       data-ledger-month
     >
       <header
-        class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-6 pbs-[18px] pbe-1.5"
+        class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3.5 pbs-[18px] pbe-1.5 @min-[560px]/registry:px-6"
       >
         <h2 :id="`tx-month-${month.month}`" class="text-[18px] font-extrabold">
           {{ month.title }}
@@ -67,7 +67,7 @@ const CHIP_TONE: Record<string, string> = {
       </header>
       <div v-for="day in month.days" :key="day.date" role="group" :aria-label="day.label">
         <div
-          class="flex items-baseline justify-between gap-3 px-6 pbs-3.5 pbe-1.5"
+          class="flex items-baseline justify-between gap-3 px-3.5 pbs-3.5 pbe-1.5 @min-[560px]/registry:px-6"
           aria-hidden="true"
         >
           <span class="text-muted text-label tracking-label font-extrabold uppercase">
@@ -81,7 +81,7 @@ const CHIP_TONE: Record<string, string> = {
           v-for="row in day.rows"
           :key="row.id"
           type="button"
-          class="neon-ledger-row border-line text-text outline-accent grid min-h-16 w-full items-center gap-3 border-t px-6 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-colors"
+          class="neon-ledger-row border-line text-text outline-accent grid min-h-16 w-full items-center gap-3 border-t px-3.5 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-colors @min-[560px]/registry:px-6"
           :class="
             openId === row.id || isSelected(row.id)
               ? 'bg-panel2 shadow-[inset_3px_0_0_var(--color-accent)]'
