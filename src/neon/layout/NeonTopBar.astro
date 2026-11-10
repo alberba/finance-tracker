@@ -5,7 +5,9 @@ import NeonSearchButton from './NeonSearchButton.vue'
 
 /**
  * Top bar of the mobile frame (DESIGN.md, «Barra superior móvil»): the brand on
- * the left, «Por confirmar» and search on the right. A section can hand the
+ * the left, «Por confirmar» and search on the right. A section can put its
+ * title where the brand is (`NeonBarTitle` teleports it into
+ * `[data-bar-title-slot]`; while it is there the brand is hidden). A section can hand the
  * bar its figure for when the page scrolls: it teleports it into
  * `[data-bar-figure-slot]` marked `data-bar-figure="shown"`, and while it is
  * shown the bar turns to the panel color and the brand gives way (see the
@@ -36,7 +38,7 @@ const { detail } = Astro.props
     <>
       <div class="relative flex min-w-0 flex-1 items-center self-stretch">
         <p
-          class="font-display text-text text-[20px] leading-none font-extrabold tracking-brand group-has-[[data-bar-figure=shown]]/bar:-translate-y-1.5 group-has-[[data-bar-figure=shown]]/bar:opacity-0 motion-safe:transition-[opacity,translate] motion-safe:duration-200 motion-safe:ease-out"
+          class="font-display text-text text-[20px] leading-none font-extrabold tracking-brand group-has-[[data-bar-figure=shown]]/bar:-translate-y-1.5 group-has-[[data-bar-figure=shown]]/bar:opacity-0 group-has-[[data-bar-title]]/bar:hidden motion-safe:transition-[opacity,translate] motion-safe:duration-200 motion-safe:ease-out"
           aria-label="finanzas"
         >
           finanzas
@@ -45,6 +47,7 @@ const { detail } = Astro.props
           </span>
         </p>
         <div class="absolute inset-0 flex items-center" data-bar-figure-slot></div>
+        <div class="flex min-w-0 items-center" data-bar-title-slot></div>
       </div>
       <div class="flex">
         <NeonPendingMenu client:only="vue" />

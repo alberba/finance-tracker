@@ -1,72 +1,38 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
-
-import { useSnapshotEdit } from '../../../composables/useSnapshotEdit'
-import { useToast } from '../../../composables/useToast'
-import { formatMoney, formatMonthName } from '../../../lib/format'
-import type { Month } from '../../../lib/month'
+import { formatMoney } from '../../../lib/format'
 import type { SnapshotKind } from '../../../scripts/types'
-import { useFinancialStateStore } from '../../../stores/financial-state'
-import { useWealthStore } from '../../../stores/wealth'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonWealthEquation from './NeonWealthEquation.vue'
 import NeonWealthMonthTable from './NeonWealthMonthTable.vue'
-import { closeAction, closeStatus, closingEdits, ledgerGroups, monthTable } from './view-model'
+import { useMonthClose } from './month-close'
 import { useNeonWealthScreens } from './wealth-screens'
 
 // «Balance por meses»: close a month by writing down the real balance of
 // each account (an empty field keeps the calculated one), next to every
 // account at the close of each month. A month in the table opens it here.
-const financialStateStore = useFinancialStateStore()
-const wealthStore = useWealthStore()
 const screens = useNeonWealthScreens()
-const { viewModel, snapshotMonth } = storeToRefs(wealthStore)
-const { showToast } = useToast()
-
-const edit = useSnapshotEdit({
-  groups: computed(() => viewModel.value.groups),
-  context: computed(() => `${financialStateStore.year}:${snapshotMonth.value}`),
-  commit: () => undefined,
-})
-const { totals, changes, valid } = edit
-
-const monthName = computed(() => formatMonthName(snapshotMonth.value))
-const monthLower = computed(() => monthName.value.toLowerCase())
-const previousName = computed(() => {
-  const index = viewModel.value.history.months.indexOf(snapshotMonth.value)
-  return index > 0 ? formatMonthName(viewModel.value.history.months[index - 1]) : '—'
-})
-const status = computed(() => closeStatus(viewModel.value, snapshotMonth.value))
-const groups = computed(() => ledgerGroups(viewModel.value, snapshotMonth.value))
-const action = computed(() =>
-  closeAction({
-    month: snapshotMonth.value,
-    closed: status.value.closed,
-    changes: changes.value,
-    invalid: !valid.value,
-  }),
-)
-const table = computed(() => monthTable(viewModel.value))
+const {
+  year,
+  edit,
+  totals,
+  changes,
+  valid,
+  snapshotMonth,
+  monthName,
+  monthLower,
+  previousName,
+  status,
+  groups,
+  action,
+  table,
+  close,
+  pick,
+} = useMonthClose()
 
 const SWATCH: Record<SnapshotKind, string> = {
   accounts: 'bg-faint',
   investments: 'bg-lilac',
   liabilities: 'bg-peach',
-}
-
-function close(): void {
-  if (action.value.locked) return
-  const edits = closingEdits(viewModel.value.groups, edit.field)
-  if (!edits) return
-  const wasClosed = status.value.closed
-  wealthStore.saveSnapshot(edits, { notify: false })
-  edit.discard()
-  showToast(wasClosed ? `Cambios de ${monthLower.value} guardados.` : `${monthName.value} cerrado.`)
-}
-
-function pick(month: Month): void {
-  wealthStore.setMonth(month)
 }
 </script>
 
@@ -96,7 +62,7 @@ function pick(month: Month): void {
     <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div class="grid min-w-0 gap-1">
         <p class="text-muted text-label tracking-label font-extrabold uppercase">
-          Balance patrimonial · {{ financialStateStore.year }}
+          Balance patrimonial · {{ year }}
         </p>
         <h1
           id="wealth-title"

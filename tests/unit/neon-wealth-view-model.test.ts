@@ -18,6 +18,7 @@ import {
   evolution,
   holdings,
   monthTotals,
+  scrubReading,
 } from '../../src/neon/sections/wealth/view-model'
 
 /**
@@ -103,6 +104,37 @@ describe('evolution', () => {
     ])
     expect(chart.points.slice(0, 3).map((point) => point.open)).toEqual([false, false, true])
     expect(chart.note).toBe('+600,00\u00a0€ desde enero. El último dato aún no está cerrado.')
+  })
+
+  it('reads the move since the first month in whole euros, with its tone', () => {
+    expect(evolution(vm(), 'month', 'line').delta).toEqual({
+      text: '+600\u00a0€',
+      since: 'desde enero',
+      tone: 'gain',
+    })
+  })
+
+  it('reads a point of the chart with its move since the first one', () => {
+    const chart = evolution(vm(), 'month', 'line')
+
+    expect(scrubReading(chart, 1, 'month')).toEqual({
+      name: 'Febrero',
+      value: 2750,
+      delta: { text: '+200\u00a0€', since: 'desde enero', tone: 'gain' },
+    })
+    expect(scrubReading(chart, 0, 'month')?.delta).toEqual({
+      text: '0\u00a0€',
+      since: 'desde enero',
+      tone: 'muted',
+    })
+    expect(scrubReading(chart, 99, 'month')).toBeNull()
+  })
+
+  it('names a quarter by its label when the chart is by quarters', () => {
+    const chart = evolution(vm(), 'quarter', 'line')
+
+    expect(scrubReading(chart, 0, 'quarter')?.name).toBe(chart.points[0].label)
+    expect(scrubReading(chart, 0, 'quarter')?.delta.since).toBe(`desde ${chart.points[0].label}`)
   })
 
   it('rounds the scale to at most four steps around the values', () => {
