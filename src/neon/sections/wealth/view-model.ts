@@ -131,6 +131,42 @@ function scale(
   }
 }
 
+/** A move in whole euros for a short line: «+600 €» with what it is measured from. */
+function whole(moved: number, since: string): { text: string; since: string; tone: FigureTone } {
+  const amount = round2(moved)
+  return {
+    text: `${amount > 0 ? '+' : amount < 0 ? '−' : ''}${formatWholeAmount(Math.abs(amount))}\u00a0€`,
+    since,
+    tone: figureTone(amount),
+  }
+}
+
+/** What the cover reads while a finger is on one point of the chart. */
+export interface ScrubReading {
+  /** «Marzo», «T2». */
+  name: string
+  value: number
+  /** The move since the first point, like the line under the figure at rest. */
+  delta: { text: string; since: string; tone: FigureTone }
+}
+
+/** The reading at point `index` of `chart`: its value, its name and its move since the first. */
+export function scrubReading(
+  chart: EvolutionChart,
+  index: number,
+  period: EvolutionPeriod,
+): ScrubReading | null {
+  const first = chart.points[0]
+  const point = chart.points[index]
+  if (!first || !point) return null
+  const firstName = period === 'month' ? formatMonthName(first.month).toLowerCase() : first.label
+  return {
+    name: period === 'month' ? formatMonthName(point.month) : point.label,
+    value: point.value,
+    delta: whole(point.value - first.value, `desde ${firstName}`),
+  }
+}
+
 /** The net worth at the close of each month (or quarter) of the year so far. */
 export function evolution(
   view: WealthViewModel,
@@ -172,12 +208,7 @@ export function evolution(
   const note =
     `${formatSignedMoney(latest.value - first.value)} desde ${firstName}.` +
     (latest.open ? ' El último dato aún no está cerrado.' : '')
-  const moved = round2(latest.value - first.value)
-  const delta = {
-    text: `${moved > 0 ? '+' : moved < 0 ? '−' : ''}${formatWholeAmount(Math.abs(moved))}\u00a0€`,
-    since: `desde ${firstName}`,
-    tone: figureTone(moved),
-  }
+  const delta = whole(latest.value - first.value, `desde ${firstName}`)
   const label =
     `Patrimonio por ${period === 'month' ? 'mes' : 'trimestre'}: ` +
     points

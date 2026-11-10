@@ -228,6 +228,8 @@ Alto de 80px, fondo `--color-panel`, cuatro columnas iguales con `padding: 0 8px
 
 Alto de 64px, `padding: 0 8px 0 20px`, fondo `--color-bg`. Marca `finanzas.` a la izquierda y, a la derecha, botones circulares de 48px sin fondo: confirmar pendientes (con un contador de 18px en `--color-accent` cuando hay pendientes) y buscar. Pasados 120px de scroll, la barra pasa a `--color-panel`, la marca sube 6px y se desvanece, y en su lugar entra «Te quedan» con la cifra en Unbounded 600; vuelve al subir. Ambos cambios son de `opacity` y `transform` en 200ms con `--ease-out`.
 
+Una sección puede poner su título en el sitio de la marca (Patrimonio: «Patrimonio» en Unbounded 700, 30px, `tracking -0.03em`, en su portada): la marca se oculta mientras esté y el contenido no lo repite, aunque conserva el encabezado para lectores de pantalla y foco.
+
 La barra de estado, la de gestos y el marco del dispositivo que dibujan los artboards son del lienzo, no del producto: no se construyen.
 
 ### Aviso con deshacer

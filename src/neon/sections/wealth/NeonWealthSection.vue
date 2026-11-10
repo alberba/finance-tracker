@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { nextTick, watch } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
+import NeonBarTitle from '../../ui/NeonBarTitle.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
 import NeonWealthHome from './NeonWealthHome.vue'
 import NeonWealthHomeMobile from './NeonWealthHomeMobile.vue'
@@ -41,6 +42,7 @@ watch(screen, async () => {
       <NeonWealthMonths v-else />
     </template>
     <template v-else>
+      <NeonBarTitle v-if="isActive && screen === 'home'" title="Patrimonio" />
       <NeonWealthHomeMobile v-if="screen === 'home'" />
       <NeonWealthMonthsMobile v-else />
     </template>

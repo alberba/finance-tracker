@@ -45,6 +45,60 @@ test('abre un mes desde el historial y lee sus saldos', async ({ page, tracker }
   ).toBeVisible()
 })
 
+test('el título está en la barra superior y no en el contenido', async ({ page, tracker }) => {
+  await tracker.openWealth()
+  const bar = page.locator('[data-mobile-app-bar]')
+
+  await expect(bar.locator('[data-bar-title]')).toHaveText('Patrimonio')
+  await expect(bar.locator('p[aria-label="finanzas"]')).toBeHidden()
+  // El contenido conserva el encabezado para lectores de pantalla y foco, sin dibujarlo.
+  const heading = section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })
+  await expect(heading).toBeAttached()
+  expect((await heading.boundingBox())!.width).toBeLessThanOrEqual(1)
+
+  await section(page).getByRole('button', { name: 'Por meses' }).click()
+  await expect(bar.locator('[data-bar-title]')).toHaveCount(0)
+  await expect(bar.locator('p[aria-label="finanzas"]')).toBeVisible()
+})
+
+test('recorre el gráfico con el dedo y al soltar vuelve a hoy', async ({ page, tracker }) => {
+  await tracker.openWealth()
+  const net = section(page).locator('[data-wealth-net]')
+  const reading = section(page).locator('[data-wealth-reading]')
+  const atRest = await net.textContent()
+  const plot = (await section(page).locator('[data-wealth-plot]').boundingBox())!
+  const y = plot.y + plot.height / 3
+
+  const cdp = await page.context().newCDPSession(page)
+  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x?: number, at = y) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: x === undefined ? [] : [{ x, y: at }],
+    })
+
+  // Un gesto vertical antes de mantener es de la página: no lee el gráfico.
+  await touch('touchStart', plot.x + 60)
+  await touch('touchMove', plot.x + 60, y + 40)
+  await page.waitForTimeout(300)
+  await expect(reading).toBeHidden()
+  await touch('touchEnd')
+
+  // Mantener y deslizar lee punto a punto.
+  await touch('touchStart', plot.x + 4)
+  await expect(reading).toHaveText('Enero')
+  const january = await net.textContent()
+  expect(january).not.toBe(atRest)
+  await expect(section(page).locator('[data-wealth-marker]')).toBeVisible()
+
+  await touch('touchMove', plot.x + plot.width - 4)
+  await expect(reading).not.toHaveText('Enero')
+  await expect(net).not.toHaveText(january!)
+
+  await touch('touchEnd')
+  await expect(reading).toBeHidden()
+  await expect(net).toHaveText(atRest!)
+})
+
 test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil', async ({
   page,
   tracker,

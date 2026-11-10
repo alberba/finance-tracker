@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 
 import { formatMoney, splitDecimals } from '../../../lib/format'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import NeonWealthAccountDetail from './NeonWealthAccountDetail.vue'
 import NeonWealthMix from './NeonWealthMix.vue'
 import NeonWealthPlot from './NeonWealthPlot.vue'
+import { useChartScrub } from './chart-scrub'
 import { ACCOUNT_FILTERS, mobileAccounts } from './mobile-view-model'
-import type { EvolutionKind, EvolutionPeriod } from './view-model'
+import { scrubReading, type EvolutionKind, type EvolutionPeriod } from './view-model'
 import { useWealthCover } from './wealth-cover'
 import { useNeonWealthScreens, type WealthTab } from './wealth-screens'
 
@@ -16,7 +17,8 @@ import { useNeonWealthScreens, type WealthTab } from './wealth-screens'
 // móvil · Pixel 10»): the net worth centred over its own chart, the two ways
 // into «Balance por meses», and below either the accounts, with a filter by
 // group, or how the assets are split. The same data as the desktop cover; an
-// account opens its sheet.
+// account opens its sheet. The visible title is in the top bar (NeonBarTitle,
+// from the section); the heading here is for screen readers and focus.
 const {
   month,
   view,
@@ -34,7 +36,6 @@ const {
 } = useWealthCover()
 const { tab, filter } = storeToRefs(useNeonWealthScreens())
 
-const net = computed(() => splitDecimals(formatMoney(totals.value.net)))
 // A long figure steps down so it stays on one line.
 const focused = ref(false)
 const netSize = computed(() =>
@@ -69,6 +70,18 @@ const plotted = computed(() => {
 })
 const accounts = computed(() => mobileAccounts(view.value, month.value, filter.value))
 
+// A finger resting on the cover and sliding reads the chart point by point: the
+// figure, the move and the month follow it, and the backdrop comes into focus.
+const hero = useTemplateRef<HTMLElement>('hero')
+const plot = useTemplateRef<HTMLElement>('plot')
+const { index: scrubbed } = useChartScrub(hero, plot, () => plotted.value.map((point) => point.x))
+const reading = computed(() =>
+  scrubbed.value === null ? null : scrubReading(chart.value, scrubbed.value, period.value),
+)
+const marker = computed(() => (scrubbed.value === null ? null : plotted.value[scrubbed.value]))
+const net = computed(() => splitDecimals(formatMoney(reading.value?.value ?? totals.value.net)))
+const delta = computed(() => reading.value?.delta ?? chart.value.delta)
+
 const PERIODS: { value: EvolutionPeriod; label: string }[] = [
   { value: 'month', label: 'Mes' },
   { value: 'quarter', label: 'Trimestre' },
@@ -90,13 +103,7 @@ const ACTION =
 
 <template>
   <div class="grid min-w-0 gap-5">
-    <h1
-      id="wealth-title"
-      tabindex="-1"
-      class="font-display text-h1 tracking-h1 px-1 leading-[1.1] font-bold outline-none"
-    >
-      Patrimonio
-    </h1>
+    <h1 id="wealth-title" tabindex="-1" class="sr-only">Patrimonio</h1>
 
     <NeonEmptyState v-if="needsAccount" role="status">
       Crea una cuenta de efectivo, inversión o pasivo en Configuración para ver tu patrimonio.
@@ -104,8 +111,9 @@ const ACTION =
 
     <template v-else>
       <section
+        ref="hero"
         aria-label="Patrimonio neto"
-        class="motion-safe:animate-rise relative -mx-4 grid min-w-0 justify-items-center gap-1.5 px-4 pbs-[22px] pbe-3 text-center motion-safe:transition-[min-height] motion-safe:duration-300"
+        class="motion-safe:animate-rise relative -mx-4 grid min-w-0 justify-items-center gap-1.5 px-4 pbs-[22px] pbe-3 text-center select-none motion-safe:transition-[min-height] motion-safe:duration-300"
         :class="focused ? 'min-h-[360px] content-start' : '-mbs-3 min-h-[210px] content-center'"
       >
         <button
@@ -129,19 +137,38 @@ const ACTION =
           </svg>
         </button>
         <div
+          ref="plot"
           role="img"
           :aria-label="chart.label"
           class="pointer-events-none absolute motion-safe:transition-[filter] motion-safe:duration-150"
           :class="
             focused
               ? 'inset-x-2 inset-bs-32 inset-be-[54px]'
-              : 'inset-x-0 inset-bs-0 -inset-be-16 blur-[1.5px]'
+              : ['inset-x-0 inset-bs-0 -inset-be-16', !marker && 'blur-[1.5px]']
           "
           :style="focused ? undefined : { maskImage: BACKDROP_MASK, maskComposite: 'intersect' }"
           data-wealth-plot
         >
           <NeonWealthPlot :points="plotted" :kind="chartKind" dots="last" />
+          <template v-if="marker">
+            <span
+              class="border-accent/60 absolute inset-bs-0 inset-be-0 border-s border-dashed"
+              :style="{ left: `${marker.x}%` }"
+              data-wealth-marker
+            ></span>
+            <span
+              class="border-accent bg-accent shadow-accent/40 absolute -ms-2 -mt-2 size-4 rounded-full border-2 shadow-md"
+              :style="{ left: `${marker.x}%`, top: `${marker.y}%` }"
+            ></span>
+          </template>
         </div>
+        <p
+          v-if="reading"
+          class="text-soft text-label tracking-label absolute inset-x-0 inset-bs-3 font-extrabold uppercase"
+          data-wealth-reading
+        >
+          {{ reading.name }}
+        </p>
         <p
           class="font-display relative leading-[1.1] font-bold tracking-[-0.035em] whitespace-nowrap tabular-nums"
           :class="netSize"
@@ -152,13 +179,9 @@ const ACTION =
             net.rest
           }}</span>
         </p>
-        <p
-          v-if="chart.delta"
-          class="text-delta relative font-extrabold"
-          :class="TONE_TEXT[chart.delta.tone]"
-        >
-          {{ chart.delta.text }}
-          <span class="text-muted text-meta ms-3 font-normal">{{ chart.delta.since }}</span>
+        <p v-if="delta" class="text-delta relative font-extrabold" :class="TONE_TEXT[delta.tone]">
+          {{ delta.text }}
+          <span class="text-muted text-meta ms-3 font-normal">{{ delta.since }}</span>
         </p>
 
         <div class="relative mbs-0.5 flex flex-wrap justify-center gap-2">
