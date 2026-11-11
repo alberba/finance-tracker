@@ -8,6 +8,7 @@ import type { SavingGoal } from '../../../scripts/types'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import {
+  MAX_TARGET,
   monthLabel,
   newGoalFit,
   parseAmount,
@@ -90,7 +91,11 @@ const remaining = computed(() =>
 )
 const fit = computed(() => newGoalFit(remaining.value, form.due - props.now, props.free))
 const valid = computed(
-  () => Boolean(name.value) && Number.isFinite(target.value) && target.value > 0,
+  () =>
+    Boolean(name.value) &&
+    Number.isFinite(target.value) &&
+    target.value > 0 &&
+    target.value <= MAX_TARGET,
 )
 
 function save(): void {
