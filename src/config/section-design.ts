@@ -15,6 +15,7 @@ export const MIGRATED_SECTIONS: readonly SectionId[] = [
   'wealth',
   'investment',
   'goals',
+  'settings',
   'data',
 ]
 
