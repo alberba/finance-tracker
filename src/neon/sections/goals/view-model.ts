@@ -34,6 +34,15 @@ export function monthLabel(value: number): string {
 }
 
 /** «250 €»: plans are made in whole euros. */
+/** The most a goal can ask for, and the most a month's saving can give a goal. */
+export const MAX_TARGET = 10_000_000
+export const MAX_MONTHLY = 100_000
+
+/** An amount kept between zero and `limit`; what is not a number is zero. */
+export function clampAmount(value: number, limit: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), limit) : 0
+}
+
 export function wholeEuros(value: number): string {
   return `${formatNumber(Math.round(value))}${NBSP}€`
 }
@@ -192,7 +201,7 @@ export function goalColumns(plans: GoalPlan[], date: Date): GoalColumn[] {
 export interface SelectedGoal extends GoalReading {
   /** «250 €», the amount on the slider. */
   monthly: string
-  /** Top of the slider: twice the larger of the needed and the current amount. */
+  /** Top of the slider: twice the larger of the needed and the current amount, up to `MAX_MONTHLY`. */
   max: number
   /** The amount that arrives right on the deadline, when the slider is off it. */
   action: { label: string; amount: number } | null
@@ -206,7 +215,7 @@ export function selectedGoal(plan: GoalPlan, monthly: number, date: Date): Selec
   return {
     ...reading,
     monthly: wholeEuros(monthly),
-    max: Math.ceil((Math.max(needed ?? 0, monthly, 50) * 2) / 50) * 50,
+    max: Math.min(Math.ceil((Math.max(needed ?? 0, monthly, 50) * 2) / 50) * 50, MAX_MONTHLY),
     action: off
       ? { label: `${monthly < needed ? 'Subir' : 'Bajar'} a ${wholeEuros(needed)}`, amount: needed }
       : null,
@@ -298,6 +307,9 @@ export function newGoalFit(
   free: number | null,
 ): { needed: number; text: string; fits: boolean } {
   if (!(target > 0)) return { needed: 0, text: 'Pon cuánto necesitas.', fits: true }
+  if (target > MAX_TARGET) {
+    return { needed: 0, text: `Como máximo ${wholeEuros(MAX_TARGET)}.`, fits: false }
+  }
   const needed = Math.ceil(target / Math.max(count, 1))
   if (free === null) {
     return { needed, text: 'Tu presupuesto no reserva ahorro este mes.', fits: true }

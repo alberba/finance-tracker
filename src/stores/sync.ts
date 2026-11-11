@@ -198,6 +198,11 @@ export const useSyncStore = defineStore('sync', () => {
     stop()
   }
 
+  /** The outbox as it is now; empty before the client runtime exists. */
+  async function listPending(): Promise<OutboxEntry[]> {
+    return isReady() ? run(listOutbox()) : []
+  }
+
   /** Coalesces reconnects, remote notices and local writes into one cycle. */
   async function syncNow(options: { full?: boolean } = {}): Promise<void> {
     if (!isReady() || connection.value === 'offline') return
@@ -973,6 +978,8 @@ export const useSyncStore = defineStore('sync', () => {
     flush,
     pullChanges,
     syncNow,
+    /** The commands still waiting to be sent, oldest first (the Datos queue). */
+    listPending,
     /** Reloads the whole read model after a server-side write (Bitvavo import and link). */
     refreshFromServer: () => syncNow({ full: true }),
     detach,

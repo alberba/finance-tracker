@@ -26,4 +26,9 @@ test('con el toggle en antiguo, cada sección abre y muestra su encabezado', asy
   await expect(page.locator('#sidebar-toggle')).toBeVisible()
 
   for (const id of SECTION_IDS) await tracker.open(id)
+
+  // Datos is the last one opened: the old design keeps its own title.
+  await expect(
+    tracker.section('data').getByRole('heading', { name: 'Datos y backups' }),
+  ).toBeVisible()
 })

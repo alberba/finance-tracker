@@ -21,17 +21,18 @@ export const useDataStore = defineStore('data', () => {
   /** The JSON backup lives in D1 and a restore replaces what is there. */
   const backsUpServerData = !isDemoMode()
 
-  async function exportJson(): Promise<void> {
+  /** Resolves to whether the file was produced; the toast already says why not. */
+  async function exportJson(): Promise<boolean> {
     if (backsUpServerData) {
       const result = await runClientHttp(fetchBackup())
       if (!result.ok) {
         showToast(`No se pudo exportar: ${result.error}`)
-        return
+        return false
       }
       const day = new Date().toISOString().slice(0, 10)
       downloadBlob(result.value, 'application/json', `finance-tracker-${day}.json`)
       showToast('JSON exportado.')
-      return
+      return true
     }
     const state = financialStateStore.state
     downloadBlob(
@@ -40,6 +41,7 @@ export const useDataStore = defineStore('data', () => {
       `finance-tracker-${state.year}.json`,
     )
     showToast('JSON exportado.')
+    return true
   }
 
   function exportTransactionsCsv(): void {
@@ -52,51 +54,59 @@ export const useDataStore = defineStore('data', () => {
     showToast('CSV exportado.')
   }
 
-  async function importJson(file: File): Promise<void> {
+  /** Resolves to whether the copy was restored; the toast already says why not. */
+  async function importJson(file: File): Promise<boolean> {
     if (backsUpServerData) {
-      await restoreJson(file)
-      return
+      return restoreJson(file)
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result || '{}'))
-        const {
-          onboardingPresented,
-          onboardingDismissed,
-          onboardingAccountCompleted,
-          onboardingMovementCompleted,
-          onboardingCompleted,
-        } = financialStateStore.state
-        financialStateStore.replaceState({
-          ...data,
-          onboardingPresented,
-          onboardingDismissed,
-          onboardingAccountCompleted,
-          onboardingMovementCompleted,
-          onboardingCompleted,
-        })
-        showToast('JSON importado correctamente.')
-      } catch {
-        showToast('No se pudo importar el archivo.')
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result || '{}'))
+          const {
+            onboardingPresented,
+            onboardingDismissed,
+            onboardingAccountCompleted,
+            onboardingMovementCompleted,
+            onboardingCompleted,
+          } = financialStateStore.state
+          financialStateStore.replaceState({
+            ...data,
+            onboardingPresented,
+            onboardingDismissed,
+            onboardingAccountCompleted,
+            onboardingMovementCompleted,
+            onboardingCompleted,
+          })
+          showToast('JSON importado correctamente.')
+          resolve(true)
+        } catch {
+          showToast('No se pudo importar el archivo.')
+          resolve(false)
+        }
       }
-    }
-    reader.readAsText(file, 'utf-8')
+      reader.onerror = () => {
+        showToast('No se pudo importar el archivo.')
+        resolve(false)
+      }
+      reader.readAsText(file, 'utf-8')
+    })
   }
 
-  async function restoreJson(file: File): Promise<void> {
+  async function restoreJson(file: File): Promise<boolean> {
     // Commands still queued point at rows the restore is about to delete:
     // send them first, and refuse while any remain (offline).
     const syncStore = useSyncStore()
     await syncStore.flush()
     if (syncStore.pendingCount > 0) {
       showToast('Hay cambios sin sincronizar. Conéctate y vuelve a intentarlo.')
-      return
+      return false
     }
     const result = await runClientHttp(restoreBackup(await file.text()))
     if (!result.ok) {
       showToast(`No se pudo importar: ${result.error}`)
-      return
+      return false
     }
     showToast(
       result.value.skipped > 0
@@ -104,6 +114,7 @@ export const useDataStore = defineStore('data', () => {
         : 'JSON importado correctamente. Recargando…',
     )
     window.location.reload()
+    return true
   }
 
   /** "Empezar de cero" provisions a private space for authenticated users. */

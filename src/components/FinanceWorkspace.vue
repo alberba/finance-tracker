@@ -5,12 +5,14 @@ import type { Component } from 'vue'
 import { sectionDesign } from '../config/section-design'
 import type { Design } from '../lib/design'
 import NeonDashboardSection from '../neon/dashboard/NeonDashboardSection.vue'
+import NeonReportLauncher from '../neon/layout/NeonReportLauncher.vue'
 import type { SectionId } from '../scripts/types'
 import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
 import DashboardSection from './sections/DashboardSection.vue'
 import WelcomeLauncher from './onboarding/WelcomeLauncher.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
+import IssueReportPanel from './reports/IssueReportPanel.vue'
 
 const sectionLoaders = {
   reports: () => import('./reports/ReportsPage.vue'),
@@ -31,9 +33,14 @@ const neonSectionLoaders = {
   investment: () => import('../neon/sections/investment/NeonInvestmentSection.vue'),
   goals: () => import('../neon/sections/goals/NeonGoalsSection.vue'),
   settings: () => import('../neon/sections/settings/NeonSettingsSection.vue'),
+  data: () => import('../neon/sections/data/NeonDataSection.vue'),
 } satisfies Partial<Record<SectionId, () => Promise<unknown>>>
 
+/** «Mis reportes» is a page, not a section: the toggle alone picks its design. */
+const neonReportsLoader = () => import('../neon/sections/reports/NeonReportsSection.vue')
+
 const ReportsPage = defineAsyncComponent(sectionLoaders.reports)
+const NeonReportsPage = defineAsyncComponent(neonReportsLoader)
 
 const sectionComponents = {
   dashboard: DashboardSection,
@@ -55,6 +62,7 @@ const neonSectionComponents: Partial<Record<SectionId, Component>> = {
   investment: defineAsyncComponent(neonSectionLoaders.investment),
   goals: defineAsyncComponent(neonSectionLoaders.goals),
   settings: defineAsyncComponent(neonSectionLoaders.settings),
+  data: defineAsyncComponent(neonSectionLoaders.data),
 }
 
 /**
@@ -72,7 +80,9 @@ const neonSectionComponents: Partial<Record<SectionId, Component>> = {
 onMounted(() => {
   const prefetchSections = () => {
     const loaders =
-      props.design === 'neon' ? { ...sectionLoaders, ...neonSectionLoaders } : sectionLoaders
+      props.design === 'neon'
+        ? { ...sectionLoaders, ...neonSectionLoaders, neonReports: neonReportsLoader }
+        : sectionLoaders
     for (const load of Object.values(loaders)) {
       void load().catch(() => undefined)
     }
@@ -116,8 +126,14 @@ const isReportDialogOpen = shallowRef(false)
 <template>
   <div class="contents" data-finance-workspace>
     <WelcomeLauncher />
-    <ReportsPage v-if="isReportsPage" />
+    <template v-if="isReportsPage">
+      <NeonReportsPage v-if="design === 'neon'" />
+      <ReportsPage v-else />
+    </template>
     <component :is="activeSectionComponent" v-else :key="currentSection" :is-active="true" />
-    <GlobalReportLauncher v-model:open="isReportDialogOpen" />
+    <NeonReportLauncher v-if="design === 'neon'" v-model:open="isReportDialogOpen">
+      <IssueReportPanel v-model:open="isReportDialogOpen" />
+    </NeonReportLauncher>
+    <GlobalReportLauncher v-else v-model:open="isReportDialogOpen" />
   </div>
 </template>
