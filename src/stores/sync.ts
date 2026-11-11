@@ -257,14 +257,19 @@ export const useSyncStore = defineStore('sync', () => {
     if (userId.value === nextUserId && initializing) return initializing
     if (initialized && userId.value === nextUserId) return
     stop()
-    await runtime?.dispose()
+    const previousRuntime = runtime
+    runtime = null
     readModel = null
     initialized = false
     detached = false
     userId.value = nextUserId
     email.value = options.email ?? null
-    runtime = await createClientRuntime(nextUserId)
+    // `initializing` is set before the first await: a second caller (shell and
+    // workspace both start it) must wait for this one instead of opening a
+    // second runtime whose connections would block the wipe on logout.
     initializing = (async () => {
+      await previousRuntime?.dispose()
+      runtime = await createClientRuntime(nextUserId)
       const cached = await run(
         Effect.gen(function* () {
           const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
