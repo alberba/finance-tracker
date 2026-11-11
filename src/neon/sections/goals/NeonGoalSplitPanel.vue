@@ -146,7 +146,7 @@ const iconButton =
                 :value="shareText(row.id)"
                 inputmode="decimal"
                 :aria-label="`Al mes para ${row.name}`"
-                class="font-display text-text min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none"
+                class="font-display text-text pointer-coarse:min-h-11 min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none"
                 @input="type(row.id, ($event.target as HTMLInputElement).value)"
               />
               <span class="text-muted text-[14px]" aria-hidden="true">€</span>
