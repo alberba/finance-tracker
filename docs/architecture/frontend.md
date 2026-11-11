@@ -47,7 +47,9 @@ Rutas de tests relativas a `tests/`.
 **Reportes no es una sección.** El lanzador `components/reports/GlobalReportLauncher.vue` abre el
 panel de alta, pero el seguimiento vive en la página `/reportes` (fuera de `APP_SECTIONS`):
 `FinanceTrackerShell` recibe `page="reports"`, `FinanceWorkspace` monta
-`components/reports/ReportsPage.vue` en lugar de la sección y `stores/ui.ts` guarda
+`components/reports/ReportsPage.vue` en lugar de la sección (con el diseño nuevo,
+`neon/sections/reports/NeonReportsSection.vue` y el botón `neon/layout/NeonReportLauncher.vue`; la
+página no está en `MIGRATED_SECTIONS`, la elige solo el interruptor) y `stores/ui.ts` guarda
 `page: 'section' | 'reports'`. Ver la [guía de reportes](../context/tabs/reportes.md).
 
 El informe mensual tampoco es una sección ni una página: «Exportar» en los filtros de Movimientos abre `components/transactions/MonthlyReportPanel.vue`. El periodo se filtra por la fecha del movimiento, no por el mes contable, y hereda la búsqueda, el tipo y la cuenta del registro, pero no el año. El PDF lo construye `domain/monthly-report/pdf-document.ts` y lo genera `lib/client/monthly-report-pdf.ts` con pdfmake y las fuentes de `assets/fonts/report`, cargados al descargar y precargados por el service worker ([ADR 0009](../adr/0009-el-informe-es-un-pdf-generado-en-el-cliente-con-pdfmake.md)).
