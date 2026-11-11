@@ -119,6 +119,12 @@ Identificadores clave en UI:
 - `src/composables/useReportThread.ts`, `src/composables/useReportsRoute.ts`
 - `src/components/reports/ReportsPage.vue` y subcomponentes (`ReportList`, `ReportListItem`,
   `ReportStatus`, `ReportDetail`, `ReportThread`, `ReportComposer`, `ReportMarkdown`)
+- Diseño nuevo (escritorio, #448): `src/neon/sections/reports/NeonReportsSection.vue` y sus piezas
+  (`NeonReportList`, `NeonReportDetail`, `NeonReportThread`, `NeonReportComposer`,
+  `NeonReportMarkdown*`, `view-model.ts`), más el botón «Reportar» con su punto de novedades en
+  `src/neon/layout/NeonReportLauncher.vue`. Usan el mismo store, composables y servicios; el
+  panel de alta sigue siendo `components/reports/IssueReportPanel.vue`, que monta `FinanceWorkspace`
+  dentro del lanzador nuevo.
 - `src/scripts/app/reports-badge.ts`
 - `src/pages/reportes.astro`, `src/components/FinanceWorkspace.vue`,
   `src/components/FinanceTrackerShell.astro`, `src/scripts/app/shell-navigation.ts`
@@ -136,6 +142,9 @@ fechas son constantes y sirven de fixtures para la E2E.
 
 ## Tests
 
+- Diseño nuevo: `tests/unit/neon-reports-view-model.test.ts`,
+  `tests/component/NeonReportsSection.test.ts`, `tests/e2e/neon-reports.spec.ts` (con la API simulada
+  de `tests/e2e/pages/reports-api.ts`, compartida con `reports.spec.ts`).
 - `tests/unit/report-status.test.ts`, `reporter-comment.test.ts`, `report-updates.test.ts`,
   `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `issue-report-route.test.ts`.
 - `tests/integration/d1-v2/repositories/issue-reports.test.ts`, `api/reports.test.ts`,
