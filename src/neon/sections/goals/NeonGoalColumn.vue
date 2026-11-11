@@ -15,7 +15,7 @@ defineEmits<{ select: [] }>()
     type="button"
     :aria-pressed="selected"
     :data-goal-column="column.name"
-    class="rounded-card outline-accent flex h-full w-full flex-col items-center gap-[22px] border px-6 py-[22px] text-center focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.98]"
+    class="rounded-card outline-accent flex h-full w-full flex-col items-center gap-[22px] border px-6 py-[22px] text-center @max-lg:px-3 @max-lg:py-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.98]"
     :class="selected ? 'bg-panel2 border-ctrl-line' : 'bg-panel border-line'"
     @click="$emit('select')"
   >
