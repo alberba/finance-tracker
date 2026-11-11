@@ -11,10 +11,6 @@
     "durationMs": 12146,
     "tests": 6
   },
-  "data.spec.ts": {
-    "durationMs": 4047,
-    "tests": 2
-  },
   "demo-mode.spec.ts": {
     "durationMs": 7611,
     "tests": 2
@@ -45,6 +41,10 @@
   },
   "neon-budget.spec.ts": {
     "durationMs": 21400,
+    "tests": 3
+  },
+  "neon-data.spec.ts": {
+    "durationMs": 6000,
     "tests": 3
   },
   "neon-goals.spec.ts": {

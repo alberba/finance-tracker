@@ -96,16 +96,29 @@ test.describe('Inversión en el diseño nuevo', () => {
     await expect(notice).toContainText('último precio del 18 mar')
   })
 
-  test('abre una posición y llega a su detalle con sus operaciones', async ({ page, tracker }) => {
+  test('abre un activo, ve sus operaciones y vuelve con la flecha y con atrás', async ({
+    page,
+    tracker,
+  }) => {
     await tracker.openInvestment()
+    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
 
     await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-    const detail = page.getByRole('dialog', { name: 'Fondos Indexados' })
-    await expect(detail).toBeVisible()
-    await expect(detail.getByRole('heading', { name: 'Operaciones' })).toBeVisible()
-    await expect(detail.getByText('Aportación fondo indexado').first()).toBeVisible()
+    await expect(page).toHaveURL(/\/inversion\?activo=/)
+    // The detail header: the arrow and the asset, no section title.
+    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeHidden()
+    await expect(section(page).getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+    await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
 
-    await detail.getByRole('button', { name: 'Cerrar' }).click()
-    await expect(detail).toBeHidden()
+    await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
+    await expect(page).toHaveURL(/\/inversion$/)
+    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+
+    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+    await page.goBack()
+    await expect(page).toHaveURL(/\/inversion$/)
+    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
   })
 })

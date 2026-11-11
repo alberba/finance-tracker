@@ -4,7 +4,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { formatNumber } from '../../../lib/format'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
-import { parseAmount, splitView, type GoalPlan } from './view-model'
+import { clampAmount, MAX_MONTHLY, parseAmount, splitView, type GoalPlan } from './view-model'
 
 // «Repartir el ahorro»: what is saved each month (the saving budget of this
 // month, to start with) shared among the goals, ten euros at a time or typed.
@@ -38,8 +38,7 @@ watch(
 )
 
 const totalAmount = computed(() => {
-  const value = parseAmount(total.value)
-  return Number.isFinite(value) && value > 0 ? value : 0
+  return clampAmount(parseAmount(total.value), MAX_MONTHLY)
 })
 const view = computed(() => splitView(props.plans, shares, totalAmount.value, props.today))
 
@@ -53,13 +52,13 @@ function shareText(id: string): string {
 
 function step(id: string, delta: number): void {
   delete drafts[id]
-  shares[id] = Math.max(Math.round((shares[id] ?? 0) + delta), 0)
+  shares[id] = clampAmount(Math.round((shares[id] ?? 0) + delta), MAX_MONTHLY)
 }
 
 function type(id: string, text: string): void {
   drafts[id] = text
   const value = parseAmount(text)
-  shares[id] = Number.isFinite(value) && value > 0 ? Math.round(value) : 0
+  shares[id] = Math.round(clampAmount(value, MAX_MONTHLY))
 }
 
 function save(): void {
@@ -146,7 +145,7 @@ const iconButton =
                 :value="shareText(row.id)"
                 inputmode="decimal"
                 :aria-label="`Al mes para ${row.name}`"
-                class="font-display text-text min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none"
+                class="font-display text-text pointer-coarse:min-h-11 min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none"
                 @input="type(row.id, ($event.target as HTMLInputElement).value)"
               />
               <span class="text-muted text-[14px]" aria-hidden="true">€</span>

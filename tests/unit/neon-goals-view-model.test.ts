@@ -5,6 +5,9 @@ import {
   freeSaving,
   goalColumns,
   goalPlans,
+  clampAmount,
+  MAX_MONTHLY,
+  MAX_TARGET,
   monthlySaving,
   newGoalFit,
   parseAmount,
@@ -190,6 +193,18 @@ describe('selected goal', () => {
     })
   })
 
+  it('keeps the top of the slider within the monthly maximum', () => {
+    const [bike] = goalPlans(state([goal('Bici', 1e30, { targetYear: 2027, targetMonth: 3 })], []))
+    expect(selectedGoal(bike, 1e30, NOW).max).toBe(MAX_MONTHLY)
+  })
+
+  it('clamps an amount between zero and its limit', () => {
+    expect(clampAmount(1e30, MAX_MONTHLY)).toBe(MAX_MONTHLY)
+    expect(clampAmount(-5, MAX_MONTHLY)).toBe(0)
+    expect(clampAmount(Number.NaN, MAX_MONTHLY)).toBe(0)
+    expect(clampAmount(250, MAX_MONTHLY)).toBe(250)
+  })
+
   it('has no amount to offer without a deadline', () => {
     const [bike] = goalPlans(state([goal('Bici', 1000)], []))
     expect(selectedGoal(bike, 0, NOW)).toMatchObject({
@@ -271,6 +286,10 @@ describe('monthly saving and a new goal', () => {
       fits: false,
     })
     expect(newGoalFit(0, 18, 150)).toEqual({ needed: 0, text: 'Pon cuánto necesitas.', fits: true })
+  })
+
+  it('refuses a target above the maximum', () => {
+    expect(newGoalFit(MAX_TARGET + 1, 18, 300)).toMatchObject({ needed: 0, fits: false })
   })
 
   it('does not judge the fit when the budget sets nothing aside for saving', () => {

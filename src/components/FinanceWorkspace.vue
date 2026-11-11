@@ -32,6 +32,7 @@ const neonSectionLoaders = {
   wealth: () => import('../neon/sections/wealth/NeonWealthSection.vue'),
   investment: () => import('../neon/sections/investment/NeonInvestmentSection.vue'),
   goals: () => import('../neon/sections/goals/NeonGoalsSection.vue'),
+  data: () => import('../neon/sections/data/NeonDataSection.vue'),
 } satisfies Partial<Record<SectionId, () => Promise<unknown>>>
 
 /** «Mis reportes» is a page, not a section: the toggle alone picks its design. */
@@ -59,6 +60,7 @@ const neonSectionComponents: Partial<Record<SectionId, Component>> = {
   wealth: defineAsyncComponent(neonSectionLoaders.wealth),
   investment: defineAsyncComponent(neonSectionLoaders.investment),
   goals: defineAsyncComponent(neonSectionLoaders.goals),
+  data: defineAsyncComponent(neonSectionLoaders.data),
 }
 
 /**
