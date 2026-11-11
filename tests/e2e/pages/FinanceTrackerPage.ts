@@ -20,7 +20,8 @@ const SECTION_CONFIG = {
   investment: { buttonLabel: 'Inversión', headingText: /^Inversión$/ },
   goals: { buttonLabel: 'Objetivos', headingText: 'Objetivos' },
   settings: { buttonLabel: 'Configuración', headingText: /^Configuración$/ },
-  data: { buttonLabel: 'Datos', headingText: 'Datos y backups' },
+  // The old section is titled «Datos y backups»; the new one, «Datos».
+  data: { buttonLabel: 'Datos', headingText: /^Datos( y backups)?$/ },
 } as const
 
 export type FinanceSectionId = keyof typeof SECTION_CONFIG
