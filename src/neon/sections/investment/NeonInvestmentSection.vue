@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { useEntrySheet } from '../../../composables/useEntrySheet'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
@@ -18,7 +18,7 @@ import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
-import { useAssetRoute } from './asset-route'
+import { startPage, useAssetRoute } from './asset-route'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
@@ -134,14 +134,12 @@ const asset = computed(() =>
     : null,
 )
 
-// Opening or leaving the detail starts a new page: back to the top, and the
-// focus on its heading so a keyboard or screen-reader user lands there.
+// Opening or leaving the detail starts a new page.
 watch(
   () => asset.value?.id ?? null,
   async () => {
-    window.scrollTo?.({ top: 0 })
     await nextTick()
-    if (props.isActive) document.getElementById('investment-title')?.focus({ preventScroll: true })
+    if (props.isActive) startPage('investment-title')
   },
 )
 // Leaving the section takes its detail with it; the URL has already moved on.
@@ -151,13 +149,6 @@ watch(
     if (!active) route.reset()
   },
 )
-// The nav item of the section you are in brings you back to its cover.
-function onNavClick(event: MouseEvent): void {
-  if (!(event.target instanceof Element)) return
-  if (event.target.closest('[data-nav-item][data-section="investment"]')) route.close()
-}
-onMounted(() => document.addEventListener('click', onNavClick))
-onBeforeUnmount(() => document.removeEventListener('click', onNavClick))
 
 // The panel keeps the last position while it slides out.
 const openId = ref<string | null>(null)

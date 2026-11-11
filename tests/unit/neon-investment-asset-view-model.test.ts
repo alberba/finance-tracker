@@ -111,7 +111,6 @@ describe('assetDetail', () => {
         quantity: '5 × 130,00 €',
         total: '+649,00 €',
         declared: true,
-        label: 'Venta del 5 mar 2026: +649,00 €',
       },
       expect.objectContaining({ id: 't2', side: 'buy', fee: 'Sin comisión', total: '1.200,00 €' }),
       expect.objectContaining({

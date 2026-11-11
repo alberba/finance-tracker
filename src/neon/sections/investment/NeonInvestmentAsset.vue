@@ -348,14 +348,12 @@ function onBack(event: MouseEvent): void {
           <li
             v-for="row in year.rows"
             :key="row.id"
-            class="border-line grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t py-2.5"
-            style="grid-template-areas: 'i o t' 'i d q' 'i f q'"
+            class="border-line grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t py-2.5 [grid-template-areas:'i_o_t'_'i_d_q'_'i_f_q']"
             :data-asset-movement="row.id"
           >
             <span
-              class="flex items-center self-center"
+              class="flex items-center self-center [grid-area:i]"
               :class="row.side === 'sell' ? 'text-soft' : 'text-text'"
-              style="grid-area: i"
               aria-hidden="true"
             >
               <svg
@@ -371,35 +369,30 @@ function onBack(event: MouseEvent): void {
               </svg>
             </span>
             <span
-              class="text-note min-w-0 truncate font-bold"
+              class="text-note min-w-0 truncate font-bold [grid-area:o]"
               :class="row.side === 'sell' ? 'text-soft' : 'text-text'"
-              style="grid-area: o"
             >
               {{ row.operation }}
             </span>
             <span
-              class="text-muted text-note font-bold whitespace-nowrap tabular-nums"
-              style="grid-area: d"
+              class="text-muted text-note font-bold whitespace-nowrap tabular-nums [grid-area:d]"
             >
               {{ row.day }}
             </span>
             <span
               v-if="row.fee"
-              class="text-muted text-meta whitespace-nowrap tabular-nums"
-              style="grid-area: f"
+              class="text-muted text-meta whitespace-nowrap tabular-nums [grid-area:f]"
             >
               {{ row.fee }}
             </span>
             <span
               v-if="row.quantity"
-              class="text-muted text-meta text-end font-bold whitespace-nowrap tabular-nums"
-              style="grid-area: q"
+              class="text-muted text-meta text-end font-bold whitespace-nowrap tabular-nums [grid-area:q]"
             >
               {{ row.quantity }}
             </span>
             <span
-              class="font-display text-figure-row text-end font-semibold whitespace-nowrap tabular-nums"
-              style="grid-area: t"
+              class="font-display text-figure-row text-end font-semibold whitespace-nowrap tabular-nums [grid-area:t]"
             >
               {{ row.total }}
             </span>

@@ -84,8 +84,6 @@ export interface AssetMovementRow {
   quantity: string
   total: string
   declared: boolean
-  /** What the row says for screen readers. */
-  label: string
 }
 
 export interface AssetYear {
@@ -113,6 +111,10 @@ const VIEW_WIDTH = 880
 const VIEW_HEIGHT = 280
 const PAD = { left: 8, right: 24, top: 16, bottom: 28 }
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Units held, or null when the asset has no units. */
+const heldUnits = (position: InvestmentPosition): number | null =>
+  position.units !== null && position.units > 0 ? position.units : null
 
 const round1 = (value: number) => Math.round(value * 10) / 10
 const round2 = (value: number) => Math.round(value * 100) / 100
@@ -157,7 +159,6 @@ function movementRow(tx: Transaction): AssetMovementRow {
       : '',
     total,
     declared: Boolean(tx.declared),
-    label: `${title} del ${formatShortDate(tx.date)}: ${total}`,
   }
 }
 
@@ -229,7 +230,7 @@ export function assetChart(
     .filter((tx) => isOperation(tx) && Number(tx.unitPrice) > 0)
     .map((tx) => ({ tx, time: parseDay(tx.date), price: Number(tx.unitPrice) }))
     .sort((a, b) => a.time - b.time)
-  const units = position.units !== null && position.units > 0 ? position.units : null
+  const units = heldUnits(position)
   if (!operations.length || units === null) return null
 
   const today = Math.max(parseDay(asOf) || 0, operations.at(-1)!.time)
@@ -247,6 +248,13 @@ export function assetChart(
   const pad = (high - low) * 0.08 || high * 0.05 || 1
   low -= pad
   high += pad
+  // Two nearly equal prices must not read as a wild swing: keep a minimum span.
+  const minSpan = todayPrice * 0.4
+  if (high - low < minSpan) {
+    const middle = (high + low) / 2
+    low = middle - minSpan / 2
+    high = middle + minSpan / 2
+  }
 
   const first = operations[0].time
   const plotWidth = VIEW_WIDTH - PAD.left - PAD.right
@@ -305,7 +313,7 @@ function assetFacts(position: InvestmentPosition, movements: readonly Transactio
   const operations = movements.filter(isOperation)
   const buys = operations.filter((tx) => tx.side !== 'sell')
   const sells = operations.length - buys.length
-  const units = position.units !== null && position.units > 0 ? position.units : null
+  const units = heldUnits(position)
   const average = position.averagePrice
   const fees = movements.reduce((sum, tx) => sum + (Number(tx.fee) || 0), 0)
   const undeclared = operations.filter((tx) => !tx.declared).length

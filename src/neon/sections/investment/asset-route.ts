@@ -3,7 +3,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 // The route of an asset's detail (#439): `/inversion?activo=<id>`. Opening it
 // pushes a history entry, so the browser's back button leaves it the same way
 // the arrow does; a link to it loads straight into the detail. This is the one
-// module of the section that touches `location` and `history`.
+// module of the section that touches `location`, `history` and the document:
+// it also scrolls to the top and moves focus when the page changes, and sends
+// the section's own nav item back to the cover.
 
 const PARAM = 'activo'
 const MARK = 'neon-investment-asset'
@@ -44,11 +46,27 @@ export function useAssetRoute() {
     selected.value = null
   }
 
+  /** The nav item of the section you are in brings you back to its cover. */
+  function onNavClick(event: MouseEvent): void {
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('[data-nav-item][data-section="investment"]')) close()
+  }
+
   onMounted(() => {
     sync()
     window.addEventListener('popstate', sync)
+    document.addEventListener('click', onNavClick)
   })
-  onBeforeUnmount(() => window.removeEventListener('popstate', sync))
+  onBeforeUnmount(() => {
+    window.removeEventListener('popstate', sync)
+    document.removeEventListener('click', onNavClick)
+  })
 
   return { selected, open, close, reset }
+}
+
+/** A new page starts: back to the top and the focus on its heading, for keyboards and screen readers. */
+export function startPage(titleId: string): void {
+  window.scrollTo?.({ top: 0 })
+  document.getElementById(titleId)?.focus({ preventScroll: true })
 }
