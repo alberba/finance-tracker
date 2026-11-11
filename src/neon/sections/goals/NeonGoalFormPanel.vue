@@ -148,7 +148,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
             :key="when.due"
             type="button"
             :aria-pressed="form.due === when.due"
-            class="rounded-pill outline-accent min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+            class="rounded-pill outline-accent pointer-coarse:min-h-11 min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
             :class="
               form.due === when.due
                 ? 'bg-sel-bg text-sel-text border-sel-border'
