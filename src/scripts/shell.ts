@@ -1,14 +1,11 @@
-import { Effect } from 'effect'
-
 import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { useSectionNavigation } from '../composables/useSectionNavigation'
 import { initReportsBadge } from './app/reports-badge'
 import { getThemeController } from '../lib/client/theme'
-import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
+import { logOut } from './app/logout'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
-import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
 import { describeCheckAge } from '../lib/client/sync-connection'
 import { fetchSession } from '../lib/client/session'
 import { runClientHttp } from '../lib/client/runtime'
@@ -296,24 +293,7 @@ function initSyncMenu(): void {
     logoutAction.setAttribute('aria-disabled', 'true')
     void sessionRequest
       .then(async (session) => {
-        if (syncStore?.userId) {
-          try {
-            await syncStore.prepareLogout()
-          } catch {
-            const discardPending = window.confirm(
-              'Hay cambios pendientes que no se pudieron sincronizar. ¿Descartarlos definitivamente y cerrar sesión?',
-            )
-            if (!discardPending) {
-              logoutAction.removeAttribute('aria-disabled')
-              return
-            }
-          }
-        }
-        await requireAuthenticationResult(await authentication.signOut())
-        if (syncStore?.userId) await syncStore.logout({ discardPending: true })
-        else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))
-        else wipeLegacyClientData()
-        window.location.href = '/login'
+        if (!(await logOut(session))) logoutAction.removeAttribute('aria-disabled')
       })
       .catch((error: unknown) => {
         logoutAction.removeAttribute('aria-disabled')
