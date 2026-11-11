@@ -3,8 +3,8 @@ import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import { TONE_TEXT, type PositionDetail } from './view-model'
 
 // A position opened from the cover, in the shared detail panel: its figures
-// and its latest operations, newest first. The full asset page («‹ VWCE») is
-// #439; until then this is where a position leads.
+// and its latest operations, newest first. The mobile frame leads here until its
+// own asset page arrives (#440); the desktop frame opens NeonInvestmentAsset.
 defineProps<{ title: string; kicker: string; detail: PositionDetail | null }>()
 
 const open = defineModel<boolean>('open', { required: true })
