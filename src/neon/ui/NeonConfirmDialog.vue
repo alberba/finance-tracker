@@ -54,7 +54,7 @@ function confirm(): void {
   <dialog
     ref="dialog"
     role="alertdialog"
-    class="bg-panel text-text border-line rounded-popover shadow-float m-auto w-[min(420px,calc(100vw-32px))] border p-5 backdrop:bg-black/40"
+    class="bg-panel text-text border-line rounded-popover shadow-float m-auto w-[min(420px,calc(100vw-32px))] border p-5 backdrop:bg-[oklch(0%_none_none/0.55)]"
     :aria-labelledby="titleId"
     @cancel="onCancel"
     @click="onScrimClick"

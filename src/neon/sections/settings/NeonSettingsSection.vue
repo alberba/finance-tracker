@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 
+import { useSecuritySettings } from '../../../composables/useSecuritySettings'
 import { useSettingsAssets } from '../../../composables/useSettingsAssets'
 import { buildAccountRows } from '../../../domain/settings/view-model'
 import { useFinancialStateStore } from '../../../stores/financial-state'
@@ -18,7 +19,7 @@ import NeonPreferencesBlock from './NeonPreferencesBlock.vue'
 import NeonRulesBlock from './NeonRulesBlock.vue'
 import NeonSecurityBlock from './NeonSecurityBlock.vue'
 import type { PendingDeletion } from './deletion'
-import { useScrollSpy } from './use-scroll-spy'
+import { scrollToId, useScrollSpy } from './use-scroll-spy'
 import {
   accountsTable,
   alertsLabel,
@@ -52,14 +53,16 @@ const rules = computed(() => rulesTable(recurringStore.rules, state.value.accoun
 const counts = computed(() => partCounts({ ...state.value, recurringRules: recurringStore.rules }))
 const alerts = computed(() => alertsLabel(assetRows.value.alerts))
 
-const ids = computed(() => SETTINGS_PARTS.map((part) => `cfg-${part.id}`))
+// «Acceso y seguridad» only exists where Better Auth is the sign-in.
+const { available: securityAvailable } = useSecuritySettings()
+const parts = computed(() =>
+  SETTINGS_PARTS.filter((part) => part.id !== 'seguridad' || securityAvailable.value),
+)
+const ids = computed(() => parts.value.map((part) => `cfg-${part.id}`))
 const current = useScrollSpy(ids)
 
 function goTo(id: SettingsPartId): void {
-  document.getElementById(`cfg-${id}`)?.scrollIntoView({
-    block: 'start',
-    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-  })
+  scrollToId(`cfg-${id}`)
 }
 
 // Onboarding sends the user to an apartado through the old tab names.
@@ -140,7 +143,7 @@ function confirmDeletion(): void {
         class="flex gap-1 overflow-x-auto @3xl:sticky @3xl:top-6 @3xl:flex-col @3xl:overflow-visible"
       >
         <a
-          v-for="part in SETTINGS_PARTS"
+          v-for="part in parts"
           :key="part.id"
           :href="`#cfg-${part.id}`"
           class="outline-accent rounded-field flex min-h-[46px] shrink-0 items-center gap-3 px-3.5 text-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]"

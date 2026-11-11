@@ -34,3 +34,11 @@ export function useScrollSpy(ids: Readonly<Ref<readonly string[]>>): Ref<string>
 
   return current
 }
+
+/** Scrolls to the element with this id, without animation if the user asks for less motion. */
+export function scrollToId(id: string): void {
+  document.getElementById(id)?.scrollIntoView({
+    block: 'start',
+    behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  })
+}

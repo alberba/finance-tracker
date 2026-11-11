@@ -26,7 +26,7 @@ const editing = ref<string | null>(null)
 const emoji = ref('')
 
 const ICON_BUTTON =
-  'bg-panel2 text-muted outline-accent grid size-9 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 pointer-fine:hover:text-text motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.96]'
+  'bg-panel2 text-muted outline-accent grid size-9 pointer-coarse:size-11 shrink-0 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 pointer-fine:hover:text-text motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.96]'
 
 function add(): void {
   if (settingsStore.addCategory(props.categoryKey, name.value)) name.value = ''
@@ -80,7 +80,7 @@ function askDelete(tag: CategoryTagViewModel): void {
           </span>
           <button
             type="button"
-            class="bg-panel2 text-soft outline-accent grid size-10 place-items-center rounded-full text-[18px] focus-visible:outline-2 focus-visible:outline-offset-2"
+            class="bg-panel2 text-soft outline-accent grid size-10 place-items-center rounded-full text-[18px] focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:size-11"
             :aria-label="`Cambiar icono de ${tag.name}`"
             :aria-expanded="editing === tag.name"
             @click="edit(tag)"

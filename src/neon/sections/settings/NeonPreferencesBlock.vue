@@ -46,7 +46,7 @@ const ROW =
   <NeonSettingsBlock
     id="preferencias"
     title="Preferencias"
-    description="Año de trabajo, moneda y tema del tracker."
+    description="Año de trabajo, moneda del tracker."
   >
     <div class="grid min-w-0" data-settings-preferences>
       <div :class="ROW">

@@ -11,7 +11,7 @@ const on = defineModel<boolean>({ required: true })
     role="switch"
     :aria-checked="on"
     :aria-label="label"
-    class="outline-accent relative h-7 w-[46px] shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.96]"
+    class="outline-accent relative h-7 w-[46px] shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.96] pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
     :class="on ? 'bg-accent' : 'inset-ring-ctrl-line inset-ring'"
     @click="on = !on"
   >

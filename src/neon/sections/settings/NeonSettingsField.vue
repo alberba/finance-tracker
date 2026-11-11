@@ -40,7 +40,7 @@ function commit(): void {
     :aria-label="label"
     :placeholder="placeholder"
     autocomplete="off"
-    class="border-ctrl-line bg-panel text-text rounded-field outline-accent placeholder:text-text/40 box-border min-h-[46px] w-full min-w-0 border px-3.5 focus-visible:outline-2 focus-visible:outline-offset-2"
+    class="border-ctrl-line bg-panel text-text rounded-field outline-accent placeholder:text-faint box-border min-h-[46px] w-full min-w-0 border px-3.5 focus-visible:outline-2 focus-visible:outline-offset-2"
     :class="[
       kind === 'figure'
         ? 'font-display text-end text-[16px] font-semibold'

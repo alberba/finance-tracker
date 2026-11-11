@@ -4,13 +4,14 @@ import { ref } from 'vue'
 import { formatMoney } from '../../../lib/format'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useMarketStore } from '../../../stores/market'
+import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import type { PendingDeletion } from './deletion'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
-import { parseAmount, type AssetRow, type AssetsTable } from './view-model'
+import { openingBalanceText, parseAmount, type AssetRow, type AssetsTable } from './view-model'
 
 // Activos: the starting value of each investment grouping, where its price
 // comes from and how it reaches Stock Events. Name and value are edited in place.
@@ -18,6 +19,7 @@ defineProps<{ table: AssetsTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
+const { showToast } = useToast()
 const financialStateStore = useFinancialStateStore()
 const marketStore = useMarketStore()
 const COLUMNS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,0.9fr)_130px_minmax(0,1.3fr)_190px_112px]'
@@ -47,14 +49,9 @@ const balance = ref('')
 /** Creates the asset and, if a symbol was typed, the quote that prices it. */
 function add(): void {
   const trimmed = name.value.trim()
-  if (
-    !settingsStore.addEntity(
-      'investmentAssets',
-      name.value,
-      String(parseAmount(balance.value) ?? 0),
-    )
-  )
-    return
+  const opening = openingBalanceText(balance.value)
+  if (opening === null) return void showToast('El saldo inicial no es un número.')
+  if (!settingsStore.addEntity('investmentAssets', name.value, opening)) return
   const asset = financialStateStore.state.investmentAssets.find((item) => item.name === trimmed)
   if (asset && symbol.value.trim()) {
     marketStore.addInstrument({

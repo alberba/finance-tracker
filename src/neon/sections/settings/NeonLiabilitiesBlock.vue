@@ -3,19 +3,21 @@ import { ref } from 'vue'
 
 import { formatMoney } from '../../../lib/format'
 import type { Entity } from '../../../scripts/types'
+import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import type { PendingDeletion } from './deletion'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
-import { parseAmount, type LiabilitiesTable } from './view-model'
+import { openingBalanceText, parseAmount, type LiabilitiesTable } from './view-model'
 
 // Pasivos: loans and debts with the amount they start from, edited in place.
 defineProps<{ table: LiabilitiesTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
+const { showToast } = useToast()
 const COLUMNS = 'grid-cols-[minmax(0,2fr)_190px_112px]'
 
 function rename(row: Entity, name: string): void {
@@ -40,7 +42,9 @@ const name = ref('')
 const balance = ref('')
 
 function add(): void {
-  if (settingsStore.addEntity('liabilities', name.value, String(parseAmount(balance.value) ?? 0))) {
+  const opening = openingBalanceText(balance.value)
+  if (opening === null) return void showToast('El saldo inicial no es un número.')
+  if (settingsStore.addEntity('liabilities', name.value, opening)) {
     name.value = ''
     balance.value = ''
   }

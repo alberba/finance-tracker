@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   accountsTable,
   alertsLabel,
+  openingBalanceText,
   assetsTable,
   liabilitiesTable,
   parseAmount,
@@ -38,6 +39,12 @@ describe('campos escritos a mano', () => {
     expect(parseAmount('64,32')).toBe(64.32)
     expect(parseAmount('')).toBeNull()
     expect(parseAmount('abc')).toBeNull()
+  })
+
+  it('lee el saldo de una fila nueva: vacío es cero y un texto que no es número se rechaza', () => {
+    expect(openingBalanceText('')).toBe('0')
+    expect(openingBalanceText('1.250,5')).toBe('1250.5')
+    expect(openingBalanceText('mucho')).toBeNull()
   })
 
   it('acepta solo años de 2000 a 2100', () => {
@@ -201,7 +208,6 @@ describe('contadores del índice', () => {
       liabilities: [],
       incomeCategories: ['Nómina'],
       expenseCategories: ['Súper', 'Casa'],
-      savingCategories: [],
       investmentCategories: ['VWCE'],
       recurringRules: [rule({}), rule({ id: 'i', type: 'investment' })],
     })

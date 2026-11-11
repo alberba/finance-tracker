@@ -66,6 +66,16 @@ export function parseCurrency(text: string): string | null {
   return /^[A-Z]{3}$/.test(value) ? value : null
 }
 
+/**
+ * The starting balance typed in an add row, as the text the store takes:
+ * empty is zero, a number is itself, anything else is null (not accepted).
+ */
+export function openingBalanceText(text: string): string | null {
+  if (!text.trim()) return '0'
+  const value = parseAmount(text)
+  return value === null ? null : String(value)
+}
+
 export interface AccountRow {
   id: string
   name: string
@@ -251,7 +261,6 @@ export function partCounts(
     | 'liabilities'
     | 'incomeCategories'
     | 'expenseCategories'
-    | 'savingCategories'
     | 'investmentCategories'
     | 'recurringRules'
   >,
@@ -263,7 +272,6 @@ export function partCounts(
     categorias:
       state.incomeCategories.length +
       state.expenseCategories.length +
-      state.savingCategories.length +
       state.investmentCategories.length,
     recurrentes: state.recurringRules.filter((rule) => rule.type !== 'investment').length,
     preferencias: null,

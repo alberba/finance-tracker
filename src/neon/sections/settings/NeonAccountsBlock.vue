@@ -2,12 +2,13 @@
 import { ref } from 'vue'
 
 import { formatMoney } from '../../../lib/format'
+import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
-import { parseAmount, type AccountRow, type AccountsTable } from './view-model'
+import { openingBalanceText, parseAmount, type AccountRow, type AccountsTable } from './view-model'
 import type { PendingDeletion } from './deletion'
 
 // Cuentas: the starting balance of each account and whether its cash counts as
@@ -16,6 +17,7 @@ defineProps<{ table: AccountsTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
+const { showToast } = useToast()
 const COLUMNS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_190px_112px]'
 
 function rename(row: AccountRow, name: string): void {
@@ -40,7 +42,9 @@ const name = ref('')
 const balance = ref('')
 
 function add(): void {
-  if (settingsStore.addEntity('accounts', name.value, String(parseAmount(balance.value) ?? 0))) {
+  const opening = openingBalanceText(balance.value)
+  if (opening === null) return void showToast('El saldo inicial no es un número.')
+  if (settingsStore.addEntity('accounts', name.value, opening)) {
     name.value = ''
     balance.value = ''
   }
