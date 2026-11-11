@@ -9,7 +9,7 @@ defineEmits<{ pick: [event: Event] }>()
 
 <template>
   <label
-    class="border-ctrl-line has-[:focus-visible]:outline-accent relative inline-flex min-h-11 cursor-pointer items-center gap-2 self-start rounded-full border px-4 text-[14px] font-extrabold has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+    class="border-ctrl-line has-[:focus-visible]:outline-accent text-note relative inline-flex min-h-11 cursor-pointer items-center gap-2 self-start rounded-full border px-4 font-extrabold has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
   >
     <svg
       class="size-[18px] shrink-0"

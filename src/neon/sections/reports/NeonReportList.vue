@@ -40,11 +40,11 @@ function onSelect(event: MouseEvent, issueNumber: number): void {
   >
     <div class="flex items-baseline justify-between gap-3">
       <h2 id="reports-list-title" class="text-block-title font-extrabold">Tus reportes</h2>
-      <p class="text-muted text-[13px]">
-        <span class="font-display text-soft text-[13px] font-semibold">{{ counts.sent }}</span>
+      <p class="text-muted text-meta">
+        <span class="font-display text-soft text-meta font-semibold">{{ counts.sent }}</span>
         enviados<template v-if="counts.news !== null">
           ·
-          <span class="font-display text-accent-text text-[13px] font-semibold">{{
+          <span class="font-display text-accent-text text-meta font-semibold">{{
             counts.news
           }}</span>
           con novedades</template
@@ -80,11 +80,11 @@ function onSelect(event: MouseEvent, issueNumber: number): void {
                 Nuevo
               </span>
             </span>
-            <span class="text-soft flex min-w-0 items-center gap-2 text-[14px] font-bold">
+            <span class="text-soft text-note flex min-w-0 items-center gap-2 font-bold">
               <NeonReportDot :tone="row.dot" />
               <span class="min-w-0">{{ row.status }}</span>
             </span>
-            <span class="text-muted text-[13px]">{{ row.meta }}</span>
+            <span class="text-muted text-meta">{{ row.meta }}</span>
           </span>
           <span
             class="font-display shrink-0 text-[15px] leading-[1.3] font-semibold"
@@ -99,7 +99,7 @@ function onSelect(event: MouseEvent, issueNumber: number): void {
       <NeonButton :disabled="loadingMore" @click="emit('loadMore')">
         {{ loadingMore ? 'Cargando…' : 'Cargar más reportes' }}
       </NeonButton>
-      <p v-if="loadMoreError" class="text-loss px-4 text-[14px] font-bold" role="alert">
+      <p v-if="loadMoreError" class="text-loss text-note px-4 font-bold" role="alert">
         {{ loadMoreError }}
       </p>
     </div>

@@ -51,7 +51,7 @@ defineProps<{ blocks: BlockNode[] }>()
       </ol>
       <pre
         v-else-if="block.type === 'code'"
-        class="bg-panel2 border-line rounded-field overflow-x-auto border p-3 text-[13px] leading-relaxed"
+        class="bg-panel2 border-line rounded-field text-meta overflow-x-auto border p-3 leading-relaxed"
       ><code class="font-mono">{{ block.value }}</code></pre>
       <hr v-else-if="block.type === 'rule'" class="border-line" />
     </template>

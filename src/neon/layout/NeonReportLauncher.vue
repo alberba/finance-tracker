@@ -28,7 +28,7 @@ onMounted(() => {
     v-show="!isOpen"
     id="global-report-trigger"
     type="button"
-    class="group bg-panel text-accent-text shadow-float outline-accent frame:inline-flex border-accent/40 fixed inset-e-[22px] inset-be-[22px] z-45 hidden size-12 cursor-pointer items-center justify-center overflow-hidden rounded-full border text-[14px] font-extrabold hover:w-33 hover:-translate-y-0.5 hover:gap-[9px] hover:px-[15px] focus-visible:w-33 focus-visible:-translate-y-0.5 focus-visible:gap-[9px] focus-visible:px-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-[width,gap,padding,translate,transform] motion-safe:duration-200 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+    class="group bg-panel text-accent-text shadow-float outline-accent frame:inline-flex border-accent/40 text-note fixed inset-e-[22px] inset-be-[22px] z-45 hidden size-12 cursor-pointer items-center justify-center overflow-hidden rounded-full border font-extrabold hover:w-33 hover:-translate-y-0.5 hover:gap-[9px] hover:px-[15px] focus-visible:w-33 focus-visible:-translate-y-0.5 focus-visible:gap-[9px] focus-visible:px-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-[width,gap,padding,translate,transform] motion-safe:duration-200 motion-safe:ease-out motion-safe:active:scale-[0.97]"
     aria-label="Crear reporte"
     :aria-describedby="hasUpdates ? 'reports-updates-description' : undefined"
     @click="isOpen = true"

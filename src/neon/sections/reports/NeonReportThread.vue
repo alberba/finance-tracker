@@ -10,6 +10,7 @@ import NeonButton from '../../ui/NeonButton.vue'
 import { encodeAttachmentFile, TEXTAREA_CLASS } from './attachment-files'
 import NeonAttachmentChip from './NeonAttachmentChip.vue'
 import NeonAttachmentPicker from './NeonAttachmentPicker.vue'
+import NeonReportCard from './NeonReportCard.vue'
 import NeonReportMarkdown from './NeonReportMarkdown.vue'
 import { threadNote, threadPerson } from './view-model'
 
@@ -162,24 +163,24 @@ function confirmDelete(item: ThreadItem): void {
 </script>
 
 <template>
-  <section
-    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-2.5 border px-6 py-[22px] [animation-delay:140ms] @max-lg:px-3 @max-lg:py-4"
+  <NeonReportCard
+    class="motion-safe:animate-rise gap-2.5 [animation-delay:140ms]"
     aria-labelledby="reports-thread-title"
   >
     <div class="flex flex-col gap-1">
       <h3 id="reports-thread-title" class="text-block-title font-extrabold">Hilo</h3>
-      <p class="text-muted text-[14px]">{{ threadNote(report) }}</p>
+      <p class="text-muted text-note">{{ threadNote(report) }}</p>
     </div>
 
     <p
       v-if="error && editingId === null"
-      class="bg-panel2 text-loss rounded-[14px] px-3.5 py-3 text-[14px] font-bold"
+      class="bg-panel2 text-loss text-note rounded-[14px] px-3.5 py-3 font-bold"
       role="alert"
     >
       {{ error }}
     </p>
 
-    <p v-if="items.length === 0" class="border-line text-muted border-t py-3.5 text-[14px]">
+    <p v-if="items.length === 0" class="border-line text-muted text-note border-t py-3.5">
       Todavía no hay respuestas ni aclaraciones en este hilo.
     </p>
 
@@ -193,13 +194,13 @@ function confirmDelete(item: ThreadItem): void {
         <div class="flex min-w-0 items-center gap-3">
           <span
             aria-hidden="true"
-            class="grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-extrabold"
+            class="text-meta grid size-10 shrink-0 place-items-center rounded-full font-extrabold"
             :class="people.get(item.id)?.own ? 'bg-sel-bg text-sel-text' : 'bg-panel2 text-soft'"
             >{{ people.get(item.id)?.initial }}</span
           >
           <p class="flex min-w-0 flex-1 flex-col">
             <span class="text-[15px] font-extrabold wrap-anywhere">{{ item.author }}</span>
-            <span class="text-muted text-[13px]">
+            <span class="text-muted text-meta">
               {{ people.get(item.id)?.role }} ·
               <time :datetime="item.createdAt">{{ people.get(item.id)?.when }}</time
               ><template v-if="item.editedAt"> · editado</template>
@@ -252,7 +253,7 @@ function confirmDelete(item: ThreadItem): void {
           <p :id="`reports-delete-${item.id}`" class="text-[16px] font-extrabold">
             ¿Borrar esta aclaración?
           </p>
-          <p class="text-soft text-[14px]">Se eliminará de GitHub y no se puede deshacer.</p>
+          <p class="text-soft text-note">Se eliminará de GitHub y no se puede deshacer.</p>
           <div class="flex flex-wrap justify-end gap-2">
             <NeonButton ref="cancelDelete" @click="cancelDelete(item)">Cancelar</NeonButton>
             <NeonButton danger :disabled="pending" @click="confirmDelete(item)"
@@ -268,7 +269,7 @@ function confirmDelete(item: ThreadItem): void {
           @submit.prevent="save"
         >
           <label class="flex flex-col gap-1.5">
-            <span class="text-muted text-[13px] font-bold">Editar aclaración</span>
+            <span class="text-muted text-meta font-bold">Editar aclaración</span>
             <textarea
               v-model="editText"
               :class="TEXTAREA_CLASS"
@@ -297,7 +298,7 @@ function confirmDelete(item: ThreadItem): void {
           </ul>
           <p
             v-if="attachmentNotice"
-            class="text-soft flex items-start gap-2 text-[14px] font-bold"
+            class="text-soft text-note flex items-start gap-2 font-bold"
             role="status"
           >
             <svg
@@ -315,7 +316,7 @@ function confirmDelete(item: ThreadItem): void {
             {{ attachmentNotice }}
           </p>
           <NeonAttachmentPicker :disabled="pending" @pick="onFilesPicked" />
-          <p v-if="localError" class="text-loss text-[14px] font-bold" role="alert">
+          <p v-if="localError" class="text-loss text-note font-bold" role="alert">
             {{ localError }}
           </p>
           <div class="flex flex-wrap justify-end gap-2">
@@ -345,8 +346,8 @@ function confirmDelete(item: ThreadItem): void {
       </svg>
       Este reporte está cerrado: el hilo es de solo lectura.
     </p>
-    <p class="text-muted pt-1.5 text-[13px]">
+    <p class="text-muted text-meta pt-1.5">
       No se muestran los comentarios de la automatización ni las aclaraciones de otras personas.
     </p>
-  </section>
+  </NeonReportCard>
 </template>

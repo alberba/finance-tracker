@@ -7,7 +7,7 @@ defineEmits<{ remove: [] }>()
 
 <template>
   <li
-    class="border-ctrl-line inline-flex min-h-11 items-center gap-1 rounded-full border ps-3.5 pe-1 text-[14px] font-bold"
+    class="border-ctrl-line text-note inline-flex min-h-11 items-center gap-1 rounded-full border ps-3.5 pe-1 font-bold"
   >
     <svg
       class="text-muted size-4 shrink-0"

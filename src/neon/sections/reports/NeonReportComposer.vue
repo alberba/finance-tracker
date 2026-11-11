@@ -10,6 +10,7 @@ import NeonButton from '../../ui/NeonButton.vue'
 import { ATTACHMENT_LIMITS, encodeAttachmentFile, TEXTAREA_CLASS } from './attachment-files'
 import NeonAttachmentChip from './NeonAttachmentChip.vue'
 import NeonAttachmentPicker from './NeonAttachmentPicker.vue'
+import NeonReportCard from './NeonReportCard.vue'
 import { composerNote } from './view-model'
 
 // «Nueva aclaración» (artboard «Mis reportes · 2560 px»): a reply on the
@@ -105,13 +106,13 @@ watch(
 </script>
 
 <template>
-  <section
-    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-3.5 border px-6 py-[22px] [animation-delay:210ms] @max-lg:px-3 @max-lg:py-4"
+  <NeonReportCard
+    class="motion-safe:animate-rise gap-3.5 [animation-delay:210ms]"
     aria-labelledby="reports-composer-title"
   >
     <div class="flex flex-col gap-1">
       <h3 id="reports-composer-title" class="text-block-title font-extrabold">Nueva aclaración</h3>
-      <p class="text-muted text-[14px]">{{ composerNote(report) }}</p>
+      <p class="text-muted text-note">{{ composerNote(report) }}</p>
     </div>
 
     <form class="flex flex-col gap-3.5" novalidate @submit.prevent="onSubmit">
@@ -143,10 +144,10 @@ watch(
 
       <div class="flex flex-wrap items-center gap-x-3.5 gap-y-2">
         <NeonAttachmentPicker :disabled="busy" @pick="onFilesPicked" />
-        <p class="text-muted min-w-55 flex-1 text-[13px]">{{ ATTACHMENT_LIMITS }}</p>
+        <p class="text-muted text-meta min-w-55 flex-1">{{ ATTACHMENT_LIMITS }}</p>
       </div>
 
-      <p id="reports-composer-notice" class="text-muted text-[13px]">
+      <p id="reports-composer-notice" class="text-muted text-meta">
         Se publica en un repositorio público. Las capturas ya subidas no se borran de GitHub al
         quitarlas de una aclaración.
       </p>
@@ -186,5 +187,5 @@ watch(
         </NeonButton>
       </div>
     </form>
-  </section>
+  </NeonReportCard>
 </template>

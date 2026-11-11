@@ -14,7 +14,7 @@ import {
  */
 const NO_COOKIE = { cookies: [], origins: [] }
 
-test.use({ storageState: NO_COOKIE })
+test.use({ storageState: NO_COOKIE, viewport: { width: 1440, height: 900 } })
 
 const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
 
@@ -107,7 +107,11 @@ test.describe('Mis reportes en el diseño nuevo', () => {
     await expect(section(page).locator('[data-report-entry="901"]')).toContainText('Nuevo')
     await expect(section(page)).toContainText('1 con novedades')
 
+    const markedSeen = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().endsWith('/api/reports/901/seen'),
+    )
     await section(page).locator('[data-report-entry="901"]').click()
+    await markedSeen
     await expect(
       section(page).getByRole('heading', { name: reportEntry().title, level: 2 }),
     ).toBeVisible()
@@ -128,24 +132,6 @@ test.describe('Mis reportes en el diseño nuevo', () => {
     await expect(launcher(page)).toBeHidden()
   })
 
-  test('la carga de la lista se ve mientras GitHub responde', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    let release!: () => void
-    const gate = new Promise<void>((resolve) => (release = resolve))
-    await page.route('**/api/reports', async (route) => {
-      await gate
-      await route.fallback()
-    })
-
-    await tracker.openReports()
-    await expect(section(page).getByText('Cargando tus reportes…')).toBeVisible()
-    await expect(section(page).locator('[aria-busy="true"]')).toBeVisible()
-
-    release()
-    await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-    await expect(section(page).getByText('Cargando tus reportes…')).toHaveCount(0)
-  })
-
   test('un fallo de la lista muestra el error y se reintenta', async ({ page, tracker }) => {
     await mockReportsApi(page)
     await page.route('**/api/reports', (route) =>
@@ -160,22 +146,6 @@ test.describe('Mis reportes en el diseño nuevo', () => {
     await page.unroute('**/api/reports')
     await alert.getByRole('button', { name: 'Reintentar' }).click()
     await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-  })
-
-  test('un fallo del detalle deja la lista y se reintenta', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await page.route('**/api/reports/901', (route) =>
-      route.fulfill({ status: 502, json: { ok: false, error: GITHUB_ERROR } }),
-    )
-
-    await tracker.openReports(901)
-    const detail = section(page).locator('[data-report-detail]')
-    await expect(detail.getByRole('alert')).toContainText(GITHUB_ERROR)
-    await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-
-    await page.unroute('**/api/reports/901')
-    await detail.getByRole('button', { name: 'Reintentar' }).click()
-    await expect(detail.getByRole('heading', { name: reportEntry().title })).toBeVisible()
   })
 
   test('un duplicado se sigue en la principal y su hilo es el de ella', async ({

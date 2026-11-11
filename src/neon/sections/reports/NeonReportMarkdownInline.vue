@@ -12,7 +12,7 @@ defineProps<{ nodes: InlineNode[] }>()
     <template v-if="node.type === 'text'">{{ node.value }}</template>
     <code
       v-else-if="node.type === 'code'"
-      class="bg-panel2 text-text rounded-[8px] px-1.5 py-0.5 font-mono text-[14px] wrap-break-word"
+      class="bg-panel2 text-text text-note rounded-[8px] px-1.5 py-0.5 font-mono wrap-break-word"
       >{{ node.value }}</code
     >
     <strong v-else-if="node.type === 'strong'" class="font-extrabold"

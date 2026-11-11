@@ -7,6 +7,7 @@ import { requestReportDialogOpen } from '../../../scripts/report-dialog'
 import type { ReportCommentInput, ReportCommentUpdateInput } from '../../../services/reports-api'
 import { useReportsStore } from '../../../stores/reports'
 import NeonButton from '../../ui/NeonButton.vue'
+import NeonReportCard from './NeonReportCard.vue'
 import NeonReportDetail from './NeonReportDetail.vue'
 import NeonReportList from './NeonReportList.vue'
 
@@ -93,15 +94,13 @@ async function back(): Promise<void> {
       </NeonButton>
     </div>
 
-    <section
+    <NeonReportCard
       v-if="reportsStore.status === 'loading' || reportsStore.status === 'idle'"
-      class="bg-panel border-line rounded-card flex w-full max-w-180 min-w-0 flex-col gap-3.5 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+      class="w-full max-w-180 gap-3.5"
       aria-busy="true"
       aria-labelledby="reports-loading"
     >
-      <p id="reports-loading" class="text-muted text-[14px]" role="status">
-        Cargando tus reportes…
-      </p>
+      <p id="reports-loading" class="text-muted text-note" role="status">Cargando tus reportes…</p>
       <ul class="flex flex-col" aria-hidden="true">
         <li
           v-for="width in ['72%', '54%', '64%', '46%']"
@@ -118,11 +117,11 @@ async function back(): Promise<void> {
           <span class="bg-panel2 block h-3.5 w-11 shrink-0 rounded-full"></span>
         </li>
       </ul>
-    </section>
+    </NeonReportCard>
 
-    <section
+    <NeonReportCard
       v-else-if="reportsStore.status === 'error'"
-      class="bg-panel border-line rounded-card flex w-full max-w-180 min-w-0 flex-col items-start gap-3.5 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+      class="w-full max-w-180 items-start gap-3.5"
       role="alert"
     >
       <p class="flex items-start gap-2.5 text-[16px] font-bold">
@@ -140,13 +139,11 @@ async function back(): Promise<void> {
         </svg>
         {{ reportsStore.error }}
       </p>
-      <p class="text-muted text-[14px]">
-        Tus reportes siguen guardados; solo falta leer su estado.
-      </p>
+      <p class="text-muted text-note">Tus reportes siguen guardados; solo falta leer su estado.</p>
       <NeonButton variant="primary" @click="reportsStore.refresh({ force: true })"
         >Reintentar</NeonButton
       >
-    </section>
+    </NeonReportCard>
 
     <section
       v-else-if="reportsStore.reports.length === 0"
@@ -157,7 +154,7 @@ async function back(): Promise<void> {
       <h2 id="reports-empty-title" class="text-block-title font-extrabold">
         Aún no has enviado ningún reporte.
       </h2>
-      <p class="text-muted text-[14px]">Lo que envíes aparecerá aquí con su estado y su hilo.</p>
+      <p class="text-muted text-note">Lo que envíes aparecerá aquí con su estado y su hilo.</p>
       <NeonButton variant="primary" @click="requestReportDialogOpen()">Crear reporte</NeonButton>
     </section>
 
@@ -199,7 +196,7 @@ async function back(): Promise<void> {
         v-else
         class="border-line rounded-card min-w-1/2 grow-999 basis-0 border border-dashed px-6 py-[22px] @max-3xl:hidden"
       >
-        <p class="text-muted text-[14px]">Selecciona un reporte para ver su estado y su hilo.</p>
+        <p class="text-muted text-note">Selecciona un reporte para ver su estado y su hilo.</p>
       </div>
     </div>
   </section>

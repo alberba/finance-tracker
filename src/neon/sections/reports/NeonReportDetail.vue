@@ -6,6 +6,7 @@ import type { ReportThreadStatus } from '../../../composables/useReportThread'
 import { isDemoMode } from '../../../scripts/demo-mode'
 import type { ReportCommentInput, ReportCommentUpdateInput } from '../../../services/reports-api'
 import NeonButton from '../../ui/NeonButton.vue'
+import NeonReportCard from './NeonReportCard.vue'
 import NeonReportComposer from './NeonReportComposer.vue'
 import NeonReportDot from './NeonReportDot.vue'
 import NeonReportMarkdown from './NeonReportMarkdown.vue'
@@ -65,9 +66,6 @@ watch(
   // loading when a link opened it): the heading takes the focus then too.
   { immediate: true },
 )
-
-const CARD =
-  'bg-panel border-line rounded-card flex min-w-0 flex-col border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4'
 </script>
 
 <template>
@@ -76,19 +74,18 @@ const CARD =
       <NeonButton data-report-back @click="$emit('back')">← Mis reportes</NeonButton>
     </div>
 
-    <section
+    <NeonReportCard
       v-if="status === 'loading' || status === 'idle'"
-      :class="CARD"
       class="gap-3.5"
       aria-busy="true"
     >
-      <p class="text-muted text-[14px]" role="status">Cargando el reporte…</p>
+      <p class="text-muted text-note" role="status">Cargando el reporte…</p>
       <span aria-hidden="true" class="bg-panel2 block h-[22px] w-3/5 rounded-full"></span>
       <span aria-hidden="true" class="bg-panel2 block h-3 w-1/3 rounded-full"></span>
       <span aria-hidden="true" class="bg-panel2 block h-30 rounded-[18px]"></span>
-    </section>
+    </NeonReportCard>
 
-    <section v-else-if="status === 'error'" :class="CARD" class="items-start gap-3.5" role="alert">
+    <NeonReportCard v-else-if="status === 'error'" class="items-start gap-3.5" role="alert">
       <p class="text-muted text-label tracking-label font-extrabold uppercase">
         Reporte #{{ issueNumber }}
       </p>
@@ -108,15 +105,15 @@ const CARD =
         {{ error }}
       </p>
       <NeonButton variant="primary" @click="$emit('retry')">Reintentar</NeonButton>
-    </section>
+    </NeonReportCard>
 
-    <section v-else-if="status === 'notFound'" :class="CARD" class="items-start gap-3.5">
+    <NeonReportCard v-else-if="status === 'notFound'" class="items-start gap-3.5">
       <p class="text-muted text-label tracking-label font-extrabold uppercase">
         Reporte #{{ issueNumber }}
       </p>
       <p class="text-[16px] font-bold">No encontramos este reporte en tu cuenta.</p>
       <NeonButton variant="primary" @click="$emit('back')">Volver a Mis reportes</NeonButton>
-    </section>
+    </NeonReportCard>
 
     <template v-else-if="shown && view">
       <header class="flex min-w-0 flex-col gap-1.5">
@@ -130,11 +127,10 @@ const CARD =
         >
           {{ title }}
         </h2>
-        <p class="text-muted text-[14px]">{{ sentLine(shown.report) }}</p>
+        <p class="text-muted text-note">{{ sentLine(shown.report) }}</p>
       </header>
 
-      <section
-        :class="CARD"
+      <NeonReportCard
         class="motion-safe:animate-rise gap-3.5 [animation-delay:70ms]"
         aria-labelledby="reports-state-title"
       >
@@ -145,7 +141,7 @@ const CARD =
             :href="view.link.href"
             target="_blank"
             rel="noopener noreferrer"
-            class="outline-accent -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-full ps-4 text-[14px] font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+            class="outline-accent text-note -my-2 inline-flex min-h-11 items-center gap-1.5 rounded-full ps-4 font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
           >
             {{ view.link.label }}
             <svg
@@ -197,7 +193,7 @@ const CARD =
             <span><span class="sr-only">principal </span>{{ view.follow.to }}</span>
           </p>
           <p class="text-[15px] font-bold">{{ view.follow.title }}</p>
-          <p class="text-muted text-[13px]">
+          <p class="text-muted text-meta">
             {{ view.follow.secondary }}. El estado y el hilo son los de la principal.
           </p>
         </div>
@@ -221,12 +217,11 @@ const CARD =
           </svg>
           {{ view.warning }}
         </p>
-      </section>
+      </NeonReportCard>
 
       <template v-if="available">
-        <section
+        <NeonReportCard
           v-if="shown.original"
-          :class="CARD"
           class="motion-safe:animate-rise gap-3.5 [animation-delay:105ms]"
           aria-labelledby="reports-original-title"
         >
@@ -234,11 +229,10 @@ const CARD =
             Tu descripción
           </h3>
           <NeonReportMarkdown :source="shown.original" />
-        </section>
+        </NeonReportCard>
 
-        <section
+        <NeonReportCard
           v-if="shown.issueDescription"
-          :class="CARD"
           class="motion-safe:animate-rise gap-3.5 [animation-delay:105ms]"
           aria-labelledby="reports-issue-description-title"
         >
@@ -246,10 +240,10 @@ const CARD =
             <h3 id="reports-issue-description-title" class="text-block-title font-extrabold">
               Descripción en GitHub
             </h3>
-            <p class="text-muted text-[14px]">Es el texto actual de la issue en GitHub.</p>
+            <p class="text-muted text-note">Es el texto actual de la issue en GitHub.</p>
           </div>
           <NeonReportMarkdown :source="shown.issueDescription" />
-        </section>
+        </NeonReportCard>
 
         <NeonReportThread
           :report="shown.report"
