@@ -6,7 +6,17 @@ import { useDataStore } from '../../../stores/data'
 import { useSyncStore } from '../../../stores/sync'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDataImportFlow from './NeonDataImportFlow.vue'
-import { exportContents, type ImportOrigin, type ImportStep } from './view-model'
+import NeonCard from '../../ui/NeonCard.vue'
+import {
+  bitvavoImported,
+  canSyncNow,
+  exportContents,
+  jsonImported,
+  lastImportNote,
+  type ImportOrigin,
+  type ImportResult,
+  type ImportStep,
+} from './view-model'
 
 // «Entrada y salida» (artboard «Datos · 2560 px»): two tiles side by side.
 // Importar opens the import flow under them; Exportar lists the two files the
@@ -25,7 +35,7 @@ const importOpen = ref(false)
 const origin = ref<ImportOrigin | null>(null)
 const file = ref<File | null>(null)
 const working = ref(false)
-const done = ref<{ title: string; text: string } | null>(null)
+const done = ref<ImportResult | null>(null)
 const lastImport = ref('')
 const lastExport = ref('')
 
@@ -71,22 +81,17 @@ async function confirmJson(): Promise<void> {
   working.value = true
   try {
     if (await dataStore.importJson(chosen)) {
-      done.value = {
-        title: 'JSON importado correctamente.',
-        text: backsUpServerData
-          ? 'La app se recarga con los datos de la copia.'
-          : 'Ya tienes los datos de la copia.',
-      }
-      lastImport.value = 'Última importación: hoy, JSON importado correctamente.'
+      done.value = jsonImported(backsUpServerData)
+      lastImport.value = lastImportNote('json')
     }
   } finally {
     working.value = false
   }
 }
 
-function onBitvavoDone(result: { title: string; text: string }): void {
-  done.value = result
-  lastImport.value = `Última importación: hoy, ${result.title.replace(/^Importados /, '').replace(/\.$/, '')} de Bitvavo.`
+function onBitvavoDone(counts: { imported: number; duplicates: number }): void {
+  done.value = bitvavoImported(counts.imported, counts.duplicates)
+  lastImport.value = lastImportNote('bitvavo', counts.imported)
 }
 
 async function exportJson(): Promise<void> {
@@ -104,16 +109,12 @@ function syncNow(): void {
 </script>
 
 <template>
-  <section
-    aria-labelledby="data-transfer-title"
-    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-[18px] border px-6 py-[22px] motion-safe:[animation-delay:70ms] @max-lg:px-3 @max-lg:py-4"
+  <NeonCard
+    title="Entrada y salida"
+    title-id="data-transfer-title"
+    class="motion-safe:animate-rise motion-safe:[animation-delay:70ms]"
   >
-    <div class="grid gap-1">
-      <h2 id="data-transfer-title" class="text-block-title font-sans font-extrabold">
-        Entrada y salida
-      </h2>
-      <p class="text-muted text-[14px]">Lo que entra y sale de tu espacio.</p>
-    </div>
+    <p class="text-muted text-note -mt-2">Lo que entra y sale de tu espacio.</p>
 
     <div class="grid grid-cols-1 gap-3.5 @min-[760px]:grid-cols-2">
       <button
@@ -150,15 +151,15 @@ function syncNow(): void {
           <span
             v-for="chip in backsUpServerData ? ['Archivo JSON', 'Bitvavo'] : ['Archivo JSON']"
             :key="chip"
-            class="border-ctrl-line text-soft rounded-pill inline-flex min-h-7 items-center border px-2.5 text-[13px] font-extrabold"
+            class="border-ctrl-line text-soft rounded-pill text-meta inline-flex min-h-7 items-center border px-2.5 font-extrabold"
           >
             {{ chip }}
           </span>
         </span>
-        <span v-if="lastImport" class="text-muted mt-auto text-[13px]" data-last-import>
+        <span v-if="lastImport" class="text-muted text-meta mt-auto" data-last-import>
           {{ lastImport }}
         </span>
-        <span class="text-accent-text text-[14px] font-extrabold">
+        <span class="text-accent-text text-note font-extrabold">
           {{ importOpen ? 'Cerrar importación' : 'Empezar importación' }}
         </span>
       </button>
@@ -184,9 +185,9 @@ function syncNow(): void {
         <p class="text-soft text-[15px]">
           Descarga un archivo con tus datos. Nada cambia en el tracker.
         </p>
-        <p class="text-muted text-[14px]" data-export-contents>
+        <p class="text-muted text-note" data-export-contents>
           <template v-for="(part, index) in contents" :key="index">
-            <span v-if="part.figure" class="font-display text-soft text-[13px] font-semibold">{{
+            <span v-if="part.figure" class="font-display text-soft text-meta font-semibold">{{
               part.text
             }}</span>
             <template v-else>{{ part.text }}</template>
@@ -195,17 +196,17 @@ function syncNow(): void {
         <div class="border-line mt-auto flex flex-col gap-3 border-t pt-3.5">
           <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <p class="min-w-0 text-[16px] font-bold">
-              Copia completa <span class="text-muted text-[13px] font-semibold">JSON</span>
+              Copia completa <span class="text-muted text-meta font-semibold">JSON</span>
             </p>
             <NeonButton id="export-json" @click="exportJson">Exportar JSON</NeonButton>
           </div>
           <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
             <p class="min-w-0 text-[16px] font-bold">
-              Movimientos <span class="text-muted text-[13px] font-semibold">CSV</span>
+              Movimientos <span class="text-muted text-meta font-semibold">CSV</span>
             </p>
             <NeonButton id="export-transactions-csv" @click="exportCsv">Exportar CSV</NeonButton>
           </div>
-          <p v-if="lastExport" class="text-muted text-[13px]" data-last-export>{{ lastExport }}</p>
+          <p v-if="lastExport" class="text-muted text-meta" data-last-export>{{ lastExport }}</p>
         </div>
       </div>
     </div>
@@ -230,7 +231,7 @@ function syncNow(): void {
       :file-name="file?.name ?? null"
       :blocked="pendingCount > 0"
       :syncing="syncStatus === 'syncing'"
-      :can-sync="connection === 'online' && syncStatus !== 'syncing'"
+      :can-sync="canSyncNow(connection === 'online', syncStatus)"
       :working="working"
       :done="done"
       @close="closeImport"
@@ -242,5 +243,5 @@ function syncNow(): void {
       @reset="reset"
       @bitvavo-done="onBitvavoDone"
     />
-  </section>
+  </NeonCard>
 </template>

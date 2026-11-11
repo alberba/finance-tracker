@@ -2,6 +2,7 @@ import type { DataSummaryViewModel } from '../../../domain/data/view-model'
 import { formatMoney, formatNumber } from '../../../lib/format'
 import type { BitvavoPreview } from '../../../lib/bitvavo-types'
 import type { OutboxEntry } from '../../../lib/client/outbox'
+import type { SyncEntityType } from '../../../lib/server/sync/command-schemas'
 import type { SyncStatus } from '../../../stores/sync'
 
 // Presentation of Datos in the new design (artboard «Datos · 2560 px», #446):
@@ -75,6 +76,11 @@ export function sinceLabel(at: number | null, now: number): string | null {
   return `hace ${Math.round(minutes / 60)} h`
 }
 
+/** A cycle can start when there is a connection and none is running. */
+export function canSyncNow(online: boolean, status: SyncStatus): boolean {
+  return online && status !== 'syncing'
+}
+
 export function pendingWord(pendingCount: number): string {
   if (pendingCount === 0) return 'nada pendiente'
   return pendingCount === 1 ? 'cambio pendiente' : 'cambios pendientes'
@@ -116,7 +122,7 @@ export function syncView(input: SyncInput): SyncView {
     meta,
     dot: !online || syncing ? 'idle' : pendingCount > 0 || status === 'error' ? 'pending' : 'ok',
     button: syncing ? 'Sincronizando…' : 'Sincronizar ahora',
-    canSync: online && !syncing,
+    canSync: canSyncNow(online, status),
     pending,
   }
 }
@@ -128,7 +134,7 @@ export interface QueueRow {
   act: string
 }
 
-const ENTITY_KIND: Record<string, string> = {
+const ENTITY_KIND: Record<SyncEntityType, string> = {
   account: 'Cuenta',
   category: 'Categoría',
   transaction: 'Movimiento',
@@ -141,6 +147,7 @@ const ENTITY_KIND: Record<string, string> = {
   userInstrument: 'Activo',
   wealthSnapshot: 'Patrimonio',
   stockeventsMapping: 'Stock Events',
+  stockeventsCashEntry: 'Stock Events',
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -213,11 +220,16 @@ export interface BitvavoSummary {
   incompatible: number
 }
 
+type PreviewOperation = BitvavoPreview['operations'][number]
+
+/** New to the app but alike a movement of yours: the person chooses create or link. */
+export function needsResolution(operation: PreviewOperation): boolean {
+  return !operation.alreadyImported && operation.candidates.length > 0
+}
+
 export function bitvavoSummary(preview: BitvavoPreview): BitvavoSummary {
   const duplicates = preview.operations.filter((operation) => operation.alreadyImported).length
-  const toResolve = preview.operations.filter(
-    (operation) => !operation.alreadyImported && operation.candidates.length > 0,
-  ).length
+  const toResolve = preview.operations.filter(needsResolution).length
   return {
     found: preview.operations.length,
     duplicates,
@@ -257,4 +269,36 @@ export function bitvavoDetail(summary: BitvavoSummary): string {
 /** Text of the confirm button: «Importar 142». */
 export function bitvavoConfirmLabel(summary: BitvavoSummary): string {
   return `Importar ${formatNumber(summary.fresh)}`
+}
+
+/** What the flow says once an import ends. */
+export interface ImportResult {
+  title: string
+  text: string
+}
+
+export function jsonImported(reloads: boolean): ImportResult {
+  return {
+    title: 'JSON importado correctamente.',
+    text: reloads
+      ? 'La app se recarga con los datos de la copia.'
+      : 'Ya tienes los datos de la copia.',
+  }
+}
+
+export function bitvavoImported(imported: number, duplicates: number): ImportResult {
+  return {
+    title: `Importados ${formatNumber(imported)} movimientos.`,
+    text:
+      duplicates > 0
+        ? `Los ${formatNumber(duplicates)} duplicados se han omitido.`
+        : 'Los encontrarás en Movimientos e Inversión.',
+  }
+}
+
+/** The note on the Importar tile: «Última importación: hoy, 142 movimientos de Bitvavo.» */
+export function lastImportNote(origin: ImportOrigin, imported = 0): string {
+  return origin === 'json'
+    ? 'Última importación: hoy, JSON importado correctamente.'
+    : `Última importación: hoy, ${formatNumber(imported)} ${count(imported, 'movimiento', 'movimientos')} de Bitvavo.`
 }

@@ -26,7 +26,7 @@ async function startFresh(): Promise<void> {
       <h2 id="data-danger-title" class="text-block-title font-sans font-extrabold">
         Zona peligrosa
       </h2>
-      <p class="text-muted text-[14px]">
+      <p class="text-muted text-note">
         Empezar de cero crea un espacio nuevo y vacío: año actual, euros, sin cuentas ni
         movimientos.
       </p>

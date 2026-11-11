@@ -2,16 +2,22 @@
 import { computed, onMounted } from 'vue'
 
 import { useBitvavoImport } from '../../../composables/useBitvavoImport'
-import { formatLongDate, formatNumber, formatShortDate } from '../../../lib/format'
+import { formatLongDate, formatShortDate } from '../../../lib/format'
 import { getPathFromSection } from '../../../scripts/app/dashboard-section-routing'
 import NeonButton from '../../ui/NeonButton.vue'
-import { bitvavoConfirmLabel, bitvavoDetail, bitvavoHeadline, bitvavoSummary } from './view-model'
+import {
+  bitvavoConfirmLabel,
+  bitvavoDetail,
+  bitvavoHeadline,
+  bitvavoSummary,
+  needsResolution,
+} from './view-model'
 
 // The Bitvavo origin of the import flow: the account must be connected in
 // Configuración, then a preview says how many operations are new and which
 // look like a movement of yours (those need a choice), and «Importar» brings
 // the new ones. The connection and the preview are the shared composable's.
-const emit = defineEmits<{ done: [result: { title: string; text: string }] }>()
+const emit = defineEmits<{ done: [counts: { imported: number; duplicates: number }] }>()
 
 const {
   form,
@@ -29,9 +35,7 @@ const {
 onMounted(() => void load())
 
 const summary = computed(() => (preview.value ? bitvavoSummary(preview.value) : null))
-const toResolve = computed(
-  () => preview.value?.operations.filter((op) => !op.alreadyImported && op.candidates.length) ?? [],
-)
+const toResolve = computed(() => preview.value?.operations.filter(needsResolution) ?? [])
 const since = computed(() =>
   form.startDate ? `desde el ${formatLongDate(form.startDate)} · ${form.timeZone}` : form.timeZone,
 )
@@ -41,13 +45,7 @@ async function importAll(): Promise<void> {
   if (!current) return
   await confirm()
   if (error.value) return
-  emit('done', {
-    title: `Importados ${formatNumber(current.fresh)} movimientos.`,
-    text:
-      current.duplicates > 0
-        ? `Los ${formatNumber(current.duplicates)} duplicados se han omitido.`
-        : 'Los encontrarás en Movimientos e Inversión.',
-  })
+  emit('done', { imported: current.fresh, duplicates: current.duplicates })
 }
 </script>
 
@@ -64,7 +62,7 @@ async function importAll(): Promise<void> {
       </p>
       <a
         :href="getPathFromSection('settings')"
-        class="text-text outline-accent rounded-pill inline-flex min-h-11 items-center self-start px-4 text-[14px] font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+        class="text-text outline-accent rounded-pill text-note inline-flex min-h-11 items-center self-start px-4 font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
       >
         Ir a Configuración
       </a>
@@ -100,7 +98,7 @@ async function importAll(): Promise<void> {
         <ul v-if="toResolve.length" class="grid gap-2.5">
           <li v-for="operation in toResolve" :key="operation.externalId">
             <label class="grid gap-1.5">
-              <span class="text-muted text-[13px] font-bold">
+              <span class="text-muted text-meta font-bold">
                 Resolver {{ operation.symbol }} del {{ formatShortDate(operation.date) }}
               </span>
               <select
@@ -135,6 +133,6 @@ async function importAll(): Promise<void> {
       </template>
     </template>
 
-    <p v-if="error" role="alert" class="text-loss text-[14px] font-bold">{{ error }}</p>
+    <p v-if="error" role="alert" class="text-loss text-note font-bold">{{ error }}</p>
   </div>
 </template>

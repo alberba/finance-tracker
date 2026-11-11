@@ -30,12 +30,12 @@ const { canStartFresh } = useDataStore()
       <h1
         id="data-title"
         tabindex="-1"
-        class="font-display motion-safe:animate-rise text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
+        class="font-display motion-safe:animate-rise text-h1 font-bold outline-none"
       >
         Datos
       </h1>
       <p
-        class="text-soft motion-safe:animate-rise max-w-155 text-[16px] motion-safe:[animation-delay:70ms]"
+        class="text-soft text-lede motion-safe:animate-rise max-w-155 motion-safe:[animation-delay:70ms]"
       >
         Trae datos de fuera, llévatelos cuando quieras y comprueba que todo está sincronizado.
       </p>

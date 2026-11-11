@@ -6,9 +6,14 @@ import {
   bitvavoConfirmLabel,
   bitvavoDetail,
   bitvavoHeadline,
+  bitvavoImported,
   bitvavoSummary,
+  canSyncNow,
   exportContents,
   importStepLabel,
+  jsonImported,
+  lastImportNote,
+  needsResolution,
   pendingWord,
   queueRows,
   sinceLabel,
@@ -288,5 +293,51 @@ describe('Bitvavo preview', () => {
       '142 son nuevos. Los 6 duplicados ya estaban importados y se omiten.',
     )
     expect(bitvavoConfirmLabel(summary)).toBe('Importar 142')
+  })
+})
+
+describe('canSyncNow', () => {
+  it('needs a connection and no cycle running', () => {
+    expect(canSyncNow(true, 'idle')).toBe(true)
+    expect(canSyncNow(true, 'error')).toBe(true)
+    expect(canSyncNow(true, 'syncing')).toBe(false)
+    expect(canSyncNow(false, 'idle')).toBe(false)
+  })
+})
+
+describe('needsResolution', () => {
+  const candidate = [{ id: 't', description: 'x', date: '2026-03-01' }]
+  it('asks only for what is new and alike a movement of yours', () => {
+    expect(needsResolution(operation('a'))).toBe(false)
+    expect(needsResolution(operation('b', { candidates: candidate }))).toBe(true)
+    expect(needsResolution(operation('c', { candidates: candidate, alreadyImported: true }))).toBe(
+      false,
+    )
+  })
+})
+
+describe('import results', () => {
+  it('says the JSON is restored and whether the app reloads', () => {
+    expect(jsonImported(true)).toEqual({
+      title: 'JSON importado correctamente.',
+      text: 'La app se recarga con los datos de la copia.',
+    })
+    expect(jsonImported(false).text).toBe('Ya tienes los datos de la copia.')
+  })
+
+  it('says how many Bitvavo movements came in and what was left out', () => {
+    expect(bitvavoImported(142, 6)).toEqual({
+      title: 'Importados 142 movimientos.',
+      text: 'Los 6 duplicados se han omitido.',
+    })
+    expect(bitvavoImported(3, 0).text).toBe('Los encontrarás en Movimientos e Inversión.')
+  })
+
+  it('notes the last import on the Importar tile', () => {
+    expect(lastImportNote('json')).toBe('Última importación: hoy, JSON importado correctamente.')
+    expect(lastImportNote('bitvavo', 142)).toBe(
+      'Última importación: hoy, 142 movimientos de Bitvavo.',
+    )
+    expect(lastImportNote('bitvavo', 1)).toBe('Última importación: hoy, 1 movimiento de Bitvavo.')
   })
 })

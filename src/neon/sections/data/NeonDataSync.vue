@@ -2,9 +2,10 @@
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import { isDemoMode } from '../../../scripts/demo-mode'
+import { useDataStore } from '../../../stores/data'
 import { useSyncStore } from '../../../stores/sync'
 import NeonButton from '../../ui/NeonButton.vue'
+import NeonCard from '../../ui/NeonCard.vue'
 import { queueRows, syncView, type QueueRow } from './view-model'
 
 // «Sincronización» (artboard «Datos · 2560 px»): whether this device holds the
@@ -13,7 +14,7 @@ import { queueRows, syncView, type QueueRow } from './view-model'
 // has no server to sync with.
 const syncStore = useSyncStore()
 const { connection, syncStatus, pendingCount, lastCheckedAt } = storeToRefs(syncStore)
-const demo = isDemoMode()
+const demo = !useDataStore().backsUpServerData
 
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | undefined
@@ -44,17 +45,16 @@ const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
 </script>
 
 <template>
-  <section
-    aria-labelledby="data-sync-title"
-    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-4 border px-6 py-[22px] motion-safe:[animation-delay:140ms] @max-lg:px-3 @max-lg:py-4"
+  <NeonCard
+    title="Sincronización"
+    title-id="data-sync-title"
+    class="motion-safe:animate-rise motion-safe:[animation-delay:140ms]"
     data-data-sync
   >
-    <h2 id="data-sync-title" class="text-block-title font-sans font-extrabold">Sincronización</h2>
-
     <div class="flex min-w-0 flex-wrap items-center gap-2.5" role="status" data-sync-state>
       <span class="size-2.5 shrink-0 rounded-full" :class="DOT[view.dot]" aria-hidden="true"></span>
       <span class="text-[16px] font-bold" data-sync-label>{{ view.label }}</span>
-      <span v-if="view.meta" class="text-muted text-[13px]">{{ view.meta }}</span>
+      <span v-if="view.meta" class="text-muted text-meta">{{ view.meta }}</span>
     </div>
 
     <div class="flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5">
@@ -73,10 +73,10 @@ const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
         class="border-line flex min-h-16 items-center justify-between gap-3 border-t py-2.5"
       >
         <span class="flex min-w-0 flex-col">
-          <span class="text-muted text-[13px]">{{ row.kind }}</span>
+          <span class="text-muted text-meta">{{ row.kind }}</span>
           <span class="truncate text-[15px] font-bold">{{ row.text }}</span>
         </span>
-        <span class="text-muted shrink-0 text-[13px]">{{ row.act }}</span>
+        <span class="text-muted text-meta shrink-0">{{ row.act }}</span>
       </li>
     </ul>
     <p v-else-if="!demo" class="text-soft text-[15px]">
@@ -93,5 +93,5 @@ const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
     >
       {{ view.button }}
     </NeonButton>
-  </section>
+  </NeonCard>
 </template>
