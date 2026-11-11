@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 import { useEntrySheet } from '../../../composables/useEntrySheet'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
@@ -17,6 +17,9 @@ import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
+import { assetDetail } from './asset-view-model'
+import { startPage, useAssetRoute } from './asset-route'
+import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentControls from './NeonInvestmentControls.vue'
@@ -50,12 +53,18 @@ import {
 // are late. Return mode and month are the investment store's, shared with the
 // old design.
 //
+// A position opens its detail. On the desktop frame that is the asset page
+// (NeonInvestmentAsset, artboard «Inversión · detalle de activo (VWCE) · 2560
+// px», #439), a history entry of its own at `/inversion?activo=<id>`: the arrow
+// and the browser's back button both return to the cover. The mobile frame
+// keeps the shared detail panel until its own detail arrives (#440).
+//
 // The mobile frame gets its own composition (NeonInvestmentMobile, artboard
 // «Inversión · móvil · Pixel 10», #438) from the same view model: there
 // «Nueva operación» is the frame's «Apuntar» button and the positions live in
 // a draggable sheet. Which one shows follows the frame's own media query, as
 // in the dashboard.
-withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
+const props = withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
 
 const financialStateStore = useFinancialStateStore()
 const investmentStore = useInvestmentStore()
@@ -118,6 +127,29 @@ const cards = computed<Card[]>(() => [
   },
 ])
 
+const route = useAssetRoute()
+const asset = computed(() =>
+  desktopFrame.value && route.selected.value
+    ? assetDetail(state.value, vm.value, route.selected.value)
+    : null,
+)
+
+// Opening or leaving the detail starts a new page.
+watch(
+  () => asset.value?.id ?? null,
+  async () => {
+    await nextTick()
+    if (props.isActive) startPage('investment-title')
+  },
+)
+// Leaving the section takes its detail with it; the URL has already moved on.
+watch(
+  () => props.isActive,
+  (active) => {
+    if (!active) route.reset()
+  },
+)
+
 // The panel keeps the last position while it slides out.
 const openId = ref<string | null>(null)
 const shownId = ref<string | null>(null)
@@ -133,7 +165,8 @@ const detail = computed(() =>
 )
 
 function openPosition(id: string): void {
-  openId.value = shownId.value = id
+  if (desktopFrame.value) route.open(id)
+  else openId.value = shownId.value = id
 }
 
 function sortBy(key: SortKey, direction: SortDirection): void {
@@ -164,6 +197,15 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       @open="openPosition"
       @month="investmentStore.setMonth"
       @method="investmentStore.setReturnMode"
+    />
+
+    <NeonInvestmentAsset
+      v-else-if="asset"
+      :detail="asset"
+      @back="route.close"
+      @buy="openEntrySheet()"
+      @sell="openEntrySheet()"
+      @declare-all="investmentStore.markDeclared(asset.undeclared)"
     />
 
     <template v-else>

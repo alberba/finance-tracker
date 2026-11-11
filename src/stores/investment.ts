@@ -381,6 +381,19 @@ export const useInvestmentStore = defineStore('investment', () => {
     )
   }
 
+  /** Marks several movements as declared in one step: one save, one sync, one toast. */
+  function markDeclared(ids: readonly string[]): void {
+    const wanted = new Set(ids)
+    const before = financialStateStore.transactions
+    financialStateStore.commitState((draft) => {
+      for (const tx of draft.transactions) {
+        if (tx.type === 'investment' && wanted.has(tx.id)) tx.declared = true
+      }
+    })
+    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
+    showToast('Movimientos marcados como declarados.')
+  }
+
   function setContributionFlow(date: string, flow: number): void {
     const before = financialStateStore.contributions
     financialStateStore.commitState((draft) => {
@@ -505,6 +518,7 @@ export const useInvestmentStore = defineStore('investment', () => {
     resyncMovement,
     deleteMovement,
     toggleDeclared,
+    markDeclared,
     setContributionFlow,
     isManualDate,
     deleteContribution,
