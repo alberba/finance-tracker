@@ -46,7 +46,11 @@ export class AuthenticationPage {
   }
   async openSecurity() {
     await new FinanceTrackerPage(this.page).open('settings')
-    await this.page.getByRole('tab', { name: 'Preferencias', exact: true }).click()
+    await this.page
+      .locator('#settings')
+      .getByRole('navigation', { name: 'Índice de configuración' })
+      .getByRole('link', { name: 'Acceso y seguridad', exact: true })
+      .click()
   }
   async ready() {
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeAttached()

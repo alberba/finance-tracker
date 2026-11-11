@@ -157,8 +157,8 @@ const error = computed(() => methods.error.value || sessions.error.value || invi
           }}
         </NeonButton>
       </div>
-      <div class="grid grid-cols-[170px_210px_auto] items-end gap-3 px-2 pbe-3.5">
-        <label class="text-muted text-meta grid gap-1.5 font-bold">
+      <div class="flex flex-wrap items-end gap-3 px-2 pbe-3.5">
+        <label class="text-muted text-meta grid w-[170px] max-w-full gap-1.5 font-bold">
           Plazas
           <input
             v-model.number="invitations.maxUses.value"
@@ -168,7 +168,7 @@ const error = computed(() => methods.error.value || sessions.error.value || invi
             class="border-ctrl-line bg-panel text-text rounded-field outline-accent font-display box-border min-h-[46px] w-full border px-3.5 text-[16px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-2"
           />
         </label>
-        <label class="text-muted text-meta grid gap-1.5 font-bold">
+        <label class="text-muted text-meta grid w-[210px] max-w-full gap-1.5 font-bold">
           Duración en días
           <input
             v-model.number="invitations.days.value"

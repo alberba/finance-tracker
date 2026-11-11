@@ -125,7 +125,7 @@ test('passkey registration and login use a verified virtual authenticator', asyn
     },
   })
   await page.getByRole('button', { name: 'Añadir passkey' }).click()
-  await expect(page.getByRole('button', { name: 'Eliminar passkey' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Eliminar la passkey/ })).toBeVisible()
   await access.goto()
   await page.getByRole('button', { name: 'Entrar con passkey' }).click()
   await expect(page).toHaveURL(/\/$/)
@@ -155,7 +155,7 @@ test('cancelled passkey registration leaves no credential', async ({ page, conte
   await new AuthenticationPage(page).ready()
   await new AuthenticationPage(page).openSecurity()
   await expect(page.getByRole('button', { name: 'Añadir passkey' })).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Eliminar passkey' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Eliminar la passkey/ })).toHaveCount(0)
 })
 
 for (const kind of ['selected', 'others'] as const) {
@@ -222,9 +222,9 @@ for (const provider of ['google', 'github']) {
     await new AuthenticationPage(page).openSecurity()
     await expect(
       page
-        .getByRole('region', { name: 'Métodos de acceso' })
-        .getByRole('listitem')
-        .filter({ hasText: provider }),
+        .locator('[data-settings-methods] > div')
+        .filter({ hasText: new RegExp(provider, 'i') })
+        .filter({ hasText: /Vinculado/ }),
     ).toBeVisible()
   })
 }
