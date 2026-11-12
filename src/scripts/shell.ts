@@ -10,6 +10,7 @@ import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
 import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
 import { describeCheckAge } from '../lib/client/sync-connection'
+import { isRecurringIntentKind, runRecurringIntentAction } from '../lib/client/recurring-write'
 import { fetchSession } from '../lib/client/session'
 import { runClientHttp } from '../lib/client/runtime'
 
@@ -330,13 +331,29 @@ function initSyncMenu(): void {
       }
     }
 
+    /**
+     * The recurring module owns the retry/discard guarantees of its intents
+     * (reopening a partially confirmed pending, keeping its reconciliation
+     * retry visible); the generic intent discard is only correct for links.
+     */
+    const runAction = (intent: { intent: { id: string; kind: string } }, action: 'retry' | 'discard') => {
+      const target = syncStore.intents.find((view) => view.intent.id === intent.intent.id)
+      if (!target) return Promise.resolve(false)
+      if (isRecurringIntentKind(target.intent.kind)) {
+        return runRecurringIntentAction(target.intent, action)
+      }
+      return action === 'retry'
+        ? syncStore.retryIntent(target.intent.id).then(() => true)
+        : syncStore.discardIntent(target.intent.id).then((result) => result !== null)
+    }
+
     intentRetryEl?.addEventListener('click', () => {
       const intent = actionableIntent()
-      if (intent) void syncStore.retryIntent(intent.intent.id).then(renderStatus)
+      if (intent) void runAction(intent, 'retry').then(renderStatus)
     })
     intentDiscardEl?.addEventListener('click', () => {
       const intent = actionableIntent()
-      if (intent) void syncStore.discardIntent(intent.intent.id).then(renderStatus)
+      if (intent) void runAction(intent, 'discard').then(renderStatus)
     })
 
     syncStore.$subscribe(renderStatus)

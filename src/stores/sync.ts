@@ -255,12 +255,15 @@ export const useSyncStore = defineStore('sync', () => {
   function resumeIntents(): SyncEffect<void> {
     return Effect.promise(async () => {
       if (!isReady() || isReadOnlyDemoActive()) return
-      const [{ resumeInstrumentLinks }, { resumePendingConfirmations }] = await Promise.all([
-        import('../lib/client/instrument-link'),
-        import('../lib/client/recurring-write'),
-      ])
+      const [{ resumeInstrumentLinks }, { resumePendingConfirmations }, { resumeRecurringRuleWrites }] =
+        await Promise.all([
+          import('../lib/client/instrument-link'),
+          import('../lib/client/recurring-write'),
+          import('../lib/client/recurring-rule-write'),
+        ])
       await resumeInstrumentLinks()
       await resumePendingConfirmations()
+      await resumeRecurringRuleWrites()
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
@@ -1361,6 +1364,21 @@ export const useSyncStore = defineStore('sync', () => {
    * that hasn't synced yet. `null` if nothing is pending or the pending
    * create wasn't minted with an id.
    */
+  /** The still-queued `create` entry for an entity, without writing anything. */
+  async function peekPendingCreate(
+    entityType: SyncEntityType,
+    matches: PendingCreateMatch,
+  ): Promise<OutboxEntry | null> {
+    if (!isReady()) return null
+    return (await run(findPendingCreate(entityType, matches))) ?? null
+  }
+
+  /** The whole outbox, in FIFO order, for read-only coordination checks. */
+  async function listQueuedCommands(): Promise<OutboxEntry[]> {
+    if (!isReady()) return []
+    return run(listOutbox())
+  }
+
   async function peekPendingCreateId(
     entityType: SyncEntityType,
     matches: PendingCreateMatch,
@@ -1532,7 +1550,9 @@ export const useSyncStore = defineStore('sync', () => {
     findEntityRef,
     getInstrumentId,
     getUserInstrumentId,
+    peekPendingCreate,
     peekPendingCreateId,
+    listQueuedCommands,
     mergeIntoPendingCreate,
     cancelPendingCreate,
     acceptIntent,

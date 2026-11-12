@@ -80,7 +80,7 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
       if (!session.user?.id) throw new Error('La sesión no contiene una identidad válida.')
       await useSyncStore(pinia).init(session.user.id, { email: session.user.email ?? null })
       state = financialStateStore.state
-      recurringStore.refreshPending()
+      await recurringStore.refreshPending()
       return
     }
 
@@ -91,7 +91,7 @@ import { registerFinanceTools, type FinanceModelContext } from '../lib/client/we
     if (dueSubscriptions.advancedCount > 0) {
       sortTransactionsInState(state)
     }
-    recurringStore.refreshPending()
+    await recurringStore.refreshPending()
     persistState(state)
   }
 

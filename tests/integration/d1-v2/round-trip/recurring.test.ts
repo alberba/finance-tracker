@@ -58,15 +58,15 @@ describe('round trip: recurring rules and pending movements', () => {
       useRecurringStore()
     })
     const recurring = useRecurringStore()
-    expect(recurring.refreshPending()).toBe(1)
-    expect(recurring.refreshPending()).toBe(0)
+    expect(await recurring.refreshPending()).toBe(1)
+    expect(await recurring.refreshPending()).toBe(0)
     let reloaded = await trip.reload()
     expect(reloaded.recurringRules).toHaveLength(1)
     expect(reloaded.pendingMovements).toHaveLength(2)
 
     const current = useRecurringStore()
     expect(
-      current.updateRule('old-rule', {
+      await current.updateRule('old-rule', {
         type: 'expense',
         accountId: 'old-account',
         category: 'Cuotas',
@@ -78,7 +78,7 @@ describe('round trip: recurring rules and pending movements', () => {
       }),
     ).toBe(true)
     await trip.syncStore.refreshFromServer()
-    current.refreshPending()
+    await current.refreshPending()
     reloaded = await trip.reload()
     expect(reloaded.recurringRules).toHaveLength(1)
     expect(reloaded.recurringRules[0]).toMatchObject({

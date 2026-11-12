@@ -11,6 +11,7 @@ import {
   listDurableIntents,
   openStorage,
   putEntity,
+  readMovementPublications,
   wipeIdbCache,
   wipeOutbox,
 } from '../helpers/client-storage'
@@ -319,6 +320,43 @@ describe('confirmPending — aceptación durable y recuperable (#492)', () => {
       movementConfirmed: true,
       pendingLinked: false,
     })
+  })
+
+  it('publica la generación del movimiento en la misma transacción de aceptación', async () => {
+    setupState([expensePending()])
+    await startSync()
+    await seedServerRefs()
+
+    const outcome = await useRecurringStore().confirmPending('pm-exp', { amount: 925 })
+    expect(outcome.accepted).toBe(true)
+    if (!outcome.accepted) throw new Error('No se aceptó la confirmación')
+
+    const [entry] = await vi.waitFor(
+      async () => {
+        const entries = await readCommands()
+        expect(entries).toHaveLength(1)
+        return entries
+      },
+      { timeout: 5000, interval: 20 },
+    )
+    // A movement created by an accepted intent carries its publication record
+    // from the first moment (#489): link recovery never has to treat it as an
+    // implicit generation 0.
+    const storage = await openStorage(USER_ID)
+    try {
+      const publications = await readMovementPublications(storage, [outcome.transactionId])
+      expect(publications.get(outcome.transactionId)).toMatchObject({
+        id: outcome.transactionId,
+        generation: 1,
+        status: 'active',
+        type: 'expense',
+        origin: 'movement',
+        instrumentId: null,
+      })
+    } finally {
+      storage.close()
+    }
+    expect(entry.intent).toMatchObject({ step: 'movement' })
   })
 
   it('repetir la confirmación reutiliza la reserva y no genera otro movimiento', async () => {

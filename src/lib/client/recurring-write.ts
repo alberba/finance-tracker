@@ -42,6 +42,8 @@ import { resolveEntityId, resolveOrCreateCategoryId, type CategoryKind } from '.
 import { isReadOnlyDemoActive } from './demo-source'
 import {
   isUnresolvedIntent,
+  type DurableIntentKind,
+  type DurableIntentRecord,
   type DurableIntentState,
   type DurableIntentView,
   type IntentPayload,
@@ -49,6 +51,7 @@ import {
   type IntentWaitReason,
 } from './durable-intents'
 import { buildMovementData, movementFingerprint } from './movement-commands'
+import { movementPublicationWriterId } from './movement-publication'
 import type { OutboxCommandInput } from './outbox'
 
 /** The user's already-decided confirmation of one pending movement. */
@@ -155,7 +158,24 @@ export async function confirmPendingMovement(
     steps: [MOVEMENT_STEP, PENDING_STEP],
     payload: encodeDecision(request),
     ...(movementCommand
-      ? { commands: [{ step: MOVEMENT_STEP, command: movementCommand }] }
+      ? {
+          commands: [{ step: MOVEMENT_STEP, command: movementCommand }],
+          // The generation record is durable with the command itself (#489):
+          // a movement accepted here is not an implicit generation 0 for the
+          // link module, it is a published movement.
+          publications: [
+            {
+              id: request.transaction.id,
+              status: 'active' as const,
+              type: request.transaction.type,
+              instrumentId: request.transaction.instrumentId ?? null,
+              unlinked: false,
+              origin: 'movement' as const,
+              fingerprint: movementFingerprint(request.transaction),
+              writerId: movementPublicationWriterId(),
+            },
+          ],
+        }
       : { waitingFor: 'private-configuration' as const }),
   })
   if (!accepted) {
@@ -729,4 +749,47 @@ function text(value: IntentPayload[string] | undefined): string | null {
 
 function number(value: IntentPayload[string] | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+// -- intent actions shared with the sidebar -----------------------------------
+
+/**
+ * The intent kinds the recurring module owns. The sidebar's retry/discard
+ * actions must route them here instead of the generic intent discard: a
+ * partial confirmation needs the pending reopened and the reconciliation
+ * retry kept visible, and a rule write needs its own retry/discard rules.
+ */
+export const isRecurringIntentKind = (kind: DurableIntentKind): boolean =>
+  kind === PENDING_CONFIRMATION_KIND || kind === 'recurringRuleWrite'
+
+/**
+ * Runs one retry/discard action for a recurring intent, returning whether it
+ * could be applied. The caller (shell/status surface) stays ignorant of the
+ * kind-specific guarantees.
+ */
+export async function runRecurringIntentAction(
+  intent: DurableIntentRecord,
+  action: 'retry' | 'discard',
+): Promise<boolean> {
+  if (intent.kind === PENDING_CONFIRMATION_KIND) {
+    const pendingId = payloadText(intent, 'pendingId') ?? intent.targetIds[0] ?? null
+    if (!pendingId) return false
+    if (action === 'retry') return (await retryPendingConfirmation(pendingId)).accepted
+    return (await discardPendingConfirmation(pendingId)).discarded
+  }
+  if (intent.kind === 'recurringRuleWrite') {
+    const ruleId = payloadText(intent, 'ruleId') ?? intent.targetIds[0] ?? null
+    if (!ruleId) return false
+    const { retryRecurringRuleWrites, discardRecurringRuleWrites } = await import(
+      './recurring-rule-write'
+    )
+    if (action === 'retry') return (await retryRecurringRuleWrites(ruleId)).accepted
+    return (await discardRecurringRuleWrites(ruleId)).discarded
+  }
+  return false
+}
+
+function payloadText(intent: DurableIntentRecord, key: string): string | null {
+  const value = intent.payload[key]
+  return typeof value === 'string' && value.length > 0 ? value : null
 }
