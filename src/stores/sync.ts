@@ -373,6 +373,7 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       runtime = await createClientRuntime(nextUserId)
     } catch (error) {
+      runtime = null
       const message = errorMessage(error, 'No se pudo abrir el almacenamiento local.')
       lastError.value = message
       syncStatus.value = 'error'

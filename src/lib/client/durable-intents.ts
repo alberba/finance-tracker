@@ -650,7 +650,7 @@ export const markIntentWaiting = (
       const intent = (await requestToPromise(
         tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
       )) as DurableIntentRecord | undefined
-      if (intent && !TERMINAL_INTENT_STATES.has(intent.state)) {
+      if (intent && !TERMINAL_INTENT_STATES.has(intent.state) && !intent.discardRequested) {
         const steps = await readIntentSteps(tx.objectStore(INTENT_PROGRESS_STORE), intentId)
         tx.objectStore(INTENTS_STORE).put(
           refreshed({ ...intent, waitingFor: reason, failure: null }, steps),
@@ -676,7 +676,7 @@ export const failDurableIntent = (
       const intent = (await requestToPromise(
         tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
       )) as DurableIntentRecord | undefined
-      if (intent && !TERMINAL_INTENT_STATES.has(intent.state)) {
+      if (intent && !TERMINAL_INTENT_STATES.has(intent.state) && !intent.discardRequested) {
         const steps = await readIntentSteps(tx.objectStore(INTENT_PROGRESS_STORE), intentId)
         tx.objectStore(INTENTS_STORE).put(
           refreshed({ ...intent, waitingFor: null, failure: message }, steps),
