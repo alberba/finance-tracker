@@ -495,7 +495,7 @@ describe('reglas recurrentes y pendientes', () => {
   })
 })
 describe('valoración de cartera', () => {
-  it('enlaza movimientos existentes al instrumento configurado', () => {
+  it('enlaza movimientos existentes al instrumento configurado', async () => {
     setActivePinia(createTestPinia())
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
@@ -553,7 +553,7 @@ describe('valoración de cartera', () => {
         instrument.holdingsUpdatedAt = '2026-07-10T10:00:00.000Z'
       }
     })
-    expect(marketStore.linkExistingMovements(instrumentId)).toBe(1)
+    expect((await marketStore.linkExistingMovements(instrumentId)).targets).toBe(1)
     expect(financialStore.transactions[0].instrumentId).toBe(instrumentId)
     expect(marketStore.linkedMovementCount(instrumentId)).toBe(1)
     expect(marketStore.valuation.instruments[0].units).toBe(2)
@@ -635,7 +635,7 @@ describe('valoración de cartera', () => {
     expect(marketStore.valuation.instruments[0].units).toBe(1)
   })
 
-  it('enlaza AGED con AGED.MI y suma sus títulos', () => {
+  it('enlaza AGED con AGED.MI y suma sus títulos', async () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
       year: 2024,
@@ -684,11 +684,11 @@ describe('valoración de cartera', () => {
 
     const marketStore = useMarketStore()
     expect(marketStore.matchingMovementCount('aged-mi')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi')).toBe(1)
+    expect((await marketStore.linkExistingMovements('aged-mi')).targets).toBe(1)
     expect(marketStore.valuation.instruments[0].units).toBe(5)
   })
 
-  it('enlaza movimientos legacy sin símbolo por la categoría del activo', () => {
+  it('enlaza movimientos legacy sin símbolo por la categoría del activo', async () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
       year: 2024,
@@ -734,7 +734,7 @@ describe('valoración de cartera', () => {
 
     const marketStore = useMarketStore()
     expect(marketStore.matchingMovementCount('aged-mi-legacy')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi-legacy')).toBe(1)
+    expect((await marketStore.linkExistingMovements('aged-mi-legacy')).targets).toBe(1)
     expect(financialStore.transactions[0].instrumentId).toBe('aged-mi-legacy')
   })
 

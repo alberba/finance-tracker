@@ -8,12 +8,14 @@ import {
   count,
   enqueue,
   listAll,
+  openOutbox,
   openStorage,
   peekBatch,
   recordFailure,
   wipeOutbox,
 } from '../helpers/client-storage'
-import { generateCommandId } from '../../src/lib/client/outbox'
+import { OUTBOX_DB_VERSION, generateCommandId } from '../../src/lib/client/outbox'
+import { ClientStorageError } from '../../src/lib/client/storage'
 
 const USER_ID = 'user-outbox-test'
 
@@ -30,7 +32,7 @@ describe('outbox', () => {
     await wipeOutbox(USER_ID)
   })
 
-  it('conserva los comandos existentes al subir la base de la cola a la versión 2', async () => {
+  it('conserva los comandos existentes al subir la base de la cola a la versión actual', async () => {
     const upgradeUser = 'user-outbox-upgrade'
     const name = `finance-tracker-outbox-v2:${upgradeUser}`
     await wipeOutbox(upgradeUser)
@@ -64,8 +66,113 @@ describe('outbox', () => {
         action: 'noop',
       })
       expect(upgraded.outbox.objectStoreNames.contains('movementPublications')).toBe(true)
+      expect(upgraded.outbox.objectStoreNames.contains('intents')).toBe(true)
+      expect(upgraded.outbox.objectStoreNames.contains('intentProgress')).toBe(true)
     } finally {
       upgraded.close()
+      await wipeOutbox(upgradeUser)
+    }
+  })
+
+  it('conserva los comandos y las generaciones al subir de la versión 2 a la actual', async () => {
+    const upgradeUser = 'user-outbox-upgrade-v2'
+    const name = `finance-tracker-outbox-v2:${upgradeUser}`
+    await wipeOutbox(upgradeUser)
+    // The #489 build: version 2 with commands and movementPublications.
+    const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 2)
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('commands', { keyPath: 'seq', autoIncrement: true })
+        request.result.createObjectStore('movementPublications', { keyPath: 'id' })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const tx = legacy.transaction(['commands', 'movementPublications'], 'readwrite')
+      tx.objectStore('commands').add({
+        command: { commandId: 'v2-command', action: 'noop' },
+        enqueuedAt: new Date().toISOString(),
+        attempts: 0,
+      })
+      tx.objectStore('movementPublications').put({
+        id: 'movement-v2',
+        generation: 3,
+        status: 'active',
+        type: 'expense',
+        instrumentId: null,
+        unlinked: false,
+        writerId: 'tab',
+        origin: 'movement',
+        fingerprint: 'f',
+        updatedAt: new Date().toISOString(),
+      })
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    legacy.close()
+
+    const upgraded = await openStorage(upgradeUser)
+    try {
+      const entries = await listAll(upgraded)
+      expect(entries.map((entry) => entry.command.commandId)).toEqual(['v2-command'])
+      const tx = upgraded.outbox.transaction('movementPublications', 'readonly')
+      const record = await new Promise<{ generation: number }>((resolve, reject) => {
+        const request = tx.objectStore('movementPublications').get('movement-v2')
+        request.onsuccess = () => resolve(request.result as { generation: number })
+        request.onerror = () => reject(request.error)
+      })
+      expect(record.generation).toBe(3)
+      expect(upgraded.outbox.version).toBe(OUTBOX_DB_VERSION)
+    } finally {
+      upgraded.close()
+      await wipeOutbox(upgradeUser)
+    }
+  })
+
+  it('falla de forma visible y tipada cuando una conexión antigua bloquea la actualización', async () => {
+    const upgradeUser = 'user-outbox-blocked'
+    const name = `finance-tracker-outbox-v2:${upgradeUser}`
+    await wipeOutbox(upgradeUser)
+    // An old tab keeps a v2 connection open and has not yielded: the upgrade
+    // cannot complete, which used to make `open` hang forever.
+    const oldTab = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 2)
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('commands', { keyPath: 'seq', autoIncrement: true })
+        request.result.createObjectStore('movementPublications', { keyPath: 'id' })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      const failure = await openOutbox(upgradeUser).catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(ClientStorageError)
+      expect((failure as Error).message).toMatch(/pestaña/i)
+    } finally {
+      oldTab.close()
+      await wipeOutbox(upgradeUser)
+    }
+  })
+
+  it('cede la conexión cuando otra pestaña abre una versión superior', async () => {
+    const upgradeUser = 'user-outbox-versionchange'
+    const name = `finance-tracker-outbox-v2:${upgradeUser}`
+    await wipeOutbox(upgradeUser)
+    const storage = await openStorage(upgradeUser)
+    try {
+      const newer = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(name, OUTBOX_DB_VERSION + 1)
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      try {
+        expect(() => storage.outbox.transaction('commands', 'readonly')).toThrow()
+      } finally {
+        newer.close()
+      }
+    } finally {
+      storage.close()
       await wipeOutbox(upgradeUser)
     }
   })

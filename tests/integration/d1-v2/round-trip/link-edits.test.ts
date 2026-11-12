@@ -88,7 +88,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
   it('publica los valores actuales de los objetivos fijados al solicitar Vincular', async () => {
     const instrumentId = await addLinkInstrument()
     const held = trip.holdSync()
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
     useInvestmentStore().saveEditedMovement(targetId, {
       date: '2026-01-15',
@@ -140,7 +140,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     // The quote configuration has already reached the server and survives a
     // reload; only the movement publication is left.
     await trip.reload()
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
     const state = await trip.reload()
     expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
@@ -152,7 +152,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
   it('no restaura un objetivo borrado durante la resolución', async () => {
     const instrumentId = await addLinkInstrument()
     const held = trip.holdSync()
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
     useMovementsStore().deleteTransaction(targetId)
 
@@ -166,7 +166,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
   it('no revincula un objetivo convertido a un tipo incompatible', async () => {
     const instrumentId = await addLinkInstrument()
     const held = trip.holdSync()
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
     useMovementsStore().saveEdit(targetId, {
       date: '2026-01-15',
@@ -191,7 +191,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
   it('respeta un desvínculo explícito posterior al solicitar Vincular', async () => {
     const instrumentId = await addLinkInstrument()
     const held = trip.holdSync()
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
 
     useInvestmentStore().saveEditedMovement(targetId, {
       date: '2026-01-15',
@@ -225,7 +225,7 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
         (command) => command.entityType === 'transaction' && command.action === 'update',
       ),
     )
-    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
     // The link has already built its command from the current movement; the
     // other device moves the server row before that command lands.
     await held.entered

@@ -12,7 +12,10 @@ import type { Instrument, InstrumentType } from '../scripts/types'
 import { todayISO } from '../scripts/utils'
 import { newId } from '../lib/client/ids'
 import { resolveEntityId, syncCreate, syncUpdate, syncRemove } from '../lib/client/command-mapping'
-import { linkInstrumentMovements } from '../lib/client/instrument-link'
+import {
+  linkInstrumentMovements,
+  type InstrumentLinkAcceptance,
+} from '../lib/client/instrument-link'
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
@@ -209,7 +212,7 @@ export const useMarketStore = defineStore('market', () => {
     ).length
   }
 
-  function linkExistingMovements(instrumentId: string): number {
+  function linkExistingMovements(instrumentId: string): Promise<InstrumentLinkAcceptance> {
     return linkInstrumentMovements({
       instrumentId,
       saveConfiguration: (instrument) => persistConfiguration(instrument),

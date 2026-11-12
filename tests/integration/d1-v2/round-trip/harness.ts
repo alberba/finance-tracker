@@ -69,6 +69,33 @@ export interface RoundTrip {
   }
   /** Every command batch the client has POSTed to `/api/sync`, in send order. */
   commandBatches: () => unknown[][]
+  /** Applies the next batch on the server, then loses the response (network error). */
+  loseNextResponse: () => void
+  /** Applies the next batch on the server, then answers with unreadable JSON. */
+  corruptNextSyncResponse: () => void
+  /** Rejects one command id on the next matching batch (definitive failure). */
+  rejectSyncCommand: (commandId: string, message: string) => void
+  /** Makes the next request answer 401, as an expired session. */
+  expireSessionOnce: () => void
+  /** Durable intents currently in the per-user queue database. */
+  intents: () => Promise<
+    Array<{
+      intent: {
+        id: string
+        state: string
+        targetIds: readonly string[]
+        payload: Record<string, string | number | boolean | null>
+        failure: string | null
+        discardRequested: boolean
+      }
+      steps: Array<{
+        step: string
+        state: string
+        commandId: string | null
+        attempt: number
+      }>
+    }>
+  >
   /** The client's own sync store, for cursor/cache assertions. */
   syncStore: ReturnType<typeof import('../../../../src/stores/sync').useSyncStore>
   /**
@@ -126,6 +153,10 @@ export async function startRoundTrip(
   let releaseSyncGate: (() => void) | null = null
   let enterSyncGate: (() => void) | null = null
   let syncGateMatches: ((commands: unknown[]) => boolean) | null = null
+  let loseResponse = false
+  let corruptResponse = false
+  let rejectCommand: { commandId: string; message: string } | null = null
+  let expireSession = false
 
   vi.stubGlobal(
     'fetch',
@@ -133,6 +164,10 @@ export async function startRoundTrip(
       const url = String(input)
       if (offline) {
         throw new TypeError('Failed to fetch')
+      }
+      if (expireSession) {
+        expireSession = false
+        return json({ error: 'Sesión expirada.' }, 401)
       }
       if (url.startsWith('/api/bootstrap')) {
         return json(await runWithDb(asServerDb(testDb.db), buildBootstrapPayload(user.id)))
@@ -143,14 +178,51 @@ export async function startRoundTrip(
         return json({ revision: changes.at(-1)?.revision ?? since, changes })
       }
       if (url === '/api/sync') {
-        const { commands } = JSON.parse(String(init?.body))
+        const { commands } = JSON.parse(String(init?.body)) as {
+          commands: Array<{ commandId: string }>
+        }
         sentBatches.push(commands)
         if (syncGate && (!syncGateMatches || syncGateMatches(commands))) {
           enterSyncGate?.()
           enterSyncGate = null
           await syncGate
         }
-        return json(await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands)))
+        if (
+          rejectCommand &&
+          commands.some((command) => command.commandId === rejectCommand!.commandId)
+        ) {
+          const rejection = rejectCommand
+          rejectCommand = null
+          return json({
+            results: commands.map((command) =>
+              command.commandId === rejection.commandId
+                ? {
+                    commandId: command.commandId,
+                    status: 'rejected',
+                    message: rejection.message,
+                  }
+                : { commandId: command.commandId, status: 'noop' },
+            ),
+            revision: 0,
+            halted: false,
+          })
+        }
+        const result = await runWithDb(
+          asServerDb(testDb.db),
+          applySyncBatch(user.id, commands as never),
+        )
+        if (loseResponse) {
+          loseResponse = false
+          throw new TypeError('Failed to fetch')
+        }
+        if (corruptResponse) {
+          corruptResponse = false
+          return new Response('respuesta ilegible', {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        }
+        return json(result)
       }
       throw new Error(`unexpected fetch ${url}`)
     }),
@@ -186,8 +258,9 @@ export async function startRoundTrip(
 
   /** Closes and reopens the client: new Pinia, new stores, same IndexedDB. */
   async function reboot(): Promise<State> {
-    // An F5 unloads the page: the previous client stops reading, sending and rendering.
-    syncStore.detach()
+    // An F5 unloads the page: the previous client stops and its IndexedDB
+    // connections close (the browser does that on unload).
+    await syncStore.dispose()
     setActivePinia(createTestPinia())
     const { useSyncStore: freshSyncStore } = await import('../../../../src/stores/sync')
     syncStore = freshSyncStore()
@@ -217,6 +290,27 @@ export async function startRoundTrip(
       offline = next
     },
     commandBatches: () => sentBatches,
+    loseNextResponse: () => {
+      loseResponse = true
+    },
+    corruptNextSyncResponse: () => {
+      corruptResponse = true
+    },
+    rejectSyncCommand: (commandId, message) => {
+      rejectCommand = { commandId, message }
+    },
+    expireSessionOnce: () => {
+      expireSession = true
+    },
+    intents: async () => {
+      const { listDurableIntents, openStorage } = await import('../../../helpers/client-storage')
+      const storage = await openStorage(user.id)
+      try {
+        return (await listDurableIntents(storage)) as never
+      } finally {
+        storage.close()
+      }
+    },
     holdSync: (matches) => {
       if (!syncGate) {
         syncGate = new Promise<void>((resolve) => {

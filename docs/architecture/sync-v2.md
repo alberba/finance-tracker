@@ -35,9 +35,12 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    antes/después en comandos.
 3. `src/stores/sync.ts` `enqueueCommand` / `publishMovementCommands` → `src/lib/client/outbox.ts`
    `enqueue` y `src/lib/client/movement-publication.ts`: validan contra los esquemas Effect Schema
-   y guardan en IndexedDB. La base `finance-tracker-outbox-v2` es la versión 2: añade
-   `movementPublications` sin tocar `commands`, de modo que una cola pendiente de la versión
-   anterior sobrevive. `flush` envía a `POST /api/sync`.
+   y guardan en IndexedDB. La base `finance-tracker-outbox-v2` es la versión 3: cada subida solo
+   añade tiendas (`movementPublications`, `intents`, `intentProgress`) sin tocar `commands`, de
+   modo que una cola pendiente de la versión anterior sobrevive; una conexión antigua que bloquee
+   la subida produce un error tipado y visible en vez de esperar indefinidamente. Los comandos
+   siguen siendo byte-compatibles con `/api/sync`: la intención viaja solo en la entrada de la cola.
+   `flush` envía a `POST /api/sync`.
 4. `src/lib/server/sync/command-schemas.ts`: esquema (Effect Schema) del comando. Lo comparten cliente y
    servidor. Los objetos son `.strict()`: un campo que falte aquí hace que la cola rechace el
    comando al encolarlo.
@@ -65,10 +68,24 @@ añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFull
 que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
 
 La vinculación de movimientos a una cotización fija sus ids objetivo al pulsar Vincular
-(`src/lib/client/instrument-link.ts`), guarda la configuración, espera la referencia de catálogo y
-publica cada movimiento con su estado actual. Un conflicto de un comando marcado como de
-vinculación se relee y se reintenta con identidad nueva; el resto de comandos conserva el rebase
-automático de ADR 0003.
+(`src/lib/client/instrument-link.ts`) y se acepta solo después de persistir la intención y esos ids
+en la base de la cola. Arranque y reconexión reconstruyen cada objetivo desde el estado **actual**
+del movimiento (nunca desde una instantánea guardada) y publican comando y progreso en la misma
+transacción; un paso ya encolado por otra pestaña se omite en vez de duplicarse. Tras un conflicto
+el módulo relee el movimiento y genera otro intento con identidad nueva; el resto de comandos
+conserva el rebase automático de ADR 0003.
+
+La caché sigue siendo una proyección reconstruible en otra base: las confirmaciones se incorporan
+antes de retirar el comando, y la retirada del comando y el avance del paso de la intención se
+confirman juntos en la base de la cola. Si la respuesta se pierde o el proceso se interrumpe entre
+esos pasos, el mismo comando (mismo `commandId` y contenido) queda disponible para un reenvío
+idempotente; un cambio de contenido o un reintento explícito tras un rechazo definitivo usan un
+`commandId` nuevo conservando la identidad del movimiento. Los estados visibles distinguen guardado
+local, espera de conexión o dependencia, pendiente, confirmado, fallo definitivo y resultado
+parcial; el fallo permite reintentar o descartar, y el descarte solo cancela lo que aún no se ha
+reclamado, reconciliando antes un envío incierto. Los registros `intents`/`intentProgress` son el
+punto de extensión de la dependencia de configuración (#491) y de las confirmaciones recurrentes
+(#492).
 
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,

@@ -68,7 +68,7 @@ describe('configuración de cotizaciones persistente', () => {
     const market = useMarketStore()
     const id = market.instruments[0].id
     expect(market.matchingMovementCount(id)).toBe(1)
-    expect(market.linkExistingMovements(id)).toBe(1)
+    expect((await market.linkExistingMovements(id)).targets).toBe(1)
     expect((await trip.reload()).transactions[0].instrumentId).toBe(id)
   })
 

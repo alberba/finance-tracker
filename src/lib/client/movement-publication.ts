@@ -29,6 +29,8 @@ import { Effect } from 'effect'
 import { entityCreatePayloadSchemas } from '../server/sync/command-schemas'
 import {
   COMMANDS_STORE,
+  INTENTS_STORE,
+  INTENT_PROGRESS_STORE,
   InvalidCommandError,
   MOVEMENT_PUBLICATIONS_STORE,
   parseOutboxCommand,
@@ -37,6 +39,11 @@ import {
   type OutboxEntry,
   type OutboxPublication,
 } from './outbox'
+import {
+  markIntentStepQueued,
+  readPublishableIntentStep,
+  type IntentPublicationSlot,
+} from './durable-intents'
 import { ClientStorage, storageError, type ClientStorageError } from './storage'
 
 type JsonRecord = Record<string, unknown>
@@ -90,13 +97,19 @@ export interface MovementPublicationInput {
   /** Marks the queued command as link-owned so a conflict re-evaluates it. */
   link?: { instrumentId: string }
   /**
+   * Durable intent step this command carries out (#490). When present, the
+   * command, its generation and the step's progress are written in the same
+   * readwrite transaction, and a step another tab already advanced is skipped.
+   */
+  intent?: { intentId: string; step: string }
+  /**
    * The movement was published without the instrument a still-running link
    * expects: a later explicit unlink that must win over the continuation.
    */
   unlinked?: boolean
 }
 
-export type MovementPublicationOutcome = 'published' | 'stale' | 'unresolved'
+export type MovementPublicationOutcome = 'published' | 'stale' | 'unresolved' | 'skipped'
 
 export interface MovementPublicationResult {
   movementId: string
@@ -104,6 +117,7 @@ export interface MovementPublicationResult {
   /** Persisted generation after a publication, or the conflicting one for `stale`. */
   generation: number
   seq?: number
+  commandId?: string
   /** The record observed when the publication was rejected as stale. */
   record?: MovementPublicationRecord
 }
@@ -192,7 +206,11 @@ async function runPublication(
   inputs: readonly MovementPublicationInput[],
   writerId: string,
 ): Promise<MovementPublicationResult[]> {
-  const tx = db.transaction([COMMANDS_STORE, MOVEMENT_PUBLICATIONS_STORE], 'readwrite')
+  const stores = [COMMANDS_STORE, MOVEMENT_PUBLICATIONS_STORE]
+  if (inputs.some((input) => input.intent)) {
+    stores.push(INTENTS_STORE, INTENT_PROGRESS_STORE)
+  }
+  const tx = db.transaction(stores, 'readwrite')
   const done = txDone(tx)
   // The commit promise is observed below; on error the transaction is aborted
   // and its rejection is expected, not an unhandled one.
@@ -227,10 +245,23 @@ async function writePublications(
   const queued: { entries: OutboxEntry[] | null } = { entries: null }
 
   for (const input of inputs) {
+    const slot: IntentPublicationSlot | null = input.intent
+      ? await readPublishableIntentStep(tx, input.intent.intentId, input.intent.step)
+      : null
     const existing = (await requestToPromise(
       publications.get(input.movementId) as IDBRequest<MovementPublicationRecord | undefined>,
     )) as MovementPublicationRecord | undefined
     const generation = existing?.generation ?? 0
+    if (input.intent && !slot) {
+      // Another tab already published (or the intent was retried/discarded):
+      // this attempt must not create a second command for the same step.
+      results.push({
+        movementId: input.movementId,
+        outcome: 'skipped',
+        generation,
+      })
+      continue
+    }
     if (input.expectedGeneration !== undefined && input.expectedGeneration !== generation) {
       results.push({
         movementId: input.movementId,
@@ -245,6 +276,7 @@ async function writePublications(
     const entryBase = {
       enqueuedAt: new Date().toISOString(),
       attempts: 0,
+      ...(input.intent ? { intent: input.intent } : {}),
       ...(input.link
         ? {
             publication: {
@@ -270,11 +302,13 @@ async function writePublications(
       await putRecord(publications, input, existing, writerId, nextGeneration, {
         status: 'active',
       })
+      if (slot) await markIntentStepQueued(tx, slot, command.commandId, seq)
       results.push({
         movementId: input.movementId,
         outcome: 'published',
         generation: nextGeneration,
         seq,
+        commandId: command.commandId,
       })
       continue
     }
@@ -290,11 +324,13 @@ async function writePublications(
         const seq = await requestToPromise(
           commands.add({ command, ...entryBase }) as IDBRequest<number>,
         )
+        if (slot) await markIntentStepQueued(tx, slot, command.commandId, seq)
         results.push({
           movementId: input.movementId,
           outcome: 'published',
           generation: nextGeneration,
           seq,
+          commandId: command.commandId,
         })
       } else {
         const pending = await findPendingCreate(commands, input.movementId, queued)
@@ -332,11 +368,13 @@ async function writePublications(
       await putRecord(publications, input, existing, writerId, nextGeneration, {
         status: 'active',
       })
+      if (slot) await markIntentStepQueued(tx, slot, command.commandId, seq)
       results.push({
         movementId: input.movementId,
         outcome: 'published',
         generation: nextGeneration,
         seq,
+        commandId: command.commandId,
       })
       continue
     }
@@ -361,14 +399,19 @@ async function writePublications(
       ...pending,
       command: { ...pending.command, data: merged },
       ...(entryBase.publication ? { publication: entryBase.publication } : {}),
+      ...(input.intent ? { intent: input.intent } : {}),
     })
     queued.entries = null
     await putRecord(publications, input, existing, writerId, nextGeneration, { status: 'active' })
+    if (slot) {
+      await markIntentStepQueued(tx, slot, pending.command.commandId, pending.seq)
+    }
     results.push({
       movementId: input.movementId,
       outcome: 'published',
       generation: nextGeneration,
       seq: pending.seq,
+      commandId: pending.command.commandId,
     })
   }
 

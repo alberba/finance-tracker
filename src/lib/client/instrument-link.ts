@@ -1,24 +1,21 @@
 /**
- * Instrument link execution (#489).
+ * Durable instrument link (#489/#490).
  *
- * The caller (the market store) no longer orchestrates the
- * configuration → sync → catalog gate → movement sequence: it captures the
- * user's action, the target ids and the optimistic state, and this module
- * hides the rest. The link:
+ * The caller expresses one intention — "link these movements to this
+ * instrument" — and this module owns the rest: persisting the fixed targets
+ * before reporting acceptance, saving the private quote configuration, waiting
+ * for the catalog reference, publishing each movement from its **current**
+ * state with the persisted generation, and resuming after a reload or a
+ * reconnection.
  *
- * 1. fixes the targets at click time, so movements created afterwards are
- *    never added;
- * 2. saves the private quote configuration and waits for its catalog
- *    reference;
- * 3. publishes each target from the movement's **current** state (latest
- *    amount, description, whole investment operation, saving destination,
- *    month, time and declared flag), guarded by the persisted generation;
- * 4. on a stale generation, re-reads the movement instead of replaying the
- *    snapshot it started with, and discards deleted, incompatible or
- *    explicitly relinked/unlinked targets.
+ * Acceptance is durable: the optimistic projection the UI shows immediately is
+ * labelled `local-saved`/`sending`, never "confirmed". Confirmation is only the
+ * server's acknowledgement, absorbed into the cache before the queue retires
+ * the command.
  *
- * Resuming an unresolved link after a reload is #490/#491: this module keeps
- * its target set in memory only.
+ * The new-instrument configuration gate still belongs to the caller until
+ * #491; this module keeps it and stores the intent around it so a reload in
+ * between does not lose the selection.
  */
 
 import { unlinkedMovementIdsForInstrument } from '../../domain/investment/symbol-matching'
@@ -26,9 +23,14 @@ import type { Instrument, Transaction } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSyncStore } from '../../stores/sync'
 import { isReadOnlyDemoActive } from './demo-source'
-import { forgetLinkTargets, rememberLinkTargets } from './link-targets'
+import { isUnresolvedIntent, type DurableIntentView } from './durable-intents'
+import { rememberLinkTargets } from './link-targets'
 import { buildMovementData, movementFingerprint } from './movement-commands'
-import { movementPublicationWriterId, type MovementPublicationRecord } from './movement-publication'
+import {
+  movementPublicationWriterId,
+  type MovementPublicationInput,
+  type MovementPublicationRecord,
+} from './movement-publication'
 
 export interface InstrumentLinkRequest {
   instrumentId: string
@@ -37,18 +39,29 @@ export interface InstrumentLinkRequest {
   onError: (message: string) => void
 }
 
+export interface InstrumentLinkAcceptance {
+  /** Movements fixed at click time (the optimistic projection the UI shows). */
+  targets: number
+  /** True once the intent and its fixed ids are durable in this browser. */
+  accepted: boolean
+}
+
+const CATALOG_ERROR = 'Sincroniza la cotización antes de vincular movimientos.'
+const CONFIGURATION_ERROR = 'No se pudo guardar la cotización.'
+
 /**
- * Runs the user's "Vincular movimientos" action. Returns the number of
- * movements that matched at click time (the optimistic state, which the
- * existing UI renders immediately); the asynchronous publication continues in
- * the background and reports failures through `onError`.
+ * Runs the user's "Vincular movimientos" action. Resolves once the intent and
+ * its fixed targets are persisted; the publication continues in the
+ * background and reports failures through the intent record and `onError`.
  */
-export function linkInstrumentMovements(request: InstrumentLinkRequest): number {
-  if (isReadOnlyDemoActive()) return 0
+export async function linkInstrumentMovements(
+  request: InstrumentLinkRequest,
+): Promise<InstrumentLinkAcceptance> {
+  if (isReadOnlyDemoActive()) return { targets: 0, accepted: false }
   const financialStore = useFinancialStateStore()
   const syncStore = useSyncStore()
   const instrument = financialStore.instruments.find((item) => item.id === request.instrumentId)
-  if (!instrument) return 0
+  if (!instrument) return { targets: 0, accepted: false }
   const assetName = financialStore.investmentAssets.find(
     (asset) => asset.id === instrument.investmentAssetId,
   )?.name
@@ -57,13 +70,51 @@ export function linkInstrumentMovements(request: InstrumentLinkRequest): number 
     instrument,
     assetName,
   )
-  if (targetIds.length === 0) return 0
+  if (targetIds.length === 0) return { targets: 0, accepted: false }
 
+  const ownerId = syncStore.userId
+  if (!ownerId) {
+    // No authenticated sync this page (unit/demo fixtures): the optimistic
+    // link is all there is, exactly as before.
+    applyOptimisticLink(instrument.id, targetIds)
+    return { targets: targetIds.length, accepted: false }
+  }
+
+  // Durable acceptance comes first: nothing is reported or projected as
+  // accepted until the intent and its original ids are in IndexedDB.
+  const accepted = await syncStore.acceptIntent({
+    kind: 'instrumentLink',
+    ownerUserId: ownerId,
+    targetIds,
+    payload: {
+      instrumentId: instrument.id,
+      ...(assetName ? { assetName } : {}),
+    },
+  })
+  if (!accepted) return { targets: targetIds.length, accepted: false }
+
+  applyOptimisticLink(instrument.id, targetIds)
+  const updated = financialStore.instruments.find((item) => item.id === instrument.id)
+  if (!updated) return { targets: targetIds.length, accepted: true }
+  rememberLinkTargets(targetIds, instrument.id)
+  void executeInstrumentLink({
+    intentId: accepted.intent.id,
+    ownerId,
+    instrument: { ...updated },
+    targetIds,
+    saveConfiguration: request.saveConfiguration,
+    onError: request.onError,
+  })
+  return { targets: targetIds.length, accepted: true }
+}
+
+function applyOptimisticLink(instrumentId: string, targetIds: readonly string[]): void {
+  const financialStore = useFinancialStateStore()
   financialStore.commitState((draft) => {
-    const draftInstrument = draft.instruments.find((item) => item.id === instrument.id)
+    const draftInstrument = draft.instruments.find((item) => item.id === instrumentId)
     for (const id of targetIds) {
       const transaction = draft.transactions.find((item) => item.id === id)
-      if (transaction) transaction.instrumentId = instrument.id
+      if (transaction) transaction.instrumentId = instrumentId
     }
     if (draftInstrument) {
       // Vincular movimientos hace que sean la fuente inicial de la tenencia.
@@ -75,33 +126,15 @@ export function linkInstrumentMovements(request: InstrumentLinkRequest): number 
       delete draftInstrument.holdingsSource
     }
   })
-
-  const updated = financialStore.instruments.find((item) => item.id === instrument.id)
-  if (!updated) return 0
-  rememberLinkTargets(targetIds, instrument.id)
-  const ownerId = syncStore.userId
-  if (!ownerId) {
-    // No authenticated sync this page (unit/demo fixtures): the optimistic
-    // link is all there is, exactly as before.
-    forgetLinkTargets(targetIds)
-    return targetIds.length
-  }
-
-  void executeInstrumentLink({
-    instrumentId: instrument.id,
-    instrument: { ...updated },
-    targetIds,
-    ownerId,
-    saveConfiguration: request.saveConfiguration,
-    onError: request.onError,
-  })
-  return targetIds.length
 }
 
-interface InstrumentLinkExecution extends InstrumentLinkRequest {
+interface InstrumentLinkExecution {
+  intentId: string
+  ownerId: string
   instrument: Instrument
   targetIds: string[]
-  ownerId: string
+  saveConfiguration: InstrumentLinkRequest['saveConfiguration']
+  onError: InstrumentLinkRequest['onError']
 }
 
 async function executeInstrumentLink(execution: InstrumentLinkExecution): Promise<void> {
@@ -110,11 +143,12 @@ async function executeInstrumentLink(execution: InstrumentLinkExecution): Promis
 
   try {
     if (!(await execution.saveConfiguration(execution.instrument))) {
-      throw new Error('No se pudo guardar la cotización.')
+      throw new Error(CONFIGURATION_ERROR)
     }
     if (!stillOwner()) return
     // A newly configured symbol gets its catalog id on the server. Confirm
-    // that write before resolving the movement's operation.
+    // that write before resolving the movement's operation (#491 will move
+    // this dependency into the intent record).
     await syncStore.syncNow()
     if (!stillOwner()) return
     let catalogId = await syncStore.getInstrumentId(execution.instrument.id)
@@ -124,20 +158,79 @@ async function executeInstrumentLink(execution: InstrumentLinkExecution): Promis
       catalogId = await syncStore.getInstrumentId(execution.instrument.id)
     }
     if (!catalogId) {
-      throw new Error('Sincroniza la cotización antes de vincular movimientos.')
+      await syncStore.failIntent(execution.intentId, CATALOG_ERROR)
+      execution.onError(CATALOG_ERROR)
+      return
     }
-    for (const movementId of execution.targetIds) {
-      if (!stillOwner()) return
-      await publishLinkedTarget(execution.instrument, movementId)
-    }
+    await resumeLinkIntent(execution.intentId)
   } catch (error) {
-    execution.onError(error instanceof Error ? error.message : String(error))
+    const message = error instanceof Error ? error.message : String(error)
+    await syncStore.failIntent(execution.intentId, message).catch(() => undefined)
+    execution.onError(message)
   } finally {
-    forgetLinkTargets(execution.targetIds)
+    // The fixed targets stay registered while the intent is unresolved so an
+    // ordinary edit that clears the instrument is recorded as an explicit
+    // unlink — also after a reload, where the resume below rehydrates them.
   }
 }
 
-async function publishLinkedTarget(instrument: Instrument, movementId: string): Promise<void> {
+/**
+ * Resumes every unresolved link intent. Called from startup and reconnection;
+ * it never adds targets and never replays a stored movement snapshot: each
+ * target is rebuilt from the movement's current state.
+ */
+export async function resumeInstrumentLinks(): Promise<void> {
+  if (isReadOnlyDemoActive()) return
+  const syncStore = useSyncStore()
+  if (!syncStore.userId) return
+  const views = await syncStore.listIntents()
+  for (const view of views) {
+    if (view.intent.kind !== 'instrumentLink') continue
+    if (!isUnresolvedIntent(view.intent)) continue
+    if (view.intent.ownerUserId !== syncStore.userId) continue
+    // The link's expected instrument is a page-local fact; rehydrate it after
+    // a reload so an ordinary edit that clears the instrument is still
+    // recorded as the user's later explicit unlink.
+    const linkedInstrumentId = view.intent.payload.instrumentId
+    if (typeof linkedInstrumentId === 'string') {
+      rememberLinkTargets(view.intent.targetIds, linkedInstrumentId)
+    }
+    // A definitive failure waits for the user's explicit retry; a discard
+    // waits for reconciliation of whatever request is still in flight.
+    if (view.intent.failure || view.intent.discardRequested) continue
+    await resumeLinkIntent(view.intent.id)
+  }
+}
+
+async function resumeLinkIntent(intentId: string): Promise<void> {
+  const syncStore = useSyncStore()
+  const financialStore = useFinancialStateStore()
+  const view = (await syncStore.listIntents()).find((item) => item.intent.id === intentId)
+  if (!view || !isUnresolvedIntent(view.intent)) return
+  if (view.intent.failure || view.intent.discardRequested) return
+  if (view.steps.some((step) => step.state === 'queued' || step.state === 'sending')) {
+    // The durable queue already owns this work; flush/commit will finish it.
+    return
+  }
+  const instrumentId = view.intent.payload.instrumentId
+  if (typeof instrumentId !== 'string') return
+  if (!(await syncStore.getInstrumentId(instrumentId))) {
+    await syncStore.markIntentWaiting(intentId, 'catalog')
+    return
+  }
+  const pending = view.steps.filter((step) => step.state === 'pending')
+  if (pending.length === 0) return
+  for (const step of pending) {
+    await publishLinkedTarget(intentId, instrumentId, step.step, financialStore.currency)
+  }
+}
+
+async function publishLinkedTarget(
+  intentId: string,
+  instrumentId: string,
+  movementId: string,
+  currency: string,
+): Promise<void> {
   const financialStore = useFinancialStateStore()
   const syncStore = useSyncStore()
   const writerId = movementPublicationWriterId()
@@ -146,11 +239,23 @@ async function publishLinkedTarget(instrument: Instrument, movementId: string): 
   while (attempts < 3) {
     attempts += 1
     const movement = financialStore.transactions.find((item) => item.id === movementId)
-    if (!movement || movement.type !== 'investment') return
+    if (!movement || movement.type !== 'investment') {
+      // Deleted or no longer an investment: the continuation must not
+      // resurrect it. The cancelling transaction is the durable record.
+      await syncStore.cancelIntentStep(intentId, movementId)
+      return
+    }
 
     const record = (await syncStore.readMovementPublications([movementId])).get(movementId)
-    if (!isCompatible(record, instrument.id)) return
-    if (movement.instrumentId && movement.instrumentId !== instrument.id) return
+    if (!isCompatible(record, instrumentId)) {
+      await syncStore.cancelIntentStep(intentId, movementId)
+      return
+    }
+    if (movement.instrumentId && movement.instrumentId !== instrumentId) {
+      // A later explicit link to another instrument wins.
+      await syncStore.cancelIntentStep(intentId, movementId)
+      return
+    }
 
     // The pull that confirms the configuration rebuilds the state from the
     // server, where this not-yet-published link is absent. Re-apply the
@@ -159,11 +264,14 @@ async function publishLinkedTarget(instrument: Instrument, movementId: string): 
     if (!movement.instrumentId) {
       financialStore.commitState((draft) => {
         const transaction = draft.transactions.find((item) => item.id === movementId)
-        if (transaction) transaction.instrumentId = instrument.id
+        if (transaction) transaction.instrumentId = instrumentId
       })
     }
     const live = financialStore.transactions.find((item) => item.id === movementId)
-    if (!live || live.type !== 'investment') return
+    if (!live || live.type !== 'investment') {
+      await syncStore.cancelIntentStep(intentId, movementId)
+      return
+    }
     const fingerprint = movementFingerprint(live)
 
     if (
@@ -175,41 +283,49 @@ async function publishLinkedTarget(instrument: Instrument, movementId: string): 
       // Another tab published a state this tab has not seen. Flush and pull
       // before rebuilding, so the command carries the current state instead of
       // overwriting it. Offline that read cannot be trusted: leave the target
-      // unlinked for a later retry rather than publish a stale command.
+      // pending for a later retry rather than publish a stale command.
       refreshed = true
       await syncStore.syncNow()
       if (syncStore.connection === 'offline') return
       continue
     }
 
-    const data = await buildMovementData(live, financialStore.currency)
-    if (!data) return
-    const ref = await syncStore.getEntityRef('transaction', movementId)
-    const [result] = await syncStore.publishMovementCommands([
-      {
-        movementId,
-        plan: {
-          action: 'update',
-          patch: data,
-          ...(ref ? { ref: { entityId: ref.entityId, baseVersion: ref.version } } : {}),
-        },
-        origin: 'instrumentLink',
-        type: live.type,
-        instrumentId: instrument.id,
-        fingerprint,
-        expectedGeneration: record?.generation ?? 0,
-        link: { instrumentId: instrument.id },
-      },
-    ])
-    if (!result) return
-    if (result.outcome === 'published') return
-    if (result.outcome === 'unresolved') return
-    // Stale: the persisted generation moved after this attempt was built.
-    if (!isCompatible(result.record, instrument.id)) return
-    if (result.record?.writerId === writerId) {
-      // Our own tab's edit: the live state is the current one.
-      continue
+    const data = await buildMovementData(live, currency)
+    if (!data) {
+      // A required private reference (account/category) is still unresolved;
+      // keep the intent pending instead of publishing an incomplete command.
+      await syncStore.markIntentWaiting(intentId, 'private-configuration')
+      return
     }
+    const ref = await syncStore.getEntityRef('transaction', movementId)
+    const input: MovementPublicationInput = {
+      movementId,
+      plan: {
+        action: 'update',
+        patch: data,
+        ...(ref ? { ref: { entityId: ref.entityId, baseVersion: ref.version } } : {}),
+      },
+      origin: 'instrumentLink',
+      type: live.type,
+      instrumentId,
+      fingerprint,
+      expectedGeneration: record?.generation ?? 0,
+      link: { instrumentId },
+      intent: { intentId, step: movementId },
+    }
+    const [result] = await syncStore.publishMovementCommands([input])
+    if (!result) return
+    if (result.outcome === 'published' || result.outcome === 'skipped') return
+    if (result.outcome === 'unresolved') {
+      await syncStore.markIntentWaiting(intentId, 'private-configuration')
+      return
+    }
+    // Stale: the persisted generation moved after this attempt was built.
+    if (!isCompatible(result.record, instrumentId)) {
+      await syncStore.cancelIntentStep(intentId, movementId)
+      return
+    }
+    if (result.record?.writerId === writerId) continue
     if (refreshed) return
     refreshed = true
     await syncStore.syncNow()
@@ -240,10 +356,9 @@ export interface LinkedMovementConflict {
 }
 
 /**
- * Re-evaluates a link-owned command the server rejected with a conflict,
- * after the sync store pulled the server's current rows. It rebuilds the
- * command from the movement's current state (with a fresh command identity,
- * minted by the publication transaction) and never retries the old payload.
+ * Re-evaluates a link-owned command from the previous build that carries no
+ * durable intent yet (#489 queues upgraded from version 2). New links always
+ * carry an intent and are recovered by `resumeInstrumentLinks`.
  */
 export async function recoverLinkedMovement(conflict: LinkedMovementConflict): Promise<boolean> {
   if (isReadOnlyDemoActive()) return false
@@ -288,4 +403,21 @@ export async function recoverLinkedMovement(conflict: LinkedMovementConflict): P
   // A stale outcome means another publication superseded this re-evaluation;
   // never overwrite it with the payload built here.
   return result?.outcome === 'published'
+}
+
+/** The unresolved intents, for a status surface that only needs names/counts. */
+export function summarizeIntent(view: DurableIntentView): {
+  confirmed: number
+  pending: number
+  failed: number
+  cancelled: number
+} {
+  return {
+    confirmed: view.steps.filter((step) => step.state === 'confirmed').length,
+    pending: view.steps.filter(
+      (step) => step.state === 'pending' || step.state === 'queued' || step.state === 'sending',
+    ).length,
+    failed: view.steps.filter((step) => step.state === 'failed').length,
+    cancelled: view.steps.filter((step) => step.state === 'cancelled').length,
+  }
 }

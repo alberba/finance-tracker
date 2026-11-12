@@ -2,8 +2,10 @@ import 'fake-indexeddb/auto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  acceptDurableIntent,
   count,
   listAll,
+  listDurableIntents,
   openStorage,
   publishMovementCommands,
   readMovementPublications,
@@ -167,6 +169,66 @@ describe('disciplina de publicación de movimientos (#489)', () => {
       entityId: 'movement-1',
     })
     expect(result.seq).toBe(commands[0].seq)
+  })
+
+  it('publica el paso de una intención y su progreso en la misma transacción', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      kind: 'instrumentLink',
+      ownerUserId: USER_ID,
+      targetIds: ['movement-1'],
+      payload: { instrumentId: 'instrument-1' },
+    })
+    const [result] = await publishMovementCommands(db, [
+      input({
+        intent: { intentId: accepted.intent.id, step: 'movement-1' },
+        link: { instrumentId: 'instrument-1' },
+        origin: 'instrumentLink',
+        instrumentId: 'instrument-1',
+      }),
+    ])
+
+    expect(result).toMatchObject({ outcome: 'published', commandId: expect.any(String) })
+    const [view] = await listDurableIntents(db)
+    expect(view.intent.state).toBe('sending')
+    expect(view.steps[0]).toMatchObject({
+      state: 'queued',
+      commandId: result.commandId,
+      seq: result.seq,
+      attempt: 1,
+    })
+    const commands = await listAll(db)
+    expect(commands[0].intent).toEqual({
+      intentId: accepted.intent.id,
+      step: 'movement-1',
+    })
+    // The intent metadata never enters the command the server receives.
+    expect(commands[0].command).not.toHaveProperty('intent')
+  })
+
+  it('no vuelve a publicar un paso que otra pestaña ya encoló', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      kind: 'instrumentLink',
+      ownerUserId: USER_ID,
+      targetIds: ['movement-1'],
+      payload: { instrumentId: 'instrument-1' },
+    })
+    await publishMovementCommands(db, [
+      input({
+        intent: { intentId: accepted.intent.id, step: 'movement-1' },
+      }),
+    ])
+    const otherTab = await openStorage(USER_ID)
+    try {
+      const [second] = await publishMovementCommands(otherTab, [
+        input({
+          intent: { intentId: accepted.intent.id, step: 'movement-1' },
+        }),
+      ])
+      expect(second.outcome).toBe('skipped')
+      expect(await count(db)).toBe(1)
+    } finally {
+      otherTab.close()
+    }
   })
 
   it('funde una edición en el create todavía encolado en la misma transacción', async () => {
