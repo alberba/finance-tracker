@@ -27,7 +27,7 @@ import {
 } from '../server/sync/command-schemas'
 import { ClientStorage, storageError, type ClientStorageError } from './storage'
 
-const DB_VERSION = 2
+export const OUTBOX_DB_VERSION = 3
 const STORE = 'commands'
 /**
  * Persisted publication generation per movement (#489), in the same database
@@ -36,6 +36,15 @@ const STORE = 'commands'
  * cannot provide.
  */
 export const MOVEMENT_PUBLICATIONS_STORE = 'movementPublications'
+/**
+ * Durable intent headers and their per-step progress (#490). They live beside
+ * `commands` in the same per-user database so accepting an intent, publishing
+ * its commands and advancing its progress can commit in one IndexedDB
+ * transaction. `commands` stays byte-compatible with `/api/sync`: intent
+ * metadata only ever rides on the queue entry, never inside the command body.
+ */
+export const INTENTS_STORE = 'intents'
+export const INTENT_PROGRESS_STORE = 'intentProgress'
 export const COMMANDS_STORE = STORE
 
 /**
@@ -60,6 +69,18 @@ export interface OutboxEntry {
   attempts: number
   lastError?: string
   publication?: OutboxPublication
+  /**
+   * Client-only link from a queued command to the durable intent step that
+   * owns it (#490). `POST /api/sync` only ever sends `entry.command`, so the
+   * wire contract is untouched.
+   */
+  intent?: OutboxIntentRef
+}
+
+/** The intent step a queued command belongs to. */
+export interface OutboxIntentRef {
+  intentId: string
+  step: string
 }
 
 /**
@@ -84,36 +105,58 @@ export const openOutbox = (userId: string): Effect.Effect<IDBDatabase, ClientSto
   Effect.tryPromise({
     try: () =>
       new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(dbNameFor(userId), DB_VERSION)
+        const request = indexedDB.open(dbNameFor(userId), OUTBOX_DB_VERSION)
+        let settled = false
 
         request.onupgradeneeded = () => {
           const db = request.result
+          // Every upgrade only adds the stores a build introduced: it never
+          // touches `commands`, so a queue written by an older build survives.
           if (!db.objectStoreNames.contains(STORE)) {
             db.createObjectStore(STORE, { keyPath: 'seq', autoIncrement: true })
           }
-          // Version 2 added this store; `commands` is left untouched so a
-          // queue written by an older build survives the upgrade.
+          // Version 2 added movement publications; version 3 added the durable
+          // intent header/progress records (#490).
           if (!db.objectStoreNames.contains(MOVEMENT_PUBLICATIONS_STORE)) {
             db.createObjectStore(MOVEMENT_PUBLICATIONS_STORE, { keyPath: 'id' })
           }
+          if (!db.objectStoreNames.contains(INTENTS_STORE)) {
+            db.createObjectStore(INTENTS_STORE, { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains(INTENT_PROGRESS_STORE)) {
+            db.createObjectStore(INTENT_PROGRESS_STORE, { keyPath: 'id' })
+          }
         }
 
-        // An older tab holding a version-1 connection would otherwise make
-        // this open hang forever. Fail visibly instead of silently.
-        request.onblocked = () =>
+        // An older tab holding a lower-version connection would otherwise
+        // make this open hang forever. Fail visibly instead of silently.
+        request.onblocked = () => {
+          if (settled) return
+          settled = true
           reject(
             new Error(
               'Otra pestaña mantiene abierto el almacenamiento local. Recarga o cierra las demás pestañas.',
             ),
           )
+        }
         request.onsuccess = () => {
           const db = request.result
+          if (settled) {
+            // The blocked upgrade eventually finished after we reported the
+            // error; do not leak that late connection.
+            db.close()
+            return
+          }
+          settled = true
           // Yield the connection to a newer build instead of blocking it.
           db.onversionchange = () => db.close()
           resolve(db)
         }
-        request.onerror = () =>
+        request.onerror = () => {
+          if (settled) return
+          settled = true
           reject(request.error ?? new Error('No se pudo abrir el outbox IndexedDB.'))
+        }
       }),
     catch: (cause) => storageError(cause, 'No se pudo abrir el outbox IndexedDB.'),
   })
@@ -321,11 +364,17 @@ export const recordFailure = (
     await txDone(tx)
   })
 
-/** Empties the whole outbox (used by "empezar de cero" / discard-local-edits flows). */
+/** Empties the whole queue (commands, intents and their progress). */
 export const clear = (): Effect.Effect<void, ClientStorageError, ClientStorage> =>
   withOutbox('No se pudo vaciar el outbox.', async (db) => {
-    const tx = db.transaction(STORE, 'readwrite')
+    const tx = db.transaction(
+      [STORE, MOVEMENT_PUBLICATIONS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE],
+      'readwrite',
+    )
     tx.objectStore(STORE).clear()
+    tx.objectStore(MOVEMENT_PUBLICATIONS_STORE).clear()
+    tx.objectStore(INTENTS_STORE).clear()
+    tx.objectStore(INTENT_PROGRESS_STORE).clear()
     await txDone(tx)
   })
 
