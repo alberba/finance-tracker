@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import PendingMovementsPanel from '../../src/components/recurring/PendingMovementsPanel.vue'
 import { nextTick } from 'vue'
@@ -216,7 +216,11 @@ describe('PendingMovementsPanel', () => {
       description: 'Gasto mensual editado',
       amount: 450,
     })
-    expect((wrapper.get('#pending-edit-panel').element as HTMLDialogElement).open).toBe(false)
+    // The save is asynchronous now: it closes the panel once the durable
+    // acceptance of the confirmation resolves.
+    await vi.waitFor(() =>
+      expect((wrapper.get('#pending-edit-panel').element as HTMLDialogElement).open).toBe(false),
+    )
     wrapper.unmount()
   })
 

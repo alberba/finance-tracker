@@ -17,16 +17,20 @@
  * Guarantees:
  * - A reservation is unique per pending (its intent id is derived from the
  *   pending id) and keeps the resolved edit, **one** movement id and the
- *   timestamps. A second tab or a reload reads it instead of deciding again.
- * - The movement command is written first and the pending update is only
- *   built once that command exists, so a pending never points at a movement
- *   that cannot exist. A failure between both keeps the reservation; the next
- *   resume retries from the stored decision.
+ *   timestamps. The movement command is published in the same transaction that
+ *   accepts the reservation; if the acceptance fails, neither exists. A second
+ *   tab or a reload reads the reservation instead of deciding again.
+ * - The pending update is only built after the server acknowledged that
+ *   movement, so a pending never points at a movement that could not exist. A
+ *   failure keeps the reservation; the next resume retries from the stored
+ *   decision.
  * - Commands keep their own `commandId`/content while their outcome is
  *   uncertain. Only an explicit retry after a definitive failure publishes a
  *   new attempt, keeping the movement identity.
  * - Discarding never reverts a confirmed movement; the reservation stays so a
  *   repeat cannot create a second one, and the partial result stays visible.
+ *   A pending already confirmed and linked is forgotten so the queue cannot
+ *   grow without bound.
  */
 
 import { useToast } from '../../composables/useToast'
@@ -138,6 +142,11 @@ export async function confirmPendingMovement(
   }
 
   const intentId = pendingConfirmationIntentId(request.pendingId)
+  // The movement command commits in the same transaction that accepts the
+  // reservation (#490/#491): there is no accepted state whose first effect is
+  // not already durable. If a required reference is still unresolved, the
+  // reservation is accepted as waiting and publishes the movement later.
+  const movementCommand = await buildAcceptanceMovementCommand(request)
   const accepted = await syncStore.acceptPendingConfirmation({
     id: intentId,
     kind: PENDING_CONFIRMATION_KIND,
@@ -145,6 +154,9 @@ export async function confirmPendingMovement(
     targetIds: [request.pendingId],
     steps: [MOVEMENT_STEP, PENDING_STEP],
     payload: encodeDecision(request),
+    ...(movementCommand
+      ? { commands: [{ step: MOVEMENT_STEP, command: movementCommand }] }
+      : { waitingFor: 'private-configuration' as const }),
   })
   if (!accepted) {
     return {
@@ -342,6 +354,24 @@ export async function pendingConfirmationStatus(
     waitingFor: view.intent.waitingFor,
     failure: view.intent.failure,
     discarded: view.intent.state === 'discarded',
+  }
+}
+
+async function buildAcceptanceMovementCommand(
+  request: PendingConfirmationRequest,
+): Promise<OutboxCommandInput | null> {
+  try {
+    const data = await buildMovementData(request.transaction, useFinancialStateStore().currency)
+    if (!data) return null
+    return {
+      action: 'create',
+      entityType: 'transaction',
+      data: { ...data, id: request.transaction.id },
+    }
+  } catch {
+    // A reference that cannot be resolved keeps the reservation waiting; it is
+    // never a reason to report the confirmation as failed.
+    return null
   }
 }
 

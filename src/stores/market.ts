@@ -215,7 +215,6 @@ export const useMarketStore = defineStore('market', () => {
   function linkExistingMovements(instrumentId: string): Promise<InstrumentLinkAcceptance> {
     return linkInstrumentMovements({
       instrumentId,
-      saveConfiguration: (instrument) => persistConfiguration(instrument),
       onError: (message) => {
         errorMessage.value = message
       },

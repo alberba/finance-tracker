@@ -15,6 +15,7 @@ import { runClientHttp } from '../../lib/client/runtime'
 import { useMarketStore } from '../../stores/market'
 import { useSyncStore } from '../../stores/sync'
 import { isUnresolvedIntent } from '../../lib/client/durable-intents'
+import { LINK_CONFIGURATION_STEP } from '../../lib/client/instrument-link'
 
 // The portfolio's visible symbol and its independent provider ticker.
 const props = defineProps<{ instrument: InstrumentRowViewModel }>()
@@ -35,20 +36,21 @@ const linkIntent = computed(() =>
       !isUnresolvedIntent(view.intent)
     )
       return false
-    // A discarded remainder is terminal for the user: keep the confirmed
-    // partial result out of the way instead of offering retry forever.
-    if (view.intent.state === 'partial' && view.intent.failure === null) return false
     return true
   }),
 )
+/** The movable steps; the configuration dependency is not a "vinculado". */
+const linkSteps = computed(
+  () => linkIntent.value?.steps.filter((step) => step.step !== LINK_CONFIGURATION_STEP) ?? [],
+)
 const linkCounts = computed(() => {
-  const view = linkIntent.value
-  if (!view) return null
+  if (!linkIntent.value) return null
   return {
-    confirmed: view.steps.filter((step) => step.state === 'confirmed').length,
-    pending: view.steps.filter((step) => step.state !== 'confirmed' && step.state !== 'cancelled')
-      .length,
-    total: view.steps.length,
+    confirmed: linkSteps.value.filter((step) => step.state === 'confirmed').length,
+    pending: linkSteps.value.filter(
+      (step) => step.state !== 'confirmed' && step.state !== 'cancelled',
+    ).length,
+    total: linkSteps.value.length,
   }
 })
 const linkFailed = computed(

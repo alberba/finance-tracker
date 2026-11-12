@@ -167,40 +167,44 @@ describe('vinculación durable y recuperable (#490)', () => {
     expect(await trip.pending()).toHaveLength(0)
   })
 
-  it('no pierde la intención aceptada si se interrumpe antes de publicar', async () => {
-    const instrumentId = await configuredInstrument(trip)
-    // The page unloads after accepting the intent but while the configuration
-    // step it handed to the caller is still unresolved: no movement command
-    // exists yet, only the durable intent and its fixed target.
-    let releaseConfiguration!: (value: boolean) => void
-    const configurationGate = new Promise<boolean>((resolve) => {
-      releaseConfiguration = resolve
-    })
+  it('no publica ningún movimiento antes de confirmar la cotización ni pierde la intención al recargar', async () => {
+    // The quote was configured and the user asked to link it in the same
+    // breath, with no connection: the accepted configuration is the intent's
+    // first step and no movement command may exist before its catalog
+    // reference is confirmed (#491 replaced the former caller-owned gate).
+    trip.setOffline(true)
+    const instrumentId = await addLinkInstrument()
     const acceptance = await linkInstrumentMovements({
       instrumentId,
-      saveConfiguration: () => configurationGate,
       onError: () => undefined,
     })
-    expect(acceptance.accepted).toBe(true)
+    expect(acceptance).toEqual({ targets: 1, accepted: true })
 
-    const interrupted = await waitForIntent(
-      trip,
-      (view) => view.intent.state === 'local-saved' && view.steps[0]?.state === 'pending',
+    const interrupted = await waitForIntent(trip, (view) =>
+      view.steps.some((step) => step.step === 'configuration' && step.state === 'queued'),
     )
-    expect(interrupted.steps[0].attempt).toBe(0)
-    const intentCommands = (await trip.pending()).filter(
-      (entry) => (entry as { intent?: unknown }).intent,
-    )
-    expect(intentCommands).toHaveLength(0)
+    const queued = (await trip.pending()) as Array<{
+      command: { commandId: string; entityType?: string; action?: string }
+      intent?: { intentId: string; step: string }
+    }>
+    const configuration = queued.find((entry) => entry.command.entityType === 'userInstrument')
+    expect(configuration?.intent).toEqual({
+      intentId: interrupted.intent.id,
+      step: 'configuration',
+    })
+    expect(queued.filter((entry) => entry.command.entityType === 'transaction')).toHaveLength(0)
 
-    // Reboot offline: the intent survives and publishes its command locally.
-    trip.setOffline(true)
+    // Reboot offline: the intent and its configuration command survive, and
+    // the movement steps are still pending behind the dependency.
     const offlineState = await trip.reloadOffline()
-    releaseConfiguration(true)
-    expect(offlineState.transactions.find((item) => item.id === targetId)?.instrumentId).toBe(
-      instrumentId,
-    )
-    await waitForIntent(trip, (view) => view.steps[0]?.state === 'queued')
+    expect(
+      offlineState.transactions.find((item) => item.id === targetId)?.instrumentId,
+    ).toBeUndefined()
+    const afterReload = await trip.intents()
+    expect(afterReload[0].steps.find((step) => step.step === 'configuration')).toMatchObject({
+      state: 'queued',
+      commandId: configuration?.command.commandId,
+    })
 
     trip.setOffline(false)
     await trip.reload()
@@ -337,11 +341,16 @@ describe('vinculación durable y recuperable (#490)', () => {
   })
 
   it('respeta un desvínculo posterior tras recargar una intención pendiente', async () => {
+    // The configuration was not confirmed when the user asked to link; the
+    // intent now owns it as a waiting dependency (#491 replaces the former
+    // definitive catalog failure this test used to trigger).
     const instrumentId = await addLinkInstrument()
     trip.setOffline(true)
     const acceptance = await useMarketStore().linkExistingMovements(instrumentId)
-    expect(acceptance.accepted).toBe(true)
-    const failed = await waitForIntent(trip, (view) => view.intent.state === 'failed')
+    expect(acceptance).toEqual({ targets: 1, accepted: true })
+    await waitForIntent(trip, (view) =>
+      view.steps.some((step) => step.step === 'configuration' && step.state === 'queued'),
+    )
 
     await trip.reloadOffline()
     useInvestmentStore().saveEditedMovement(targetId, {
@@ -359,10 +368,10 @@ describe('vinculación durable y recuperable (#490)', () => {
     })
 
     trip.setOffline(false)
-    await trip.syncStore.retryIntent(failed.intent.id)
-    await waitForIntent(trip, (view) => view.intent.state === 'discarded')
-
     const state = await trip.reload()
+    const [view] = await trip.intents()
+    expect(view.intent.failure).toBeNull()
+    expect(view.steps.find((step) => step.step === targetId)?.state).toBe('cancelled')
     expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
       symbol: 'OTHER',
     })

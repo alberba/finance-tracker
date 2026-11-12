@@ -77,6 +77,14 @@ export interface RoundTrip {
   rejectSyncCommand: (commandId: string, message: string) => void
   /** Makes the next request answer 401, as an expired session. */
   expireSessionOnce: () => void
+  /**
+   * Applies the next command batch and then makes every `/api/changes` (and
+   * therefore the pull) fail. Lets a test prove a write wakes its dependent
+   * work from the confirmed response itself, without a later cached query.
+   */
+  failChangesAfterNextSync: () => void
+  /** Stops (or resumes) failing `/api/changes`. */
+  setChangesFailing: (failing: boolean) => void
   /** Durable intents currently in the per-user queue database. */
   intents: () => Promise<
     Array<{
@@ -157,6 +165,8 @@ export async function startRoundTrip(
   let corruptResponse = false
   let rejectCommand: { commandId: string; message: string } | null = null
   let expireSession = false
+  let changesFailing = false
+  let failChangesAfterSync = false
 
   vi.stubGlobal(
     'fetch',
@@ -173,6 +183,7 @@ export async function startRoundTrip(
         return json(await runWithDb(asServerDb(testDb.db), buildBootstrapPayload(user.id)))
       }
       if (url.startsWith('/api/changes')) {
+        if (changesFailing) throw new TypeError('Failed to fetch')
         const since = Number(new URL(url, 'https://test.local').searchParams.get('since') ?? 0)
         const changes = await runWithDb(asServerDb(testDb.db), listChangesSince(user.id, since))
         return json({ revision: changes.at(-1)?.revision ?? since, changes })
@@ -225,6 +236,10 @@ export async function startRoundTrip(
         if (loseResponse) {
           loseResponse = false
           throw new TypeError('Failed to fetch')
+        }
+        if (failChangesAfterSync) {
+          failChangesAfterSync = false
+          changesFailing = true
         }
         if (corruptResponse) {
           corruptResponse = false
@@ -312,6 +327,13 @@ export async function startRoundTrip(
     },
     expireSessionOnce: () => {
       expireSession = true
+    },
+    failChangesAfterNextSync: () => {
+      failChangesAfterSync = true
+    },
+    setChangesFailing: (failing: boolean) => {
+      changesFailing = failing
+      if (!failing) failChangesAfterSync = false
     },
     intents: async () => {
       const { listDurableIntents, openStorage } = await import('../../../helpers/client-storage')

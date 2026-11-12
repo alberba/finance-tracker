@@ -121,7 +121,9 @@ async function startSync(): Promise<ReturnType<typeof useSyncStore>> {
  * Forces the next queue-DB transaction matching `matches` to fail, the way a
  * real storage error does. Returns a restore function.
  */
-function failNextQueueTransaction(matches: (stores: string[]) => boolean): () => void {
+function failNextQueueTransaction(
+  matches: (stores: string[], mode: IDBTransactionMode) => boolean,
+): () => void {
   const prototype = IDBDatabase.prototype
   const real = prototype.transaction
   const spy = vi.spyOn(prototype, 'transaction').mockImplementation(function (
@@ -131,7 +133,7 @@ function failNextQueueTransaction(matches: (stores: string[]) => boolean): () =>
     options?: IDBTransactionOptions,
   ) {
     const names = Array.isArray(stores) ? stores : [stores]
-    if (this.name.startsWith('finance-tracker-outbox') && matches(names)) {
+    if (this.name.startsWith('finance-tracker-outbox') && matches(names, mode ?? 'readonly')) {
       spy.mockRestore()
       throw new DOMException('fallo de almacenamiento simulado', 'AbortError')
     }
@@ -182,7 +184,8 @@ describe('confirmPending — aceptación durable y recuperable (#492)', () => {
     // The reservation is written before the optimistic confirmation: if that
     // write fails, nothing is projected and the pending stays open.
     const restore = failNextQueueTransaction(
-      (stores) => stores.includes('intents') && !stores.includes('commands'),
+      (stores, mode) =>
+        mode === 'readwrite' && stores.includes('intents') && stores.includes('commands'),
     )
     let outcome
     try {
