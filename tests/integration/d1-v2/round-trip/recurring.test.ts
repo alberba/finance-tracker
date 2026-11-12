@@ -64,6 +64,10 @@ describe('round trip: recurring rules and pending movements', () => {
     expect(reloaded.recurringRules).toHaveLength(1)
     expect(reloaded.pendingMovements).toHaveLength(2)
 
+    const serverRule = await trip.syncStore.getEntityRef('recurringRule', 'old-rule')
+    expect(serverRule).not.toBeNull()
+    expect(serverRule!.entityId).not.toBe('old-rule')
+
     const current = useRecurringStore()
     expect(
       await current.updateRule('old-rule', {
@@ -88,6 +92,26 @@ describe('round trip: recurring rules and pending movements', () => {
     })
     expect(reloaded.pendingMovements).toHaveLength(2)
     expect(reloaded.pendingMovements.every((item) => item.ruleId === 'old-rule')).toBe(true)
+    // The migrated v1 id is only the local handle: the command addresses the
+    // row's own server id, and the new occurrence references it.
+    const updates = trip
+      .commandBatches()
+      .flat()
+      .filter(
+        (command) =>
+          (command as { entityType?: string }).entityType === 'recurringRule' &&
+          (command as { action?: string }).action === 'update',
+      ) as Array<{ entityId: string }>
+    expect(updates.every((command) => command.entityId === serverRule!.entityId)).toBe(true)
+    const pendingCreate = trip
+      .commandBatches()
+      .flat()
+      .find(
+        (command) =>
+          (command as { entityType?: string }).entityType === 'pendingMovement' &&
+          (command as { action?: string }).action === 'create',
+      ) as { data: { recurringRuleId: string } } | undefined
+    expect(pendingCreate?.data.recurringRuleId).toBe(serverRule!.entityId)
     expect(await trip.pending()).toEqual([])
   })
 })

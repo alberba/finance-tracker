@@ -307,6 +307,41 @@ describe('regla recurrente — fases durables y reanudación (#493)', () => {
     expect(await readCommands()).toHaveLength(3)
   })
 
+  it('cuenta la intención una sola vez y la incluye en el ciclo de sesión', async () => {
+    setupState()
+    const syncStore = await startSync()
+    await seedRefs()
+
+    expect(await useRecurringStore().addRule(ruleInput())).toBe(true)
+    const commands = await readCommands()
+    expect(commands).toHaveLength(3)
+    // The three queued commands are the work; the unresolved intent that owns
+    // them is not counted a second time.
+    await vi.waitFor(() => expect(syncStore.pendingCount).toBe(3), { timeout: 5000 })
+    expect(syncStore.unresolvedIntentCount).toBe(1)
+    expect(syncStore.failedIntentCount).toBe(0)
+    await expect(syncStore.prepareLogout()).rejects.toThrow(/No se pudieron sincronizar/)
+
+    // A session change stops this user's work and does not count it; the other
+    // user's database stays isolated.
+    const otherUser = `${USER_ID}-other`
+    await wipeIdbCache(otherUser)
+    await wipeOutbox(otherUser)
+    await syncStore.init(otherUser)
+    expect(syncStore.intents).toHaveLength(0)
+    expect(syncStore.pendingCount).toBe(0)
+    const previous = await openStorage(USER_ID)
+    try {
+      expect(await listDurableIntents(previous)).toHaveLength(1)
+    } finally {
+      previous.close()
+    }
+    await syncStore.logout({ discardPending: true })
+    activeStore = null
+    await wipeIdbCache(otherUser)
+    await wipeOutbox(otherUser)
+  })
+
   it('mantiene regla, edición y ocurrencias tras interrumpir y reanudar', async () => {
     setupState()
     await startSync()
