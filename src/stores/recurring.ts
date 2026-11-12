@@ -3,6 +3,14 @@ import { defineStore } from 'pinia'
 import { computed, watch } from 'vue'
 
 import { useToast } from '../composables/useToast'
+import {
+  applyPendingEdit,
+  buildPendingTransaction,
+  confirmFieldsFromPending,
+  isValidSaving,
+  resolvePendingEdit,
+  type PendingMovementEdit,
+} from '../domain/recurring/pending'
 import { generatePendingMovements } from '../domain/recurring/pending'
 import { nextOccurrenceDate, todayISO } from '../domain/recurring/occurrences'
 import {
@@ -11,17 +19,22 @@ import {
   syncListDiff,
   type CategoryKind,
 } from '../lib/client/command-mapping'
-import { syncMovements } from '../lib/client/movement-commands'
-import { computeInvestmentMovement } from '../scripts/investment-movements'
+import {
+  confirmPendingMovement as confirmPendingMovementWrite,
+  discardPendingConfirmation,
+  pendingConfirmationStatus as readPendingConfirmationStatus,
+  retryPendingConfirmation,
+  type PendingConfirmationOutcome,
+  type PendingConfirmationStatus,
+} from '../lib/client/recurring-write'
 import type {
   InvestmentSide,
   PendingMovement,
   RecurringFrequency,
   RecurringRule,
-  Transaction,
   TransactionType,
 } from '../scripts/types'
-import { monthFromISO, round2, uid } from '../scripts/utils'
+import { round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useSyncStore } from './sync'
@@ -112,22 +125,6 @@ function operationData(template: {
   }
 }
 
-function clearInvestmentFields(target: {
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}): void {
-  delete target.symbol
-  delete target.side
-  delete target.units
-  delete target.unitPrice
-  delete target.fee
-  delete target.time
-}
-
 /**
  * WP7b — maps a legacy `PendingMovement` row to a `pendingMovement` sync
  * command payload. Returns `null` (skip, see `syncListDiff`) when either
@@ -185,147 +182,6 @@ export interface NewRecurringRuleInput {
   interval: number
   startDate: string
   endDate?: string
-}
-
-export interface PendingMovementEdit {
-  date: string
-  accountId: string
-  destinationAccountId?: string
-  category: string
-  description: string
-  amount: number
-  type?: TransactionType
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}
-
-/**
- * The final fields of a pending movement after an edit. `amount` is the
- * unsigned figure the pending row shows; `signedAmount` is what the movement
- * records (an investment sale is negative).
- */
-interface ResolvedPendingEdit {
-  type: TransactionType
-  occurrenceDate: string
-  accountId: string
-  destinationAccountId?: string
-  category: string
-  description: string
-  amount: number
-  signedAmount: number
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}
-
-/** Resolves an edit against the pending row, validating it like the panel does. */
-function resolvePendingEdit(
-  pending: PendingMovement,
-  edit: Partial<PendingMovementEdit>,
-): ResolvedPendingEdit | null {
-  const type = edit.type ?? pending.type
-  const investment =
-    type === 'investment'
-      ? computeInvestmentMovement({
-          side: edit.side ?? pending.side ?? 'buy',
-          symbol: edit.symbol ?? pending.symbol ?? '',
-          units: edit.units ?? pending.units ?? 0,
-          unitPrice: edit.unitPrice ?? pending.unitPrice ?? 0,
-          fee: edit.fee ?? pending.fee ?? 0,
-        })
-      : null
-  const amount = investment
-    ? Math.abs(investment.signedAmount)
-    : round2(edit.amount ?? pending.amount)
-  const fields: ResolvedPendingEdit = {
-    type,
-    occurrenceDate: edit.date ?? pending.occurrenceDate,
-    accountId: edit.accountId ?? pending.accountId,
-    destinationAccountId:
-      type === 'saving' ? (edit.destinationAccountId ?? pending.destinationAccountId) : undefined,
-    category: edit.category ?? pending.category,
-    description: (edit.description ?? pending.description).trim(),
-    amount,
-    signedAmount: investment ? investment.signedAmount : amount,
-    ...(investment
-      ? {
-          symbol: investment.normalizedSymbol,
-          side: edit.side ?? pending.side ?? 'buy',
-          units: investment.normalizedUnits,
-          unitPrice: investment.normalizedUnitPrice,
-          fee: investment.normalizedFee,
-          time: (edit.time ?? pending.time)?.trim() || undefined,
-        }
-      : {}),
-  }
-  return isValidPendingEdit(fields) ? fields : null
-}
-
-function isValidPendingEdit(fields: ResolvedPendingEdit): boolean {
-  return Boolean(
-    fields.occurrenceDate &&
-    fields.accountId &&
-    isValidSaving(fields) &&
-    fields.category &&
-    fields.description &&
-    fields.amount > 0 &&
-    (fields.type !== 'investment' ||
-      (fields.symbol && (fields.units ?? 0) > 0 && (fields.unitPrice ?? 0) > 0)),
-  )
-}
-
-/** A confirmation without edits keeps the pending row exactly as it is. */
-function confirmFieldsFromPending(pending: PendingMovement): ResolvedPendingEdit {
-  const amount = Math.abs(pending.amount)
-  return {
-    type: pending.type,
-    occurrenceDate: pending.occurrenceDate,
-    accountId: pending.accountId,
-    destinationAccountId: pending.type === 'saving' ? pending.destinationAccountId : undefined,
-    category: pending.category,
-    description: pending.description.trim(),
-    amount: pending.amount,
-    signedAmount: pending.type === 'investment' && pending.side === 'sell' ? -amount : amount,
-    symbol: pending.symbol,
-    side: pending.side,
-    units: pending.units,
-    unitPrice: pending.unitPrice,
-    fee: pending.fee,
-    time: pending.time,
-  }
-}
-
-function applyPendingEdit(current: PendingMovement, fields: ResolvedPendingEdit): void {
-  current.type = fields.type
-  current.occurrenceDate = fields.occurrenceDate
-  current.accountId = fields.accountId
-  if (fields.type === 'saving' && fields.destinationAccountId) {
-    current.destinationAccountId = fields.destinationAccountId
-  } else {
-    delete current.destinationAccountId
-  }
-  current.category = fields.category
-  current.description = fields.description
-  current.amount = fields.amount
-  if (fields.type === 'investment') {
-    if (fields.symbol) current.symbol = fields.symbol
-    if (fields.side) current.side = fields.side
-    if (fields.units !== undefined) current.units = fields.units
-    if (fields.unitPrice !== undefined) current.unitPrice = fields.unitPrice
-    if (fields.fee !== undefined) current.fee = fields.fee
-    if (fields.time) current.time = fields.time
-    else delete current.time
-  } else {
-    clearInvestmentFields(current)
-  }
-  current.updatedAt = new Date().toISOString()
 }
 
 export const useRecurringStore = defineStore('recurring', () => {
@@ -601,73 +457,42 @@ export const useRecurringStore = defineStore('recurring', () => {
     queueRulesThenPending(beforeRules, beforePending)
   }
 
-  function confirmPending(id: string, edit?: Partial<PendingMovementEdit>): boolean {
+  /**
+   * Confirms (optionally after editing) one pending. Resolves once the
+   * reservation, the accepted edit and the single movement id are durable in
+   * this browser and the optimistic confirmation is shown; the server
+   * confirmation may still be in flight and is reported by the intent status.
+   * A repeat or a reload reuses the reservation instead of deciding again.
+   */
+  async function confirmPending(
+    id: string,
+    edit?: Partial<PendingMovementEdit>,
+  ): Promise<PendingConfirmationOutcome> {
     const pending = openPendingMovements.value.find((item) => item.id === id)
-    if (!pending) return false
-    const fields = edit ? resolvePendingEdit(pending, edit) : confirmFieldsFromPending(pending)
-    if (!fields) return false
-    const transactionId = uid('tx')
-    const beforeTransactions = financialStateStore.transactions
-    const beforePending = pendingMovements.value
-    const transaction: Transaction = {
-      id: transactionId,
-      date: fields.occurrenceDate,
-      month: monthFromISO(fields.occurrenceDate) ?? 1,
-      type: fields.type,
-      accountId: fields.accountId,
-      ...(fields.destinationAccountId ? { destinationAccountId: fields.destinationAccountId } : {}),
-      category: fields.category,
-      description: fields.description,
-      amount: fields.signedAmount,
-      ...(fields.symbol ? { symbol: fields.symbol } : {}),
-      ...(fields.side ? { side: fields.side } : {}),
-      ...(fields.units !== undefined ? { units: fields.units } : {}),
-      ...(fields.unitPrice !== undefined ? { unitPrice: fields.unitPrice } : {}),
-      ...(fields.fee !== undefined ? { fee: fields.fee } : {}),
-      ...(fields.time ? { time: fields.time } : {}),
-      declared: false,
-      createdAt: new Date().toISOString(),
+    if (!pending) {
+      // Not open: either an accepted reservation is already projected, or the
+      // pending was confirmed elsewhere. Reuse the reserved identity if any.
+      return retryPendingConfirmation(id)
     }
-    let confirmed = false
-    financialStateStore.commitState((draft) => {
-      const current = draft.pendingMovements.find((item) => item.id === id)
-      if (!current || current.status !== 'pending') return
-      draft.transactions.push(transaction)
-      confirmed = true
-      current.status = 'confirmed'
-      current.transactionId = transactionId
-      if (edit) applyPendingEdit(current, fields)
-      else current.updatedAt = new Date().toISOString()
+    const fields = edit ? resolvePendingEdit(pending, edit) : confirmFieldsFromPending(pending)
+    if (!fields) return { accepted: false, reason: 'invalid' }
+    const now = new Date().toISOString()
+    const transaction = buildPendingTransaction(fields, uid('tx'), now)
+    const outcome = await confirmPendingMovementWrite({
+      pendingId: id,
+      ruleId: pending.ruleId,
+      resolved: fields,
+      transaction,
+      edited: Boolean(edit),
+      pendingCreatedAt: pending.createdAt,
+      pendingUpdatedAt: now,
     })
-    const afterTransactions = financialStateStore.transactions
-    const afterPending = financialStateStore.state.pendingMovements
-    const currency = financialStateStore.currency
-    // In order, not side by side: both resolve the same category, and the
-    // pending must be built once the movement has queued its create, or each
-    // mints its own id and the pending references one that is never created.
-    let movementEnqueued = false
-    enqueueSync(async () => {
-      let pendingEnqueued: boolean | void
-      try {
-        if (!movementEnqueued) {
-          movementEnqueued =
-            (await syncMovements(beforeTransactions, afterTransactions, currency)) !== false
-        }
-      } finally {
-        // Preserve the pending sync attempt even if movement sync fails.
-        pendingEnqueued = await syncListDiff(
-          'pendingMovement',
-          beforePending,
-          afterPending,
-          (pending) => buildPendingMovementData(pending, currency),
-        )
-      }
-      return movementEnqueued && pendingEnqueued !== false
-    }, 'Pendiente confirmado: ya cuenta en el Registro.')
-    if (confirmed) {
+    // Only the movement that was actually accepted is reported to Stock
+    // Events; a repeat reuses the stored one and never re-fires the side effect.
+    if (outcome.accepted && outcome.transactionId === transaction.id) {
       void stockEventsStore.syncMovement(transaction)
     }
-    return true
+    return outcome
   }
 
   function editPending(id: string, edit: PendingMovementEdit): boolean {
@@ -681,7 +506,7 @@ export const useRecurringStore = defineStore('recurring', () => {
         (item) => item.id === id && item.status === 'pending',
       )
       if (!current) return
-      applyPendingEdit(current, fields)
+      applyPendingEdit(current, fields, new Date().toISOString())
     })
     const after = financialStateStore.state.pendingMovements
     enqueueSync(
@@ -728,23 +553,15 @@ export const useRecurringStore = defineStore('recurring', () => {
     toggleRule,
     removeRule,
     confirmPending,
+    retryConfirmation: (id: string) => retryPendingConfirmation(id),
+    discardConfirmation: (id: string) => discardPendingConfirmation(id),
+    pendingConfirmationStatus: (id: string): Promise<PendingConfirmationStatus | null> =>
+      readPendingConfirmationStatus(id),
     editPending,
     skipPending: (id: string) => changePendingStatus(id, 'skipped'),
     cancelPending: (id: string) => changePendingStatus(id, 'cancelled'),
   }
 })
-
-/** A saving needs a destination different from its origin; other types ignore it. */
-function isValidSaving(input: {
-  type: TransactionType
-  accountId: string
-  destinationAccountId?: string
-}): boolean {
-  return (
-    input.type !== 'saving' ||
-    (Boolean(input.destinationAccountId) && input.destinationAccountId !== input.accountId)
-  )
-}
 
 function resolveToday(): string {
   const candidate =

@@ -191,8 +191,19 @@ export async function startRoundTrip(
           rejectCommand &&
           commands.some((command) => command.commandId === rejectCommand!.commandId)
         ) {
+          // The rejected command never reaches the server; the rest of the
+          // batch is applied for real, so a test can observe one step staying
+          // unapplied next to one that landed.
           const rejection = rejectCommand
           rejectCommand = null
+          const applied = await runWithDb(
+            asServerDb(testDb.db),
+            applySyncBatch(
+              user.id,
+              commands.filter((command) => command.commandId !== rejection.commandId) as never,
+            ),
+          )
+          const byId = new Map(applied.results.map((result) => [result.commandId, result]))
           return json({
             results: commands.map((command) =>
               command.commandId === rejection.commandId
@@ -201,10 +212,10 @@ export async function startRoundTrip(
                     status: 'rejected',
                     message: rejection.message,
                   }
-                : { commandId: command.commandId, status: 'noop' },
+                : byId.get(command.commandId),
             ),
-            revision: 0,
-            halted: false,
+            revision: applied.revision,
+            halted: applied.halted,
           })
         }
         const result = await runWithDb(

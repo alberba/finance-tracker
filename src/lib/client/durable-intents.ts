@@ -213,48 +213,100 @@ export const acceptDurableIntent = (
     const done = txDone(tx)
     done.catch(() => undefined)
     try {
-      const now = new Date().toISOString()
-      const intent: DurableIntentRecord = {
-        id: input.id ?? generateIntentId(),
-        kind: input.kind,
-        ownerUserId: input.ownerUserId,
-        createdAt: now,
-        updatedAt: now,
-        state: 'local-saved',
-        targetIds: [...input.targetIds],
-        payload: { ...(input.payload ?? {}) },
-        waitingFor: null,
-        failure: null,
-        discardRequested: false,
-      }
-      const stepNames = [...(input.steps ?? input.targetIds)]
-      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
-      await requestToPromise(tx.objectStore(INTENTS_STORE).add(intent) as IDBRequest<IDBValidKey>)
-      const steps: IntentProgressRecord[] = []
-      for (const step of stepNames) {
-        const record: IntentProgressRecord = {
-          id: intentProgressId(intent.id, step),
-          intentId: intent.id,
-          step,
-          state: 'pending',
-          commandId: null,
-          seq: null,
-          attempt: 0,
-          lastError: null,
-          claimedBy: null,
-          claimedAt: null,
-          updatedAt: now,
-        }
-        progressStore.add(record)
-        steps.push(record)
-      }
+      const view = await writeNewIntent(
+        tx.objectStore(INTENTS_STORE),
+        tx.objectStore(INTENT_PROGRESS_STORE),
+        input,
+      )
       await done
-      return { intent, steps }
+      return view
     } catch (error) {
       abortQuietly(tx)
       throw error
     }
   })
+
+export interface AcceptOrReadDurableIntentResult {
+  view: DurableIntentView
+  /** False when a concurrent acceptance (another tab) already owned the id. */
+  created: boolean
+}
+
+/**
+ * Accepts the intent under a caller-chosen id, or returns the record a
+ * concurrent acceptance already wrote. Acceptance keyed by the financial
+ * action (e.g. one pending confirmation) must be idempotent across tabs: the
+ * read and the write happen in the same transaction, so only one of them
+ * creates the reservation and both agree on its fixed values.
+ */
+export const acceptOrReadDurableIntent = (
+  input: AcceptDurableIntentInput & { id: string },
+): Effect.Effect<AcceptOrReadDurableIntentResult, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo guardar la confirmación en este dispositivo.', async (db) => {
+    const tx = db.transaction([INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
+      const intentsStore = tx.objectStore(INTENTS_STORE)
+      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+      const existing = (await requestToPromise(
+        intentsStore.get(input.id) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      if (existing) {
+        const steps = await readIntentSteps(progressStore, existing.id)
+        await done
+        return { view: { intent: existing, steps }, created: false }
+      }
+      const view = await writeNewIntent(intentsStore, progressStore, input)
+      await done
+      return { view, created: true }
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
+  })
+
+async function writeNewIntent(
+  intentsStore: IDBObjectStore,
+  progressStore: IDBObjectStore,
+  input: AcceptDurableIntentInput,
+): Promise<DurableIntentView> {
+  const now = new Date().toISOString()
+  const intent: DurableIntentRecord = {
+    id: input.id ?? generateIntentId(),
+    kind: input.kind,
+    ownerUserId: input.ownerUserId,
+    createdAt: now,
+    updatedAt: now,
+    state: 'local-saved',
+    targetIds: [...input.targetIds],
+    payload: { ...(input.payload ?? {}) },
+    waitingFor: null,
+    failure: null,
+    discardRequested: false,
+  }
+  const stepNames = [...(input.steps ?? input.targetIds)]
+  await requestToPromise(intentsStore.add(intent) as IDBRequest<IDBValidKey>)
+  const steps: IntentProgressRecord[] = []
+  for (const step of stepNames) {
+    const record: IntentProgressRecord = {
+      id: intentProgressId(intent.id, step),
+      intentId: intent.id,
+      step,
+      state: 'pending',
+      commandId: null,
+      seq: null,
+      attempt: 0,
+      lastError: null,
+      claimedBy: null,
+      claimedAt: null,
+      updatedAt: now,
+    }
+    progressStore.add(record)
+    steps.push(record)
+  }
+  return { intent, steps }
+}
 
 /** Reads the durable intents, oldest first, with their steps. */
 export const listDurableIntents = (): Effect.Effect<
@@ -925,6 +977,47 @@ export const countDurableWork = (): Effect.Effect<number, ClientStorageError, Cl
       if (hasRemainingWork) total += 1
     }
     return total
+  })
+
+/**
+ * Forgets one settled intent and its progress. The caller must be sure the
+ * intent can no longer prevent a duplicate financial action (a confirmed
+ * recurrence whose pending is already confirmed and linked); unresolved or
+ * partial intents keep their record on purpose. Nothing is deleted while a
+ * queued command still references the intent.
+ */
+export const deleteDurableIntent = (
+  intentId: string,
+): Effect.Effect<boolean, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo retirar la intención confirmada.', async (db) => {
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
+      const intent = (await requestToPromise(
+        tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      if (!intent || !TERMINAL_INTENT_STATES.has(intent.state)) {
+        await done
+        return false
+      }
+      const entries = (await requestToPromise(
+        tx.objectStore(COMMANDS_STORE).getAll() as IDBRequest<OutboxEntry[]>,
+      )) as OutboxEntry[]
+      if (entries.some((entry) => entry.intent?.intentId === intentId)) {
+        await done
+        return false
+      }
+      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+      const steps = await readIntentSteps(progressStore, intentId)
+      for (const step of steps) progressStore.delete(step.id)
+      tx.objectStore(INTENTS_STORE).delete(intentId)
+      await done
+      return true
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
   })
 
 async function readIntentSteps(
