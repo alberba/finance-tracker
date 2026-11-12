@@ -33,6 +33,7 @@ import {
   INTENTS_STORE,
   INTENT_PROGRESS_STORE,
   InvalidCommandError,
+  MOVEMENT_PUBLICATIONS_STORE,
   parseOutboxCommand,
   requestToPromise,
   txDone,
@@ -46,7 +47,8 @@ import { ClientStorage, storageError, type ClientStorageError } from './storage'
 export type IntentPayloadValue = string | number | boolean | null
 export type IntentPayload = Record<string, IntentPayloadValue>
 
-export type DurableIntentKind = 'instrumentLink' | 'pendingConfirmation'
+export type DurableIntentKind =
+  'instrumentLink' | 'pendingConfirmation' | 'recurringRuleWrite'
 export type DurableIntentState =
   'local-saved' | 'waiting' | 'sending' | 'confirmed' | 'failed' | 'partial' | 'discarded'
 export type IntentStepState =
@@ -111,6 +113,25 @@ export interface AcceptDurableIntentInput {
   adopt?: readonly AdoptIntentCommandInput[]
   /** Commands published in the acceptance transaction itself. */
   commands?: readonly IntentCommandInput[]
+  /**
+   * Movement generation records committed with the acceptance (#489/#492).
+   * A movement created by an accepted intent must carry the same publication
+   * record as one published through `publishMovementCommands`, so later link
+   * work reads one shape instead of treating it as an implicit generation 0.
+   */
+  publications?: readonly IntentPublicationInput[]
+}
+
+/** A movement publication record to commit with an acceptance (generation 1). */
+export interface IntentPublicationInput {
+  id: string
+  status: 'active' | 'deleted'
+  type: string
+  instrumentId: string | null
+  unlinked: boolean
+  origin: 'movement' | 'instrumentLink'
+  fingerprint: string
+  writerId: string
 }
 
 /** A still-queued command the accepted intent takes ownership of. */
@@ -226,7 +247,7 @@ export const acceptDurableIntent = (
   input: AcceptDurableIntentInput,
 ): Effect.Effect<DurableIntentView, ClientStorageError, ClientStorage> =>
   withQueueDb('No se pudo guardar la vinculación en este dispositivo.', async (db) => {
-    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const tx = db.transaction(acceptanceStores(input), 'readwrite')
     const done = txDone(tx)
     done.catch(() => undefined)
     try {
@@ -256,7 +277,7 @@ export const acceptOrReadDurableIntent = (
   input: AcceptDurableIntentInput & { id: string },
 ): Effect.Effect<AcceptOrReadDurableIntentResult, ClientStorageError, ClientStorage> =>
   withQueueDb('No se pudo guardar la confirmación en este dispositivo.', async (db) => {
-    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const tx = db.transaction(acceptanceStores(input), 'readwrite')
     const done = txDone(tx)
     done.catch(() => undefined)
     try {
@@ -279,6 +300,12 @@ export const acceptOrReadDurableIntent = (
     }
   })
 
+function acceptanceStores(input: AcceptDurableIntentInput): string[] {
+  const stores = [COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE]
+  if (input.publications?.length) stores.push(MOVEMENT_PUBLICATIONS_STORE)
+  return stores
+}
+
 /**
  * Creates the intent header, its named steps and the commands/adoptions that
  * commit with the acceptance (#490/#491), all inside the caller's transaction.
@@ -287,7 +314,19 @@ async function writeNewIntent(
   tx: IDBTransaction,
   input: AcceptDurableIntentInput,
 ): Promise<DurableIntentView> {
-  const now = new Date().toISOString()
+  const intentsStore = tx.objectStore(INTENTS_STORE)
+  // Acceptance order is a durable fact: the caller that stops publishing a
+  // rule at the first unresolved change depends on it, and two intents
+  // accepted in the same millisecond must not compare equal.
+  const existing = (await requestToPromise(
+    intentsStore.getAll() as IDBRequest<DurableIntentRecord[]>,
+  )) as DurableIntentRecord[]
+  const latest = existing.reduce<number>((max, record) => {
+    const value = Date.parse(record.createdAt)
+    return Number.isFinite(value) && value > max ? value : max
+  }, 0)
+  const nowMs = Date.now()
+  const now = new Date(latest >= nowMs ? latest + 1 : nowMs).toISOString()
   const intent: DurableIntentRecord = {
     id: input.id ?? generateIntentId(),
     kind: input.kind,
@@ -308,7 +347,6 @@ async function writeNewIntent(
       ...(input.commands ?? []).map((command) => command.step),
     ]),
   ]
-  const intentsStore = tx.objectStore(INTENTS_STORE)
   const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
   await requestToPromise(intentsStore.add(intent) as IDBRequest<IDBValidKey>)
   for (const step of stepNames) {
@@ -333,6 +371,7 @@ async function writeNewIntent(
   // both the intent and its first step are durable.
   if (input.adopt?.length) await adoptIntentCommands(tx, intent.id, input.adopt)
   if (input.commands?.length) await writeIntentCommands(tx, intent.id, input.commands)
+  if (input.publications?.length) writeAcceptancePublications(tx, input.publications)
 
   const recorded = await readIntentSteps(progressStore, intent.id)
   const byStep = new Map(recorded.map((step) => [step.step, step]))
@@ -346,6 +385,34 @@ async function writeNewIntent(
   const next = refreshed(stored, steps)
   intentsStore.put(next)
   return { intent: next, steps }
+}
+
+/**
+ * Writes the movement generation records of the commands accepted in this
+ * same transaction: the movement create exists and its generation is durable
+ * together, so no later publication has to treat a confirmed movement as an
+ * implicit generation 0.
+ */
+function writeAcceptancePublications(
+  tx: IDBTransaction,
+  publications: readonly IntentPublicationInput[],
+): void {
+  const store = tx.objectStore(MOVEMENT_PUBLICATIONS_STORE)
+  const now = new Date().toISOString()
+  for (const publication of publications) {
+    store.put({
+      id: publication.id,
+      generation: 1,
+      status: publication.status,
+      type: publication.type,
+      instrumentId: publication.instrumentId,
+      unlinked: publication.unlinked,
+      writerId: publication.writerId,
+      origin: publication.origin,
+      fingerprint: publication.fingerprint,
+      updatedAt: now,
+    })
+  }
 }
 
 /** Reads the durable intents, oldest first, with their steps. */
@@ -364,7 +431,7 @@ export const listDurableIntents = (): Effect.Effect<
     )) as IntentProgressRecord[]
     await txDone(tx)
     return intents
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
       .map((intent) => ({
         intent,
         steps: progress

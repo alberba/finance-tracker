@@ -113,7 +113,7 @@ export class LiveMarketPage {
     unitPrice?: number
     fee?: number
     time?: string
-  }): Promise<void> {
+  }, options: { waitForSync?: boolean } = {}): Promise<void> {
     await this.recurringRules.getByRole('button', { name: 'Nueva compra recurrente' }).click()
     const form = this.recurringPanel
     await expect(form).toBeVisible()
@@ -132,16 +132,21 @@ export class LiveMarketPage {
       await form.getByLabel('Precio por título').fill(String(params.unitPrice))
     if (params.fee !== undefined) await form.getByLabel('Comisiones').fill(String(params.fee))
     if (params.time !== undefined) await form.getByLabel('Hora').fill(params.time)
-    const saved = expectSyncCommand(
-      this.page,
-      (command) =>
-        command.action === 'create' &&
-        command.entityType === 'recurringRule' &&
-        command.data.name === params.description,
-    )
+    // An offline flow cannot wait for the server acknowledgement; the row
+    // becoming visible is its observable acceptance.
+    const saved =
+      options.waitForSync === false
+        ? null
+        : expectSyncCommand(
+            this.page,
+            (command) =>
+              command.action === 'create' &&
+              command.entityType === 'recurringRule' &&
+              command.data.name === params.description,
+          )
     await form.getByRole('button', { name: 'Crear regla' }).click()
     await expect(form).toBeHidden()
-    await saved
+    if (saved) await saved
   }
 
   /**

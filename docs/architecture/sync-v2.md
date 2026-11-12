@@ -96,6 +96,18 @@ emite un `commandId` nuevo conservando el movimiento. Descartar no revierte un m
 confirmado: la reserva permanece para impedir una segunda confirmación y el resultado parcial se
 muestra; una reserva ya enlazada y confirmada se olvida para no crecer sin límite.
 
+El guardado de una regla (`src/lib/client/recurring-rule-write.ts`) usa el mismo protocolo con pasos
+nombrados: publica el comando de la regla, después un paso por cada ocurrencia generada y solo al
+final el avance del calendario; una recarga retoma el paso pendiente con los ids ya aceptados y sin
+esperar confirmación remota. La regla se direcciona por su id propio o por el `legacyId` de una
+fila migrada. Las escrituras de una misma regla se publican en orden de aceptación y ninguna edición
+se publica mientras otra anterior siga sin resolver, para que un comando antiguo reenviado no pise
+la edición aceptada (ADR 0003 solo rebasa contra la versión, no contra una edición posterior).
+Eliminar una regla publica únicamente su `remove` —el servidor borra sus pendientes en cascada— y
+descarta antes las intenciones pendientes de esa regla, para no encolar actualizaciones condenadas a
+`not_found`. Las acciones de reintentar/descartar de la barra lateral enrutan las intenciones
+recurrentes al módulo recurrente; el descarte parcial reabre el pendiente y conserva el reintento.
+
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,
 mercado, moneda y títulos manuales son privados del usuario. `alias` referencia su cuenta de

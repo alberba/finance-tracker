@@ -197,7 +197,7 @@ describe('reglas recurrentes y pendientes', () => {
     })
     const store = useRecurringStore()
     expect(
-      store.addRule({
+      await store.addRule({
         type: 'expense',
         accountId: 'checking',
         category: 'Vivienda',
@@ -208,12 +208,12 @@ describe('reglas recurrentes y pendientes', () => {
         startDate: '2024-01-15',
       }),
     ).toBe(true)
-    store.refreshPending('2024-02-20')
+    await store.refreshPending('2024-02-20')
     expect(store.pendingCount).toBe(2)
     expect(financialStore.transactions).toHaveLength(0)
     const pendingId = store.openPendingMovements[0].id
     expect(
-      store.editPending(pendingId, {
+      await store.editPending(pendingId, {
         date: '2024-01-16',
         accountId: 'checking',
         category: 'Vivienda',
@@ -271,7 +271,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(store.pendingCount).toBe(1)
 
     // Reclassify from expense to investment with investment account and operation fields
-    const ok = store.editPending('pm-exp', {
+    const ok = await store.editPending('pm-exp', {
       type: 'investment',
       date: '2024-02-16',
       accountId: 'broker-crypto',
@@ -315,7 +315,7 @@ describe('reglas recurrentes y pendientes', () => {
 
     vi.unstubAllGlobals()
   })
-  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {
+  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-01-15' })
     const financialStore = useFinancialStateStore()
@@ -340,7 +340,7 @@ describe('reglas recurrentes y pendientes', () => {
     })
     const store = useRecurringStore()
     expect(
-      store.addRule({
+      await store.addRule({
         type: 'investment',
         accountId: 'broker',
         category: 'Fondos',
@@ -361,7 +361,7 @@ describe('reglas recurrentes y pendientes', () => {
     const ruleId = store.rules[0].id
 
     expect(
-      store.updateRule(ruleId, {
+      await store.updateRule(ruleId, {
         type: 'investment',
         accountId: 'broker',
         category: 'Fondos',
@@ -392,7 +392,7 @@ describe('reglas recurrentes y pendientes', () => {
       nextOccurrenceDate: '2024-02-01',
     })
 
-    store.refreshPending('2024-02-02')
+    await store.refreshPending('2024-02-02')
     expect(store.openPendingMovements).toHaveLength(2)
     expect(store.openPendingMovements[1]).toMatchObject({
       description: 'Aporte actualizado',
@@ -450,7 +450,7 @@ describe('reglas recurrentes y pendientes', () => {
 
       const store = useRecurringStore()
       expect(
-        store.addRule({
+        await store.addRule({
           type: 'investment',
           accountId: 'broker',
           category: 'Fondos Indexados',
@@ -467,7 +467,7 @@ describe('reglas recurrentes y pendientes', () => {
           startDate: '2024-02-01',
         }),
       ).toBe(true)
-      store.refreshPending('2024-02-20')
+      await store.refreshPending('2024-02-20')
       const pendingId = store.openPendingMovements[0]?.id
       expect(pendingId).toBeTruthy()
       expect((await store.confirmPending(pendingId as string)).accepted).toBe(true)

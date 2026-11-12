@@ -180,7 +180,7 @@ describe('round trip: ahorro', () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     const recurring = useRecurringStore()
     expect(
-      recurring.addRule({
+      await recurring.addRule({
         type: 'saving',
         accountId: ids.origin,
         destinationAccountId: ids.destination,
