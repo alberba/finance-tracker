@@ -59,7 +59,7 @@ function comparable(exported: Row): Row {
 }
 
 /** One row in every collection the export carries, with the optional fields filled in. */
-async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<void> {
+async function seedFullDataset(db: TestDatabase['db'], userId: string, symbol = 'VWCE'): Promise<void> {
   const account = await runWithDb(db, accountsRepository.create(userId, {
     name: 'Broker',
     kind: 'investment',
@@ -78,8 +78,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     name: 'Liquidez',
   }))
   const instrument = await runWithDb(db, marketRepository.createInstrument({
-    symbol: 'VWCE',
-    normalizedSymbol: 'VWCE',
+    symbol,
+    normalizedSymbol: symbol,
     provider: 'test',
     currency: 'EUR',
   }))
@@ -88,8 +88,8 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     categoryId: category.id,
     alias: account.id,
     quoteConfig: {
-      symbol: 'VWCE',
-      quoteSymbol: 'VWCE.DE',
+      symbol,
+      quoteSymbol: `${symbol}.DE`,
       type: 'etf',
       provider: 'test',
       currency: 'EUR',
@@ -115,7 +115,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     accountingMonth: 4,
     operation: {
       instrumentId: instrument.id,
-      symbol: 'VWCE',
+      symbol,
       side: 'buy',
       units: 2.5,
       unitPrice: 100,
@@ -130,7 +130,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
       date: '2026-03-02',
       time: '09:30',
       side: 'buy',
-      symbol: 'VWCE',
+      symbol,
       quantity: '2.5',
       unitPrice: '100',
     } as never,
@@ -159,7 +159,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     endDate: '2027-01-05',
     lastExecutionDate: '2026-03-05',
     nextRunDate: '2026-05-05',
-    symbol: 'VWCE',
+    symbol,
     side: 'buy',
     units: 2,
     unitPrice: 100,
@@ -176,7 +176,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     dueDate: '2026-05-05',
     type: 'investment',
     description: 'Aporte',
-    symbol: 'VWCE',
+    symbol,
     side: 'buy',
     units: 2,
     unitPrice: 100,
@@ -217,6 +217,17 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     date: '2026-03-03',
     description: 'Ahorro',
     amount: 150,
+    currency: 'EUR',
+  }))
+  // A prior-year movement: the export is never year-filtered, so it must
+  // survive export → import → export along with this year's rows.
+  await runWithDb(db, transactionsRepository.create(userId, {
+    legacyId: 'tx-2025',
+    accountId: account.id,
+    categoryId: category.id,
+    type: 'expense',
+    date: '2025-12-31',
+    amount: -7.5,
     currency: 'EUR',
   }))
   const savingRule = await runWithDb(db, recurringRulesRepository.create(userId, {
@@ -281,7 +292,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
   }))
   await runWithDb(db, stockeventsSymbolMappingsRepository.create(userId, {
     categoryId: category.id,
-    stockeventsSymbol: 'VWCE.DE',
+    stockeventsSymbol: `${symbol}.DE`,
     sync: true,
     watchlistId: 'wl-1',
     hidden: true,
@@ -439,6 +450,41 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(new Set(tradeDetailsByTransactions.mock.calls[0][1])).toEqual(new Set(transactionIds))
   })
 
+  it("only exports the authenticated user's collections and relations", async () => {
+    await seedFullDataset(testDb.db, principal.userId)
+    const other = await seedUser(testDb.db, 'export-other@example.com')
+    await seedFullDataset(testDb.db, other.id, 'VWCE-OTHER')
+
+    const { GET } = await import('../../../../src/pages/api/data/export')
+    const exported = await (await GET({ locals: { principal } } as never)).json()
+
+    const otherSnapshots = await runWithDb(testDb.db, wealthRepository.listByUser(other.id))
+    const otherContributions = await runWithDb(testDb.db, contributionsRepository.listByUser(other.id))
+    const otherTransactions = await runWithDb(testDb.db, transactionsRepository.listByUser(other.id))
+    const exportedIds = new Set(
+      [
+        ...exported.transactions,
+        ...exported.wealthSnapshots,
+        ...exported.contributions,
+      ].map((row: Row) => row.id),
+    )
+    expect(otherSnapshots.some((row) => exportedIds.has(row.id))).toBe(false)
+    expect(otherContributions.some((row) => exportedIds.has(row.id))).toBe(false)
+    expect(otherTransactions.some((row) => exportedIds.has(row.id))).toBe(false)
+
+    const ownAccountIds = new Set(exported.accounts.map((account: Row) => account.id))
+    expect(
+      exported.wealthSnapshots
+        .flatMap((snapshot: Row) => snapshot.balances)
+        .every((balance: Row) => ownAccountIds.has(balance.accountId)),
+    ).toBe(true)
+    expect(
+      exported.contributions
+        .flatMap((contribution: Row) => contribution.allocations)
+        .every((allocation: Row) => ownAccountIds.has(allocation.accountId)),
+    ).toBe(true)
+  })
+
   it('round-trips accounts/transactions through export → import with FK ids remapped', async () => {
     const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
       name: 'Cuenta origen',
@@ -572,6 +618,56 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     const { GET: exportGET } = await import('../../../../src/pages/api/data/export')
     const exported = await (await exportGET({ locals: { principal } } as never)).json()
     expect(exported.format).toBe('finance-tracker/v2-export')
+    // The backup keeps its exact top-level key order and field names.
+    expect(Object.keys(exported)).toEqual([
+      'format',
+      'exportedAt',
+      'userId',
+      'settings',
+      'accounts',
+      'categories',
+      'twrLiquidityAccounts',
+      'transactions',
+      'subscriptions',
+      'recurringRules',
+      'pendingMovements',
+      'budgetEntries',
+      'goals',
+      'wealthSnapshots',
+      'contributions',
+      'userInstruments',
+      'stockeventsSymbolMappings',
+      'stockeventsCashMappings',
+      'stockeventsCashSyncEntries',
+    ])
+    // Both nested relations and the export's own `operation` projection are
+    // present; the raw bootstrap `tradeDetail` must not leak into the backup.
+    const investment = exported.transactions.find((transaction: Row) => transaction.legacyId === 'tx-1')
+    expect(investment.operation).toEqual({
+      instrumentId: expect.any(String),
+      symbol: 'VWCE',
+      side: 'buy',
+      units: 2.5,
+      unitPrice: 100,
+      fee: 0.5,
+    })
+    expect(
+      exported.transactions.every((transaction: Row) => !('tradeDetail' in transaction)),
+    ).toBe(true)
+    expect(exported.wealthSnapshots[0].balances).toHaveLength(1)
+    expect(exported.wealthSnapshots[0].balances[0]).toMatchObject({
+      balance: 1234.56,
+      currency: 'EUR',
+    })
+    expect(exported.contributions[0].allocations).toHaveLength(1)
+    expect(exported.contributions[0].allocations[0]).toMatchObject({
+      amount: 300,
+      currency: 'EUR',
+    })
+    // The export has no year scope: the 2025 movement travels in the backup.
+    expect(
+      exported.transactions.some((transaction: Row) => transaction.legacyId === 'tx-2025'),
+    ).toBe(true)
 
     // The target already has data of its own, which the restore must remove.
     const target = await seedUser(testDb.db, 'restore-target@example.com')
