@@ -673,4 +673,159 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       page.locator('#investment [data-investment-quotes]').getByLabel('Títulos de LINKED'),
     ).toHaveValue('2')
   })
+  test('guarda una vinculación sin conexión, recarga y la completa al reconectar', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const movementSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+    )
+    await tracker.addInvestmentMovement({
+      date: '2026-07-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'AGED',
+      category: 'ETF AGED',
+      unitPrice: 9,
+      units: 5,
+      fee: 0,
+    })
+    await movementSynced
+
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openSettings()
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+    })
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('1 por vincular')
+
+    // The sync endpoints are unreachable, but the shell still loads: the user
+    // can request the link while the server cannot confirm anything.
+    const blocked = /\/api\/(bootstrap|changes|sync)(\?.*)?$/
+    const abortSync = (route: import('@playwright/test').Route) => route.abort()
+    await page.route(blocked, abortSync)
+    await liveMarket.linkExistingMovements('AGED.MI')
+    await expect(row).toContainText('1 vinculados')
+    await expect(row.locator('[data-link-intent-status]')).toContainText(
+      'Guardado en este dispositivo',
+    )
+
+    // A reload cannot be done with `context.setOffline` (the shell has no
+    // service worker), but blocking the API exercises the same recovery.
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(
+      liveMarket.instrument('AGED.MI').locator('[data-link-intent-status]'),
+    ).toContainText('Guardado en este dispositivo')
+
+    await page.unroute(blocked, abortSync)
+    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
+      timeout: 20000,
+    })
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    const linked = liveMarket.instrument('AGED.MI')
+    await expect(linked).toContainText('1 vinculados')
+    await expect(linked.locator('[data-link-intent-status]')).toHaveCount(0)
+  })
+
+  test('muestra el fallo de la vinculación y lo reintenta desde el editor', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const liveMarket = new LiveMarketPage(page)
+    const movementSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+    )
+    await tracker.addInvestmentMovement({
+      date: '2026-07-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'AGED',
+      category: 'ETF AGED',
+      unitPrice: 9,
+      units: 5,
+      fee: 0,
+    })
+    await movementSynced
+    await tracker.openSettings()
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+    })
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('1 por vincular')
+
+    // The next movement update is rejected definitively, as a server would
+    // for a movement that no longer exists.
+    await page.route('**/api/sync', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const body = route.request().postDataJSON() as {
+        commands: Array<{ commandId: string; action: string; entityType?: string }>
+      }
+      const rejected = body.commands.filter(
+        (command) => command.action === 'update' && command.entityType === 'transaction',
+      )
+      if (!rejected.length) return route.continue()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          results: body.commands.map((command) =>
+            rejected.some((item) => item.commandId === command.commandId)
+              ? {
+                  commandId: command.commandId,
+                  status: 'rejected',
+                  message: 'El movimiento ya no existe en el servidor.',
+                }
+              : { commandId: command.commandId, status: 'noop' },
+          ),
+          revision: 0,
+          halted: false,
+        }),
+      })
+    })
+
+    await liveMarket.linkExistingMovements('AGED.MI')
+    const status = row.locator('[data-link-intent-status]')
+    await expect(status).toContainText('El movimiento ya no existe', { timeout: 15000 })
+    await expect(row.locator('[data-link-intent-retry]')).toBeVisible()
+    await expect(row.locator('[data-link-intent-discard]')).toBeVisible()
+
+    await page.unroute('**/api/sync')
+    await row.locator('[data-link-intent-retry]').click()
+    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
+      timeout: 20000,
+    })
+    await expect(row).toContainText('1 vinculados')
+    await expect(status).toHaveCount(0)
+  })
 })

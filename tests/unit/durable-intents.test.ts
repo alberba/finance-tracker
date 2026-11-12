@@ -235,6 +235,45 @@ describe('intenciones durables de la cola local (#490)', () => {
     expect(view.steps[0].state).toBe('confirmed')
   })
 
+  it('serializa dos conexiones y solo una publica el mismo paso', async () => {
+    const accepted = await acceptDurableIntent(db, linkIntent({ targetIds: ['movement-1'] }))
+    const otherTab = await openStorage(USER_ID)
+    try {
+      const [fromThisTab, fromOtherTab] = await Promise.all([
+        publishDurableIntentCommands(db, accepted.intent.id, [
+          { step: 'movement-1', command: updateCommand('movement-1') },
+        ]),
+        publishDurableIntentCommands(otherTab, accepted.intent.id, [
+          { step: 'movement-1', command: updateCommand('movement-1') },
+        ]),
+      ])
+      expect(fromThisTab.published.length + fromOtherTab.published.length).toBe(1)
+      expect(await count(db)).toBe(1)
+      const [view] = await listDurableIntents(db)
+      expect(view.steps[0].state).toBe('queued')
+    } finally {
+      otherTab.close()
+    }
+  })
+
+  it('una sola pestaña reclama el envío del comando de la intención', async () => {
+    const accepted = await acceptDurableIntent(db, linkIntent({ targetIds: ['movement-1'] }))
+    await publishDurableIntentCommands(db, accepted.intent.id, [
+      { step: 'movement-1', command: updateCommand('movement-1') },
+    ])
+    const [entry] = await listCommands(db)
+    const otherTab = await openStorage(USER_ID)
+    try {
+      const [first, second] = await Promise.all([
+        claimDurableIntentCommands(db, [entry.seq], 'tab-a'),
+        claimDurableIntentCommands(otherTab, [entry.seq], 'tab-b'),
+      ])
+      expect(first.size + second.size).toBe(1)
+    } finally {
+      otherTab.close()
+    }
+  })
+
   it('cuenta una intención sin comandos una sola vez y no duplica sus comandos', async () => {
     const accepted = await acceptDurableIntent(db, linkIntent())
     expect(await countDurableWork(db)).toBe(1)

@@ -900,19 +900,30 @@ async function writeDiscard(
  */
 export const countDurableWork = (): Effect.Effect<number, ClientStorageError, ClientStorage> =>
   withQueueDb('No se pudo contar el trabajo pendiente.', async (db) => {
-    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE], 'readonly')
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readonly')
     const entries = (await requestToPromise(
       tx.objectStore(COMMANDS_STORE).getAll() as IDBRequest<OutboxEntry[]>,
     )) as OutboxEntry[]
     const intents = (await requestToPromise(
       tx.objectStore(INTENTS_STORE).getAll() as IDBRequest<DurableIntentRecord[]>,
     )) as DurableIntentRecord[]
+    const progress = (await requestToPromise(
+      tx.objectStore(INTENT_PROGRESS_STORE).getAll() as IDBRequest<IntentProgressRecord[]>,
+    )) as IntentProgressRecord[]
     await txDone(tx)
     let total = entries.length
     for (const intent of intents) {
       if (!isUnresolvedIntent(intent)) continue
       if (entries.some((entry) => entry.intent?.intentId === intent.id)) continue
-      total += 1
+      const hasRemainingWork = progress.some(
+        (step) =>
+          step.intentId === intent.id &&
+          (step.state === 'pending' ||
+            step.state === 'queued' ||
+            step.state === 'sending' ||
+            step.state === 'failed'),
+      )
+      if (hasRemainingWork) total += 1
     }
     return total
   })

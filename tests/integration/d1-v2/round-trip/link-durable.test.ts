@@ -6,7 +6,6 @@ import { linkInstrumentMovements } from '../../../../src/lib/client/instrument-l
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
-import { useSyncStore } from '../../../../src/stores/sync'
 import { runWithDb } from '../../../../src/db/database'
 import { openStorage, wipeOutbox } from '../../../helpers/client-storage'
 import { startRoundTrip, type RoundTrip } from './harness'

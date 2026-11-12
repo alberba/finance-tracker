@@ -24,11 +24,10 @@ import {
   commitIntentCommands,
   countDurableWork,
   discardDurableIntent,
-  failDurableIntent,
+  failDurableIntent as failDurableIntentEffect,
   isUnresolvedIntent,
   listDurableIntents,
   markIntentWaiting as markIntentWaitingEffect,
-  failDurableIntent as failDurableIntentEffect,
   releaseIntentClaims,
   retryDurableIntent,
   type AcceptDurableIntentInput,
@@ -138,7 +137,9 @@ export const useSyncStore = defineStore('sync', () => {
   const failedIntentCount = computed(
     () =>
       intents.value.filter(
-        (view) => isUnresolvedIntent(view.intent) && view.intent.state === 'failed',
+        (view) =>
+          isUnresolvedIntent(view.intent) &&
+          (view.intent.failure !== null || view.steps.some((step) => step.state === 'failed')),
       ).length,
   )
 
