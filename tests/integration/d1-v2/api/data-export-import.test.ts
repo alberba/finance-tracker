@@ -336,6 +336,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     testDb.close()
   })
 
@@ -357,6 +358,85 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(bodyText).not.toContain('super-secret-plaintext-key')
     expect(bodyText).not.toContain('integrationCredentials')
     expect(bodyText).not.toContain('integration_credentials')
+  })
+
+  it('loads every relation collection in batches, never once per parent row', async () => {
+    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
+      name: 'Broker',
+      kind: 'investment',
+      currency: 'EUR',
+      openingBalance: 0,
+    }))
+    const snapshotIds: string[] = []
+    const contributionIds: string[] = []
+    const transactionIds: string[] = []
+    for (let index = 0; index < 3; index += 1) {
+      const snapshot = await runWithDb(testDb.db, wealthRepository.create(principal.userId, {
+        snapshotDate: `2026-0${index + 1}-28`,
+        year: 2026,
+        month: index + 1,
+      }))
+      snapshotIds.push(snapshot.id)
+      await runWithDb(testDb.db, wealthRepository.createBalance(principal.userId, {
+        snapshotId: snapshot.id,
+        accountId: account.id,
+        balance: 100 + index,
+        currency: 'EUR',
+      }))
+
+      const contribution = await runWithDb(testDb.db, contributionsRepository.create(principal.userId, {
+        date: `2026-0${index + 1}-10`,
+        amount: 50 + index,
+        currency: 'EUR',
+      }))
+      contributionIds.push(contribution.id)
+      await runWithDb(testDb.db, contributionsRepository.createAllocation(principal.userId, {
+        contributionId: contribution.id,
+        accountId: account.id,
+        amount: 50 + index,
+        currency: 'EUR',
+      }))
+
+      const transaction = await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
+        accountId: account.id,
+        type: 'investment',
+        date: `2026-0${index + 1}-02`,
+        amount: -100 - index,
+        currency: 'EUR',
+        operation: {
+          symbol: 'VWCE',
+          side: 'buy',
+          units: index + 1,
+          unitPrice: 100,
+          fee: 0.5,
+        },
+      }))
+      transactionIds.push(transaction.id)
+    }
+
+    const balancesBySnapshots = vi.spyOn(wealthRepository, 'listBalancesBySnapshots')
+    const balancesBySnapshot = vi.spyOn(wealthRepository, 'listBalancesBySnapshot')
+    const allocationsByContributions = vi.spyOn(contributionsRepository, 'listAllocationsByContributions')
+    const allocationsByContribution = vi.spyOn(contributionsRepository, 'listAllocationsByContribution')
+    const tradeDetailsByTransactions = vi.spyOn(transactionsRepository, 'listTradeDetailsByTransactions')
+
+    const { GET } = await import('../../../../src/pages/api/data/export')
+    const response = await GET({ locals: { principal } } as never)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+
+    expect(body.wealthSnapshots.flatMap((snapshot: Row) => snapshot.balances)).toHaveLength(3)
+    expect(body.contributions.flatMap((contribution: Row) => contribution.allocations)).toHaveLength(3)
+    expect(body.transactions.filter((transaction: Row) => transaction.operation !== null)).toHaveLength(3)
+
+    expect(balancesBySnapshot).not.toHaveBeenCalled()
+    expect(allocationsByContribution).not.toHaveBeenCalled()
+    expect(balancesBySnapshots).toHaveBeenCalledTimes(1)
+    expect(new Set(balancesBySnapshots.mock.calls[0][1])).toEqual(new Set(snapshotIds))
+    expect(allocationsByContributions).toHaveBeenCalledTimes(1)
+    expect(new Set(allocationsByContributions.mock.calls[0][1])).toEqual(new Set(contributionIds))
+    expect(tradeDetailsByTransactions).toHaveBeenCalledTimes(1)
+    expect(new Set(tradeDetailsByTransactions.mock.calls[0][1])).toEqual(new Set(transactionIds))
   })
 
   it('round-trips accounts/transactions through export → import with FK ids remapped', async () => {
