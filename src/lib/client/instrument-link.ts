@@ -24,7 +24,7 @@ import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSyncStore } from '../../stores/sync'
 import { isReadOnlyDemoActive } from './demo-source'
 import { isUnresolvedIntent, type DurableIntentView } from './durable-intents'
-import { forgetLinkTargets, rememberLinkTargets } from './link-targets'
+import { rememberLinkTargets } from './link-targets'
 import { buildMovementData, movementFingerprint } from './movement-commands'
 import {
   movementPublicationWriterId,
@@ -168,7 +168,9 @@ async function executeInstrumentLink(execution: InstrumentLinkExecution): Promis
     await syncStore.failIntent(execution.intentId, message).catch(() => undefined)
     execution.onError(message)
   } finally {
-    forgetLinkTargets(execution.targetIds)
+    // The fixed targets stay registered while the intent is unresolved so an
+    // ordinary edit that clears the instrument is recorded as an explicit
+    // unlink — also after a reload, where the resume below rehydrates them.
   }
 }
 
@@ -186,6 +188,13 @@ export async function resumeInstrumentLinks(): Promise<void> {
     if (view.intent.kind !== 'instrumentLink') continue
     if (!isUnresolvedIntent(view.intent)) continue
     if (view.intent.ownerUserId !== syncStore.userId) continue
+    // The link's expected instrument is a page-local fact; rehydrate it after
+    // a reload so an ordinary edit that clears the instrument is still
+    // recorded as the user's later explicit unlink.
+    const linkedInstrumentId = view.intent.payload.instrumentId
+    if (typeof linkedInstrumentId === 'string') {
+      rememberLinkTargets(view.intent.targetIds, linkedInstrumentId)
+    }
     // A definitive failure waits for the user's explicit retry; a discard
     // waits for reconciliation of whatever request is still in flight.
     if (view.intent.failure || view.intent.discardRequested) continue

@@ -62,6 +62,11 @@ const linkStatus = computed(() => {
   if (linkFailed.value) {
     return view.intent.failure ?? 'No se pudo completar la vinculación.'
   }
+  if (view.intent.state === 'partial' && view.intent.failure === null) {
+    return `Resultado parcial: ${linkCounts.value?.confirmed ?? 0} de ${
+      linkCounts.value?.total ?? 0
+    } vinculados; el resto se descartó.`
+  }
   if (view.intent.state === 'sending') {
     return `Guardado en este dispositivo · ${linkCounts.value?.pending ?? 0} pendientes de confirmar.`
   }

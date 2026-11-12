@@ -4,6 +4,7 @@ import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { linkInstrumentMovements } from '../../../../src/lib/client/instrument-link'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
+import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
 import { runWithDb } from '../../../../src/db/database'
@@ -269,11 +270,21 @@ describe('vinculación durable y recuperable (#490)', () => {
 
     await trip.syncStore.retryIntent(failed.intent.id)
     await waitForIntent(trip, (view) => view.intent.state === 'confirmed')
-    const ids = linkUpdateCommandIds(trip)
+    const updates = trip
+      .commandBatches()
+      .flat()
+      .filter(
+        (command) =>
+          (command as { entityType?: string; action?: string }).entityType === 'transaction' &&
+          (command as { action?: string }).action === 'update',
+      ) as Array<{ commandId: string; entityId: string }>
+    const ids = updates.map((command) => command.commandId)
     expect(ids.length).toBeGreaterThanOrEqual(2)
     expect(new Set(ids).size).toBe(ids.length)
     expect(new Set(ids).has(queued.commandId)).toBe(true)
     expect(new Set(ids).size).toBe(2)
+    // A retry is another command attempt on the same movement identity.
+    expect(updates.every((command) => command.entityId === targetId)).toBe(true)
   })
 
   it('muestra el resultado parcial real y descarta solo lo pendiente', async () => {
@@ -323,6 +334,39 @@ describe('vinculación durable y recuperable (#490)', () => {
     expect(after.steps.filter((step) => step.state === 'confirmed')).toHaveLength(1)
     expect(after.steps.filter((step) => step.state === 'cancelled')).toHaveLength(1)
     expect(await trip.pending()).toHaveLength(0)
+  })
+
+  it('respeta un desvínculo posterior tras recargar una intención pendiente', async () => {
+    const instrumentId = await addLinkInstrument()
+    trip.setOffline(true)
+    const acceptance = await useMarketStore().linkExistingMovements(instrumentId)
+    expect(acceptance.accepted).toBe(true)
+    const failed = await waitForIntent(trip, (view) => view.intent.state === 'failed')
+
+    await trip.reloadOffline()
+    useInvestmentStore().saveEditedMovement(targetId, {
+      date: '2026-01-15',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'OTHER',
+      category: 'Link Asset',
+      unitPrice: '100',
+      units: '2',
+      fee: '0',
+      movementCurrency: 'EUR',
+      accountId: CASH_ID,
+      declared: false,
+    })
+
+    trip.setOffline(false)
+    await trip.syncStore.retryIntent(failed.intent.id)
+    await waitForIntent(trip, (view) => view.intent.state === 'discarded')
+
+    const state = await trip.reload()
+    expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
+      symbol: 'OTHER',
+    })
+    expect(state.transactions.find((item) => item.id === targetId)?.instrumentId).toBeUndefined()
   })
 
   it('no presenta como aceptada una vinculación cuyo registro durable falla', async () => {

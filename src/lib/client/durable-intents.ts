@@ -33,7 +33,6 @@ import {
   INTENTS_STORE,
   INTENT_PROGRESS_STORE,
   InvalidCommandError,
-  generateCommandId,
   parseOutboxCommand,
   requestToPromise,
   txDone,
@@ -999,34 +998,3 @@ export async function markIntentStepQueued(
   const steps = await readIntentSteps(progressStore, slot.intent.id)
   tx.objectStore(INTENTS_STORE).put(refreshed({ ...slot.intent, waitingFor: null }, steps))
 }
-
-/** The `commandId` currently assigned to a step, reused on uncertain resend. */
-export async function currentIntentCommandId(
-  tx: IDBTransaction,
-  intentId: string,
-  step: string,
-): Promise<string | null> {
-  const progress = (await requestToPromise(
-    tx.objectStore(INTENT_PROGRESS_STORE).get(intentProgressId(intentId, step)) as IDBRequest<
-      IntentProgressRecord | undefined
-    >,
-  )) as IntentProgressRecord | undefined
-  return progress?.commandId ?? null
-}
-
-/** Recomputes an intent state after a step changed outside this module. */
-export async function refreshIntent(tx: IDBTransaction, intentId: string): Promise<void> {
-  const intentsStore = tx.objectStore(INTENTS_STORE)
-  const intent = (await requestToPromise(
-    intentsStore.get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
-  )) as DurableIntentRecord | undefined
-  if (!intent) return
-  const steps = await readIntentSteps(tx.objectStore(INTENT_PROGRESS_STORE), intentId)
-  intentsStore.put({
-    ...refreshed(intent, steps),
-    failure: intent.failure ?? failureMessage(steps),
-  })
-}
-
-/** Exposed for tests and for the store's command id minting. */
-export { generateCommandId as generateIntentCommandId }
