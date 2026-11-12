@@ -6,12 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
 import {
+  commitDurableIntentCommands,
   listAll,
   openStorage,
   putEntity,
   wipeIdbCache,
   wipeOutbox,
+  type OutboxEntry,
 } from '../helpers/client-storage'
+import { resumePendingConfirmations } from '../../src/lib/client/recurring-write'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useRecurringStore } from '../../src/stores/recurring'
 import { useSyncStore } from '../../src/stores/sync'
@@ -120,42 +123,74 @@ describe('confirmPending — category id shared by the movement and the pending 
       quotes: {},
     })
 
-    expect(useRecurringStore().confirmPending('pm-eth')).toBe(true)
+    const outcome = await useRecurringStore().confirmPending('pm-eth')
+    expect(outcome.accepted).toBe(true)
+    if (!outcome.accepted) throw new Error('No se aceptó')
 
-    const readCommands = async () => {
+    const readEntries = async () => {
       const outboxDb = await openStorage(USER_ID)
-      const commands = (await listAll(outboxDb)).map((entry) => entry.command)
-      outboxDb.close()
-      return commands
+      try {
+        return (await listAll(outboxDb)) as OutboxEntry[]
+      } finally {
+        outboxDb.close()
+      }
     }
 
-    let commands: Awaited<ReturnType<typeof readCommands>> = []
-    await vi.waitFor(
+    // The movement create goes first, with the category id it mints. It must
+    // be acknowledged before the pending update is built against that same id.
+    const firstBatch = await vi.waitFor(
       async () => {
-        commands = await readCommands()
-        expect(
-          commands.find((c) => c.action === 'update' && c.entityType === 'pendingMovement'),
-        ).toBeDefined()
+        const entries = await readEntries()
+        const movement = entries.find(
+          (entry) =>
+            entry.command.action === 'create' && entry.command.entityType === 'transaction',
+        )
+        expect(movement).toBeDefined()
+        return entries
       },
       { timeout: 5000, interval: 25 },
     )
+    const movement = firstBatch.find(
+      (entry) => entry.command.action === 'create' && entry.command.entityType === 'transaction',
+    )!
 
-    const createdCategoryIds = commands
-      .filter((c) => c.action === 'create' && c.entityType === 'category')
-      .map((c) => (c as { data: { id?: string } }).data.id)
-    const pendingUpdate = commands.find(
-      (c) => c.action === 'update' && c.entityType === 'pendingMovement',
+    const acknowledgement = await openStorage(USER_ID)
+    try {
+      await commitDurableIntentCommands(acknowledgement, {
+        plainSeqs: [],
+        outcomes: [{ entry: movement, status: 'confirmed' }],
+      })
+      await putEntity(acknowledgement, 'transaction', { id: outcome.transactionId, version: 1 })
+    } finally {
+      acknowledgement.close()
+    }
+    await resumePendingConfirmations()
+
+    const pendingUpdate = await vi.waitFor(
+      async () => {
+        const entries = await readEntries()
+        const update = entries.find(
+          (entry) =>
+            entry.command.action === 'update' && entry.command.entityType === 'pendingMovement',
+        )
+        expect(update).toBeDefined()
+        return update!.command
+      },
+      { timeout: 5000, interval: 25 },
     )
-    expect(pendingUpdate).toBeDefined()
     expect(pendingUpdate).toMatchObject({ patch: { status: 'confirmed' } })
     const patch = (pendingUpdate as { patch: Record<string, unknown> }).patch
+    const movementData = (movement.command as { data: Record<string, unknown> }).data
+    expect(movementData.categoryId).toBe(patch.categoryId)
+    expect(movementData.categoryId).toEqual(expect.any(String))
+    // The pending update references a category the queue actually creates when
+    // the movement minted it in this same flow.
+    const entries = await readEntries()
+    const createdCategoryIds = entries
+      .filter(
+        (entry) => entry.command.action === 'create' && entry.command.entityType === 'category',
+      )
+      .map((entry) => (entry.command as { data: { id?: string } }).data.id)
     expect(createdCategoryIds).toContain(patch.categoryId)
-    expect(commands).toContainEqual(
-      expect.objectContaining({
-        action: 'create',
-        entityType: 'transaction',
-        data: expect.objectContaining({ categoryId: patch.categoryId }),
-      }),
-    )
   })
 })

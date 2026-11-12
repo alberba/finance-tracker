@@ -19,11 +19,13 @@ import {
 } from '../lib/client/outbox'
 import {
   acceptDurableIntent as acceptDurableIntentEffect,
+  acceptOrReadDurableIntent,
   cancelIntentStep as cancelIntentStepEffect,
   claimIntentCommands,
   commitIntentCommands,
   completeIntentStep as completeIntentStepEffect,
   countDurableWork,
+  deleteDurableIntent,
   discardDurableIntent,
   failDurableIntent as failDurableIntentEffect,
   isUnresolvedIntent,
@@ -253,12 +255,16 @@ export const useSyncStore = defineStore('sync', () => {
   function resumeIntents(): SyncEffect<void> {
     return Effect.promise(async () => {
       if (!isReady() || isReadOnlyDemoActive()) return
-      const { resumeInstrumentLinks } = await import('../lib/client/instrument-link')
+      const [{ resumeInstrumentLinks }, { resumePendingConfirmations }] = await Promise.all([
+        import('../lib/client/instrument-link'),
+        import('../lib/client/recurring-write'),
+      ])
       await resumeInstrumentLinks()
+      await resumePendingConfirmations()
     }).pipe(
       Effect.catch((error) =>
         Effect.sync(() => {
-          lastError.value = errorMessage(error, 'No se pudo reanudar una vinculación.')
+          lastError.value = errorMessage(error, 'No se pudo reanudar un cambio guardado.')
         }),
       ),
     )
@@ -736,6 +742,37 @@ export const useSyncStore = defineStore('sync', () => {
     if (isReadOnlyDemoActive() || !isReady()) return
     await run(resumeIntents())
     await run(refreshIntentState().pipe(Effect.orElseSucceed(() => undefined)))
+  }
+
+  /**
+   * Accepts a durable confirmation keyed by the financial action, or returns
+   * the record a concurrent tab already wrote. Idempotent by construction.
+   */
+  async function acceptPendingConfirmation(
+    input: AcceptDurableIntentInput & { id: string },
+  ): Promise<DurableIntentView | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const { view } = await run(acceptOrReadDurableIntent(input))
+      await run(refreshIntentState())
+      return view
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
+  }
+
+  /** Forgets a settled intent once it can no longer prevent a duplicate. */
+  async function deleteIntent(id: string): Promise<boolean> {
+    if (isReadOnlyDemoActive() || !isReady()) return false
+    try {
+      const deleted = await run(deleteDurableIntent(id))
+      if (deleted) await run(refreshIntentState())
+      return deleted
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo retirar una intención confirmada.')
+      return false
+    }
   }
 
   /** Reads the persisted publication generations of some movements. */
@@ -1499,8 +1536,10 @@ export const useSyncStore = defineStore('sync', () => {
     mergeIntoPendingCreate,
     cancelPendingCreate,
     acceptIntent,
-    listIntents,
+    acceptPendingConfirmation,
+    deleteIntent,
     publishIntentCommands,
+    listIntents,
     findIntentCommand,
     findQueuedUserInstrumentCommand,
     completeIntentStep,

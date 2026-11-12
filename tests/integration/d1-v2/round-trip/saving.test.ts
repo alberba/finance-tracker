@@ -204,7 +204,9 @@ describe('round trip: ahorro', () => {
     })
 
     // A reloaded page has new stores; the pre-reload instance is gone.
-    expect(useRecurringStore().confirmPending(withPending.pendingMovements[0].id)).toBe(true)
+    expect(
+      (await useRecurringStore().confirmPending(withPending.pendingMovements[0].id)).accepted,
+    ).toBe(true)
     const confirmed = await trip.reload()
     expect(confirmed.transactions[0]).toMatchObject({
       type: 'saving',
@@ -229,7 +231,10 @@ describe('round trip: ahorro', () => {
     await addSaving()
     await trip.reload()
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
-    const rows = await runWithDb(trip.testDb.db as never, accountsRepository.listByUser(trip.userId))
+    const rows = await runWithDb(
+      trip.testDb.db as never,
+      accountsRepository.listByUser(trip.userId),
+    )
     const hucha = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
@@ -276,19 +281,25 @@ describe('round trip: ahorro', () => {
     const goalsRepository = await import('../../../../src/db/repositories/goals')
     const accountsRepository = await import('../../../../src/db/repositories/accounts')
     const db = trip.testDb.db as never
-    const expense = await runWithDb(db, accountsRepository.createCategory(trip.userId, {
-      name: 'Comida',
-      kind: 'expense',
-    }))
+    const expense = await runWithDb(
+      db,
+      accountsRepository.createCategory(trip.userId, {
+        name: 'Comida',
+        kind: 'expense',
+      }),
+    )
 
     await expect(
-      runWithDb(db, goalsRepository.create(trip.userId, {
-        key: 'saving:x',
-        categoryId: expense.id,
-        name: 'No',
-        targetAmount: 10,
-        currency: 'EUR',
-      })),
+      runWithDb(
+        db,
+        goalsRepository.create(trip.userId, {
+          key: 'saving:x',
+          categoryId: expense.id,
+          name: 'No',
+          targetAmount: 10,
+          currency: 'EUR',
+        }),
+      ),
     ).rejects.toThrow(/categoría de ahorro/)
   })
 
@@ -351,35 +362,44 @@ describe('round trip: ahorro', () => {
     const destination = rows.find((row) => row.name === 'Hucha')!
 
     await expect(
-      runWithDb(db, rulesRepository.create(trip.userId, {
-        name: 'Ahorro sin destino',
+      runWithDb(
+        db,
+        rulesRepository.create(trip.userId, {
+          name: 'Ahorro sin destino',
+          type: 'saving',
+          accountId: origin.id,
+          amount: 100,
+          currency: 'EUR',
+          frequency: 'monthly',
+        }),
+      ),
+    ).rejects.toThrow(/cuenta destino/)
+
+    const rule = await runWithDb(
+      db,
+      rulesRepository.create(trip.userId, {
+        name: 'Ahorro mensual',
         type: 'saving',
         accountId: origin.id,
+        destinationAccountId: destination.id,
         amount: 100,
         currency: 'EUR',
         frequency: 'monthly',
-      })),
-    ).rejects.toThrow(/cuenta destino/)
-
-    const rule = await runWithDb(db, rulesRepository.create(trip.userId, {
-      name: 'Ahorro mensual',
-      type: 'saving',
-      accountId: origin.id,
-      destinationAccountId: destination.id,
-      amount: 100,
-      currency: 'EUR',
-      frequency: 'monthly',
-    }))
+      }),
+    )
 
     await expect(
-      runWithDb(db, pendingRepository.create(trip.userId, {
-        recurringRuleId: rule.id,
-        type: 'saving',
-        accountId: origin.id,
-        amount: 100,
-        currency: 'EUR',
-        dueDate: '2026-10-01',
-      })),
+      runWithDb(
+        db,
+        pendingRepository.create(trip.userId, {
+          recurringRuleId: rule.id,
+          type: 'saving',
+          accountId: origin.id,
+          amount: 100,
+          currency: 'EUR',
+          dueDate: '2026-10-01',
+        }),
+      ),
     ).rejects.toThrow(/cuenta destino/)
 
     await expect(

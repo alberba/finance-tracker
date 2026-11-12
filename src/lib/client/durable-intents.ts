@@ -230,66 +230,49 @@ export const acceptDurableIntent = (
     const done = txDone(tx)
     done.catch(() => undefined)
     try {
-      const now = new Date().toISOString()
-      const intent: DurableIntentRecord = {
-        id: input.id ?? generateIntentId(),
-        kind: input.kind,
-        ownerUserId: input.ownerUserId,
-        createdAt: now,
-        updatedAt: now,
-        state: 'local-saved',
-        targetIds: [...input.targetIds],
-        payload: { ...(input.payload ?? {}) },
-        waitingFor: input.waitingFor ?? null,
-        failure: null,
-        discardRequested: false,
-      }
-      const stepNames = [
-        ...new Set([
-          ...(input.steps ?? input.targetIds),
-          ...(input.adopt ?? []).map((adopted) => adopted.step),
-          ...(input.commands ?? []).map((command) => command.step),
-        ]),
-      ]
+      const view = await writeNewIntent(tx, input)
+      await done
+      return view
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
+  })
+
+export interface AcceptOrReadDurableIntentResult {
+  view: DurableIntentView
+  /** False when a concurrent acceptance (another tab) already owned the id. */
+  created: boolean
+}
+
+/**
+ * Accepts the intent under a caller-chosen id, or returns the record a
+ * concurrent acceptance already wrote. Acceptance keyed by the financial
+ * action (e.g. one pending confirmation) must be idempotent across tabs: the
+ * read and the write happen in the same transaction, so only one of them
+ * creates the reservation and both agree on its fixed values.
+ */
+export const acceptOrReadDurableIntent = (
+  input: AcceptDurableIntentInput & { id: string },
+): Effect.Effect<AcceptOrReadDurableIntentResult, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo guardar la confirmación en este dispositivo.', async (db) => {
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
       const intentsStore = tx.objectStore(INTENTS_STORE)
       const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
-      await requestToPromise(intentsStore.add(intent) as IDBRequest<IDBValidKey>)
-      for (const step of stepNames) {
-        const record: IntentProgressRecord = {
-          id: intentProgressId(intent.id, step),
-          intentId: intent.id,
-          step,
-          state: 'pending',
-          commandId: null,
-          seq: null,
-          attempt: 0,
-          lastError: null,
-          claimedBy: null,
-          claimedAt: null,
-          updatedAt: now,
-        }
-        progressStore.add(record)
+      const existing = (await requestToPromise(
+        intentsStore.get(input.id) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      if (existing) {
+        const steps = await readIntentSteps(progressStore, existing.id)
+        await done
+        return { view: { intent: existing, steps }, created: false }
       }
-      // The configuration dependency (#491) commits with the acceptance: an
-      // already-queued command is adopted as-is, and a fresh one, if any, is
-      // published in this same transaction. Nothing is reported accepted until
-      // both the intent and its first step are durable.
-      if (input.adopt?.length) await adoptIntentCommands(tx, intent.id, input.adopt)
-      if (input.commands?.length) await writeIntentCommands(tx, intent.id, input.commands)
-
-      const recorded = await readIntentSteps(progressStore, intent.id)
-      const byStep = new Map(recorded.map((step) => [step.step, step]))
-      const steps = stepNames
-        .map((step) => byStep.get(step))
-        .filter((step): step is IntentProgressRecord => step !== undefined)
-      const stored =
-        ((await requestToPromise(
-          intentsStore.get(intent.id) as IDBRequest<DurableIntentRecord | undefined>,
-        )) as DurableIntentRecord | undefined) ?? intent
-      const next = refreshed(stored, steps)
-      intentsStore.put(next)
+      const view = await writeNewIntent(tx, input)
       await done
-      return { intent: next, steps }
+      return { view, created: true }
     } catch (error) {
       abortQuietly(tx)
       throw error
@@ -297,46 +280,72 @@ export const acceptDurableIntent = (
   })
 
 /**
- * Tags already-queued commands as an intent's steps in the acceptance
- * transaction: same `commandId`/content, no new command. A seq that no longer
- * exists (another tab acknowledged it first) leaves its step `pending`, so the
- * owning module rebuilds it from current state instead of replaying a ghost.
+ * Creates the intent header, its named steps and the commands/adoptions that
+ * commit with the acceptance (#490/#491), all inside the caller's transaction.
  */
-async function adoptIntentCommands(
+async function writeNewIntent(
   tx: IDBTransaction,
-  intentId: string,
-  adopt: readonly AdoptIntentCommandInput[],
-): Promise<void> {
+  input: AcceptDurableIntentInput,
+): Promise<DurableIntentView> {
   const now = new Date().toISOString()
-  const commandStore = tx.objectStore(COMMANDS_STORE)
+  const intent: DurableIntentRecord = {
+    id: input.id ?? generateIntentId(),
+    kind: input.kind,
+    ownerUserId: input.ownerUserId,
+    createdAt: now,
+    updatedAt: now,
+    state: 'local-saved',
+    targetIds: [...input.targetIds],
+    payload: { ...(input.payload ?? {}) },
+    waitingFor: input.waitingFor ?? null,
+    failure: null,
+    discardRequested: false,
+  }
+  const stepNames = [
+    ...new Set([
+      ...(input.steps ?? input.targetIds),
+      ...(input.adopt ?? []).map((adopted) => adopted.step),
+      ...(input.commands ?? []).map((command) => command.step),
+    ]),
+  ]
+  const intentsStore = tx.objectStore(INTENTS_STORE)
   const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
-  for (const adopted of adopt) {
-    const entry = (await requestToPromise(
-      commandStore.get(adopted.seq) as IDBRequest<OutboxEntry | undefined>,
-    )) as OutboxEntry | undefined
-    if (!entry || entry.intent) continue
-    const progress = (await requestToPromise(
-      progressStore.get(intentProgressId(intentId, adopted.step)) as IDBRequest<
-        IntentProgressRecord | undefined
-      >,
-    )) as IntentProgressRecord | undefined
-    if (!progress || progress.state !== 'pending') continue
-    commandStore.put({
-      ...entry,
-      intent: { intentId, step: adopted.step },
-    } satisfies OutboxEntry)
-    progressStore.put({
-      ...progress,
-      state: 'queued',
-      commandId: entry.command.commandId,
-      seq: adopted.seq,
-      attempt: progress.attempt + 1,
+  await requestToPromise(intentsStore.add(intent) as IDBRequest<IDBValidKey>)
+  for (const step of stepNames) {
+    const record: IntentProgressRecord = {
+      id: intentProgressId(intent.id, step),
+      intentId: intent.id,
+      step,
+      state: 'pending',
+      commandId: null,
+      seq: null,
+      attempt: 0,
       lastError: null,
       claimedBy: null,
       claimedAt: null,
       updatedAt: now,
-    } satisfies IntentProgressRecord)
+    }
+    progressStore.add(record)
   }
+  // The configuration dependency (#491) commits with the acceptance: an
+  // already-queued command is adopted as-is, and a fresh one, if any, is
+  // published in this same transaction. Nothing is reported accepted until
+  // both the intent and its first step are durable.
+  if (input.adopt?.length) await adoptIntentCommands(tx, intent.id, input.adopt)
+  if (input.commands?.length) await writeIntentCommands(tx, intent.id, input.commands)
+
+  const recorded = await readIntentSteps(progressStore, intent.id)
+  const byStep = new Map(recorded.map((step) => [step.step, step]))
+  const steps = stepNames
+    .map((step) => byStep.get(step))
+    .filter((step): step is IntentProgressRecord => step !== undefined)
+  const stored =
+    ((await requestToPromise(
+      intentsStore.get(intent.id) as IDBRequest<DurableIntentRecord | undefined>,
+    )) as DurableIntentRecord | undefined) ?? intent
+  const next = refreshed(stored, steps)
+  intentsStore.put(next)
+  return { intent: next, steps }
 }
 
 /** Reads the durable intents, oldest first, with their steps. */
@@ -404,6 +413,49 @@ async function runIntentPublication(
   } catch (error) {
     abortQuietly(tx)
     throw error
+  }
+}
+
+/**
+ * Tags already-queued commands as an intent's steps in the acceptance
+ * transaction: same `commandId`/content, no new command. A seq that no longer
+ * exists (another tab acknowledged it first) leaves its step `pending`, so the
+ * owning module rebuilds it from current state instead of replaying a ghost.
+ */
+async function adoptIntentCommands(
+  tx: IDBTransaction,
+  intentId: string,
+  adopt: readonly AdoptIntentCommandInput[],
+): Promise<void> {
+  const now = new Date().toISOString()
+  const commandStore = tx.objectStore(COMMANDS_STORE)
+  const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+  for (const adopted of adopt) {
+    const entry = (await requestToPromise(
+      commandStore.get(adopted.seq) as IDBRequest<OutboxEntry | undefined>,
+    )) as OutboxEntry | undefined
+    if (!entry || entry.intent) continue
+    const progress = (await requestToPromise(
+      progressStore.get(intentProgressId(intentId, adopted.step)) as IDBRequest<
+        IntentProgressRecord | undefined
+      >,
+    )) as IntentProgressRecord | undefined
+    if (!progress || progress.state !== 'pending') continue
+    commandStore.put({
+      ...entry,
+      intent: { intentId, step: adopted.step },
+    } satisfies OutboxEntry)
+    progressStore.put({
+      ...progress,
+      state: 'queued',
+      commandId: entry.command.commandId,
+      seq: adopted.seq,
+      attempt: progress.attempt + 1,
+      lastError: null,
+      claimedBy: null,
+      claimedAt: null,
+      updatedAt: now,
+    } satisfies IntentProgressRecord)
   }
 }
 
@@ -1167,6 +1219,47 @@ export const countDurableWork = (): Effect.Effect<number, ClientStorageError, Cl
       if (hasRemainingWork) total += 1
     }
     return total
+  })
+
+/**
+ * Forgets one settled intent and its progress. The caller must be sure the
+ * intent can no longer prevent a duplicate financial action (a confirmed
+ * recurrence whose pending is already confirmed and linked); unresolved or
+ * partial intents keep their record on purpose. Nothing is deleted while a
+ * queued command still references the intent.
+ */
+export const deleteDurableIntent = (
+  intentId: string,
+): Effect.Effect<boolean, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo retirar la intención confirmada.', async (db) => {
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
+      const intent = (await requestToPromise(
+        tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      if (!intent || !TERMINAL_INTENT_STATES.has(intent.state)) {
+        await done
+        return false
+      }
+      const entries = (await requestToPromise(
+        tx.objectStore(COMMANDS_STORE).getAll() as IDBRequest<OutboxEntry[]>,
+      )) as OutboxEntry[]
+      if (entries.some((entry) => entry.intent?.intentId === intentId)) {
+        await done
+        return false
+      }
+      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+      const steps = await readIntentSteps(progressStore, intentId)
+      for (const step of steps) progressStore.delete(step.id)
+      tx.objectStore(INTENTS_STORE).delete(intentId)
+      await done
+      return true
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
   })
 
 async function readIntentSteps(

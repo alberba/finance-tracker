@@ -83,9 +83,18 @@ idempotente; un cambio de contenido o un reintento explícito tras un rechazo de
 `commandId` nuevo conservando la identidad del movimiento. Los estados visibles distinguen guardado
 local, espera de conexión o dependencia, pendiente, confirmado, fallo definitivo y resultado
 parcial; el fallo permite reintentar o descartar, y el descarte solo cancela lo que aún no se ha
-reclamado, reconciliando antes un envío incierto. Los registros `intents`/`intentProgress` son el
-punto de extensión de la dependencia de configuración (#491) y de las confirmaciones recurrentes
-(#492).
+reclamado, reconciliando antes un envío incierto. Los registros `intents`/`intentProgress` guardan
+la dependencia de configuración (#491) y las confirmaciones recurrentes (#492).
+
+La confirmación de un pendiente (`src/lib/client/recurring-write.ts`) persiste una reserva única
+por pendiente con la edición resuelta, un solo id de movimiento y sus marcas; el alta del
+movimiento se publica en la misma transacción que acepta la intención. La actualización del
+pendiente solo se construye después de que el servidor confirme ese movimiento, para que nunca
+referencie un movimiento que no pudo existir. Recargar, repetir desde otra pestaña o reintentar
+reutiliza la reserva y la identidad; un rechazo definitivo espera un reintento explícito, que
+emite un `commandId` nuevo conservando el movimiento. Descartar no revierte un movimiento ya
+confirmado: la reserva permanece para impedir una segunda confirmación y el resultado parcial se
+muestra; una reserva ya enlazada y confirmada se olvida para no crecer sin límite.
 
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,

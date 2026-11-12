@@ -172,7 +172,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(state.pendingMovements[0].unitPrice).toBe(3210.654321)
   })
 
-  it('confirma, edita y mantiene pendientes fuera de transacciones hasta confirmar', () => {
+  it('confirma, edita y mantiene pendientes fuera de transacciones hasta confirmar', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
     const financialStore = useFinancialStateStore()
@@ -221,14 +221,14 @@ describe('reglas recurrentes y pendientes', () => {
         amount: 925,
       }),
     ).toBe(true)
-    expect(store.confirmPending(pendingId)).toBe(true)
+    expect((await store.confirmPending(pendingId)).accepted).toBe(true)
     expect(financialStore.transactions[0].description).toBe('Alquiler editado')
     expect(financialStore.transactions[0].amount).toBe(925)
     expect(store.pendingCount).toBe(1)
     vi.unstubAllGlobals()
   })
 
-  it('edita un movimiento pendiente de inversión y permite reclasificar su tipo', () => {
+  it('edita un movimiento pendiente de inversión y permite reclasificar su tipo', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
     const financialStore = useFinancialStateStore()
@@ -300,7 +300,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(edited.amount).toBe(502.5)
 
     // Confirm the edited investment pending movement and verify transaction
-    expect(store.confirmPending('pm-exp')).toBe(true)
+    expect((await store.confirmPending('pm-exp')).accepted).toBe(true)
     expect(financialStore.transactions).toHaveLength(1)
     expect(financialStore.transactions[0]).toMatchObject({
       type: 'investment',
@@ -470,7 +470,7 @@ describe('reglas recurrentes y pendientes', () => {
       store.refreshPending('2024-02-20')
       const pendingId = store.openPendingMovements[0]?.id
       expect(pendingId).toBeTruthy()
-      expect(store.confirmPending(pendingId as string)).toBe(true)
+      expect((await store.confirmPending(pendingId as string)).accepted).toBe(true)
 
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
       expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stockevents/transactions')
