@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as transactionsRepository from '../../../../src/db/repositories/transactions'
+import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
@@ -114,17 +115,20 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
       amount: 50,
     })
 
+    const edited = useFinancialStateStore().transactions.find((item) => item.id === targetId)!
     held.release()
     const state = await trip.reload()
 
     expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
-      description: expect.any(String),
+      description: edited.description,
+      amount: edited.amount,
       instrumentId,
       units: 5,
       unitPrice: 40,
       fee: 2,
       time: '11:45',
       declared: true,
+      movementCurrency: 'EUR',
     })
     const late = state.transactions.find((item) => item.description === 'Compra tardía')
     expect(late).toBeDefined()

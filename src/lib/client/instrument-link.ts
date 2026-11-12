@@ -140,7 +140,9 @@ async function executeInstrumentLink(execution: InstrumentLinkExecution): Promis
 async function publishLinkedTarget(instrument: Instrument, movementId: string): Promise<void> {
   const financialStore = useFinancialStateStore()
   const syncStore = useSyncStore()
+  const writerId = movementPublicationWriterId()
   let attempts = 0
+  let refreshed = false
   while (attempts < 3) {
     attempts += 1
     const movement = financialStore.transactions.find((item) => item.id === movementId)
@@ -165,15 +167,18 @@ async function publishLinkedTarget(instrument: Instrument, movementId: string): 
     const fingerprint = movementFingerprint(live)
 
     if (
+      !refreshed &&
       record &&
-      record.writerId !== movementPublicationWriterId() &&
+      record.writerId !== writerId &&
       record.fingerprint !== fingerprint
     ) {
-      // Another tab published a state this tab has not seen. Refresh before
-      // rebuilding so the command carries that state instead of overwriting it.
+      // Another tab published a state this tab has not seen. Flush and pull
+      // before rebuilding, so the command carries the current state instead of
+      // overwriting it. Offline that read cannot be trusted: leave the target
+      // unlinked for a later retry rather than publish a stale command.
+      refreshed = true
       await syncStore.syncNow()
-      const refreshed = financialStore.transactions.find((item) => item.id === movementId)
-      if (!refreshed || movementFingerprint(refreshed) !== record.fingerprint) return
+      if (syncStore.connection === 'offline') return
       continue
     }
 
@@ -201,18 +206,14 @@ async function publishLinkedTarget(instrument: Instrument, movementId: string): 
     if (result.outcome === 'unresolved') return
     // Stale: the persisted generation moved after this attempt was built.
     if (!isCompatible(result.record, instrument.id)) return
-    if (result.record?.writerId === movementPublicationWriterId()) {
+    if (result.record?.writerId === writerId) {
       // Our own tab's edit: the live state is the current one.
       continue
     }
+    if (refreshed) return
+    refreshed = true
     await syncStore.syncNow()
-    const refreshed = financialStore.transactions.find((item) => item.id === movementId)
-    if (
-      !refreshed ||
-      !result.record ||
-      movementFingerprint(refreshed) !== result.record.fingerprint
-    )
-      return
+    if (syncStore.connection === 'offline') return
   }
 }
 
@@ -280,8 +281,11 @@ export async function recoverLinkedMovement(conflict: LinkedMovementConflict): P
       type: live.type,
       instrumentId: conflict.instrumentId,
       fingerprint: movementFingerprint(live),
+      expectedGeneration: record?.generation ?? 0,
       link: { instrumentId: conflict.instrumentId },
     },
   ])
+  // A stale outcome means another publication superseded this re-evaluation;
+  // never overwrite it with the payload built here.
   return result?.outcome === 'published'
 }

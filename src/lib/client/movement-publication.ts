@@ -108,11 +108,32 @@ export interface MovementPublicationResult {
   record?: MovementPublicationRecord
 }
 
-/** Identifies this page while it is open; two tabs never share one. */
-const WRITER_ID =
-  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `tab_${Date.now()}_${Math.random().toString(36).slice(2)}`
+const WRITER_STORAGE_KEY = 'finance-tracker-publication-writer'
+
+/**
+ * Identifies the browser tab, not the page load: it survives a reload (so a
+ * tab recognises its own earlier publications as its own) and stays separate
+ * between tabs (so a genuinely concurrent tab is detected). `sessionStorage`
+ * is per-tab; environments without it fall back to a per-module id.
+ */
+function resolveWriterId(): string {
+  try {
+    const stored = sessionStorage.getItem(WRITER_STORAGE_KEY)
+    if (stored) return stored
+    const minted =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `tab_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    sessionStorage.setItem(WRITER_STORAGE_KEY, minted)
+    return minted
+  } catch {
+    return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `tab_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  }
+}
+
+const WRITER_ID = resolveWriterId()
 
 export const movementPublicationWriterId = (): string => WRITER_ID
 
@@ -173,6 +194,31 @@ async function runPublication(
 ): Promise<MovementPublicationResult[]> {
   const tx = db.transaction([COMMANDS_STORE, MOVEMENT_PUBLICATIONS_STORE], 'readwrite')
   const done = txDone(tx)
+  // The commit promise is observed below; on error the transaction is aborted
+  // and its rejection is expected, not an unhandled one.
+  done.catch(() => undefined)
+  try {
+    const results = await writePublications(tx, inputs, writerId)
+    await done
+    return results
+  } catch (error) {
+    // A rejected command must leave the queue exactly as it was: aborting the
+    // shared transaction discards the commands and generations written before
+    // the failure instead of committing them.
+    try {
+      tx.abort()
+    } catch {
+      // The transaction may already be finished; the original error wins.
+    }
+    throw error
+  }
+}
+
+async function writePublications(
+  tx: IDBTransaction,
+  inputs: readonly MovementPublicationInput[],
+  writerId: string,
+): Promise<MovementPublicationResult[]> {
   const commands = tx.objectStore(COMMANDS_STORE)
   const publications = tx.objectStore(MOVEMENT_PUBLICATIONS_STORE)
   const results: MovementPublicationResult[] = []
@@ -326,7 +372,6 @@ async function runPublication(
     })
   }
 
-  await done
   return results
 }
 

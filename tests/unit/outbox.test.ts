@@ -30,6 +30,46 @@ describe('outbox', () => {
     await wipeOutbox(USER_ID)
   })
 
+  it('conserva los comandos existentes al subir la base de la cola a la versión 2', async () => {
+    const upgradeUser = 'user-outbox-upgrade'
+    const name = `finance-tracker-outbox-v2:${upgradeUser}`
+    await wipeOutbox(upgradeUser)
+    // A queue written by the previous build: version 1, only `commands`.
+    const legacy = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 1)
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('commands', { keyPath: 'seq', autoIncrement: true })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const tx = legacy.transaction('commands', 'readwrite')
+      tx.objectStore('commands').add({
+        command: { commandId: 'existing-command', action: 'noop' },
+        enqueuedAt: new Date().toISOString(),
+        attempts: 0,
+      })
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    legacy.close()
+
+    const upgraded = await openStorage(upgradeUser)
+    try {
+      const entries = await listAll(upgraded)
+      expect(entries).toHaveLength(1)
+      expect(entries[0].command).toMatchObject({
+        commandId: 'existing-command',
+        action: 'noop',
+      })
+      expect(upgraded.outbox.objectStoreNames.contains('movementPublications')).toBe(true)
+    } finally {
+      upgraded.close()
+      await wipeOutbox(upgradeUser)
+    }
+  })
+
   it('generates a unique commandId when none is supplied', () => {
     const a = generateCommandId()
     const b = generateCommandId()

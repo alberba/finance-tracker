@@ -43,26 +43,27 @@ export async function buildMovementPublications(
   currency: string,
 ): Promise<MovementPublicationInput[] | null> {
   const syncStore = useSyncStore()
-  const current = useFinancialStateStore().transactions
   const beforeById = new Map(before.map((movement) => [movement.id, movement]))
-  const afterIds = new Set(after.map((movement) => movement.id))
+  const afterById = new Map(after.map((movement) => [movement.id, movement]))
   const publications: MovementPublicationInput[] = []
 
   for (const [id, previous] of beforeById) {
-    if (afterIds.has(id)) continue
-    const record = await publicationForRemoval(syncStore, id, previous)
-    publications.push(record)
+    if (afterById.has(id)) continue
+    const live = liveMovement(id)
+    if (live) continue
+    publications.push(await publicationForRemoval(syncStore, id, previous))
   }
 
   for (const item of after) {
     const previous = beforeById.get(item.id)
-    const live = current.find((movement) => movement.id === item.id)
+    // Re-read on every step: another command may have edited or deleted the
+    // movement while this one was resolving references.
+    const live = liveMovement(item.id)
     if (!live) {
       // Deleted after this snapshot was taken. Cancelling a still-queued
       // create (or publishing the removal) keeps a link continuation from
       // resurrecting it.
-      const record = await publicationForRemoval(syncStore, item.id, item)
-      publications.push(record)
+      publications.push(await publicationForRemoval(syncStore, item.id, previous ?? item))
       continue
     }
     if (previous && JSON.stringify(previous) === JSON.stringify(live)) continue
@@ -102,6 +103,10 @@ export async function buildMovementPublications(
   }
 
   return publications
+}
+
+function liveMovement(id: string): Transaction | undefined {
+  return useFinancialStateStore().transactions.find((movement) => movement.id === id)
 }
 
 async function publicationForRemoval(

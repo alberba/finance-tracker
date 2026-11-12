@@ -1007,14 +1007,18 @@ export const useSyncStore = defineStore('sync', () => {
       return
     }
     if (!isReady() || detached) return
-    const { recoverLinkedMovement } = await import('../lib/client/instrument-link')
-    for (const conflict of conflicts) {
-      try {
-        await recoverLinkedMovement(conflict)
-      } catch (error) {
-        lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
-        showToast('⚠️ No se pudo reintentar la vinculación de un movimiento.')
+    try {
+      const { recoverLinkedMovement } = await import('../lib/client/instrument-link')
+      for (const conflict of conflicts) {
+        try {
+          await recoverLinkedMovement(conflict)
+        } catch (error) {
+          lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
+          showToast('⚠️ No se pudo reintentar la vinculación de un movimiento.')
+        }
       }
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
     }
   }
 

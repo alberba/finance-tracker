@@ -6,9 +6,13 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 ## Ida: de la UI a D1
 
 1. **Comando del movimiento**: `syncMovements` (`src/lib/client/movement-commands.ts`) recibe
-   las listas antes/después y la moneda general. Inversión, Movimientos y confirmación de
-   pendientes usan la misma conversión y encolado. Su promesa termina al encolar, antes de que
-   el servidor confirme:
+   las listas antes/después y la moneda general. Inversión, Movimientos, confirmación de
+   pendientes y `Vincular movimientos` usan la misma conversión y publicación. Cada comando se
+   construye releyendo el movimiento actual, no la copia de la lista, y se escribe junto a su
+   **generación persistida** en una sola transacción de IndexedDB de la cola
+   (`src/lib/client/movement-publication.ts`): así una edición o un borrado posterior —también
+   desde otra pestaña, sin Web Locks— no se sobrescribe con una instantánea antigua. Su promesa
+   termina al publicar, antes de que el servidor confirme:
    - Resuelve cuenta y categoría; conserva las cuentas con identidad pendiente y omite el comando
      si la cuenta requerida no se puede resolver.
    - Resuelve los instrumentos del bootstrap en caché por su id propio o su id de correlación de
@@ -29,8 +33,11 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).
 2. `src/lib/client/command-mapping.ts`: `syncListDiff` / `syncCreate` / `syncUpdate` convierten el
    antes/después en comandos.
-3. `src/stores/sync.ts` `enqueueCommand` → `src/lib/client/outbox.ts` `enqueue`: valida contra los
-   esquemas Effect Schema y guarda en IndexedDB. `flush` envía a `POST /api/sync`.
+3. `src/stores/sync.ts` `enqueueCommand` / `publishMovementCommands` → `src/lib/client/outbox.ts`
+   `enqueue` y `src/lib/client/movement-publication.ts`: validan contra los esquemas Effect Schema
+   y guardan en IndexedDB. La base `finance-tracker-outbox-v2` es la versión 2: añade
+   `movementPublications` sin tocar `commands`, de modo que una cola pendiente de la versión
+   anterior sobrevive. `flush` envía a `POST /api/sync`.
 4. `src/lib/server/sync/command-schemas.ts`: esquema (Effect Schema) del comando. Lo comparten cliente y
    servidor. Los objetos son `.strict()`: un campo que falte aquí hace que la cola rechace el
    comando al encolarlo.
@@ -56,6 +63,12 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 y `src/pages/api/data/import.ts` las recrea campo a campo, así que un campo nuevo también se
 añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFullDataset`) comprueba
 que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
+
+La vinculación de movimientos a una cotización fija sus ids objetivo al pulsar Vincular
+(`src/lib/client/instrument-link.ts`), guarda la configuración, espera la referencia de catálogo y
+publica cada movimiento con su estado actual. Un conflicto de un comando marcado como de
+vinculación se relee y se reintenta con identidad nueva; el resto de comandos conserva el rebase
+automático de ADR 0003.
 
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,
