@@ -27,8 +27,31 @@ import {
 } from '../server/sync/command-schemas'
 import { ClientStorage, storageError, type ClientStorageError } from './storage'
 
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE = 'commands'
+/**
+ * Persisted publication generation per movement (#489), in the same database
+ * as the queue so a command and the generation it advances commit in one
+ * IndexedDB transaction — the cross-tab exclusion that a page-local lock
+ * cannot provide.
+ */
+export const MOVEMENT_PUBLICATIONS_STORE = 'movementPublications'
+export const COMMANDS_STORE = STORE
+
+/**
+ * Client-only provenance of a queued command. It never travels to the server:
+ * `POST /api/sync` sends `entry.command`, not the whole entry. The queue uses
+ * it to re-evaluate a link-owned command on conflict instead of rebasing a
+ * stale snapshot (ADR 0003 stays untouched for every other command).
+ */
+export interface OutboxPublication {
+  movementId: string
+  origin: 'instrumentLink'
+  /** Generation the command was published at. */
+  generation: number
+  /** Local instrument id the link targets. */
+  instrumentId: string
+}
 
 export interface OutboxEntry {
   seq: number
@@ -36,6 +59,7 @@ export interface OutboxEntry {
   enqueuedAt: string
   attempts: number
   lastError?: string
+  publication?: OutboxPublication
 }
 
 /**
@@ -67,23 +91,43 @@ export const openOutbox = (userId: string): Effect.Effect<IDBDatabase, ClientSto
           if (!db.objectStoreNames.contains(STORE)) {
             db.createObjectStore(STORE, { keyPath: 'seq', autoIncrement: true })
           }
+          // Version 2 added this store; `commands` is left untouched so a
+          // queue written by an older build survives the upgrade.
+          if (!db.objectStoreNames.contains(MOVEMENT_PUBLICATIONS_STORE)) {
+            db.createObjectStore(MOVEMENT_PUBLICATIONS_STORE, { keyPath: 'id' })
+          }
         }
 
-        request.onsuccess = () => resolve(request.result)
+        // An older tab holding a version-1 connection would otherwise make
+        // this open hang forever. Fail visibly instead of silently.
+        request.onblocked = () =>
+          reject(
+            new Error(
+              'Otra pestaña mantiene abierto el almacenamiento local. Recarga o cierra las demás pestañas.',
+            ),
+          )
+        request.onsuccess = () => {
+          const db = request.result
+          // Yield the connection to a newer build instead of blocking it.
+          db.onversionchange = () => db.close()
+          resolve(db)
+        }
         request.onerror = () =>
           reject(request.error ?? new Error('No se pudo abrir el outbox IndexedDB.'))
       }),
     catch: (cause) => storageError(cause, 'No se pudo abrir el outbox IndexedDB.'),
   })
 
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+/** Resolves one IndexedDB request; shared with the movement publication transaction. */
+export function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error ?? new Error('Fallo en operación del outbox.'))
   })
 }
 
-function txDone(tx: IDBTransaction): Promise<void> {
+/** Resolves when an IndexedDB transaction commits; shared with the movement publication transaction. */
+export function txDone(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error ?? new Error('Fallo en transacción del outbox.'))
@@ -153,6 +197,35 @@ export function generateCommandId(): string {
 }
 
 /**
+ * Validates one command the same way `enqueue` does, returning the parsed
+ * command or throwing `InvalidCommandError`. Shared with the movement
+ * publication transaction so a command written there gets the identical
+ * guarantee without opening a second IndexedDB transaction.
+ */
+export function parseOutboxCommand(command: OutboxCommandInput): SyncCommandInput {
+  const withId = { ...command, commandId: command.commandId ?? generateCommandId() }
+  const parsed = syncCommandSchema.safeParse(withId)
+  if (!parsed.success) {
+    throw new InvalidCommandError(parsed.issues)
+  }
+
+  if (parsed.data.action === 'create') {
+    const entityCheck = entityCreatePayloadSchemas[parsed.data.entityType].safeParse(
+      parsed.data.data,
+    )
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.issues)
+    }
+  } else if (parsed.data.action === 'update') {
+    const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch)
+    if (!entityCheck.success) {
+      throw new InvalidCommandError(entityCheck.issues)
+    }
+  }
+  return parsed.data
+}
+
+/**
  * Validates and appends a command to the outbox. Adds `commandId` if the
  * caller didn't supply one. Fails with `InvalidCommandError` if the command
  * doesn't match the server's schema, or if its per-entity `data`/`patch`
@@ -170,28 +243,16 @@ export const enqueue = (
   command: OutboxCommandInput,
 ): Effect.Effect<OutboxEntry, InvalidCommandError | ClientStorageError, ClientStorage> =>
   Effect.gen(function* () {
-    const withId = { ...command, commandId: command.commandId ?? generateCommandId() }
-    const parsed = syncCommandSchema.safeParse(withId)
-    if (!parsed.success) {
-      return yield* Effect.fail(new InvalidCommandError(parsed.issues))
-    }
-
-    if (parsed.data.action === 'create') {
-      const entityCheck = entityCreatePayloadSchemas[parsed.data.entityType].safeParse(
-        parsed.data.data,
-      )
-      if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
-      }
-    } else if (parsed.data.action === 'update') {
-      const entityCheck = entityUpdateSchemas[parsed.data.entityType].safeParse(parsed.data.patch)
-      if (!entityCheck.success) {
-        return yield* Effect.fail(new InvalidCommandError(entityCheck.issues))
-      }
-    }
+    const parsed = yield* Effect.try({
+      try: () => parseOutboxCommand(command),
+      catch: (cause) => {
+        if (cause instanceof InvalidCommandError) return cause
+        throw cause
+      },
+    })
 
     const entry: Omit<OutboxEntry, 'seq'> = {
-      command: parsed.data,
+      command: parsed,
       enqueuedAt: new Date().toISOString(),
       attempts: 0,
     }

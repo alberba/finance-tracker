@@ -20,6 +20,13 @@ import {
   type PendingCreateMatch,
 } from '../lib/client/outbox'
 import {
+  publishMovementCommands as publishMovementCommandsEffect,
+  readMovementPublications as readMovementPublicationsEffect,
+  type MovementPublicationInput,
+  type MovementPublicationRecord,
+  type MovementPublicationResult,
+} from '../lib/client/movement-publication'
+import {
   getCachedBootstrap,
   getCachedSettings,
   getAllEntities,
@@ -382,6 +389,46 @@ export const useSyncStore = defineStore('sync', () => {
     return entry
   }
 
+  /**
+   * Publishes movement commands atomically with their persisted generations
+   * (#489). The queue remains the only source of truth: a publication only
+   * writes commands, and the immediate flush follows the usual path.
+   */
+  async function publishMovementCommands(
+    inputs: MovementPublicationInput[],
+  ): Promise<MovementPublicationResult[]> {
+    if (isReadOnlyDemoActive() || !isReady() || inputs.length === 0) {
+      return inputs.map((input) => ({
+        movementId: input.movementId,
+        outcome: 'unresolved' as const,
+        generation: 0,
+      }))
+    }
+    try {
+      const results = await run(publishMovementCommandsEffect(inputs))
+      pendingCount.value = await run(
+        countOutbox().pipe(Effect.orElseSucceed(() => pendingCount.value)),
+      )
+      if (results.some((result) => result.outcome === 'published')) void syncNow()
+      return results
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return inputs.map((input) => ({
+        movementId: input.movementId,
+        outcome: 'unresolved' as const,
+        generation: 0,
+      }))
+    }
+  }
+
+  /** Reads the persisted publication generations of some movements. */
+  async function readMovementPublications(
+    movementIds: string[],
+  ): Promise<Map<string, MovementPublicationRecord>> {
+    if (isReadOnlyDemoActive() || !isReady() || movementIds.length === 0) return new Map()
+    return run(readMovementPublicationsEffect(movementIds))
+  }
+
   function scheduleRetry(): void {
     if (retryTimer) {
       return
@@ -552,6 +599,15 @@ export const useSyncStore = defineStore('sync', () => {
       // moving, instead of parking the command and freezing everything
       // behind it (audit §2.4).
       const retries: OutboxCommandInput[] = []
+      // Link-owned commands are not blindly rebased: the link module re-reads
+      // the movement after this cycle pulled the server's current rows and
+      // publishes a new attempt from the current state (#489). Every other
+      // command keeps ADR-0003's automatic rebase.
+      const linkConflicts: Array<{
+        movementId: string
+        instrumentId: string
+        generation: number
+      }> = []
       let lastDropMessage: string | null = null
       // Another request still holds this command's reservation; the server
       // halted the batch there, so the entry stays queued and is resent
@@ -584,7 +640,14 @@ export const useSyncStore = defineStore('sync', () => {
           }
         } else if (result.status === 'conflict') {
           const command = entry.command
-          if (command.action === 'update' || command.action === 'remove') {
+          if (entry.publication?.origin === 'instrumentLink' && command.action === 'update') {
+            acked.push(entry.seq)
+            linkConflicts.push({
+              movementId: entry.publication.movementId,
+              instrumentId: entry.publication.instrumentId,
+              generation: entry.publication.generation,
+            })
+          } else if (command.action === 'update' || command.action === 'remove') {
             acked.push(entry.seq)
             const baseVersion = result.currentVersion ?? command.baseVersion
             retries.push(
@@ -647,6 +710,11 @@ export const useSyncStore = defineStore('sync', () => {
       // whichever call lands last wins the visible text.
       if (retries.length > 0) {
         showToast('Un cambio tuyo se reaplicó sobre la versión más reciente del servidor.')
+      }
+      if (linkConflicts.length > 0) {
+        // Fire-and-forget on purpose: the recovery must wait for this sync
+        // cycle (and its lock) to finish before pulling and republishing.
+        void recoverLinkCommands(linkConflicts)
       }
       if (lastDropMessage) {
         showToast(`⚠️ No se pudo guardar este cambio: ${lastDropMessage}`)
@@ -921,6 +989,35 @@ export const useSyncStore = defineStore('sync', () => {
     )
   }
 
+  /**
+   * Re-evaluates a link-owned movement after a server conflict. It waits for
+   * the running cycle to end, pulls the server's newer rows and only then
+   * asks the link module to rebuild the command from the current movement —
+   * never from the patch the conflicted command carried (#489).
+   */
+  async function recoverLinkCommands(
+    conflicts: ReadonlyArray<{ movementId: string; instrumentId: string; generation: number }>,
+  ): Promise<void> {
+    try {
+      await syncNow()
+      if (!isReady() || detached || connection.value === 'offline') return
+      await pullChanges()
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo releer los movimientos vinculados.')
+      return
+    }
+    if (!isReady() || detached) return
+    const { recoverLinkedMovement } = await import('../lib/client/instrument-link')
+    for (const conflict of conflicts) {
+      try {
+        await recoverLinkedMovement(conflict)
+      } catch (error) {
+        lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
+        showToast('⚠️ No se pudo reintentar la vinculación de un movimiento.')
+      }
+    }
+  }
+
   async function prepareLogout(): Promise<void> {
     await syncNow()
     if (isReady()) pendingCount.value = await run(countOutbox())
@@ -965,6 +1062,8 @@ export const useSyncStore = defineStore('sync', () => {
     lastCheckedAt,
     init,
     enqueueCommand,
+    publishMovementCommands,
+    readMovementPublications,
     flush,
     pullChanges,
     syncNow,
