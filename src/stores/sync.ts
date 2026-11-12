@@ -22,18 +22,23 @@ import {
   cancelIntentStep as cancelIntentStepEffect,
   claimIntentCommands,
   commitIntentCommands,
+  completeIntentStep as completeIntentStepEffect,
   countDurableWork,
   discardDurableIntent,
   failDurableIntent as failDurableIntentEffect,
   isUnresolvedIntent,
   listDurableIntents,
   markIntentWaiting as markIntentWaitingEffect,
+  publishIntentCommands as publishIntentCommandsEffect,
   releaseIntentClaims,
+  reopenIntentStep as reopenIntentStepEffect,
   retryDurableIntent,
   type AcceptDurableIntentInput,
   type DurableIntentView,
+  type IntentCommandInput,
   type IntentCommandOutcome,
   type IntentWaitReason,
+  type PublishIntentCommandsResult,
 } from '../lib/client/durable-intents'
 import {
   movementPublicationWriterId,
@@ -160,6 +165,8 @@ export const useSyncStore = defineStore('sync', () => {
   let readModel: SyncV2Bootstrap | null = null
   /** A fresh client re-reads the full model once; the cache only covers failures. */
   let readModelStale = false
+  /** A batch just confirmed a private quote configuration (#491). */
+  let configurationConfirmed = false
   let stopConnection: (() => void) | null = null
   let detached = false
 
@@ -322,10 +329,18 @@ export const useSyncStore = defineStore('sync', () => {
       // offline reaches the queue in this same cycle.
       yield* resumeIntents()
       yield* flushEffect()
+      if (configurationConfirmed) {
+        // The flush confirmed a quote configuration: its absorbed row is the
+        // catalog reference the dependent link needs (#491). Resume right
+        // here, before the pull, so an interrupted cache read cannot keep the
+        // link waiting. Only this confirmation wakes the dependent steps;
+        // publishing from the generic hook after any conflict would rebuild a
+        // command over a read model that still carries the conflicted queue.
+        configurationConfirmed = false
+        yield* resumeIntents()
+      }
       if ((syncStatus.value as SyncStatus) === 'error') return
       yield* pullUnlocked()
-      // The pull above may have confirmed a quote configuration: the link
-      // depending on it gets its catalog reference now (#491 extends this).
       yield* resumeIntents()
     })
   }
@@ -556,6 +571,99 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (error) {
       lastError.value = errorMessage(error, 'No se pudieron leer las vinculaciones guardadas.')
       return intents.value
+    }
+  }
+
+  /**
+   * Publishes the commands of named intent steps atomically with their
+   * progress. The link module owns which commands and in what order; this is
+   * only the store edge that runs the transaction and refreshes the status.
+   */
+  async function publishIntentCommands(
+    id: string,
+    commands: IntentCommandInput[],
+  ): Promise<PublishIntentCommandsResult | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const result = await run(publishIntentCommandsEffect(id, commands))
+      await run(refreshIntentState())
+      if (result.published.length > 0) void syncNow()
+      return result
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
+  }
+
+  /** The still-queued command a named intent step owns, if any. */
+  async function findIntentCommand(intentId: string, step: string): Promise<OutboxEntry | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    const entries = await run(listOutbox())
+    return (
+      entries.find((entry) => entry.intent?.intentId === intentId && entry.intent.step === step) ??
+      null
+    )
+  }
+
+  /**
+   * Queued private quote configuration for an instrument, if the ordinary
+   * editor path already wrote one. The link adopts it instead of publishing a
+   * duplicate.
+   */
+  async function findQueuedUserInstrumentCommand(
+    instrumentId: string,
+    trackingId: string | null,
+  ): Promise<{ seq: number; commandId: string; action: 'create' | 'update' | 'remove' } | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const entries = await run(listOutbox())
+      const match = entries.find((entry) => {
+        if (entry.intent) return false
+        const command = entry.command
+        if (!('entityType' in command) || command.entityType !== 'userInstrument') return false
+        if (command.action === 'create') {
+          const data = command.data as { id?: unknown; instrumentId?: unknown }
+          return data.id === instrumentId || data.instrumentId === instrumentId
+        }
+        if (command.action === 'remove')
+          return command.entityId === instrumentId || command.entityId === trackingId
+        return (
+          command.action === 'update' &&
+          (command.entityId === instrumentId || command.entityId === trackingId)
+        )
+      })
+      return match
+        ? {
+            seq: match.seq,
+            commandId: match.command.commandId,
+            action: match.command.action as 'create' | 'update' | 'remove',
+          }
+        : null
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo leer la configuración pendiente.')
+      return null
+    }
+  }
+
+  /** The read model already proves a dependency effect; do not resend it. */
+  async function completeIntentStep(id: string, step: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(completeIntentStepEffect(id, step))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo confirmar la vinculación.')
+    }
+  }
+
+  /** Rebuilds a step whose command disappeared before being acknowledged. */
+  async function reopenIntentStep(id: string, step: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(reopenIntentStepEffect(id, step))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo retomar la vinculación.')
     }
   }
 
@@ -867,7 +975,11 @@ export const useSyncStore = defineStore('sync', () => {
         }
         if (result.status === 'applied' || result.status === 'noop') {
           const command = entry.command
-          if (result.status === 'applied') confirmed.push(confirmedChange(command, result.entity))
+          if (result.status === 'applied') {
+            confirmed.push(confirmedChange(command, result.entity))
+            if ('entityType' in command && command.entityType === 'userInstrument')
+              configurationConfirmed = true
+          }
           if (result.entity !== undefined) {
             if (command.action === 'settingsUpdate') {
               // Keeps this device's `user_settings.version` current, so the next
@@ -878,6 +990,16 @@ export const useSyncStore = defineStore('sync', () => {
             } else if (command.action === 'create' || command.action === 'update') {
               yield* applyResultToCache(command.entityType, result.entity)
             }
+          }
+          if (
+            result.status === 'noop' &&
+            'entityType' in command &&
+            command.entityType === 'userInstrument'
+          ) {
+            // The configuration already existed server-side; the local read
+            // model may never have seen it. Force a fresh bootstrap so the
+            // dependent link resolves its catalog reference (#491).
+            readModelStale = true
           }
           if (entry.intent) {
             intentOutcomes.push({ entry, status: 'confirmed' })
@@ -1378,6 +1500,11 @@ export const useSyncStore = defineStore('sync', () => {
     cancelPendingCreate,
     acceptIntent,
     listIntents,
+    publishIntentCommands,
+    findIntentCommand,
+    findQueuedUserInstrumentCommand,
+    completeIntentStep,
+    reopenIntentStep,
     markIntentWaiting,
     failIntent,
     cancelIntentStep,

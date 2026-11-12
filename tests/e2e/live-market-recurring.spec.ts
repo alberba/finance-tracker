@@ -700,6 +700,12 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
     await movementSynced
 
+    // The sync endpoints are unreachable from the start: the quote is
+    // configured and linked before the server can confirm anything, which is
+    // exactly the #491 case (no manual sync step, no catalog precheck).
+    const blocked = /\/api\/(bootstrap|changes|sync)(\?.*)?$/
+    const abortSync = (route: import('@playwright/test').Route) => route.abort()
+    await page.route(blocked, abortSync)
     const liveMarket = new LiveMarketPage(page)
     await tracker.openSettings()
     await liveMarket.addInstrument({
@@ -708,20 +714,19 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       symbol: 'AGED.MI',
       currency: 'EUR',
       keepOpen: true,
+      waitForSync: false,
     })
     const row = liveMarket.instrument('AGED.MI')
     await expect(row).toContainText('1 por vincular')
 
-    // The sync endpoints are unreachable, but the shell still loads: the user
-    // can request the link while the server cannot confirm anything.
-    const blocked = /\/api\/(bootstrap|changes|sync)(\?.*)?$/
-    const abortSync = (route: import('@playwright/test').Route) => route.abort()
-    await page.route(blocked, abortSync)
+    // The shell still loads: the user can request the link while the server
+    // cannot confirm the configuration yet. It is stored, not failed.
     await liveMarket.linkExistingMovements('AGED.MI')
     await expect(row).toContainText('1 vinculados')
     await expect(row.locator('[data-link-intent-status]')).toContainText(
       'Guardado en este dispositivo',
     )
+    await expect(row.locator('[data-link-intent-retry]')).toHaveCount(0)
 
     // A reload cannot be done with `context.setOffline` (the shell has no
     // service worker), but blocking the API exercises the same recovery.
@@ -732,6 +737,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(
       liveMarket.instrument('AGED.MI').locator('[data-link-intent-status]'),
     ).toContainText('Guardado en este dispositivo')
+    await expect(liveMarket.instrument('AGED.MI').locator('[data-link-intent-retry]')).toHaveCount(
+      0,
+    )
 
     await page.unroute(blocked, abortSync)
     await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
@@ -774,6 +782,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
     await movementSynced
     await tracker.openSettings()
+    const configurationSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
     await liveMarket.addInstrument({
       asset: 'ETF AGED',
       type: 'etf',
@@ -781,6 +793,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       currency: 'EUR',
       keepOpen: true,
     })
+    await configurationSynced
     const row = liveMarket.instrument('AGED.MI')
     await expect(row).toContainText('1 por vincular')
 

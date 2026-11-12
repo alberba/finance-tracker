@@ -1,5 +1,5 @@
 /**
- * Durable instrument link (#489/#490).
+ * Durable instrument link (#489/#490/#491).
  *
  * The caller expresses one intention — "link these movements to this
  * instrument" — and this module owns the rest: persisting the fixed targets
@@ -13,17 +13,30 @@
  * server's acknowledgement, absorbed into the cache before the queue retires
  * the command.
  *
- * The new-instrument configuration gate still belongs to the caller until
- * #491; this module keeps it and stores the intent around it so a reload in
- * between does not lose the selection.
+ * A quote configured moments ago has no catalog reference yet (#491). The
+ * configuration becomes one of the intent's own steps — either a command
+ * adopted from the queue (the one `addInstrument` already wrote) or a fresh
+ * command accepted/published in the acceptance transaction — and the movement
+ * steps stay pending until the reference exists. A missing cache entry is a
+ * temporary wait (`waiting: catalog`), never a failed link: the confirmation
+ * absorbed from the sync response (or the bootstrap it triggers) is what
+ * resolves the reference and publishes the movements.
  */
 
 import { unlinkedMovementIdsForInstrument } from '../../domain/investment/symbol-matching'
 import type { Instrument, Transaction } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSyncStore } from '../../stores/sync'
+import { resolveEntityId } from './command-mapping'
 import { isReadOnlyDemoActive } from './demo-source'
-import { isUnresolvedIntent, type DurableIntentView } from './durable-intents'
+import {
+  isUnresolvedIntent,
+  type AdoptIntentCommandInput,
+  type DurableIntentView,
+  type IntentCommandInput,
+  type IntentPayload,
+  type IntentWaitReason,
+} from './durable-intents'
 import { rememberLinkTargets } from './link-targets'
 import { buildMovementData, movementFingerprint } from './movement-commands'
 import {
@@ -31,11 +44,13 @@ import {
   type MovementPublicationInput,
   type MovementPublicationRecord,
 } from './movement-publication'
+import type { OutboxCommandInput } from './outbox'
+
+/** The intent step that carries the private quote configuration. */
+export const LINK_CONFIGURATION_STEP = 'configuration'
 
 export interface InstrumentLinkRequest {
   instrumentId: string
-  /** Persists the private quote configuration; resolves once the command is queued. */
-  saveConfiguration: (instrument: Instrument) => Promise<boolean>
   onError: (message: string) => void
 }
 
@@ -45,9 +60,6 @@ export interface InstrumentLinkAcceptance {
   /** True once the intent and its fixed ids are durable in this browser. */
   accepted: boolean
 }
-
-const CATALOG_ERROR = 'Sincroniza la cotización antes de vincular movimientos.'
-const CONFIGURATION_ERROR = 'No se pudo guardar la cotización.'
 
 /**
  * Runs the user's "Vincular movimientos" action. Resolves once the intent and
@@ -80,32 +92,144 @@ export async function linkInstrumentMovements(
     return { targets: targetIds.length, accepted: false }
   }
 
+  const dependency = await captureConfigurationDependency(instrument)
   // Durable acceptance comes first: nothing is reported or projected as
-  // accepted until the intent and its original ids are in IndexedDB.
+  // accepted until the intent, its original ids and its configuration
+  // dependency are in IndexedDB.
   const accepted = await syncStore.acceptIntent({
     kind: 'instrumentLink',
     ownerUserId: ownerId,
     targetIds,
+    steps: [...(dependency ? [LINK_CONFIGURATION_STEP] : []), ...targetIds],
+    // The accepted private configuration travels with the intent (scalar
+    // fields: the payload is not a place for a structured snapshot). It lets
+    // a definitive configuration failure be retried after a reload even when
+    // the quote never reached the server and left the local projection.
     payload: {
       instrumentId: instrument.id,
+      investmentAssetId: instrument.investmentAssetId,
+      quoteConfig: JSON.stringify(liveConfiguration(instrument).quoteConfig),
       ...(assetName ? { assetName } : {}),
     },
+    ...(dependency?.acceptance ?? {}),
   })
   if (!accepted) return { targets: targetIds.length, accepted: false }
 
   applyOptimisticLink(instrument.id, targetIds)
-  const updated = financialStore.instruments.find((item) => item.id === instrument.id)
-  if (!updated) return { targets: targetIds.length, accepted: true }
   rememberLinkTargets(targetIds, instrument.id)
   void executeInstrumentLink({
     intentId: accepted.intent.id,
     ownerId,
-    instrument: { ...updated },
-    targetIds,
-    saveConfiguration: request.saveConfiguration,
+    instrumentId: instrument.id,
     onError: request.onError,
   })
   return { targets: targetIds.length, accepted: true }
+}
+
+interface ConfigurationDependency {
+  /**
+   * The commands step to accept with the intent. `adopt` takes over the
+   * command `addInstrument` already queued; `commands` publishes a fresh one
+   * in the same transaction. Both are absent when the configuration references
+   * (the investment account) cannot be resolved yet: the intent is accepted
+   * `waiting` and the same records are retried, never a sent command rebuilt.
+   */
+  acceptance:
+    | { adopt: AdoptIntentCommandInput[] }
+    | { commands: IntentCommandInput[] }
+    | { waitingFor: IntentWaitReason }
+}
+
+/**
+ * Whether the movement commands need the confirmed catalog reference, and the
+ * configuration work that will produce it. The reference lives in the private
+ * configuration's server row, not in the local instrument id: it only exists
+ * after the `userInstrument` command is applied.
+ */
+async function captureConfigurationDependency(
+  instrument: Instrument,
+): Promise<ConfigurationDependency | null> {
+  const syncStore = useSyncStore()
+  if (await syncStore.getInstrumentId(instrument.id)) return null
+  const trackingId = await syncStore.getUserInstrumentId(instrument.id)
+  const queued = await syncStore.findQueuedUserInstrumentCommand(instrument.id, trackingId)
+  if (queued && queued.action !== 'remove')
+    return { acceptance: { adopt: [{ step: LINK_CONFIGURATION_STEP, seq: queued.seq }] } }
+  const command = await buildConfigurationCommand(liveConfiguration(instrument))
+  return command
+    ? { acceptance: { commands: [{ step: LINK_CONFIGURATION_STEP, command }] } }
+    : { acceptance: { waitingFor: 'private-configuration' } }
+}
+
+interface ConfigurationSource {
+  instrumentId: string
+  investmentAssetId: string
+  quoteConfig: Record<string, unknown>
+}
+
+/** The quote configuration as it lives in the financial state right now. */
+function liveConfiguration(instrument: Instrument): ConfigurationSource {
+  const { id, investmentAssetId, ...quoteConfig } = instrument
+  return { instrumentId: id, investmentAssetId, quoteConfig }
+}
+
+/** The configuration accepted with the intent, for rebuilding after a reload. */
+function persistedConfiguration(payload: IntentPayload): ConfigurationSource | null {
+  const { instrumentId, investmentAssetId, quoteConfig } = payload
+  if (
+    typeof instrumentId !== 'string' ||
+    typeof investmentAssetId !== 'string' ||
+    typeof quoteConfig !== 'string'
+  )
+    return null
+  try {
+    const parsed = JSON.parse(quoteConfig) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      instrumentId,
+      investmentAssetId,
+      quoteConfig: parsed as Record<string, unknown>,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Builds the private configuration command from the accepted configuration —
+ * the live instrument when it still exists (later edits win), else the copy
+ * carried by the intent. It is a `create` while the row has never reached the
+ * server (idempotent by client identity, ADR 0001) and an `update` once it
+ * exists.
+ */
+async function buildConfigurationCommand(
+  source: ConfigurationSource,
+): Promise<OutboxCommandInput | null> {
+  const syncStore = useSyncStore()
+  const alias = await resolveEntityId('account', source.investmentAssetId)
+  if (!alias) return null
+  const trackingId = await syncStore.getUserInstrumentId(source.instrumentId)
+  if (!trackingId) {
+    return {
+      action: 'create',
+      entityType: 'userInstrument',
+      data: {
+        id: source.instrumentId,
+        instrumentId: source.instrumentId,
+        alias,
+        quoteConfig: source.quoteConfig,
+      },
+    }
+  }
+  const ref = await syncStore.getEntityRef('userInstrument', trackingId)
+  if (!ref) return null
+  return {
+    action: 'update',
+    entityType: 'userInstrument',
+    entityId: ref.entityId,
+    baseVersion: ref.version,
+    patch: { alias, quoteConfig: source.quoteConfig },
+  }
 }
 
 function applyOptimisticLink(instrumentId: string, targetIds: readonly string[]): void {
@@ -131,9 +255,7 @@ function applyOptimisticLink(instrumentId: string, targetIds: readonly string[])
 interface InstrumentLinkExecution {
   intentId: string
   ownerId: string
-  instrument: Instrument
-  targetIds: string[]
-  saveConfiguration: InstrumentLinkRequest['saveConfiguration']
+  instrumentId: string
   onError: InstrumentLinkRequest['onError']
 }
 
@@ -142,35 +264,16 @@ async function executeInstrumentLink(execution: InstrumentLinkExecution): Promis
   const stillOwner = () => syncStore.userId === execution.ownerId && !isReadOnlyDemoActive()
 
   try {
-    if (!(await execution.saveConfiguration(execution.instrument))) {
-      throw new Error(CONFIGURATION_ERROR)
-    }
-    if (!stillOwner()) return
-    // A newly configured symbol gets its catalog id on the server. Confirm
-    // that write before resolving the movement's operation (#491 will move
-    // this dependency into the intent record).
-    await syncStore.syncNow()
-    if (!stillOwner()) return
-    let catalogId = await syncStore.getInstrumentId(execution.instrument.id)
-    if (!catalogId) {
-      await syncStore.syncNow()
-      if (!stillOwner()) return
-      catalogId = await syncStore.getInstrumentId(execution.instrument.id)
-    }
-    if (!catalogId) {
-      await syncStore.failIntent(execution.intentId, CATALOG_ERROR)
-      execution.onError(CATALOG_ERROR)
-      return
-    }
     await resumeLinkIntent(execution.intentId)
+    if (!stillOwner()) return
+    // Publishing is local; this just starts sending. There is no manual sync
+    // step in the link protocol: an offline link stays queued and a later
+    // startup/reconnection resumes it from the intent.
+    void syncStore.syncNow()
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await syncStore.failIntent(execution.intentId, message).catch(() => undefined)
     execution.onError(message)
-  } finally {
-    // The fixed targets stay registered while the intent is unresolved so an
-    // ordinary edit that clears the instrument is recorded as an explicit
-    // unlink — also after a reload, where the resume below rehydrates them.
   }
 }
 
@@ -208,17 +311,84 @@ async function resumeLinkIntent(intentId: string): Promise<void> {
   const view = (await syncStore.listIntents()).find((item) => item.intent.id === intentId)
   if (!view || !isUnresolvedIntent(view.intent)) return
   if (view.intent.failure || view.intent.discardRequested) return
-  if (view.steps.some((step) => step.state === 'queued' || step.state === 'sending')) {
-    // The durable queue already owns this work; flush/commit will finish it.
-    return
-  }
   const instrumentId = view.intent.payload.instrumentId
   if (typeof instrumentId !== 'string') return
-  if (!(await syncStore.getInstrumentId(instrumentId))) {
+
+  // The private configuration is the first dependency: the movement's
+  // operation must carry the server's catalog reference, never the local id.
+  const configuration = view.steps.find((step) => step.step === LINK_CONFIGURATION_STEP)
+  if (configuration) {
+    if (configuration.state === 'failed' || configuration.state === 'cancelled') return
+    if (configuration.state === 'queued' || configuration.state === 'sending') {
+      if (await syncStore.findIntentCommand(intentId, LINK_CONFIGURATION_STEP)) {
+        // The queue owns it; the flush confirms it and the resume that follows
+        // the confirmation wakes the movement steps.
+        return
+      }
+      // Its command disappeared before it was acknowledged. If the catalog
+      // reference is already visible the effect exists; otherwise rebuild the
+      // same content as a fresh (idempotent) attempt.
+      if (await syncStore.getInstrumentId(instrumentId)) {
+        await syncStore.completeIntentStep(intentId, LINK_CONFIGURATION_STEP)
+      } else {
+        await syncStore.reopenIntentStep(intentId, LINK_CONFIGURATION_STEP)
+      }
+      return resumeLinkIntent(intentId)
+    }
+    if (configuration.state === 'pending') {
+      const catalogId = await syncStore.getInstrumentId(instrumentId)
+      if (catalogId) {
+        await syncStore.completeIntentStep(intentId, LINK_CONFIGURATION_STEP)
+        return resumeLinkIntent(intentId)
+      }
+      const instrument = financialStore.instruments.find((item) => item.id === instrumentId)
+      const trackingId = await syncStore.getUserInstrumentId(instrumentId)
+      const queued =
+        instrument || trackingId
+          ? null
+          : await syncStore.findQueuedUserInstrumentCommand(instrumentId, trackingId)
+      if (!instrument && queued?.action === 'remove') {
+        // The user deleted the quote while the link waited: its later choice
+        // wins instead of resurrecting the configuration.
+        await syncStore.failIntent(intentId, 'La cotización se eliminó; descarta la vinculación.')
+        return
+      }
+      const source = instrument
+        ? liveConfiguration(instrument)
+        : persistedConfiguration(view.intent.payload)
+      if (!source) {
+        await syncStore.failIntent(intentId, 'La cotización ya no existe en este dispositivo.')
+        return
+      }
+      const command = await buildConfigurationCommand(source)
+      if (!command) {
+        await syncStore.markIntentWaiting(intentId, 'private-configuration')
+        return
+      }
+      const published = await syncStore.publishIntentCommands(intentId, [
+        { step: LINK_CONFIGURATION_STEP, command },
+      ])
+      if (published?.published.length) {
+        void syncStore.syncNow()
+      } else if (published) {
+        // Another tab already moved the step forward; its confirmation wakes us.
+        await syncStore.markIntentWaiting(intentId, 'catalog')
+      }
+      return
+    }
+  }
+
+  const catalogId = await syncStore.getInstrumentId(instrumentId)
+  if (!catalogId) {
+    // Temporary: the confirmation that materializes the reference is either
+    // in flight (configuration step queued) or pending a cache refresh.
     await syncStore.markIntentWaiting(intentId, 'catalog')
+    void syncStore.syncNow()
     return
   }
-  const pending = view.steps.filter((step) => step.state === 'pending')
+  const pending = view.steps.filter(
+    (step) => step.state === 'pending' && step.step !== LINK_CONFIGURATION_STEP,
+  )
   if (pending.length === 0) return
   for (const step of pending) {
     await publishLinkedTarget(intentId, instrumentId, step.step, financialStore.currency)
@@ -285,8 +455,7 @@ async function publishLinkedTarget(
       // overwriting it. Offline that read cannot be trusted: leave the target
       // pending for a later retry rather than publish a stale command.
       refreshed = true
-      await syncStore.syncNow()
-      if (syncStore.connection === 'offline') return
+      if (!(await refreshBeforeRebuild(syncStore))) return
       continue
     }
 
@@ -328,9 +497,20 @@ async function publishLinkedTarget(
     if (result.record?.writerId === writerId) continue
     if (refreshed) return
     refreshed = true
-    await syncStore.syncNow()
-    if (syncStore.connection === 'offline') return
+    if (!(await refreshBeforeRebuild(syncStore))) return
   }
+}
+
+/**
+ * Pulls the other tab's state before rebuilding a movement, unless a sync
+ * cycle is already running: this runs from that cycle's own resume hook, so
+ * awaiting `syncNow()` there would wait on the cycle it belongs to. The
+ * pending target is then retried after the cycle pulls.
+ */
+async function refreshBeforeRebuild(syncStore: ReturnType<typeof useSyncStore>): Promise<boolean> {
+  if (syncStore.syncStatus === 'syncing') return false
+  await syncStore.syncNow()
+  return syncStore.connection !== 'offline'
 }
 
 /**

@@ -300,13 +300,35 @@ export const enqueue = (
       attempts: 0,
     }
 
-    const seq = yield* withOutbox('No se pudo encolar el comando.', async (db) => {
+    return yield* withOutbox('No se pudo encolar el comando.', async (db) => {
       const tx = db.transaction(STORE, 'readwrite')
-      const key = await requestToPromise(tx.objectStore(STORE).add(entry) as IDBRequest<number>)
+      const store = tx.objectStore(STORE)
+      if (parsed.action === 'create') {
+        // The client identity is the entity's own id (ADR 0001), so a second
+        // `create` for the same id is the same effect, never another row. A
+        // concurrent writer (e.g. the queue path and an accepted intent) gets
+        // the entry that is already queued instead of a duplicate command.
+        const identity = (parsed.data as { id?: unknown }).id
+        if (typeof identity === 'string') {
+          const queued = (await requestToPromise(
+            store.getAll() as IDBRequest<OutboxEntry[]>,
+          )) as OutboxEntry[]
+          const existing = queued.find(
+            (candidate) =>
+              candidate.command.action === 'create' &&
+              candidate.command.entityType === parsed.entityType &&
+              (candidate.command.data as { id?: unknown }).id === identity,
+          )
+          if (existing) {
+            await txDone(tx)
+            return existing
+          }
+        }
+      }
+      const key = await requestToPromise(store.add(entry) as IDBRequest<number>)
       await txDone(tx)
-      return key
+      return { ...entry, seq: key }
     })
-    return { ...entry, seq }
   })
 
 /** Returns every queued entry, in FIFO order. */
