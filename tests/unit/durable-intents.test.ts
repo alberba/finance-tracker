@@ -3,15 +3,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   acceptDurableIntent,
+  acknowledge,
   count,
   claimDurableIntentCommands,
   commitDurableIntentCommands,
+  completeDurableIntentStep,
   countDurableWork,
   discardDurableIntent,
+  enqueue,
   listAll,
   listDurableIntents,
   openStorage,
   publishDurableIntentCommands,
+  reopenDurableIntentStep,
   retryDurableIntent,
   wipeOutbox,
   type IntentCommandOutcome,
@@ -38,6 +42,35 @@ function updateCommand(entityId: string, description = 'Vinculado') {
     baseVersion: 1,
     patch: { description },
   }
+}
+
+/** The private quote configuration a link depends on before its catalog id exists. */
+function configurationCommand(instrumentId = 'instrument-1') {
+  return {
+    action: 'create' as const,
+    entityType: 'userInstrument' as const,
+    data: {
+      id: instrumentId,
+      instrumentId,
+      alias: 'asset-1',
+      quoteConfig: {
+        type: 'etf',
+        symbol: 'LINK',
+        market: '',
+        currency: 'EUR',
+        provider: 'yahoo',
+        active: true,
+      },
+    },
+  }
+}
+
+function linkWithConfiguration(overrides: Record<string, unknown> = {}) {
+  return linkIntent({
+    targetIds: ['movement-1'],
+    steps: ['configuration', 'movement-1'],
+    ...overrides,
+  })
 }
 
 describe('intenciones durables de la cola local (#490)', () => {
@@ -71,6 +104,80 @@ describe('intenciones durables de la cola local (#490)', () => {
       `${accepted.intent.id}:movement-2`,
     ])
     expect(accepted.steps.every((step) => step.state === 'pending')).toBe(true)
+  })
+
+  it('acepta la intención con su comando de configuración en una sola transacción', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      ...linkWithConfiguration(),
+      commands: [{ step: 'configuration', command: configurationCommand() }],
+    })
+
+    const configuration = accepted.steps.find((step) => step.step === 'configuration')
+    expect(accepted.intent.state).toBe('sending')
+    expect(configuration).toMatchObject({ state: 'queued', attempt: 1 })
+    expect(accepted.steps.find((step) => step.step === 'movement-1')?.state).toBe('pending')
+
+    const entries = await listAll(db)
+    expect(entries).toHaveLength(1)
+    expect(entries[0].intent).toEqual({
+      intentId: accepted.intent.id,
+      step: 'configuration',
+    })
+    expect(entries[0].command).toMatchObject({
+      action: 'create',
+      entityType: 'userInstrument',
+      commandId: configuration?.commandId,
+    })
+    expect(await countDurableWork(db)).toBe(1)
+
+    // The accepted configuration survives reopening the storage with the intent.
+    db.close()
+    db = await openStorage(USER_ID)
+    const [reloaded] = await listDurableIntents(db)
+    expect(reloaded.intent.state).toBe('sending')
+    expect(reloaded.steps.find((step) => step.step === 'configuration')).toMatchObject({
+      state: 'queued',
+      commandId: configuration?.commandId,
+    })
+  })
+
+  it('adopta un comando de configuración ya encolado sin reescribirlo', async () => {
+    const queued = await enqueue(db, configurationCommand())
+
+    const accepted = await acceptDurableIntent(db, {
+      ...linkWithConfiguration(),
+      adopt: [{ step: 'configuration', seq: queued.seq }],
+    })
+
+    const configuration = accepted.steps.find((step) => step.step === 'configuration')
+    expect(configuration).toMatchObject({
+      state: 'queued',
+      seq: queued.seq,
+      commandId: queued.command.commandId,
+    })
+    const entries = await listAll(db)
+    expect(entries).toHaveLength(1)
+    expect(entries[0].command).toEqual(queued.command)
+    expect(entries[0].intent).toEqual({
+      intentId: accepted.intent.id,
+      step: 'configuration',
+    })
+    expect(await countDurableWork(db)).toBe(1)
+  })
+
+  it('deja la configuración pendiente si el comando a adoptar ya no existe', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      ...linkWithConfiguration(),
+      waitingFor: 'private-configuration',
+      adopt: [{ step: 'configuration', seq: 99 }],
+    })
+
+    const configuration = accepted.steps.find((step) => step.step === 'configuration')
+    expect(configuration).toMatchObject({ state: 'pending', seq: null })
+    expect(accepted.intent.state).toBe('waiting')
+    expect(accepted.intent.waitingFor).toBe('private-configuration')
+    expect(await listAll(db)).toHaveLength(0)
+    expect(await countDurableWork(db)).toBe(1)
   })
 
   it('conserva la intención aceptada al reabrir el almacenamiento', async () => {
@@ -113,6 +220,50 @@ describe('intenciones durables de la cola local (#490)', () => {
     expect(again.published).toEqual([])
     expect(again.skipped.sort()).toEqual(['movement-1', 'movement-2'])
     expect(await count(db)).toBe(2)
+  })
+
+  it('confirma una dependencia ya satisfecha sin reenviar su comando', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      ...linkWithConfiguration(),
+      commands: [{ step: 'configuration', command: configurationCommand() }],
+    })
+    const [queued] = await listAll(db)
+
+    await completeDurableIntentStep(db, accepted.intent.id, 'configuration')
+
+    const [view] = await listDurableIntents(db)
+    expect(view.steps.find((step) => step.step === 'configuration')).toMatchObject({
+      state: 'confirmed',
+    })
+    expect(view.intent.state).toBe('local-saved')
+    expect(await count(db)).toBe(0)
+    expect(queued.seq).toBeGreaterThan(0)
+  })
+
+  it('reabre una configuración cuyo comando desapareció antes de confirmarse', async () => {
+    const accepted = await acceptDurableIntent(db, {
+      ...linkWithConfiguration(),
+      commands: [{ step: 'configuration', command: configurationCommand() }],
+    })
+    const [queued] = await listAll(db)
+    // Another tab sent and retired the command without this page recording
+    // the outcome: the step points at a seq that no longer exists.
+    await acknowledge(db, [queued.seq])
+
+    await reopenDurableIntentStep(db, accepted.intent.id, 'configuration')
+    let [view] = await listDurableIntents(db)
+    expect(view.steps.find((step) => step.step === 'configuration')).toMatchObject({
+      state: 'pending',
+      seq: null,
+    })
+
+    const again = await publishDurableIntentCommands(db, accepted.intent.id, [
+      { step: 'configuration', command: configurationCommand() },
+    ])
+    expect(again.published).toHaveLength(1)
+    expect(again.published[0].commandId).not.toBe(queued.command.commandId)
+    ;[view] = await listDurableIntents(db)
+    expect(view.steps.find((step) => step.step === 'configuration')?.state).toBe('queued')
   })
 
   it('retira el comando y confirma el paso en la misma transacción', async () => {

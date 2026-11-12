@@ -54,6 +54,8 @@ export class LiveMarketPage {
     currency: string
     provider?: string
     keepOpen?: boolean
+    /** Offline scenarios assert the command's durability, not its confirmation. */
+    waitForSync?: boolean
   }): Promise<void> {
     await this.openQuotes()
     await this.page
@@ -77,13 +79,16 @@ export class LiveMarketPage {
         .locator(`[data-provider="${params.provider}"]`)
         .click()
     }
-    const saved = expectSyncCommand(
-      this.page,
-      (command) => command.action === 'create' && command.entityType === 'userInstrument',
-    )
+    const saved =
+      params.waitForSync === false
+        ? null
+        : expectSyncCommand(
+            this.page,
+            (command) => command.action === 'create' && command.entityType === 'userInstrument',
+          )
     await form.getByRole('button', { name: 'Añadir instrumento' }).click()
     await expect(this.instrument(params.symbol.toUpperCase())).toBeVisible()
-    await saved
+    if (saved) await saved
     if (!params.keepOpen) await this.closeQuote()
   }
 

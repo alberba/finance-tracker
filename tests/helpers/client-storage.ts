@@ -232,6 +232,16 @@ export const cancelDurableIntentStep = (
   ...args: Parameters<typeof durableIntents.cancelIntentStep>
 ) => runWithStorage(storage, durableIntents.cancelIntentStep(...args))
 
+export const completeDurableIntentStep = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.completeIntentStep>
+) => runWithStorage(storage, durableIntents.completeIntentStep(...args))
+
+export const reopenDurableIntentStep = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.reopenIntentStep>
+) => runWithStorage(storage, durableIntents.reopenIntentStep(...args))
+
 export const retryDurableIntent = (
   storage: ClientStorageHandles,
   ...args: Parameters<typeof durableIntents.retryDurableIntent>

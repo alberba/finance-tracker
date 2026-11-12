@@ -100,6 +100,23 @@ export interface AcceptDurableIntentInput {
   payload?: IntentPayload
   /** Step keys; one per target by default (link) or named phases (#492). */
   steps?: readonly string[]
+  /** Why the intent is not publishing yet (a dependency it waits for). */
+  waitingFor?: IntentWaitReason
+  /**
+   * Commands already queued before the intent existed (the quote configuration
+   * written when the user added the instrument). They are tagged as this
+   * intent's steps in the same transaction that accepts it, so their outcome
+   * can be recorded against the intent without rewriting their content.
+   */
+  adopt?: readonly AdoptIntentCommandInput[]
+  /** Commands published in the acceptance transaction itself. */
+  commands?: readonly IntentCommandInput[]
+}
+
+/** A still-queued command the accepted intent takes ownership of. */
+export interface AdoptIntentCommandInput {
+  step: string
+  seq: number
 }
 
 export interface IntentCommandInput {
@@ -209,7 +226,7 @@ export const acceptDurableIntent = (
   input: AcceptDurableIntentInput,
 ): Effect.Effect<DurableIntentView, ClientStorageError, ClientStorage> =>
   withQueueDb('No se pudo guardar la vinculación en este dispositivo.', async (db) => {
-    const tx = db.transaction([INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
     const done = txDone(tx)
     done.catch(() => undefined)
     try {
@@ -223,14 +240,20 @@ export const acceptDurableIntent = (
         state: 'local-saved',
         targetIds: [...input.targetIds],
         payload: { ...(input.payload ?? {}) },
-        waitingFor: null,
+        waitingFor: input.waitingFor ?? null,
         failure: null,
         discardRequested: false,
       }
-      const stepNames = [...(input.steps ?? input.targetIds)]
+      const stepNames = [
+        ...new Set([
+          ...(input.steps ?? input.targetIds),
+          ...(input.adopt ?? []).map((adopted) => adopted.step),
+          ...(input.commands ?? []).map((command) => command.step),
+        ]),
+      ]
+      const intentsStore = tx.objectStore(INTENTS_STORE)
       const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
-      await requestToPromise(tx.objectStore(INTENTS_STORE).add(intent) as IDBRequest<IDBValidKey>)
-      const steps: IntentProgressRecord[] = []
+      await requestToPromise(intentsStore.add(intent) as IDBRequest<IDBValidKey>)
       for (const step of stepNames) {
         const record: IntentProgressRecord = {
           id: intentProgressId(intent.id, step),
@@ -246,15 +269,75 @@ export const acceptDurableIntent = (
           updatedAt: now,
         }
         progressStore.add(record)
-        steps.push(record)
       }
+      // The configuration dependency (#491) commits with the acceptance: an
+      // already-queued command is adopted as-is, and a fresh one, if any, is
+      // published in this same transaction. Nothing is reported accepted until
+      // both the intent and its first step are durable.
+      if (input.adopt?.length) await adoptIntentCommands(tx, intent.id, input.adopt)
+      if (input.commands?.length) await writeIntentCommands(tx, intent.id, input.commands)
+
+      const recorded = await readIntentSteps(progressStore, intent.id)
+      const byStep = new Map(recorded.map((step) => [step.step, step]))
+      const steps = stepNames
+        .map((step) => byStep.get(step))
+        .filter((step): step is IntentProgressRecord => step !== undefined)
+      const stored =
+        ((await requestToPromise(
+          intentsStore.get(intent.id) as IDBRequest<DurableIntentRecord | undefined>,
+        )) as DurableIntentRecord | undefined) ?? intent
+      const next = refreshed(stored, steps)
+      intentsStore.put(next)
       await done
-      return { intent, steps }
+      return { intent: next, steps }
     } catch (error) {
       abortQuietly(tx)
       throw error
     }
   })
+
+/**
+ * Tags already-queued commands as an intent's steps in the acceptance
+ * transaction: same `commandId`/content, no new command. A seq that no longer
+ * exists (another tab acknowledged it first) leaves its step `pending`, so the
+ * owning module rebuilds it from current state instead of replaying a ghost.
+ */
+async function adoptIntentCommands(
+  tx: IDBTransaction,
+  intentId: string,
+  adopt: readonly AdoptIntentCommandInput[],
+): Promise<void> {
+  const now = new Date().toISOString()
+  const commandStore = tx.objectStore(COMMANDS_STORE)
+  const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+  for (const adopted of adopt) {
+    const entry = (await requestToPromise(
+      commandStore.get(adopted.seq) as IDBRequest<OutboxEntry | undefined>,
+    )) as OutboxEntry | undefined
+    if (!entry || entry.intent) continue
+    const progress = (await requestToPromise(
+      progressStore.get(intentProgressId(intentId, adopted.step)) as IDBRequest<
+        IntentProgressRecord | undefined
+      >,
+    )) as IntentProgressRecord | undefined
+    if (!progress || progress.state !== 'pending') continue
+    commandStore.put({
+      ...entry,
+      intent: { intentId, step: adopted.step },
+    } satisfies OutboxEntry)
+    progressStore.put({
+      ...progress,
+      state: 'queued',
+      commandId: entry.command.commandId,
+      seq: adopted.seq,
+      attempt: progress.attempt + 1,
+      lastError: null,
+      claimedBy: null,
+      claimedAt: null,
+      updatedAt: now,
+    } satisfies IntentProgressRecord)
+  }
+}
 
 /** Reads the durable intents, oldest first, with their steps. */
 export const listDurableIntents = (): Effect.Effect<
@@ -324,6 +407,50 @@ async function runIntentPublication(
   }
 }
 
+/** Adopts an untagged queued `create` for the same client identity, if any. */
+async function adoptEquivalentCreate(
+  tx: IDBTransaction,
+  intentId: string,
+  step: string,
+  command: OutboxEntry['command'],
+): Promise<{ seq: number; commandId: string } | null> {
+  if (command.action !== 'create') return null
+  const identity = (command.data as { id?: unknown }).id
+  if (typeof identity !== 'string') return null
+  const commandStore = tx.objectStore(COMMANDS_STORE)
+  const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+  const entries = (await requestToPromise(
+    commandStore.getAll() as IDBRequest<OutboxEntry[]>,
+  )) as OutboxEntry[]
+  const existing = entries.find(
+    (entry) =>
+      !entry.intent &&
+      entry.command.action === 'create' &&
+      entry.command.entityType === command.entityType &&
+      (entry.command.data as { id?: unknown }).id === identity,
+  )
+  if (!existing) return null
+  const progress = (await requestToPromise(
+    progressStore.get(intentProgressId(intentId, step)) as IDBRequest<
+      IntentProgressRecord | undefined
+    >,
+  )) as IntentProgressRecord | undefined
+  if (!progress || progress.state !== 'pending') return null
+  commandStore.put({ ...existing, intent: { intentId, step } } satisfies OutboxEntry)
+  progressStore.put({
+    ...progress,
+    state: 'queued',
+    commandId: existing.command.commandId,
+    seq: existing.seq,
+    attempt: progress.attempt + 1,
+    lastError: null,
+    claimedBy: null,
+    claimedAt: null,
+    updatedAt: new Date().toISOString(),
+  } satisfies IntentProgressRecord)
+  return { seq: existing.seq, commandId: existing.command.commandId }
+}
+
 async function writeIntentCommands(
   tx: IDBTransaction,
   intentId: string,
@@ -352,6 +479,14 @@ async function writeIntentCommands(
       continue
     }
     const command = parseOutboxCommand(input.command)
+    // The same client identity is the same create (ADR 0001). If the ordinary
+    // editor path already queued this entity between the caller's read and this
+    // transaction, adopt it instead of adding a second command for one effect.
+    const adopted = await adoptEquivalentCreate(tx, intentId, input.step, command)
+    if (adopted) {
+      result.published.push({ step: input.step, ...adopted })
+      continue
+    }
     const now = new Date().toISOString()
     const entry: Omit<OutboxEntry, 'seq'> = {
       command,
@@ -721,6 +856,113 @@ export const cancelIntentStep = (
         } satisfies IntentProgressRecord)
         const steps = await readIntentSteps(progressStore, intentId)
         tx.objectStore(INTENTS_STORE).put(refreshed(intent, steps))
+      }
+      await done
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
+  })
+
+/**
+ * Marks a dependency step confirmed when the read model already proves its
+ * effect (the catalog reference exists), without inventing a command. A
+ * still-queued, never-sent command for that step is removed in the same
+ * transaction: sending it would only duplicate a confirmed effect.
+ */
+export const completeIntentStep = (
+  intentId: string,
+  step: string,
+): Effect.Effect<void, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo confirmar la configuración de la vinculación.', async (db) => {
+    const tx = db.transaction([COMMANDS_STORE, INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
+      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+      const intent = (await requestToPromise(
+        tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      const progress = (await requestToPromise(
+        progressStore.get(intentProgressId(intentId, step)) as IDBRequest<
+          IntentProgressRecord | undefined
+        >,
+      )) as IntentProgressRecord | undefined
+      if (!intent || !progress || TERMINAL_STEP_STATES.has(progress.state)) {
+        await done
+        return
+      }
+      if (progress.seq !== null && progress.claimedBy === null) {
+        const entry = (await requestToPromise(
+          tx.objectStore(COMMANDS_STORE).get(progress.seq) as IDBRequest<OutboxEntry | undefined>,
+        )) as OutboxEntry | undefined
+        if (entry && entry.attempts === 0) tx.objectStore(COMMANDS_STORE).delete(entry.seq)
+      }
+      const now = new Date().toISOString()
+      progressStore.put({
+        ...progress,
+        state: 'confirmed',
+        seq: null,
+        claimedBy: null,
+        claimedAt: null,
+        lastError: null,
+        updatedAt: now,
+      } satisfies IntentProgressRecord)
+      const steps = await readIntentSteps(progressStore, intentId)
+      tx.objectStore(INTENTS_STORE).put(refreshed(intent, steps))
+      await done
+    } catch (error) {
+      abortQuietly(tx)
+      throw error
+    }
+  })
+
+/**
+ * Reopens a step whose command disappeared before it could be acknowledged
+ * (another tab sent and retired it, an interrupted cache absorption): its
+ * outcome is unproven, so the owning module rebuilds it from current state.
+ * Never called for a command that still exists in the queue.
+ */
+export const reopenIntentStep = (
+  intentId: string,
+  step: string,
+): Effect.Effect<void, ClientStorageError, ClientStorage> =>
+  withQueueDb('No se pudo retomar la configuración de la vinculación.', async (db) => {
+    const tx = db.transaction([INTENTS_STORE, INTENT_PROGRESS_STORE], 'readwrite')
+    const done = txDone(tx)
+    done.catch(() => undefined)
+    try {
+      const progressStore = tx.objectStore(INTENT_PROGRESS_STORE)
+      const intent = (await requestToPromise(
+        tx.objectStore(INTENTS_STORE).get(intentId) as IDBRequest<DurableIntentRecord | undefined>,
+      )) as DurableIntentRecord | undefined
+      const progress = (await requestToPromise(
+        progressStore.get(intentProgressId(intentId, step)) as IDBRequest<
+          IntentProgressRecord | undefined
+        >,
+      )) as IntentProgressRecord | undefined
+      if (
+        intent &&
+        progress &&
+        !TERMINAL_STEP_STATES.has(progress.state) &&
+        progress.state !== 'failed' &&
+        !intent.discardRequested
+      ) {
+        const now = new Date().toISOString()
+        progressStore.put({
+          ...progress,
+          state: 'pending',
+          commandId: null,
+          seq: null,
+          claimedBy: null,
+          claimedAt: null,
+          lastError: null,
+          updatedAt: now,
+        } satisfies IntentProgressRecord)
+        const steps = await readIntentSteps(progressStore, intentId)
+        tx.objectStore(INTENTS_STORE).put(
+          refreshed({ ...intent, failure: null, waitingFor: null }, steps),
+        )
       }
       await done
     } catch (error) {
