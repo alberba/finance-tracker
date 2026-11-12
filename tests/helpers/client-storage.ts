@@ -11,6 +11,7 @@ import { Effect } from 'effect'
 
 import * as crypto from '../../src/lib/client/crypto'
 import * as cache from '../../src/lib/client/idb-cache'
+import * as movementPublication from '../../src/lib/client/movement-publication'
 import * as outbox from '../../src/lib/client/outbox'
 import { ClientStorage, type ClientStorageHandles } from '../../src/lib/client/storage'
 import * as wipe from '../../src/lib/client/wipe'
@@ -20,8 +21,15 @@ export type { CachedEntity } from '../../src/lib/client/idb-cache'
 export type {
   OutboxCommandInput,
   OutboxEntry,
+  OutboxPublication,
   PendingCreateMatch,
 } from '../../src/lib/client/outbox'
+export type {
+  MovementCommandPlan,
+  MovementPublicationInput,
+  MovementPublicationRecord,
+  MovementPublicationResult,
+} from '../../src/lib/client/movement-publication'
 export type { EncryptedPayload } from '../../src/lib/client/crypto'
 export { InvalidCommandError } from '../../src/lib/client/outbox'
 
@@ -159,6 +167,17 @@ export const discard = (storage: ClientStorageHandles, seq: number) =>
   runWithStorage(storage, outbox.discard(seq))
 
 export const wipeOutbox = (userId: string) => Effect.runPromise(outbox.wipeOutbox(userId))
+
+// -- movement publication --------------------------------------------------------
+
+export const publishMovementCommands = (
+  storage: ClientStorageHandles,
+  inputs: movementPublication.MovementPublicationInput[],
+  options?: Parameters<typeof movementPublication.publishMovementCommands>[1],
+) => runWithStorage(storage, movementPublication.publishMovementCommands(inputs, options))
+
+export const readMovementPublications = (storage: ClientStorageHandles, movementIds: string[]) =>
+  runWithStorage(storage, movementPublication.readMovementPublications(movementIds))
 
 // -- crypto and wipe -----------------------------------------------------------
 

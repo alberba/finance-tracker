@@ -57,6 +57,18 @@ export interface RoundTrip {
   setOffline: (offline: boolean) => void
   /** Applies commands as if another device had sent them. */
   asOtherDevice: (commands: unknown[]) => Promise<void>
+  /**
+   * Holds `POST /api/sync` until released. Lets a test interleave edits while
+   * a link's configuration/commands are still being resolved. With a
+   * predicate, only the batch whose commands satisfy it is held.
+   */
+  holdSync: (matches?: (commands: unknown[]) => boolean) => {
+    /** Resolves once a matching batch is actually waiting at the gate. */
+    entered: Promise<void>
+    release: () => void
+  }
+  /** Every command batch the client has POSTed to `/api/sync`, in send order. */
+  commandBatches: () => unknown[][]
   /** The client's own sync store, for cursor/cache assertions. */
   syncStore: ReturnType<typeof import('../../../../src/stores/sync').useSyncStore>
   /**
@@ -109,6 +121,11 @@ export async function startRoundTrip(
   setActivePinia(createTestPinia())
 
   let offline = false
+  const sentBatches: unknown[][] = []
+  let syncGate: Promise<void> | null = null
+  let releaseSyncGate: (() => void) | null = null
+  let enterSyncGate: (() => void) | null = null
+  let syncGateMatches: ((commands: unknown[]) => boolean) | null = null
 
   vi.stubGlobal(
     'fetch',
@@ -127,6 +144,12 @@ export async function startRoundTrip(
       }
       if (url === '/api/sync') {
         const { commands } = JSON.parse(String(init?.body))
+        sentBatches.push(commands)
+        if (syncGate && (!syncGateMatches || syncGateMatches(commands))) {
+          enterSyncGate?.()
+          enterSyncGate = null
+          await syncGate
+        }
         return json(await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands)))
       }
       throw new Error(`unexpected fetch ${url}`)
@@ -192,6 +215,29 @@ export async function startRoundTrip(
     reboot,
     setOffline: (next: boolean) => {
       offline = next
+    },
+    commandBatches: () => sentBatches,
+    holdSync: (matches) => {
+      if (!syncGate) {
+        syncGate = new Promise<void>((resolve) => {
+          releaseSyncGate = resolve
+        })
+      }
+      syncGateMatches = matches ?? null
+      const entered = new Promise<void>((resolve) => {
+        enterSyncGate = resolve
+      })
+      return {
+        entered,
+        release: () => {
+          const release = releaseSyncGate
+          syncGate = null
+          releaseSyncGate = null
+          enterSyncGate = null
+          syncGateMatches = null
+          release?.()
+        },
+      }
     },
     asOtherDevice: async (commands) => {
       await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands as never))
