@@ -135,6 +135,20 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     expect(late?.instrumentId).toBeUndefined()
   })
 
+  it('vincula con un instrumento ya configurado y confirmado antes de pulsar', async () => {
+    const instrumentId = await addLinkInstrument()
+    // The quote configuration has already reached the server and survives a
+    // reload; only the movement publication is left.
+    await trip.reload()
+    expect(useMarketStore().linkExistingMovements(instrumentId)).toBe(1)
+
+    const state = await trip.reload()
+    expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
+      instrumentId,
+    })
+    expect(useMarketStore().linkedMovementCount(instrumentId)).toBe(1)
+  })
+
   it('no restaura un objetivo borrado durante la resolución', async () => {
     const instrumentId = await addLinkInstrument()
     const held = trip.holdSync()
