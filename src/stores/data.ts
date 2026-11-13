@@ -113,15 +113,6 @@ export const useDataStore = defineStore('data', () => {
     if (!canStartFresh) {
       return
     }
-    // A fresh space deletes the rows any queued command or unresolved intent
-    // still points at: deliver first, and refuse offline instead of orphaning
-    // durable work.
-    const syncStore = useSyncStore()
-    await syncStore.flush()
-    if (syncStore.pendingCount > 0) {
-      showToast('Hay cambios sin sincronizar. Conéctate y vuelve a intentarlo.')
-      return
-    }
     const result = await runClientHttp(initializeFreshState())
     if (!result.ok) {
       showToast(result.error ?? 'No se pudo crear el espacio nuevo.')

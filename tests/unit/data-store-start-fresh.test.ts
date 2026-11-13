@@ -8,7 +8,6 @@ vi.mock('../../src/lib/client/state-initialize', () => ({
 
 import { initializeFreshState } from '../../src/lib/client/state-initialize'
 import { useDataStore } from '../../src/stores/data'
-import { useSyncStore } from '../../src/stores/sync'
 
 /**
  * Plain `node` environment (repo-wide vitest config, no jsdom dependency) —
@@ -49,19 +48,6 @@ describe("useDataStore — 'empezar de cero'", () => {
 
     expect(initializeFreshState).toHaveBeenCalledTimes(1)
     expect(reload).toHaveBeenCalledTimes(1)
-  })
-
-  it('startFresh() refuses to orphan durable work while offline', async () => {
-    vi.mocked(initializeFreshState).mockReturnValue(Effect.succeed({ ok: true }))
-    const syncStore = useSyncStore()
-    syncStore.pendingCount = 1
-    const { reload } = stubDom()
-
-    await useDataStore().startFresh()
-
-    expect(initializeFreshState).not.toHaveBeenCalled()
-    expect(reload).not.toHaveBeenCalled()
-    syncStore.pendingCount = 0
   })
 
   it('startFresh() does not reload the page when the API call fails', async () => {
