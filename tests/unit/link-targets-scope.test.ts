@@ -1,5 +1,12 @@
-import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { forgetLinkTargets, rememberLinkTargets } from '../../src/lib/client/link-targets'
+import { buildMovementPublications } from '../../src/lib/client/movement-commands'
+import { useFinancialStateStore } from '../../src/stores/financial-state'
+import { useSyncStore } from '../../src/stores/sync'
+import { createTestPinia } from '../helpers/pinia'
+import type { Transaction } from '../../src/scripts/types'
 
 /**
  * The page-local link targets are keyed by owner: one user's unresolved link
@@ -7,27 +14,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * review). The observable effect lives in `buildMovementPublications`, which
  * is what marks a publication `unlinked`.
  */
-const session = vi.hoisted(() => ({
-  userId: 'user-a' as string | null,
-  getEntityRef: vi.fn(async () => null),
-  peekPendingCreateId: vi.fn(async () => null),
-}))
-
-vi.mock('../../src/stores/sync', () => ({ useSyncStore: () => session }))
-vi.mock('../../src/lib/client/command-mapping', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/lib/client/command-mapping')>()
-  return {
-    ...actual,
-    resolveEntityId: vi.fn(async () => 'srv-account'),
-    resolveOrCreateCategoryId: vi.fn(async () => 'srv-category'),
-  }
-})
-
-import { forgetLinkTargets, rememberLinkTargets } from '../../src/lib/client/link-targets'
-import { buildMovementPublications } from '../../src/lib/client/movement-commands'
-import { useFinancialStateStore } from '../../src/stores/financial-state'
-import type { Transaction } from '../../src/scripts/types'
-
 function movement(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: 'movement-1',
@@ -38,12 +24,34 @@ function movement(overrides: Partial<Transaction> = {}): Transaction {
     category: 'Cripto',
     description: 'Compra',
     amount: 100,
+    // An imported operation publishes only its declaration and description,
+    // so the test stays on the link decision instead of reference resolution.
+    remoteOperation: {
+      provider: 'bitvavo',
+      externalId: 'ext-1',
+      executedAt: '2026-01-10T09:30:00.000Z',
+      timeZone: 'Europe/Madrid',
+      date: '2026-01-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'BTC-EUR',
+      quantity: '0.001',
+      unitPrice: '100',
+      fee: '0',
+      cashAmount: '0.1',
+      currency: 'EUR',
+    },
     ...overrides,
   }
 }
 
-async function unlinkedFlag(before: Transaction, after: Transaction): Promise<boolean | undefined> {
-  setActivePinia(createPinia())
+async function unlinkedFlag(
+  ownerUserId: string,
+  before: Transaction,
+  after: Transaction,
+): Promise<boolean | undefined> {
+  setActivePinia(createTestPinia())
+  useSyncStore().userId = ownerUserId
   useFinancialStateStore().commitState((draft) => {
     draft.transactions = [after]
   })
@@ -55,7 +63,6 @@ async function unlinkedFlag(before: Transaction, after: Transaction): Promise<bo
 
 describe('objetivos de vinculación por usuario', () => {
   beforeEach(() => {
-    session.userId = 'user-a'
     forgetLinkTargets('user-a')
     forgetLinkTargets('user-b')
   })
@@ -63,7 +70,7 @@ describe('objetivos de vinculación por usuario', () => {
   it('marca el desvínculo explícito del mismo usuario', async () => {
     rememberLinkTargets('user-a', ['movement-1'], 'instrument-a')
     await expect(
-      unlinkedFlag(movement({ instrumentId: 'instrument-a' }), movement()),
+      unlinkedFlag('user-a', movement({ instrumentId: 'instrument-a' }), movement()),
     ).resolves.toBe(true)
   })
 
@@ -71,10 +78,9 @@ describe('objetivos de vinculación por usuario', () => {
     // The previous session linked movement-1; the next user signs in and edits
     // a movement that happens to share the id.
     rememberLinkTargets('user-a', ['movement-1'], 'instrument-a')
-    session.userId = 'user-b'
 
     await expect(
-      unlinkedFlag(movement({ instrumentId: 'instrument-a' }), movement()),
+      unlinkedFlag('user-b', movement({ instrumentId: 'instrument-a' }), movement()),
     ).resolves.toBeUndefined()
   })
 
@@ -83,7 +89,7 @@ describe('objetivos de vinculación por usuario', () => {
     forgetLinkTargets('user-a', ['movement-1'])
 
     await expect(
-      unlinkedFlag(movement({ instrumentId: 'instrument-a' }), movement()),
+      unlinkedFlag('user-a', movement({ instrumentId: 'instrument-a' }), movement()),
     ).resolves.toBeUndefined()
   })
 })

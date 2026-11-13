@@ -519,7 +519,13 @@ describe('confirmación recurrente durable (#492)', () => {
     const afterDiscard = await trip.reloadOffline()
     expect(afterDiscard.transactions).toHaveLength(1)
     expect(afterDiscard.transactions[0].id).toBe(outcome.transactionId)
-    expect(afterDiscard.pendingMovements[0].status).toBe('pending')
+    // The confirmed movement keeps its pending link after the reload, even
+    // though the server still shows the pending open (its update was the
+    // rejected step): reopening it would offer a second confirmation.
+    expect(afterDiscard.pendingMovements[0]).toMatchObject({
+      status: 'confirmed',
+      transactionId: outcome.transactionId,
+    })
     const view = await waitForIntent((intent) => intent.intent.state === 'partial')
     expect(view.intent.failure).toContain('movimiento')
 

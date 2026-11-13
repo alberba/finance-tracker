@@ -187,6 +187,19 @@ export class LiveMarketPage {
     await this.instrument(symbol).getByRole('button', { name: 'Vincular movimientos' }).click()
   }
 
+  /** The durable link status and its retry/discard actions inside one quote editor. */
+  linkStatus(symbol: string): Locator {
+    return this.instrument(symbol).locator('[data-link-intent-status]')
+  }
+
+  linkRetry(symbol: string): Locator {
+    return this.instrument(symbol).locator('[data-link-intent-retry]')
+  }
+
+  linkDiscard(symbol: string): Locator {
+    return this.instrument(symbol).locator('[data-link-intent-discard]')
+  }
+
   async editFirstRecurringRule(params: {
     description: string
     amount: number

@@ -252,10 +252,18 @@ export async function resumePendingConfirmations(): Promise<void> {
     if (view.intent.kind !== PENDING_CONFIRMATION_KIND) continue
     if (view.intent.ownerUserId !== syncStore.userId) continue
     if (!isUnresolvedIntent(view.intent)) continue
-    // A definitive failure or a discard waits for the user's explicit retry.
-    if (view.intent.failure || view.intent.discardRequested) continue
     const decision = decodeDecision(view.intent.payload)
     if (!decision) continue
+    // A definitive failure or a discard waits for the user's explicit retry.
+    // If the movement was already confirmed, the pending must still be
+    // re-projected as confirmed and linked after a reload: the server may
+    // still report the pending row open (its update was the rejected step),
+    // and reopening it locally would offer a second confirmation. The
+    // reservation remains either way.
+    if (view.intent.failure || view.intent.discardRequested) {
+      if (stepOf(view, MOVEMENT_STEP)?.state === 'confirmed') reconcileConfirmedLink(decision)
+      continue
+    }
     const projected = await projectStoredDecision(view.intent.id, decision)
     if (!projected.accepted) continue
     await publishPendingConfirmation(view.intent.id)
