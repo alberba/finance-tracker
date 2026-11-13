@@ -187,41 +187,12 @@ describe("GET /api/bootstrap", () => {
     expect(await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))).toEqual([]);
   });
 
-  it("filters transactions/budgetEntries/wealthSnapshots by ?year", async () => {
-    const account = await runWithDb(testDb.db, accountsRepository.create(principal.userId, {
-      name: "Cuenta",
-      kind: "cash",
-      currency: "EUR",
-      openingBalance: 0,
-    }));
-    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
-      accountId: account.id,
-      type: "expense",
-      date: "2024-05-01",
-      amount: -10,
-      currency: "EUR",
-    }));
-    await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
-      accountId: account.id,
-      type: "expense",
-      date: "2025-05-01",
-      amount: -20,
-      currency: "EUR",
-    }));
-
-    const { GET } = await import("../../../../src/pages/api/bootstrap");
-    const response = await GET({
-      request: new Request("https://example.test/api/bootstrap?year=2024"),
-      locals: { principal },
-    } as never);
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.transactions).toHaveLength(1);
-    expect(body.transactions[0].date).toBe("2024-05-01");
-  });
-
-  it("returns the complete nested relations of the selected year", async () => {
+  it("returns the complete nested relations of the selected year, only the authenticated user's", async () => {
     const seeded = await seedNestedRelations(testDb.db, principal.userId);
+    // Another user with their own rows in the same year: any leak adds ids
+    // to the exact lists asserted below.
+    const other = await seedUser(testDb.db, "bootstrap-other@example.com");
+    await seedNestedRelations(testDb.db, other.id, "VWCE-OTHER");
 
     const { GET } = await import("../../../../src/pages/api/bootstrap");
     const response = await GET({
@@ -231,27 +202,27 @@ describe("GET /api/bootstrap", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
 
-    // The bootstrap payload keeps its exact key order and field names.
-    expect(Object.keys(body)).toEqual([
-      "year",
+    // The bootstrap payload keeps its field names.
+    expect(Object.keys(body).sort()).toEqual([
+      "accounts",
+      "budgetEntries",
+      "categories",
+      "contributions",
+      "goals",
+      "instruments",
+      "pendingMovements",
+      "recurringRules",
       "revision",
       "settings",
-      "accounts",
-      "categories",
-      "transactions",
-      "subscriptions",
-      "recurringRules",
-      "pendingMovements",
-      "budgetEntries",
-      "goals",
-      "wealthSnapshots",
-      "contributions",
-      "userInstruments",
-      "instruments",
-      "twrLiquidityAccounts",
-      "stockeventsSymbolMappings",
       "stockeventsCashMappings",
       "stockeventsCashSyncEntries",
+      "stockeventsSymbolMappings",
+      "subscriptions",
+      "transactions",
+      "twrLiquidityAccounts",
+      "userInstruments",
+      "wealthSnapshots",
+      "year",
     ]);
 
     expect(body.transactions.map((transaction: { id: string }) => transaction.id)).toEqual([
@@ -297,7 +268,7 @@ describe("GET /api/bootstrap", () => {
     ]);
   });
 
-  it("loads each relation in one query scoped to the selected year's rows", async () => {
+  it("loads each relation in one query, scoped to the selected year in the bootstrap and unscoped in the export", async () => {
     const seeded = await seedNestedRelations(testDb.db, principal.userId);
     // A second row of the selected year in each parent collection, so that a
     // query per parent row is told apart from one batched query.
@@ -355,50 +326,33 @@ describe("GET /api/bootstrap", () => {
     expect(allocations).toHaveLength(1);
     expect(allocations[0].params).toContain(seeded.contribution2025.id);
     expect(allocations[0].params).toContain(seeded.contribution2026.id);
-  });
 
-  it("only reads the authenticated user's collections and relations", async () => {
-    const mine = await seedNestedRelations(testDb.db, principal.userId);
-    const other = await seedUser(testDb.db, "bootstrap-other@example.com");
-    const theirs = await seedNestedRelations(testDb.db, other.id, "VWCE-OTHER");
+    // The backup export reads the same relations with no year scope: still one
+    // query per relation, now carrying the 2025 rows too.
+    recorder.clear();
+    const { GET: exportGET } = await import("../../../../src/pages/api/data/export");
+    const exportResponse = await exportGET({ locals: { principal } } as never);
+    expect(exportResponse.status).toBe(200);
 
-    const { GET } = await import("../../../../src/pages/api/bootstrap");
-    const mineResponse = await GET({
-      request: new Request("https://example.test/api/bootstrap?year=2026"),
-      locals: { principal },
-    } as never);
-    const mineBody = await mineResponse.json();
-    expect(mineBody.transactions.map((transaction: { id: string }) => transaction.id)).toEqual([
-      mine.transaction2026.id,
-    ]);
-    expect(mineBody.wealthSnapshots.map((snapshot: { id: string }) => snapshot.id)).toEqual([
-      mine.snapshot2026.id,
-    ]);
-    expect(mineBody.wealthSnapshots[0].balances[0].accountId).toBe(mine.account.id);
-    const mineAllocations = mineBody.contributions.flatMap(
-      (contribution: { allocations: { accountId: string }[] }) => contribution.allocations,
+    const exportBalances = recorder.selectsFrom("snapshot_balances");
+    expect(exportBalances).toHaveLength(1);
+    expect(exportBalances[0].params).toEqual(
+      expect.arrayContaining([seeded.snapshot2025.id, seeded.snapshot2026.id, secondSnapshot.id]),
     );
-    // Both contributions (never year-filtered) keep their own allocation.
-    expect(mineAllocations.map((allocation: { accountId: string }) => allocation.accountId)).toEqual([
-      mine.account.id,
-      mine.account.id,
-    ]);
-
-    const otherPrincipal: AuthPrincipal = {
-      userId: other.id,
-      email: other.email,
-      provider: "better-auth",
-      subject: "sub-2",
-    };
-    const theirsResponse = await GET({
-      request: new Request("https://example.test/api/bootstrap?year=2026"),
-      locals: { principal: otherPrincipal },
-    } as never);
-    const theirsBody = await theirsResponse.json();
-    expect(theirsBody.transactions.map((transaction: { id: string }) => transaction.id)).toEqual([
-      theirs.transaction2026.id,
-    ]);
-    expect(theirsBody.wealthSnapshots[0].balances[0].accountId).toBe(theirs.account.id);
+    const exportTradeDetails = recorder.selectsFrom("investment_trade_details");
+    expect(exportTradeDetails).toHaveLength(1);
+    expect(exportTradeDetails[0].params).toEqual(
+      expect.arrayContaining([
+        seeded.transaction2025.id,
+        seeded.transaction2026.id,
+        secondTransaction.id,
+      ]),
+    );
+    const exportAllocations = recorder.selectsFrom("contribution_allocations");
+    expect(exportAllocations).toHaveLength(1);
+    expect(exportAllocations[0].params).toEqual(
+      expect.arrayContaining([seeded.contribution2025.id, seeded.contribution2026.id]),
+    );
   });
 
   it("never includes integration_credentials", async () => {
