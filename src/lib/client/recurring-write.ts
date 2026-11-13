@@ -340,7 +340,11 @@ export async function discardPendingConfirmation(
     }
   }
   if (result.kept > 0) {
-    if (decision) reopenPending(decision)
+    // The movement is confirmed: reverting it would be another financial
+    // action, and reopening the pending would enable a second confirmation.
+    // Keep the pending confirmed and linked to that movement (reconciling the
+    // link in this projection) and surface the partial result.
+    if (decision) reconcileConfirmedLink(decision)
     await syncStore.failIntent(intentId, PARTIAL_CONFIRMATION_MESSAGE)
     useToast().showToast(PARTIAL_CONFIRMATION_MESSAGE)
     return { discarded: true, keptMovement: true, message: PARTIAL_CONFIRMATION_MESSAGE }
@@ -464,14 +468,22 @@ async function projectStoredDecision(
   return { accepted: true }
 }
 
-function reopenPending(decision: StoredDecision): void {
+/**
+ * Reconciles the pending→movement relation without undoing either side: the
+ * confirmed movement stays in the ledger and the pending keeps pointing at it,
+ * so no surface can offer another confirmation for the same pending. If the
+ * server later reports the pending still open, the durable reservation remains
+ * the guard against a second movement (see `confirmPendingMovement`).
+ */
+function reconcileConfirmedLink(decision: StoredDecision): void {
   useFinancialStateStore().commitState((draft) => {
+    if (!draft.transactions.some((item) => item.id === decision.transaction.id)) {
+      draft.transactions.push({ ...decision.transaction })
+    }
     const current = draft.pendingMovements.find((item) => item.id === decision.pendingId)
     if (!current) return
-    if (current.status === 'confirmed' && current.transactionId === decision.transaction.id) {
-      current.status = 'pending'
-      current.transactionId = null
-    }
+    current.status = 'confirmed'
+    current.transactionId = decision.transaction.id
   })
 }
 

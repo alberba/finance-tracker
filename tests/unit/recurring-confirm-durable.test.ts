@@ -15,7 +15,11 @@ import {
   wipeIdbCache,
   wipeOutbox,
 } from '../helpers/client-storage'
-import { resumePendingConfirmations } from '../../src/lib/client/recurring-write'
+import {
+  PARTIAL_CONFIRMATION_MESSAGE,
+  discardPendingConfirmation,
+  resumePendingConfirmations,
+} from '../../src/lib/client/recurring-write'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useRecurringStore } from '../../src/stores/recurring'
 import { useSyncStore } from '../../src/stores/sync'
@@ -447,6 +451,90 @@ describe('confirmPending — aceptación durable y recuperable (#492)', () => {
     await resumePendingConfirmations()
     expect(await readIntents()).toHaveLength(0)
     expect(await readCommands()).toHaveLength(0)
+  })
+
+  it('descartar con el movimiento ya confirmado no reabre el pendiente ni permite un segundo movimiento', async () => {
+    setupState([expensePending()])
+    await startSync()
+    await seedServerRefs()
+
+    const outcome = await useRecurringStore().confirmPending('pm-exp', { amount: 925 })
+    expect(outcome.accepted).toBe(true)
+    if (!outcome.accepted) throw new Error('No se aceptó')
+
+    // The movement is confirmed; its pending update is then rejected
+    // definitively (the server row is gone). This is the only remaining work.
+    const [movementEntry] = await vi.waitFor(
+      async () => {
+        const entries = await readCommands()
+        expect(entries).toHaveLength(1)
+        return entries
+      },
+      { timeout: 5000, interval: 20 },
+    )
+    const movementDb = await openStorage(USER_ID)
+    try {
+      await commitDurableIntentCommands(movementDb, {
+        plainSeqs: [],
+        outcomes: [{ entry: movementEntry, status: 'confirmed' }],
+      })
+      await putEntity(movementDb, 'transaction', { id: outcome.transactionId, version: 1 })
+    } finally {
+      movementDb.close()
+    }
+    await resumePendingConfirmations()
+    const pendingEntry = await vi.waitFor(
+      async () => {
+        const pending = (await readCommands()).find(
+          (entry) =>
+            entry.command.action === 'update' && entry.command.entityType === 'pendingMovement',
+        )
+        expect(pending).toBeDefined()
+        return pending!
+      },
+      { timeout: 5000, interval: 20 },
+    )
+    const pendingDb = await openStorage(USER_ID)
+    try {
+      await commitDurableIntentCommands(pendingDb, {
+        plainSeqs: [],
+        outcomes: [
+          { entry: pendingEntry, status: 'failed', message: 'El pendiente ya no existe.' },
+        ],
+      })
+    } finally {
+      pendingDb.close()
+    }
+
+    const discarded = await discardPendingConfirmation('pm-exp')
+    expect(discarded).toMatchObject({ discarded: true, keptMovement: true })
+
+    // #492: a confirmed movement is never reverted. The pending must stay
+    // confirmed and linked to that movement, so the UI cannot offer a second
+    // confirmation; the partial result stays explicit instead.
+    expect(useFinancialStateStore().transactions).toHaveLength(1)
+    expect(useFinancialStateStore().transactions[0].id).toBe(outcome.transactionId)
+    expect(useRecurringStore().pendingMovements[0]).toMatchObject({
+      status: 'confirmed',
+      transactionId: outcome.transactionId,
+    })
+    expect(useRecurringStore().openPendingMovements).toHaveLength(0)
+    const [view] = await readIntents()
+    expect(view.intent).toMatchObject({
+      state: 'partial',
+      failure: PARTIAL_CONFIRMATION_MESSAGE,
+    })
+
+    // Even if a stale surface asks to confirm the same pending again, the kept
+    // reservation reuses the movement identity instead of creating another.
+    const repeated = await useRecurringStore().confirmPending('pm-exp')
+    expect(repeated).toEqual({ accepted: true, transactionId: outcome.transactionId })
+    expect(useFinancialStateStore().transactions).toHaveLength(1)
+    expect(
+      (await readCommands()).filter(
+        (entry) => entry.command.action === 'create' && entry.command.entityType === 'transaction',
+      ),
+    ).toHaveLength(0)
   })
 
   it('cuenta la reserva una sola vez, la incluye en el estado y bloquea el cierre de sesión', async () => {

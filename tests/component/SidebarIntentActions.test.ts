@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import 'fake-indexeddb/auto'
 import { createApp } from 'vue'
 import { setActivePinia } from 'pinia'
@@ -177,8 +176,8 @@ describe('sidebar — retry/discard de intenciones recurrentes', () => {
     document.body.innerHTML = ''
   })
 
-  it('descartar un resultado parcial reabre el pendiente y mantiene el reintento', async () => {
-    const { pendingId } = await setupPendingConfirmation()
+  it('descartar un resultado parcial conserva el vínculo confirmado y no reabre el pendiente', async () => {
+    const { pendingId, transactionId } = await setupPendingConfirmation()
     const syncStore = useSyncStore(pinia)
     expect(syncStore.intents[0]?.intent.state).toBe('partial')
     expect(syncStore.intents[0]?.intent.failure).toBe('El pendiente ya no existe.')
@@ -196,9 +195,8 @@ describe('sidebar — retry/discard de intenciones recurrentes', () => {
       { timeout: 5000, interval: 20 },
     )
 
-    // The partial result is kept (the movement is never reverted) but the
-    // pending is reopenable and the reconciliation retry stays visible: the
-    // generic intent discard would have closed both.
+    // #492: the confirmed movement is never reverted and its pending link is
+    // not reopened, so no surface can offer a second confirmation.
     const status = await useRecurringStore().pendingConfirmationStatus(pendingId)
     expect(status).toMatchObject({
       state: 'partial',
@@ -206,9 +204,11 @@ describe('sidebar — retry/discard de intenciones recurrentes', () => {
       pendingLinked: false,
       discarded: false,
     })
-    expect(useRecurringStore().openPendingMovements.some((item) => item.id === pendingId)).toBe(
-      true,
-    )
+    expect(useRecurringStore().pendingMovements[0]).toMatchObject({
+      status: 'confirmed',
+      transactionId,
+    })
+    expect(useRecurringStore().openPendingMovements).toHaveLength(0)
     expect(useFinancialStateStore().transactions).toHaveLength(1)
     await vi.waitFor(
       () => {
