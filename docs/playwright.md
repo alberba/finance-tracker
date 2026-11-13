@@ -1,5 +1,8 @@
 # Playwright
 
+Las reglas de test y E2E están en [TESTING_STANDARDS.md](../TESTING_STANDARDS.md);
+este documento es el runbook de la suite de navegador. Si hay contradicción, manda el estándar.
+
 La suite de navegador se divide en recorridos funcionales, smoke, regresión visual y escenarios
 especializados de sync v2. Todo cliente autenticado usa sync v2. Funcional y visual ejecutan el
 build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1 local, y autenticación
