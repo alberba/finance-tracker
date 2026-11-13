@@ -1,12 +1,12 @@
 import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
-import { createTestPinia } from '../helpers/pinia'
+import { createTestPinia } from '../../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: () => false }))
+vi.mock('../../../src/scripts/demo-mode', () => ({ isDemoMode: () => false }))
 
-import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { useSyncStore } from '../../src/stores/sync'
+import { useFinancialStateStore } from '../../../src/stores/financial-state'
+import { useSyncStore } from '../../../src/stores/sync'
 
 const EMPTY = {
   revision: 0,

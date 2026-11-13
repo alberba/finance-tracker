@@ -82,7 +82,7 @@ function setupState(pendingMovements: PendingMovement[]) {
  * reports acceptance. `confirmPending` now resolves after the durable
  * reservation, so the calls below await it. The durable acceptance, restart,
  * publication-order and repeat coverage moved to
- * `tests/unit/recurring-confirm-durable.test.ts` and
+ * `tests/integration/client-storage/recurring-confirm-durable.test.ts` and
  * `tests/integration/d1-v2/round-trip/recurring-durable.test.ts`.
  */
 describe('confirmPending — editing and confirming in one step (issue #408)', () => {

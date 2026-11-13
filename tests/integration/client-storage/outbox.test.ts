@@ -13,9 +13,9 @@ import {
   peekBatch,
   recordFailure,
   wipeOutbox,
-} from '../helpers/client-storage'
-import { OUTBOX_DB_VERSION, generateCommandId } from '../../src/lib/client/outbox'
-import { ClientStorageError } from '../../src/lib/client/storage'
+} from '../../helpers/client-storage'
+import { OUTBOX_DB_VERSION, generateCommandId } from '../../../src/lib/client/outbox'
+import { ClientStorageError } from '../../../src/lib/client/storage'
 
 const USER_ID = 'user-outbox-test'
 
@@ -49,7 +49,7 @@ describe('outbox', () => {
       const tx = legacy.transaction('commands', 'readwrite')
       tx.objectStore('commands').add({
         command: { commandId: 'existing-command', action: 'noop' },
-        enqueuedAt: new Date().toISOString(),
+        enqueuedAt: '2026-11-01T10:00:00.000Z',
         attempts: 0,
       })
       tx.oncomplete = () => resolve()
@@ -92,7 +92,7 @@ describe('outbox', () => {
       const tx = legacy.transaction(['commands', 'movementPublications'], 'readwrite')
       tx.objectStore('commands').add({
         command: { commandId: 'v2-command', action: 'noop' },
-        enqueuedAt: new Date().toISOString(),
+        enqueuedAt: '2026-11-01T10:00:00.000Z',
         attempts: 0,
       })
       tx.objectStore('movementPublications').put({
@@ -105,7 +105,7 @@ describe('outbox', () => {
         writerId: 'tab',
         origin: 'movement',
         fingerprint: 'f',
-        updatedAt: new Date().toISOString(),
+        updatedAt: '2026-11-01T10:00:00.000Z',
       })
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)

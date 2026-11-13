@@ -20,7 +20,7 @@ import {
   wipeOutbox,
   type IntentCommandOutcome,
   type TestStorage,
-} from '../helpers/client-storage'
+} from '../../helpers/client-storage'
 
 const USER_ID = 'user-durable-intents'
 

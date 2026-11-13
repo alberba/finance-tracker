@@ -1,9 +1,9 @@
 import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
-import { createTestPinia } from '../helpers/pinia'
+import { createTestPinia } from '../../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
+vi.mock('../../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
 import {
   commitDurableIntentCommands,
@@ -14,12 +14,12 @@ import {
   readMovementPublications,
   wipeIdbCache,
   wipeOutbox,
-} from '../helpers/client-storage'
-import { resumePendingConfirmations } from '../../src/lib/client/recurring-write'
-import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { useRecurringStore } from '../../src/stores/recurring'
-import { useSyncStore } from '../../src/stores/sync'
-import type { PendingMovement } from '../../src/scripts/types'
+} from '../../helpers/client-storage'
+import { resumePendingConfirmations } from '../../../src/lib/client/recurring-write'
+import { useFinancialStateStore } from '../../../src/stores/financial-state'
+import { useRecurringStore } from '../../../src/stores/recurring'
+import { useSyncStore } from '../../../src/stores/sync'
+import type { PendingMovement } from '../../../src/scripts/types'
 
 const USER_ID = 'user-recurring-confirm-durable'
 

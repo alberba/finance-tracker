@@ -47,7 +47,7 @@ El estado que consume la UI guarda el plan en `state.budget[type][category][mont
   tras recarga, rechazo de texto inválido y guardado del plan anual.
 - `tests/e2e/pages/FinanceTrackerPage.ts`: helpers de navegación, rango, celdas y panel.
 - `tests/unit/budget-view-model.test.ts`: estados de mes, tonos, ventanas y barras.
-- `tests/unit/budget-store-sync.test.ts`: edición y encolado desde el store.
+- `tests/integration/client-storage/budget-store-sync.test.ts`: edición y encolado desde el store.
 - `tests/integration/d1-v2/round-trip/budget.test.ts`: persistencia con el store real y SQLite,
   incluida la primera edición, el mes y el aislamiento entre años.
 - `tests/e2e/layout-visual.spec.ts`: presentación de Presupuesto en escritorio y móvil.

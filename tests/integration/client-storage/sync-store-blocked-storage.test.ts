@@ -2,11 +2,11 @@ import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
+vi.mock('../../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
-import { createTestPinia } from '../helpers/pinia'
-import { wipeIdbCache, wipeOutbox } from '../helpers/client-storage'
-import { useSyncStore } from '../../src/stores/sync'
+import { createTestPinia } from '../../helpers/pinia'
+import { wipeIdbCache, wipeOutbox } from '../../helpers/client-storage'
+import { useSyncStore } from '../../../src/stores/sync'
 
 const USER_ID = 'user-store-blocked-storage'
 
@@ -20,9 +20,9 @@ describe('useSyncStore — almacenamiento bloqueado por una pestaña antigua (#4
 
   afterEach(async () => {
     vi.unstubAllGlobals()
-    // Let a late, already-rejected upgrade finish and close itself.
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    await wipeOutbox(USER_ID)
+    // A late, already-rejected upgrade finishes and closes itself once the old
+    // tab is gone; the wipe is refused while that connection is still open.
+    await vi.waitFor(() => wipeOutbox(USER_ID))
     await wipeIdbCache(USER_ID)
   })
 

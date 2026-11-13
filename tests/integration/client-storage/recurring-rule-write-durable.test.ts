@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
+vi.mock('../../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
 import {
   acceptDurableIntent,
@@ -14,12 +14,12 @@ import {
   wipeIdbCache,
   wipeOutbox,
   type OutboxEntry,
-} from '../helpers/client-storage'
-import { createTestPinia } from '../helpers/pinia'
-import { resumeRecurringRuleWrites } from '../../src/lib/client/recurring-rule-write'
-import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { useRecurringStore } from '../../src/stores/recurring'
-import { useSyncStore } from '../../src/stores/sync'
+} from '../../helpers/client-storage'
+import { createTestPinia } from '../../helpers/pinia'
+import { resumeRecurringRuleWrites } from '../../../src/lib/client/recurring-rule-write'
+import { useFinancialStateStore } from '../../../src/stores/financial-state'
+import { useRecurringStore } from '../../../src/stores/recurring'
+import { useSyncStore } from '../../../src/stores/sync'
 
 const USER_ID = 'user-recurring-rule-write-durable'
 

@@ -1,4 +1,3 @@
-import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
 import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

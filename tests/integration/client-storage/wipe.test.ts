@@ -9,7 +9,7 @@ import {
   openStorage,
   putEntity,
   wipeAllClientData,
-} from '../helpers/client-storage'
+} from '../../helpers/client-storage'
 
 const USER_ID = 'user-wipe-test'
 

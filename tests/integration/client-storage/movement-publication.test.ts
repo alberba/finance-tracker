@@ -12,7 +12,7 @@ import {
   wipeOutbox,
   type MovementPublicationInput,
   type TestStorage,
-} from '../helpers/client-storage'
+} from '../../helpers/client-storage'
 
 const USER_ID = 'user-movement-publication'
 
