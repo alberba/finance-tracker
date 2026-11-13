@@ -71,10 +71,11 @@ despliegues. Para una PR de riesgo, ejecútala manualmente antes de mezclar.
 pregunta que hay que mirar, no necesariamente un fallo. Si el cambio visual es el esperado,
 actualiza los snapshots explícitamente.
 
-Dónde van los tests: `tests/unit` (lógica pura), `tests/component` (un `<Nombre>.test.ts` por
-componente Vue), `tests/integration/d1-v2` (stores y repositorios contra SQLite) y `tests/e2e`
-(`<área>.spec.ts` con Page Objects en `tests/e2e/pages`). Lista el directorio antes de abrir un
-fichero por nombre.
+Antes de escribir, modificar o borrar un test, lee [TESTING_STANDARDS.md](./TESTING_STANDARDS.md):
+allí viven el criterio de entrada, el rojo antes de verde, la poda y las reglas de E2E. Dónde van
+los tests: `tests/unit` (lógica pura), `tests/component` (un `<Nombre>.test.ts` por componente Vue),
+`tests/integration/d1-v2` (stores y repositorios contra SQLite) y `tests/e2e` (`<área>.spec.ts` con
+Page Objects en `tests/e2e/pages`). Lista el directorio antes de abrir un fichero por nombre.
 
 ## Pull requests
 

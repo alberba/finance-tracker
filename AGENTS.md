@@ -16,6 +16,9 @@
   SQLite and production on Oracle; [authentication](docs/operations/authentication.md) for Better Auth.
 - Coding and review: [CODING_STANDARDS.md](CODING_STANDARDS.md) is authoritative, including the
   Standards axis of `/code-review`. Report conflicting narrative docs as drift.
+- Tests (Vitest, Vue, Astro or Playwright): before writing, modifying or deleting one, read
+  [TESTING_STANDARDS.md](TESTING_STANDARDS.md). It is authoritative for test rules; the narrative
+  docs are `docs/testing.md` and `docs/playwright.md`.
 - Setup, branches, commits and PRs: read [CONTRIBUTING.md](CONTRIBUTING.md).
 - Adding or changing E2E cases, CI or browser failures, E2E runs and snapshot regeneration: read
   [playwright](docs/playwright.md).
