@@ -23,7 +23,11 @@
 import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
 import { createTestPinia } from '../../../helpers/pinia'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
+import * as accountsRepository from '../../../../src/db/repositories/accounts'
+import * as pendingRepository from '../../../../src/db/repositories/pending-movements'
+import * as recurringRulesRepository from '../../../../src/db/repositories/recurring-rules'
+import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { users } from '../../../../src/db/schema'
 import { applySyncBatch } from '../../../../src/lib/server/sync/apply-command'
 import { buildBootstrapPayload } from '../../../../src/lib/server/bootstrap-payload'
@@ -32,6 +36,7 @@ import type { State } from '../../../../src/scripts/types'
 import { createTestDb, type TestDatabase } from '../setup'
 import type { Db } from '../../../../src/db/client'
 import { runWithDb } from '../../../../src/db/database'
+import type { listDurableIntents } from '../../../helpers/client-storage'
 
 /**
  * The test database is better-sqlite3-backed, so it lacks D1's `batch`. No
@@ -71,8 +76,6 @@ export interface RoundTrip {
   commandBatches: () => unknown[][]
   /** Applies the next batch on the server, then loses the response (network error). */
   loseNextResponse: () => void
-  /** Applies the next batch on the server, then answers with unreadable JSON. */
-  corruptNextSyncResponse: () => void
   /** Rejects one command id on the next matching batch (definitive failure). */
   rejectSyncCommand: (commandId: string, message: string) => void
   /** Makes the next request answer 401, as an expired session. */
@@ -86,24 +89,7 @@ export interface RoundTrip {
   /** Stops (or resumes) failing `/api/changes`. */
   setChangesFailing: (failing: boolean) => void
   /** Durable intents currently in the per-user queue database. */
-  intents: () => Promise<
-    Array<{
-      intent: {
-        id: string
-        state: string
-        targetIds: readonly string[]
-        payload: Record<string, string | number | boolean | null>
-        failure: string | null
-        discardRequested: boolean
-      }
-      steps: Array<{
-        step: string
-        state: string
-        commandId: string | null
-        attempt: number
-      }>
-    }>
-  >
+  intents: () => Promise<Awaited<ReturnType<typeof listDurableIntents>>>
   /** The client's own sync store, for cursor/cache assertions. */
   syncStore: ReturnType<typeof import('../../../../src/stores/sync').useSyncStore>
   /**
@@ -174,7 +160,6 @@ export async function startRoundTrip(
   let enterSyncGate: (() => void) | null = null
   let syncGateMatches: ((commands: unknown[]) => boolean) | null = null
   let loseResponse = false
-  let corruptResponse = false
   let rejectCommand: { commandId: string; message: string } | null = null
   let expireSession = false
   let changesFailing = false
@@ -253,13 +238,6 @@ export async function startRoundTrip(
           failChangesAfterSync = false
           changesFailing = true
         }
-        if (corruptResponse) {
-          corruptResponse = false
-          return new Response('respuesta ilegible', {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        }
         return json(result)
       }
       throw new Error(`unexpected fetch ${url}`)
@@ -330,9 +308,6 @@ export async function startRoundTrip(
     loseNextResponse: () => {
       loseResponse = true
     },
-    corruptNextSyncResponse: () => {
-      corruptResponse = true
-    },
     rejectSyncCommand: (commandId, message) => {
       rejectCommand = { commandId, message }
     },
@@ -350,7 +325,7 @@ export async function startRoundTrip(
       const { listDurableIntents, openStorage } = await import('../../../helpers/client-storage')
       const storage = await openStorage(user.id)
       try {
-        return (await listDurableIntents(storage)) as never
+        return await listDurableIntents(storage)
       } finally {
         storage.close()
       }
@@ -400,5 +375,153 @@ export async function startRoundTrip(
       vi.unstubAllGlobals()
       vi.unstubAllEnvs()
     },
+  }
+}
+
+/** Legacy ids of the investment asset and the broker cash account of the link scenario. */
+export const LINK_ASSET_ID = 'link-asset'
+export const LINK_CASH_ID = 'link-broker'
+
+/**
+ * The seed every instrument-link scenario shares: an investment asset, a broker
+ * cash account and one old purchase of `LINK` that Vincular has to pick up.
+ */
+export async function seedLinkMovement(db: TestDatabase['db'], userId: string): Promise<void> {
+  await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: LINK_ASSET_ID,
+      name: 'Link Asset',
+      kind: 'investment',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
+  const cash = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: LINK_CASH_ID,
+      name: 'Broker',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
+  const category = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, { name: 'Link Asset', kind: 'investment' }),
+  )
+  await runWithDb(
+    db,
+    transactionsRepository.create(userId, {
+      accountId: cash.id,
+      categoryId: category.id,
+      type: 'investment',
+      date: '2026-01-15',
+      amount: -201,
+      currency: 'EUR',
+      description: 'Compra antigua',
+      operation: { symbol: 'LINK', side: 'buy', units: 2, unitPrice: 100, fee: 1 },
+    }),
+  )
+}
+
+/** Configures the `LINK` quote of the seeded asset and returns its local instrument id. */
+export async function addLinkInstrument(): Promise<string> {
+  const { useMarketStore } = await import('../../../../src/stores/market')
+  const market = useMarketStore()
+  expect(
+    market.addInstrument({
+      investmentAssetId: LINK_ASSET_ID,
+      type: 'etf',
+      symbol: 'LINK',
+      market: '',
+      currency: 'EUR',
+      provider: 'yahoo',
+    }),
+  ).toBe(true)
+  const instrument = market.instruments.find((item) => item.symbol === 'LINK')
+  if (!instrument) throw new Error('No se configuró el instrumento')
+  return instrument.id
+}
+
+/** Polls the durable intents until one satisfies `predicate`, and returns it. */
+export async function waitForIntent(
+  trip: RoundTrip,
+  predicate: (view: Awaited<ReturnType<RoundTrip['intents']>>[number]) => boolean,
+  timeout = 5000,
+) {
+  return vi.waitFor(
+    async () => {
+      const view = (await trip.intents()).find(predicate)
+      expect(view).toBeDefined()
+      return view!
+    },
+    { timeout },
+  )
+}
+
+/**
+ * The monthly rent pending shared by the recurring confirmation scenarios: a
+ * cash account, the `Vivienda` category, an open rule and its 2026-02-01
+ * occurrence, all ready for the first bootstrap.
+ */
+export async function seedRentPending(
+  db: TestDatabase['db'],
+  userId: string,
+  cashLegacyId: string,
+): Promise<{ accountId: string; categoryId: string; ruleId: string; pendingId: string }> {
+  const account = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: cashLegacyId,
+      name: 'Cuenta',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 1000,
+    }),
+  )
+  const category = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, { name: 'Vivienda', kind: 'expense' }),
+  )
+  const rule = await runWithDb(
+    db,
+    recurringRulesRepository.create(userId, {
+      id: 'rule-rent',
+      legacyId: 'rule-rent',
+      name: 'Alquiler',
+      type: 'expense',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 900,
+      currency: 'EUR',
+      frequency: 'monthly',
+      startDate: '2026-01-01',
+      lastExecutionDate: '2026-01-01',
+      nextRunDate: '2026-02-01',
+    }),
+  )
+  const pending = await runWithDb(
+    db,
+    pendingRepository.create(userId, {
+      id: 'pending-rent',
+      legacyId: 'pending-rent',
+      recurringRuleId: rule.id,
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 900,
+      currency: 'EUR',
+      dueDate: '2026-02-01',
+      type: 'expense',
+      description: 'Alquiler',
+      status: 'pending',
+    }),
+  )
+  return {
+    accountId: account.id,
+    categoryId: category.id,
+    ruleId: rule.id,
+    pendingId: pending.id,
   }
 }

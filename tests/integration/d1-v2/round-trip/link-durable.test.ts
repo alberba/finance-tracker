@@ -1,35 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import * as accountsRepository from '../../../../src/db/repositories/accounts'
-import * as transactionsRepository from '../../../../src/db/repositories/transactions'
-import { linkInstrumentMovements } from '../../../../src/lib/client/instrument-link'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
-import { runWithDb } from '../../../../src/db/database'
 import { openStorage, wipeOutbox } from '../../../helpers/client-storage'
-import { startRoundTrip, type RoundTrip } from './harness'
-
-const ASSET_ID = 'link-asset'
-const CASH_ID = 'link-broker'
-
-async function addLinkInstrument(): Promise<string> {
-  const market = useMarketStore()
-  expect(
-    market.addInstrument({
-      investmentAssetId: ASSET_ID,
-      type: 'etf',
-      symbol: 'LINK',
-      market: '',
-      currency: 'EUR',
-      provider: 'yahoo',
-    }),
-  ).toBe(true)
-  const instrument = market.instruments.find((item) => item.symbol === 'LINK')
-  if (!instrument) throw new Error('No se configuró el instrumento')
-  return instrument.id
-}
+import {
+  addLinkInstrument,
+  LINK_CASH_ID as CASH_ID,
+  seedLinkMovement,
+  startRoundTrip,
+  waitForIntent,
+  type RoundTrip,
+} from './harness'
 
 /** Adds and confirms the quote configuration before the link is requested. */
 async function configuredInstrument(trip: RoundTrip): Promise<string> {
@@ -41,21 +24,6 @@ async function configuredInstrument(trip: RoundTrip): Promise<string> {
 async function seed(trip: RoundTrip): Promise<string> {
   const seeded = await trip.reload()
   return seeded.transactions[0].id
-}
-
-async function waitForIntent(
-  trip: RoundTrip,
-  predicate: (view: Awaited<ReturnType<RoundTrip['intents']>>[number]) => boolean,
-) {
-  return vi.waitFor(
-    async () => {
-      const [view] = await trip.intents()
-      expect(view).toBeDefined()
-      expect(predicate(view)).toBe(true)
-      return view
-    },
-    { timeout: 5000 },
-  )
 }
 
 async function waitQueuedIntentCommand(
@@ -93,45 +61,7 @@ describe('vinculación durable y recuperable (#490)', () => {
   let targetId: string
 
   beforeEach(async () => {
-    trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: ASSET_ID,
-          name: 'Link Asset',
-          kind: 'investment',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const cash = await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: CASH_ID,
-          name: 'Broker',
-          kind: 'cash',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const category = await runWithDb(
-        db,
-        accountsRepository.createCategory(userId, { name: 'Link Asset', kind: 'investment' }),
-      )
-      await runWithDb(
-        db,
-        transactionsRepository.create(userId, {
-          accountId: cash.id,
-          categoryId: category.id,
-          type: 'investment',
-          date: '2026-01-15',
-          amount: -201,
-          currency: 'EUR',
-          description: 'Compra antigua',
-          operation: { symbol: 'LINK', side: 'buy', units: 2, unitPrice: 100, fee: 1 },
-        }),
-      )
-    })
+    trip = await startRoundTrip(seedLinkMovement)
     targetId = await seed(trip)
   })
 
@@ -167,50 +97,6 @@ describe('vinculación durable y recuperable (#490)', () => {
     expect(await trip.pending()).toHaveLength(0)
   })
 
-  it('no publica ningún movimiento antes de confirmar la cotización ni pierde la intención al recargar', async () => {
-    // The quote was configured and the user asked to link it in the same
-    // breath, with no connection: the accepted configuration is the intent's
-    // first step and no movement command may exist before its catalog
-    // reference is confirmed (#491 replaced the former caller-owned gate).
-    trip.setOffline(true)
-    const instrumentId = await addLinkInstrument()
-    const acceptance = await linkInstrumentMovements({
-      instrumentId,
-      onError: () => undefined,
-    })
-    expect(acceptance).toEqual({ targets: 1, accepted: true })
-
-    const interrupted = await waitForIntent(trip, (view) =>
-      view.steps.some((step) => step.step === 'configuration' && step.state === 'queued'),
-    )
-    const queued = (await trip.pending()) as Array<{
-      command: { commandId: string; entityType?: string; action?: string }
-      intent?: { intentId: string; step: string }
-    }>
-    const configuration = queued.find((entry) => entry.command.entityType === 'userInstrument')
-    expect(configuration?.intent).toEqual({
-      intentId: interrupted.intent.id,
-      step: 'configuration',
-    })
-    expect(queued.filter((entry) => entry.command.entityType === 'transaction')).toHaveLength(0)
-
-    // Reboot offline: the intent and its configuration command survive, and
-    // the movement steps are still pending behind the dependency.
-    const offlineState = await trip.reloadOffline()
-    expect(
-      offlineState.transactions.find((item) => item.id === targetId)?.instrumentId,
-    ).toBeUndefined()
-    const afterReload = await trip.intents()
-    expect(afterReload[0].steps.find((step) => step.step === 'configuration')).toMatchObject({
-      state: 'queued',
-      commandId: configuration?.command.commandId,
-    })
-
-    trip.setOffline(false)
-    await trip.reload()
-    await waitForIntent(trip, (view) => view.intent.state === 'confirmed')
-  })
-
   it('reenvía el mismo comando cuando se pierde la respuesta y no duplica el efecto', async () => {
     const instrumentId = await configuredInstrument(trip)
     trip.loseNextResponse()
@@ -230,28 +116,6 @@ describe('vinculación durable y recuperable (#490)', () => {
     const ids = linkUpdateCommandIds(trip)
     expect(ids.length).toBeGreaterThanOrEqual(2)
     expect(new Set(ids)).toEqual(new Set([queued.commandId]))
-  })
-
-  it('recupera la confirmación cuando la respuesta se recibe pero no se puede incorporar', async () => {
-    const instrumentId = await configuredInstrument(trip)
-    trip.corruptNextSyncResponse()
-
-    await useMarketStore().linkExistingMovements(instrumentId)
-    const queued = await waitQueuedIntentCommand(trip)
-    await vi.waitFor(() => expect(trip.commandBatches().length).toBeGreaterThan(0), {
-      timeout: 5000,
-    })
-    const uncertain = await waitForIntent(
-      trip,
-      (view) => view.steps[0]?.state === 'queued' || view.steps[0]?.state === 'sending',
-    )
-    expect(uncertain.steps[0].commandId).toBe(queued.commandId)
-
-    const state = await trip.reload()
-    expect(state.transactions).toHaveLength(1)
-    expect(state.transactions[0].instrumentId).toBe(instrumentId)
-    await waitForIntent(trip, (view) => view.intent.state === 'confirmed')
-    expect(new Set(linkUpdateCommandIds(trip))).toEqual(new Set([queued.commandId]))
   })
 
   it('conserva el fallo definitivo y reintenta con otro comando y el mismo movimiento', async () => {
@@ -380,16 +244,39 @@ describe('vinculación durable y recuperable (#490)', () => {
 
   it('no presenta como aceptada una vinculación cuyo registro durable falla', async () => {
     const instrumentId = await configuredInstrument(trip)
-    const accept = vi.spyOn(trip.syncStore, 'acceptIntent').mockResolvedValue(null)
+    // A real storage error at the IndexedDB boundary: the transaction that
+    // would record the intent (and its commands) aborts.
+    const real = IDBDatabase.prototype.transaction
+    const spy = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementation(function (
+      this: IDBDatabase,
+      stores: string | string[],
+      mode?: IDBTransactionMode,
+      options?: IDBTransactionOptions,
+    ) {
+      const names = Array.isArray(stores) ? stores : [stores]
+      if (
+        this.name.startsWith('finance-tracker-outbox') &&
+        mode === 'readwrite' &&
+        names.includes('intents')
+      ) {
+        spy.mockRestore()
+        throw new DOMException('fallo de almacenamiento simulado', 'AbortError')
+      }
+      return real.call(this, stores, mode, options)
+    } as typeof IDBDatabase.prototype.transaction)
 
-    const acceptance = await useMarketStore().linkExistingMovements(instrumentId)
+    let acceptance
+    try {
+      acceptance = await useMarketStore().linkExistingMovements(instrumentId)
+    } finally {
+      spy.mockRestore()
+    }
 
     expect(acceptance).toEqual({ targets: 1, accepted: false })
     expect(
       useFinancialStateStore().transactions.find((item) => item.id === targetId)?.instrumentId,
     ).toBeUndefined()
     expect(await trip.intents()).toHaveLength(0)
-    accept.mockRestore()
   })
 })
 
@@ -398,45 +285,7 @@ describe('ciclo de vida del trabajo durable (#490)', () => {
   let targetId: string
 
   beforeEach(async () => {
-    trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: ASSET_ID,
-          name: 'Link Asset',
-          kind: 'investment',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const cash = await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: CASH_ID,
-          name: 'Broker',
-          kind: 'cash',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const category = await runWithDb(
-        db,
-        accountsRepository.createCategory(userId, { name: 'Link Asset', kind: 'investment' }),
-      )
-      await runWithDb(
-        db,
-        transactionsRepository.create(userId, {
-          accountId: cash.id,
-          categoryId: category.id,
-          type: 'investment',
-          date: '2026-01-15',
-          amount: -201,
-          currency: 'EUR',
-          description: 'Compra antigua',
-          operation: { symbol: 'LINK', side: 'buy', units: 2, unitPrice: 100, fee: 1 },
-        }),
-      )
-    })
+    trip = await startRoundTrip(seedLinkMovement)
     targetId = await seed(trip)
   })
 

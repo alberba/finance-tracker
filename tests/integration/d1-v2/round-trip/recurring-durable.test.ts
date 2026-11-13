@@ -10,7 +10,7 @@ import { createTestPinia } from '../../../helpers/pinia'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useRecurringStore } from '../../../../src/stores/recurring'
 import { useSyncStore } from '../../../../src/stores/sync'
-import { startRoundTrip, type RoundTrip } from './harness'
+import { seedRentPending, startRoundTrip, type RoundTrip } from './harness'
 
 const ACCOUNT_LEGACY = 'confirm-checking'
 const SAVINGS_LEGACY = 'confirm-savings'
@@ -69,20 +69,10 @@ function confirmFirstPending(edit?: Record<string, unknown>) {
   return recurring.confirmPending(pending.id, edit as never)
 }
 
-async function seedRows(
-  db: Parameters<NonNullable<Parameters<typeof startRoundTrip>[0]>>[0],
-  userId: string,
-) {
-  const account = await runWithDb(
-    db,
-    accounts.create(userId, {
-      legacyId: ACCOUNT_LEGACY,
-      name: 'Cuenta',
-      kind: 'cash',
-      currency: 'EUR',
-      openingBalance: 1000,
-    }),
-  )
+type SeedDb = Parameters<NonNullable<Parameters<typeof startRoundTrip>[0]>>[0]
+
+/** The savings and broker accounts, plus the monthly saving rule and its open occurrence. */
+async function seedSavingPending(db: SeedDb, userId: string, accountId: string) {
   const savings = await runWithDb(
     db,
     accounts.create(userId, {
@@ -93,7 +83,7 @@ async function seedRows(
       openingBalance: 0,
     }),
   )
-  const broker = await runWithDb(
+  await runWithDb(
     db,
     accounts.create(userId, {
       legacyId: BROKER_LEGACY,
@@ -103,47 +93,10 @@ async function seedRows(
       openingBalance: 500,
     }),
   )
-  const category = await runWithDb(
-    db,
-    accounts.createCategory(userId, { name: 'Vivienda', kind: 'expense' }),
-  )
+  await runWithDb(db, accounts.createCategory(userId, { name: 'Cripto', kind: 'investment' }))
   const savingCategory = await runWithDb(
     db,
     accounts.createCategory(userId, { name: 'Fondo de emergencia', kind: 'saving' }),
-  )
-  await runWithDb(db, accounts.createCategory(userId, { name: 'Cripto', kind: 'investment' }))
-  const rule = await runWithDb(
-    db,
-    rules.create(userId, {
-      id: 'rule-rent',
-      legacyId: 'rule-rent',
-      name: 'Alquiler',
-      type: 'expense',
-      accountId: account.id,
-      categoryId: category.id,
-      amount: 900,
-      currency: 'EUR',
-      frequency: 'monthly',
-      startDate: '2026-01-01',
-      lastExecutionDate: '2026-01-01',
-      nextRunDate: '2026-02-01',
-    }),
-  )
-  const pending = await runWithDb(
-    db,
-    pendingRepository.create(userId, {
-      id: 'pending-rent',
-      legacyId: 'pending-rent',
-      recurringRuleId: rule.id,
-      accountId: account.id,
-      categoryId: category.id,
-      amount: 900,
-      currency: 'EUR',
-      dueDate: '2026-02-01',
-      type: 'expense',
-      description: 'Alquiler',
-      status: 'pending',
-    }),
   )
   const savingRule = await runWithDb(
     db,
@@ -152,7 +105,7 @@ async function seedRows(
       legacyId: 'rule-saving',
       name: 'Ahorro mensual',
       type: 'saving',
-      accountId: account.id,
+      accountId,
       destinationAccountId: savings.id,
       categoryId: savingCategory.id,
       amount: 200,
@@ -163,13 +116,13 @@ async function seedRows(
       nextRunDate: '2026-02-01',
     }),
   )
-  const savingPending = await runWithDb(
+  await runWithDb(
     db,
     pendingRepository.create(userId, {
       id: 'pending-saving',
       legacyId: 'pending-saving',
       recurringRuleId: savingRule.id,
-      accountId: account.id,
+      accountId,
       destinationAccountId: savings.id,
       categoryId: savingCategory.id,
       amount: 200,
@@ -180,42 +133,38 @@ async function seedRows(
       status: 'pending',
     }),
   )
-  return {
-    accountId: account.id,
-    savingsId: savings.id,
-    brokerId: broker.id,
-    ruleId: rule.id,
-    pendingId: pending.id,
-    savingPendingId: savingPending.id,
+}
+
+/**
+ * Boots the client over the shared rent pending; `withSavings` adds what only
+ * the destination-account and investment scenarios use.
+ */
+async function bootConfirmationTrip(withSavings: boolean): Promise<void> {
+  secondTab = null
+  trip = await startRoundTrip(async (db, userId) => {
+    const rent = await seedRentPending(db, userId, ACCOUNT_LEGACY)
+    if (withSavings) await seedSavingPending(db, userId, rent.accountId)
+  })
+  await trip.reload()
+  const recurring = useRecurringStore()
+  seeded = {
+    accountId: ACCOUNT_LEGACY,
+    savingsId: SAVINGS_LEGACY,
+    ruleId: recurring.rules.find((item) => item.type === 'expense')!.id,
+    pendingId: recurring.openPendingMovements.find((item) => item.type === 'expense')!.id,
+    savingPendingId:
+      recurring.openPendingMovements.find((item) => item.type === 'saving')?.id ?? '',
   }
 }
 
-describe('confirmación recurrente durable (#492)', () => {
-  beforeEach(async () => {
-    secondTab = null
-    trip = await startRoundTrip(async (db, userId) => {
-      await seedRows(db, userId)
-    })
-    await trip.reload()
-    const pending = useRecurringStore().openPendingMovements.find((item) => item.type === 'expense')
-    const rule = useRecurringStore().rules.find((item) => item.type === 'expense')
-    const savingPending = useRecurringStore().openPendingMovements.find(
-      (item) => item.type === 'saving',
-    )
-    seeded = {
-      accountId: ACCOUNT_LEGACY,
-      savingsId: SAVINGS_LEGACY,
-      ruleId: rule!.id,
-      pendingId: pending!.id,
-      savingPendingId: savingPending!.id,
-    }
-  })
+afterEach(async () => {
+  await secondTab?.dispose()
+  secondTab = null
+  trip.cleanup()
+})
 
-  afterEach(async () => {
-    await secondTab?.dispose()
-    secondTab = null
-    trip.cleanup()
-  })
+describe('confirmación recurrente durable (#492)', () => {
+  beforeEach(() => bootConfirmationTrip(false))
 
   it('acepta sin conexión, conserva la edición al recargar y confirma una sola vez', async () => {
     trip.setOffline(true)
@@ -270,6 +219,17 @@ describe('confirmación recurrente durable (#492)', () => {
     expect(synced.transactions[0]).toMatchObject({ id: transactionId, amount: 925 })
     expect(synced.pendingMovements[0]).toMatchObject({ status: 'confirmed', transactionId })
     expect(await trip.pending()).toHaveLength(0)
+    // The movement create was sent once; only the pending update came later.
+    expect(
+      trip
+        .commandBatches()
+        .flat()
+        .filter(
+          (command) =>
+            (command as { entityType?: string; action?: string }).entityType === 'transaction' &&
+            (command as { action?: string }).action === 'create',
+        ),
+    ).toHaveLength(1)
     // No unresolved recurring work is left; the settled reservation may have
     // been forgotten already (retention), which must not change the result.
     await vi.waitFor(
@@ -279,50 +239,6 @@ describe('confirmación recurrente durable (#492)', () => {
       },
       { timeout: 5000, interval: 20 },
     )
-  })
-
-  it('retoma entre el movimiento y el pendiente reutilizando el comando y la identidad', async () => {
-    trip.setOffline(true)
-    const outcome = await confirmFirstPending({ amount: 925 })
-    expect(outcome.accepted).toBe(true)
-    if (!outcome.accepted) throw new Error('No se aceptó')
-
-    // The movement command is queued; the pending update is not published yet
-    // because the movement still has to be acknowledged by the server.
-    const interrupted = await waitForQueuedCommands(1)
-    const movementCommandId = interrupted[0].command.commandId
-    const before = await trip.intents()
-    expect(before[0].steps).toMatchObject([
-      { step: 'movement', state: 'queued', commandId: movementCommandId },
-      { step: 'pending', state: 'pending' },
-    ])
-
-    // Reboot: the reservation survives. On the next connection the same
-    // movement command is resent, never a second create with a new identity.
-    const offlineState = await trip.reloadOffline()
-    expect(offlineState.transactions).toHaveLength(1)
-    expect(offlineState.transactions[0].id).toBe(outcome.transactionId)
-    const afterReload = await waitForQueuedCommands(1)
-    expect(afterReload[0].command.commandId).toBe(movementCommandId)
-
-    trip.setOffline(false)
-    const synced = await trip.reload()
-    expect(synced.transactions).toHaveLength(1)
-    expect(synced.transactions[0].id).toBe(outcome.transactionId)
-    expect(synced.pendingMovements[0]).toMatchObject({
-      status: 'confirmed',
-      transactionId: outcome.transactionId,
-    })
-    // The movement create was sent once; only the pending update came later.
-    const movementCreates = trip
-      .commandBatches()
-      .flat()
-      .filter(
-        (command) =>
-          (command as { entityType?: string; action?: string }).entityType === 'transaction' &&
-          (command as { action?: string }).action === 'create',
-      )
-    expect(movementCreates).toHaveLength(1)
   })
 
   it('conserva el comando pendiente ya encolado antes de enviarlo', async () => {
@@ -587,6 +503,10 @@ describe('confirmación recurrente durable (#492)', () => {
       transactionId: first.transactionId,
     })
   })
+})
+
+describe('confirmación recurrente durable con ahorro e inversión (#492)', () => {
+  beforeEach(() => bootConfirmationTrip(true))
 
   it('conserva la cuenta destino de un ahorro', async () => {
     trip.setOffline(true)

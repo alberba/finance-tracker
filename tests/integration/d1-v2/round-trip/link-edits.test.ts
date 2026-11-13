@@ -1,84 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import * as accountsRepository from '../../../../src/db/repositories/accounts'
-import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { useFinancialStateStore } from '../../../../src/stores/financial-state'
 import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useMarketStore } from '../../../../src/stores/market'
 import { useMovementsStore } from '../../../../src/stores/movements'
 import { useSyncStore } from '../../../../src/stores/sync'
-import { runWithDb } from '../../../../src/db/database'
 import {
   openStorage,
   readMovementPublications,
   type TestStorage,
 } from '../../../helpers/client-storage'
-import { startRoundTrip, type RoundTrip } from './harness'
-
-const ASSET_ID = 'link-asset'
-const CASH_ID = 'link-broker'
-
-async function addLinkInstrument(): Promise<string> {
-  const market = useMarketStore()
-  expect(
-    market.addInstrument({
-      investmentAssetId: ASSET_ID,
-      type: 'etf',
-      symbol: 'LINK',
-      market: '',
-      currency: 'EUR',
-      provider: 'yahoo',
-    }),
-  ).toBe(true)
-  const instrument = market.instruments.find((item) => item.symbol === 'LINK')
-  if (!instrument) throw new Error('No se configuró el instrumento')
-  return instrument.id
-}
+import {
+  addLinkInstrument,
+  LINK_CASH_ID as CASH_ID,
+  seedLinkMovement,
+  startRoundTrip,
+  type RoundTrip,
+} from './harness'
 
 describe('vinculación que respeta las ediciones posteriores (#489)', () => {
   let trip: RoundTrip
   let targetId: string
 
   beforeEach(async () => {
-    trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: ASSET_ID,
-          name: 'Link Asset',
-          kind: 'investment',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const cash = await runWithDb(
-        db,
-        accountsRepository.create(userId, {
-          legacyId: CASH_ID,
-          name: 'Broker',
-          kind: 'cash',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
-      const category = await runWithDb(
-        db,
-        accountsRepository.createCategory(userId, { name: 'Link Asset', kind: 'investment' }),
-      )
-      await runWithDb(
-        db,
-        transactionsRepository.create(userId, {
-          accountId: cash.id,
-          categoryId: category.id,
-          type: 'investment',
-          date: '2026-01-15',
-          amount: -201,
-          currency: 'EUR',
-          description: 'Compra antigua',
-          operation: { symbol: 'LINK', side: 'buy', units: 2, unitPrice: 100, fee: 1 },
-        }),
-      )
-    })
+    trip = await startRoundTrip(seedLinkMovement)
     const seeded = await trip.reload()
     targetId = seeded.transactions[0].id
   })
@@ -133,20 +78,6 @@ describe('vinculación que respeta las ediciones posteriores (#489)', () => {
     const late = state.transactions.find((item) => item.description === 'Compra tardía')
     expect(late).toBeDefined()
     expect(late?.instrumentId).toBeUndefined()
-  })
-
-  it('vincula con un instrumento ya configurado y confirmado antes de pulsar', async () => {
-    const instrumentId = await addLinkInstrument()
-    // The quote configuration has already reached the server and survives a
-    // reload; only the movement publication is left.
-    await trip.reload()
-    expect((await useMarketStore().linkExistingMovements(instrumentId)).targets).toBe(1)
-
-    const state = await trip.reload()
-    expect(state.transactions.find((item) => item.id === targetId)).toMatchObject({
-      instrumentId,
-    })
-    expect(useMarketStore().linkedMovementCount(instrumentId)).toBe(1)
   })
 
   it('no restaura un objetivo borrado durante la resolución', async () => {

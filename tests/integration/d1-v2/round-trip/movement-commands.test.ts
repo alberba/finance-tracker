@@ -36,54 +36,39 @@ describe('round trip: shared movement commands (#263)', () => {
 
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(
-        db,
-        accounts.create(userId, {
-          id: accountId,
-          name: 'MyInvestor',
-          kind: 'cash',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
+      await runWithDb(db, accounts.create(userId, {
+        id: accountId,
+        name: 'MyInvestor',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Acciones', kind: 'investment' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Fondos', kind: 'investment' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Ocio', kind: 'expense' }))
       await runWithDb(db, accounts.createCategory(userId, { name: 'Nómina', kind: 'income' }))
-      const instrument = await runWithDb(
-        db,
-        market.createInstrument({
-          legacyId: 'legacy-vwce',
-          symbol: 'VWCE',
-          normalizedSymbol: 'VWCE',
-          provider: 'yahoo',
-          currency: 'USD',
-        }),
-      )
+      const instrument = await runWithDb(db, market.createInstrument({
+        legacyId: 'legacy-vwce',
+        symbol: 'VWCE',
+        normalizedSymbol: 'VWCE',
+        provider: 'yahoo',
+        currency: 'USD',
+      }))
       instrumentId = 'legacy-vwce'
-      await runWithDb(
-        db,
-        market.createUserInstrument(userId, {
-          instrumentId: instrument.id,
-          alias: accountId,
-        }),
-      )
-      const canonicalInstrument = await runWithDb(
-        db,
-        market.createInstrument({
-          symbol: 'IWDA',
-          normalizedSymbol: 'IWDA',
-          provider: 'yahoo',
-          currency: 'USD',
-        }),
-      )
-      await runWithDb(
-        db,
-        market.createUserInstrument(userId, {
-          instrumentId: canonicalInstrument.id,
-          alias: accountId,
-        }),
-      )
+      await runWithDb(db, market.createUserInstrument(userId, {
+        instrumentId: instrument.id,
+        alias: accountId,
+      }))
+      const canonicalInstrument = await runWithDb(db, market.createInstrument({
+        symbol: 'IWDA',
+        normalizedSymbol: 'IWDA',
+        provider: 'yahoo',
+        currency: 'USD',
+      }))
+      await runWithDb(db, market.createUserInstrument(userId, {
+        instrumentId: canonicalInstrument.id,
+        alias: accountId,
+      }))
     })
   })
 
@@ -142,10 +127,7 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(useInvestmentStore().addMovement(investmentInput)).toBe(true)
     const first = await trip.reload()
     const id = first.transactions[0].id
-    const changes = await runWithDb(
-      trip.testDb.db as unknown as Db,
-      listChangesSince(trip.userId, 0),
-    )
+    const changes = await runWithDb(trip.testDb.db as unknown as Db, listChangesSince(trip.userId, 0))
     const createPayload = changes
       .filter((change) => change.entityType === 'transaction' && change.entityId === id)
       .flatMap((change) => (change.payload ? [JSON.parse(change.payload)] : []))
@@ -638,16 +620,13 @@ describe('round trip: imported movement protections (#263)', () => {
 
   beforeEach(async () => {
     trip = await startRoundTrip(async (db, userId) => {
-      await runWithDb(
-        db,
-        accounts.create(userId, {
-          id: accountId,
-          name: 'Bitvavo',
-          kind: 'cash',
-          currency: 'EUR',
-          openingBalance: 0,
-        }),
-      )
+      await runWithDb(db, accounts.create(userId, {
+        id: accountId,
+        name: 'Bitvavo',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }))
       await runWithDb(db, importOperation(userId, accountId, remoteOperation, null))
     })
   })

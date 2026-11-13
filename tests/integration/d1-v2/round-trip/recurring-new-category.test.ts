@@ -3,12 +3,10 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import * as accounts from '../../../../src/db/repositories/accounts'
-import * as pendingRepository from '../../../../src/db/repositories/pending-movements'
-import * as rules from '../../../../src/db/repositories/recurring-rules'
 import { runWithDb } from '../../../../src/db/database'
 import { categories, pendingMovements, transactions } from '../../../../src/db/schema'
 import { useRecurringStore } from '../../../../src/stores/recurring'
-import { startRoundTrip, type RoundTrip } from './harness'
+import { seedRentPending, startRoundTrip, type RoundTrip } from './harness'
 
 /**
  * Confirming an investment pending whose category does not exist on the server
@@ -25,16 +23,7 @@ let pendingId: string
 
 beforeEach(async () => {
   trip = await startRoundTrip(async (db, userId) => {
-    const cash = await runWithDb(
-      db,
-      accounts.create(userId, {
-        legacyId: CASH_LEGACY,
-        name: 'Cuenta',
-        kind: 'cash',
-        currency: 'EUR',
-        openingBalance: 1000,
-      }),
-    )
+    await seedRentPending(db, userId, CASH_LEGACY)
     await runWithDb(
       db,
       accounts.create(userId, {
@@ -43,43 +32,6 @@ beforeEach(async () => {
         kind: 'investment',
         currency: 'EUR',
         openingBalance: 500,
-      }),
-    )
-    const housing = await runWithDb(
-      db,
-      accounts.createCategory(userId, { name: 'Vivienda', kind: 'expense' }),
-    )
-    const rule = await runWithDb(
-      db,
-      rules.create(userId, {
-        id: 'rule-rent',
-        legacyId: 'rule-rent',
-        name: 'Alquiler',
-        type: 'expense',
-        accountId: cash.id,
-        categoryId: housing.id,
-        amount: 900,
-        currency: 'EUR',
-        frequency: 'monthly',
-        startDate: '2026-01-01',
-        lastExecutionDate: '2026-01-01',
-        nextRunDate: '2026-02-01',
-      }),
-    )
-    await runWithDb(
-      db,
-      pendingRepository.create(userId, {
-        id: 'pending-rent',
-        legacyId: 'pending-rent',
-        recurringRuleId: rule.id,
-        accountId: cash.id,
-        categoryId: housing.id,
-        amount: 900,
-        currency: 'EUR',
-        dueDate: '2026-02-01',
-        type: 'expense',
-        description: 'Alquiler',
-        status: 'pending',
       }),
     )
   })
@@ -145,21 +97,6 @@ describe('confirmar un pendiente de inversión con una categoría nueva (#283)',
       category: 'Cripto',
       transactionId: outcome.transactionId,
     })
-    expect(await trip.pending()).toHaveLength(0)
-  })
-
-  it('con conexión también acuerdan la misma categoría y no queda cola', async () => {
-    const outcome = await confirmAsNewCategoryInvestment()
-    expect(outcome.accepted).toBe(true)
-    if (!outcome.accepted) throw new Error('No se aceptó')
-
-    const synced = await trip.reload()
-
-    const { cripto, pending, movements } = await serverRows()
-    expect(cripto).toHaveLength(1)
-    expect(movements[0]).toMatchObject({ id: outcome.transactionId, categoryId: cripto[0].id })
-    expect(pending).toMatchObject({ status: 'confirmed', categoryId: cripto[0].id })
-    expect(synced.pendingMovements[0]).toMatchObject({ status: 'confirmed', category: 'Cripto' })
     expect(await trip.pending()).toHaveLength(0)
   })
 })

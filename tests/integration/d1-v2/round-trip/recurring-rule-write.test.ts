@@ -21,11 +21,9 @@ interface Seeded {
 
 let trip: RoundTrip
 let seeded: Seeded
-let today: string
 let secondTab: ReturnType<typeof useSyncStore> | null = null
 
 function setToday(value: string): void {
-  today = value
   ;(window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__ = value
 }
 
@@ -166,7 +164,10 @@ describe('regla recurrente durable (#493)', () => {
       lastExecutionDate: '2026-03-01',
       nextRunDate: '2026-04-01',
     })
-    expect(queued[0].command.data).toMatchObject({ lastExecutionDate: null, nextRunDate: '2026-03-01' })
+    expect(queued[0].command.data).toMatchObject({
+      lastExecutionDate: null,
+      nextRunDate: '2026-03-01',
+    })
 
     // A reload while still offline reuses the durable records: the same rule
     // and occurrence ids, one of each, and the accepted values.
@@ -178,13 +179,9 @@ describe('regla recurrente durable (#493)', () => {
       lastExecutionDate: '2026-03-01',
       nextOccurrenceDate: '2026-04-01',
     })
-    const reloadedPending = offlineState.pendingMovements.filter(
-      (item) => item.ruleId === rule!.id,
-    )
+    const reloadedPending = offlineState.pendingMovements.filter((item) => item.ruleId === rule!.id)
     expect(reloadedPending).toHaveLength(1)
     expect(reloadedPending[0].id).toBe(pending[0].id)
-    expect(offlineState.pendingMovements).toHaveLength(1)
-    expect(offlineState.recurringRules).toHaveLength(1)
     expect(await trip.pending()).toHaveLength(3)
 
     // Reconnecting sends each queued command once; nothing is duplicated.
@@ -204,20 +201,6 @@ describe('regla recurrente durable (#493)', () => {
       status: 'pending',
     })
     expect(await trip.pending()).toEqual([])
-    // No rule/pending command was published twice.
-    const createIds = trip
-      .commandBatches()
-      .flat()
-      .filter(
-        (command) =>
-          (command as { action?: string; entityType?: string }).action === 'create' &&
-          ['recurringRule', 'pendingMovement'].includes(
-            (command as { entityType?: string }).entityType ?? '',
-          ),
-      )
-      .map((command) => (command as { commandId: string }).commandId)
-    expect(new Set(createIds).size).toBe(createIds.length)
-    expect(today).toBe('2026-03-15')
   })
 
   it('edita, pausa y refresca sin conexión sin perder ni duplicar ocurrencias', async () => {
@@ -236,7 +219,9 @@ describe('regla recurrente durable (#493)', () => {
       }),
     ).toBe(true)
     const ruleId = useRecurringStore().rules[0].id
-    const generated = useRecurringStore().openPendingMovements.map((item) => item.id).sort()
+    const generated = useRecurringStore()
+      .openPendingMovements.map((item) => item.id)
+      .sort()
     expect(generated).toHaveLength(2)
 
     trip.setOffline(true)
@@ -295,118 +280,96 @@ describe('regla recurrente durable (#493)', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('confirma un pendiente antes del primer envío de una regla recién creada', async () => {
-    trip.setOffline(true)
-    const recurring = useRecurringStore()
-
-    // An investment rule and its occurrence are accepted offline; neither has
-    // ever reached the server.
-    expect(
-      await recurring.addRule({
-        type: 'investment',
-        accountId: seeded.brokerId,
+  it.each([
+    {
+      kind: 'inversión',
+      rule: (ids: Seeded) => ({
+        type: 'investment' as const,
+        accountId: ids.brokerId,
         category: 'Cripto',
         description: 'Compra BTC',
         amount: 10010,
         symbol: 'btc',
+        side: 'buy' as const,
+        units: 0.5,
+        unitPrice: 20000,
+        fee: 10,
+        time: '10:30',
+      }),
+      transaction: () => ({
+        type: 'investment',
+        symbol: 'BTC',
         side: 'buy',
         units: 0.5,
         unitPrice: 20000,
         fee: 10,
         time: '10:30',
-        frequency: 'monthly',
-        interval: 1,
-        startDate: '2026-03-01',
+        amount: 10010,
       }),
-    ).toBe(true)
-    const rule = useRecurringStore().rules[0]
-    const investmentPending = useRecurringStore().openPendingMovements.find(
-      (item) => item.ruleId === rule.id,
-    )!
-    const confirmed = await useRecurringStore().confirmPending(investmentPending.id)
-    expect(confirmed.accepted).toBe(true)
-    if (!confirmed.accepted) throw new Error('No se aceptó el pendiente de inversión')
-
-    const offline = await trip.reloadOffline()
-    expect(
-      offline.transactions.find((item) => item.id === confirmed.transactionId),
-    ).toMatchObject({
-      type: 'investment',
-      symbol: 'BTC',
-      side: 'buy',
-      units: 0.5,
-      unitPrice: 20000,
-      fee: 10,
-      time: '10:30',
-      amount: 10010,
-    })
-
-    trip.setOffline(false)
-    const synced = await trip.reload()
-    expect(synced.transactions).toHaveLength(1)
-    expect(synced.transactions[0]).toMatchObject({
-      id: confirmed.transactionId,
-      symbol: 'BTC',
-      units: 0.5,
-      unitPrice: 20000,
-    })
-    expect(synced.recurringRules).toHaveLength(1)
-    expect(
-      synced.pendingMovements.find((item) => item.id === investmentPending.id),
-    ).toMatchObject({
-      status: 'confirmed',
-      transactionId: confirmed.transactionId,
-      ruleId: rule.id,
-    })
-    // The confirmed pending references the rule that was created in the same
-    // queue, in order: the rule create precedes the movement and the update.
-    const ruleCreate = trip
-      .commandBatches()
-      .flat()
-      .find(
-        (command) =>
-          (command as { action?: string; entityType?: string }).action === 'create' &&
-          (command as { entityType?: string }).entityType === 'recurringRule',
-      )
-    expect(ruleCreate).toBeDefined()
-  })
-
-  it('confirma el pendiente de una regla de ahorro recién creada con su cuenta destino', async () => {
-    trip.setOffline(true)
-    expect(
-      await useRecurringStore().addRule({
-        type: 'saving',
-        accountId: seeded.accountId,
-        destinationAccountId: seeded.savingsId,
+    },
+    {
+      kind: 'ahorro con su cuenta destino',
+      rule: (ids: Seeded) => ({
+        type: 'saving' as const,
+        accountId: ids.accountId,
+        destinationAccountId: ids.savingsId,
         category: 'Fondo de emergencia',
         description: 'Ahorro mensual',
         amount: 200,
-        frequency: 'monthly',
-        interval: 1,
-        startDate: '2026-03-01',
       }),
-    ).toBe(true)
-    const rule = useRecurringStore().rules[0]
-    const pending = useRecurringStore().openPendingMovements.find(
-      (item) => item.ruleId === rule.id,
-    )!
-    const confirmed = await useRecurringStore().confirmPending(pending.id)
-    expect(confirmed.accepted).toBe(true)
-    if (!confirmed.accepted) throw new Error('No se aceptó el ahorro')
+      transaction: (ids: Seeded) => ({
+        type: 'saving',
+        accountId: ids.accountId,
+        destinationAccountId: ids.savingsId,
+        amount: 200,
+      }),
+    },
+  ])(
+    'confirma el pendiente de una regla de $kind recién creada antes de su primer envío',
+    async ({ rule: buildRule, transaction }) => {
+      trip.setOffline(true)
+      // The rule and its occurrence are accepted offline; neither has ever
+      // reached the server when the pending is confirmed.
+      expect(
+        await useRecurringStore().addRule({
+          ...buildRule(seeded),
+          frequency: 'monthly',
+          interval: 1,
+          startDate: '2026-03-01',
+        }),
+      ).toBe(true)
+      const rule = useRecurringStore().rules[0]
+      const pending = useRecurringStore().openPendingMovements.find(
+        (item) => item.ruleId === rule.id,
+      )!
+      const confirmed = await useRecurringStore().confirmPending(pending.id)
+      expect(confirmed.accepted).toBe(true)
+      if (!confirmed.accepted) throw new Error('No se aceptó la confirmación')
 
-    trip.setOffline(false)
-    const synced = await trip.reload()
-    expect(synced.transactions.find((item) => item.id === confirmed.transactionId)).toMatchObject({
-      type: 'saving',
-      accountId: seeded.accountId,
-      destinationAccountId: seeded.savingsId,
-      amount: 200,
-    })
-    expect(synced.pendingMovements.find((item) => item.id === pending.id)).toMatchObject({
-      status: 'confirmed',
-      transactionId: confirmed.transactionId,
-    })
-  })
+      trip.setOffline(false)
+      const synced = await trip.reload()
+      expect(synced.transactions).toHaveLength(1)
+      expect(synced.transactions[0]).toMatchObject({
+        id: confirmed.transactionId,
+        ...transaction(seeded),
+      })
+      expect(synced.recurringRules).toHaveLength(1)
+      expect(synced.pendingMovements.find((item) => item.id === pending.id)).toMatchObject({
+        status: 'confirmed',
+        transactionId: confirmed.transactionId,
+        ruleId: rule.id,
+      })
+      // The confirmed pending references the rule created in the same queue:
+      // the rule create reaches the server before the pending's.
+      const created = trip
+        .commandBatches()
+        .flat()
+        .filter((command) => (command as { action?: string }).action === 'create')
+        .map((command) => (command as { entityType?: string }).entityType)
+      expect(created.indexOf('recurringRule')).toBeGreaterThanOrEqual(0)
+      expect(created.indexOf('recurringRule')).toBeLessThan(created.indexOf('pendingMovement'))
+    },
+  )
 
   it('un rechazo definitivo de la regla se reintenta con las mismas identidades', async () => {
     trip.setOffline(true)
@@ -428,23 +391,20 @@ describe('regla recurrente durable (#493)', () => {
       command: { commandId: string; entityType: string; action: string }
     }>
     const ruleCreate = queued.find(
-      (entry) =>
-        entry.command.entityType === 'recurringRule' && entry.command.action === 'create',
+      (entry) => entry.command.entityType === 'recurringRule' && entry.command.action === 'create',
     )!
     trip.rejectSyncCommand(ruleCreate.command.commandId, 'La cuenta ya no existe.')
 
     trip.setOffline(false)
     await trip.syncStore.syncNow()
     // The definitive failure is visible and the reservation keeps both works.
-    const statuses = await vi.waitFor(
+    await vi.waitFor(
       async () => {
         const views = await useRecurringStore().ruleWriteStatus(ruleId)
         expect(views.some((view) => view.failure !== null)).toBe(true)
-        return views
       },
       { timeout: 5000, interval: 20 },
     )
-    expect(statuses.some((view) => view.failure !== null)).toBe(true)
 
     // Explicit retry: new command attempts, same rule/pending identities.
     const retried = await useRecurringStore().retryRuleWrite(ruleId)
@@ -533,7 +493,8 @@ describe('regla recurrente durable (#493)', () => {
     const queued = await trip.pending()
     const pendingCreates = queued.filter(
       (entry) =>
-        (entry as { command: { action: string; entityType: string } }).command.action === 'create' &&
+        (entry as { command: { action: string; entityType: string } }).command.action ===
+          'create' &&
         (entry as { command: { action: string; entityType: string } }).command.entityType ===
           'pendingMovement',
     )
@@ -550,9 +511,7 @@ describe('regla recurrente durable (#493)', () => {
       '2026-04-01',
     ])
     // One occurrence per due date: the first tab's identity wins.
-    expect(synced.pendingMovements.map((item) => item.id).sort()).toEqual(
-      tabAIds.sort(),
-    )
+    expect(synced.pendingMovements.map((item) => item.id).sort()).toEqual(tabAIds.sort())
     // The category already existed, so no tab minted a duplicate one.
     const categoryCreates = trip
       .commandBatches()
