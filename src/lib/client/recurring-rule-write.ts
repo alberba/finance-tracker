@@ -47,7 +47,6 @@ import { isReadOnlyDemoActive } from './demo-source'
 import {
   isUnresolvedIntent,
   type DurableIntentState,
-  type DurableIntentView,
   type IntentCommandInput,
   type IntentPayload,
   type IntentStepState,
@@ -73,13 +72,13 @@ const CALENDAR_STEP = 'calendar'
 
 const INTENT_PREFIX = 'recurringRuleWrite:'
 
-export type RecurringRuleWriteAction = 'create' | 'update' | 'remove' | 'refresh'
+type RecurringRuleWriteAction = 'create' | 'update' | 'remove' | 'refresh'
 
 /**
  * The user's already-decided recurring change. Nothing here validates money,
  * resolves references or generates occurrences.
  */
-export interface RecurringRuleWriteRequest {
+interface RecurringRuleWriteRequest {
   action: RecurringRuleWriteAction
   /** The accepted rule, with the calendar it had before generation. */
   rule: RecurringRule
@@ -114,11 +113,11 @@ export interface RecurringRuleWriteStatus {
   steps: Array<{ step: string; state: IntentStepState }>
 }
 
-export interface PendingMovementWriteOutcome {
+interface PendingMovementWriteOutcome {
   accepted: boolean
 }
 
-export interface RecurringRuleWriteDiscard {
+interface RecurringRuleWriteDiscard {
   discarded: boolean
   /** Confirmed steps that were kept (a rule already created server-side). */
   kept: number

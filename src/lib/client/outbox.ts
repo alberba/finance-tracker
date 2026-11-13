@@ -295,7 +295,8 @@ function editablePatch(
   entityType: SyncEntityType,
   data: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const { id: _identity, ...rest } = data
+  const rest = { ...data }
+  delete rest.id
   const parsed = safeParse(entityUpdateSchemas[entityType].schema, rest, {
     onExcessProperty: 'ignore',
   })

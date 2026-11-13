@@ -65,7 +65,7 @@ import {
 } from './recurring-intent-support'
 
 /** The user's already-decided confirmation of one pending movement. */
-export interface PendingConfirmationRequest {
+interface PendingConfirmationRequest {
   pendingId: string
   /** The pending's rule, kept so the update resolves the same parent. */
   ruleId: string
@@ -80,7 +80,7 @@ export interface PendingConfirmationRequest {
   pendingUpdatedAt: string
 }
 
-export type PendingConfirmationFailureReason =
+type PendingConfirmationFailureReason =
   'invalid' | 'not-found' | 'storage' | 'reconciling' | 'conflict'
 
 export type PendingConfirmationOutcome =
@@ -100,7 +100,7 @@ export interface PendingConfirmationStatus {
   discarded: boolean
 }
 
-export interface PendingConfirmationDiscard {
+interface PendingConfirmationDiscard {
   discarded: boolean
   /** The movement had already been confirmed: it is kept, the link is not. */
   keptMovement: boolean
