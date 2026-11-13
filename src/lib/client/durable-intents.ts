@@ -20,10 +20,11 @@
  *
  * This module is intentionally a storage protocol, not a flow executor: it
  * knows intent headers, named steps and command outcomes, while each caller
- * (`instrument-link.ts` today, recurring confirmations in #492) owns its own
- * rules and rebuilds commands from live state. #491 extends an intent with a
- * catalog-configuration dependency by using `waitingFor` and the same
- * accept/publish/retry/discard protocol.
+ * (`instrument-link.ts`, `recurring-write.ts` and `recurring-rule-write.ts`)
+ * owns its own rules and rebuilds commands from live state. A step can carry a
+ * `waitingFor` dependency (the catalog configuration of #491) and a
+ * transactionally checked occurrence reservation (#493) without turning this
+ * into a generic workflow grammar.
  */
 
 import { Effect } from 'effect'
@@ -144,6 +145,14 @@ export interface IntentCommandInput {
   step: string
   command: OutboxCommandInput
   publication?: OutboxPublication
+  /**
+   * Occurrence this command creates (#493), checked **inside** the same
+   * readwrite transaction that writes the command: two tabs may generate the
+   * same rule+dueDate occurrence, and only one pending command may exist.
+   * When another command already covers it, the step completes without
+   * writing a duplicate.
+   */
+  occurrence?: { ruleId: string; dueDate: string }
 }
 
 export interface PublishIntentCommandsResult {
@@ -587,6 +596,7 @@ async function writeIntentCommands(
     return result
   }
   const blocked = intent.failure !== null || intent.discardRequested
+  let completedOccurrence = false
   for (const input of commands) {
     const progress = (await requestToPromise(
       progressStore.get(intentProgressId(intentId, input.step)) as IDBRequest<
@@ -604,6 +614,25 @@ async function writeIntentCommands(
     const adopted = await adoptEquivalentCreate(tx, intentId, input.step, command)
     if (adopted) {
       result.published.push({ step: input.step, ...adopted })
+      continue
+    }
+    if (input.occurrence && (await hasQueuedOccurrence(commandStore, input.occurrence))) {
+      // Another tab already reserved this rule+dueDate occurrence. Its pending
+      // is the canonical one; this step is complete without a second command,
+      // and the caller re-reads the record instead of publishing again.
+      const now = new Date().toISOString()
+      progressStore.put({
+        ...progress,
+        state: 'confirmed',
+        commandId: null,
+        seq: null,
+        claimedBy: null,
+        claimedAt: null,
+        lastError: null,
+        updatedAt: now,
+      } satisfies IntentProgressRecord)
+      result.skipped.push(input.step)
+      completedOccurrence = true
       continue
     }
     const now = new Date().toISOString()
@@ -628,11 +657,26 @@ async function writeIntentCommands(
     } satisfies IntentProgressRecord)
     result.published.push({ step: input.step, seq, commandId: command.commandId })
   }
-  if (result.published.length > 0) {
+  if (result.published.length > 0 || completedOccurrence) {
     const steps = await readIntentSteps(progressStore, intentId)
     intentsStore.put(refreshed({ ...intent, waitingFor: null }, steps))
   }
   return result
+}
+
+/** Occurrence guard evaluated against the commands this transaction can see. */
+async function hasQueuedOccurrence(
+  store: IDBObjectStore,
+  occurrence: { ruleId: string; dueDate: string },
+): Promise<boolean> {
+  const entries = (await requestToPromise(store.getAll() as IDBRequest<OutboxEntry[]>)) as
+    | OutboxEntry[]
+  return entries.some((entry) => {
+    const command = entry.command
+    if (command.action !== 'create' || command.entityType !== 'pendingMovement') return false
+    const data = command.data as { recurringRuleId?: unknown; dueDate?: unknown }
+    return data.recurringRuleId === occurrence.ruleId && data.dueDate === occurrence.dueDate
+  })
 }
 
 /**

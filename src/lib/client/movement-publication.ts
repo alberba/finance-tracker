@@ -17,11 +17,11 @@
  * explicit later link/unlink is recorded here too, so a late continuation can
  * never restore or relink it.
  *
- * `#490` will add intent/progress stores to this same database; the atomic
- * publication below is the seam it extends, not replaces. It intentionally
- * does not persist a whole movement snapshot: the record is a generation and
- * a short fingerprint, and the command content is always rebuilt from the
- * movement's current state.
+ * The durable intent/progress stores from #490 live in this same database and
+ * the atomic publication below is the seam they extend, not replace. It
+ * intentionally does not persist a whole movement snapshot: the record is a
+ * generation and a short fingerprint, and the command content is always
+ * rebuilt from the movement's current state.
  */
 
 import { Effect } from 'effect'

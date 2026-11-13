@@ -841,4 +841,134 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await expect(row).toContainText('1 vinculados')
     await expect(status).toHaveCount(0)
   })
+
+  test('descarta desde la barra lateral un vínculo parcial y conserva el confirmado', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const liveMarket = new LiveMarketPage(page)
+    const movementsSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+      2,
+    )
+    for (const date of ['2026-07-10', '2026-07-11']) {
+      await tracker.addInvestmentMovement({
+        date,
+        time: '09:30',
+        side: 'buy',
+        symbol: 'AGED',
+        category: 'ETF AGED',
+        unitPrice: 9,
+        units: 5,
+        fee: 0,
+      })
+    }
+    await movementsSynced
+    await tracker.openSettings()
+    const configurationSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+    })
+    await configurationSynced
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('2 por vincular')
+
+    // One of the two movement updates is rejected definitively: the link
+    // finishes with one confirmed target and one failed target.
+    let rejected = false
+    await page.route('**/api/sync', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const body = route.request().postDataJSON() as {
+        commands: Array<{ commandId: string; action: string; entityType?: string }>
+      }
+      const updates = body.commands.filter(
+        (command) => command.action === 'update' && command.entityType === 'transaction',
+      )
+      if (rejected || updates.length === 0) return route.continue()
+      rejected = true
+      const failed = updates[0]
+      // The other commands must reach the real server: a synthetic `noop`
+      // would look confirmed locally but leave the other movement unlinked
+      // after the reload. Forward the batch without the rejected command and
+      // merge its results back in the original order.
+      const forwarded = body.commands.filter((command) => command !== failed)
+      let payload: Record<string, unknown> = { revision: 0, halted: false }
+      const remaining = new Map<string, unknown>()
+      if (forwarded.length > 0) {
+        const response = await route.fetch({
+          postData: JSON.stringify({ ...body, commands: forwarded }),
+        })
+        payload = (await response.json()) as Record<string, unknown>
+        for (const result of payload.results as Array<{ commandId: string }>) {
+          remaining.set(result.commandId, result)
+        }
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...payload,
+          results: body.commands.map((command) =>
+            command.commandId === failed.commandId
+              ? {
+                  commandId: command.commandId,
+                  status: 'rejected',
+                  message: 'El movimiento ya no existe en el servidor.',
+                }
+              : remaining.get(command.commandId),
+          ),
+        }),
+      })
+    })
+
+    await liveMarket.linkExistingMovements('AGED.MI')
+    const status = liveMarket.linkStatus('AGED.MI')
+    await expect(status).toContainText('El movimiento ya no existe', { timeout: 15000 })
+    await expect(status).toContainText('1/2 vinculados')
+
+    // The sidebar owns the generic intent discard. The quote panel is a top
+    // layer, so close it before opening the user menu; after the discard the
+    // confirmed link stays and the real partial state is visible again in the
+    // editor, not hidden behind a "Sincronizado".
+    await liveMarket.closeQuote()
+    await tracker.openUserMenu()
+    await expect(tracker.intentStatus).toBeVisible()
+    await tracker.discardIntentFromSidebar()
+    await expect(tracker.intentStatus).toBeHidden()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText(
+      'Resultado parcial: 1 de 2 vinculados',
+    )
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
+
+    // The partial outcome is durable: a reload drops the failed target's
+    // optimistic link (it was never confirmed), keeps the confirmed one and
+    // still shows the partial state instead of a silent retry.
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText(
+      'Resultado parcial: 1 de 2 vinculados',
+    )
+    await expect(liveMarket.instrument('AGED.MI')).toContainText('1 vinculados')
+    await expect(liveMarket.instrument('AGED.MI')).toContainText('1 por vincular')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
+  })
 })

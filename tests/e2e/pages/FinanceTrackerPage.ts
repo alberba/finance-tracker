@@ -1213,6 +1213,22 @@ export class FinanceTrackerPage {
     }
   }
 
+  /** The shell's durable-intent surface: the first failed action, with retry/discard. */
+  get intentStatus(): Locator {
+    return this.page.locator('#sidebar-intent-status')
+  }
+
+  /** Opens the user menu, where the shell shows the first failed durable action. */
+  async openUserMenu(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Abrir menú de usuario' }).click()
+  }
+
+  /** Discards the failed durable action the sidebar is currently showing. */
+  async discardIntentFromSidebar(): Promise<void> {
+    await expect(this.intentStatus).toBeVisible()
+    await this.intentStatus.getByRole('button', { name: 'Descartar' }).click()
+  }
+
   async waitForSync() {
     const status = this.page.locator('#sidebar-sync-status')
     await expect(status).toContainText('Sincronizado', { timeout: 15000 })

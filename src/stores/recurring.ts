@@ -91,7 +91,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     calendar: RecurringRule | null,
     message: string,
   ): Promise<boolean> {
-    const outcome = await saveRecurringRule({ action, rule, pendings, calendar, message })
+    const outcome = await saveRecurringRule({ action, rule, pendings, calendar })
     if (!outcome.accepted) {
       showToast(
         outcome.message ??
@@ -99,6 +99,7 @@ export const useRecurringStore = defineStore('recurring', () => {
       )
       return false
     }
+    showToast(message)
     return true
   }
 
@@ -282,11 +283,12 @@ export const useRecurringStore = defineStore('recurring', () => {
     if (!fields) return false
     const draft = { ...pending }
     applyPendingEdit(draft, fields, new Date().toISOString())
-    const saved = await savePendingMovementWrite(draft, 'Pendiente actualizado.')
+    const saved = await savePendingMovementWrite(draft)
     if (!saved.accepted) {
-      showToast(saved.message ?? '⚠️ El pendiente aún no está guardado.')
+      showToast('⚠️ El pendiente aún no está guardado.')
       return false
     }
+    showToast('Pendiente actualizado.')
     return true
   }
 
@@ -296,13 +298,12 @@ export const useRecurringStore = defineStore('recurring', () => {
     )
     if (!pending) return
     const draft = { ...pending, status, updatedAt: new Date().toISOString() }
-    const saved = await savePendingMovementWrite(
-      draft,
-      status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.',
-    )
+    const saved = await savePendingMovementWrite(draft)
     if (!saved.accepted) {
-      showToast(saved.message ?? '⚠️ El cambio aún no está guardado.')
+      showToast('⚠️ El cambio aún no está guardado.')
+      return
     }
+    showToast(status === 'skipped' ? 'Vencimiento saltado.' : 'Pendiente descartado.')
   }
 
   /** Retries the failed/discarded durable writes of one rule. */

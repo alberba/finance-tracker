@@ -65,6 +65,35 @@ function configurationCommand(instrumentId = 'instrument-1') {
   }
 }
 
+/** A recurrence write whose only step is one occurrence (#493). */
+function ruleWriteIntent(pendingId: string) {
+  return {
+    kind: 'recurringRuleWrite' as const,
+    ownerUserId: USER_ID,
+    targetIds: ['rule-1'],
+    steps: [`pending:${pendingId}`],
+    payload: { ruleId: 'rule-1' },
+  }
+}
+
+function pendingCreate(id: string) {
+  return {
+    action: 'create' as const,
+    entityType: 'pendingMovement' as const,
+    data: {
+      id,
+      recurringRuleId: 'srv-rule',
+      accountId: 'srv-account',
+      amount: 900,
+      currency: 'EUR',
+      dueDate: '2026-11-05',
+      type: 'expense',
+      description: 'Alquiler',
+      status: 'pending',
+    },
+  }
+}
+
 function linkWithConfiguration(overrides: Record<string, unknown> = {}) {
   return linkIntent({
     targetIds: ['movement-1'],
@@ -420,6 +449,49 @@ describe('intenciones durables de la cola local (#490)', () => {
         claimDurableIntentCommands(otherTab, [entry.seq], 'tab-b'),
       ])
       expect(first.size + second.size).toBe(1)
+    } finally {
+      otherTab.close()
+    }
+  })
+
+  it('reserva una ocurrencia dentro de la misma transacción: dos pestañas no crean dos pendientes', async () => {
+    const otherTab = await openStorage(USER_ID)
+    try {
+      // Two tabs generate the same rule+dueDate occurrence with their own
+      // pending ids and accept one intent each, as a concurrent refresh would.
+      const first = await acceptDurableIntent(db, ruleWriteIntent('pending-a'))
+      const second = await acceptDurableIntent(otherTab, ruleWriteIntent('pending-b'))
+      const occurrence = { ruleId: 'srv-rule', dueDate: '2026-11-05' }
+      const [firstResult, secondResult] = await Promise.all([
+        publishDurableIntentCommands(db, first.intent.id, [
+          {
+            step: 'pending:pending-a',
+            command: pendingCreate('pending-a'),
+            occurrence,
+          },
+        ]),
+        publishDurableIntentCommands(otherTab, second.intent.id, [
+          {
+            step: 'pending:pending-b',
+            command: pendingCreate('pending-b'),
+            occurrence,
+          },
+        ]),
+      ])
+
+      const creates = (await listAll(db)).filter(
+        (entry) =>
+          entry.command.action === 'create' && entry.command.entityType === 'pendingMovement',
+      )
+      expect(creates).toHaveLength(1)
+      // One tab queued the occurrence; the other completed its own step without
+      // a second command because the guard runs inside the readwrite transaction.
+      expect(firstResult.published.length + secondResult.published.length).toBe(1)
+      const stepStates = (await listDurableIntents(db))
+        .map((view) => view.steps.find((step) => step.step.startsWith('pending:'))?.state)
+        .sort()
+      expect(stepStates).toEqual(['confirmed', 'queued'])
+      expect(await countDurableWork(db)).toBe(1)
     } finally {
       otherTab.close()
     }

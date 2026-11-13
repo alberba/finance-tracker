@@ -27,15 +27,14 @@
  * The intent payload keeps the decided rule, its accepted occurrences and the
  * pre/post-calendar values as JSON. It is the reconstructible record #487 asks
  * for, and it never stores an old copy of a movement.
+ *
+ * Boundary (ADR-0006): this module is invoked exclusively from Pinia actions,
+ * the documented edge where promises are executed. The Effect-based storage
+ * protocol stays in `durable-intents`/`outbox`; only the small vocabulary in
+ * `recurring-intent-support.ts` is shared with the pending-confirmation module.
  */
 
-import { useToast } from '../../composables/useToast'
-import type {
-  InvestmentSide,
-  PendingMovement,
-  RecurringRule,
-  TransactionType,
-} from '../../scripts/types'
+import type { PendingMovement, RecurringRule, TransactionType } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSyncStore } from '../../stores/sync'
 import {
@@ -48,32 +47,38 @@ import { isReadOnlyDemoActive } from './demo-source'
 import {
   isUnresolvedIntent,
   type DurableIntentState,
-  type DurableIntentView,
+  type IntentCommandInput,
   type IntentPayload,
-  type IntentProgressRecord,
   type IntentStepState,
   type IntentWaitReason,
 } from './durable-intents'
 import type { OutboxCommandInput } from './outbox'
+import {
+  RECONCILING_MESSAGE,
+  isDurableStep,
+  mintNonce,
+  operationData,
+  stepOf,
+} from './recurring-intent-support'
 
-export const RECURRING_RULE_WRITE_KIND = 'recurringRuleWrite' as const
+const RECURRING_RULE_WRITE_KIND = 'recurringRuleWrite' as const
 
 /** The rule command: create, update, remove, or absent on a pure refresh. */
-export const RULE_STEP = 'rule'
+const RULE_STEP = 'rule'
 /** One step per occurrence: a pending command is published alone, atomically. */
-export const PENDING_STEP_PREFIX = 'pending:'
+const PENDING_STEP_PREFIX = 'pending:'
 /** The calendar advance; published only after the pendings step is durable. */
-export const CALENDAR_STEP = 'calendar'
+const CALENDAR_STEP = 'calendar'
 
 const INTENT_PREFIX = 'recurringRuleWrite:'
 
-export type RecurringRuleWriteAction = 'create' | 'update' | 'remove' | 'refresh'
+type RecurringRuleWriteAction = 'create' | 'update' | 'remove' | 'refresh'
 
 /**
  * The user's already-decided recurring change. Nothing here validates money,
  * resolves references or generates occurrences.
  */
-export interface RecurringRuleWriteRequest {
+interface RecurringRuleWriteRequest {
   action: RecurringRuleWriteAction
   /** The accepted rule, with the calendar it had before generation. */
   rule: RecurringRule
@@ -85,8 +90,6 @@ export interface RecurringRuleWriteRequest {
    * are the last durable step.
    */
   calendar: RecurringRule | null
-  /** Toast shown once the acceptance is durable. */
-  message?: string
 }
 
 export interface RecurringRuleWriteOutcome {
@@ -110,12 +113,11 @@ export interface RecurringRuleWriteStatus {
   steps: Array<{ step: string; state: IntentStepState }>
 }
 
-export interface PendingMovementWriteOutcome {
+interface PendingMovementWriteOutcome {
   accepted: boolean
-  message?: string
 }
 
-export interface RecurringRuleWriteDiscard {
+interface RecurringRuleWriteDiscard {
   discarded: boolean
   /** Confirmed steps that were kept (a rule already created server-side). */
   kept: number
@@ -132,7 +134,7 @@ interface StoredRuleWrite {
 
 type PublicationOutcome = 'published' | 'skipped' | 'blocked' | 'failed' | 'completed'
 
-export const recurringRuleWriteIntentId = (ruleId: string, nonce: string): string =>
+const recurringRuleWriteIntentId = (ruleId: string, nonce: string): string =>
   `${INTENT_PREFIX}${ruleId}:${nonce}`
 
 const ruleIdFromIntentId = (intentId: string): string | null => {
@@ -160,7 +162,6 @@ export async function saveRecurringRule(
     // state, so the calendar is applied with the rest of the accepted change.
     projectWrite(request)
     if (request.calendar) applyCalendar(request)
-    showMessage(request)
     return { accepted: true, ruleId: request.rule.id, intentId: null }
   }
 
@@ -212,7 +213,6 @@ export async function saveRecurringRule(
   // confirmed): an occurrence that is not durable yet must not look covered.
   await publishRuleWritesFor(request.rule.id)
   await projectFromIntent(intentId)
-  showMessage(request)
   return { accepted: true, ruleId: request.rule.id, intentId }
 }
 
@@ -298,12 +298,10 @@ export async function removeRecurringRule(
  */
 export async function savePendingMovement(
   pending: PendingMovement,
-  message?: string,
 ): Promise<PendingMovementWriteOutcome> {
   const syncStore = useSyncStore()
   if (isReadOnlyDemoActive() || !syncStore.userId) {
     projectPending(pending)
-    if (message) useToast().showToast(message)
     return { accepted: true }
   }
   const ruleId = await resolveEntityId('recurringRule', pending.ruleId)
@@ -313,7 +311,6 @@ export async function savePendingMovement(
   const saved = await syncUpdate('pendingMovement', pending.id, data)
   if (saved === false) return { accepted: false }
   projectPending(pending)
-  if (message) useToast().showToast(message)
   return { accepted: true }
 }
 
@@ -460,7 +457,7 @@ export async function discardRecurringRuleWrites(
     return {
       discarded: false,
       kept,
-      message: 'Se está reconciliando un envío en curso; inténtalo de nuevo en unos segundos.',
+      message: RECONCILING_MESSAGE,
     }
   }
   // A create that never reached the queue must disappear from the optimistic
@@ -472,7 +469,6 @@ export async function discardRecurringRuleWrites(
     if (ruleStep?.state === 'confirmed') continue
     projectDiscardOfCreate(stored.rule.id, stored.pendings)
   }
-  useToast().showToast('Cambio de regla descartado.')
   return { discarded: true, kept }
 }
 
@@ -693,13 +689,7 @@ async function publishPendingStep(
   const step = pendingStep(pendingId)
   const ruleId = await resolveEntityId('recurringRule', stored.rule.id)
   if (!ruleId) return (await discardIfRuleGone(intentId, stored)) ? 'completed' : 'blocked'
-  // The same occurrence can already be durable: another tab queued it, or this
-  // device already shows it. One pending per rule+dueDate, never a duplicate.
-  const occurrences = await queuedPendingOccurrences(ruleId)
-  if (occurrences.has(occurrenceKey(ruleId, pending.occurrenceDate))) {
-    await useSyncStore().completeIntentStep(intentId, step)
-    return 'completed'
-  }
+  // This device already shows the occurrence: no command is needed for it.
   if (pendingAlreadyShown(pending)) {
     await useSyncStore().completeIntentStep(intentId, step)
     return 'completed'
@@ -714,6 +704,10 @@ async function publishPendingStep(
         entityType: 'pendingMovement',
         data: { ...data, id: pending.id },
       },
+      // The cross-tab "one pending per rule+dueDate" invariant is enforced in
+      // the publication transaction itself (#493): a read before it could let
+      // two tabs queue the same occurrence.
+      occurrence: { ruleId, dueDate: pending.occurrenceDate },
     },
   ])
 }
@@ -754,7 +748,7 @@ async function publishCalendarStep(
 
 async function publishCommands(
   intentId: string,
-  commands: Array<{ step: string; command: OutboxCommandInput }>,
+  commands: Array<{ step: string; command: OutboxCommandInput; occurrence?: IntentOccurrence }>,
 ): Promise<PublicationOutcome> {
   const result = await useSyncStore().publishIntentCommands(intentId, commands)
   if (!result) return 'failed'
@@ -913,25 +907,6 @@ async function resolveDestination(template: {
   return (await resolveEntityId('account', template.destinationAccountId)) ?? undefined
 }
 
-/** Flattened operation, explicit nulls so leaving investment clears it (ADR 0002). */
-function operationData(template: {
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}) {
-  return {
-    symbol: template.symbol ?? null,
-    side: template.side ?? null,
-    units: template.units ?? null,
-    unitPrice: template.unitPrice ?? null,
-    fee: template.fee ?? null,
-    time: template.time ?? null,
-  }
-}
-
 // -- projection ----------------------------------------------------------------
 
 function projectWrite(request: RecurringRuleWriteRequest): void {
@@ -1046,21 +1021,7 @@ function ruleInState(ruleId: string): boolean {
   return useFinancialStateStore().state.recurringRules.some((rule) => rule.id === ruleId)
 }
 
-async function queuedPendingOccurrences(ruleId: string): Promise<Set<string>> {
-  const entries = await useSyncStore().listQueuedCommands()
-  const keys = new Set<string>()
-  for (const entry of entries) {
-    const command = entry.command
-    if (command.action !== 'create' || command.entityType !== 'pendingMovement') continue
-    const data = command.data as { recurringRuleId?: unknown; dueDate?: unknown }
-    if (typeof data.recurringRuleId !== 'string' || typeof data.dueDate !== 'string') continue
-    if (data.recurringRuleId !== ruleId) continue
-    keys.add(occurrenceKey(ruleId, data.dueDate))
-  }
-  return keys
-}
-
-const occurrenceKey = (ruleId: string, dueDate: string): string => `${ruleId}:${dueDate}`
+type IntentOccurrence = NonNullable<IntentCommandInput['occurrence']>
 
 // -- persistence --------------------------------------------------------------
 
@@ -1124,14 +1085,6 @@ function isPending(value: unknown): value is PendingMovement {
   )
 }
 
-function stepOf(view: DurableIntentView, step: string): IntentProgressRecord | undefined {
-  return view.steps.find((item) => item.step === step)
-}
-
-function isDurableStep(step: IntentProgressRecord): boolean {
-  return step.state === 'queued' || step.state === 'sending' || step.state === 'confirmed'
-}
-
 async function pruneSettledRuleWrites(): Promise<void> {
   const syncStore = useSyncStore()
   for (const view of await syncStore.listIntents()) {
@@ -1153,13 +1106,3 @@ async function pruneRuleWrite(intentId: string): Promise<void> {
   }
 }
 
-function showMessage(request: RecurringRuleWriteRequest): void {
-  if (request.message) useToast().showToast(request.message)
-}
-
-function mintNonce(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
