@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false) }))
 
 import {
+  acceptDurableIntent,
+  enqueue,
   listAll,
   listDurableIntents,
   openStorage,
@@ -305,6 +307,96 @@ describe('regla recurrente — fases durables y reanudación (#493)', () => {
       nextRunDate: '2026-04-01',
     })
     expect(await readCommands()).toHaveLength(3)
+  })
+
+  it('no duplica una ocurrencia que otra pestaña ya reservó', async () => {
+    setupState()
+    await startSync()
+    await seedRefs()
+
+    const rule = {
+      id: 'rule-shared',
+      type: 'expense' as const,
+      accountId: 'checking',
+      category: 'Vivienda',
+      description: 'Alquiler',
+      amount: 900,
+      frequency: 'monthly' as const,
+      interval: 1,
+      startDate: '2026-03-01',
+      endDate: null,
+      active: true,
+      lastExecutionDate: '2026-03-01',
+      nextOccurrenceDate: '2026-04-01',
+    }
+    const pending = {
+      id: 'pm-other-tab',
+      occurrenceKey: 'rule-shared:2026-03-01',
+      ruleId: 'rule-shared',
+      occurrenceDate: '2026-03-01',
+      type: 'expense' as const,
+      accountId: 'checking',
+      category: 'Vivienda',
+      description: 'Alquiler',
+      amount: 900,
+      status: 'pending' as const,
+      createdAt: '2026-03-01T00:00:00.000Z',
+      updatedAt: '2026-03-01T00:00:00.000Z',
+      transactionId: null,
+    }
+    // The other tab already queued the occurrence with its own pending id.
+    const db = await openStorage(USER_ID)
+    await putEntity(db, 'recurringRule', { id: 'srv-rule', legacyId: 'rule-shared', version: 0 })
+    await enqueue(db, {
+      action: 'create',
+      entityType: 'pendingMovement',
+      data: {
+        id: 'pm-already-queued',
+        recurringRuleId: 'srv-rule',
+        accountId: 'srv-account',
+        categoryId: 'srv-cat-vivienda',
+        amount: 900,
+        currency: 'EUR',
+        dueDate: '2026-03-01',
+        type: 'expense',
+        description: 'Alquiler',
+        status: 'pending',
+      },
+    })
+    // Its accepted intent is resumed by this tab after a reload.
+    await acceptDurableIntent(db, {
+      id: `recurringRuleWrite:${rule.id}:other-tab`,
+      kind: 'recurringRuleWrite',
+      ownerUserId: USER_ID,
+      targetIds: [rule.id],
+      steps: [`pending:${pending.id}`],
+      payload: {
+        ruleId: rule.id,
+        action: 'update',
+        data: JSON.stringify({
+          action: 'update',
+          rule,
+          pendings: [pending],
+          calendar: null,
+          currency: 'EUR',
+        }),
+      },
+    })
+    db.close()
+
+    await resumeRecurringRuleWrites()
+
+    const entries = await readCommands()
+    expect(pendingCreates(entries)).toHaveLength(1)
+    expect(
+      (pendingCreates(entries)[0].command as unknown as { data: { id: string } }).data.id,
+    ).toBe('pm-already-queued')
+    const resumed = (await readIntents()).find(
+      (view) => view.intent.payload.ruleId === rule.id,
+    )!
+    expect(resumed.steps.find((step) => step.step === `pending:${pending.id}`)?.state).toBe(
+      'confirmed',
+    )
   })
 
   it('cuenta la intención una sola vez y la incluye en el ciclo de sesión', async () => {

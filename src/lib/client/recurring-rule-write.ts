@@ -49,6 +49,7 @@ import {
   isUnresolvedIntent,
   type DurableIntentState,
   type DurableIntentView,
+  type IntentCommandInput,
   type IntentPayload,
   type IntentProgressRecord,
   type IntentStepState,
@@ -693,13 +694,7 @@ async function publishPendingStep(
   const step = pendingStep(pendingId)
   const ruleId = await resolveEntityId('recurringRule', stored.rule.id)
   if (!ruleId) return (await discardIfRuleGone(intentId, stored)) ? 'completed' : 'blocked'
-  // The same occurrence can already be durable: another tab queued it, or this
-  // device already shows it. One pending per rule+dueDate, never a duplicate.
-  const occurrences = await queuedPendingOccurrences(ruleId)
-  if (occurrences.has(occurrenceKey(ruleId, pending.occurrenceDate))) {
-    await useSyncStore().completeIntentStep(intentId, step)
-    return 'completed'
-  }
+  // This device already shows the occurrence: no command is needed for it.
   if (pendingAlreadyShown(pending)) {
     await useSyncStore().completeIntentStep(intentId, step)
     return 'completed'
@@ -714,6 +709,10 @@ async function publishPendingStep(
         entityType: 'pendingMovement',
         data: { ...data, id: pending.id },
       },
+      // The cross-tab "one pending per rule+dueDate" invariant is enforced in
+      // the publication transaction itself (#493): a read before it could let
+      // two tabs queue the same occurrence.
+      occurrence: { ruleId, dueDate: pending.occurrenceDate },
     },
   ])
 }
@@ -754,7 +753,7 @@ async function publishCalendarStep(
 
 async function publishCommands(
   intentId: string,
-  commands: Array<{ step: string; command: OutboxCommandInput }>,
+  commands: Array<{ step: string; command: OutboxCommandInput; occurrence?: IntentOccurrence }>,
 ): Promise<PublicationOutcome> {
   const result = await useSyncStore().publishIntentCommands(intentId, commands)
   if (!result) return 'failed'
@@ -1046,21 +1045,7 @@ function ruleInState(ruleId: string): boolean {
   return useFinancialStateStore().state.recurringRules.some((rule) => rule.id === ruleId)
 }
 
-async function queuedPendingOccurrences(ruleId: string): Promise<Set<string>> {
-  const entries = await useSyncStore().listQueuedCommands()
-  const keys = new Set<string>()
-  for (const entry of entries) {
-    const command = entry.command
-    if (command.action !== 'create' || command.entityType !== 'pendingMovement') continue
-    const data = command.data as { recurringRuleId?: unknown; dueDate?: unknown }
-    if (typeof data.recurringRuleId !== 'string' || typeof data.dueDate !== 'string') continue
-    if (data.recurringRuleId !== ruleId) continue
-    keys.add(occurrenceKey(ruleId, data.dueDate))
-  }
-  return keys
-}
-
-const occurrenceKey = (ruleId: string, dueDate: string): string => `${ruleId}:${dueDate}`
+type IntentOccurrence = NonNullable<IntentCommandInput['occurrence']>
 
 // -- persistence --------------------------------------------------------------
 

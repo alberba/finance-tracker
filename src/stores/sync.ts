@@ -1377,12 +1377,6 @@ export const useSyncStore = defineStore('sync', () => {
     return (await run(findPendingCreate(entityType, matches))) ?? null
   }
 
-  /** The whole outbox, in FIFO order, for read-only coordination checks. */
-  async function listQueuedCommands(): Promise<OutboxEntry[]> {
-    if (!isReady()) return []
-    return run(listOutbox())
-  }
-
   async function peekPendingCreateId(
     entityType: SyncEntityType,
     matches: PendingCreateMatch,
@@ -1557,7 +1551,6 @@ export const useSyncStore = defineStore('sync', () => {
     getUserInstrumentId,
     peekPendingCreate,
     peekPendingCreateId,
-    listQueuedCommands,
     mergeIntoPendingCreate,
     cancelPendingCreate,
     acceptIntent,
