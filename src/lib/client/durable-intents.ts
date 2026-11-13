@@ -20,10 +20,11 @@
  *
  * This module is intentionally a storage protocol, not a flow executor: it
  * knows intent headers, named steps and command outcomes, while each caller
- * (`instrument-link.ts` today, recurring confirmations in #492) owns its own
- * rules and rebuilds commands from live state. #491 extends an intent with a
- * catalog-configuration dependency by using `waitingFor` and the same
- * accept/publish/retry/discard protocol.
+ * (`instrument-link.ts`, `recurring-write.ts` and `recurring-rule-write.ts`)
+ * owns its own rules and rebuilds commands from live state. A step can carry a
+ * `waitingFor` dependency (the catalog configuration of #491) and a
+ * transactionally checked occurrence reservation (#493) without turning this
+ * into a generic workflow grammar.
  */
 
 import { Effect } from 'effect'

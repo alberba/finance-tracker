@@ -11,8 +11,13 @@
  * It shares only the transactional mechanisms #490 introduced (the durable
  * intent header/progress records in the queue database and the atomic
  * movement publication); it is not a generic flow executor and has no rule of
- * its own. Rule, pending and calendar coordination stay in the store until
- * #493 extends this same module.
+ * its own. Rule, occurrence and calendar coordination lives in its sibling
+ * `recurring-rule-write.ts` (#493), with only the small protocol vocabulary in
+ * `recurring-intent-support.ts` shared.
+ *
+ * Boundary (ADR-0006): this module is invoked exclusively from Pinia actions,
+ * the documented edge where promises are executed. The Effect-based storage
+ * protocol stays in `durable-intents`/`movement-publication`/`outbox`.
  *
  * Guarantees:
  * - A reservation is unique per pending (its intent id is derived from the
@@ -33,7 +38,6 @@
  *   grow without bound.
  */
 
-import { useToast } from '../../composables/useToast'
 import { applyPendingEdit, type ResolvedPendingEdit } from '../../domain/recurring/pending'
 import type { InvestmentSide, Transaction } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
@@ -47,12 +51,18 @@ import {
   type DurableIntentState,
   type DurableIntentView,
   type IntentPayload,
-  type IntentProgressRecord,
   type IntentWaitReason,
 } from './durable-intents'
 import { buildMovementData, movementFingerprint } from './movement-commands'
 import { movementPublicationWriterId } from './movement-publication'
 import type { OutboxCommandInput } from './outbox'
+import {
+  RECONCILING_MESSAGE,
+  operationData,
+  payloadNumber,
+  payloadText,
+  stepOf,
+} from './recurring-intent-support'
 
 /** The user's already-decided confirmation of one pending movement. */
 export interface PendingConfirmationRequest {
@@ -97,7 +107,7 @@ export interface PendingConfirmationDiscard {
   message?: string
 }
 
-export const PENDING_CONFIRMATION_KIND = 'pendingConfirmation' as const
+const PENDING_CONFIRMATION_KIND = 'pendingConfirmation' as const
 const MOVEMENT_STEP = 'movement'
 const PENDING_STEP = 'pending'
 const INTENT_PREFIX = 'pendingConfirmation:'
@@ -106,7 +116,7 @@ const INTENT_PREFIX = 'pendingConfirmation:'
  * The reservation's durable name. Derived from the pending's own identity
  * (ADR 0001), so two tabs confirming the same pending agree on one record.
  */
-export const pendingConfirmationIntentId = (pendingId: string): string =>
+const pendingConfirmationIntentId = (pendingId: string): string =>
   `${INTENT_PREFIX}${pendingId}`
 
 export const PARTIAL_CONFIRMATION_MESSAGE =
@@ -204,7 +214,7 @@ export async function confirmPendingMovement(
     return {
       accepted: false,
       reason: 'reconciling',
-      message: 'Se está reconciliando un envío anterior de este pendiente.',
+      message: RECONCILING_MESSAGE,
     }
   }
   // A failure or an explicit discard was the previous word on this pending: a
@@ -296,7 +306,7 @@ export async function retryPendingConfirmation(
     return {
       accepted: false,
       reason: 'reconciling',
-      message: 'Se está reconciliando un envío anterior de este pendiente.',
+      message: RECONCILING_MESSAGE,
     }
   }
   const retried = await syncStore.retryIntent(intentId)
@@ -336,7 +346,7 @@ export async function discardPendingConfirmation(
     return {
       discarded: false,
       keptMovement: result.kept > 0,
-      message: 'Se está reconciliando un envío en curso; inténtalo de nuevo en unos segundos.',
+      message: RECONCILING_MESSAGE,
     }
   }
   if (result.kept > 0) {
@@ -346,11 +356,9 @@ export async function discardPendingConfirmation(
     // link in this projection) and surface the partial result.
     if (decision) reconcileConfirmedLink(decision)
     await syncStore.failIntent(intentId, PARTIAL_CONFIRMATION_MESSAGE)
-    useToast().showToast(PARTIAL_CONFIRMATION_MESSAGE)
     return { discarded: true, keptMovement: true, message: PARTIAL_CONFIRMATION_MESSAGE }
   }
   if (decision) revertProjection(decision)
-  useToast().showToast('Confirmación descartada.')
   return { discarded: true, keptMovement: false }
 }
 
@@ -643,20 +651,20 @@ function encodeDecision(request: PendingConfirmationRequest): IntentPayload {
 }
 
 function decodeDecision(payload: IntentPayload): StoredDecision | null {
-  const pendingId = text(payload.pendingId)
-  const ruleId = text(payload.ruleId)
-  const transactionId = text(payload.transactionId)
-  const occurrenceDate = text(payload.occurrenceDate)
-  const type = text(payload.type)
-  const accountId = text(payload.accountId)
-  const category = text(payload.category)
-  const description = text(payload.description)
-  const amount = number(payload.amount)
-  const signedAmount = number(payload.signedAmount)
-  const month = number(payload.month)
-  const movementCreatedAt = text(payload.movementCreatedAt)
-  const pendingCreatedAt = text(payload.pendingCreatedAt)
-  const pendingUpdatedAt = text(payload.pendingUpdatedAt)
+  const pendingId = payloadText(payload, 'pendingId')
+  const ruleId = payloadText(payload, 'ruleId')
+  const transactionId = payloadText(payload, 'transactionId')
+  const occurrenceDate = payloadText(payload, 'occurrenceDate')
+  const type = payloadText(payload, 'type')
+  const accountId = payloadText(payload, 'accountId')
+  const category = payloadText(payload, 'category')
+  const description = payloadText(payload, 'description')
+  const amount = payloadNumber(payload, 'amount')
+  const signedAmount = payloadNumber(payload, 'signedAmount')
+  const month = payloadNumber(payload, 'month')
+  const movementCreatedAt = payloadText(payload, 'movementCreatedAt')
+  const pendingCreatedAt = payloadText(payload, 'pendingCreatedAt')
+  const pendingUpdatedAt = payloadText(payload, 'pendingUpdatedAt')
   if (
     !pendingId ||
     !ruleId ||
@@ -678,19 +686,19 @@ function decodeDecision(payload: IntentPayload): StoredDecision | null {
     type: type as ResolvedPendingEdit['type'],
     occurrenceDate,
     accountId,
-    ...(text(payload.destinationAccountId)
-      ? { destinationAccountId: text(payload.destinationAccountId)! }
+    ...(payloadText(payload, 'destinationAccountId')
+      ? { destinationAccountId: payloadText(payload, 'destinationAccountId')! }
       : {}),
     category,
     description,
     amount,
     signedAmount,
-    ...(text(payload.symbol) ? { symbol: text(payload.symbol)! } : {}),
-    ...(text(payload.side) ? { side: text(payload.side) as InvestmentSide } : {}),
-    ...(number(payload.units) !== null ? { units: number(payload.units)! } : {}),
-    ...(number(payload.unitPrice) !== null ? { unitPrice: number(payload.unitPrice)! } : {}),
-    ...(number(payload.fee) !== null ? { fee: number(payload.fee)! } : {}),
-    ...(text(payload.time) ? { time: text(payload.time)! } : {}),
+    ...(payloadText(payload, 'symbol') ? { symbol: payloadText(payload, 'symbol')! } : {}),
+    ...(payloadText(payload, 'side') ? { side: payloadText(payload, 'side') as InvestmentSide } : {}),
+    ...(payloadNumber(payload, 'units') !== null ? { units: payloadNumber(payload, 'units')! } : {}),
+    ...(payloadNumber(payload, 'unitPrice') !== null ? { unitPrice: payloadNumber(payload, 'unitPrice')! } : {}),
+    ...(payloadNumber(payload, 'fee') !== null ? { fee: payloadNumber(payload, 'fee')! } : {}),
+    ...(payloadText(payload, 'time') ? { time: payloadText(payload, 'time')! } : {}),
   }
   const transaction: Transaction = {
     id: transactionId,
@@ -724,25 +732,6 @@ function decodeDecision(payload: IntentPayload): StoredDecision | null {
   }
 }
 
-/** The operation of an investment template, flattened as the pending command expects. */
-function operationData(template: {
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}) {
-  return {
-    symbol: template.symbol ?? null,
-    side: template.side ?? null,
-    units: template.units ?? null,
-    unitPrice: template.unitPrice ?? null,
-    fee: template.fee ?? null,
-    time: template.time ?? null,
-  }
-}
-
 function needsExplicitRetry(view: DurableIntentView): boolean {
   if (view.intent.discardRequested) return false
   return (
@@ -751,25 +740,14 @@ function needsExplicitRetry(view: DurableIntentView): boolean {
   )
 }
 
-function stepOf(view: DurableIntentView, step: string): IntentProgressRecord | undefined {
-  return view.steps.find((item) => item.step === step)
-}
-
-function text(value: IntentPayload[string] | undefined): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null
-}
-
-function number(value: IntentPayload[string] | undefined): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
 // -- intent actions shared with the sidebar -----------------------------------
 
 /**
  * The intent kinds the recurring module owns. The sidebar's retry/discard
  * actions must route them here instead of the generic intent discard: a
- * partial confirmation needs the pending reopened and the reconciliation
- * retry kept visible, and a rule write needs its own retry/discard rules.
+ * partial confirmation keeps its confirmed movement, pending link and
+ * reconciliation retry visible, and a rule write needs its own retry/discard
+ * rules.
  */
 export const isRecurringIntentKind = (kind: DurableIntentKind): boolean =>
   kind === PENDING_CONFIRMATION_KIND || kind === 'recurringRuleWrite'
@@ -784,13 +762,13 @@ export async function runRecurringIntentAction(
   action: 'retry' | 'discard',
 ): Promise<boolean> {
   if (intent.kind === PENDING_CONFIRMATION_KIND) {
-    const pendingId = payloadText(intent, 'pendingId') ?? intent.targetIds[0] ?? null
+    const pendingId = payloadText(intent.payload, 'pendingId') ?? intent.targetIds[0] ?? null
     if (!pendingId) return false
     if (action === 'retry') return (await retryPendingConfirmation(pendingId)).accepted
     return (await discardPendingConfirmation(pendingId)).discarded
   }
   if (intent.kind === 'recurringRuleWrite') {
-    const ruleId = payloadText(intent, 'ruleId') ?? intent.targetIds[0] ?? null
+    const ruleId = payloadText(intent.payload, 'ruleId') ?? intent.targetIds[0] ?? null
     if (!ruleId) return false
     const { retryRecurringRuleWrites, discardRecurringRuleWrites } = await import(
       './recurring-rule-write'
@@ -799,9 +777,4 @@ export async function runRecurringIntentAction(
     return (await discardRecurringRuleWrites(ruleId)).discarded
   }
   return false
-}
-
-function payloadText(intent: DurableIntentRecord, key: string): string | null {
-  const value = intent.payload[key]
-  return typeof value === 'string' && value.length > 0 ? value : null
 }

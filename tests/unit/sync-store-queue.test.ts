@@ -101,6 +101,57 @@ describe('useSyncStore — queue never stays poisoned (audit §2)', () => {
     expect(store.lastError).toContain('La cuenta indicada no existe')
   })
 
+  it('no avisa de un not_found de un pendiente cuya regla se eliminó en otro sitio', async () => {
+    const toast = {
+      textContent: '',
+      dataset: {} as Record<string, string>,
+      hasAttribute: () => false,
+    }
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'toast' ? toast : null),
+    })
+    onSync = (commands) =>
+      json({
+        results: commands.map((c) => ({
+          commandId: c.commandId,
+          status: 'not_found',
+          message:
+            (c as { entityType?: string }).entityType === 'pendingMovement'
+              ? 'Entidad no encontrada.'
+              : 'La cuenta ya no existe.',
+        })),
+        revision: 0,
+        halted: false,
+      })
+    const store = useSyncStore()
+    await store.init(userId)
+
+    // The rule was removed elsewhere and the server cascaded its pendings:
+    // there is no row for this update and nothing the user could retry.
+    await store.enqueueCommand({
+      action: 'update',
+      entityType: 'pendingMovement',
+      entityId: 'pm-gone',
+      baseVersion: 0,
+      patch: { status: 'confirmed' },
+    })
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0))
+    expect(toast.textContent).toBe('')
+    expect(store.lastError).toBeNull()
+
+    // Any other not_found keeps its visible, actionable warning.
+    await store.enqueueCommand({
+      action: 'update',
+      entityType: 'account',
+      entityId: 'acc-gone',
+      baseVersion: 0,
+      patch: { name: 'Cuenta' },
+    })
+    await vi.waitFor(async () => expect(await queued()).toHaveLength(0))
+    expect(toast.textContent).toContain('La cuenta ya no existe')
+    expect(store.lastError).toContain('La cuenta ya no existe')
+  })
+
   it('keeps the head entry through repeated server failures so a Worker outage never loses an edit', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] })
     onSync = () => json({ error: 'Error interno del servidor.' }, 500)

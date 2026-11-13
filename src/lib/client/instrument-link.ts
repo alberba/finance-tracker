@@ -594,20 +594,3 @@ export async function recoverLinkedMovement(conflict: LinkedMovementConflict): P
 function stepsSettled(view: DurableIntentView): boolean {
   return view.steps.every((step) => step.state === 'confirmed' || step.state === 'cancelled')
 }
-
-/** The unresolved intents, for a status surface that only needs names/counts. */
-export function summarizeIntent(view: DurableIntentView): {
-  confirmed: number
-  pending: number
-  failed: number
-  cancelled: number
-} {
-  return {
-    confirmed: view.steps.filter((step) => step.state === 'confirmed').length,
-    pending: view.steps.filter(
-      (step) => step.state === 'pending' || step.state === 'queued' || step.state === 'sending',
-    ).length,
-    failed: view.steps.filter((step) => step.state === 'failed').length,
-    cancelled: view.steps.filter((step) => step.state === 'cancelled').length,
-  }
-}

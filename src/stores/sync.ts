@@ -137,7 +137,7 @@ export const useSyncStore = defineStore('sync', () => {
   const revision = shallowRef(0)
   const pendingCount = shallowRef(0)
   const lastError = shallowRef<string | null>(null)
-  /** Durable intents (link today, recurring confirmations in #492). */
+  /** Durable intents: instrument links, confirmations and rule writes (#490/#492/#493). */
   const intents = shallowRef<DurableIntentView[]>([])
   const unresolvedIntentCount = computed(
     () => intents.value.filter((view) => isUnresolvedIntent(view.intent)).length,
@@ -1103,16 +1103,34 @@ export const useSyncStore = defineStore('sync', () => {
           // retry, so acknowledge them out of the outbox — surfaced via
           // `lastError` (and, for an intent, as a persisted failure) rather
           // than silently dropped.
+          //
+          // A pending movement's rule can be removed elsewhere (another tab or
+          // device): the server cascades its pendings, so the queued update has
+          // nothing left to address. Treat that specific `not_found` as a
+          // settled dependency instead of a user-facing error (#493): an intent
+          // still records its failure so its status surface explains the
+          // partial result, but the global toast is not shown for a change the
+          // user cannot act on.
+          const removedDependency =
+            result.status === 'not_found' &&
+            'entityType' in entry.command &&
+            entry.command.entityType === 'pendingMovement'
           if (entry.intent) {
             intentOutcomes.push({
               entry,
               status: 'failed',
               message: result.message,
             })
-            lastDropMessage = result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            if (!removedDependency) {
+              lastDropMessage =
+                result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            }
           } else {
             plainAcked.push(entry.seq)
-            lastDropMessage = result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            if (!removedDependency) {
+              lastDropMessage =
+                result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            }
           }
         }
       }

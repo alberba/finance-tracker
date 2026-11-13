@@ -27,15 +27,14 @@
  * The intent payload keeps the decided rule, its accepted occurrences and the
  * pre/post-calendar values as JSON. It is the reconstructible record #487 asks
  * for, and it never stores an old copy of a movement.
+ *
+ * Boundary (ADR-0006): this module is invoked exclusively from Pinia actions,
+ * the documented edge where promises are executed. The Effect-based storage
+ * protocol stays in `durable-intents`/`outbox`; only the small vocabulary in
+ * `recurring-intent-support.ts` is shared with the pending-confirmation module.
  */
 
-import { useToast } from '../../composables/useToast'
-import type {
-  InvestmentSide,
-  PendingMovement,
-  RecurringRule,
-  TransactionType,
-} from '../../scripts/types'
+import type { PendingMovement, RecurringRule, TransactionType } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useSyncStore } from '../../stores/sync'
 import {
@@ -51,20 +50,26 @@ import {
   type DurableIntentView,
   type IntentCommandInput,
   type IntentPayload,
-  type IntentProgressRecord,
   type IntentStepState,
   type IntentWaitReason,
 } from './durable-intents'
 import type { OutboxCommandInput } from './outbox'
+import {
+  RECONCILING_MESSAGE,
+  isDurableStep,
+  mintNonce,
+  operationData,
+  stepOf,
+} from './recurring-intent-support'
 
-export const RECURRING_RULE_WRITE_KIND = 'recurringRuleWrite' as const
+const RECURRING_RULE_WRITE_KIND = 'recurringRuleWrite' as const
 
 /** The rule command: create, update, remove, or absent on a pure refresh. */
-export const RULE_STEP = 'rule'
+const RULE_STEP = 'rule'
 /** One step per occurrence: a pending command is published alone, atomically. */
-export const PENDING_STEP_PREFIX = 'pending:'
+const PENDING_STEP_PREFIX = 'pending:'
 /** The calendar advance; published only after the pendings step is durable. */
-export const CALENDAR_STEP = 'calendar'
+const CALENDAR_STEP = 'calendar'
 
 const INTENT_PREFIX = 'recurringRuleWrite:'
 
@@ -86,8 +91,6 @@ export interface RecurringRuleWriteRequest {
    * are the last durable step.
    */
   calendar: RecurringRule | null
-  /** Toast shown once the acceptance is durable. */
-  message?: string
 }
 
 export interface RecurringRuleWriteOutcome {
@@ -113,7 +116,6 @@ export interface RecurringRuleWriteStatus {
 
 export interface PendingMovementWriteOutcome {
   accepted: boolean
-  message?: string
 }
 
 export interface RecurringRuleWriteDiscard {
@@ -133,7 +135,7 @@ interface StoredRuleWrite {
 
 type PublicationOutcome = 'published' | 'skipped' | 'blocked' | 'failed' | 'completed'
 
-export const recurringRuleWriteIntentId = (ruleId: string, nonce: string): string =>
+const recurringRuleWriteIntentId = (ruleId: string, nonce: string): string =>
   `${INTENT_PREFIX}${ruleId}:${nonce}`
 
 const ruleIdFromIntentId = (intentId: string): string | null => {
@@ -161,7 +163,6 @@ export async function saveRecurringRule(
     // state, so the calendar is applied with the rest of the accepted change.
     projectWrite(request)
     if (request.calendar) applyCalendar(request)
-    showMessage(request)
     return { accepted: true, ruleId: request.rule.id, intentId: null }
   }
 
@@ -213,7 +214,6 @@ export async function saveRecurringRule(
   // confirmed): an occurrence that is not durable yet must not look covered.
   await publishRuleWritesFor(request.rule.id)
   await projectFromIntent(intentId)
-  showMessage(request)
   return { accepted: true, ruleId: request.rule.id, intentId }
 }
 
@@ -299,12 +299,10 @@ export async function removeRecurringRule(
  */
 export async function savePendingMovement(
   pending: PendingMovement,
-  message?: string,
 ): Promise<PendingMovementWriteOutcome> {
   const syncStore = useSyncStore()
   if (isReadOnlyDemoActive() || !syncStore.userId) {
     projectPending(pending)
-    if (message) useToast().showToast(message)
     return { accepted: true }
   }
   const ruleId = await resolveEntityId('recurringRule', pending.ruleId)
@@ -314,7 +312,6 @@ export async function savePendingMovement(
   const saved = await syncUpdate('pendingMovement', pending.id, data)
   if (saved === false) return { accepted: false }
   projectPending(pending)
-  if (message) useToast().showToast(message)
   return { accepted: true }
 }
 
@@ -461,7 +458,7 @@ export async function discardRecurringRuleWrites(
     return {
       discarded: false,
       kept,
-      message: 'Se está reconciliando un envío en curso; inténtalo de nuevo en unos segundos.',
+      message: RECONCILING_MESSAGE,
     }
   }
   // A create that never reached the queue must disappear from the optimistic
@@ -473,7 +470,6 @@ export async function discardRecurringRuleWrites(
     if (ruleStep?.state === 'confirmed') continue
     projectDiscardOfCreate(stored.rule.id, stored.pendings)
   }
-  useToast().showToast('Cambio de regla descartado.')
   return { discarded: true, kept }
 }
 
@@ -912,25 +908,6 @@ async function resolveDestination(template: {
   return (await resolveEntityId('account', template.destinationAccountId)) ?? undefined
 }
 
-/** Flattened operation, explicit nulls so leaving investment clears it (ADR 0002). */
-function operationData(template: {
-  symbol?: string
-  side?: InvestmentSide
-  units?: number
-  unitPrice?: number
-  fee?: number
-  time?: string
-}) {
-  return {
-    symbol: template.symbol ?? null,
-    side: template.side ?? null,
-    units: template.units ?? null,
-    unitPrice: template.unitPrice ?? null,
-    fee: template.fee ?? null,
-    time: template.time ?? null,
-  }
-}
-
 // -- projection ----------------------------------------------------------------
 
 function projectWrite(request: RecurringRuleWriteRequest): void {
@@ -1109,14 +1086,6 @@ function isPending(value: unknown): value is PendingMovement {
   )
 }
 
-function stepOf(view: DurableIntentView, step: string): IntentProgressRecord | undefined {
-  return view.steps.find((item) => item.step === step)
-}
-
-function isDurableStep(step: IntentProgressRecord): boolean {
-  return step.state === 'queued' || step.state === 'sending' || step.state === 'confirmed'
-}
-
 async function pruneSettledRuleWrites(): Promise<void> {
   const syncStore = useSyncStore()
   for (const view of await syncStore.listIntents()) {
@@ -1138,13 +1107,3 @@ async function pruneRuleWrite(intentId: string): Promise<void> {
   }
 }
 
-function showMessage(request: RecurringRuleWriteRequest): void {
-  if (request.message) useToast().showToast(request.message)
-}
-
-function mintNonce(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}

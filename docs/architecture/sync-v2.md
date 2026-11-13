@@ -73,7 +73,9 @@ en la base de la cola. Arranque y reconexión reconstruyen cada objetivo desde e
 del movimiento (nunca desde una instantánea guardada) y publican comando y progreso en la misma
 transacción; un paso ya encolado por otra pestaña se omite en vez de duplicarse. Tras un conflicto
 el módulo relee el movimiento y genera otro intento con identidad nueva; el resto de comandos
-conserva el rebase automático de ADR 0003.
+conserva el rebase automático de ADR 0003. El registro de objetivos pendientes que reconoce un
+desvínculo explícito es de la página y está aislado por usuario: se reinicia al cambiar de sesión y
+olvida sus ids cuando la intención termina, para que un usuario no marque publicaciones de otro.
 
 La caché sigue siendo una proyección reconstruible en otra base: las confirmaciones se incorporan
 antes de retirar el comando, y la retirada del comando y el avance del paso de la intención se
@@ -93,8 +95,10 @@ pendiente solo se construye después de que el servidor confirme ese movimiento,
 referencie un movimiento que no pudo existir. Recargar, repetir desde otra pestaña o reintentar
 reutiliza la reserva y la identidad; un rechazo definitivo espera un reintento explícito, que
 emite un `commandId` nuevo conservando el movimiento. Descartar no revierte un movimiento ya
-confirmado: la reserva permanece para impedir una segunda confirmación y el resultado parcial se
-muestra; una reserva ya enlazada y confirmada se olvida para no crecer sin límite.
+confirmado: el pendiente se conserva confirmado y enlazado a ese movimiento en la proyección (no se
+reabre, para no habilitar una segunda confirmación), la reserva permanece para impedir otra
+identidad y el resultado parcial se muestra; una reserva ya enlazada y confirmada se olvida para no
+crecer sin límite.
 
 El guardado de una regla (`src/lib/client/recurring-rule-write.ts`) usa el mismo protocolo con pasos
 nombrados: publica el comando de la regla, después un paso por cada ocurrencia generada y solo al
@@ -105,8 +109,18 @@ se publica mientras otra anterior siga sin resolver, para que un comando antiguo
 la edición aceptada (ADR 0003 solo rebasa contra la versión, no contra una edición posterior).
 Eliminar una regla publica únicamente su `remove` —el servidor borra sus pendientes en cascada— y
 descarta antes las intenciones pendientes de esa regla, para no encolar actualizaciones condenadas a
-`not_found`. Las acciones de reintentar/descartar de la barra lateral enrutan las intenciones
-recurrentes al módulo recurrente; el descarte parcial reabre el pendiente y conserva el reintento.
+`not_found`. Un `not_found` de actualización de un pendiente cuya regla ya no existe en el servidor
+se trata como dependencia resuelta: no produce el aviso global, aunque la intención conserve su
+estado parcial. La unicidad de una ocurrencia por regla+fecha se comprueba **dentro** de la misma
+transacción que publica el comando, no con una lectura previa, de modo que dos pestañas no pueden
+encolar dos pendientes para el mismo vencimiento. Las acciones de reintentar/descartar de la barra
+lateral enrutan las intenciones recurrentes al módulo recurrente; el descarte parcial conserva el
+pendiente confirmado, su enlace y el reintento visible.
+
+Los módulos `recurring-write.ts`, `recurring-rule-write.ts` e `instrument-link.ts` son el borde de
+acciones de Pinia que ejecuta las promesas (ADR 0006); los primitivos `Effect` —transacciones,
+reservas y publicación atómica— permanecen en `durable-intents.ts`, `movement-publication.ts` y
+`outbox.ts`, y la presentación (toasts) queda en el store o en el shell, nunca en estos módulos.
 
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,
