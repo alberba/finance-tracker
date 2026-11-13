@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import SettingsInstrumentEditor from '../../src/components/settings/SettingsInstrumentEditor.vue'
 import type { InstrumentRowViewModel } from '../../src/domain/settings/view-model'
 import { useSyncStore } from '../../src/stores/sync'
@@ -102,7 +103,7 @@ it('muestra la espera de la referencia de catálogo sin presentarla como fallo',
       ],
     }),
   ] as never
-  await wrapper.vm.$nextTick()
+  await nextTick()
   const status = wrapper.get('[data-link-intent-status]')
   expect(status.text()).toContain('esperando la sincronización de la cotización')
   expect(status.attributes('role')).toBe('status')
@@ -122,7 +123,7 @@ it('no cuenta la configuración como movimiento vinculado y expone el resultado 
       ],
     }),
   ] as never
-  await wrapper.vm.$nextTick()
+  await nextTick()
   const status = wrapper.get('[data-link-intent-status]')
   // The configuration dependency is not a "vinculado": 0 of 1, not 1 of 2.
   expect(status.text()).toContain('Resultado parcial: 0 de 1 vinculados')
@@ -143,7 +144,7 @@ it('muestra el fallo de la configuración con reintentar y descartar', async () 
       ],
     }),
   ] as never
-  await wrapper.vm.$nextTick()
+  await nextTick()
   const status = wrapper.get('[data-link-intent-status]')
   expect(status.text()).toContain('La cotización no es válida.')
   expect(status.text()).toContain('(0/1 vinculados)')

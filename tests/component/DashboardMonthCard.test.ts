@@ -203,6 +203,6 @@ describe('DashboardMonthCard', () => {
   })
 
   it('locks the year when there is only one', () => {
-    expect(mountCard([expense]).get('#year-display').attributes('disabled')).toBeDefined()
+    expect(mountCard([expense]).get<HTMLSelectElement>('#year-display').element.disabled).toBe(true)
   })
 })
