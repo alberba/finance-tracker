@@ -1,6 +1,5 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
 
 import ThemeSwitcher from '../../src/components/layout/ThemeSwitcher.vue'
 import { createThemeController, type ThemeController } from '../../src/lib/client/theme'
@@ -62,7 +61,7 @@ describe('ThemeSwitcher', () => {
     const wrapper = mount(ThemeSwitcher, { props: { variant: 'sheet' } })
 
     controller.setPreference('light')
-    await nextTick()
+    await wrapper.vm.$nextTick()
 
     expect(pressed(wrapper)).toEqual(['Claro'])
   })

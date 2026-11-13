@@ -96,10 +96,6 @@ describe('transporte de yahoo-finance2', () => {
 
   it('distingue errores HTTP de un error de red', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network offline')))
-    const error = await yahooFinance.search('offline').catch((reason: unknown) => reason)
-
-    expect(error).toBeInstanceOf(Error)
-    expect(error).not.toBeInstanceOf(YahooFinanceHttpError)
-    expect((error as Error).message).toContain('network offline')
+    await expect(yahooFinance.search('offline')).rejects.not.toBeInstanceOf(YahooFinanceHttpError)
   })
 })

@@ -87,28 +87,6 @@ Si una prueba falla, abre `playwright-report/index.html`. Las trazas se inspecci
 pnpm exec playwright show-trace test-results/ruta-a-trace.zip
 ```
 
-## Fixture y excepciones
-
-Cada escenario autenticado importa `test` de `tests/e2e/fixtures.ts`: el fixture crea un usuario
-aislado (`testUserEmail`, cabecera `X-Test-User-Email`) y `tracker` inicializa su espacio por la API
-antes de abrir la app. Para fijar «hoy», `test.use({ fixedTime: '...' })` antes del primer render.
-Un escenario sin `tracker` sigue usando ese `test` y toma la identidad de `testUserEmail`:
-
-- **Varios contextos o dispositivos** (`multi-user-isolation`, `offline-sync`, `bitvavo`): `tracker`
-  enlaza un usuario a la página por defecto, así que cada contexto se abre con `browser.newContext`,
-  deriva su identidad de `testUserEmail` (`testUserEmail.replace(/^pw-/, 'pw-<etiqueta>-')`) y se
-  inicializa por la API.
-- **Primera presentación de un usuario sin tocar** (`onboarding`): `tracker` completa la bienvenida
-  antes del primer render, así que el spec usa `testUserEmail` e inicializa por la API sin `tracker`.
-
-Excepción real a la regla 15: `authentication.spec.ts` importa `test` de `@playwright/test`. Prueba el
-registro, el acceso y las sesiones de Better Auth sin sesión previa y el fixture inyectaría
-`X-Test-User-Email` en todo contexto, lo que sustituiría el flujo bajo prueba. Su cabecera lo declara.
-
-Los selectores de estructura viven en `tests/e2e/pages/` (regla 14). Un locator que un spec solo usa
-en una aserción puntual puede ser user-facing (rol, etiqueta, texto); los `focus` de los visuales son
-cadenas CSS de configuración, no locators de aserción.
-
 ## CI
 
 Una PR ejecuta calidad en tres jobs paralelos (lint y typecheck, Vitest sin cobertura,

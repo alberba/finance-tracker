@@ -1,25 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Sentry es el límite externo: un SDK falso recoge lo que se reportaría. El módulo de
-// tracking y `withApiErrorHandling` son los reales.
-const sentry = vi.hoisted(() => {
-  const reported: Array<{ error: unknown; tags: Record<string, string> }> = []
-  let tags: Record<string, string> = {}
-  return {
-    reported,
-    sdk: {
-      withScope: (handler: (scope: { setTag: (key: string, value: string) => void }) => void) => {
-        tags = {}
-        handler({ setTag: (key, value) => (tags[key] = value) })
-      },
-      captureException: (error: unknown) => {
-        reported.push({ error, tags })
-      },
-    },
-  }
-})
+// Se mockea el módulo de tracking para que el SDK real de Sentry no se importe:
+// acá solo se comprueba cuándo y con qué se reporta.
+const errorTracking = vi.hoisted(() => ({ reportApiRouteFailure: vi.fn() }))
 
-vi.mock('@sentry/cloudflare', () => sentry.sdk)
+vi.mock('../../src/lib/server/error-tracking', () => errorTracking)
 
 import {
   ForbiddenError,
@@ -32,7 +17,6 @@ const ROUTE = '/api/issues/report'
 let consoleError: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
-  sentry.reported.length = 0
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -55,9 +39,11 @@ describe('withApiErrorHandling', () => {
       throw error
     })
 
-    expect(sentry.reported).toEqual([
-      { error, tags: { 'api.route': ROUTE, 'http.response.status_code': '500' } },
-    ])
+    expect(errorTracking.reportApiRouteFailure).toHaveBeenCalledTimes(1)
+    expect(errorTracking.reportApiRouteFailure).toHaveBeenCalledWith(error, {
+      route: ROUTE,
+      status: 500,
+    })
   })
 
   it('deja el error inesperado en el log con la ruta en el mensaje', async () => {
@@ -77,7 +63,7 @@ describe('withApiErrorHandling', () => {
 
     expect(response.status).toBe(401)
     expect(await response.json()).toEqual({ error: 'Se requiere autenticación.' })
-    expect(sentry.reported).toEqual([])
+    expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
   })
 
   it('responde 403 con el mensaje del error y no reporta nada', async () => {
@@ -89,7 +75,7 @@ describe('withApiErrorHandling', () => {
     expect(await response.json()).toEqual({
       error: 'No tienes permiso para realizar esta operación.',
     })
-    expect(sentry.reported).toEqual([])
+    expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
   })
 
   it('devuelve la respuesta del handler tal cual y no reporta nada', async () => {
@@ -98,7 +84,7 @@ describe('withApiErrorHandling', () => {
     const response = await withApiErrorHandling(ROUTE, async () => expected)
 
     expect(response).toBe(expected)
-    expect(sentry.reported).toEqual([])
+    expect(errorTracking.reportApiRouteFailure).not.toHaveBeenCalled()
     expect(consoleError).not.toHaveBeenCalled()
   })
 })

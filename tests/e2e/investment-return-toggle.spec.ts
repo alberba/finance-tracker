@@ -50,7 +50,7 @@ test.describe('toggle de modo de rentabilidad (Simple / TWR)', () => {
     await expect(simpleBtn).toHaveAttribute('aria-pressed', 'false')
 
     // La etiqueta del KPI cambia a "Rentabilidad TWR"
-    await expect(tracker.returnLabel).toHaveText('Rentabilidad TWR')
+    await expect(section.locator('#inv-return-label')).toHaveText('Rentabilidad TWR')
   })
 
   test('al volver al modo Simple la etiqueta del KPI restaura el texto original', async ({
@@ -61,12 +61,14 @@ test.describe('toggle de modo de rentabilidad (Simple / TWR)', () => {
 
     // Activar TWR
     await section.getByRole('button', { name: 'TWR' }).click()
-    await expect(tracker.returnLabel).toHaveText('Rentabilidad TWR')
+    await expect(section.locator('#inv-return-label')).toHaveText('Rentabilidad TWR')
 
     // Volver a Simple
     await section.getByRole('button', { name: 'Simple' }).click()
-    await expect(tracker.returnLabel).toHaveText('Rentabilidad estimada')
-    await expect(tracker.returnFigure).toBeVisible()
+    await expect(section.locator('#inv-return-label')).toHaveText('Rentabilidad estimada')
+    await expect(
+      section.locator('#inv-return-label').locator('..').locator('#inv-return'),
+    ).toBeVisible()
   })
 
   test('el modo de rentabilidad se conserva al cambiar entre subtabs de inversión', async ({
@@ -88,7 +90,7 @@ test.describe('toggle de modo de rentabilidad (Simple / TWR)', () => {
     // Volver al Resumen y el modo sigue activo
     await tracker.openInvestmentDashboardTab()
     await expect(twrBtn).toHaveAttribute('aria-pressed', 'true')
-    await expect(tracker.returnLabel).toHaveText('Rentabilidad TWR')
+    await expect(section.locator('#inv-return-label')).toHaveText('Rentabilidad TWR')
   })
 
   test('TWR usa la liquidez configurada por broker para el valor de cartera', async ({
@@ -202,7 +204,7 @@ test.describe('toggle de modo de rentabilidad (Simple / TWR)', () => {
       await readScenarioState(page),
     )
 
-    const displayed = parseMoney(await tracker.totalValue.innerText())
+    const displayed = parseMoney(await section.locator('#inv-total-value').innerText())
     expect(displayed).toBeCloseTo(expected, 2)
   })
 })

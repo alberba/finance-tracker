@@ -5,7 +5,6 @@ import { nextTick } from 'vue'
 
 import TransactionPanel from '../../src/components/transactions/TransactionPanel.vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { openPanel as pressOpen, panelWithOpener } from '../helpers/panel-host'
 
 vi.mock('../../src/composables/useSetupNavigation', () => ({
   useSetupNavigation: () => ({ createAccount: vi.fn(), editCategories: vi.fn() }),
@@ -32,25 +31,22 @@ afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount())
 })
 
-async function mountOpenPanel() {
-  const wrapper = mount(panelWithOpener(TransactionPanel), {
-    attachTo: document.body,
-    global: { plugins: [pinia] },
-  })
+async function openPanel() {
+  const wrapper = mount(TransactionPanel, { attachTo: document.body, global: { plugins: [pinia] } })
   wrappers.push(wrapper)
-  await pressOpen(wrapper)
+  wrapper.vm.openNew()
   await nextTick()
   await nextTick()
   return wrapper
 }
 
-async function chooseSaving(wrapper: Awaited<ReturnType<typeof mountOpenPanel>>) {
+async function chooseSaving(wrapper: Awaited<ReturnType<typeof openPanel>>) {
   await wrapper.get('[data-tx-type="saving"]').trigger('click')
 }
 
 describe('TransactionPanel saving', () => {
   it('shows origin and destination only for a saving', async () => {
-    const wrapper = await mountOpenPanel()
+    const wrapper = await openPanel()
     expect(wrapper.find('[name="destinationAccountId"]').exists()).toBe(false)
 
     await chooseSaving(wrapper)
@@ -61,7 +57,7 @@ describe('TransactionPanel saving', () => {
   })
 
   it('never offers the origin as destination', async () => {
-    const wrapper = await mountOpenPanel()
+    const wrapper = await openPanel()
     await chooseSaving(wrapper)
 
     const destination = wrapper.get('[name="destinationAccountId"]')
@@ -73,7 +69,7 @@ describe('TransactionPanel saving', () => {
   })
 
   it('saves a saving with its destination and leaves the net out of the preview', async () => {
-    const wrapper = await mountOpenPanel()
+    const wrapper = await openPanel()
     await chooseSaving(wrapper)
     await wrapper.get('[name="amount"]').setValue('150')
 

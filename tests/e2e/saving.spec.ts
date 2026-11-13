@@ -4,12 +4,12 @@ test.describe('Ahorro E2E', () => {
   test(
     'registra un ahorro entre dos cuentas, lo persiste y lo muestra distinto de la inversión',
     { tag: '@smoke' },
-    async ({ tracker }) => {
+    async ({ tracker, page }) => {
       await tracker.openSettingsTab('Categorías')
-      const savings = tracker.categoryList('savingCategories')
+      const savings = tracker.section('settings').locator('[data-category-list="savingCategories"]')
       await savings.getByLabel('Nueva categoría de ahorro').fill('Hucha viaje')
       await savings.getByRole('button', { name: 'Añadir' }).click()
-      await expect(tracker.categoryItem(savings, 'Hucha viaje')).toBeVisible()
+      await expect(savings.locator('[data-category="Hucha viaje"]')).toBeVisible()
 
       await tracker.openTransactions()
       await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
@@ -28,7 +28,7 @@ test.describe('Ahorro E2E', () => {
       await panel.getByLabel('Descripción').fill('Ahorro e2e')
       await panel.getByLabel('Importe').fill('120')
       await panel.getByRole('button', { name: 'Guardar movimiento' }).click()
-      await expect(tracker.toast).toContainText('Movimiento guardado.')
+      await expect(page.locator('#toast')).toContainText('Movimiento guardado.')
 
       const row = tracker.transactionRows.filter({ hasText: 'Ahorro e2e' })
       await expect(row).toHaveCount(1)
@@ -43,17 +43,20 @@ test.describe('Ahorro E2E', () => {
 
   test('el dashboard suma ahorro e inversión en un solo indicador', async ({ tracker }) => {
     await tracker.openDashboard()
-    await expect(tracker.kpi('investment').card.getByText('Ahorro e inversión')).toBeVisible()
+    await expect(
+      tracker.dashboardSection.locator('[data-kpi="investment"]').getByText('Ahorro e inversión'),
+    ).toBeVisible()
   })
 
   test('crea un objetivo de ahorro que suma los ahorros anteriores de su categoría', async ({
     tracker,
+    page,
   }) => {
     await tracker.openSettingsTab('Categorías')
-    const savings = tracker.categoryList('savingCategories')
+    const savings = tracker.section('settings').locator('[data-category-list="savingCategories"]')
     await savings.getByLabel('Nueva categoría de ahorro').fill('Colchón')
     await savings.getByRole('button', { name: 'Añadir' }).click()
-    await expect(tracker.categoryItem(savings, 'Colchón')).toBeVisible()
+    await expect(savings.locator('[data-category="Colchón"]')).toBeVisible()
 
     await tracker.openTransactions()
     await tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento' }).click()
@@ -68,19 +71,19 @@ test.describe('Ahorro E2E', () => {
     await movement.getByLabel('Descripción').fill('Ahorro previo')
     await movement.getByLabel('Importe').fill('120')
     await movement.getByRole('button', { name: 'Guardar movimiento' }).click()
-    await expect(tracker.toast).toContainText('Movimiento guardado.')
+    await expect(page.locator('#toast')).toContainText('Movimiento guardado.')
 
     await tracker.openGoals()
     const goals = tracker.goalsSection
-    await expect(tracker.savingGoalsEmpty).toBeVisible()
+    await expect(goals.locator('[data-saving-goals-empty]')).toBeVisible()
     await goals.getByRole('button', { name: 'Nuevo objetivo de ahorro' }).click()
-    const panel = tracker.savingGoalPanel
+    const panel = page.locator('#saving-goal-panel')
     await panel.getByLabel('Nombre').fill('Fondo de emergencia')
     await panel.getByLabel('Importe objetivo').fill('3000')
     await panel.getByLabel('Categoría de ahorro').selectOption({ label: 'Colchón' })
     await panel.getByRole('button', { name: 'Guardar objetivo' }).click()
 
-    const row = tracker.savingGoalRows
+    const row = goals.locator('[data-saving-goal-row]')
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('Fondo de emergencia')
     await expect(row).toContainText('Colchón')
@@ -91,7 +94,11 @@ test.describe('Ahorro E2E', () => {
 
   test('el presupuesto tiene el ahorro como cuarto tipo', async ({ tracker }) => {
     await tracker.openBudgetTab('saving')
-    await expect(tracker.budgetTab('saving')).toHaveAttribute('aria-selected', 'true')
-    await expect(tracker.budgetSection.getByRole('tab', { name: /^Ahorro/ })).toBeVisible()
+    const budget = tracker.budgetSection
+    await expect(budget.locator('[data-budget-tab="saving"]')).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await expect(budget.getByRole('tab', { name: /^Ahorro/ })).toBeVisible()
   })
 })

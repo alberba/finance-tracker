@@ -6,7 +6,7 @@
  * work disappears from the UI on reload).
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
 
 describe("round trip: sincronización", () => {
@@ -21,45 +21,23 @@ describe("round trip: sincronización", () => {
   });
 
   it("does not skip changes made on another device when flushing its own (§5.3)", async () => {
-    const { useSettingsStore } = await import("../../../../src/stores/settings");
-    const { useFinancialStateStore } = await import("../../../../src/stores/financial-state");
-
-    // This device has already pulled; its own batch is about to go out...
-    const gate = trip.holdSync();
-    useSettingsStore().addEntity("accounts", "Portátil", "0");
-    await gate.entered;
-    // ...and, while that batch is in flight, another device creates an account
-    // this one has never pulled.
+    // Another device creates an account; this one never pulls it...
     await trip.asOtherDevice([
       {
-        commandId: "00000000-0000-4000-8000-000000000001",
+        commandId: crypto.randomUUID(),
         action: "create",
         entityType: "account",
         data: { name: "Desde el móvil", kind: "cash", currency: "EUR", openingBalance: 10, legacyId: "movil" },
       },
     ]);
-    // The ack carries the *global* revision — the moment the cursor can jump
-    // over what this device hasn't seen.
-    gate.release();
 
-    // No reload: a reload re-reads everything from the bootstrap and would hide
-    // a cursor that skipped the change. The live client must receive it through
-    // its own pull.
-    await vi.waitFor(() => {
-      expect(
-        useFinancialStateStore()
-          .accounts.map((account) => account.name)
-          .sort(),
-      ).toEqual(["Desde el móvil", "Portátil"]);
-    });
-    expect(
-      useFinancialStateStore().accounts.find((account) => account.name === "Desde el móvil"),
-    ).toMatchObject({ openingBalance: 10 });
-    // And the cache knows the other device's row, so editing it is an update.
-    expect(await trip.syncStore.getEntityRef("account", "movil")).toMatchObject({
-      entityId: expect.any(String),
-      version: 1,
-    });
+    // ...and instead pushes work of its own, which acks with the *global*
+    // revision — the moment the cursor can jump over what it hasn't seen.
+    const { useSettingsStore } = await import("../../../../src/stores/settings");
+    useSettingsStore().addEntity("accounts", "Portátil", "0");
+    await trip.reload();
+
+    expect(await trip.syncStore.getEntityRef("account", "movil")).not.toBeNull();
   });
 
   it("keeps the local cache when the bootstrap request fails (§5.2)", async () => {

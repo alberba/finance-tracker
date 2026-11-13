@@ -5,7 +5,6 @@ import { nextTick } from 'vue'
 
 import TransactionPanel from '../../src/components/transactions/TransactionPanel.vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { openPanel, panelWithOpener } from '../helpers/panel-host'
 
 describe('TransactionPanel', () => {
   beforeEach(() => {
@@ -36,8 +35,8 @@ describe('TransactionPanel', () => {
   }
 
   it('selects the first category of the new type when the type changes', async () => {
-    const wrapper = mount(panelWithOpener(TransactionPanel), { attachTo: document.body })
-    await openPanel(wrapper)
+    const wrapper = mount(TransactionPanel, { attachTo: document.body })
+    ;(wrapper.vm as unknown as { openNew: () => void }).openNew()
     await nextTick()
 
     const select = () => wrapper.get('select[name="category"]').element as HTMLSelectElement

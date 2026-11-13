@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures'
-import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import type { AvailableReportEntry } from '../../src/domain/reports/report-entry'
 
 // PNG real de 1×1 píxel: pasa la comprobación de cabecera del servidor.
@@ -16,7 +15,7 @@ function imageFile(name: string, size = PNG_1X1.length) {
 
 test.describe('Reports E2E', () => {
   test('abre el panel lateral de reporte desde el acceso global', async ({ page, tracker }) => {
-    const trigger = tracker.globalReportTrigger
+    const trigger = page.locator('#global-report-trigger')
     await expect(trigger).toBeVisible()
     const triggerBox = await trigger.boundingBox()
     const iconBox = await trigger.locator('svg').boundingBox()
@@ -164,8 +163,8 @@ test.describe('Reports E2E', () => {
     const panel = tracker.issueReportDialog
     await expect(panel.getByLabel('Resultado esperado')).toHaveCount(0)
     await expect(panel.getByLabel('Resultado actual')).toHaveCount(0)
-    await expect(tracker.issueReportNotice).toContainText('repositorio público')
-    await expect(tracker.issueReportNotice).toContainText('email')
+    await expect(panel.locator('#issue-report-notice')).toContainText('repositorio público')
+    await expect(panel.locator('#issue-report-notice')).toContainText('email')
     await panel.getByLabel('Resumen').fill('El filtro no guarda el valor')
 
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
@@ -330,13 +329,11 @@ test.describe('Reports E2E', () => {
     await tracker.openGlobalReportDialog()
     const panel = tracker.issueReportDialog
     await panel.getByLabel('Resumen').fill('Captura del filtro roto')
-    await tracker.issueReportAttachments.setInputFiles([
-      imageFile('uno.png'),
-      imageFile('dos.png'),
-      imageFile('tres.png'),
-    ])
+    await panel
+      .locator('#issue-report-attachments')
+      .setInputFiles([imageFile('uno.png'), imageFile('dos.png'), imageFile('tres.png')])
 
-    const list = tracker.issueReportAttachmentList
+    const list = panel.locator('#issue-report-attachment-list')
     await expect(list.getByRole('img')).toHaveCount(3)
     await expect(list.getByRole('img', { name: 'Vista previa de dos.png' })).toBeVisible()
 
@@ -359,12 +356,12 @@ test.describe('Reports E2E', () => {
   }) => {
     await tracker.openGlobalReportDialog()
     const panel = tracker.issueReportDialog
-    const input = tracker.issueReportAttachments
+    const input = panel.locator('#issue-report-attachments')
 
     await input.setInputFiles([imageFile('a.png'), imageFile('b.png'), imageFile('c.png')])
     await input.setInputFiles(imageFile('d.png'))
     await expect(tracker.issueReportStatus()).toContainText('hasta 3')
-    await expect(tracker.issueReportAttachmentList.getByRole('img')).toHaveCount(3)
+    await expect(panel.locator('#issue-report-attachment-list').getByRole('img')).toHaveCount(3)
 
     await panel.getByRole('button', { name: 'Quitar a.png' }).click()
     await input.setInputFiles(imageFile('grande.png', 2 * 1024 * 1024 + 1))
@@ -561,7 +558,7 @@ test.describe('Mis reportes E2E', () => {
     await mockReportsApi(page)
     await tracker.openReports()
 
-    const entry = tracker.reportEntry(901)
+    const entry = page.locator('[data-report-entry="901"]')
     await expect(entry).toBeVisible()
     await entry.click()
     await expect(page).toHaveURL(/\/reportes\?reporte=901/)
@@ -614,11 +611,11 @@ test.describe('Mis reportes E2E', () => {
     })
 
     await tracker.openReports()
-    const dot = tracker.globalReportUpdates
+    const dot = page.locator('#global-report-trigger [data-reports-updates]')
     await expect(dot).toBeVisible()
-    await expect(tracker.reportEntry(901).getByText('Nuevo')).toBeVisible()
+    await expect(page.locator('[data-report-entry="901"]').getByText('Nuevo')).toBeVisible()
 
-    await tracker.reportEntry(901).click()
+    await page.locator('[data-report-entry="901"]').click()
     await expect(
       tracker.reportsPage.getByRole('heading', { name: reportEntry().title }),
     ).toBeVisible()
@@ -631,12 +628,12 @@ test.describe('Mis reportes E2E', () => {
       loadMore: () => [reportEntry({ number: 902, title: 'Exportación a PDF' })],
     })
     await page.goto('/reportes')
-    await expect(tracker.reportEntry(901)).toBeVisible()
+    await expect(page.locator('[data-report-entry="901"]')).toBeVisible()
 
     await tracker.reportsPage.getByRole('button', { name: 'Cargar más reportes' }).click()
 
-    await expect(tracker.reportEntry(902)).toContainText('Exportación a PDF')
-    await expect(tracker.reportEntry(901)).toBeVisible()
+    await expect(page.locator('[data-report-entry="902"]')).toContainText('Exportación a PDF')
+    await expect(page.locator('[data-report-entry="901"]')).toBeVisible()
     await expect(
       tracker.reportsPage.getByRole('button', { name: 'Cargar más reportes' }),
     ).toHaveCount(0)
@@ -671,11 +668,11 @@ test.describe('Mis reportes E2E', () => {
 
     await tracker.openReports(901)
     const detail = tracker.reportsPage
-    await expect(tracker.reportThreadItem(detail, 700)).toContainText('Lo reproducimos')
+    await expect(detail.locator('[data-thread-item="700"]')).toContainText('Lo reproducimos')
 
     await detail.getByRole('textbox', { name: 'Nueva aclaración' }).fill('Ocurre solo en móvil.')
     await detail.getByRole('button', { name: 'Publicar aclaración' }).click()
-    const own = tracker.reportThreadItem(detail, 555)
+    const own = detail.locator('[data-thread-item="555"]')
     await expect(own).toContainText('Ocurre solo en móvil.')
     await expect(own).toContainText('Tú')
 
@@ -689,7 +686,7 @@ test.describe('Mis reportes E2E', () => {
     await own.getByRole('button', { name: 'Borrar' }).click()
     const dialog = page.getByRole('alertdialog', { name: '¿Borrar esta aclaración?' })
     await dialog.getByRole('button', { name: 'Borrar' }).click()
-    await expect(tracker.reportThreadItem(detail, 555)).toHaveCount(0)
+    await expect(detail.locator('[data-thread-item="555"]')).toHaveCount(0)
   })
 
   test('un hilo cerrado queda en solo lectura', async ({ page, tracker }) => {
@@ -737,19 +734,18 @@ test.describe('Mis reportes E2E', () => {
       if (request.url().includes('/api/reports')) apiCalls.push(request.url())
     })
 
-    const tracker = new FinanceTrackerPage(page)
     await page.goto('/?demo=1')
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await page.goto('/reportes')
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
 
-    await expect(tracker.reportEntry(901)).toContainText(
+    await expect(page.locator('[data-report-entry="901"]')).toContainText(
       'El gráfico de gastos no respeta el filtro de mes',
     )
-    await expect(tracker.reportEntry(902)).toContainText(
+    await expect(page.locator('[data-report-entry="902"]')).toContainText(
       'Añadir exportación a PDF de los movimientos',
     )
-    await tracker.reportEntry(901).click()
+    await page.locator('[data-report-entry="901"]').click()
     await expect(page.getByText('En la demo no se envían comentarios.')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Tu descripción' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Descripción en GitHub' })).toBeVisible()

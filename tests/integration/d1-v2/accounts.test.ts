@@ -3,10 +3,6 @@ import { eq } from "drizzle-orm";
 import { accounts, users } from "../../../src/db/schema";
 import { createTestDb, type TestDatabase } from "./setup";
 
-/** Fixed instants: the rows never depend on the wall clock (rule 4). */
-const NOW = "2026-06-15T10:00:00.000Z";
-const LATER = "2026-06-15T11:00:00.000Z";
-
 /**
  * WP5 acceptance criterion: "a sample repository test (e.g. accounts CRUD
  * + FK violation rejected) passes against real local D1". `accounts` is
@@ -31,8 +27,8 @@ describe("d1-v2 integration: accounts", () => {
       .insert(users)
       .values({
         email: "owner@example.com",
-        createdAt: NOW,
-        updatedAt: NOW,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
       .returning();
     return user;
@@ -41,7 +37,7 @@ describe("d1-v2 integration: accounts", () => {
   it("inserts, reads, updates and deletes an account (CRUD)", async () => {
     const { db } = testDb;
     const user = await seedUser();
-    const now = NOW;
+    const now = new Date().toISOString();
 
     const [created] = await db
       .insert(accounts)
@@ -64,7 +60,7 @@ describe("d1-v2 integration: accounts", () => {
 
     await db
       .update(accounts)
-      .set({ name: "Cuenta renombrada", updatedAt: LATER })
+      .set({ name: "Cuenta renombrada", updatedAt: new Date().toISOString() })
       .where(eq(accounts.id, created.id));
 
     const [updated] = await db.select().from(accounts).where(eq(accounts.id, created.id));
@@ -77,7 +73,7 @@ describe("d1-v2 integration: accounts", () => {
 
   it("rejects inserting an account for a non-existent user (FK violation)", async () => {
     const { db } = testDb;
-    const now = NOW;
+    const now = new Date().toISOString();
 
     await expect(
       db.insert(accounts).values({
@@ -99,12 +95,12 @@ describe("d1-v2 integration: accounts", () => {
       .insert(users)
       .values({
         email: "other@example.com",
-        createdAt: NOW,
-        updatedAt: NOW,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
       .returning();
 
-    const now = NOW;
+    const now = new Date().toISOString();
     await db.insert(accounts).values({
       userId: userA.id,
       name: "Cuenta A",

@@ -5,12 +5,12 @@ test.describe('Patrimonio', () => {
     await tracker.openWealth()
     await tracker.selectWealthMonth('MARZO')
     const band = tracker.wealthSection.locator('[data-wealth-band]')
-    const total = tracker.wealthTotal
+    const total = band.locator('#wealth-total')
     const before = await total.textContent()
 
     await tracker.wealthSnapshotInput('Revolut').fill('12345,67')
 
-    const changes = tracker.snapshotChanges
+    const changes = tracker.wealthSection.locator('[data-snapshot-changes]')
     await expect(changes).toContainText('1 cambio sin guardar')
     await expect(band.locator('[data-wealth-status]')).toHaveText('Con cambios sin guardar')
     await expect(total).not.toHaveText(before ?? '')
@@ -21,22 +21,24 @@ test.describe('Patrimonio', () => {
     await expect(total).toHaveText(before ?? '')
   })
 
-  test('una entrada inválida no se guarda hasta corregirla', async ({ tracker }) => {
+  test('una entrada inválida no se guarda hasta corregirla', async ({ page, tracker }) => {
     await tracker.openWealth()
     await tracker.selectWealthMonth('MARZO')
     const input = tracker.wealthSnapshotInput('Revolut')
 
     await input.fill('12x')
     await expect(input).toHaveAttribute('aria-invalid', 'true')
-    await tracker.saveSnapshotButton.click()
-    await expect(tracker.toast).toContainText('Corrige los saldos no válidos antes de guardar.')
+    await tracker.wealthSection.locator('[data-save-snapshot]').click()
+    await expect(page.locator('#toast')).toContainText(
+      'Corrige los saldos no válidos antes de guardar.',
+    )
     await expect(input).toHaveValue('12x')
     await expect(tracker.wealthSection.locator('[data-wealth-status]')).toHaveText(
       'Con cambios sin guardar',
     )
 
     await input.fill('150')
-    await tracker.saveSnapshotButton.click()
+    await tracker.wealthSection.locator('[data-save-snapshot]').click()
     await expect(tracker.wealthSection.locator('[data-wealth-status]')).toHaveText('Guardado')
     await expect(input).toHaveValue('150')
   })

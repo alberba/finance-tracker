@@ -22,15 +22,15 @@ test.describe('Modo demo', () => {
       }
     })
 
-    const tracker = new FinanceTrackerPage(page)
     await page.goto('/demo')
 
-    await expect(tracker.appRoot).toHaveAttribute('data-demo', '1')
+    await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await page.goto('/movimientos')
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
 
+    const tracker = new FinanceTrackerPage(page)
     await tracker.addCustomTransaction({
       date: '2026-08-12',
       monthLabel: 'AGOSTO',
@@ -70,9 +70,9 @@ test.describe('Modo demo', () => {
 
     await userMenu.getByRole('menuitem', { name: /Activar modo demo/ }).click()
 
-    await expect(tracker.appRoot).toHaveAttribute('data-demo', '1')
+    await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeVisible()
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await tracker.addCustomTransaction({
       date: '2026-08-12',
       monthLabel: 'AGOSTO',
@@ -85,9 +85,9 @@ test.describe('Modo demo', () => {
     await userMenuButton.click()
     await userMenu.getByRole('menuitem', { name: /Salir del modo demo/ }).click()
 
-    await expect(tracker.appRoot).not.toHaveAttribute('data-demo', '1')
+    await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')
     await expect(page.getByText('Modo demo · datos ficticios')).toBeHidden()
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     const currentState = await readScenarioState(page)
     currentState.meta.generatedAt = ''
     expect(currentState).toEqual(authenticatedState)

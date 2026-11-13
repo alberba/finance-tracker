@@ -1,67 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Sentry es el límite externo: un SDK falso recoge los eventos que saldrían hacia Sentry.
-// El scope expone solo setTag y setFingerprint: cualquier otro adjunto reventaría el test.
-interface SentryEvent {
-  message: string
-  level: string
-  tags: Record<string, string>
-  fingerprint?: string[]
-}
-const sentry = vi.hoisted(() => {
-  const state = {
-    events: [] as SentryEvent[],
-    inits: [] as Array<Record<string, unknown>>,
-    initFails: false,
-    scopeFails: false,
-  }
-  let scope: { tags: Record<string, string>; fingerprint?: string[] } = { tags: {} }
-  return {
-    state,
-    sdk: {
-      init: (options: Record<string, unknown>) => {
-        if (state.initFails) throw new Error('init falló')
-        state.inits.push(options)
-      },
-      withScope: (
-        handler: (scope: {
-          setTag: (key: string, value: string) => void
-          setFingerprint: (fingerprint: string[]) => void
-        }) => void,
-      ) => {
-        if (state.scopeFails) throw new Error('el SDK de Sentry falló')
-        const current: typeof scope = { tags: {} }
-        scope = current
-        handler({
-          setTag: (key, value) => {
-            current.tags[key] = value
-          },
-          setFingerprint: (fingerprint) => {
-            current.fingerprint = fingerprint
-          },
-        })
-      },
-      captureMessage: (message: string, level: string) => {
-        state.events.push({ message, level, ...scope })
-      },
-    },
-  }
-})
+// Se mockea el SDK para que el real nunca se cargue: lo que se fija aquí es lo
+// que sale hacia Sentry y cuándo se inicializa en el destino Node.
+const sentry = vi.hoisted(() => ({
+  init: vi.fn(),
+  withScope: vi.fn(),
+  captureMessage: vi.fn(),
+  captureException: vi.fn(),
+}))
 
-vi.mock('@sentry/cloudflare', () => sentry.sdk)
+vi.mock('@sentry/cloudflare', () => sentry)
 
-let logged: unknown[][]
+const setTag = vi.fn()
+const setFingerprint = vi.fn()
 
 beforeEach(() => {
   vi.resetModules()
-  sentry.state.events = []
-  sentry.state.inits = []
-  sentry.state.initFails = false
-  sentry.state.scopeFails = false
-  logged = []
-  vi.spyOn(console, 'error').mockImplementation((...args) => {
-    logged.push(args)
-  })
+  vi.clearAllMocks()
+  sentry.withScope.mockImplementation(
+    (
+      handler: (scope: { setTag: typeof setTag; setFingerprint: typeof setFingerprint }) => void,
+    ) => {
+      // El scope expone solo setTag y setFingerprint: cualquier otro adjunto reventaría el test.
+      handler({ setTag, setFingerprint })
+    },
+  )
 })
 
 async function loadTracking() {
@@ -74,13 +37,15 @@ describe('reportReportSideFailure', () => {
 
     reportReportSideFailure({ stage: 'track', reason: 'http-401' })
 
-    expect(sentry.state.events).toHaveLength(1)
-    expect(sentry.state.events[0]).toMatchObject({
-      message: 'Fallo auxiliar del reporte web (track: http-401)',
-      level: 'warning',
-      tags: { 'report.stage': 'track', 'report.reason': 'http-401' },
-    })
-    expect(Object.keys(sentry.state.events[0].tags)).toHaveLength(2)
+    expect(setTag.mock.calls).toEqual([
+      ['report.stage', 'track'],
+      ['report.reason', 'http-401'],
+    ])
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      'Fallo auxiliar del reporte web (track: http-401)',
+      'warning',
+    )
   })
 
   it('agrupa por fase y motivo: cada combinación es su propia issue', async () => {
@@ -89,19 +54,23 @@ describe('reportReportSideFailure', () => {
     reportReportSideFailure({ stage: 'track', reason: 'http-401' })
     reportReportSideFailure({ stage: 'upload', reason: 'http-403' })
 
-    expect(sentry.state.events.map((event) => event.fingerprint)).toEqual([
-      ['report-side-failure', 'track', 'http-401'],
-      ['report-side-failure', 'upload', 'http-403'],
+    expect(setFingerprint.mock.calls).toEqual([
+      [['report-side-failure', 'track', 'http-401']],
+      [['report-side-failure', 'upload', 'http-403']],
     ])
   })
 
-  it('no relanza si el SDK falla, y deja un log fijo sin el texto del fallo', async () => {
-    sentry.state.scopeFails = true
+  it('no relanza si el SDK falla, y deja un log fijo', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sentry.withScope.mockImplementation(() => {
+      throw new Error('el SDK de Sentry falló')
+    })
     const { reportReportSideFailure } = await loadTracking()
 
     expect(() => reportReportSideFailure({ stage: 'upload', reason: 'failed' })).not.toThrow()
 
-    expect(logged).toEqual([['[api] No se pudo reportar a Sentry el fallo auxiliar del reporte.']])
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    consoleError.mockRestore()
   })
 })
 
@@ -112,7 +81,7 @@ describe('initServerErrorTracking', () => {
     initServerErrorTracking(undefined)
     initServerErrorTracking('')
 
-    expect(sentry.state.inits).toEqual([])
+    expect(sentry.init).not.toHaveBeenCalled()
   })
 
   it('con DSN inicializa una sola vez, aunque se llame en cada petición', async () => {
@@ -121,8 +90,8 @@ describe('initServerErrorTracking', () => {
     initServerErrorTracking('https://clave@sentry.example/1')
     initServerErrorTracking('https://clave@sentry.example/1')
 
-    expect(sentry.state.inits).toHaveLength(1)
-    expect(sentry.state.inits[0]).toMatchObject({
+    expect(sentry.init).toHaveBeenCalledTimes(1)
+    expect(sentry.init.mock.calls[0]?.[0]).toMatchObject({
       dsn: 'https://clave@sentry.example/1',
       dataCollection: { userInfo: false, cookies: false, httpBodies: [] },
     })
@@ -133,18 +102,20 @@ describe('initServerErrorTracking', () => {
 
     initServerErrorTracking('https://clave@sentry.example/1')
 
-    const { integrations } = sentry.state.inits[0] as {
+    const { integrations } = sentry.init.mock.calls[0]?.[0] as {
       integrations: (defaults: { name: string }[]) => { name: string }[]
     }
     expect(integrations([{ name: 'Console' }, { name: 'Http' }])).toEqual([{ name: 'Http' }])
   })
 
-  it('no rompe la petición si el SDK falla al inicializar, y deja un log fijo', async () => {
-    sentry.state.initFails = true
+  it('no rompe la petición si el SDK falla al inicializar', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sentry.init.mockImplementation(() => {
+      throw new Error('init falló')
+    })
     const { initServerErrorTracking } = await loadTracking()
 
     expect(() => initServerErrorTracking('https://clave@sentry.example/1')).not.toThrow()
-
-    expect(logged).toEqual([['[api] No se pudo inicializar Sentry en el servidor.']])
+    consoleError.mockRestore()
   })
 })

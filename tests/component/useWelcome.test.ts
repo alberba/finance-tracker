@@ -1,62 +1,18 @@
-import 'fake-indexeddb/auto'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, nextTick } from 'vue'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { syncSettingsUpdate } from '../../src/lib/client/command-mapping'
 import { useWelcome } from '../../src/composables/useWelcome'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
-import { useSyncStore } from '../../src/stores/sync'
-import { listAll, openStorage } from '../helpers/client-storage'
 
-const USER_ID = 'user-use-welcome'
+vi.mock('../../src/lib/client/command-mapping', () => ({
+  syncSettingsUpdate: vi.fn().mockResolvedValue(undefined),
+}))
+const Host = defineComponent({ setup: useWelcome, template: '<div />' })
 
-/**
- * Host mínimo del composable: pinta su estado en `data-*` y expone `dismiss` y `resume`
- * como botones, así el test lee el DOM y pulsa en vez de tocar `wrapper.vm`.
- */
-const Host = defineComponent({
-  setup: useWelcome,
-  template: `<div :data-open="String(open)" :data-can-resume="String(canResume)" :data-complete="String(complete)">
-    <button type="button" data-dismiss @click="dismiss()">dismiss</button>
-    <button type="button" data-resume @click="resume()">resume</button>
-  </div>`,
-})
-
-type HostWrapper = ReturnType<typeof mount>
-const isOpen = (wrapper: HostWrapper) => wrapper.attributes('data-open') === 'true'
-const canResume = (wrapper: HostWrapper) => wrapper.attributes('data-can-resume') === 'true'
-const isComplete = (wrapper: HostWrapper) => wrapper.attributes('data-complete') === 'true'
-const dismiss = (wrapper: HostWrapper) => wrapper.get('[data-dismiss]').trigger('click')
-const resume = (wrapper: HostWrapper) => wrapper.get('[data-resume]').trigger('click')
-
-let syncStore: ReturnType<typeof useSyncStore>
-
-/** What the user's settings sync has queued on this device: the real outbox, offline. */
-async function queuedSettingsPatches(): Promise<Array<Record<string, unknown>>> {
-  const storage = await openStorage(USER_ID)
-  try {
-    return (await listAll(storage)).flatMap((entry) =>
-      entry.command.action === 'settingsUpdate'
-        ? [entry.command.patch as Record<string, unknown>]
-        : [],
-    )
-  } finally {
-    storage.close()
-  }
-}
-
-beforeEach(async () => {
-  // The network is the boundary: this device is offline, so settings only queue.
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => {
-      throw new TypeError('Failed to fetch')
-    }),
-  )
+beforeEach(() => {
   setActivePinia(createPinia())
-  syncStore = useSyncStore()
-  await syncStore.init(USER_ID)
-  syncStore.connection = 'offline'
   document.documentElement.dataset.financeReady = 'true'
   useFinancialStateStore().commitState((draft) => {
     draft.accounts = []
@@ -69,47 +25,42 @@ beforeEach(async () => {
   })
 })
 
-afterEach(async () => {
-  await syncStore.logout({ discardPending: true })
-  vi.unstubAllGlobals()
-})
-
 describe('useWelcome', () => {
   it('does not record a first presentation when bootstrap failed', async () => {
     const store = useFinancialStateStore()
     store.failLoad('No se pudo cargar')
     const wrapper = mount(Host)
     await nextTick()
-    expect(isOpen(wrapper)).toBe(false)
+    expect(wrapper.vm.open).toBe(false)
     expect(store.state.onboardingPresented).toBe(false)
     store.replaceState(store.state)
     await nextTick()
-    expect(isOpen(wrapper)).toBe(true)
+    expect(wrapper.vm.open).toBe(true)
     wrapper.unmount()
   })
 
   it('waits for bootstrap before presenting the welcome', async () => {
     document.documentElement.dataset.financeReady = 'false'
     const wrapper = mount(Host)
-    expect(isOpen(wrapper)).toBe(false)
+    expect(wrapper.vm.open).toBe(false)
     document.documentElement.dataset.financeReady = 'true'
-    await vi.waitFor(() => expect(isOpen(wrapper)).toBe(true))
+    await vi.waitFor(() => expect(wrapper.vm.open).toBe(true))
     wrapper.unmount()
   })
 
   it('remembers a dismissal and allows resuming without auto reopening', async () => {
     const wrapper = mount(Host)
     await nextTick()
-    await dismiss(wrapper)
+    wrapper.vm.dismiss()
     await nextTick()
     expect(useFinancialStateStore().state.onboardingDismissed).toBe(true)
     wrapper.unmount()
     const returning = mount(Host)
     await nextTick()
-    expect(isOpen(returning)).toBe(false)
-    expect(canResume(returning)).toBe(true)
-    await resume(returning)
-    expect(isOpen(returning)).toBe(true)
+    expect(returning.vm.open).toBe(false)
+    expect(returning.vm.canResume).toBe(true)
+    returning.vm.resume()
+    expect(returning.vm.open).toBe(true)
     returning.unmount()
   })
 
@@ -121,23 +72,23 @@ describe('useWelcome', () => {
       draft.onboardingDismissed = true
     })
     await nextTick()
-    expect(isOpen(wrapper)).toBe(false)
-    await resume(wrapper)
+    expect(wrapper.vm.open).toBe(false)
+    wrapper.vm.resume()
     useFinancialStateStore().commitState((draft) => {
       draft.currency = 'USD'
     })
     await nextTick()
-    expect(isOpen(wrapper)).toBe(true)
+    expect(wrapper.vm.open).toBe(true)
     wrapper.unmount()
   })
 
   it('persists presentation together with dismissal before an earlier sync finishes', async () => {
     const wrapper = mount(Host)
     await nextTick()
-    await dismiss(wrapper)
-    await vi.waitFor(async () => {
-      const patches = await queuedSettingsPatches()
-      expect(patches.at(-1)).toEqual({ onboardingPresented: true, onboardingDismissed: true })
+    wrapper.vm.dismiss()
+    expect(syncSettingsUpdate).toHaveBeenLastCalledWith({
+      onboardingPresented: true,
+      onboardingDismissed: true,
     })
     wrapper.unmount()
   })
@@ -161,10 +112,10 @@ describe('useWelcome', () => {
     })
     const wrapper = mount(Host)
     await nextTick()
-    expect(isOpen(wrapper)).toBe(true)
-    expect(isComplete(wrapper)).toBe(true)
+    expect(wrapper.vm.open).toBe(true)
+    expect(wrapper.vm.complete).toBe(true)
     expect(store.state.onboardingCompleted).toBe(false)
-    await dismiss(wrapper)
+    wrapper.vm.dismiss()
     expect(store.state.onboardingCompleted).toBe(true)
     wrapper.unmount()
   })
@@ -195,8 +146,8 @@ describe('useWelcome', () => {
       draft.transactions = []
     })
     await nextTick()
-    expect(canResume(wrapper)).toBe(false)
-    expect(isOpen(wrapper)).toBe(false)
+    expect(wrapper.vm.canResume).toBe(false)
+    expect(wrapper.vm.open).toBe(false)
     wrapper.unmount()
   })
 })

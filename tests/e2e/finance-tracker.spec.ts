@@ -305,7 +305,7 @@ test.describe('Finance tracker E2E', () => {
     await expect(
       tracker.transactionsSection.getByRole('heading', { name: 'Neto de febrero 2026' }),
     ).toBeVisible()
-    await expect(tracker.transactionsMonthNet).toHaveText('+1.480,23 €')
+    await expect(tracker.transactionsSection.locator('#tx-month-net')).toHaveText('+1.480,23 €')
     await expect(
       tracker.transactionsBreakdown.getByRole('heading', { name: 'Febrero por categoría' }),
     ).toBeVisible()
@@ -361,7 +361,7 @@ test.describe('Finance tracker E2E', () => {
   }) => {
     await page.goto('/')
     await expect(page).toHaveURL(/\/$/)
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await tracker.openTransactions()
     await expect(
       tracker.transactionsSection.getByRole('heading', {
@@ -528,7 +528,7 @@ test.describe('Finance tracker E2E', () => {
     // The panel is a modal dialog in the top layer: the toast, a manual
     // popover shown after it, renders above it.
     await expect(tracker.transactionPanel).toBeVisible()
-    const toast = tracker.toast
+    const toast = page.locator('#toast')
     await expect(toast).toBeVisible()
     expect(await toast.evaluate((element) => element.matches(':popover-open'))).toBe(true)
     // Still in its corner, not centred like a bare popover.

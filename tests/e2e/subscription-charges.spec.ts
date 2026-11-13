@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect } from './fixtures'
+import { test, expect } from '@playwright/test'
+import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { syncV2TestHeaders } from './seed-sync-v2'
-
-// The charge is due the day before the app's (pinned) today.
-test.use({ fixedTime: '2026-09-13T10:00:00Z' })
 
 test('sync v2 guarda el cobro vencido al arrancar y no lo duplica al recargar', async ({
   page,
-  tracker,
-  testUserEmail,
 }) => {
-  const headers = await syncV2TestHeaders(page.request, testUserEmail)
+  const email = `pw-subscription-${randomUUID()}@e2e.test`
+  await page.context().setExtraHTTPHeaders({ 'X-Test-User-Email': email })
+  const initialization = await page.request.post('/api/state/initialize', { data: {} })
+  expect(initialization.ok()).toBe(true)
+  const headers = await syncV2TestHeaders(page.request, email)
   const accountId = randomUUID()
   const seeded = await page.request.post('/api/sync', {
     headers,
@@ -52,9 +52,9 @@ test('sync v2 guarda el cobro vencido al arrancar y no lo duplica al recargar', 
     'applied',
     'applied',
   ])
-  // The fixture already booted the app before the seed: the next start is the
-  // one that must settle the due charge.
-  await tracker.reload()
+  await page.clock.setFixedTime(new Date('2026-09-13T10:00:00Z'))
+  const tracker = new FinanceTrackerPage(page)
+  await tracker.goto()
   await tracker.openTransactions()
   const charges = tracker.transactionRows.filter({ hasText: 'Todoist' })
   await expect(charges).toHaveCount(1)

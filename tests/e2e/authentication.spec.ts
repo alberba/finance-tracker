@@ -5,15 +5,6 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { AuthenticationPage } from './pages/AuthenticationPage'
 import { expectSelfHostedFonts } from './pages/fonts'
 
-/**
- * Excepción a la regla 15 de TESTING_STANDARDS.md: importa `test` de
- * `@playwright/test`, no de `fixtures.ts`. Este spec prueba el registro, el
- * acceso y las sesiones reales de Better Auth sin sesión previa, y el fixture
- * inyecta `X-Test-User-Email` en todo contexto (la identidad de prueba
- * sustituiría el flujo bajo prueba) e inicializa un usuario ya autenticado.
- * Cada caso crea sus propias cuentas por la interfaz. Ver docs/playwright.md.
- */
-
 function authenticationHeaders(info: TestInfo) {
   let hash = 0
   for (const character of info.testId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0

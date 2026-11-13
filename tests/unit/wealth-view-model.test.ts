@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { buildWealthViewModel, parseSnapshotInput } from '../../src/domain/wealth/view-model'
 import { monthIndex, type Month } from '../../src/lib/month'
@@ -44,10 +44,6 @@ describe('parseSnapshotInput', () => {
 })
 
 describe('buildWealthViewModel', () => {
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
   it('groups the snapshot rows into liquidity, investment and debt', () => {
     const vm = buildWealthViewModel(state(), 2)
 
@@ -77,12 +73,10 @@ describe('buildWealthViewModel', () => {
   })
 
   it('keeps future months of the current year out of reach', () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
     const current = state()
-    current.year = 2026
+    current.year = new Date().getFullYear()
     const vm = buildWealthViewModel(current, 1)
-    const thisMonth = 6
+    const thisMonth = new Date().getMonth() + 1
 
     expect(vm.months[monthIndex(thisMonth as Month)].available).toBe(true)
     expect(vm.months.filter((month) => month.available)).toHaveLength(thisMonth)

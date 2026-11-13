@@ -20,7 +20,6 @@ import BudgetSection from '../../src/components/sections/BudgetSection.vue'
 import WealthSection from '../../src/components/sections/WealthSection.vue'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useUiStore } from '../../src/stores/ui'
-import { openPanel, panelWithOpener } from '../helpers/panel-host'
 
 vi.mock('../../src/composables/useSetupNavigation', () => ({
   useSetupNavigation: () => ({ createAccount: vi.fn(), editCategories: vi.fn() }),
@@ -65,20 +64,22 @@ const panels = [
 
 describe('account requirements', () => {
   it.each(panels)('blocks exposed creation in $name without accounts', async ({ component }) => {
-    const wrapper = render(panelWithOpener(component))
-    await openPanel(wrapper)
+    const wrapper = render(component)
+    wrapper.vm.openNew()
+    await nextTick()
     expect(wrapper.get('dialog').attributes('open')).toBeUndefined()
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
   it.each(panels)('reacts to account creation and removal in $name', async ({ component }) => {
     const store = useFinancialStateStore()
-    const wrapper = render(panelWithOpener(component))
+    const wrapper = render(component)
     store.patchState((draft) => {
       draft.accounts = [account]
     })
     await nextTick()
-    await openPanel(wrapper)
+    wrapper.vm.openNew()
+    await nextTick()
     await nextTick()
     expect(wrapper.get('dialog').attributes('open')).toBeDefined()
     expect(wrapper.findComponent(SetupRequirement).exists()).toBe(false)

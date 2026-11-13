@@ -1,9 +1,9 @@
 import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
-import { createTestPinia } from '../../helpers/pinia'
+import { createTestPinia } from '../helpers/pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../src/scripts/demo-mode', () => ({
+vi.mock('../../src/scripts/demo-mode', () => ({
   isDemoMode: vi.fn(() => false),
 }))
 
@@ -13,7 +13,7 @@ import {
   putEntity,
   wipeIdbCache,
   wipeOutbox,
-} from '../../helpers/client-storage'
+} from '../helpers/client-storage'
 import {
   resolveCategoryId,
   resolveEntityId,
@@ -24,8 +24,8 @@ import {
   syncRemove,
   syncSettingsUpdate,
   syncUpdate,
-} from '../../../src/lib/client/command-mapping'
-import { useSyncStore } from '../../../src/stores/sync'
+} from '../../src/lib/client/command-mapping'
+import { useSyncStore } from '../../src/stores/sync'
 
 const USER_ID = 'user-command-mapping-test'
 

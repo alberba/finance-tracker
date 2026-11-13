@@ -49,9 +49,9 @@ test('los requisitos bloquean solo las acciones afectadas y se resuelven al crea
   ).toBeVisible()
 
   await tracker.openWealth()
-  await expect(tracker.saveSnapshotButton).toBeDisabled()
+  await expect(tracker.wealthSection.locator('[data-save-snapshot]')).toBeDisabled()
   await tracker.wealthSection.getByRole('button', { name: 'Crear cuenta', exact: true }).click()
-  const panel = tracker.settingsAccountPanel
+  const panel = page.locator('#settings-account-panel')
   await expect(panel).toBeVisible()
   await panel.getByLabel('Nombre').fill('Cuenta inicial')
   await panel.getByLabel('Saldo inicial (€)').fill('0')
@@ -64,7 +64,7 @@ test('los requisitos bloquean solo las acciones afectadas y se resuelven al crea
   ).toBeEnabled()
   await expect(tracker.transactionsSection.locator('[data-setup-requirement]')).toHaveCount(0)
   await tracker.openWealth()
-  await expect(tracker.saveSnapshotButton).toBeEnabled()
+  await expect(tracker.wealthSection.locator('[data-save-snapshot]')).toBeEnabled()
 
   await tracker.openSettingsCard('Cuentas', 'Cuenta inicial')
   await panel.getByRole('button', { name: 'Eliminar', exact: true }).click()

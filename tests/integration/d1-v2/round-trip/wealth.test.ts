@@ -5,7 +5,7 @@
  * keyed by month alone, so two years collide).
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { startRoundTrip, type RoundTrip } from "./harness";
 import { runWithDb } from '../../../../src/db/database'
 
@@ -26,7 +26,6 @@ describe("round trip: patrimonio", () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     trip.cleanup();
   });
 
@@ -79,11 +78,7 @@ describe("round trip: patrimonio", () => {
 
     // The previous year's row is written *after* this year's, so a projection
     // that drops the year and keys by month alone would let it win the slot.
-    // The client's current year comes from the clock: fix it (only `Date`, so
-    // IndexedDB and the sync timers keep running) instead of the wall clock.
-    vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-06-15T10:00:00Z"));
-    const year = 2026;
+    const year = new Date().getFullYear();
     const currentYear = await runWithDb(trip.testDb.db, wealthRepository.create(trip.userId, {
       snapshotDate: `${year}-03-01`,
       year,

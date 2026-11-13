@@ -1,16 +1,15 @@
 import { readScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
-import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import type { Page } from '@playwright/test'
 
 /** The portfolio chart opens in €; the percentage view is one click away. */
 async function showPortfolioPercent(page: Page) {
-  await new FinanceTrackerPage(page)
-    .investmentSection()
+  await page
+    .locator('#investment')
     .getByRole('group', { name: 'Unidad del gráfico' })
     .getByRole('button', { name: '%' })
     .click()
-  await expect(new FinanceTrackerPage(page).portfolioChart).toHaveAttribute(
+  await expect(page.locator('#investment-portfolio-chart')).toHaveAttribute(
     'aria-label',
     'Evolución cartera total',
   )
@@ -18,9 +17,8 @@ async function showPortfolioPercent(page: Page) {
 
 /** Expands the first position so its per-asset chart renders. */
 async function openFirstPosition(page: Page) {
-  const tracker = new FinanceTrackerPage(page)
-  await tracker.investmentPositions.first().click()
-  await expect(tracker.assetChart).toBeVisible()
+  await page.locator('#investment [data-position]').first().click()
+  await expect(page.locator('#investment-asset-chart')).toBeVisible()
 }
 
 test.describe('Investment charts E2E', () => {
@@ -30,9 +28,9 @@ test.describe('Investment charts E2E', () => {
     async ({ tracker, page }) => {
       await tracker.openInvestment()
 
-      await expect(tracker.portfolioChart).toBeVisible()
-      await expect(tracker.allocationBar).toBeVisible()
-      await expect(tracker.assetChart).toHaveCount(0)
+      await expect(page.locator('#investment-portfolio-chart')).toBeVisible()
+      await expect(page.locator('#investment-allocation')).toBeVisible()
+      await expect(page.locator('#investment-asset-chart')).toHaveCount(0)
 
       await openFirstPosition(page)
     },
@@ -136,7 +134,7 @@ test.describe('Investment charts E2E', () => {
     page,
   }) => {
     await tracker.openInvestment()
-    await tracker.investmentMonthSelect.selectOption('3')
+    await page.locator('#investment-month').selectOption('3')
     await showPortfolioPercent(page)
     await openFirstPosition(page)
 
@@ -319,7 +317,7 @@ test.describe('Investment charts E2E', () => {
     page,
   }) => {
     await tracker.openInvestment()
-    await tracker.investmentMonthSelect.selectOption('1')
+    await page.locator('#investment-month').selectOption('1')
     await showPortfolioPercent(page)
     await openFirstPosition(page)
 
@@ -349,9 +347,10 @@ test.describe('Investment charts E2E', () => {
     tracker,
   }) => {
     await tracker.openInvestment()
+    const section = tracker.investmentSection()
 
-    const segments = tracker.allocationSegments
-    const positions = tracker.investmentPositions
+    const segments = section.locator('#investment-allocation [data-segment]')
+    const positions = section.locator('[data-position]')
     const count = await positions.count()
     expect(count).toBeGreaterThan(0)
     await expect(segments).toHaveCount(count)
@@ -374,8 +373,8 @@ test.describe('Investment charts E2E', () => {
     })
 
     // Seleccionar mes anterior
-    await tracker.investmentMonthSelect.selectOption('1')
-    await expect(new FinanceTrackerPage(page).portfolioChart).toHaveAttribute(
+    await page.locator('#investment-month').selectOption('1')
+    await expect(page.locator('#investment-portfolio-chart')).toHaveAttribute(
       'data-chart-point-count',
       /\d+/,
     )

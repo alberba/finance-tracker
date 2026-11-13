@@ -1,8 +1,22 @@
+// @vitest-environment happy-dom
+import { Effect } from 'effect'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../../src/services/stockevents-api', () => ({
+  fetchStockEventsCredentialStatus: vi.fn(),
+  createStockEventsTransaction: vi.fn(),
+  checkStockEventsSymbols: vi.fn(),
+}))
+
 import { normalizeState } from '../../src/scripts/state'
 import type { Transaction } from '../../src/scripts/types'
+import {
+  createStockEventsTransaction,
+  checkStockEventsSymbols,
+  fetchStockEventsCredentialStatus,
+} from '../../src/services/stockevents-api'
+import { ApiClientError } from '../../src/lib/client/api-error'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
 import { useInvestmentStore } from '../../src/stores/investment'
 import { useStockEventsStore } from '../../src/stores/stockevents'
@@ -59,53 +73,33 @@ function seedState(transactions: Transaction[], tradesToCash = false): void {
   )
 }
 
-/** Lo que Stock Events recibió por HTTP: el borde externo que sustituye al servicio propio. */
-let transactionsPosted: Array<Record<string, unknown>>
-let symbolChecksPosted: Array<Array<Record<string, unknown>>>
-let credentialConfigured: boolean
-let transactionResponse: () => Response
-let toast: { textContent: string }
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
+function toastText(): string {
+  return document.getElementById('toast')?.textContent || ''
 }
 
-function toastText(): string {
-  return toast.textContent
+async function settle(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
 }
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  toast = { textContent: '', dataset: {}, hasAttribute: () => false } as never
-  vi.stubGlobal('document', { getElementById: (id: string) => (id === 'toast' ? toast : null) })
-  transactionsPosted = []
-  symbolChecksPosted = []
-  credentialConfigured = true
-  transactionResponse = () =>
-    json({ transaction: { id: 'se-tx-1', watchlistId: 'wl-1', symbol: 'ETH' } })
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string, init?: RequestInit) => {
-      const body = init?.body ? JSON.parse(String(init.body)) : undefined
-      if (url === '/api/integrations/stockevents') return json({ configured: credentialConfigured })
-      if (url === '/api/stockevents/transactions') {
-        transactionsPosted.push(body.transaction)
-        return transactionResponse()
-      }
-      if (url === '/api/stockevents/check-symbols') {
-        symbolChecksPosted.push(body.checks)
-        return json({ results: [] })
-      }
-      throw new Error(`unexpected fetch ${url}`)
+  document.body.innerHTML = '<div id="toast"></div>'
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(true))
+  vi.mocked(createStockEventsTransaction).mockReturnValue(
+    Effect.succeed({
+      id: 'se-tx-1',
+      watchlistId: 'wl-1',
+      symbol: 'ETH',
     }),
   )
+  vi.mocked(checkStockEventsSymbols).mockReturnValue(Effect.succeed([]))
 })
 
 afterEach(() => {
-  vi.unstubAllGlobals()
+  document.body.innerHTML = ''
 })
 
 describe('stockEvents syncMovement — skip warning', () => {
@@ -118,13 +112,14 @@ describe('stockEvents syncMovement — skip warning', () => {
     const result = await store.syncMovement(btcBuy)
 
     expect(result).toBe('skipped')
-    expect(transactionsPosted).toEqual([])
+    expect(createStockEventsTransaction).not.toHaveBeenCalled()
     expect(toastText()).toBe('Stock Events: BTC no tiene sincronización activada o lista asignada.')
+    expect(console.warn).toHaveBeenCalled()
   })
 
   it('se mantiene en silencio cuando no hay conexión con Stock Events', async () => {
     seedState([btcBuy])
-    credentialConfigured = false
+    vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(false))
     const store = useStockEventsStore()
     await store.initializeCredential()
     expect(store.isConnected).toBe(false)
@@ -132,7 +127,7 @@ describe('stockEvents syncMovement — skip warning', () => {
     const result = await store.syncMovement(btcBuy)
 
     expect(result).toBe('skipped')
-    expect(transactionsPosted).toEqual([])
+    expect(createStockEventsTransaction).not.toHaveBeenCalled()
     expect(toastText()).toBe('')
   })
 
@@ -144,7 +139,7 @@ describe('stockEvents syncMovement — skip warning', () => {
     const result = await store.syncMovement({ ...ethBuy, units: 0 })
 
     expect(result).toBe('skipped')
-    expect(transactionsPosted).toEqual([])
+    expect(createStockEventsTransaction).not.toHaveBeenCalled()
     expect(toastText()).toBe(
       'Stock Events: el movimiento de ETH no tiene datos válidos para sincronizar.',
     )
@@ -158,7 +153,9 @@ it('comprueba el ticker cripto efectivo en Stock Events', async () => {
 
   await store.checkSymbols()
 
-  expect(symbolChecksPosted).toEqual([[{ symbol: 'ETH.CRYPTO', watchlistId: 'wl-1' }]])
+  expect(checkStockEventsSymbols).toHaveBeenCalledWith([
+    { symbol: 'ETH.CRYPTO', watchlistId: 'wl-1' },
+  ])
 })
 
 describe('stockEvents syncMovement — éxito y fallo', () => {
@@ -170,8 +167,8 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
     const result = await store.syncMovement(ethBuy)
 
     expect(result).toBe('synced')
-    expect(transactionsPosted).toHaveLength(1)
-    expect(transactionsPosted[0]).toMatchObject({
+    expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
       watchlistId: 'wl-1',
       symbol: 'ETH.CRYPTO',
       date: '2026-07-15T10:30:00Z',
@@ -185,7 +182,15 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
 
   it('devuelve failed cuando Stock Events rechaza la petición', async () => {
     seedState([ethBuy])
-    transactionResponse = () => json({ error: 'límite alcanzado' }, 422)
+    vi.mocked(createStockEventsTransaction).mockReturnValue(
+      Effect.fail(
+        new ApiClientError('api-error', {
+          endpoint: '/api/stockevents/transactions',
+          fallbackMessage: 'No se pudo sincronizar con Stock Events',
+          serverMessage: 'límite alcanzado',
+        }),
+      ),
+    )
     const store = useStockEventsStore()
     await store.initializeCredential()
 
@@ -206,8 +211,8 @@ describe('investment store — reenvío manual', () => {
     const result = await investmentStore.resyncMovement(ethBuy.id)
 
     expect(result).toBe(true)
-    expect(transactionsPosted).toHaveLength(1)
-    expect(transactionsPosted[0]).toMatchObject({
+    expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
       symbol: 'ETH.CRYPTO',
       change: 0.0047,
       price: 2110.3,
@@ -223,13 +228,13 @@ describe('investment store — reenvío manual', () => {
     const result = await investmentStore.resyncMovement('tx-inexistente')
 
     expect(result).toBe(false)
-    expect(transactionsPosted).toEqual([])
+    expect(createStockEventsTransaction).not.toHaveBeenCalled()
     expect(toastText()).toBe('Movimiento no encontrado.')
   })
 
   it('pide activar la conexión cuando el reenvío queda en skipped sin conexión', async () => {
     seedState([btcBuy])
-    credentialConfigured = false
+    vi.mocked(fetchStockEventsCredentialStatus).mockReturnValue(Effect.succeed(false))
     const store = useStockEventsStore()
     await store.initializeCredential()
     expect(store.isConnected).toBe(false)
@@ -238,7 +243,7 @@ describe('investment store — reenvío manual', () => {
     const result = await investmentStore.resyncMovement(btcBuy.id)
 
     expect(result).toBe(false)
-    expect(transactionsPosted).toEqual([])
+    expect(createStockEventsTransaction).not.toHaveBeenCalled()
     expect(toastText()).toBe('Activa la conexión con Stock Events para reenviar.')
   })
 })
@@ -263,11 +268,11 @@ describe('investment store — sincronización al editar', () => {
       accountId: 'broker',
       declared: false,
     })
-    // The resend is fire-and-forget: wait for the request Stock Events receives.
-    await vi.waitFor(() => expect(transactionsPosted).toHaveLength(1))
+    await settle()
 
     expect(saved).toBe(true)
-    expect(transactionsPosted[0]).toMatchObject({
+    expect(createStockEventsTransaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
       symbol: 'ETH.CRYPTO',
       date: '2026-07-16T11:45:00Z',
       change: 0.0047,
@@ -285,7 +290,7 @@ describe('stockEvents syncMovement — ajuste global de efectivo', () => {
 
     await store.syncMovement(ethBuy)
 
-    expect(transactionsPosted[0]).not.toHaveProperty('toCash')
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
   })
 
   it('el reenvío manual descuenta efectivo cuando el ajuste está activado', async () => {
@@ -294,7 +299,7 @@ describe('stockEvents syncMovement — ajuste global de efectivo', () => {
 
     await useInvestmentStore().resyncMovement(ethBuy.id)
 
-    expect(transactionsPosted[0]).toMatchObject({
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).toMatchObject({
       toCash: true,
     })
   })
@@ -306,6 +311,6 @@ describe('stockEvents syncMovement — ajuste global de efectivo', () => {
 
     await store.syncMovement(ethBuy, { toCash: false })
 
-    expect(transactionsPosted[0]).not.toHaveProperty('toCash')
+    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
   })
 })

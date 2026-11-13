@@ -18,13 +18,13 @@ test.describe('Mobile smoke', () => {
         }
       })
       await tracker.goto()
-      await tracker.expectReady()
+      await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
       await expect(
         tracker.dashboardSection.getByRole('heading', { name: 'Dashboard', exact: true }),
       ).toBeVisible()
 
       const hero = tracker.dashboardSection.getByRole('region', { name: 'Patrimonio neto' })
-      const netWorth = tracker.netWorthKpi
+      const netWorth = hero.locator('#kpi-net-worth')
       await expect(netWorth).toContainText('€')
 
       const layout = await hero.evaluate((element) => {
@@ -98,7 +98,7 @@ test.describe('Mobile smoke', () => {
   }) => {
     await page.setViewportSize({ width: 393, height: 560 })
     await tracker.openTransactions()
-    await tracker.newTransactionLauncher.click()
+    await page.locator('#tx-open-modal').click()
 
     // The panel fills the screen; its footer stays put while the fields scroll.
     const panel = page.getByRole('dialog', { name: 'Nuevo movimiento' })
@@ -220,7 +220,7 @@ test.describe('Mobile smoke', () => {
     await expect(menu).toBeHidden()
     await expect(tracker.issueReportDialog).toBeVisible()
     await expect(tracker.issueReportDialog.getByLabel('Resumen')).toBeFocused()
-    await expect(tracker.globalReportTrigger).toBeHidden()
+    await expect(page.locator('#global-report-trigger')).toBeHidden()
   })
 
   test('publica los metadatos mínimos de instalación PWA', async ({ page, tracker }) => {
@@ -248,7 +248,7 @@ test.describe('Mobile smoke', () => {
 
   test('mantiene accesible el modo demo desde la experiencia PWA', async ({ page, tracker }) => {
     await tracker.goto()
-    await tracker.expectReady()
+    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Más secciones' }).click()
@@ -259,13 +259,13 @@ test.describe('Mobile smoke', () => {
       })
       .click()
 
-    await expect(tracker.appRoot).toHaveAttribute('data-demo', '1')
+    await expect(page.locator('html')).toHaveAttribute('data-demo', '1')
     const banner = page.getByRole('status').filter({ hasText: 'Modo demo · datos ficticios' })
     await expect(banner).toBeVisible()
     // Activating demo mode reloads the page, and the browser may restore a
     // scroll offset that tucks the banner under the sticky app bar: measure
     // the layout from the top, polled until the reload settles.
-    const appBar = tracker.mobileAppBar
+    const appBar = page.locator('[data-mobile-app-bar]')
     await expect
       .poll(async () => {
         await page.evaluate(() => window.scrollTo(0, 0))
@@ -279,7 +279,7 @@ test.describe('Mobile smoke', () => {
       .toBeGreaterThanOrEqual(0)
 
     await banner.getByRole('button', { name: 'Salir' }).click()
-    await expect(tracker.appRoot).not.toHaveAttribute('data-demo', '1')
+    await expect(page.locator('html')).not.toHaveAttribute('data-demo', '1')
   })
 
   test.describe('Presupuesto', () => {
