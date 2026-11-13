@@ -1,4 +1,5 @@
-import { test, expect, devices, type BrowserContext, type Page } from '@playwright/test'
+import { devices, type BrowserContext, type Page } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
@@ -14,10 +15,16 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
  * A same-user conflict (ADR 0003) is reapplied automatically over the
  * server's current version, with a discreet toast — there is no
  * conflict-resolution dialog to wait on any more.
+ *
+ * Every scenario needs several contexts (offline/online, two devices of one
+ * identity, desktop plus mobile), which the single-page `tracker` fixture cannot
+ * express. They import the fixture's `test` only for the isolated identity
+ * (`testUserEmail`, one derived address per scenario) and initialize each
+ * context's space through the API in `provisionUser`. No scenario reads
+ * "today": dates are literals and the ledger is filtered to their month.
  */
 
 const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
-const SYNC_STATUS = '#sidebar-sync-status'
 
 async function provisionUser(
   context: BrowserContext,
@@ -38,12 +45,13 @@ async function provisionUser(
   return { tracker, page }
 }
 
-function uniqueEmail(label: string): string {
-  return `pw-offline-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@e2e.test`
+/** One distinct, deterministic identity per scenario. */
+function identity(testUserEmail: string, label: string): string {
+  return testUserEmail.replace(/^pw-/, `pw-offline-${label}-`)
 }
 
 /**
- * Waits for `#sidebar-sync-status` to read "Sincronizado" and *stay* that
+ * Waits for the sidebar sync status to read "Sincronizado" and *stay* that
  * way.
  *
  * WP10 fix: a bare single check races the `/api/session` →
@@ -59,18 +67,20 @@ function uniqueEmail(label: string): string {
  * rather than a stale snapshot from before any of it began.
  */
 async function waitForSynced(page: Page): Promise<void> {
-  await expect(page.locator(SYNC_STATUS)).toContainText('Sincronizado', { timeout: 15000 })
+  const status = new FinanceTrackerPage(page).syncStatus
+  await expect(status).toContainText('Sincronizado', { timeout: 15000 })
   await page.waitForLoadState('networkidle')
-  await expect(page.locator(SYNC_STATUS)).toContainText('Sincronizado', { timeout: 15000 })
+  await expect(status).toContainText('Sincronizado', { timeout: 15000 })
 }
 
 test.describe('Sincronización offline (sync v2)', () => {
   test('CRUD sin conexión persiste localmente y se sincroniza al reconectar, sin duplicados', async ({
     browser,
+    testUserEmail,
   }) => {
     const context = await browser.newContext()
     try {
-      const { tracker, page } = await provisionUser(context, uniqueEmail('crud'))
+      const { tracker, page } = await provisionUser(context, identity(testUserEmail, 'crud'))
       await tracker.addAccount({ name: 'Cuenta Offline', openingBalance: 0 })
       await waitForSynced(page)
 
@@ -117,8 +127,9 @@ test.describe('Sincronización offline (sync v2)', () => {
 
   test('una edición concurrente en dos dispositivos se resuelve sola, sin diálogo ni cola congelada', async ({
     browser,
+    testUserEmail,
   }) => {
-    const email = uniqueEmail('conflict')
+    const email = identity(testUserEmail, 'conflict')
     const contextDeviceOne = await browser.newContext()
     const contextDeviceTwo = await browser.newContext()
 
@@ -181,11 +192,10 @@ test.describe('Sincronización offline (sync v2)', () => {
       // is reapplied automatically over device one's version, and the user
       // gets a discreet notice instead of a choice to make.
       await contextDeviceTwo.setOffline(false)
-      await expect(pageTwo.locator('#toast')).toContainText(
-        'se reaplicó sobre la versión más reciente',
-        { timeout: 15000 },
-      )
-      await expect(pageTwo.locator('[data-conflict-resolution-dialog]')).toHaveCount(0)
+      await expect(deviceTwo.toast).toContainText('se reaplicó sobre la versión más reciente', {
+        timeout: 15000,
+      })
+      await expect(deviceTwo.conflictResolutionDialog).toHaveCount(0)
       await waitForSynced(pageTwo)
 
       // The queue kept moving through the conflict and drained on its own —
@@ -202,8 +212,9 @@ test.describe('Sincronización offline (sync v2)', () => {
   })
   test('un movimiento guardado en el móvil aparece en el ordenador abierto sin recargar', async ({
     browser,
+    testUserEmail,
   }) => {
-    const email = uniqueEmail('live')
+    const email = identity(testUserEmail, 'live')
     const desktopContext = await browser.newContext()
     const mobileContext = await browser.newContext({ ...devices['Pixel 5'] })
 

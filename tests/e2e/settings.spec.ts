@@ -44,7 +44,7 @@ test.describe('Settings E2E', () => {
 
       await settings.getByRole('tab', { name: /Activos/ }).click()
       await expect(settings.locator('tr[data-asset-id]')).toHaveCount(9)
-      await expect(settings.locator('#settings-tab-accounts')).toBeHidden()
+      await expect(tracker.settingsAccountsTabPanel).toBeHidden()
     },
   )
 
@@ -134,19 +134,16 @@ test.describe('Settings E2E', () => {
 
   test('añade, reordena y elimina una categoría de gasto', async ({ tracker, page }) => {
     await tracker.openSettingsTab('Categorías')
-    const expenses = tracker.section('settings').locator('[data-category-list="expenseCategories"]')
+    const expenses = tracker.categoryList('expenseCategories')
 
     await expenses.getByLabel('Nueva categoría de gastos').fill('Mascotas')
     await expenses.getByRole('button', { name: 'Añadir' }).click()
-    const item = expenses.locator('[data-category="Mascotas"]')
+    const item = tracker.categoryItem(expenses, 'Mascotas')
     await expect(item).toBeVisible()
-    await expect(expenses.locator('[data-category]').last()).toHaveAttribute(
-      'data-category',
-      'Mascotas',
-    )
+    await expect(tracker.categoryItem(expenses).last()).toHaveAttribute('data-category', 'Mascotas')
 
     await item.getByRole('button', { name: 'Subir Mascotas' }).click()
-    await expect(expenses.locator('[data-category]').last()).not.toHaveAttribute(
+    await expect(tracker.categoryItem(expenses).last()).not.toHaveAttribute(
       'data-category',
       'Mascotas',
     )

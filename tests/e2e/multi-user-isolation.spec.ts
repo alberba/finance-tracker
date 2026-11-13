@@ -1,4 +1,5 @@
-import { test, expect, type BrowserContext, type Page } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 /**
@@ -11,6 +12,12 @@ import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
  *
  * Each test user is provisioned only in v2 and sync isolation follows the
  * authenticated principal resolved by the server.
+ *
+ * The `tracker` fixture binds one user to the default page, so these scenarios
+ * do not request it: they take their isolated identity from `testUserEmail`
+ * (one derived address per simulated user), open one context per user and
+ * initialize each space through the API in `provisionUser`. They do not read
+ * "today": every date is a literal and the ledger is filtered to its month.
  */
 
 const TEST_USER_EMAIL_HEADER = 'X-Test-User-Email'
@@ -34,8 +41,9 @@ async function provisionUser(
   return { tracker, page }
 }
 
-function uniqueEmail(label: string): string {
-  return `pw-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@e2e.test`
+/** One distinct, deterministic identity per simulated user of this test. */
+function identity(testUserEmail: string, label: string): string {
+  return testUserEmail.replace(/^pw-/, `pw-${label}-`)
 }
 
 test.describe('Aislamiento multiusuario (sync v2)', () => {
@@ -52,8 +60,10 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     await contextB?.close()
   })
 
-  test('el movimiento creado por el usuario A no es visible para el usuario B', async () => {
-    const { tracker: trackerA } = await provisionUser(contextA, uniqueEmail('a'))
+  test('el movimiento creado por el usuario A no es visible para el usuario B', async ({
+    testUserEmail,
+  }) => {
+    const { tracker: trackerA } = await provisionUser(contextA, identity(testUserEmail, 'a'))
     await trackerA.addAccount({ name: 'Cuenta A', openingBalance: 100 })
     await trackerA.addCustomTransaction({
       date: '2026-01-05',
@@ -68,17 +78,20 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     await trackerA.filterTransactionsMonth('ENERO')
     await trackerA.expectTransactionDescriptionVisible('Gasto exclusivo de A')
 
-    const { tracker: trackerB } = await provisionUser(contextB, uniqueEmail('b'))
+    const { tracker: trackerB } = await provisionUser(contextB, identity(testUserEmail, 'b'))
     await trackerB.filterTransactionsMonth('ENERO')
 
     await expect(trackerB.transactionsSection.getByText('Gasto exclusivo de A')).toHaveCount(0)
   })
 
-  test('el usuario B no ve la cuenta creada por el usuario A', async () => {
-    const { tracker: trackerA } = await provisionUser(contextA, uniqueEmail('a2'))
+  test('el usuario B no ve la cuenta creada por el usuario A', async ({ testUserEmail }) => {
+    const { tracker: trackerA } = await provisionUser(contextA, identity(testUserEmail, 'a2'))
     await trackerA.addAccount({ name: 'Cuenta Secreta de A', openingBalance: 999 })
 
-    const { tracker: trackerB, page: pageB } = await provisionUser(contextB, uniqueEmail('b2'))
+    const { tracker: trackerB, page: pageB } = await provisionUser(
+      contextB,
+      identity(testUserEmail, 'b2'),
+    )
     await trackerB.openSettings()
 
     await expect(pageB.getByText('Cuenta Secreta de A')).toHaveCount(0)
@@ -86,8 +99,9 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
 
   test('cada usuario conserva sus propios datos entre sesiones (misma identidad, contexto nuevo)', async ({
     browser,
+    testUserEmail,
   }) => {
-    const email = uniqueEmail('owner')
+    const email = identity(testUserEmail, 'owner')
     const { tracker: trackerA } = await provisionUser(contextA, email)
     await trackerA.addAccount({ name: 'Cuenta Persistente', openingBalance: 250 })
     await trackerA.addCustomTransaction({

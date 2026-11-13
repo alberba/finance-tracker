@@ -53,9 +53,7 @@ test.describe('Goals E2E', () => {
     await expect(row).toContainText('dic 2027')
 
     await tracker.openDashboard()
-    await expect(tracker.dashboardSection.locator('#savings-goal')).toContainText(
-      'Colchón de seguridad',
-    )
+    await expect(tracker.savingsGoalSummary).toContainText('Colchón de seguridad')
 
     await tracker.reload()
     await tracker.openGoalPanel('short')

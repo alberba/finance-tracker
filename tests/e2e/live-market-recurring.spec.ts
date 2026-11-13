@@ -2,7 +2,7 @@ import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 import { setSwitch } from './pages/controls'
-import { expectSyncCommand } from './pages/sync'
+import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({
@@ -29,22 +29,20 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.reload()
     await tracker.openSettingsTab('Recurrentes')
 
-    const tab = page.locator('#settings [data-settings-recurring]')
-    const rule = tab.locator('tr[data-settings-rule-id="legacy-expense-rule"]')
+    const liveMarket = new LiveMarketPage(page)
+    const rule = liveMarket.settingsRuleRow('legacy-expense-rule')
     await expect(rule).toBeVisible()
     const toggle = rule.getByRole('switch', { name: 'Regla Alquiler histórico activa' })
     await setSwitch(toggle, false)
     await expect(toggle).not.toBeChecked()
     await rule.getByRole('button', { name: 'Editar la regla Alquiler histórico' }).click()
-    const panel = page.locator('#settings-recurring-panel')
+    const panel = liveMarket.settingsRecurringPanel
     await expect(panel.getByLabel('Descripción')).toHaveValue('Alquiler histórico')
     await panel.getByRole('button', { name: 'Cancelar' }).click()
     await expect(panel).toBeHidden()
 
     await tracker.openInvestmentRecurringTab()
-    await expect(page.locator('#investment [data-recurring-rules]')).not.toContainText(
-      'Alquiler histórico',
-    )
+    await expect(liveMarket.recurringRules).not.toContainText('Alquiler histórico')
   })
 
   test(
@@ -89,7 +87,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       })
       await tracker.openInvestmentDashboardTab()
 
-      const panel = page.locator('#investment [data-investment-quotes]')
+      const panel = liveMarket.investmentQuotes
       await expect(panel.getByText('VWCE', { exact: true })).toBeVisible()
       await expect(panel.getByText('Actualizado')).toBeVisible()
       await expect(panel.getByText('125,50 €')).toBeVisible()
@@ -147,7 +145,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
     await tracker.openInvestmentDashboardTab()
 
-    const panel = page.locator('#investment [data-investment-quotes]')
+    const panel = liveMarket.investmentQuotes
     await expect(panel.getByText('AGED.MI', { exact: true })).toBeVisible()
     await expect(panel.getByText('9,28 €')).toBeVisible()
     expect(requestedProvider).toBe('yahoo')
@@ -198,7 +196,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       fee: 0,
     })
     await tracker.openSettings()
-    await new LiveMarketPage(page).addInstrument({
+    const liveMarket = new LiveMarketPage(page)
+    await liveMarket.addInstrument({
       asset: 'Crypto',
       type: 'crypto',
       symbol: 'BTC',
@@ -206,7 +205,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       currency: 'EUR',
     })
     await tracker.openInvestmentDashboardTab()
-    const quotes = page.locator('#investment [data-investment-quotes]')
+    const quotes = liveMarket.investmentQuotes
     await expect(quotes.getByLabel('Títulos de BTC', { exact: true })).toHaveValue('0.09491284')
     await expect(quotes.getByText('73.000,00 €', { exact: true })).toBeVisible()
     expect(requestedSymbol).toBe('BTC-EUR')
@@ -331,9 +330,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
-    await expect(
-      page.locator('#investment [data-investment-quotes]').getByLabel('Títulos de AGED.MI'),
-    ).toHaveValue('5')
+    await expect(liveMarket.investmentQuotes.getByLabel('Títulos de AGED.MI')).toHaveValue('5')
   })
 
   test('permite vincular un movimiento legacy de ETF AGED sin símbolo', async ({
@@ -409,7 +406,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).toHaveCount(3)
+    await expect(liveMarket.dashboardPendingItems).toHaveCount(3)
     await tracker.openTransactions()
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(liveMarket.pendingPanel).toBeVisible()
@@ -439,11 +436,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.reload()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
-    await expect(
-      liveMarket.pendingPanel
-        .locator('[data-pending-item]')
-        .filter({ hasText: 'Compra VWCE editada' }),
-    ).toHaveCount(0)
+    await expect(liveMarket.pendingItems().filter({ hasText: 'Compra VWCE editada' })).toHaveCount(
+      0,
+    )
   })
 
   test('permite editar los campos de inversión de un pendiente automatizado', async ({
@@ -474,7 +469,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await expect(liveMarket.dashboardPendingItems).not.toHaveCount(0)
     await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(1)
@@ -532,7 +527,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const liveMarket = new LiveMarketPage(page)
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await expect(liveMarket.dashboardPendingItems).not.toHaveCount(0)
     await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
 
@@ -547,9 +542,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     )
     await typeControl.getByRole('button', { name: 'Inversión' }).click()
 
-    await expect(categorySelect.locator('option[value="Fondos Indexados"]')).toBeAttached()
+    await expect(categorySelect.getByRole('option', { name: 'Fondos Indexados' })).toBeAttached()
     await categorySelect.selectOption('Fondos Indexados')
 
+    // <optgroup> has no accessible role in a closed select: assert its markup.
     await expect(accountSelect.locator('optgroup[label="Activos de inversión"]')).toBeAttached()
     await accountSelect.selectOption({ label: 'Fondos Indexados' })
 
@@ -636,7 +632,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       currency: 'EUR',
     })
     await tracker.openInvestmentDashboardTab()
-    const panel = page.locator('#investment [data-investment-quotes]')
+    const panel = liveMarket.investmentQuotes
     await expect(panel.getByText('Retrasado')).toBeVisible()
   })
 
@@ -669,9 +665,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
-    await expect(
-      page.locator('#investment [data-investment-quotes]').getByLabel('Títulos de LINKED'),
-    ).toHaveValue('2')
+    await expect(liveMarket.investmentQuotes.getByLabel('Títulos de LINKED')).toHaveValue('2')
   })
   test('guarda una vinculación sin conexión, recarga y la completa al reconectar', async ({
     page,
@@ -703,9 +697,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     // The sync endpoints are unreachable from the start: the quote is
     // configured and linked before the server can confirm anything, which is
     // exactly the #491 case (no manual sync step, no catalog precheck).
-    const blocked = /\/api\/(bootstrap|changes|sync)(\?.*)?$/
-    const abortSync = (route: import('@playwright/test').Route) => route.abort()
-    await page.route(blocked, abortSync)
+    const reconnect = await blockSyncApi(page)
     const liveMarket = new LiveMarketPage(page)
     await tracker.openSettings()
     await liveMarket.addInstrument({
@@ -723,10 +715,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     // cannot confirm the configuration yet. It is stored, not failed.
     await liveMarket.linkExistingMovements('AGED.MI')
     await expect(row).toContainText('1 vinculados')
-    await expect(row.locator('[data-link-intent-status]')).toContainText(
-      'Guardado en este dispositivo',
-    )
-    await expect(row.locator('[data-link-intent-retry]')).toHaveCount(0)
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText('Guardado en este dispositivo')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
 
     // A reload cannot be done with `context.setOffline` (the shell has no
     // service worker), but blocking the API exercises the same recovery.
@@ -734,24 +724,30 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.openSettings()
     await liveMarket.openQuotes()
     await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
-    await expect(
-      liveMarket.instrument('AGED.MI').locator('[data-link-intent-status]'),
-    ).toContainText('Guardado en este dispositivo')
-    await expect(liveMarket.instrument('AGED.MI').locator('[data-link-intent-retry]')).toHaveCount(
-      0,
-    )
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText('Guardado en este dispositivo')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
 
-    await page.unroute(blocked, abortSync)
-    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
-      timeout: 20000,
-    })
+    // Both listeners exist before the route is lifted: the configuration goes
+    // first and only its confirmation wakes the dependent link update.
+    const configurationSent = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
+    const linkSent = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
+    )
+    await reconnect()
+    await configurationSent
+    await linkSent
+    await expect(tracker.syncStatus).toContainText('Sincronizado')
     await tracker.reload()
     await tracker.openSettings()
     await liveMarket.openQuotes()
     await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
     const linked = liveMarket.instrument('AGED.MI')
     await expect(linked).toContainText('1 vinculados')
-    await expect(linked.locator('[data-link-intent-status]')).toHaveCount(0)
+    await expect(liveMarket.linkStatus('AGED.MI')).toHaveCount(0)
   })
 
   test('muestra el fallo de la vinculación y lo reintenta desde el editor', async ({
@@ -828,16 +824,18 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await liveMarket.linkExistingMovements('AGED.MI')
-    const status = row.locator('[data-link-intent-status]')
-    await expect(status).toContainText('El movimiento ya no existe', { timeout: 15000 })
-    await expect(row.locator('[data-link-intent-retry]')).toBeVisible()
-    await expect(row.locator('[data-link-intent-discard]')).toBeVisible()
+    const status = liveMarket.linkStatus('AGED.MI')
+    await expect(status).toContainText('El movimiento ya no existe')
+    await expect(liveMarket.linkRetry('AGED.MI')).toBeVisible()
+    await expect(liveMarket.linkDiscard('AGED.MI')).toBeVisible()
 
     await page.unroute('**/api/sync')
-    await row.locator('[data-link-intent-retry]').click()
-    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
-      timeout: 20000,
-    })
+    const retried = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
+    )
+    await liveMarket.linkRetry('AGED.MI').click()
+    await retried
     await expect(row).toContainText('1 vinculados')
     await expect(status).toHaveCount(0)
   })
@@ -938,7 +936,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     await liveMarket.linkExistingMovements('AGED.MI')
     const status = liveMarket.linkStatus('AGED.MI')
-    await expect(status).toContainText('El movimiento ya no existe', { timeout: 15000 })
+    await expect(status).toContainText('El movimiento ya no existe')
     await expect(status).toContainText('1/2 vinculados')
 
     // The sidebar owns the generic intent discard. The quote panel is a top

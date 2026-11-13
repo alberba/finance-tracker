@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import { test as base, expect, devices, type APIRequestContext, type Page } from '@playwright/test'
+import { devices, type APIRequestContext, type Page } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
+
+/**
+ * Los usuarios son los aislados del fixture (`testUserEmail` en la cabecera de
+ * cada contexto), pero estos escenarios no piden `tracker`: ese fixture completa
+ * la bienvenida antes del primer render, y aquí se ejercita la primera
+ * presentación real de un usuario sin tocar. Cada test inicializa su espacio por
+ * la API (`initialize`).
+ */
 
 type Entity = { id: string; version: number; name: string }
 type Bootstrap = {
@@ -9,16 +18,6 @@ type Bootstrap = {
   transactions: Entity[]
   categories: Array<Entity & { kind: string }>
 }
-
-const test = base.extend<{ email: string }>({
-  email: async ({ browserName }, use) => {
-    await use(`onboarding-${browserName}-${randomUUID()}@e2e.test`)
-  },
-  context: async ({ context, email }, use) => {
-    await context.setExtraHTTPHeaders({ 'X-Test-User-Email': email })
-    await use(context)
-  },
-})
 
 const welcome = (page: Page) => page.getByRole('dialog', { name: 'Bienvenido a tus finanzas' })
 const resume = (page: Page) => page.getByRole('button', { name: 'Retomar bienvenida' })
@@ -141,7 +140,7 @@ test.describe('Bienvenida (sync v2)', () => {
       expect((await initialize(context.request)).alreadyInitialized).toBe(true)
       expect((await bootstrap(context.request)).categories).toEqual(before.categories)
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
-      await openWelcome(page)
+      const tracker = await openWelcome(page)
       await expect(welcome(page).getByRole('button', { name: 'Crear cuenta' })).toBeEnabled()
       await expect(
         welcome(page).getByRole('button', { name: 'Registrar movimiento' }),
@@ -151,7 +150,7 @@ test.describe('Bienvenida (sync v2)', () => {
       ).toBeVisible()
       for (const theme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme: theme })
-        await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+        await expect(tracker.appRoot).toHaveAttribute('data-theme', theme)
         await page.screenshot({
           path: testInfo.outputPath(`welcome-${device}-${theme}.png`),
           animations: 'disabled',
@@ -165,7 +164,7 @@ test.describe('Bienvenida (sync v2)', () => {
     page,
     context,
     browser,
-    email,
+    testUserEmail: email,
   }) => {
     await initialize(context.request)
     const tracker = await openWelcome(page)
@@ -175,7 +174,7 @@ test.describe('Bienvenida (sync v2)', () => {
       onboardingDismissed: 1,
       onboardingCompleted: 0,
     })
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+    await expect(tracker.syncStatus).toHaveText(/^Sincronizado ·/)
     await tracker.reload()
     await expect(welcome(page)).toBeHidden()
     await expect(resume(page)).toBeVisible()
@@ -201,7 +200,7 @@ test.describe('Bienvenida (sync v2)', () => {
     page,
     context,
     browser,
-    email,
+    testUserEmail: email,
   }) => {
     await initialize(context.request)
     const tracker = await openWelcome(page)
@@ -218,7 +217,7 @@ test.describe('Bienvenida (sync v2)', () => {
       onboardingAccountCompleted: 1,
       onboardingMovementCompleted: 0,
     })
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+    await expect(tracker.syncStatus).toHaveText(/^Sincronizado ·/)
     await tracker.reload()
     await resume(page).click()
     await expect(welcome(page).getByText('✓ Cuenta creada')).toBeVisible()
@@ -252,7 +251,7 @@ test.describe('Bienvenida (sync v2)', () => {
       onboardingMovementCompleted: 1,
       onboardingCompleted: 1,
     })
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+    await expect(tracker.syncStatus).toHaveText(/^Sincronizado ·/)
     await tracker.reload()
     await expect(welcome(page)).toBeHidden()
     await expect(resume(page)).toHaveCount(0)
@@ -296,7 +295,7 @@ test.describe('Bienvenida (sync v2)', () => {
         })),
       )
     }
-    await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+    await expect(tracker.syncStatus).toHaveText(/^Sincronizado ·/)
     await tracker.reload()
     await expect(welcome(page)).toBeHidden()
     await expect(resume(page)).toHaveCount(0)
@@ -314,9 +313,10 @@ test.describe('Bienvenida (sync v2)', () => {
     page,
     context,
     browser,
+    testUserEmail,
   }) => {
     const source = await browser.newContext({
-      extraHTTPHeaders: { 'X-Test-User-Email': `onboarding-source-${randomUUID()}@e2e.test` },
+      extraHTTPHeaders: { 'X-Test-User-Email': testUserEmail.replace(/^pw-/, 'pw-source-') },
     })
     try {
       await seedExistingData(source.request)
@@ -327,11 +327,13 @@ test.describe('Bienvenida (sync v2)', () => {
       const tracker = await openWelcome(page)
       await welcome(page).getByRole('button', { name: 'Ahora no' }).click()
       await expectSettings(context.request, { onboardingDismissed: 1 })
-      await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
+      await expect(tracker.syncStatus).toHaveText(/^Sincronizado ·/)
       await tracker.openData()
-      await page
-        .locator('#import-json')
-        .setInputFiles({ name: 'copia.json', mimeType: 'application/json', buffer: backup })
+      await tracker.importFileInput.setInputFiles({
+        name: 'copia.json',
+        mimeType: 'application/json',
+        buffer: backup,
+      })
       const confirmation = page.getByRole('alertdialog', { name: '¿Importar esta copia?' })
       const imported = page.waitForResponse((response) =>
         response.url().includes('/api/data/import?mode=replace'),
@@ -341,7 +343,7 @@ test.describe('Bienvenida (sync v2)', () => {
       const importResponse = await imported
       expect(importResponse.ok()).toBe(true)
       await reloaded
-      await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+      await tracker.expectReady()
       await expectSettings(context.request, {
         onboardingAccountCompleted: 1,
         onboardingMovementCompleted: 1,

@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures'
+import { setSwitch } from './pages/controls'
 import type { Page } from '@playwright/test'
 import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
@@ -39,12 +40,11 @@ function shortDate(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00Z`))
 }
 
-function todayLocal(): string {
-  const today = new Date()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${today.getFullYear()}-${month}-${day}`
-}
+// The app's today, pinned before the first render so every date below is a fixed literal.
+const FIXED_TIME = '2026-11-12T12:00:00Z'
+const TODAY = '2026-11-12'
+
+test.use({ fixedTime: FIXED_TIME })
 
 test.describe('suscripciones de gastos', () => {
   test(
@@ -53,7 +53,7 @@ test.describe('suscripciones de gastos', () => {
     async ({ page, tracker }) => {
       await tracker.openSubscriptionsTab()
 
-      const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+      const subscriptions = tracker.subscriptionsTab
       await expect(
         subscriptions.getByLabel('Resumen de suscripciones').getByText('Comprometido al mes'),
       ).toBeVisible()
@@ -91,7 +91,7 @@ test.describe('suscripciones de gastos', () => {
     page,
     tracker,
   }) => {
-    const today = todayLocal()
+    const today = TODAY
     await tracker.addSubscription({
       name: 'E2E Streaming',
       amount: 14.99,
@@ -101,11 +101,11 @@ test.describe('suscripciones de gastos', () => {
     })
 
     await expect(page.getByRole('status')).toContainText('gasto generado')
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+    const subscriptions = tracker.subscriptionsTab
     const summary = subscriptions.getByLabel('Resumen de suscripciones')
     await expect(summary).toContainText('14,99 €')
     await expect(summary).toContainText('179,88 €')
-    await expect(subscriptions.locator('[data-subscriptions-total]')).toHaveText('14,99 € / mes')
+    await expect(tracker.subscriptionsTotal).toHaveText('14,99 € / mes')
 
     await tracker.openTransactions()
     await tracker.transactionsSection.getByRole('tab', { name: /Registro/ }).click()
@@ -122,7 +122,7 @@ test.describe('suscripciones de gastos', () => {
     page,
     tracker,
   }) => {
-    const today = todayLocal()
+    const today = TODAY
     await tracker.addSubscription({
       name: 'E2E Pausable',
       amount: 8,
@@ -131,12 +131,10 @@ test.describe('suscripciones de gastos', () => {
       firstChargeDate: today,
     })
 
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    const row = subscriptions.locator('tr[data-subscription-id]', { hasText: 'E2E Pausable' })
+    const row = tracker.subscriptionRow('E2E Pausable')
     const toggle = row.getByRole('switch', { name: 'E2E Pausable activa' })
     await expect(toggle).toBeChecked()
-    await row.locator('label:has([role="switch"])').click()
-    await expect(toggle).not.toBeChecked()
+    await setSwitch(toggle, false)
     await expect(row).toContainText('Pausada')
     await row.getByRole('button', { name: 'Eliminar la suscripción E2E Pausable' }).click()
     const dialog = page.getByRole('alertdialog', { name: '¿Eliminar esta suscripción?' })
@@ -207,7 +205,7 @@ test.describe('suscripciones de gastos', () => {
     await tracker.openTransactions()
     await tracker.openSubscriptionsTab()
 
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
+    const subscriptions = tracker.subscriptionsTab
     const summary = subscriptions.getByLabel('Resumen de suscripciones')
     await expect(summary).toContainText('20,00 €')
     await expect(summary).toContainText('240,00 €')
@@ -217,9 +215,7 @@ test.describe('suscripciones de gastos', () => {
     await expect(where).toContainText('Ocio')
     await expect(where).toContainText('Software')
     await expect(where).not.toContainText('Salud')
-    await expect(
-      subscriptions.locator('tr[data-subscription-id]', { hasText: 'Gimnasio pausado' }),
-    ).toContainText('En pausa')
+    await expect(tracker.subscriptionRow('Gimnasio pausado')).toContainText('En pausa')
 
     await page.setViewportSize({ width: 375, height: 812 })
     await expect(subscriptions).toBeVisible()
@@ -229,7 +225,7 @@ test.describe('suscripciones de gastos', () => {
   })
 
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {
-    const today = todayLocal()
+    const today = TODAY
     const pausedDate = addDays(today, -10)
     const nextChargeDate = addDays(pausedDate, 14)
 
@@ -254,11 +250,9 @@ test.describe('suscripciones de gastos', () => {
       transactions: [],
     })
     await tracker.openSubscriptionsTab()
-    const subscriptions = tracker.transactionsSection.locator('#transactions-tab-subscriptions')
-    const row = subscriptions.locator('tr[data-subscription-id]', { hasText: 'E2E Reactivada' })
+    const row = tracker.subscriptionRow('E2E Reactivada')
     const toggle = row.getByRole('switch', { name: 'E2E Reactivada activa' })
-    await row.locator('label:has([role="switch"])').click()
-    await expect(toggle).toBeChecked()
+    await setSwitch(toggle, true)
 
     await expect(row).toContainText(shortDate(nextChargeDate))
 

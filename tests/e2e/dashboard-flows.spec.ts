@@ -38,11 +38,11 @@ test.describe('Finance tracker E2E', () => {
     },
   )
 
-  test('redirige rutas de sección desconocidas al dashboard', async ({ page }) => {
+  test('redirige rutas de sección desconocidas al dashboard', async ({ page, tracker }) => {
     await page.goto('/seccion-inexistente')
     await expect(page).toHaveURL(/\/$/)
     await expect(
-      page.locator('#dashboard').getByRole('heading', {
+      tracker.dashboardSection.getByRole('heading', {
         name: 'Dashboard',
         exact: true,
       }),

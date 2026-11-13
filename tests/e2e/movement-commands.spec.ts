@@ -1,60 +1,16 @@
-import { randomUUID } from 'node:crypto'
-import { test, expect } from '@playwright/test'
-import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { syncV2TestHeaders } from './seed-sync-v2'
+import { test, expect } from './fixtures'
+import { expectSyncCommand } from './pages/sync'
 
-test('editing an investment from Movimientos preserves its data after sync and reload @smoke', async ({
-  browser,
-}) => {
-  const email = `movement-command-${randomUUID()}@e2e.test`
-  const context = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
-  try {
-    const headers = await syncV2TestHeaders(context.request, email)
-    const seed = await context.request.post('/api/sync', {
-      headers,
-      data: {
-        commands: [
-          {
-            commandId: randomUUID(),
-            action: 'create',
-            entityType: 'account',
-            data: {
-              id: randomUUID(),
-              name: 'MyInvestor',
-              kind: 'cash',
-              currency: 'EUR',
-              openingBalance: 0,
-            },
-          },
-          {
-            commandId: randomUUID(),
-            action: 'create',
-            entityType: 'category',
-            data: { id: randomUUID(), name: 'Acciones', kind: 'investment' },
-          },
-        ],
-      },
-    })
-    expect(seed.ok()).toBe(true)
-    expect((await seed.json()).results.map((result: { status: string }) => result.status)).toEqual([
-      'applied',
-      'applied',
-    ])
-    const page = await context.newPage()
-    await page.clock.setFixedTime(new Date('2026-09-12T12:00:00Z'))
-    const tracker = new FinanceTrackerPage(page)
-    await tracker.goto()
+test.describe('edición de una inversión desde Movimientos', () => {
+  test.use({ fixedTime: '2026-09-12T12:00:00Z' })
 
-    const created = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/sync') &&
-        response
-          .request()
-          .postDataJSON()
-          ?.commands.some(
-            (command: { action: string; entityType: string }) =>
-              command.action === 'create' && command.entityType === 'transaction',
-          ),
+  test('editing an investment from Movimientos preserves its data after sync and reload @smoke', async ({
+    page,
+    tracker,
+  }) => {
+    const created = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
     )
     await tracker.addInvestmentMovement({
       date: '2026-09-12',
@@ -69,23 +25,16 @@ test('editing an investment from Movimientos preserves its data after sync and r
       brokerName: 'MyInvestor',
       declared: true,
     })
-    expect((await (await created).json()).results[0].status).toBe('applied')
+    await created
 
-    const edited = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/sync') &&
-        response
-          .request()
-          .postDataJSON()
-          ?.commands.some(
-            (command: { action: string; entityType: string }) =>
-              command.action === 'update' && command.entityType === 'transaction',
-          ),
+    const edited = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
     )
     await tracker.editTransactionByDescription('Compra 10 VWCE', {
       newDescription: 'Compra revisada',
     })
-    expect((await (await edited).json()).results[0].status).toBe('applied')
+    await edited
     await tracker.reload()
     await tracker.openInvestmentMovementsTab()
     await tracker
@@ -93,66 +42,27 @@ test('editing an investment from Movimientos preserves its data after sync and r
       .getByRole('button', { name: /^Editar / })
       .click()
     const panel = tracker.investmentMovementPanel()
-    await expect(panel.locator('#investment-movement-time')).toHaveValue('10:30')
-    await expect(panel.locator('#investment-movement-symbol')).toHaveValue('VWCE')
-    await expect(panel.locator('#investment-movement-units')).toHaveValue('10')
-    await expect(panel.locator('#investment-movement-unit-price')).toHaveValue('120.5')
-    await expect(panel.locator('#investment-movement-fee')).toHaveValue('1.2')
-    await expect(panel.locator('#investment-movement-currency')).toHaveValue('USD')
+    const fields = tracker.investmentMovementFields(panel)
+    await expect(fields.time).toHaveValue('10:30')
+    await expect(fields.symbol).toHaveValue('VWCE')
+    await expect(fields.units).toHaveValue('10')
+    await expect(fields.unitPrice).toHaveValue('120.5')
+    await expect(fields.fee).toHaveValue('1.2')
+    await expect(fields.currency).toHaveValue('USD')
     await expect(panel.getByRole('switch', { name: 'Ya está declarado' })).toBeChecked()
-  } finally {
-    await context.close()
-  }
+  })
 })
 
-test('a movement counted in another month than its date keeps it after sync and reload @smoke', async ({
-  browser,
-}) => {
-  const email = `accounting-month-${randomUUID()}@e2e.test`
-  const context = await browser.newContext({ extraHTTPHeaders: { 'X-Test-User-Email': email } })
-  try {
-    const headers = await syncV2TestHeaders(context.request, email)
-    const seed = await context.request.post('/api/sync', {
-      headers,
-      data: {
-        commands: [
-          {
-            commandId: randomUUID(),
-            action: 'create',
-            entityType: 'account',
-            data: {
-              id: randomUUID(),
-              name: 'Cuenta',
-              kind: 'cash',
-              currency: 'EUR',
-              openingBalance: 0,
-            },
-          },
-          {
-            commandId: randomUUID(),
-            action: 'create',
-            entityType: 'category',
-            data: { id: randomUUID(), name: 'Ocio', kind: 'expense' },
-          },
-        ],
-      },
-    })
-    expect(seed.ok()).toBe(true)
-    const page = await context.newPage()
-    await page.clock.setFixedTime(new Date('2026-03-15T12:00:00Z'))
-    const tracker = new FinanceTrackerPage(page)
-    await tracker.goto()
+test.describe('mes contable de un movimiento', () => {
+  test.use({ fixedTime: '2026-03-15T12:00:00Z' })
 
-    const created = page.waitForResponse(
-      (response) =>
-        response.url().endsWith('/api/sync') &&
-        response
-          .request()
-          .postDataJSON()
-          ?.commands.some(
-            (command: { action: string; entityType: string }) =>
-              command.action === 'create' && command.entityType === 'transaction',
-          ),
+  test('a movement counted in another month than its date keeps it after sync and reload @smoke', async ({
+    page,
+    tracker,
+  }) => {
+    const created = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
     )
     await tracker.addCustomTransaction({
       date: '2026-01-31',
@@ -161,14 +71,14 @@ test('a movement counted in another month than its date keeps it after sync and 
       categoryLabel: 'Ocio',
       amount: 40,
       description: 'Cena fin de enero',
-      accountLabel: 'Cuenta',
+      accountLabel: 'Revolut',
     })
-    expect((await (await created).json()).results[0].status).toBe('applied')
+    await created
 
     await tracker.reload()
+    await tracker.openTransactions()
+    await tracker.revealOlderTransactions()
     // The ledger lists every month, so the row's own month is what must stay February (2).
     await expect(tracker.transactionRow('Cena fin de enero')).toHaveAttribute('data-tx-month', '2')
-  } finally {
-    await context.close()
-  }
+  })
 })

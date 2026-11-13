@@ -21,20 +21,16 @@ test.describe('inversión · compras recurrentes', () => {
   }) => {
     const liveMarket = new LiveMarketPage(page)
     await tracker.openInvestmentRecurringTab()
-    await expect(liveMarket.recurringRules.locator('[data-ledger-empty]')).toBeVisible()
+    await expect(liveMarket.recurringEmpty).toBeVisible()
 
     await liveMarket.createRecurringRule({ ...RULE, frequency: 'weekly', amount: 25 })
 
-    const row = liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')
+    const row = liveMarket.recurringRuleRows
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('Compra mensual')
     // 25 € a week is 25 × 52 ÷ 12 a month.
-    await expect(liveMarket.recurringRules.locator('[data-recurring-summary]')).toContainText(
-      '108,33 €',
-    )
-    await expect(liveMarket.recurringRules.locator('[data-recurring-monthly-total]')).toContainText(
-      '108,33 €',
-    )
+    await expect(liveMarket.recurringSummary).toContainText('108,33 €')
+    await expect(liveMarket.recurringMonthlyTotal).toContainText('108,33 €')
   })
 
   test('edita una regla desde el plan', async ({ page, tracker }) => {
@@ -44,9 +40,9 @@ test.describe('inversión · compras recurrentes', () => {
 
     await liveMarket.editFirstRecurringRule({ description: 'Compra VWCE', amount: 212.5 })
 
-    const row = liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')
+    const row = liveMarket.recurringRuleRows
     await expect(row).toContainText('Compra VWCE')
-    await expect(row.locator('[data-recurring-amount]')).toHaveText('212,50 €')
+    await expect(liveMarket.recurringAmount(row)).toHaveText('212,50 €')
   })
 
   test('pausa, reactiva y elimina una compra recurrente desde el plan', async ({
@@ -57,7 +53,7 @@ test.describe('inversión · compras recurrentes', () => {
     await tracker.openInvestmentRecurringTab()
     await liveMarket.createRecurringRule(RULE)
 
-    const summary = liveMarket.recurringRules.locator('[data-recurring-summary]')
+    const summary = liveMarket.recurringSummary
     await expect(summary).toContainText('300,00 €')
 
     const toggle = liveMarket.recurringRules.getByRole('switch', {
@@ -67,15 +63,13 @@ test.describe('inversión · compras recurrentes', () => {
     await setSwitch(toggle, false)
     await expect(toggle).not.toBeChecked()
     await expect(summary).not.toContainText('300,00 €')
-    await expect(liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')).toContainText(
-      'Pausada',
-    )
+    await expect(liveMarket.recurringRuleRows).toContainText('Pausada')
 
     await setSwitch(toggle, true)
     await expect(toggle).toBeChecked()
     await expect(summary).toContainText('300,00 €')
 
-    const row = liveMarket.recurringRules.locator('tr[data-recurring-rule-id]').first()
+    const row = liveMarket.recurringRuleRows.first()
     const rowDelete = row.getByRole('button', { name: /^Eliminar la regla / })
     if (await rowDelete.isVisible()) {
       await rowDelete.click()
@@ -87,6 +81,6 @@ test.describe('inversión · compras recurrentes', () => {
     const dialog = page.getByRole('alertdialog', { name: '¿Eliminar esta regla?' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Eliminar regla' }).click()
-    await expect(liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')).toHaveCount(0)
+    await expect(liveMarket.recurringRuleRows).toHaveCount(0)
   })
 })

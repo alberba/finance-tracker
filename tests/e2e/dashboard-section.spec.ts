@@ -1,6 +1,18 @@
+import type { Locator } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 import { expectSyncCommand } from './pages/sync'
+
+const FIXED_TIME = '2026-11-12T10:00:00Z'
+
+/** The dashboard's period selectors, by their accessible names. */
+const yearSelect = (dashboard: Locator) =>
+  dashboard.getByRole('combobox', { name: 'Año', exact: true })
+const monthSelect = (dashboard: Locator) =>
+  dashboard.getByRole('combobox', { name: 'Mes', exact: true })
+
+// The default year and month follow today; pin it so the figures below stay put.
+test.use({ fixedTime: FIXED_TIME })
 
 test.describe('Dashboard section', () => {
   test(
@@ -13,15 +25,14 @@ test.describe('Dashboard section', () => {
       await expect(dashboard.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
       await expect(dashboard.getByRole('button', { name: 'Nuevo movimiento' })).toBeVisible()
 
-      const band = dashboard.getByRole('region', { name: 'Patrimonio neto' })
-      await expect(band.locator('#kpi-net-worth')).toContainText('€')
-      await expect(band.locator('#chart-networth')).toBeVisible()
+      await expect(tracker.netWorthKpi).toContainText('€')
+      await expect(tracker.netWorthChart).toBeVisible()
 
-      await expect(dashboard.locator('#kpi-income')).toContainText('€')
-      await expect(dashboard.locator('#kpi-expense')).toContainText('€')
-      await expect(dashboard.locator('#kpi-investment')).toContainText('€')
-      await expect(dashboard.locator('#year-display')).toBeDisabled()
-      await expect(dashboard.locator('#dashboard-month')).toBeVisible()
+      await expect(tracker.kpi('income').figure).toContainText('€')
+      await expect(tracker.kpi('expense').figure).toContainText('€')
+      await expect(tracker.kpi('investment').figure).toContainText('€')
+      await expect(yearSelect(dashboard)).toBeDisabled()
+      await expect(monthSelect(dashboard)).toBeVisible()
 
       for (const name of [
         'Distribución del patrimonio',
@@ -33,7 +44,7 @@ test.describe('Dashboard section', () => {
       ]) {
         await expect(dashboard.getByRole('heading', { name, exact: true })).toBeVisible()
       }
-      await expect(page.locator('#chart-cashflow')).toHaveCount(0)
+      await expect(tracker.cashflowChart).toHaveCount(0)
       await expect.poll(() => page.evaluate(() => '__dashboardViewModel' in window)).toBe(false)
 
       await dashboard.getByRole('button', { name: 'Ver presupuesto del mes' }).click()
@@ -41,7 +52,7 @@ test.describe('Dashboard section', () => {
     },
   )
 
-  test('conserva el año, el mes y el rango entre secciones', async ({ page, tracker }) => {
+  test('conserva el año, el mes y el rango entre secciones', async ({ tracker }) => {
     await tracker.addCustomTransaction({
       date: '2027-01-02',
       monthLabel: 'ENERO',
@@ -53,20 +64,20 @@ test.describe('Dashboard section', () => {
 
     await tracker.openDashboard()
     const dashboard = tracker.dashboardSection
-    await expect(dashboard.locator('#year-display')).toBeEnabled()
-    await dashboard.locator('#year-display').selectOption('2027')
+    await expect(yearSelect(dashboard)).toBeEnabled()
+    await yearSelect(dashboard).selectOption('2027')
 
-    await dashboard.locator('#dashboard-month').selectOption('1')
-    await expect(dashboard.locator('#dashboard-month')).toHaveValue('1')
+    await monthSelect(dashboard).selectOption('1')
+    await expect(monthSelect(dashboard)).toHaveValue('1')
     await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
-    await expect(dashboard.locator('#kpi-income')).toHaveText('2.001,00 €')
+    await expect(tracker.kpi('income').figure).toHaveText('2.001,00 €')
 
     const range = dashboard.getByRole('group', { name: 'Rango temporal del gráfico' })
     await range.getByRole('button', { name: '6M' }).click()
     await expect(range.getByRole('button', { name: '6M' })).toHaveAttribute('aria-pressed', 'true')
 
     await tracker.openSettings()
-    await expect(page.locator('#settings-year')).toHaveValue('2027')
+    await expect(tracker.settingsYear).toHaveValue('2027')
   })
 
   for (const { kind, january, february } of [
@@ -82,9 +93,8 @@ test.describe('Dashboard section', () => {
       const dashboard = tracker.dashboardSection
       const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
       await month.selectOption('4')
-      const kpi = dashboard.locator(`[data-kpi="${kind}"]`)
-      const figure = kpi.locator(`#kpi-${kind}`)
-      const bars = kpi.getByRole('button')
+      const { card, figure } = tracker.kpi(kind as 'income' | 'expense' | 'investment')
+      const bars = card.getByRole('button')
 
       await page.mouse.move(0, 0)
       await bars.nth(0).hover()
@@ -108,13 +118,13 @@ test.describe('Dashboard section', () => {
     const dashboard = tracker.dashboardSection
     const month = dashboard.getByRole('combobox', { name: 'Mes', exact: true })
     await month.selectOption('4')
-    const kpi = dashboard.locator('[data-kpi="investment"]')
+    const { card, figure } = tracker.kpi('investment')
     await page.mouse.move(0, 0)
-    await kpi.getByRole('button').nth(0).hover()
-    await expect(kpi.locator('#kpi-investment')).toHaveText('250,00 €')
+    await card.getByRole('button').nth(0).hover()
+    await expect(figure).toHaveText('250,00 €')
 
     await month.selectOption('5')
-    await expect(kpi.locator('#kpi-investment')).toHaveText('0,00 €')
+    await expect(figure).toHaveText('0,00 €')
   })
 
   test.describe('Consulta local del KPI', () => {
@@ -123,19 +133,18 @@ test.describe('Dashboard section', () => {
       const dashboard = tracker.dashboardSection
       await dashboard.getByRole('combobox', { name: 'Mes', exact: true }).selectOption('4')
       await page.mouse.move(0, 0)
-      await dashboard.locator('[data-kpi="income"]').getByRole('button').nth(0).hover()
+      await tracker.kpi('income').card.getByRole('button').nth(0).hover()
     })
 
     test('mantiene la comparación del mes seleccionado', async ({ tracker }) => {
-      const income = tracker.dashboardSection.locator('[data-kpi="income"]')
-      await expect(income.locator('[data-kpi-change]')).toHaveText('100,00 %')
-      await expect(income).toContainText('Marzo: 2.000,00 €')
+      const income = tracker.kpi('income')
+      await expect(income.change).toHaveText('100,00 %')
+      await expect(income.card).toContainText('Marzo: 2.000,00 €')
     })
 
     test('mantiene los importes de los otros KPI', async ({ tracker }) => {
-      const dashboard = tracker.dashboardSection
-      await expect(dashboard.locator('#kpi-expense')).toHaveText('0,00 €')
-      await expect(dashboard.locator('#kpi-investment')).toHaveText('0,00 €')
+      await expect(tracker.kpi('expense').figure).toHaveText('0,00 €')
+      await expect(tracker.kpi('investment').figure).toHaveText('0,00 €')
     })
 
     test('mantiene el periodo seleccionado', async ({ tracker }) => {
@@ -149,15 +158,14 @@ test.describe('Dashboard section', () => {
 
   test('confirma y salta pendientes hasta dejarlo todo al día', async ({ page, tracker }) => {
     await tracker.openDashboard()
-    const pending = page.locator('#dashboard [data-dashboard-pending]')
-    await expect(pending.locator('[data-pending-empty]')).toHaveText(
-      'Todo al día. Aún no hay pendientes.',
-    )
+    const liveMarket = new LiveMarketPage(page)
+    const pending = liveMarket.dashboardPending
+    await expect(liveMarket.dashboardPendingEmpty).toHaveText('Todo al día. Aún no hay pendientes.')
 
     await tracker.openInvestmentRecurringTab()
-    await new LiveMarketPage(page).createThreePendingMovements('2026-07-10')
+    await liveMarket.createThreePendingMovements('2026-07-10')
     await tracker.openDashboard()
-    const items = pending.locator('[data-pending-item]')
+    const items = liveMarket.dashboardPendingItems
     await expect(items).toHaveCount(3)
     await expect(pending.getByRole('heading', { name: 'Pendientes 3' })).toBeVisible()
 
@@ -198,7 +206,7 @@ test.describe('Dashboard section', () => {
     await lastConfirmed
 
     await expect(items).toHaveCount(0)
-    await expect(pending.locator('[data-pending-empty]')).toBeVisible()
+    await expect(liveMarket.dashboardPendingEmpty).toBeVisible()
   })
 
   test('abre el panel de nuevo movimiento desde la cabecera', async ({ page, tracker }) => {
@@ -233,7 +241,7 @@ test.describe('Dashboard section', () => {
       const body = route.request().postDataJSON() as {
         instruments?: Array<{ id: string; symbol: string; currency: string }>
       }
-      const now = new Date().toISOString()
+      const now = FIXED_TIME
       const quotes = Object.fromEntries(
         (body.instruments || []).map((instrument) => {
           const stale = instrument.symbol === 'LATE'
@@ -276,9 +284,9 @@ test.describe('Dashboard section', () => {
     })
     await tracker.openDashboard()
 
-    const quotes = page.locator('#dashboard [data-dashboard-quotes]')
-    const fresh = quotes.locator('[data-quote="VWCE"]')
-    const late = quotes.locator('[data-quote="LATE"]')
+    const quotes = liveMarket.dashboardQuotes
+    const fresh = liveMarket.dashboardQuote('VWCE')
+    const late = liveMarket.dashboardQuote('LATE')
     await expect(fresh).toContainText('125,5')
     await expect(fresh).not.toContainText('Retrasado')
     await expect(late).toContainText('Retrasado')
@@ -291,20 +299,17 @@ test('conserva el periodo y navega desde tarjetas con atrás y adelante en demo'
   tracker,
 }) => {
   await page.goto('/dashboard?demo=1')
-  await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+  await tracker.expectReady()
   const dashboard = tracker.dashboardSection
-  await dashboard.locator('#dashboard-month').selectOption('1')
+  await monthSelect(dashboard).selectOption('1')
   await expect(dashboard.getByRole('heading', { name: 'Enero', exact: true })).toBeVisible()
   await dashboard.getByRole('button', { name: 'Ver todos', exact: true }).click()
   await expect(page).toHaveURL(/\/movimientos$/)
   await expect(tracker.transactionsSection).toBeVisible()
   await page.goBack()
   await expect(dashboard).toBeVisible()
-  await expect(dashboard.locator('#dashboard-month')).toHaveValue('1')
+  await expect(monthSelect(dashboard)).toHaveValue('1')
   await page.goForward()
   await expect(tracker.transactionsSection).toBeVisible()
-  await expect(page.locator('[data-nav-item][data-section=transactions]:visible')).toHaveAttribute(
-    'aria-current',
-    'page',
-  )
+  await expect(tracker.navItem('transactions')).toHaveAttribute('aria-current', 'page')
 })

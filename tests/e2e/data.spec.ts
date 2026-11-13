@@ -24,7 +24,7 @@ test.describe('Data E2E', () => {
       await expect(dataSection.getByRole('heading', { name: 'Datos y backups' })).toBeVisible()
 
       await expect(dataSection.locator('[data-data-figures]')).toContainText(/Movimientos\s*[1-9]/)
-      await expect(dataSection.locator('#data-meta')).toContainText('Origen:')
+      await expect(tracker.dataMeta).toContainText('Origen:')
     },
   )
 
@@ -71,13 +71,13 @@ test.describe('Data E2E', () => {
     expect(empty.accounts).toHaveLength(0)
     expect(empty.transactions).toHaveLength(0)
 
-    await dataSection.locator('#import-json').setInputFiles(path)
+    await tracker.importFileInput.setInputFiles(path)
     const dialog = page.getByRole('alertdialog', { name: '¿Importar esta copia?' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Sustituir mis datos' }).click()
 
     await expect(dialog).toBeHidden()
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await tracker.expectReady()
     await expect(figures).toContainText(/Movimientos\s*[1-9]/)
     const restored = await readScenarioState(page)
     const restoredAccount = restored.accounts.find((account) => account.name === 'Cuenta de copia')

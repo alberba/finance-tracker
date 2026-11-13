@@ -1,15 +1,17 @@
-import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import fixture from '../unit/fixtures/bitvavo-real-sanitized.json' with { type: 'json' }
+import { test, expect } from './fixtures'
 import { BitvavoPage } from './pages/BitvavoPage'
 import { seedMarketInstrument } from './seed-market-instrument'
 import { syncV2TestHeaders } from './seed-sync-v2'
 
 // Real D1 and server routes, with only the external Bitvavo HTTP boundary replaced.
+// A second client of the same user needs its own context, so the scenario takes
+// the fixture's isolated identity (`testUserEmail`) instead of the `tracker` page.
 test('imports a closed preview, retains exact data after reload and synchronizes another client @smoke', async ({
   browser,
+  testUserEmail: email,
 }, testInfo) => {
-  const email = `bitvavo-${randomUUID()}@e2e.test`
   const headers = {
     'X-Test-User-Email': email,
     'X-Test-Bitvavo-History': JSON.stringify(fixture.transactions),

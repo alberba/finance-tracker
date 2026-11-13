@@ -24,28 +24,18 @@ test.describe('contribution defaults from wealth', () => {
   }) => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('investments', 'Fund')
-        .locator('input[data-contribution-snapshot-kind="investments"]'),
-    ).toHaveValue('1000')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
-        .locator('input[data-contribution-snapshot-kind="accounts"]'),
-    ).toHaveValue('1200')
+    await expect(tracker.contributionWorkflowSnapshotInput('investments', 'Fund')).toHaveValue(
+      '1000',
+    )
+    await expect(tracker.contributionWorkflowSnapshotInput('accounts', 'MyInvestor')).toHaveValue(
+      '1200',
+    )
 
     await tracker.contributionWorkflowSelectMonth('FEBRERO')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('investments', 'Fund')
-        .locator('input[data-contribution-snapshot-kind="investments"]'),
-    ).toHaveValue('0')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
-        .locator('input[data-contribution-snapshot-kind="accounts"]'),
-    ).toHaveValue('1200')
+    await expect(tracker.contributionWorkflowSnapshotInput('investments', 'Fund')).toHaveValue('0')
+    await expect(tracker.contributionWorkflowSnapshotInput('accounts', 'MyInvestor')).toHaveValue(
+      '1200',
+    )
   })
 
   test('keeps edited snapshot fields across month and date changes', async ({ tracker }) => {
@@ -55,18 +45,14 @@ test.describe('contribution defaults from wealth', () => {
     await tracker.contributionWorkflowSetLiquiditySnapshot('MyInvestor', 1400)
     await tracker.contributionWorkflowSelectMonth('FEBRERO')
     await tracker.contributionWorkflowSetDate('2026-03-15')
-    await tracker.contributionWorkflow().locator('#contribution-workflow-date').press('Tab')
+    await tracker.contributionWorkflowDateInput.press('Tab')
 
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('investments', 'Fund')
-        .locator('input[data-contribution-snapshot-kind="investments"]'),
-    ).toHaveValue('1100')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
-        .locator('input[data-contribution-snapshot-kind="accounts"]'),
-    ).toHaveValue('1400')
+    await expect(tracker.contributionWorkflowSnapshotInput('investments', 'Fund')).toHaveValue(
+      '1100',
+    )
+    await expect(tracker.contributionWorkflowSnapshotInput('accounts', 'MyInvestor')).toHaveValue(
+      '1400',
+    )
   })
 
   test('keeps edited allocations across date and month changes', async ({ tracker, page }) => {
@@ -76,7 +62,7 @@ test.describe('contribution defaults from wealth', () => {
     await tracker.contributionWorkflowSetTotal(125)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 125)
     await tracker.contributionWorkflowSetDate('2026-03-15')
-    await tracker.contributionWorkflow().locator('#contribution-workflow-date').press('Tab')
+    await tracker.contributionWorkflowDateInput.press('Tab')
     await tracker.contributionWorkflowSelectMonth('ABRIL')
 
     await expect(page.getByRole('spinbutton', { name: 'Importe total del aporte' })).toHaveValue(
@@ -141,10 +127,8 @@ test.describe('contribution defaults from wealth', () => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetDate('2026-01-15')
-    await expect(
-      tracker
-        .contributionWorkflowSnapshotRow('accounts', 'MyInvestor')
-        .locator('input[data-contribution-snapshot-kind="accounts"]'),
-    ).toHaveValue('1300')
+    await expect(tracker.contributionWorkflowSnapshotInput('accounts', 'MyInvestor')).toHaveValue(
+      '1300',
+    )
   })
 })

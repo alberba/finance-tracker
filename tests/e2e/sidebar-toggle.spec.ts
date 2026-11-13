@@ -1,10 +1,11 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
 const sidebar = (page: Page) => page.getByRole('complementary')
 const sidebarNav = (page: Page) => page.getByRole('navigation', { name: 'Secciones del tracker' })
-const toggle = (page: Page) => page.locator('#sidebar-toggle')
-const html = (page: Page) => page.locator('html')
+const toggle = (page: Page) => new FinanceTrackerPage(page).sidebarToggle
+const html = (page: Page) => new FinanceTrackerPage(page).appRoot
 
 test.describe('Sidebar toggle', () => {
   test('la inicialización del sidebar no lanza errores en carga', async ({ page, tracker }) => {
@@ -14,8 +15,8 @@ test.describe('Sidebar toggle', () => {
     })
 
     await tracker.goto()
-    await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await expect(page.locator('#dashboard')).toBeVisible()
+    await tracker.expectReady()
+    await expect(tracker.dashboardSection).toBeVisible()
 
     expect(pageErrors).toEqual([])
   })
@@ -87,11 +88,11 @@ test.describe('Sidebar toggle', () => {
     await expect(html(page)).toHaveAttribute('data-sidebar', 'collapsed')
 
     await sidebarNav(page).getByRole('button', { name: 'Movimientos' }).click()
-    await expect(page.locator('#transactions')).toBeVisible()
+    await expect(tracker.transactionsSection).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Movimientos', exact: true })).toBeVisible()
 
     await sidebarNav(page).getByRole('button', { name: 'Inversión' }).click()
-    await expect(page.locator('#investment')).toBeVisible()
+    await expect(tracker.investmentSection()).toBeVisible()
   })
 
   test('expandir de nuevo el sidebar vuelve a mostrar las etiquetas de texto', async ({
@@ -121,7 +122,7 @@ test.describe('Sidebar toggle', () => {
     await expect(html(page)).toHaveAttribute('data-sidebar', 'collapsed')
 
     await tracker.reload()
-    await expect(page.locator('#dashboard')).toBeVisible()
+    await expect(tracker.dashboardSection).toBeVisible()
 
     await expect(html(page)).toHaveAttribute('data-sidebar', 'collapsed')
     await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false')
@@ -135,7 +136,7 @@ test.describe('Sidebar toggle', () => {
     await expect(html(page)).toHaveAttribute('data-sidebar', 'expanded')
 
     await tracker.reload()
-    await expect(page.locator('#dashboard')).toBeVisible()
+    await expect(tracker.dashboardSection).toBeVisible()
 
     await expect(html(page)).toHaveAttribute('data-sidebar', 'expanded')
   })

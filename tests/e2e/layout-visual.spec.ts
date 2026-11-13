@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
-import type { FinanceSectionId, FinanceTrackerPage } from './pages/FinanceTrackerPage'
+import { FinanceTrackerPage, type FinanceSectionId } from './pages/FinanceTrackerPage'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 
 const SECTION_IDS: FinanceSectionId[] = [
@@ -48,8 +48,8 @@ const INVESTMENT_VIEWS: Array<{
     focus: '#investment [data-ledger-detail]',
     open: async (page, tracker) => {
       await tracker.openInvestmentDashboardTab()
-      await page.locator('#investment [data-position]').first().click()
-      await expect(page.locator('#investment-asset-chart')).toBeVisible()
+      await tracker.investmentPositions.first().click()
+      await expect(tracker.assetChart).toBeVisible()
     },
   },
   { name: 'investment-movements', open: (_page, tracker) => tracker.openInvestmentMovementsTab() },
@@ -63,8 +63,7 @@ const INVESTMENT_VIEWS: Array<{
     name: 'investment-movement-edit-panel',
     open: async (page, tracker) => {
       await tracker.openInvestmentMovementsTab()
-      await page
-        .locator('#investment tr[data-investment-tx-id]')
+      await tracker.investmentMovementRows
         .first()
         .getByRole('button', { name: /^Editar / })
         .click()
@@ -75,7 +74,7 @@ const INVESTMENT_VIEWS: Array<{
     name: 'investment-movement-delete-dialog',
     open: async (page, tracker) => {
       await tracker.openInvestmentMovementsTab()
-      const row = page.locator('#investment tr[data-investment-tx-id]').first()
+      const row = tracker.investmentMovementRows.first()
       const rowDelete = row.getByRole('button', { name: /^Eliminar / })
       if (await rowDelete.isVisible()) {
         await rowDelete.click()
@@ -136,8 +135,7 @@ const INVESTMENT_VIEWS: Array<{
       const liveMarket = new LiveMarketPage(page)
       await tracker.openInvestmentRecurringTab()
       await liveMarket.createRecurringRule(RECURRING_RULE)
-      await page
-        .locator('#investment tr[data-recurring-rule-id]')
+      await liveMarket.recurringRuleRows
         .first()
         .getByRole('button', { name: /^Editar la regla / })
         .first()
@@ -151,7 +149,7 @@ const INVESTMENT_VIEWS: Array<{
       const liveMarket = new LiveMarketPage(page)
       await tracker.openInvestmentRecurringTab()
       await liveMarket.createRecurringRule(RECURRING_RULE)
-      const row = page.locator('#investment tr[data-recurring-rule-id]').first()
+      const row = liveMarket.recurringRuleRows.first()
       const rowDelete = row.getByRole('button', { name: /^Eliminar la regla / })
       if (await rowDelete.isVisible()) {
         await rowDelete.click()
@@ -213,7 +211,7 @@ const DASHBOARD_VIEWS: Array<{
       await tracker.openInvestmentRecurringTab()
       await new LiveMarketPage(page).createThreePendingMovements('2026-09-15')
       await tracker.openDashboard()
-      await expect(page.locator('#dashboard [data-pending-item]')).toHaveCount(3)
+      await expect(new LiveMarketPage(page).dashboardPendingItems).toHaveCount(3)
     },
   },
 ]
@@ -310,7 +308,7 @@ const WEALTH_VIEWS: Array<{
     open: async (_page, tracker) => {
       await tracker.openWealth()
       await tracker.wealthSnapshotInput('Revolut').fill('1234,5')
-      await expect(tracker.wealthSection.locator('[data-snapshot-changes]')).toBeVisible()
+      await expect(tracker.snapshotChanges).toBeVisible()
     },
   },
   {
@@ -372,7 +370,7 @@ const SETTINGS_VIEWS: Array<{
     open: async (page, tracker) => {
       await tracker.openSettingsTab('Recurrentes')
       await tracker.section('settings').getByRole('button', { name: 'Nueva regla' }).click()
-      await expect(page.locator('#settings-recurring-panel')).toBeVisible()
+      await expect(new LiveMarketPage(page).settingsRecurringPanel).toBeVisible()
     },
   },
   {
@@ -388,8 +386,8 @@ const SETTINGS_VIEWS: Array<{
     focus: '#settings [data-category="Comida"]',
     open: async (page, tracker) => {
       await tracker.openSettingsTab('Categorías')
-      await page
-        .locator('#settings')
+      await tracker
+        .section('settings')
         .getByRole('button', { name: 'Cambiar emoji de Comida' })
         .click()
       await expect(page.getByRole('dialog', { name: 'Elegir emoji de Comida' })).toBeVisible()
@@ -419,7 +417,7 @@ const SHELL_VIEWS: Array<{
     scope: 'demo-banner',
     open: async (page) => {
       await page.goto('/?demo=1')
-      await expect(page.locator('html[data-finance-ready="true"]')).toBeVisible()
+      await new FinanceTrackerPage(page).expectReady()
       await expect(page.getByRole('status').filter({ hasText: 'Modo demo' })).toBeVisible()
     },
   },
@@ -439,7 +437,10 @@ const SHELL_DESKTOP_VIEWS: typeof SHELL_VIEWS = [
     scope: 'nav-tabs',
     open: async (page) => {
       await page.getByRole('button', { name: 'Colapsar barra lateral' }).click()
-      await expect(page.locator('html')).toHaveAttribute('data-sidebar', 'collapsed')
+      await expect(new FinanceTrackerPage(page).appRoot).toHaveAttribute(
+        'data-sidebar',
+        'collapsed',
+      )
       await page.getByRole('button', { name: 'Abrir menú de usuario' }).click()
       await expect(page.getByRole('menu', { name: 'Menú de usuario' })).toBeVisible()
     },
@@ -688,7 +689,7 @@ async function expectViewSnapshot(
   // Geometry and pixels inspect the same open view in one isolated scenario.
   const section = SECTION_IDS.find((id) => name.startsWith(`page-${id}`))
   const scope = section ?? (name.startsWith('page-shell-demo') ? 'demo-banner' : 'nav-tabs')
-  const snapshotFonts = page.locator('style[data-snapshot-fonts]')
+  const snapshotFonts = new FinanceTrackerPage(page).snapshotFontStyle
   await snapshotFonts.evaluate((style: HTMLStyleElement) => {
     style.disabled = true
   })
@@ -739,7 +740,7 @@ async function expectViewSnapshot(
   // Shell captures retain separate identities because the user email is visible.
   if (!name.startsWith('page-shell-') && !name.endsWith('-dark.png')) {
     await page.emulateMedia({ colorScheme: 'dark' })
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(new FinanceTrackerPage(page).appRoot).toHaveAttribute('data-theme', 'dark')
     await expectViewSnapshot(page, async () => {}, name.replace('.png', '-dark.png'), focus)
   }
 }
@@ -1070,7 +1071,7 @@ test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
         `snapshot visual estable en "${view.name}" (oscuro)`,
         { tag: '@snapshot' },
         async ({ tracker, page }) => {
-          await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+          await expect(new FinanceTrackerPage(page).appRoot).toHaveAttribute('data-theme', 'dark')
           await expectViewSnapshot(
             page,
             () => view.open(page, tracker),
@@ -1118,7 +1119,7 @@ test.describe('Shell · vistas secundarias', { tag: '@visual' }, () => {
           `snapshot visual estable en "${view.name}" (escritorio, oscuro)`,
           { tag: '@snapshot' },
           async ({ tracker, page }) => {
-            await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+            await expect(new FinanceTrackerPage(page).appRoot).toHaveAttribute('data-theme', 'dark')
             await expectViewSnapshot(
               page,
               () => view.open(page, tracker),

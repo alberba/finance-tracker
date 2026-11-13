@@ -27,6 +27,41 @@ export class LiveMarketPage {
     return this.page.locator('[data-recurring-rules]')
   }
 
+  /** Quote and units panel of the investment dashboard. */
+  get investmentQuotes(): Locator {
+    return this.page.locator('#investment [data-investment-quotes]')
+  }
+
+  /** «Recurrentes» tab of Configuración: income and expense rules. */
+  get settingsRecurring(): Locator {
+    return this.page.locator('#settings [data-settings-recurring]')
+  }
+
+  settingsRuleRow(ruleId: string): Locator {
+    return this.settingsRecurring.locator(`tr[data-settings-rule-id="${ruleId}"]`)
+  }
+
+  get recurringEmpty(): Locator {
+    return this.recurringRules.locator('[data-ledger-empty]')
+  }
+
+  get recurringSummary(): Locator {
+    return this.recurringRules.locator('[data-recurring-summary]')
+  }
+
+  get recurringMonthlyTotal(): Locator {
+    return this.recurringRules.locator('[data-recurring-monthly-total]')
+  }
+
+  /** The amount cell of a recurring rule row. */
+  recurringAmount(row: Locator): Locator {
+    return row.locator('[data-recurring-amount]')
+  }
+
+  get recurringRuleRows(): Locator {
+    return this.recurringRules.locator('tr[data-recurring-rule-id]')
+  }
+
   /** The side panel that creates and edits a recurring purchase. */
   get recurringPanel(): Locator {
     return this.page.locator('#investment-recurring-panel')
@@ -36,6 +71,13 @@ export class LiveMarketPage {
     return this.page.locator('[data-pending-panel]')
   }
 
+  /** Pending movements listed in «Movimientos», or one by its id. */
+  pendingItems(id?: string): Locator {
+    return this.pendingPanel.locator(
+      id === undefined ? '[data-pending-item]' : `[data-pending-item="${id}"]`,
+    )
+  }
+
   /** Side panel where a pending movement is edited before it is confirmed. */
   get pendingEditPanel(): Locator {
     return this.page.locator('#pending-edit-panel')
@@ -43,6 +85,28 @@ export class LiveMarketPage {
 
   get dashboardPending(): Locator {
     return this.page.locator('#dashboard [data-dashboard-pending]')
+  }
+
+  get dashboardPendingEmpty(): Locator {
+    return this.dashboardPending.locator('[data-pending-empty]')
+  }
+
+  /** The «Cotizaciones» block of the dashboard. */
+  get dashboardQuotes(): Locator {
+    return this.page.locator('#dashboard [data-dashboard-quotes]')
+  }
+
+  dashboardQuote(symbol: string): Locator {
+    return this.dashboardQuotes.locator(`[data-quote="${symbol}"]`)
+  }
+
+  get dashboardPendingItems(): Locator {
+    return this.dashboardPending.locator('[data-pending-item]')
+  }
+
+  /** The side panel that edits one settings-level recurring rule. */
+  get settingsRecurringPanel(): Locator {
+    return this.page.locator('#settings-recurring-panel')
   }
 
   /** Adds a symbol's quote, choosing the asset that groups its value. */
@@ -100,20 +164,23 @@ export class LiveMarketPage {
     await expect(this.quotePanel).toBeHidden()
   }
 
-  async createRecurringRule(params: {
-    account: string
-    category: string
-    description: string
-    amount: number
-    frequency: string
-    startDate: string
-    type?: 'investment'
-    symbol?: string
-    units?: number
-    unitPrice?: number
-    fee?: number
-    time?: string
-  }, options: { waitForSync?: boolean } = {}): Promise<void> {
+  async createRecurringRule(
+    params: {
+      account: string
+      category: string
+      description: string
+      amount: number
+      frequency: string
+      startDate: string
+      type?: 'investment'
+      symbol?: string
+      units?: number
+      unitPrice?: number
+      fee?: number
+      time?: string
+    },
+    options: { waitForSync?: boolean } = {},
+  ): Promise<void> {
     await this.recurringRules.getByRole('button', { name: 'Nueva compra recurrente' }).click()
     const form = this.recurringPanel
     await expect(form).toBeVisible()
@@ -208,7 +275,7 @@ export class LiveMarketPage {
     fee?: number
     time?: string
   }): Promise<void> {
-    const row = this.recurringRules.locator('tr[data-recurring-rule-id]').first()
+    const row = this.recurringRuleRows.first()
     await row.getByRole('button', { name: /^Editar la regla / }).click()
     const form = this.recurringPanel
     await expect(form).toBeVisible()
@@ -245,7 +312,7 @@ export class LiveMarketPage {
   }
 
   async openFirstPendingEdit(): Promise<Locator> {
-    const item = this.pendingPanel.locator('[data-pending-item]').first()
+    const item = this.pendingItems().first()
     await item.getByRole('button', { name: /^Editar/ }).click()
     await expect(this.pendingEditPanel).toBeVisible()
     return this.pendingEditPanel
@@ -270,6 +337,6 @@ export class LiveMarketPage {
   }
 
   async expectPendingCount(count: number): Promise<void> {
-    await expect(this.pendingPanel.locator('[data-pending-item]')).toHaveCount(count)
+    await expect(this.pendingItems()).toHaveCount(count)
   }
 }

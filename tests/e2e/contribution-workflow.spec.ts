@@ -3,10 +3,12 @@ import { test, expect } from './fixtures'
 import { setSwitch } from './pages/controls'
 
 test.describe('recorrido guiado de aportes', () => {
-  test('fecha inicial del aporte es hoy', async ({ tracker, page }) => {
+  // The guided contribution opens on today's date: pin it before the first render.
+  test.use({ fixedTime: '2026-11-12T12:00:00Z' })
+
+  test('fecha inicial del aporte es hoy', async ({ tracker }) => {
     await tracker.openContributionWorkflowModal()
-    const expectedToday = await page.evaluate(() => new Date().toLocaleDateString('en-CA'))
-    expect(await tracker.contributionWorkflowDateValue()).toBe(expectedToday)
+    expect(await tracker.contributionWorkflowDateValue()).toBe('2026-11-12')
   })
 
   test('abre modal, muestra paso 1 y avisa por importe sin asignar', async ({ tracker, page }) => {
@@ -14,12 +16,10 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSelectMonth('ENERO')
     await tracker.contributionWorkflowSetDate('2026-01-31')
 
-    const modal = page.locator('#contribution-workflow-dialog')
-    await expect(modal.locator('#contribution-workflow-step-snapshot')).toBeVisible()
-    expect(
-      await modal.locator('[data-contribution-snapshot-row="investments"]').count(),
-    ).toBeGreaterThan(0)
-    const liquidity = modal.locator('[data-contribution-snapshot-row="accounts"]')
+    const modal = tracker.contributionWorkflow()
+    await expect(tracker.contributionWorkflowSnapshotStep).toBeVisible()
+    expect(await tracker.contributionWorkflowSnapshotRows('investments').count()).toBeGreaterThan(0)
+    const liquidity = tracker.contributionWorkflowSnapshotRows('accounts')
     await expect(liquidity.filter({ hasText: 'MyInvestor' })).toHaveCount(1)
     await expect(liquidity.filter({ hasText: 'Trading 212' })).toHaveCount(1)
     await expect(liquidity.filter({ hasText: 'Trade Republic' })).toHaveCount(1)
@@ -107,7 +107,7 @@ test.describe('recorrido guiado de aportes', () => {
     await expect(page.getByRole('status')).toContainText('Aporte guardado')
     const row = tracker.contributionRow('2026-04-15')
     await expect(row).toBeVisible()
-    await expect(row.locator('[data-contribution-value]')).toHaveText('15.850,00 €')
+    await expect(tracker.contributionCell(row, 'value')).toHaveText('15.850,00 €')
 
     const accounts = await page.evaluate(
       (state) => {
@@ -168,7 +168,7 @@ test.describe('recorrido guiado de aportes', () => {
 
     await tracker.openContributionWorkflowModal()
     await expect(
-      page.locator('[data-contribution-snapshot-row="accounts"]', {
+      tracker.contributionWorkflowSnapshotRows('accounts').filter({
         hasText: 'Trade Republic',
       }),
     ).toHaveCount(0)
@@ -264,7 +264,7 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSetTotal(125.5)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 125.5)
 
-    const modal = page.locator('#contribution-workflow-dialog')
+    const modal = tracker.contributionWorkflow()
     await setSwitch(
       modal.getByRole('switch', {
         name: 'Añadir las asignaciones al efectivo de Stock Events',
@@ -293,7 +293,7 @@ test.describe('recorrido guiado de aportes', () => {
     await tracker.contributionWorkflowSetTotal(150.5)
     await tracker.contributionWorkflowSetAllocation('MyInvestor', 150.5)
     await setSwitch(
-      page.locator('#contribution-workflow-dialog').getByRole('switch', {
+      tracker.contributionWorkflow().getByRole('switch', {
         name: 'Añadir las asignaciones al efectivo de Stock Events',
       }),
       true,
@@ -308,18 +308,18 @@ test.describe('recorrido guiado de aportes', () => {
     })
   })
 
-  test('enter en el paso 1 no guarda el aporte', async ({ tracker, page }) => {
+  test('enter en el paso 1 no guarda el aporte', async ({ tracker }) => {
     await tracker.openContributionWorkflowModal()
     await tracker.contributionWorkflowSelectMonth('ABRIL')
     await tracker.contributionWorkflowSetDate('2026-04-30')
     await tracker.contributionWorkflowSetInvestmentSnapshot('Fondos Indexados', 13000)
 
-    const modal = page.locator('#contribution-workflow-dialog')
+    const modal = tracker.contributionWorkflow()
     await tracker.contributionWorkflowPressEnterInInvestmentSnapshot('Fondos Indexados')
 
     await expect(modal).toBeVisible()
-    await expect(modal.locator('#contribution-workflow-step-snapshot')).toBeVisible()
-    await expect(page.locator('#toast')).not.toContainText('Aporte guardado con avisos.')
+    await expect(tracker.contributionWorkflowSnapshotStep).toBeVisible()
+    await expect(tracker.toast).not.toContainText('Aporte guardado con avisos.')
     await expect(tracker.contributionRow('2026-04-30')).toHaveCount(0)
   })
 })

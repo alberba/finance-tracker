@@ -1,5 +1,7 @@
 import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
+import { LiveMarketPage } from './pages/LiveMarketPage'
+import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 /**
  * #492 — an edited recurring confirmation survives a reload and creates exactly
@@ -13,23 +15,6 @@ import { test, expect } from './fixtures'
 
 const DUE_DATE = '2026-11-05'
 const STAMP = '2026-11-01T00:00:00.000Z'
-
-/**
- * Cuts only the sync endpoints. `/api/session` stays reachable so the shell can
- * hydrate and reload; that is the real "queued locally, no server" window.
- */
-async function blockSyncApi(page: import('@playwright/test').Page): Promise<void> {
-  const block = (route: import('@playwright/test').Route) => route.abort()
-  await page.route('**/api/sync', block)
-  await page.route('**/api/bootstrap', block)
-  await page.route('**/api/changes*', block)
-}
-
-async function unblockSyncApi(page: import('@playwright/test').Page): Promise<void> {
-  await page.unroute('**/api/sync')
-  await page.unroute('**/api/bootstrap')
-  await page.unroute('**/api/changes*')
-}
 
 test.describe('confirmación recurrente tras recargar (#492)', () => {
   test.use({ fixedTime: '2026-11-12T10:00:00Z' })
@@ -70,16 +55,17 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
       })
     })
 
+    const liveMarket = new LiveMarketPage(page)
     await tracker.openTransactions()
-    const pendingPanel = page.locator('[data-pending-panel]')
-    const pendingItem = pendingPanel.locator('[data-pending-item="e2e-confirm-pending"]')
+    const pendingItem = liveMarket.pendingItems('e2e-confirm-pending')
     await expect(pendingItem).toBeVisible()
 
-    // The sync API is unreachable from now on; navigation still works.
-    await blockSyncApi(page)
+    // The sync API is unreachable from now on (`/api/session` stays reachable
+    // so the shell can hydrate and reload); navigation still works.
+    const reconnect = await blockSyncApi(page)
 
     await pendingItem.getByRole('button', { name: 'Editar y confirmar Alquiler E2E' }).click()
-    const panel = page.locator('#pending-edit-panel')
+    const panel = liveMarket.pendingEditPanel
     await expect(panel).toBeVisible()
     await panel.getByLabel('Descripción').fill('Alquiler E2E editado')
     await panel.getByLabel('Importe', { exact: true }).fill('925')
@@ -90,9 +76,8 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
     // the pending is no longer open and the status does not claim the server
     // confirmed it.
     await expect(pendingItem).toHaveCount(0)
-    const status = page.locator('#sidebar-sync-status')
-    await expect(status).toContainText('pendiente')
-    await expect(status).not.toContainText('Sincronizado')
+    await expect(tracker.syncStatus).toContainText('pendiente')
+    await expect(tracker.syncStatus).not.toContainText('Sincronizado')
 
     // Reload with the API still failing: the accepted edit and the movement id
     // must be recovered from the queue, without a second movement.
@@ -102,23 +87,27 @@ test.describe('confirmación recurrente tras recargar (#492)', () => {
     const rows = tracker.transactionRows.filter({ hasText: 'Alquiler E2E editado' })
     await expect(rows).toHaveCount(1)
     await expect(rows.first()).toContainText('925,00')
-    await expect(page.locator('[data-pending-panel]')).toHaveCount(0)
+    await expect(liveMarket.pendingPanel).toHaveCount(0)
 
     // Reconnect: the movement is resent with the same command; the pending link
     // is completed after the movement is acknowledged.
-    await unblockSyncApi(page)
-    await page.waitForResponse(
-      (response) => response.url().includes('/api/sync') && response.request().method() === 'POST',
-      { timeout: 20000 },
+    // The listener exists before the route is lifted, so a fast response
+    // cannot arrive first.
+    const movementSent = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'create' &&
+        command.entityType === 'transaction' &&
+        command.data.description === 'Alquiler E2E editado',
     )
-    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
-      timeout: 20000,
-    })
+    await reconnect()
+    await movementSent
+    await expect(tracker.syncStatus).toContainText('Sincronizado')
 
     await tracker.reload()
     await tracker.openTransactions()
     await tracker.filterTransactionsMonth('NOVIEMBRE')
     await expect(tracker.transactionRows.filter({ hasText: 'Alquiler E2E editado' })).toHaveCount(1)
-    await expect(page.locator('[data-pending-panel]')).toHaveCount(0)
+    await expect(liveMarket.pendingPanel).toHaveCount(0)
   })
 })

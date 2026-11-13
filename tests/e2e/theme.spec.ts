@@ -1,10 +1,12 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 
-const html = (page: Page) => page.locator('html')
+const html = (page: Page) => new FinanceTrackerPage(page).appRoot
 const sidebarTheme = (page: Page) =>
   page.getByRole('complementary').getByRole('group', { name: 'Tema' })
-const settingsTheme = (page: Page) => page.locator('#settings').getByRole('group', { name: 'Tema' })
+const settingsTheme = (page: Page) =>
+  new FinanceTrackerPage(page).section('settings').getByRole('group', { name: 'Tema' })
 
 async function expectPressed(group: Locator, name: string | RegExp) {
   await expect(group.getByRole('button', { name, exact: true })).toHaveAttribute(
@@ -80,7 +82,7 @@ test.describe('Tema: claro, oscuro o sistema', () => {
     test('la hoja «Más» y la barra superior eligen el mismo tema', async ({ page, tracker }) => {
       await page.emulateMedia({ colorScheme: 'light' })
       await tracker.goto()
-      const appBarTheme = page.locator('[data-mobile-app-bar]').getByRole('group', { name: 'Tema' })
+      const appBarTheme = tracker.mobileAppBar.getByRole('group', { name: 'Tema' })
 
       await page.getByRole('button', { name: 'Más secciones' }).click()
       const sheetTheme = page

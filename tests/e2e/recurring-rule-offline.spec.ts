@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
+import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 /**
  * #493 — a rule accepted while the sync API is unreachable survives a reload
@@ -22,19 +23,6 @@ const RULE = {
   unitPrice: 300,
 }
 
-async function blockSyncApi(page: import('@playwright/test').Page): Promise<void> {
-  const block = (route: import('@playwright/test').Route) => route.abort()
-  await page.route('**/api/sync', block)
-  await page.route('**/api/bootstrap', block)
-  await page.route('**/api/changes*', block)
-}
-
-async function unblockSyncApi(page: import('@playwright/test').Page): Promise<void> {
-  await page.unroute('**/api/sync')
-  await page.unroute('**/api/bootstrap')
-  await page.unroute('**/api/changes*')
-}
-
 test.describe('regla recurrente tras recargar (#493)', () => {
   test.use({ fixedTime: '2026-11-12T10:00:00Z' })
 
@@ -45,9 +33,9 @@ test.describe('regla recurrente tras recargar (#493)', () => {
     const liveMarket = new LiveMarketPage(page)
     await tracker.openInvestmentRecurringTab()
 
-    await blockSyncApi(page)
+    const reconnect = await blockSyncApi(page)
     await liveMarket.createRecurringRule(RULE, { waitForSync: false })
-    const rows = liveMarket.recurringRules.locator('tr[data-recurring-rule-id]')
+    const rows = liveMarket.recurringRuleRows
     await expect(rows).toHaveCount(1)
     await expect(rows).toContainText(RULE.description)
 
@@ -57,30 +45,40 @@ test.describe('regla recurrente tras recargar (#493)', () => {
     await tracker.openInvestmentRecurringTab()
     await expect(rows).toHaveCount(1)
     await expect(rows).toContainText(RULE.description)
-    await expect(page.locator('#sidebar-sync-status')).toContainText('pendiente')
-    await expect(page.locator('#sidebar-sync-status')).not.toContainText('Sincronizado')
+    await expect(tracker.syncStatus).toContainText('pendiente')
+    await expect(tracker.syncStatus).not.toContainText('Sincronizado')
 
     await tracker.openTransactions()
-    await expect(page.locator('[data-pending-panel] [data-pending-item]')).toHaveCount(1)
-    await expect(
-      page.locator('[data-pending-panel] [data-pending-item]').first(),
-    ).toContainText(RULE.description)
+    await expect(liveMarket.pendingItems()).toHaveCount(1)
+    await expect(liveMarket.pendingItems().first()).toContainText(RULE.description)
 
     // Reconnect: the queued commands are sent once and the local work drains.
-    await unblockSyncApi(page)
-    await page.waitForResponse(
-      (response) => response.url().includes('/api/sync') && response.request().method() === 'POST',
-      { timeout: 20000 },
+    // Both listeners exist before the route is lifted, so a fast response
+    // cannot arrive first.
+    const ruleSent = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'create' &&
+        command.entityType === 'recurringRule' &&
+        command.data.name === RULE.description,
     )
-    await expect(page.locator('#sidebar-sync-status')).toContainText('Sincronizado', {
-      timeout: 20000,
-    })
+    const occurrenceSent = expectSyncCommand(
+      page,
+      (command) =>
+        command.action === 'create' &&
+        command.entityType === 'pendingMovement' &&
+        command.data.description === RULE.description,
+    )
+    await reconnect()
+    await ruleSent
+    await occurrenceSent
+    await expect(tracker.syncStatus).toContainText('Sincronizado')
 
     await tracker.reload()
     await tracker.openInvestmentRecurringTab()
     await expect(rows).toHaveCount(1)
     await expect(rows).toContainText(RULE.description)
     await tracker.openTransactions()
-    await expect(page.locator('[data-pending-panel] [data-pending-item]')).toHaveCount(1)
+    await expect(liveMarket.pendingItems()).toHaveCount(1)
   })
 })
