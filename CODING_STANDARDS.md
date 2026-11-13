@@ -1,12 +1,15 @@
 # Estándares de código
 
 Las reglas que debe cumplir el código de este repo, reunidas en un solo sitio. Es la fuente que
-revisa el eje **Standards** de `/code-review`, y la lista contra la que se contrasta un diff.
+revisa el eje **Standards** de `/code-review`, y la lista contra la que se contrasta un diff. Las
+reglas específicas de tests viven en [`TESTING_STANDARDS.md`](TESTING_STANDARDS.md), que el mismo
+eje revisa.
 
 Los documentos de `docs/` siguen siendo la narrativa y el porqué: `docs/architecture/frontend.md`
 explica las capas, `docs/testing.md` la estrategia de Vitest y `docs/playwright.md` la suite de
-navegador. Este fichero extrae de ellos lo que es una **regla**. Si alguno contradice a este, es
-deriva que hay que corregir, no una excepción: manda este fichero y se actualiza el otro.
+navegador. Este fichero extrae de ellos lo que es una **regla**. Si alguno contradice a este o al
+estándar de tests, es deriva que hay que corregir, no una excepción: mandan esos dos ficheros y se
+actualiza la narrativa.
 
 ## Lo que ya aplica el tooling
 
