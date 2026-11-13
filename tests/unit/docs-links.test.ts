@@ -9,7 +9,14 @@ import { describe, expect, it } from 'vitest'
  */
 
 const root = new URL('../../', import.meta.url).pathname
-const rootDocs = ['AGENTS.md', 'CODING_STANDARDS.md', 'CONTRIBUTING.md', 'GLOSSARY.md', 'README.md']
+const rootDocs = [
+  'AGENTS.md',
+  'CODING_STANDARDS.md',
+  'CONTRIBUTING.md',
+  'GLOSSARY.md',
+  'README.md',
+  'TESTING_STANDARDS.md',
+]
 
 const docPaths = [
   ...rootDocs,
@@ -43,6 +50,19 @@ describe('ADR numbers', () => {
       .map((name) => name.slice(0, 4))
     const repeated = numbers.filter((number, index) => numbers.indexOf(number) !== index)
     expect(repeated).toEqual([])
+  })
+})
+
+describe('testing standards', () => {
+  it('AGENTS.md requires reading them before touching a test', () => {
+    const agents = readFileSync(join(root, 'AGENTS.md'), 'utf8')
+    expect(agents).toContain('TESTING_STANDARDS.md')
+  })
+
+  it('the tdd and code-review skills load them as a source', () => {
+    for (const skill of ['.agents/skills/tdd/SKILL.md', '.agents/skills/code-review/SKILL.md']) {
+      expect(readFileSync(join(root, skill), 'utf8')).toContain('TESTING_STANDARDS.md')
+    }
   })
 })
 

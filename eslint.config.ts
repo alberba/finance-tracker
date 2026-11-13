@@ -107,6 +107,11 @@ export default defineConfig([
           message:
             'Usa `tracker.reload()`: espera a `html[data-finance-ready]` antes de navegar. Un `page.reload()` a pelo da fallos que parecen lentitud de compilación.',
         },
+        {
+          selector: "CallExpression[callee.property.name='waitForTimeout']",
+          message:
+            'Prohibido `waitForTimeout` (TESTING_STANDARDS.md): espera una respuesta, una URL, un locator o una señal explícita de la app.',
+        },
       ],
     },
   },

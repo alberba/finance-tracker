@@ -1,5 +1,8 @@
 # Estrategia de Vitest
 
+Las reglas que debe cumplir un test están en [TESTING_STANDARDS.md](../TESTING_STANDARDS.md);
+este documento explica la estrategia, las capas y los comandos. Si hay contradicción, manda el estándar.
+
 Vitest concentra las comprobaciones rápidas del proyecto en tres capas. El objetivo es que el bucle
 local habitual tarde segundos y que cada regla se pruebe en el entorno más pequeño que la representa
 con fidelidad.
@@ -47,16 +50,11 @@ solo para mejorar el porcentaje. El HTML se escribe en `coverage/`.
 
 ## Criterios para tests nuevos
 
-1. Prueba la regla en la capa más baja que pueda representarla de forma fiable.
-2. Un test debe fallar por una sola razón observable.
-3. Usa datos y nombres deterministas; no dependas del orden global de la suite.
-4. Mockea límites externos, no la unidad que intentas validar.
-5. Una regresión corregida incluye el test que la reproduce.
-6. No aumentes timeouts o workers para ocultar una carrera; corrige el aislamiento.
-7. En happy-dom, `select.value` deja de seguir a `v-model` cuando las opciones cambian después de
-   montar. Comprueba lo que se guarda (el evento emitido o el store), no `select.value`.
-8. En los round-trip, `trip.reload()` crea un Pinia nuevo: vuelve a obtener los stores después de
-   recargar, porque las referencias anteriores apuntan al Pinia viejo.
+La lista completa y numerada está en [TESTING_STANDARDS.md](../TESTING_STANDARDS.md). En corto:
+cada test nombra el defecto que evita, se escribe en la capa más baja que lo represente con
+fidelidad, falla por una sola razón observable, usa datos deterministas, mockea solo el límite
+externo y se ha visto en rojo antes de darlo por bueno. Las reglas de poda, E2E y ejecución también
+viven allí.
 
 ## Cuarentena de tests inestables (#233)
 
