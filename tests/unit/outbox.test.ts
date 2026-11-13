@@ -237,6 +237,73 @@ describe('outbox', () => {
     expect(await count(db)).toBe(0)
   })
 
+  it('reutiliza el create pendiente solo cuando el contenido es equivalente', async () => {
+    const data = { id: 'acc-dedupe', name: 'Cuenta', kind: 'checking', currency: 'EUR', openingBalance: 0 }
+    const first = await enqueue(db, { action: 'create', entityType: 'account', data })
+    const replay = await enqueue(db, {
+      action: 'create',
+      entityType: 'account',
+      data: { ...data },
+    })
+
+    expect(replay.seq).toBe(first.seq)
+    expect(replay.command.commandId).toBe(first.command.commandId)
+    expect(await count(db)).toBe(1)
+  })
+
+  it('pliega el contenido nuevo en un create que aún no se ha enviado', async () => {
+    const first = await enqueue(db, {
+      action: 'create',
+      entityType: 'account',
+      data: { id: 'acc-fold', name: 'Cuenta', kind: 'checking', currency: 'EUR', openingBalance: 0 },
+    })
+    const folded = await enqueue(db, {
+      action: 'create',
+      entityType: 'account',
+      data: { id: 'acc-fold', name: 'Cuenta renombrada', kind: 'checking', currency: 'EUR', openingBalance: 0 },
+    })
+
+    expect(folded.seq).toBe(first.seq)
+    expect(folded.command.commandId).toBe(first.command.commandId)
+    const [entry] = await listAll(db)
+    expect(entry.command).toMatchObject({
+      action: 'create',
+      data: { id: 'acc-fold', name: 'Cuenta renombrada' },
+    })
+    expect(await count(db)).toBe(1)
+  })
+
+  it('no reescribe el contenido de un create ya enviado: publica otro comando con identidad nueva', async () => {
+    const first = await enqueue(db, {
+      action: 'create',
+      entityType: 'account',
+      data: { id: 'acc-sent', name: 'Cuenta', kind: 'checking', currency: 'EUR', openingBalance: 0 },
+    })
+    // The command may already be on the wire with its uncertain outcome.
+    await recordFailure(db, first.seq, 'timeout')
+
+    const changed = await enqueue(db, {
+      action: 'create',
+      entityType: 'account',
+      data: { id: 'acc-sent', name: 'Cuenta corregida', kind: 'checking', currency: 'EUR', openingBalance: 0 },
+    })
+
+    expect(changed.seq).not.toBe(first.seq)
+    expect(changed.command.commandId).not.toBe(first.command.commandId)
+    expect(changed.command).toMatchObject({
+      action: 'update',
+      entityType: 'account',
+      entityId: 'acc-sent',
+      baseVersion: 0,
+      patch: { name: 'Cuenta corregida' },
+    })
+    expect((changed.command as { patch: Record<string, unknown> }).patch).not.toHaveProperty('id')
+    expect(await count(db)).toBe(2)
+    // The already-sent create keeps its exact content for an idempotent resend.
+    const queued = await listAll(db)
+    expect(queued[0].command).toMatchObject({ data: { name: 'Cuenta' } })
+  })
+
   it('lists entries FIFO and peekBatch caps at the requested limit', async () => {
     for (let i = 0; i < 7; i += 1) {
       await enqueue(db, { action: 'noop' })

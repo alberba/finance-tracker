@@ -25,6 +25,7 @@ import {
   type SyncCommandInput,
   type SyncEntityType,
 } from '../server/sync/command-schemas'
+import { safeParse } from '../schema'
 import { ClientStorage, storageError, type ClientStorageError } from './storage'
 
 export const OUTBOX_DB_VERSION = 3
@@ -268,6 +269,41 @@ export function parseOutboxCommand(command: OutboxCommandInput): SyncCommandInpu
   return parsed.data
 }
 
+/** Structural equality of payloads, independent of key insertion order. */
+function equivalentPayload(a: unknown, b: unknown): boolean {
+  return stableJson(a) === stableJson(b)
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'undefined'
+}
+
+/**
+ * The subset of a create payload the entity's update schema accepts. Identity
+ * and grouping fields that only exist at creation (e.g. `userInstrument`'s
+ * `instrumentId`) are dropped instead of making the update invalid.
+ */
+function editablePatch(
+  entityType: SyncEntityType,
+  data: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const { id: _identity, ...rest } = data
+  const parsed = safeParse(entityUpdateSchemas[entityType].schema, rest, {
+    onExcessProperty: 'ignore',
+  })
+  if (!parsed.success) return null
+  const patch = parsed.data as Record<string, unknown>
+  return Object.keys(patch).length > 0 ? patch : null
+}
+
 /**
  * Validates and appends a command to the outbox. Adds `commandId` if the
  * caller didn't supply one. Fails with `InvalidCommandError` if the command
@@ -304,10 +340,10 @@ export const enqueue = (
       const tx = db.transaction(STORE, 'readwrite')
       const store = tx.objectStore(STORE)
       if (parsed.action === 'create') {
-        // The client identity is the entity's own id (ADR 0001), so a second
-        // `create` for the same id is the same effect, never another row. A
-        // concurrent writer (e.g. the queue path and an accepted intent) gets
-        // the entry that is already queued instead of a duplicate command.
+        // The client identity is the entity's own id (ADR 0001), so two
+        // `create`s for the same id are the same effect, never two rows. The
+        // queue reuses the existing entry only when its content is equivalent:
+        // silently dropping changed content would lose the user's edit.
         const identity = (parsed.data as { id?: unknown }).id
         if (typeof identity === 'string') {
           const queued = (await requestToPromise(
@@ -319,9 +355,52 @@ export const enqueue = (
               candidate.command.entityType === parsed.entityType &&
               (candidate.command.data as { id?: unknown }).id === identity,
           )
-          if (existing) {
+          if (existing && existing.command.action === 'create') {
+            if (equivalentPayload(existing.command.data, parsed.data)) {
+              await txDone(tx)
+              return existing
+            }
+            if (existing.attempts === 0) {
+              // Never sent: fold the accepted content into the still-queued
+              // create, the same rule `amendPendingCreate` applies.
+              const folded = {
+                ...existing,
+                command: { ...existing.command, data: parsed.data },
+              }
+              store.put(folded)
+              await txDone(tx)
+              return folded
+            }
+            // The create may already be on the wire with an uncertain
+            // outcome. Rewriting its content would break an idempotent resend,
+            // so the changed fields travel as a distinct command id addressed
+            // at the same client identity (ADR 0003 rebases its version).
+            const patch = editablePatch(parsed.entityType, parsed.data)
+            if (patch) {
+              const update = parseOutboxCommand({
+                action: 'update',
+                entityType: parsed.entityType,
+                entityId: identity,
+                baseVersion: 0,
+                patch,
+              })
+              const seq = await requestToPromise(
+                store.add({ ...entry, command: update }) as IDBRequest<number>,
+              )
+              await txDone(tx)
+              return { ...entry, command: update, seq }
+            }
+            // No editable field survives the patch schema: carry the whole
+            // payload as a new create with its own command id.
+            const fresh = parseOutboxCommand({
+              ...parsed,
+              commandId: generateCommandId(),
+            } as OutboxCommandInput)
+            const seq = await requestToPromise(
+              store.add({ ...entry, command: fresh }) as IDBRequest<number>,
+            )
             await txDone(tx)
-            return existing
+            return { ...entry, command: fresh, seq }
           }
         }
       }
