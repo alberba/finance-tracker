@@ -48,8 +48,9 @@ async function unlinkedFlag(before: Transaction, after: Transaction): Promise<bo
     draft.transactions = [after]
   })
   const publications = await buildMovementPublications([before], [after], 'EUR')
+  expect(publications).not.toBeNull()
   expect(publications).toHaveLength(1)
-  return publications[0].unlinked
+  return publications![0].unlinked
 }
 
 describe('objetivos de vinculación por usuario', () => {
