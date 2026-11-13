@@ -6,6 +6,7 @@ vi.mock('../../../src/scripts/demo-mode', () => ({ isDemoMode: vi.fn(() => false
 
 import { createTestPinia } from '../../helpers/pinia'
 import { wipeIdbCache, wipeOutbox } from '../../helpers/client-storage'
+import { ClientStorageError } from '../../../src/lib/client/storage'
 import { useSyncStore } from '../../../src/stores/sync'
 
 const USER_ID = 'user-store-blocked-storage'
@@ -39,7 +40,9 @@ describe('useSyncStore — almacenamiento bloqueado por una pestaña antigua (#4
     })
     try {
       const store = useSyncStore()
-      await expect(store.init(USER_ID)).rejects.toThrow(/pestaña/i)
+      const failure = await store.init(USER_ID).catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(ClientStorageError)
+      expect((failure as Error).message).toMatch(/pestaña/i)
       expect(store.lastError).toMatch(/pestaña/i)
       expect(store.syncStatus).toBe('error')
     } finally {

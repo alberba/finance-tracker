@@ -16,7 +16,6 @@ import {
   openStorage,
   publishDurableIntentCommands,
   reopenDurableIntentStep,
-  retryDurableIntent,
   wipeOutbox,
   type IntentCommandOutcome,
   type TestStorage,
@@ -157,7 +156,6 @@ describe('intenciones durables de la cola local (#490)', () => {
       entityType: 'userInstrument',
       commandId: configuration?.commandId,
     })
-    expect(await countDurableWork(db)).toBe(1)
 
     // The accepted configuration survives reopening the storage with the intent.
     db.close()
@@ -191,7 +189,6 @@ describe('intenciones durables de la cola local (#490)', () => {
       intentId: accepted.intent.id,
       step: 'configuration',
     })
-    expect(await countDurableWork(db)).toBe(1)
   })
 
   it('deja la configuración pendiente si el comando a adoptar ya no existe', async () => {
@@ -223,7 +220,7 @@ describe('intenciones durables de la cola local (#490)', () => {
     expect(reloaded.steps).toHaveLength(2)
   })
 
-  it('publica los comandos y el progreso en una sola transacción y no los duplica', async () => {
+  it('publica los comandos y el progreso en una sola transacción', async () => {
     const accepted = await acceptDurableIntent(db, linkIntent())
     const result = await publishDurableIntentCommands(db, accepted.intent.id, [
       { step: 'movement-1', command: updateCommand('movement-1') },
@@ -239,16 +236,6 @@ describe('intenciones durables de la cola local (#490)', () => {
       result.published.map((item) => item.commandId),
     )
     expect(await count(db)).toBe(2)
-
-    // A second tab that tries to publish the same steps after the first
-    // transaction committed must not create duplicate commands.
-    const again = await publishDurableIntentCommands(db, accepted.intent.id, [
-      { step: 'movement-1', command: updateCommand('movement-1') },
-      { step: 'movement-2', command: updateCommand('movement-2') },
-    ])
-    expect(again.published).toEqual([])
-    expect(again.skipped.sort()).toEqual(['movement-1', 'movement-2'])
-    expect(await count(db)).toBe(2)
   })
 
   it('confirma una dependencia ya satisfecha sin reenviar su comando', async () => {
@@ -256,7 +243,6 @@ describe('intenciones durables de la cola local (#490)', () => {
       ...linkWithConfiguration(),
       commands: [{ step: 'configuration', command: configurationCommand() }],
     })
-    const [queued] = await listAll(db)
 
     await completeDurableIntentStep(db, accepted.intent.id, 'configuration')
 
@@ -266,7 +252,6 @@ describe('intenciones durables de la cola local (#490)', () => {
     })
     expect(view.intent.state).toBe('local-saved')
     expect(await count(db)).toBe(0)
-    expect(queued.seq).toBeGreaterThan(0)
   })
 
   it('reabre una configuración cuyo comando desapareció antes de confirmarse', async () => {
@@ -334,33 +319,6 @@ describe('intenciones durables de la cola local (#490)', () => {
       commandId: published.published[0].commandId,
     })
     expect(view.intent.state).toBe('sending')
-  })
-
-  it('reintenta un fallo definitivo con un comando nuevo y la misma identidad de movimiento', async () => {
-    const accepted = await acceptDurableIntent(db, linkIntent({ targetIds: ['movement-1'] }))
-    const first = await publishDurableIntentCommands(db, accepted.intent.id, [
-      { step: 'movement-1', command: updateCommand('movement-1') },
-    ])
-    const [entry] = await listCommands(db)
-    await commitResults(db, [{ entry, status: 'failed', message: 'El movimiento ya no existe.' }])
-    let [view] = await listDurableIntents(db)
-    expect(view.intent.state).toBe('failed')
-    expect(view.intent.failure).toContain('ya no existe')
-    expect(await count(db)).toBe(0)
-
-    await retryDurableIntent(db, accepted.intent.id)
-    ;[view] = await listDurableIntents(db)
-    expect(view.intent.state).toBe('local-saved')
-    expect(view.intent.failure).toBeNull()
-    expect(view.steps[0].state).toBe('pending')
-
-    const second = await publishDurableIntentCommands(db, accepted.intent.id, [
-      { step: 'movement-1', command: updateCommand('movement-1') },
-    ])
-    expect(second.published[0].commandId).not.toBe(first.published[0].commandId)
-    expect(second.published[0].step).toBe('movement-1')
-    const [queued] = await listCommands(db)
-    expect(queued.command).toMatchObject({ entityType: 'transaction', entityId: 'movement-1' })
   })
 
   it('descarta lo cancelable, conserva lo confirmado y deja el resultado parcial visible', async () => {

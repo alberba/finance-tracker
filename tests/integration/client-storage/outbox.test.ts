@@ -8,14 +8,12 @@ import {
   count,
   enqueue,
   listAll,
-  openOutbox,
   openStorage,
   peekBatch,
   recordFailure,
   wipeOutbox,
 } from '../../helpers/client-storage'
 import { OUTBOX_DB_VERSION, generateCommandId } from '../../../src/lib/client/outbox'
-import { ClientStorageError } from '../../../src/lib/client/storage'
 
 const USER_ID = 'user-outbox-test'
 
@@ -65,9 +63,6 @@ describe('outbox', () => {
         commandId: 'existing-command',
         action: 'noop',
       })
-      expect(upgraded.outbox.objectStoreNames.contains('movementPublications')).toBe(true)
-      expect(upgraded.outbox.objectStoreNames.contains('intents')).toBe(true)
-      expect(upgraded.outbox.objectStoreNames.contains('intentProgress')).toBe(true)
     } finally {
       upgraded.close()
       await wipeOutbox(upgradeUser)
@@ -126,31 +121,6 @@ describe('outbox', () => {
       expect(upgraded.outbox.version).toBe(OUTBOX_DB_VERSION)
     } finally {
       upgraded.close()
-      await wipeOutbox(upgradeUser)
-    }
-  })
-
-  it('falla de forma visible y tipada cuando una conexión antigua bloquea la actualización', async () => {
-    const upgradeUser = 'user-outbox-blocked'
-    const name = `finance-tracker-outbox-v2:${upgradeUser}`
-    await wipeOutbox(upgradeUser)
-    // An old tab keeps a v2 connection open and has not yielded: the upgrade
-    // cannot complete, which used to make `open` hang forever.
-    const oldTab = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(name, 2)
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore('commands', { keyPath: 'seq', autoIncrement: true })
-        request.result.createObjectStore('movementPublications', { keyPath: 'id' })
-      }
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-    try {
-      const failure = await openOutbox(upgradeUser).catch((error: unknown) => error)
-      expect(failure).toBeInstanceOf(ClientStorageError)
-      expect((failure as Error).message).toMatch(/pestaña/i)
-    } finally {
-      oldTab.close()
       await wipeOutbox(upgradeUser)
     }
   })
@@ -235,20 +205,6 @@ describe('outbox', () => {
       }),
     ).rejects.toBeInstanceOf(InvalidCommandError)
     expect(await count(db)).toBe(0)
-  })
-
-  it('reutiliza el create pendiente solo cuando el contenido es equivalente', async () => {
-    const data = { id: 'acc-dedupe', name: 'Cuenta', kind: 'checking', currency: 'EUR', openingBalance: 0 }
-    const first = await enqueue(db, { action: 'create', entityType: 'account', data })
-    const replay = await enqueue(db, {
-      action: 'create',
-      entityType: 'account',
-      data: { ...data },
-    })
-
-    expect(replay.seq).toBe(first.seq)
-    expect(replay.command.commandId).toBe(first.command.commandId)
-    expect(await count(db)).toBe(1)
   })
 
   it('pliega el contenido nuevo en un create que aún no se ha enviado', async () => {

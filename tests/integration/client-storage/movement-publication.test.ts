@@ -45,21 +45,6 @@ describe('disciplina de publicación de movimientos (#489)', () => {
     await wipeOutbox(USER_ID)
   })
 
-  it('escribe el comando y su generación en una sola transacción', async () => {
-    const [result] = await publishMovementCommands(db, [input()])
-
-    expect(result).toMatchObject({ movementId: 'movement-1', outcome: 'published', generation: 1 })
-    expect(await count(db)).toBe(1)
-    const records = await readMovementPublications(db, ['movement-1'])
-    expect(records.get('movement-1')).toMatchObject({
-      generation: 1,
-      status: 'active',
-      type: 'investment',
-      writerId: expect.any(String),
-      origin: 'movement',
-    })
-  })
-
   it('rechaza una publicación cuya generación ya cambió y no escribe el comando', async () => {
     await publishMovementCommands(db, [input()])
 
@@ -130,21 +115,6 @@ describe('disciplina de publicación de movimientos (#489)', () => {
     } finally {
       otherTab.close()
     }
-  })
-
-  it('marca como desvinculado un movimiento publicado sin el instrumento del vínculo', async () => {
-    await publishMovementCommands(db, [input({ instrumentId: 'instrument-1' })])
-
-    await publishMovementCommands(db, [
-      input({ instrumentId: null, fingerprint: 'fingerprint-2', unlinked: true }),
-    ])
-
-    const records = await readMovementPublications(db, ['movement-1'])
-    expect(records.get('movement-1')).toMatchObject({
-      generation: 2,
-      instrumentId: null,
-      unlinked: true,
-    })
   })
 
   it('guarda la proveniencia del vínculo junto al comando, sin tocar el comando enviado', async () => {

@@ -22,22 +22,10 @@ export type { CachedEntity } from '../../src/lib/client/idb-cache'
 export type {
   OutboxCommandInput,
   OutboxEntry,
-  OutboxPublication,
   PendingCreateMatch,
 } from '../../src/lib/client/outbox'
-export type {
-  AcceptDurableIntentInput,
-  DurableIntentRecord,
-  DurableIntentView,
-  IntentCommandOutcome,
-  IntentProgressRecord,
-} from '../../src/lib/client/durable-intents'
-export type {
-  MovementCommandPlan,
-  MovementPublicationInput,
-  MovementPublicationRecord,
-  MovementPublicationResult,
-} from '../../src/lib/client/movement-publication'
+export type { IntentCommandOutcome } from '../../src/lib/client/durable-intents'
+export type { MovementPublicationInput } from '../../src/lib/client/movement-publication'
 export type { EncryptedPayload } from '../../src/lib/client/crypto'
 export { InvalidCommandError } from '../../src/lib/client/outbox'
 
@@ -207,30 +195,10 @@ export const claimDurableIntentCommands = (
   ...args: Parameters<typeof durableIntents.claimIntentCommands>
 ) => runWithStorage(storage, durableIntents.claimIntentCommands(...args))
 
-export const releaseDurableIntentClaims = (
-  storage: ClientStorageHandles,
-  ...args: Parameters<typeof durableIntents.releaseIntentClaims>
-) => runWithStorage(storage, durableIntents.releaseIntentClaims(...args))
-
 export const commitDurableIntentCommands = (
   storage: ClientStorageHandles,
   ...args: Parameters<typeof durableIntents.commitIntentCommands>
 ) => runWithStorage(storage, durableIntents.commitIntentCommands(...args))
-
-export const markDurableIntentWaiting = (
-  storage: ClientStorageHandles,
-  ...args: Parameters<typeof durableIntents.markIntentWaiting>
-) => runWithStorage(storage, durableIntents.markIntentWaiting(...args))
-
-export const failDurableIntent = (
-  storage: ClientStorageHandles,
-  ...args: Parameters<typeof durableIntents.failDurableIntent>
-) => runWithStorage(storage, durableIntents.failDurableIntent(...args))
-
-export const cancelDurableIntentStep = (
-  storage: ClientStorageHandles,
-  ...args: Parameters<typeof durableIntents.cancelIntentStep>
-) => runWithStorage(storage, durableIntents.cancelIntentStep(...args))
 
 export const completeDurableIntentStep = (
   storage: ClientStorageHandles,
@@ -241,11 +209,6 @@ export const reopenDurableIntentStep = (
   storage: ClientStorageHandles,
   ...args: Parameters<typeof durableIntents.reopenIntentStep>
 ) => runWithStorage(storage, durableIntents.reopenIntentStep(...args))
-
-export const retryDurableIntent = (
-  storage: ClientStorageHandles,
-  ...args: Parameters<typeof durableIntents.retryDurableIntent>
-) => runWithStorage(storage, durableIntents.retryDurableIntent(...args))
 
 export const discardDurableIntent = (
   storage: ClientStorageHandles,
