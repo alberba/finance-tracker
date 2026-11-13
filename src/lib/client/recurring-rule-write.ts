@@ -1105,4 +1105,3 @@ async function pruneRuleWrite(intentId: string): Promise<void> {
     await useSyncStore().deleteIntent(intentId)
   }
 }
-
