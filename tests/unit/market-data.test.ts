@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { quoteMock } = vi.hoisted(() => ({ quoteMock: vi.fn() }))
 vi.mock('../../src/lib/server/yahoo-finance', async (importOriginal) => ({
@@ -36,9 +36,19 @@ const instrument: Instrument = {
   active: true,
 }
 
+/** The instant the quotes are fetched at: fixed, never the wall clock. */
+const NOW = '2026-10-20T10:00:00.000Z'
+
 describe('adaptador de mercado server-side', () => {
   beforeEach(() => {
     quoteMock.mockReset()
+    // Only `Date`: the adapter's promises and timers keep running.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(NOW))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('normaliza la respuesta del proveedor y calcula la variación diaria', async () => {
@@ -47,7 +57,7 @@ describe('adaptador de mercado server-side', () => {
         JSON.stringify({
           price: '125.5',
           previous_close: '124',
-          datetime: new Date().toISOString(),
+          datetime: NOW,
         }),
         { status: 200 },
       ),
@@ -133,7 +143,7 @@ describe('adaptador de mercado server-side', () => {
         quoteType: ticker === 'BTC' ? 'ETF' : 'CRYPTOCURRENCY',
         currency: ticker === 'BTC' ? 'USD' : 'EUR',
         regularMarketPrice: ticker === 'BTC' ? 36.03 : 73_000,
-        regularMarketTime: new Date(),
+        regularMarketTime: new Date(NOW),
       }))
       const quote = await loadQuote(
         {
@@ -159,7 +169,7 @@ describe('adaptador de mercado server-side', () => {
       quoteType: 'CRYPTOCURRENCY',
       currency: symbol.endsWith('EUR') ? 'EUR' : 'USD',
       regularMarketPrice: symbol.endsWith('EUR') ? 73_000 : 80_000,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
     }))
     const visible: Instrument = {
       ...instrument,
@@ -185,7 +195,7 @@ describe('adaptador de mercado server-side', () => {
       quoteType: 'ETF',
       currency: 'USD',
       regularMarketPrice: 36.03,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
     })
     const quote = await loadQuote(
       {
@@ -206,7 +216,7 @@ describe('adaptador de mercado server-side', () => {
     quoteMock.mockResolvedValue({
       currency: 'EUR',
       regularMarketPrice: 9.276,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
       regularMarketPreviousClose: 9.312,
     })
 
@@ -237,7 +247,7 @@ describe('adaptador de mercado server-side', () => {
   it('usa Yahoo por defecto sin credenciales', async () => {
     quoteMock.mockResolvedValue({
       regularMarketPrice: 10,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
       currency: 'EUR',
     })
     const quote = await loadQuote(
@@ -257,7 +267,7 @@ describe('adaptador de mercado server-side', () => {
   it('marca el retraso declarado por Yahoo aunque la fecha del dato sea reciente', async () => {
     quoteMock.mockResolvedValue({
       regularMarketPrice: 10,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
       exchangeDataDelayedBy: 15,
     })
     const quote = await loadQuote(
@@ -372,7 +382,7 @@ describe('adaptador de mercado server-side', () => {
       currency: 'GBp',
       regularMarketPrice: 2500,
       regularMarketPreviousClose: 2000,
-      regularMarketTime: new Date(),
+      regularMarketTime: new Date(NOW),
     })
     const quote = await loadQuote(
       {
@@ -415,7 +425,7 @@ describe('adaptador de mercado server-side', () => {
         JSON.stringify({
           price: '9.276',
           previous_close: '9.312',
-          datetime: new Date().toISOString(),
+          datetime: NOW,
         }),
         { status: 200 },
       ),
@@ -467,7 +477,7 @@ describe('adaptador de mercado server-side', () => {
 
     await Promise.resolve()
     expect(quoteMock).toHaveBeenCalledTimes(1)
-    resolveResponse?.({ currency: 'EUR', regularMarketPrice: 10, regularMarketTime: new Date() })
+    resolveResponse?.({ currency: 'EUR', regularMarketPrice: 10, regularMarketTime: new Date(NOW) })
 
     await expect(Promise.all([first, second])).resolves.toEqual([
       expect.objectContaining({ price: 10 }),

@@ -62,13 +62,64 @@ export interface TestDatabase {
   close: () => void;
 }
 
+/** A statement the test database executed, with the values bound to it. */
+export interface ExecutedStatement {
+  sql: string;
+  params: unknown[];
+}
+
+/**
+ * Records the statements a test database executes, so a test can assert on
+ * how many queries reach a table and which ids they carry at the persistence
+ * boundary, without spying on repository helpers. Pass `onStatement` to
+ * `createTestDb`; call `clear()` after seeding to observe only the code under
+ * test.
+ */
+export function createStatementRecorder() {
+  let statements: ExecutedStatement[] = [];
+  return {
+    onStatement: (statement: ExecutedStatement) => {
+      statements.push(statement);
+    },
+    clear: () => {
+      statements = [];
+    },
+    /** The SELECT statements that read `table` since the last `clear()`. */
+    selectsFrom: (table: string): ExecutedStatement[] =>
+      statements.filter(
+        ({ sql }) =>
+          /^\s*select\b/i.test(sql) &&
+          new RegExp(`\\bfrom\\s+["\`]?${table}["\`]?(\\s|$)`, "i").test(sql),
+      ),
+  };
+}
+
 /**
  * Spins up a fresh in-memory SQLite database with `migrations-v2/*.sql`
  * applied and foreign-key enforcement turned on (SQLite defaults it off,
  * unlike D1 which enforces it), ready for repository/API-route tests.
  */
-export function createTestDb(): TestDatabase {
+export function createTestDb(
+  options: { onStatement?: (statement: ExecutedStatement) => void } = {},
+): TestDatabase {
   const sqlite = new Database(":memory:");
+  const { onStatement } = options;
+  if (onStatement) {
+    // Observes every execution of a prepared statement (what Drizzle uses)
+    // together with its bound values; the real statement still runs.
+    const prepare = sqlite.prepare.bind(sqlite) as (source: string) => Database.Statement;
+    (sqlite as { prepare: unknown }).prepare = (source: string) => {
+      const statement = prepare(source);
+      for (const method of ["run", "all", "get", "iterate"] as const) {
+        const execute = (statement[method] as (...args: unknown[]) => unknown).bind(statement);
+        (statement as unknown as Record<string, unknown>)[method] = (...args: unknown[]) => {
+          onStatement({ sql: source, params: args.flat(Infinity) });
+          return execute(...args);
+        };
+      }
+      return statement;
+    };
+  }
   sqlite.pragma("foreign_keys = ON");
 
   for (const migration of readMigrationFiles()) {

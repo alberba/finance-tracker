@@ -16,7 +16,7 @@ import * as stockeventsSymbolMappingsRepository from '../../../../src/db/reposit
 import * as stockeventsCashMappingsRepository from '../../../../src/db/repositories/stockevents-cash-mappings'
 import * as syncRepository from '../../../../src/db/repositories/sync'
 import * as userSettingsRepository from '../../../../src/db/repositories/user-settings'
-import { createTestDb, type TestDatabase } from '../setup'
+import { createStatementRecorder, createTestDb, type TestDatabase } from '../setup'
 import { seedUser } from '../repositories/fixtures'
 
 let currentDb: TestDatabase['db']
@@ -333,9 +333,10 @@ function postJson(url: string, body: unknown): Request {
 describe('GET /api/data/export + POST /api/data/import', () => {
   let testDb: TestDatabase
   let principal: AuthPrincipal
+  const recorder = createStatementRecorder()
 
   beforeEach(async () => {
-    testDb = createTestDb()
+    testDb = createTestDb({ onStatement: recorder.onStatement })
     currentDb = testDb.db
     const user = await seedUser(testDb.db, 'export-user@example.com')
     principal = {
@@ -425,11 +426,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       transactionIds.push(transaction.id)
     }
 
-    const balancesBySnapshots = vi.spyOn(wealthRepository, 'listBalancesBySnapshots')
-    const balancesBySnapshot = vi.spyOn(wealthRepository, 'listBalancesBySnapshot')
-    const allocationsByContributions = vi.spyOn(contributionsRepository, 'listAllocationsByContributions')
-    const allocationsByContribution = vi.spyOn(contributionsRepository, 'listAllocationsByContribution')
-    const tradeDetailsByTransactions = vi.spyOn(transactionsRepository, 'listTradeDetailsByTransactions')
+    recorder.clear()
 
     const { GET } = await import('../../../../src/pages/api/data/export')
     const response = await GET({ locals: { principal } } as never)
@@ -440,14 +437,17 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(body.contributions.flatMap((contribution: Row) => contribution.allocations)).toHaveLength(3)
     expect(body.transactions.filter((transaction: Row) => transaction.operation !== null)).toHaveLength(3)
 
-    expect(balancesBySnapshot).not.toHaveBeenCalled()
-    expect(allocationsByContribution).not.toHaveBeenCalled()
-    expect(balancesBySnapshots).toHaveBeenCalledTimes(1)
-    expect(new Set(balancesBySnapshots.mock.calls[0][1])).toEqual(new Set(snapshotIds))
-    expect(allocationsByContributions).toHaveBeenCalledTimes(1)
-    expect(new Set(allocationsByContributions.mock.calls[0][1])).toEqual(new Set(contributionIds))
-    expect(tradeDetailsByTransactions).toHaveBeenCalledTimes(1)
-    expect(new Set(tradeDetailsByTransactions.mock.calls[0][1])).toEqual(new Set(transactionIds))
+    // One query per relation, however many parent rows there are, observed at
+    // the persistence boundary: a query per parent row would be three here.
+    const balanceQueries = recorder.selectsFrom('snapshot_balances')
+    expect(balanceQueries).toHaveLength(1)
+    expect(balanceQueries[0].params).toEqual(expect.arrayContaining(snapshotIds))
+    const allocationQueries = recorder.selectsFrom('contribution_allocations')
+    expect(allocationQueries).toHaveLength(1)
+    expect(allocationQueries[0].params).toEqual(expect.arrayContaining(contributionIds))
+    const tradeDetailQueries = recorder.selectsFrom('investment_trade_details')
+    expect(tradeDetailQueries).toHaveLength(1)
+    expect(tradeDetailQueries[0].params).toEqual(expect.arrayContaining(transactionIds))
   })
 
   it("only exports the authenticated user's collections and relations", async () => {
@@ -461,6 +461,14 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     const otherSnapshots = await runWithDb(testDb.db, wealthRepository.listByUser(other.id))
     const otherContributions = await runWithDb(testDb.db, contributionsRepository.listByUser(other.id))
     const otherTransactions = await runWithDb(testDb.db, transactionsRepository.listByUser(other.id))
+    // The other user really has data of their own for the export to leak.
+    expect(otherSnapshots.length).toBeGreaterThan(0)
+    expect(otherContributions.length).toBeGreaterThan(0)
+    expect(otherTransactions.length).toBeGreaterThan(0)
+    // ...and the export carries the authenticated user's own data.
+    expect(exported.wealthSnapshots.length).toBeGreaterThan(0)
+    expect(exported.contributions.length).toBeGreaterThan(0)
+    expect(exported.transactions.length).toBeGreaterThan(0)
     const exportedIds = new Set(
       [
         ...exported.transactions,
@@ -473,15 +481,15 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     expect(otherTransactions.some((row) => exportedIds.has(row.id))).toBe(false)
 
     const ownAccountIds = new Set(exported.accounts.map((account: Row) => account.id))
+    const exportedBalances = exported.wealthSnapshots.flatMap((snapshot: Row) => snapshot.balances)
+    const exportedAllocations = exported.contributions.flatMap(
+      (contribution: Row) => contribution.allocations,
+    )
+    expect(exportedBalances.length).toBeGreaterThan(0)
+    expect(exportedAllocations.length).toBeGreaterThan(0)
+    expect(exportedBalances.every((balance: Row) => ownAccountIds.has(balance.accountId))).toBe(true)
     expect(
-      exported.wealthSnapshots
-        .flatMap((snapshot: Row) => snapshot.balances)
-        .every((balance: Row) => ownAccountIds.has(balance.accountId)),
-    ).toBe(true)
-    expect(
-      exported.contributions
-        .flatMap((contribution: Row) => contribution.allocations)
-        .every((allocation: Row) => ownAccountIds.has(allocation.accountId)),
+      exportedAllocations.every((allocation: Row) => ownAccountIds.has(allocation.accountId)),
     ).toBe(true)
   })
 
@@ -651,6 +659,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
       unitPrice: 100,
       fee: 0.5,
     })
+    expect(exported.transactions.length).toBeGreaterThan(1)
     expect(
       exported.transactions.every((transaction: Row) => !('tradeDetail' in transaction)),
     ).toBe(true)

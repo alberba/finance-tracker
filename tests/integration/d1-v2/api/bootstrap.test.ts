@@ -7,7 +7,7 @@ import * as integrationCredentialsRepository from "../../../../src/db/repositori
 import * as marketRepository from "../../../../src/db/repositories/market";
 import * as transactionsRepository from "../../../../src/db/repositories/transactions";
 import * as wealthRepository from "../../../../src/db/repositories/wealth";
-import { createTestDb, type TestDatabase } from "../setup";
+import { createStatementRecorder, createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
 import { runWithDb } from '../../../../src/db/database'
 
@@ -145,9 +145,10 @@ async function seedNestedRelations(db: TestDatabase["db"], userId: string, symbo
 describe("GET /api/bootstrap", () => {
   let testDb: TestDatabase;
   let principal: AuthPrincipal;
+  const recorder = createStatementRecorder();
 
   beforeEach(async () => {
-    testDb = createTestDb();
+    testDb = createTestDb({ onStatement: recorder.onStatement });
     currentDb = testDb.db;
     const user = await seedUser(testDb.db, "bootstrap-user@example.com");
     principal = {
@@ -296,17 +297,37 @@ describe("GET /api/bootstrap", () => {
     ]);
   });
 
-  it("only asks for the relations of rows inside the selected year", async () => {
+  it("loads each relation in one query scoped to the selected year's rows", async () => {
     const seeded = await seedNestedRelations(testDb.db, principal.userId);
-    const balancesBySnapshots = vi.spyOn(wealthRepository, "listBalancesBySnapshots");
-    const allocationsByContributions = vi.spyOn(
-      contributionsRepository,
-      "listAllocationsByContributions",
-    );
-    const tradeDetailsByTransactions = vi.spyOn(
-      transactionsRepository,
-      "listTradeDetailsByTransactions",
-    );
+    // A second row of the selected year in each parent collection, so that a
+    // query per parent row is told apart from one batched query.
+    const secondSnapshot = await runWithDb(testDb.db, wealthRepository.create(principal.userId, {
+      snapshotDate: "2026-06-30",
+      year: 2026,
+      month: 6,
+    }));
+    await runWithDb(testDb.db, wealthRepository.createBalance(principal.userId, {
+      snapshotId: secondSnapshot.id,
+      accountId: seeded.account.id,
+      balance: 1100,
+      currency: "EUR",
+    }));
+    const secondTransaction = await runWithDb(testDb.db, transactionsRepository.create(principal.userId, {
+      accountId: seeded.account.id,
+      type: "investment",
+      date: "2026-06-02",
+      amount: -100,
+      currency: "EUR",
+      operation: {
+        instrumentId: seeded.instrument.id,
+        symbol: "VWCE",
+        side: "buy",
+        units: 1,
+        unitPrice: 100,
+        fee: 0,
+      },
+    }));
+    recorder.clear();
 
     const { GET } = await import("../../../../src/pages/api/bootstrap");
     const response = await GET({
@@ -315,20 +336,25 @@ describe("GET /api/bootstrap", () => {
     } as never);
     expect(response.status).toBe(200);
 
-    expect(balancesBySnapshots).toHaveBeenCalledTimes(1);
-    expect(new Set(balancesBySnapshots.mock.calls[0][1])).toEqual(
-      new Set([seeded.snapshot2026.id]),
-    );
-    expect(tradeDetailsByTransactions).toHaveBeenCalledTimes(1);
-    expect(new Set(tradeDetailsByTransactions.mock.calls[0][1])).toEqual(
-      new Set([seeded.transaction2026.id]),
-    );
+    // One batched query per relation, observed at the persistence boundary.
+    const balances = recorder.selectsFrom("snapshot_balances");
+    expect(balances).toHaveLength(1);
+    expect(balances[0].params).toContain(seeded.snapshot2026.id);
+    expect(balances[0].params).toContain(secondSnapshot.id);
+    expect(balances[0].params).not.toContain(seeded.snapshot2025.id);
+
+    const tradeDetails = recorder.selectsFrom("investment_trade_details");
+    expect(tradeDetails).toHaveLength(1);
+    expect(tradeDetails[0].params).toContain(seeded.transaction2026.id);
+    expect(tradeDetails[0].params).toContain(secondTransaction.id);
+    expect(tradeDetails[0].params).not.toContain(seeded.transaction2025.id);
+
     // Contributions are outside the year filter: every contribution's
     // allocations are loaded, not only the selected year's.
-    expect(allocationsByContributions).toHaveBeenCalledTimes(1);
-    expect(new Set(allocationsByContributions.mock.calls[0][1])).toEqual(
-      new Set([seeded.contribution2025.id, seeded.contribution2026.id]),
-    );
+    const allocations = recorder.selectsFrom("contribution_allocations");
+    expect(allocations).toHaveLength(1);
+    expect(allocations[0].params).toContain(seeded.contribution2025.id);
+    expect(allocations[0].params).toContain(seeded.contribution2026.id);
   });
 
   it("only reads the authenticated user's collections and relations", async () => {
@@ -349,11 +375,14 @@ describe("GET /api/bootstrap", () => {
       mine.snapshot2026.id,
     ]);
     expect(mineBody.wealthSnapshots[0].balances[0].accountId).toBe(mine.account.id);
-    expect(
-      mineBody.contributions.flatMap(
-        (contribution: { allocations: { accountId: string }[] }) => contribution.allocations,
-      ).every((allocation: { accountId: string }) => allocation.accountId === mine.account.id),
-    ).toBe(true);
+    const mineAllocations = mineBody.contributions.flatMap(
+      (contribution: { allocations: { accountId: string }[] }) => contribution.allocations,
+    );
+    // Both contributions (never year-filtered) keep their own allocation.
+    expect(mineAllocations.map((allocation: { accountId: string }) => allocation.accountId)).toEqual([
+      mine.account.id,
+      mine.account.id,
+    ]);
 
     const otherPrincipal: AuthPrincipal = {
       userId: other.id,

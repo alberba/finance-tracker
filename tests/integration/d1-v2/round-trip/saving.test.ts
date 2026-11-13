@@ -28,14 +28,10 @@ async function seed(trip: RoundTrip) {
   return { origin, destination, broker }
 }
 
-/** Lets the fire-and-forget enqueue of a store action finish before the outbox is drained. */
-const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
-
 /** The user creating the category in Configuración, which is what a goal needs first. */
 async function createSavingCategory(trip: RoundTrip, name: string) {
   const { useSettingsStore } = await import('../../../../src/stores/settings')
   useSettingsStore().addCategory('savingCategories', name)
-  await settled()
   await trip.reload()
 }
 
@@ -271,7 +267,6 @@ describe('round trip: ahorro', () => {
       category: 'Fondo de emergencia',
       targetAmount: 1000,
     })
-    await settled()
     const reloaded = await trip.reload()
     expect(Object.keys(reloaded.goals)).not.toContain('saving')
     expect(reloaded.savingGoals).toHaveLength(1)
@@ -312,7 +307,6 @@ describe('round trip: ahorro', () => {
       category: 'Fondo de emergencia',
       targetAmount: 1000,
     })
-    await settled()
     await trip.reload()
 
     useSettingsStore().removeCategory('savingCategories', 'Fondo de emergencia')
@@ -331,7 +325,6 @@ describe('round trip: ahorro', () => {
         targetAmount: 1000,
       }),
     ).toBe(true)
-    await settled()
     const created = await trip.reload()
     const id = created.savingGoals[0].id
 
@@ -340,14 +333,12 @@ describe('round trip: ahorro', () => {
       category: 'Fondo de emergencia',
       targetAmount: 2400,
     })
-    await settled()
     const edited = await trip.reload()
     expect(edited.savingGoals).toMatchObject([
       { name: 'Colchón de dos meses', category: 'Fondo de emergencia', targetAmount: 2400 },
     ])
 
     useGoalsStore().removeSavingGoal(id)
-    await settled()
     const removed = await trip.reload()
     expect(removed.savingGoals).toHaveLength(0)
   })

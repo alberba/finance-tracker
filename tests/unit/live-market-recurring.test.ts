@@ -488,14 +488,21 @@ describe('reglas recurrentes y pendientes', () => {
         feesCurrency: 'EUR',
         type: 'buy',
       })
-      await new Promise((resolve) => setTimeout(resolve, 0))
     } finally {
       vi.unstubAllGlobals()
     }
   })
 })
 describe('valoración de cartera', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('enlaza movimientos existentes al instrumento configurado', async () => {
+    // `updateCurrentUnits` stamps the holding with the clock; a purchase created
+    // a second later has to count on top of it, so fix only `Date`.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-07-10T12:00:00.000Z'))
     setActivePinia(createTestPinia())
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
@@ -574,7 +581,7 @@ describe('valoración de cartera', () => {
         side: 'buy',
         units: 2,
         unitPrice: 100,
-        createdAt: new Date(Date.now() + 1_000).toISOString(),
+        createdAt: '2026-07-10T12:00:01.000Z',
       })
     })
     expect(marketStore.valuation.instruments[0].units).toBe(5)

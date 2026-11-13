@@ -591,10 +591,15 @@ describe('regla recurrente durable (#493)', () => {
     // The server deletes the rule's pendings through the cascade: no doomed
     // pending update is queued behind the remove.
     trip.setOffline(false)
+    // `reload()` restarts the client (a fresh sync store) and its drain keeps
+    // syncing until a clean cycle clears `lastError`, so the error a rejected
+    // command leaves can only be read from the live client right after the
+    // one cycle that sends the removal.
+    await trip.syncStore.syncNow()
+    expect(trip.syncStore.lastError).toBeNull()
     const synced = await trip.reload()
     expect(synced.recurringRules).toHaveLength(0)
     expect(synced.pendingMovements).toHaveLength(0)
-    expect(trip.syncStore.lastError).toBeNull()
     const pendingCommands = trip
       .commandBatches()
       .flat()

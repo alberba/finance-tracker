@@ -115,12 +115,23 @@ export interface RoundTrip {
   cleanup: () => void
 }
 
-/** Lets pending microtasks and timers run — see `reload()`. */
-async function settle(): Promise<void> {
+/**
+ * Yields to the event loop so the stores' floating enqueues (`void
+ * syncListDiff(...)`, which have no observable completion signal) can reach
+ * the outbox. It is a turn of the loop, not a wait on the clock: no timer, so
+ * it keeps working under fake timers.
+ */
+async function yieldToEventLoop(): Promise<void> {
   for (let i = 0; i < 5; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => setImmediate(resolve))
   }
 }
+
+/** Fixed instant for every row the harness writes (rule 4: no wall clock). */
+const HARNESS_NOW = '2026-06-15T10:00:00.000Z'
+
+/** Per-process counter: every round trip gets its own deterministic, unique user. */
+let userSequence = 0
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -142,11 +153,12 @@ export async function startRoundTrip(
   seed?: (db: TestDatabase['db'], userId: string) => Promise<void>,
 ): Promise<RoundTrip> {
   const testDb = createTestDb()
-  const now = new Date().toISOString()
+  const now = HARNESS_NOW
+  userSequence += 1
   const [user] = await testDb.db
     .insert(users)
     .values({
-      email: `round-trip-${Math.random().toString(36).slice(2)}@example.com`,
+      email: `round-trip-${userSequence}@example.com`,
       createdAt: now,
       updatedAt: now,
     })
@@ -270,7 +282,7 @@ export async function startRoundTrip(
       let last = -1
       let stable = 0
       for (let round = 0; round < 400 && stable < 3; round += 1) {
-        await settle()
+        await yieldToEventLoop()
         if (!offline) await syncStore.syncNow()
         const count = await countOutbox(db)
         stable = count === last && (offline || count === 0) ? stable + 1 : 0
@@ -291,7 +303,6 @@ export async function startRoundTrip(
     const { useSyncStore: freshSyncStore } = await import('../../../../src/stores/sync')
     syncStore = freshSyncStore()
     await syncStore.init(user.id)
-    await settle()
     const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
     return useFinancialStateStore().state
   }

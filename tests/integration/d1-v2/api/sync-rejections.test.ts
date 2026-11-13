@@ -106,7 +106,12 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]));
 
     await expectRejectedAndFinalized("remove-used-category", result);
-    expect(await runWithDb(testDb.db, accountsRepository.getCategory(userId, category.id))).toBeDefined();
+    // The row survives untouched: same name, same version (nothing was applied).
+    expect(await runWithDb(testDb.db, accountsRepository.getCategory(userId, category.id))).toMatchObject({
+      id: category.id,
+      name: category.name,
+      version: category.version,
+    });
   });
 
   it("rejects removing an account still referenced by a transaction (§2.6)", async () => {
@@ -121,7 +126,11 @@ describe("sync commands that can never succeed are rejected, not retried (audit 
     }]));
 
     await expectRejectedAndFinalized("remove-used-account", result);
-    expect(await runWithDb(testDb.db, accountsRepository.get(userId, account.id))).toBeDefined();
+    expect(await runWithDb(testDb.db, accountsRepository.get(userId, account.id))).toMatchObject({
+      id: account.id,
+      name: account.name,
+      version: account.version,
+    });
   });
 
   it("still removes an unreferenced category", async () => {

@@ -20,9 +20,13 @@ function instrument(partial: Partial<Instrument> & Pick<Instrument, 'id' | 'symb
   }
 }
 
+/** Deterministic ids: unique within the run, identical across runs. */
+let transactionSequence = 0
+
 function buy(partial: Partial<Transaction>): Transaction {
+  transactionSequence += 1
   return {
-    id: `tx-${Math.random()}`,
+    id: `tx-${transactionSequence}`,
     type: 'investment',
     date: '2026-07-01',
     amount: 100,

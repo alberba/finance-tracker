@@ -12,6 +12,16 @@ import { accounts, categories, subscriptions } from "../../../../src/db/schema";
 import { startRoundTrip, type RoundTrip } from "./harness";
 import { runWithDb } from '../../../../src/db/database'
 
+/**
+ * Deterministic, valid UUIDs (rule 4): a counter for command ids, which only
+ * have to be unique within a test, and fixed literals for the identities the
+ * client fixes.
+ */
+let commandSequence = 0;
+const nextCommandId = () =>
+  `00000000-0000-4000-8000-${String((commandSequence += 1)).padStart(12, "0")}`;
+const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
+
 describe("round trip: identidad propia para entidades nuevas", () => {
   let trip: RoundTrip;
 
@@ -24,11 +34,11 @@ describe("round trip: identidad propia para entidades nuevas", () => {
   });
 
   it("almacena la entidad con la identidad que fijó el cliente", async () => {
-    const id = crypto.randomUUID();
+    const id = CLIENT_ID;
 
     await trip.asOtherDevice([
       {
-        commandId: crypto.randomUUID(),
+        commandId: nextCommandId(),
         action: "create",
         entityType: "account",
         data: { id, name: "Revolut", kind: "cash", currency: "EUR", openingBalance: 285.67 },
@@ -48,11 +58,11 @@ describe("round trip: identidad propia para entidades nuevas", () => {
   });
 
   it("el create y los update posteriores comparten la identidad desde el primer instante", async () => {
-    const id = crypto.randomUUID();
+    const id = CLIENT_ID;
 
     await trip.asOtherDevice([
       {
-        commandId: crypto.randomUUID(),
+        commandId: nextCommandId(),
         action: "create",
         entityType: "account",
         data: { id, name: "Santander", kind: "cash", currency: "EUR", openingBalance: 31.09 },
@@ -60,7 +70,7 @@ describe("round trip: identidad propia para entidades nuevas", () => {
       // Sin tabla de equivalencias y sin esperar al ack: el `update` va
       // dirigido a la misma identidad que el cliente fijó al crear.
       {
-        commandId: crypto.randomUUID(),
+        commandId: nextCommandId(),
         action: "update",
         entityType: "account",
         entityId: id,
@@ -83,7 +93,7 @@ describe("round trip: identidad propia para entidades nuevas", () => {
   });
 
   it("reenviar el mismo create es un no-op, no un duplicado", async () => {
-    const id = crypto.randomUUID();
+    const id = CLIENT_ID;
     const data = {
       id,
       name: "Netflix",
@@ -99,13 +109,13 @@ describe("round trip: identidad propia para entidades nuevas", () => {
     };
 
     await trip.asOtherDevice([
-      { commandId: crypto.randomUUID(), action: "create", entityType: "subscription", data },
+      { commandId: nextCommandId(), action: "create", entityType: "subscription", data },
     ]);
     // Un reenvío tras vaciar la cola local llega con otro commandId, así que
     // la idempotencia por `sync_commands.id` no lo cubre: la identidad la da
     // el cliente, y esa es la que no puede duplicarse.
     await trip.asOtherDevice([
-      { commandId: crypto.randomUUID(), action: "create", entityType: "subscription", data },
+      { commandId: nextCommandId(), action: "create", entityType: "subscription", data },
     ]);
 
     const rows = await trip.testDb.db
@@ -133,7 +143,7 @@ describe("round trip: identidad propia para entidades nuevas", () => {
     // derivado: sigue siendo un no-op contra la fila migrada.
     await trip.asOtherDevice([
       {
-        commandId: crypto.randomUUID(),
+        commandId: nextCommandId(),
         action: "create",
         entityType: "category",
         data: { name: "Comida", kind: "expense", legacyId: "expense:Comida" },

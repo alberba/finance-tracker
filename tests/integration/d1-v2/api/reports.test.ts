@@ -296,6 +296,7 @@ describe('/api/reports', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     testDb.close()
     vi.unstubAllGlobals()
   })
@@ -921,6 +922,9 @@ describe('/api/reports', () => {
   })
 
   it('recorta la marca de visto a «ahora»', async () => {
+    const now = new Date('2026-10-20T12:00:00.000Z')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
     await record(userA.id, 10)
     const { POST } = await import('../../../../src/pages/api/reports/[number]/seen')
     const response = await POST(
@@ -930,7 +934,7 @@ describe('/api/reports', () => {
     const row = testDb.sqlite
       .prepare('SELECT last_seen_at FROM issue_reports WHERE issue_number = 10')
       .get() as { last_seen_at: string }
-    expect(Date.parse(row.last_seen_at)).toBeLessThanOrEqual(Date.now())
+    expect(row.last_seen_at).toBe(now.toISOString())
   })
 
   it('normaliza la marca de visto a ISO con milisegundos antes del max()', async () => {
