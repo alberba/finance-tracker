@@ -37,7 +37,7 @@ import {
   type IntentPayload,
   type IntentWaitReason,
 } from './durable-intents'
-import { rememberLinkTargets } from './link-targets'
+import { forgetLinkTargets, rememberLinkTargets } from './link-targets'
 import { buildMovementData, movementFingerprint } from './movement-commands'
 import {
   movementPublicationWriterId,
@@ -116,7 +116,7 @@ export async function linkInstrumentMovements(
   if (!accepted) return { targets: targetIds.length, accepted: false }
 
   applyOptimisticLink(instrument.id, targetIds)
-  rememberLinkTargets(targetIds, instrument.id)
+  rememberLinkTargets(ownerId, targetIds, instrument.id)
   void executeInstrumentLink({
     intentId: accepted.intent.id,
     ownerId,
@@ -289,14 +289,19 @@ export async function resumeInstrumentLinks(): Promise<void> {
   const views = await syncStore.listIntents()
   for (const view of views) {
     if (view.intent.kind !== 'instrumentLink') continue
-    if (!isUnresolvedIntent(view.intent)) continue
     if (view.intent.ownerUserId !== syncStore.userId) continue
+    // A terminal intent (confirmed or fully discarded) can no longer publish a
+    // link: forget its page-local targets instead of keeping them forever.
+    if (!isUnresolvedIntent(view.intent) || stepsSettled(view)) {
+      forgetLinkTargets(view.intent.ownerUserId, view.intent.targetIds)
+      continue
+    }
     // The link's expected instrument is a page-local fact; rehydrate it after
     // a reload so an ordinary edit that clears the instrument is still
     // recorded as the user's later explicit unlink.
     const linkedInstrumentId = view.intent.payload.instrumentId
     if (typeof linkedInstrumentId === 'string') {
-      rememberLinkTargets(view.intent.targetIds, linkedInstrumentId)
+      rememberLinkTargets(view.intent.ownerUserId, view.intent.targetIds, linkedInstrumentId)
     }
     // A definitive failure waits for the user's explicit retry; a discard
     // waits for reconciliation of whatever request is still in flight.
@@ -583,6 +588,11 @@ export async function recoverLinkedMovement(conflict: LinkedMovementConflict): P
   // A stale outcome means another publication superseded this re-evaluation;
   // never overwrite it with the payload built here.
   return result?.outcome === 'published'
+}
+
+/** No step can still publish or wait: a finalized discard or a confirmation. */
+function stepsSettled(view: DurableIntentView): boolean {
+  return view.steps.every((step) => step.state === 'confirmed' || step.state === 'cancelled')
 }
 
 /** The unresolved intents, for a status surface that only needs names/counts. */

@@ -67,6 +67,7 @@ import {
   type ClientHttp,
   type ClientNetworkError,
 } from '../lib/client/http'
+import { resetLinkTargets } from '../lib/client/link-targets'
 import { createClientRuntime, type ClientRuntime } from '../lib/client/runtime'
 import { ClientStorage, type ClientStorageError } from '../lib/client/storage'
 import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
@@ -389,6 +390,9 @@ export const useSyncStore = defineStore('sync', () => {
     }
     stop()
     await runtime?.dispose()
+    // Page-local link targets belong to the leaving session; a different user
+    // must never inherit them (#487 review).
+    resetLinkTargets()
     readModel = null
     initialized = false
     detached = false
@@ -1509,6 +1513,7 @@ export const useSyncStore = defineStore('sync', () => {
     await leavingRuntime?.dispose()
     if (leavingUserId) {
       await Effect.runPromise(wipeAllClientData(leavingUserId))
+      resetLinkTargets(leavingUserId)
     }
     initialized = false
     detached = false

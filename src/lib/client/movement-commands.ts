@@ -88,7 +88,7 @@ export async function buildMovementPublications(
         ? { action: 'update', patch: data }
         : { action: 'create', data: { ...data, id: live.id } }
     }
-    const linkTarget = linkTargetFor(live.id)
+    const linkTarget = linkTargetFor(syncStore.userId ?? '', live.id)
     publications.push({
       movementId: live.id,
       plan,
