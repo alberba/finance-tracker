@@ -23,7 +23,11 @@
 import 'fake-indexeddb/auto'
 import { setActivePinia } from 'pinia'
 import { createTestPinia } from '../../../helpers/pinia'
-import { vi } from 'vitest'
+import { expect, vi } from 'vitest'
+import * as accountsRepository from '../../../../src/db/repositories/accounts'
+import * as pendingRepository from '../../../../src/db/repositories/pending-movements'
+import * as recurringRulesRepository from '../../../../src/db/repositories/recurring-rules'
+import * as transactionsRepository from '../../../../src/db/repositories/transactions'
 import { users } from '../../../../src/db/schema'
 import { applySyncBatch } from '../../../../src/lib/server/sync/apply-command'
 import { buildBootstrapPayload } from '../../../../src/lib/server/bootstrap-payload'
@@ -32,6 +36,7 @@ import type { State } from '../../../../src/scripts/types'
 import { createTestDb, type TestDatabase } from '../setup'
 import type { Db } from '../../../../src/db/client'
 import { runWithDb } from '../../../../src/db/database'
+import type { listDurableIntents } from '../../../helpers/client-storage'
 
 /**
  * The test database is better-sqlite3-backed, so it lacks D1's `batch`. No
@@ -57,6 +62,34 @@ export interface RoundTrip {
   setOffline: (offline: boolean) => void
   /** Applies commands as if another device had sent them. */
   asOtherDevice: (commands: unknown[]) => Promise<void>
+  /**
+   * Holds `POST /api/sync` until released. Lets a test interleave edits while
+   * a link's configuration/commands are still being resolved. With a
+   * predicate, only the batch whose commands satisfy it is held.
+   */
+  holdSync: (matches?: (commands: unknown[]) => boolean) => {
+    /** Resolves once a matching batch is actually waiting at the gate. */
+    entered: Promise<void>
+    release: () => void
+  }
+  /** Every command batch the client has POSTed to `/api/sync`, in send order. */
+  commandBatches: () => unknown[][]
+  /** Applies the next batch on the server, then loses the response (network error). */
+  loseNextResponse: () => void
+  /** Rejects one command id on the next matching batch (definitive failure). */
+  rejectSyncCommand: (commandId: string, message: string) => void
+  /** Makes the next request answer 401, as an expired session. */
+  expireSessionOnce: () => void
+  /**
+   * Applies the next command batch and then makes every `/api/changes` (and
+   * therefore the pull) fail. Lets a test prove a write wakes its dependent
+   * work from the confirmed response itself, without a later cached query.
+   */
+  failChangesAfterNextSync: () => void
+  /** Stops (or resumes) failing `/api/changes`. */
+  setChangesFailing: (failing: boolean) => void
+  /** Durable intents currently in the per-user queue database. */
+  intents: () => Promise<Awaited<ReturnType<typeof listDurableIntents>>>
   /** The client's own sync store, for cursor/cache assertions. */
   syncStore: ReturnType<typeof import('../../../../src/stores/sync').useSyncStore>
   /**
@@ -68,12 +101,23 @@ export interface RoundTrip {
   cleanup: () => void
 }
 
-/** Lets pending microtasks and timers run — see `reload()`. */
-async function settle(): Promise<void> {
+/**
+ * Yields to the event loop so the stores' floating enqueues (`void
+ * syncListDiff(...)`, which have no observable completion signal) can reach
+ * the outbox. It is a turn of the loop, not a wait on the clock: no timer, so
+ * it keeps working under fake timers.
+ */
+async function yieldToEventLoop(): Promise<void> {
   for (let i = 0; i < 5; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => setImmediate(resolve))
   }
 }
+
+/** Fixed instant for every row the harness writes (rule 4: no wall clock). */
+const HARNESS_NOW = '2026-06-15T10:00:00.000Z'
+
+/** Per-process counter: every round trip gets its own deterministic, unique user. */
+let userSequence = 0
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -95,11 +139,12 @@ export async function startRoundTrip(
   seed?: (db: TestDatabase['db'], userId: string) => Promise<void>,
 ): Promise<RoundTrip> {
   const testDb = createTestDb()
-  const now = new Date().toISOString()
+  const now = HARNESS_NOW
+  userSequence += 1
   const [user] = await testDb.db
     .insert(users)
     .values({
-      email: `round-trip-${Math.random().toString(36).slice(2)}@example.com`,
+      email: `round-trip-${userSequence}@example.com`,
       createdAt: now,
       updatedAt: now,
     })
@@ -109,6 +154,16 @@ export async function startRoundTrip(
   setActivePinia(createTestPinia())
 
   let offline = false
+  const sentBatches: unknown[][] = []
+  let syncGate: Promise<void> | null = null
+  let releaseSyncGate: (() => void) | null = null
+  let enterSyncGate: (() => void) | null = null
+  let syncGateMatches: ((commands: unknown[]) => boolean) | null = null
+  let loseResponse = false
+  let rejectCommand: { commandId: string; message: string } | null = null
+  let expireSession = false
+  let changesFailing = false
+  let failChangesAfterSync = false
 
   vi.stubGlobal(
     'fetch',
@@ -117,17 +172,73 @@ export async function startRoundTrip(
       if (offline) {
         throw new TypeError('Failed to fetch')
       }
+      if (expireSession) {
+        expireSession = false
+        return json({ error: 'Sesión expirada.' }, 401)
+      }
       if (url.startsWith('/api/bootstrap')) {
         return json(await runWithDb(asServerDb(testDb.db), buildBootstrapPayload(user.id)))
       }
       if (url.startsWith('/api/changes')) {
+        if (changesFailing) throw new TypeError('Failed to fetch')
         const since = Number(new URL(url, 'https://test.local').searchParams.get('since') ?? 0)
         const changes = await runWithDb(asServerDb(testDb.db), listChangesSince(user.id, since))
         return json({ revision: changes.at(-1)?.revision ?? since, changes })
       }
       if (url === '/api/sync') {
-        const { commands } = JSON.parse(String(init?.body))
-        return json(await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands)))
+        const { commands } = JSON.parse(String(init?.body)) as {
+          commands: Array<{ commandId: string }>
+        }
+        sentBatches.push(commands)
+        if (syncGate && (!syncGateMatches || syncGateMatches(commands))) {
+          enterSyncGate?.()
+          enterSyncGate = null
+          await syncGate
+        }
+        if (
+          rejectCommand &&
+          commands.some((command) => command.commandId === rejectCommand!.commandId)
+        ) {
+          // The rejected command never reaches the server; the rest of the
+          // batch is applied for real, so a test can observe one step staying
+          // unapplied next to one that landed.
+          const rejection = rejectCommand
+          rejectCommand = null
+          const applied = await runWithDb(
+            asServerDb(testDb.db),
+            applySyncBatch(
+              user.id,
+              commands.filter((command) => command.commandId !== rejection.commandId) as never,
+            ),
+          )
+          const byId = new Map(applied.results.map((result) => [result.commandId, result]))
+          return json({
+            results: commands.map((command) =>
+              command.commandId === rejection.commandId
+                ? {
+                    commandId: command.commandId,
+                    status: 'rejected',
+                    message: rejection.message,
+                  }
+                : byId.get(command.commandId),
+            ),
+            revision: applied.revision,
+            halted: applied.halted,
+          })
+        }
+        const result = await runWithDb(
+          asServerDb(testDb.db),
+          applySyncBatch(user.id, commands as never),
+        )
+        if (loseResponse) {
+          loseResponse = false
+          throw new TypeError('Failed to fetch')
+        }
+        if (failChangesAfterSync) {
+          failChangesAfterSync = false
+          changesFailing = true
+        }
+        return json(result)
       }
       throw new Error(`unexpected fetch ${url}`)
     }),
@@ -149,7 +260,7 @@ export async function startRoundTrip(
       let last = -1
       let stable = 0
       for (let round = 0; round < 400 && stable < 3; round += 1) {
-        await settle()
+        await yieldToEventLoop()
         if (!offline) await syncStore.syncNow()
         const count = await countOutbox(db)
         stable = count === last && (offline || count === 0) ? stable + 1 : 0
@@ -163,13 +274,13 @@ export async function startRoundTrip(
 
   /** Closes and reopens the client: new Pinia, new stores, same IndexedDB. */
   async function reboot(): Promise<State> {
-    // An F5 unloads the page: the previous client stops reading, sending and rendering.
-    syncStore.detach()
+    // An F5 unloads the page: the previous client stops and its IndexedDB
+    // connections close (the browser does that on unload).
+    await syncStore.dispose()
     setActivePinia(createTestPinia())
     const { useSyncStore: freshSyncStore } = await import('../../../../src/stores/sync')
     syncStore = freshSyncStore()
     await syncStore.init(user.id)
-    await settle()
     const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
     return useFinancialStateStore().state
   }
@@ -192,6 +303,54 @@ export async function startRoundTrip(
     reboot,
     setOffline: (next: boolean) => {
       offline = next
+    },
+    commandBatches: () => sentBatches,
+    loseNextResponse: () => {
+      loseResponse = true
+    },
+    rejectSyncCommand: (commandId, message) => {
+      rejectCommand = { commandId, message }
+    },
+    expireSessionOnce: () => {
+      expireSession = true
+    },
+    failChangesAfterNextSync: () => {
+      failChangesAfterSync = true
+    },
+    setChangesFailing: (failing: boolean) => {
+      changesFailing = failing
+      if (!failing) failChangesAfterSync = false
+    },
+    intents: async () => {
+      const { listDurableIntents, openStorage } = await import('../../../helpers/client-storage')
+      const storage = await openStorage(user.id)
+      try {
+        return await listDurableIntents(storage)
+      } finally {
+        storage.close()
+      }
+    },
+    holdSync: (matches) => {
+      if (!syncGate) {
+        syncGate = new Promise<void>((resolve) => {
+          releaseSyncGate = resolve
+        })
+      }
+      syncGateMatches = matches ?? null
+      const entered = new Promise<void>((resolve) => {
+        enterSyncGate = resolve
+      })
+      return {
+        entered,
+        release: () => {
+          const release = releaseSyncGate
+          syncGate = null
+          releaseSyncGate = null
+          enterSyncGate = null
+          syncGateMatches = null
+          release?.()
+        },
+      }
     },
     asOtherDevice: async (commands) => {
       await runWithDb(asServerDb(testDb.db), applySyncBatch(user.id, commands as never))
@@ -216,5 +375,153 @@ export async function startRoundTrip(
       vi.unstubAllGlobals()
       vi.unstubAllEnvs()
     },
+  }
+}
+
+/** Legacy ids of the investment asset and the broker cash account of the link scenario. */
+export const LINK_ASSET_ID = 'link-asset'
+export const LINK_CASH_ID = 'link-broker'
+
+/**
+ * The seed every instrument-link scenario shares: an investment asset, a broker
+ * cash account and one old purchase of `LINK` that Vincular has to pick up.
+ */
+export async function seedLinkMovement(db: TestDatabase['db'], userId: string): Promise<void> {
+  await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: LINK_ASSET_ID,
+      name: 'Link Asset',
+      kind: 'investment',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
+  const cash = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: LINK_CASH_ID,
+      name: 'Broker',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 0,
+    }),
+  )
+  const category = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, { name: 'Link Asset', kind: 'investment' }),
+  )
+  await runWithDb(
+    db,
+    transactionsRepository.create(userId, {
+      accountId: cash.id,
+      categoryId: category.id,
+      type: 'investment',
+      date: '2026-01-15',
+      amount: -201,
+      currency: 'EUR',
+      description: 'Compra antigua',
+      operation: { symbol: 'LINK', side: 'buy', units: 2, unitPrice: 100, fee: 1 },
+    }),
+  )
+}
+
+/** Configures the `LINK` quote of the seeded asset and returns its local instrument id. */
+export async function addLinkInstrument(): Promise<string> {
+  const { useMarketStore } = await import('../../../../src/stores/market')
+  const market = useMarketStore()
+  expect(
+    market.addInstrument({
+      investmentAssetId: LINK_ASSET_ID,
+      type: 'etf',
+      symbol: 'LINK',
+      market: '',
+      currency: 'EUR',
+      provider: 'yahoo',
+    }),
+  ).toBe(true)
+  const instrument = market.instruments.find((item) => item.symbol === 'LINK')
+  if (!instrument) throw new Error('No se configuró el instrumento')
+  return instrument.id
+}
+
+/** Polls the durable intents until one satisfies `predicate`, and returns it. */
+export async function waitForIntent(
+  trip: RoundTrip,
+  predicate: (view: Awaited<ReturnType<RoundTrip['intents']>>[number]) => boolean,
+  timeout = 5000,
+) {
+  return vi.waitFor(
+    async () => {
+      const view = (await trip.intents()).find(predicate)
+      expect(view).toBeDefined()
+      return view!
+    },
+    { timeout },
+  )
+}
+
+/**
+ * The monthly rent pending shared by the recurring confirmation scenarios: a
+ * cash account, the `Vivienda` category, an open rule and its 2026-02-01
+ * occurrence, all ready for the first bootstrap.
+ */
+export async function seedRentPending(
+  db: TestDatabase['db'],
+  userId: string,
+  cashLegacyId: string,
+): Promise<{ accountId: string; categoryId: string; ruleId: string; pendingId: string }> {
+  const account = await runWithDb(
+    db,
+    accountsRepository.create(userId, {
+      legacyId: cashLegacyId,
+      name: 'Cuenta',
+      kind: 'cash',
+      currency: 'EUR',
+      openingBalance: 1000,
+    }),
+  )
+  const category = await runWithDb(
+    db,
+    accountsRepository.createCategory(userId, { name: 'Vivienda', kind: 'expense' }),
+  )
+  const rule = await runWithDb(
+    db,
+    recurringRulesRepository.create(userId, {
+      id: 'rule-rent',
+      legacyId: 'rule-rent',
+      name: 'Alquiler',
+      type: 'expense',
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 900,
+      currency: 'EUR',
+      frequency: 'monthly',
+      startDate: '2026-01-01',
+      lastExecutionDate: '2026-01-01',
+      nextRunDate: '2026-02-01',
+    }),
+  )
+  const pending = await runWithDb(
+    db,
+    pendingRepository.create(userId, {
+      id: 'pending-rent',
+      legacyId: 'pending-rent',
+      recurringRuleId: rule.id,
+      accountId: account.id,
+      categoryId: category.id,
+      amount: 900,
+      currency: 'EUR',
+      dueDate: '2026-02-01',
+      type: 'expense',
+      description: 'Alquiler',
+      status: 'pending',
+    }),
+  )
+  return {
+    accountId: account.id,
+    categoryId: category.id,
+    ruleId: rule.id,
+    pendingId: pending.id,
   }
 }

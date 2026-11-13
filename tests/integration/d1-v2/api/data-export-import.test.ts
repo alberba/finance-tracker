@@ -219,6 +219,17 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     amount: 150,
     currency: 'EUR',
   }))
+  // A prior-year movement: the export is never year-filtered, so it must
+  // survive export → import → export along with this year's rows.
+  await runWithDb(db, transactionsRepository.create(userId, {
+    legacyId: 'tx-2025',
+    accountId: account.id,
+    categoryId: category.id,
+    type: 'expense',
+    date: '2025-12-31',
+    amount: -7.5,
+    currency: 'EUR',
+  }))
   const savingRule = await runWithDb(db, recurringRulesRepository.create(userId, {
     name: 'Ahorro mensual',
     type: 'saving',
@@ -336,6 +347,7 @@ describe('GET /api/data/export + POST /api/data/import', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     testDb.close()
   })
 
@@ -492,6 +504,53 @@ describe('GET /api/data/export + POST /api/data/import', () => {
     const { GET: exportGET } = await import('../../../../src/pages/api/data/export')
     const exported = await (await exportGET({ locals: { principal } } as never)).json()
     expect(exported.format).toBe('finance-tracker/v2-export')
+    // The backup keeps its top-level field names.
+    expect(Object.keys(exported).sort()).toEqual([
+      'accounts',
+      'budgetEntries',
+      'categories',
+      'contributions',
+      'exportedAt',
+      'format',
+      'goals',
+      'pendingMovements',
+      'recurringRules',
+      'settings',
+      'stockeventsCashMappings',
+      'stockeventsCashSyncEntries',
+      'stockeventsSymbolMappings',
+      'subscriptions',
+      'transactions',
+      'twrLiquidityAccounts',
+      'userId',
+      'userInstruments',
+      'wealthSnapshots',
+    ])
+    // Both nested relations and the export's own `operation` projection are
+    // present; the raw bootstrap `tradeDetail` must not leak into the backup.
+    const investment = exported.transactions.find((transaction: Row) => transaction.legacyId === 'tx-1')
+    expect(investment.operation).toEqual({
+      instrumentId: expect.any(String),
+      symbol: 'VWCE',
+      side: 'buy',
+      units: 2.5,
+      unitPrice: 100,
+      fee: 0.5,
+    })
+    expect(
+      exported.transactions.every((transaction: Row) => !('tradeDetail' in transaction)),
+    ).toBe(true)
+    // An array matcher also fixes the length: exactly one balance / allocation.
+    expect(exported.wealthSnapshots[0].balances).toMatchObject([
+      { balance: 1234.56, currency: 'EUR' },
+    ])
+    expect(exported.contributions[0].allocations).toMatchObject([
+      { amount: 300, currency: 'EUR' },
+    ])
+    // The export has no year scope: the 2025 movement travels in the backup.
+    expect(
+      exported.transactions.some((transaction: Row) => transaction.legacyId === 'tx-2025'),
+    ).toBe(true)
 
     // The target already has data of its own, which the restore must remove.
     const target = await seedUser(testDb.db, 'restore-target@example.com')

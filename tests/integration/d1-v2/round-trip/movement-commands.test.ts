@@ -395,7 +395,7 @@ describe('round trip: shared movement commands (#263)', () => {
       },
     ])
     await trip.reload()
-    expect(useRecurringStore().confirmPending('pending-purchase')).toBe(true)
+    expect((await useRecurringStore().confirmPending('pending-purchase')).accepted).toBe(true)
     const reloaded = await trip.reload()
     expect(reloaded.transactions[0]).toMatchObject({
       symbol: 'VWCE',

@@ -1,12 +1,10 @@
 import { Data, Effect } from 'effect'
 import { defineStore, getActivePinia } from 'pinia'
-import { onScopeDispose, shallowRef } from 'vue'
+import { computed, onScopeDispose, shallowRef } from 'vue'
 
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
 import { useToast } from '../composables/useToast'
 import {
-  acknowledge,
-  count as countOutbox,
   discard as discardOutboxEntry,
   enqueue,
   findPendingCreate,
@@ -19,6 +17,39 @@ import {
   type OutboxEntry,
   type PendingCreateMatch,
 } from '../lib/client/outbox'
+import {
+  acceptDurableIntent as acceptDurableIntentEffect,
+  acceptOrReadDurableIntent,
+  cancelIntentStep as cancelIntentStepEffect,
+  claimIntentCommands,
+  commitIntentCommands,
+  completeIntentStep as completeIntentStepEffect,
+  countDurableWork,
+  deleteDurableIntent,
+  discardDurableIntent,
+  failDurableIntent as failDurableIntentEffect,
+  isUnresolvedIntent,
+  listDurableIntents,
+  markIntentWaiting as markIntentWaitingEffect,
+  publishIntentCommands as publishIntentCommandsEffect,
+  releaseIntentClaims,
+  reopenIntentStep as reopenIntentStepEffect,
+  retryDurableIntent,
+  type AcceptDurableIntentInput,
+  type DurableIntentView,
+  type IntentCommandInput,
+  type IntentCommandOutcome,
+  type IntentWaitReason,
+  type PublishIntentCommandsResult,
+} from '../lib/client/durable-intents'
+import {
+  movementPublicationWriterId,
+  publishMovementCommands as publishMovementCommandsEffect,
+  readMovementPublications as readMovementPublicationsEffect,
+  type MovementPublicationInput,
+  type MovementPublicationRecord,
+  type MovementPublicationResult,
+} from '../lib/client/movement-publication'
 import {
   getCachedBootstrap,
   getCachedSettings,
@@ -36,6 +67,7 @@ import {
   type ClientHttp,
   type ClientNetworkError,
 } from '../lib/client/http'
+import { resetLinkTargets } from '../lib/client/link-targets'
 import { createClientRuntime, type ClientRuntime } from '../lib/client/runtime'
 import { ClientStorage, type ClientStorageError } from '../lib/client/storage'
 import { applyRemoteChanges, type RemoteChange } from '../lib/client/sync-read-model'
@@ -105,6 +137,19 @@ export const useSyncStore = defineStore('sync', () => {
   const revision = shallowRef(0)
   const pendingCount = shallowRef(0)
   const lastError = shallowRef<string | null>(null)
+  /** Durable intents: instrument links, confirmations and rule writes (#490/#492/#493). */
+  const intents = shallowRef<DurableIntentView[]>([])
+  const unresolvedIntentCount = computed(
+    () => intents.value.filter((view) => isUnresolvedIntent(view.intent)).length,
+  )
+  const failedIntentCount = computed(
+    () =>
+      intents.value.filter(
+        (view) =>
+          isUnresolvedIntent(view.intent) &&
+          (view.intent.failure !== null || view.steps.some((step) => step.state === 'failed')),
+      ).length,
+  )
 
   /**
    * The client runtime owns the IndexedDB handles (ADR-0006). Created on
@@ -123,6 +168,8 @@ export const useSyncStore = defineStore('sync', () => {
   let readModel: SyncV2Bootstrap | null = null
   /** A fresh client re-reads the full model once; the cache only covers failures. */
   let readModelStale = false
+  /** A batch just confirmed a private quote configuration (#491). */
+  let configurationConfirmed = false
   let stopConnection: (() => void) | null = null
   let detached = false
 
@@ -192,10 +239,58 @@ export const useSyncStore = defineStore('sync', () => {
     })
   }
 
+  /** Reads the durable intents and their work count without rendering anything. */
+  function refreshIntentState(): SyncEffect<void, ClientStorageError> {
+    return Effect.gen(function* () {
+      intents.value = yield* listDurableIntents()
+      pendingCount.value = yield* countDurableWork()
+    })
+  }
+
+  /**
+   * Publishes the pending commands of unresolved intents. The link module owns
+   * the rules; the store only provides the edge and the lifecycle hook. A
+   * failure here never breaks the sync cycle: the intent stays durable and the
+   * next startup/reconnection retries it.
+   */
+  function resumeIntents(): SyncEffect<void> {
+    return Effect.promise(async () => {
+      if (!isReady() || isReadOnlyDemoActive()) return
+      const [{ resumeInstrumentLinks }, { resumePendingConfirmations }, { resumeRecurringRuleWrites }] =
+        await Promise.all([
+          import('../lib/client/instrument-link'),
+          import('../lib/client/recurring-write'),
+          import('../lib/client/recurring-rule-write'),
+        ])
+      await resumeInstrumentLinks()
+      await resumePendingConfirmations()
+      await resumeRecurringRuleWrites()
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          lastError.value = errorMessage(error, 'No se pudo reanudar un cambio guardado.')
+        }),
+      ),
+    )
+  }
+
   /** An unloaded page: stops every background read, send and render of this client. */
   function detach(): void {
     detached = true
     stop()
+  }
+
+  /**
+   * Closes this page's IndexedDB connections (a real unload does that for us).
+   * The integration harness uses it to restart the runtime against the same
+   * storage without leaking connections that would block a later logout wipe.
+   */
+  async function dispose(): Promise<void> {
+    detach()
+    const leaving = runtime
+    runtime = null
+    initialized = false
+    await leaving?.dispose()
   }
 
   /** Coalesces reconnects, remote notices and local writes into one cycle. */
@@ -240,9 +335,23 @@ export const useSyncStore = defineStore('sync', () => {
     return Effect.gen(function* () {
       if (!readModel || readModelStale) yield* bootstrapUnlocked()
       yield* pullUnlocked()
+      // Publish whatever is ready before the flush, so a link accepted
+      // offline reaches the queue in this same cycle.
+      yield* resumeIntents()
       yield* flushEffect()
+      if (configurationConfirmed) {
+        // The flush confirmed a quote configuration: its absorbed row is the
+        // catalog reference the dependent link needs (#491). Resume right
+        // here, before the pull, so an interrupted cache read cannot keep the
+        // link waiting. Only this confirmation wakes the dependent steps;
+        // publishing from the generic hook after any conflict would rebuild a
+        // command over a read model that still carries the conflicted queue.
+        configurationConfirmed = false
+        yield* resumeIntents()
+      }
       if ((syncStatus.value as SyncStatus) === 'error') return
       yield* pullUnlocked()
+      yield* resumeIntents()
     })
   }
 
@@ -251,25 +360,60 @@ export const useSyncStore = defineStore('sync', () => {
     if (next === 'online') void syncNow()
   }
 
+  function installConnectionWatcher(): void {
+    stopConnection?.()
+    stopConnection = watchSyncConnection({
+      changed: () => {
+        void syncNow()
+      },
+      online: () => handleConnectionChange('online'),
+      offline: () => handleConnectionChange('offline'),
+    })
+  }
+
   /** Shares initialization so the shell cannot race the workspace. */
   async function init(nextUserId: string, options: { email?: string | null } = {}): Promise<void> {
     if (isReadOnlyDemoActive()) return
     if (userId.value === nextUserId && initializing) return initializing
-    if (initialized && userId.value === nextUserId) return
+    if (initialized && userId.value === nextUserId && !detached) return
+    if (initialized && userId.value === nextUserId) {
+      // The session expired (401 detached this client) and the user signed
+      // back in without a reload. Keep every durable record and resume: a
+      // plain `return` here used to leave the client detached forever.
+      detached = false
+      email.value = options.email ?? email.value
+      installConnectionWatcher()
+      await run(refreshIntentState().pipe(Effect.orElseSucceed(() => undefined)))
+      await run(resumeIntents())
+      await syncNow({ full: true })
+      return
+    }
     stop()
     await runtime?.dispose()
+    // Page-local link targets belong to the leaving session; a different user
+    // must never inherit them (#487 review).
+    resetLinkTargets()
     readModel = null
     initialized = false
     detached = false
     userId.value = nextUserId
     email.value = options.email ?? null
-    runtime = await createClientRuntime(nextUserId)
+    try {
+      runtime = await createClientRuntime(nextUserId)
+    } catch (error) {
+      runtime = null
+      const message = errorMessage(error, 'No se pudo abrir el almacenamiento local.')
+      lastError.value = message
+      syncStatus.value = 'error'
+      showToast(`⚠️ ${message}`)
+      throw error
+    }
     initializing = (async () => {
       const cached = await run(
         Effect.gen(function* () {
           const bootstrap = yield* getCachedBootstrap<SyncV2Bootstrap>()
           const cachedRevision = yield* getCachedRevision()
-          const pending = yield* countOutbox()
+          const pending = yield* countDurableWork()
           return { bootstrap, cachedRevision, pending }
         }),
       )
@@ -277,15 +421,13 @@ export const useSyncStore = defineStore('sync', () => {
       revision.value = readModel?.revision ?? cached.cachedRevision
       pendingCount.value = cached.pending
       await run(renderReadModel())
+      await run(refreshIntentState().pipe(Effect.orElseSucceed(() => undefined)))
+      // Startup resumes durable work even offline: publishing its commands is
+      // local, and a reconnection flush will send them.
+      await run(resumeIntents())
+      installConnectionWatcher()
       await syncNow({ full: true })
       initialized = true
-      stopConnection = watchSyncConnection({
-        changed: () => {
-          void syncNow()
-        },
-        online: () => handleConnectionChange('online'),
-        offline: () => handleConnectionChange('offline'),
-      })
     })()
     try {
       await initializing
@@ -362,7 +504,9 @@ export const useSyncStore = defineStore('sync', () => {
           }),
         ),
       )
-      pendingCount.value = yield* countOutbox().pipe(Effect.orElseSucceed(() => pendingCount.value))
+      pendingCount.value = yield* countDurableWork().pipe(
+        Effect.orElseSucceed(() => pendingCount.value),
+      )
       return entry
     })
   }
@@ -380,6 +524,270 @@ export const useSyncStore = defineStore('sync', () => {
     const entry = await run(appendCommand(command))
     if (entry) void syncNow()
     return entry
+  }
+
+  /**
+   * Publishes movement commands atomically with their persisted generations
+   * (#489). The queue remains the only source of truth: a publication only
+   * writes commands, and the immediate flush follows the usual path.
+   */
+  async function publishMovementCommands(
+    inputs: MovementPublicationInput[],
+  ): Promise<MovementPublicationResult[]> {
+    if (isReadOnlyDemoActive() || !isReady() || inputs.length === 0) {
+      return inputs.map((input) => ({
+        movementId: input.movementId,
+        outcome: 'unresolved' as const,
+        generation: 0,
+      }))
+    }
+    try {
+      const results = await run(publishMovementCommandsEffect(inputs))
+      await run(refreshIntentState())
+      pendingCount.value = await run(
+        countDurableWork().pipe(Effect.orElseSucceed(() => pendingCount.value)),
+      )
+      if (results.some((result) => result.outcome === 'published')) void syncNow()
+      return results
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return inputs.map((input) => ({
+        movementId: input.movementId,
+        outcome: 'unresolved' as const,
+        generation: 0,
+      }))
+    }
+  }
+
+  // -- durable intents (#490) -------------------------------------------------
+
+  /** Accepts an intent only after its record and fixed targets are durable. */
+  async function acceptIntent(input: AcceptDurableIntentInput): Promise<DurableIntentView | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const view = await run(acceptDurableIntentEffect(input))
+      await run(refreshIntentState())
+      return view
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
+  }
+
+  /** The current intent records, refreshed from IndexedDB. */
+  async function listIntents(): Promise<DurableIntentView[]> {
+    if (isReadOnlyDemoActive() || !isReady()) return []
+    try {
+      const views = await run(listDurableIntents())
+      intents.value = views
+      return views
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudieron leer las vinculaciones guardadas.')
+      return intents.value
+    }
+  }
+
+  /**
+   * Publishes the commands of named intent steps atomically with their
+   * progress. The link module owns which commands and in what order; this is
+   * only the store edge that runs the transaction and refreshes the status.
+   */
+  async function publishIntentCommands(
+    id: string,
+    commands: IntentCommandInput[],
+  ): Promise<PublishIntentCommandsResult | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const result = await run(publishIntentCommandsEffect(id, commands))
+      await run(refreshIntentState())
+      if (result.published.length > 0) void syncNow()
+      return result
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
+  }
+
+  /** The still-queued command a named intent step owns, if any. */
+  async function findIntentCommand(intentId: string, step: string): Promise<OutboxEntry | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    const entries = await run(listOutbox())
+    return (
+      entries.find((entry) => entry.intent?.intentId === intentId && entry.intent.step === step) ??
+      null
+    )
+  }
+
+  /**
+   * Queued private quote configuration for an instrument, if the ordinary
+   * editor path already wrote one. The link adopts it instead of publishing a
+   * duplicate.
+   */
+  async function findQueuedUserInstrumentCommand(
+    instrumentId: string,
+    trackingId: string | null,
+  ): Promise<{ seq: number; commandId: string; action: 'create' | 'update' | 'remove' } | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const entries = await run(listOutbox())
+      const match = entries.find((entry) => {
+        if (entry.intent) return false
+        const command = entry.command
+        if (!('entityType' in command) || command.entityType !== 'userInstrument') return false
+        if (command.action === 'create') {
+          const data = command.data as { id?: unknown; instrumentId?: unknown }
+          return data.id === instrumentId || data.instrumentId === instrumentId
+        }
+        if (command.action === 'remove')
+          return command.entityId === instrumentId || command.entityId === trackingId
+        return (
+          command.action === 'update' &&
+          (command.entityId === instrumentId || command.entityId === trackingId)
+        )
+      })
+      return match
+        ? {
+            seq: match.seq,
+            commandId: match.command.commandId,
+            action: match.command.action as 'create' | 'update' | 'remove',
+          }
+        : null
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo leer la configuración pendiente.')
+      return null
+    }
+  }
+
+  /** The read model already proves a dependency effect; do not resend it. */
+  async function completeIntentStep(id: string, step: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(completeIntentStepEffect(id, step))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo confirmar la vinculación.')
+    }
+  }
+
+  /** Rebuilds a step whose command disappeared before being acknowledged. */
+  async function reopenIntentStep(id: string, step: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(reopenIntentStepEffect(id, step))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo retomar la vinculación.')
+    }
+  }
+
+  async function markIntentWaiting(id: string, reason: IntentWaitReason): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(markIntentWaitingEffect(id, reason))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo guardar el estado de la vinculación.')
+    }
+  }
+
+  async function failIntent(id: string, message: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(failDurableIntentEffect(id, message))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo guardar el fallo de la vinculación.')
+    }
+  }
+
+  async function cancelIntentStep(id: string, step: string): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    try {
+      await run(cancelIntentStepEffect(id, step))
+      await run(refreshIntentState())
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo cancelar el objetivo de la vinculación.')
+    }
+  }
+
+  /** Explicit retry: same movement identity, a new command attempt. */
+  async function retryIntent(id: string): Promise<DurableIntentView | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const view = await run(retryDurableIntent(id))
+      await run(refreshIntentState())
+      if (view) {
+        await run(resumeIntents())
+        if (pendingCount.value > 0) void syncNow()
+      }
+      return view
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
+      return null
+    }
+  }
+
+  /**
+   * Cancels what is still cancellable. An already-claimed request is
+   * reconciled by the normal flush before the discard is reported as final.
+   */
+  async function discardIntent(id: string) {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const result = await run(discardDurableIntent(id))
+      await run(refreshIntentState())
+      if (result && !result.finalized) void syncNow()
+      return result
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo descartar la vinculación.')
+      return null
+    }
+  }
+
+  /** Publishes pending intent commands now, even offline (they are queue-local). */
+  async function resumePendingIntents(): Promise<void> {
+    if (isReadOnlyDemoActive() || !isReady()) return
+    await run(resumeIntents())
+    await run(refreshIntentState().pipe(Effect.orElseSucceed(() => undefined)))
+  }
+
+  /**
+   * Accepts a durable confirmation keyed by the financial action, or returns
+   * the record a concurrent tab already wrote. Idempotent by construction.
+   */
+  async function acceptPendingConfirmation(
+    input: AcceptDurableIntentInput & { id: string },
+  ): Promise<DurableIntentView | null> {
+    if (isReadOnlyDemoActive() || !isReady()) return null
+    try {
+      const { view } = await run(acceptOrReadDurableIntent(input))
+      await run(refreshIntentState())
+      return view
+    } catch (error) {
+      surfaceEnqueueError(error)
+      return null
+    }
+  }
+
+  /** Forgets a settled intent once it can no longer prevent a duplicate. */
+  async function deleteIntent(id: string): Promise<boolean> {
+    if (isReadOnlyDemoActive() || !isReady()) return false
+    try {
+      const deleted = await run(deleteDurableIntent(id))
+      if (deleted) await run(refreshIntentState())
+      return deleted
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo retirar una intención confirmada.')
+      return false
+    }
+  }
+
+  /** Reads the persisted publication generations of some movements. */
+  async function readMovementPublications(
+    movementIds: string[],
+  ): Promise<Map<string, MovementPublicationRecord>> {
+    if (isReadOnlyDemoActive() || !isReady() || movementIds.length === 0) return new Map()
+    return run(readMovementPublicationsEffect(movementIds))
   }
 
   function scheduleRetry(): void {
@@ -431,16 +839,25 @@ export const useSyncStore = defineStore('sync', () => {
     return null
   }
 
-  function absorbConfirmed(changes: RemoteChange[]): SyncEffect<void, ClientStorageError> {
+  /**
+   * Writes the server's confirmed rows into the cache. Returns `false` when
+   * the cache could not take them: an intent's command then stays queued
+   * (the replay is idempotent) instead of retiring a confirmation the local
+   * projection never received.
+   */
+  function absorbConfirmed(changes: RemoteChange[]): SyncEffect<boolean> {
     return Effect.gen(function* () {
-      if (!readModel || changes.length === 0) return
+      if (changes.length === 0) return true
+      if (!readModel) return true
       readModel = yield* saveReadModel(applyRemoteChanges(readModel, changes, readModel.revision))
+      return true
     }).pipe(
       Effect.catchTag('ClientStorageError', (error) =>
         Effect.sync(() => {
           // The next pull brings the same rows; until then a full read is the safe fallback.
           console.warn('[sync] No se pudo incorporar un cambio confirmado', error)
           readModelStale = true
+          return false
         }),
       ),
     )
@@ -512,10 +929,22 @@ export const useSyncStore = defineStore('sync', () => {
       // Once the head has failed, send it alone so a failure is charged to
       // the entry that caused it, not to whichever command led the batch.
       const [head] = yield* peekBatch(1)
-      const batch = head && head.attempts > 0 ? [head] : yield* peekBatch(5)
-      if (batch.length === 0) return
-
+      const peeked = head && head.attempts > 0 ? [head] : yield* peekBatch(5)
+      if (peeked.length === 0) return
       if (userId.value !== sendingUserId || runtime !== sendingRuntime) return
+
+      // Transactional claim: two tabs (also without Web Locks) cannot both
+      // mark and send one intent step. Plain commands keep the FIFO behaviour.
+      const claimable = yield* claimIntentCommands(
+        peeked.map((entry) => entry.seq),
+        movementPublicationWriterId(),
+      )
+      const batch = peeked.filter((entry) => claimable.has(entry.seq))
+      if (batch.length === 0) return
+      const intentSeqs = batch.filter((entry) => entry.intent).map((entry) => entry.seq)
+      const releaseClaims = () =>
+        releaseIntentClaims(intentSeqs).pipe(Effect.orElseSucceed(() => undefined))
+
       syncStatus.value = 'syncing'
       const outcome = yield* sendRequest('/api/sync', {
         method: 'POST',
@@ -528,6 +957,7 @@ export const useSyncStore = defineStore('sync', () => {
         ),
       )
       if (!outcome.ok) {
+        yield* releaseClaims()
         return yield* handleSendFailure(batch, outcome.message)
       }
       const response = outcome.response
@@ -535,6 +965,7 @@ export const useSyncStore = defineStore('sync', () => {
       yield* rejectExpiredSession(response)
 
       if (!response.ok && response.status !== 409) {
+        yield* releaseClaims()
         return yield* handleSendFailure(batch, `El servidor respondió ${response.status}`, true)
       }
 
@@ -544,33 +975,55 @@ export const useSyncStore = defineStore('sync', () => {
         ),
       )) as { results: SyncCommandResult[]; revision: number; halted: boolean } | null
       if (!body) {
+        yield* releaseClaims()
         return yield* handleSendFailure(batch, 'La respuesta de sincronización no es válida.')
       }
-      const acked: number[] = []
+      const plainAcked: number[] = []
+      /** Per-step outcomes committed atomically with the intent progress. */
+      const intentOutcomes: IntentCommandOutcome[] = []
       // ADR 0003: a same-user conflict is never worth a modal — it is
       // reapplied over the server's current version and the queue keeps
       // moving, instead of parking the command and freezing everything
       // behind it (audit §2.4).
       const retries: OutboxCommandInput[] = []
+      // A link-owned command from a build without intents (#489 queue) is not
+      // blindly rebased: the old recovery path re-reads the movement.
+      const linkConflicts: Array<{
+        movementId: string
+        instrumentId: string
+        generation: number
+      }> = []
       let lastDropMessage: string | null = null
       // Another request still holds this command's reservation; the server
       // halted the batch there, so the entry stays queued and is resent
       // after a backoff instead of immediately.
       let resendAfterBackoff = false
       const confirmed: Array<RemoteChange | null> = []
+      let processed = 0
       for (const [index, result] of body.results.entries()) {
         const entry = batch[index]
         if (!entry) {
           continue
         }
+        processed = index + 1
         if (result.status === 'in_progress') {
+          if (entry.intent) {
+            intentOutcomes.push({
+              entry,
+              status: 'uncertain',
+              message: result.message,
+            })
+          }
           resendAfterBackoff = true
           break
         }
         if (result.status === 'applied' || result.status === 'noop') {
-          acked.push(entry.seq)
           const command = entry.command
-          if (result.status === 'applied') confirmed.push(confirmedChange(command, result.entity))
+          if (result.status === 'applied') {
+            confirmed.push(confirmedChange(command, result.entity))
+            if ('entityType' in command && command.entityType === 'userInstrument')
+              configurationConfirmed = true
+          }
           if (result.entity !== undefined) {
             if (command.action === 'settingsUpdate') {
               // Keeps this device's `user_settings.version` current, so the next
@@ -582,10 +1035,40 @@ export const useSyncStore = defineStore('sync', () => {
               yield* applyResultToCache(command.entityType, result.entity)
             }
           }
+          if (
+            result.status === 'noop' &&
+            'entityType' in command &&
+            command.entityType === 'userInstrument'
+          ) {
+            // The configuration already existed server-side; the local read
+            // model may never have seen it. Force a fresh bootstrap so the
+            // dependent link resolves its catalog reference (#491).
+            readModelStale = true
+          }
+          if (entry.intent) {
+            intentOutcomes.push({ entry, status: 'confirmed' })
+          } else {
+            plainAcked.push(entry.seq)
+          }
         } else if (result.status === 'conflict') {
           const command = entry.command
-          if (command.action === 'update' || command.action === 'remove') {
-            acked.push(entry.seq)
+          if (entry.intent) {
+            // The owning module rebuilds this step from the movement's current
+            // state after this cycle pulled the server's rows. Never rebase
+            // the stored patch (#489/#487).
+            intentOutcomes.push({ entry, status: 'pending', message: result.message })
+          } else if (
+            entry.publication?.origin === 'instrumentLink' &&
+            command.action === 'update'
+          ) {
+            plainAcked.push(entry.seq)
+            linkConflicts.push({
+              movementId: entry.publication.movementId,
+              instrumentId: entry.publication.instrumentId,
+              generation: entry.publication.generation,
+            })
+          } else if (command.action === 'update' || command.action === 'remove') {
+            plainAcked.push(entry.seq)
             const baseVersion = result.currentVersion ?? command.baseVersion
             retries.push(
               command.action === 'update'
@@ -607,7 +1090,7 @@ export const useSyncStore = defineStore('sync', () => {
             // ADR 0003 for the settings singleton: rebase over the server's
             // version instead of leaving the entry queued, where a stale
             // `baseVersion` would conflict forever.
-            acked.push(entry.seq)
+            plainAcked.push(entry.seq)
             retries.push({
               action: 'settingsUpdate',
               baseVersion: result.currentVersion ?? command.baseVersion,
@@ -618,17 +1101,63 @@ export const useSyncStore = defineStore('sync', () => {
           // `not_found` (entity removed elsewhere) and `rejected` (invalid
           // payload, dangling reference, entity in use) can never succeed on
           // retry, so acknowledge them out of the outbox — surfaced via
-          // `lastError` rather than silently dropped.
-          acked.push(entry.seq)
-          lastDropMessage = result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+          // `lastError` (and, for an intent, as a persisted failure) rather
+          // than silently dropped.
+          //
+          // A pending movement's rule can be removed elsewhere (another tab or
+          // device): the server cascades its pendings, so the queued update has
+          // nothing left to address. Treat that specific `not_found` as a
+          // settled dependency instead of a user-facing error (#493): an intent
+          // still records its failure so its status surface explains the
+          // partial result, but the global toast is not shown for a change the
+          // user cannot act on.
+          const removedDependency =
+            result.status === 'not_found' &&
+            'entityType' in entry.command &&
+            entry.command.entityType === 'pendingMovement'
+          if (entry.intent) {
+            intentOutcomes.push({
+              entry,
+              status: 'failed',
+              message: result.message,
+            })
+            if (!removedDependency) {
+              lastDropMessage =
+                result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            }
+          } else {
+            plainAcked.push(entry.seq)
+            if (!removedDependency) {
+              lastDropMessage =
+                result.message ?? `No se pudo aplicar un cambio (${result.status}).`
+            }
+          }
         }
+      }
+
+      // Entries the server never processed (a halted batch) keep their
+      // command and become resendable immediately instead of waiting a lease.
+      if (processed < batch.length) {
+        yield* releaseIntentClaims(
+          batch
+            .slice(processed)
+            .filter((entry) => entry.intent)
+            .map((entry) => entry.seq),
+        ).pipe(Effect.orElseSucceed(() => undefined))
       }
 
       // The read model takes the confirmed results before the outbox lets
       // them go, so no reload (even offline) can see neither of the two.
-      yield* absorbConfirmed(confirmed.filter((change) => change !== null))
-      yield* acknowledge(acked)
-      pendingCount.value = yield* countOutbox()
+      const absorbed = yield* absorbConfirmed(confirmed.filter((change) => change !== null))
+      if (!absorbed) {
+        // Keep the intent's command: the replay is idempotent and the next
+        // attempt can absorb the same confirmation.
+        for (const result of intentOutcomes) {
+          if (result.status === 'confirmed') result.status = 'uncertain'
+        }
+      }
+      yield* commitIntentCommands({ plainSeqs: plainAcked, outcomes: intentOutcomes })
+      yield* refreshIntentState().pipe(Effect.orElseSucceed(() => undefined))
       // The cursor deliberately does NOT move here (audit §5.3). `body.revision`
       // is the user's *global* revision after this batch, which includes changes
       // other devices made and this one has never applied — adopting it would
@@ -648,6 +1177,16 @@ export const useSyncStore = defineStore('sync', () => {
       if (retries.length > 0) {
         showToast('Un cambio tuyo se reaplicó sobre la versión más reciente del servidor.')
       }
+      if (linkConflicts.length > 0) {
+        // Fire-and-forget on purpose: the recovery must wait for this sync
+        // cycle (and its lock) to finish before pulling and republishing.
+        void recoverLinkCommands(linkConflicts)
+      }
+      if (intentOutcomes.some((result) => result.status === 'pending')) {
+        // The next cycle pulls the server's current rows and the intent owner
+        // republishes from them with a fresh command identity.
+        syncAgainRequested = true
+      }
       if (lastDropMessage) {
         showToast(`⚠️ No se pudo guardar este cambio: ${lastDropMessage}`)
       }
@@ -656,7 +1195,7 @@ export const useSyncStore = defineStore('sync', () => {
         scheduleRetry()
       } else {
         retryAttempt = 0
-        if (body.halted || (yield* countOutbox()) > 0) {
+        if (body.halted || (yield* countDurableWork()) > 0) {
           flushAgainRequested = true
         }
       }
@@ -847,6 +1386,15 @@ export const useSyncStore = defineStore('sync', () => {
    * that hasn't synced yet. `null` if nothing is pending or the pending
    * create wasn't minted with an id.
    */
+  /** The still-queued `create` entry for an entity, without writing anything. */
+  async function peekPendingCreate(
+    entityType: SyncEntityType,
+    matches: PendingCreateMatch,
+  ): Promise<OutboxEntry | null> {
+    if (!isReady()) return null
+    return (await run(findPendingCreate(entityType, matches))) ?? null
+  }
+
   async function peekPendingCreateId(
     entityType: SyncEntityType,
     matches: PendingCreateMatch,
@@ -915,15 +1463,48 @@ export const useSyncStore = defineStore('sync', () => {
         const pending = yield* findPendingCreate(entityType, matches)
         if (!pending) return false
         yield* discardOutboxEntry(pending.seq)
-        pendingCount.value = yield* countOutbox()
+        pendingCount.value = yield* countDurableWork()
         return true
       }),
     )
   }
 
+  /**
+   * Re-evaluates a link-owned movement after a server conflict. It waits for
+   * the running cycle to end, pulls the server's newer rows and only then
+   * asks the link module to rebuild the command from the current movement —
+   * never from the patch the conflicted command carried (#489).
+   */
+  async function recoverLinkCommands(
+    conflicts: ReadonlyArray<{ movementId: string; instrumentId: string; generation: number }>,
+  ): Promise<void> {
+    try {
+      await syncNow()
+      if (!isReady() || detached || connection.value === 'offline') return
+      await pullChanges()
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo releer los movimientos vinculados.')
+      return
+    }
+    if (!isReady() || detached) return
+    try {
+      const { recoverLinkedMovement } = await import('../lib/client/instrument-link')
+      for (const conflict of conflicts) {
+        try {
+          await recoverLinkedMovement(conflict)
+        } catch (error) {
+          lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
+          showToast('⚠️ No se pudo reintentar la vinculación de un movimiento.')
+        }
+      }
+    } catch (error) {
+      lastError.value = errorMessage(error, 'No se pudo reintentar la vinculación.')
+    }
+  }
+
   async function prepareLogout(): Promise<void> {
     await syncNow()
-    if (isReady()) pendingCount.value = await run(countOutbox())
+    if (isReady()) pendingCount.value = await run(countDurableWork())
     if (pendingCount.value > 0) {
       throw new Error(
         'No se pudieron sincronizar todos los cambios. Puedes quedarte o descartarlos y salir.',
@@ -944,6 +1525,7 @@ export const useSyncStore = defineStore('sync', () => {
     await leavingRuntime?.dispose()
     if (leavingUserId) {
       await Effect.runPromise(wipeAllClientData(leavingUserId))
+      resetLinkTargets(leavingUserId)
     }
     initialized = false
     detached = false
@@ -951,6 +1533,7 @@ export const useSyncStore = defineStore('sync', () => {
     email.value = null
     revision.value = 0
     pendingCount.value = 0
+    intents.value = []
     syncStatus.value = 'idle'
   }
 
@@ -963,14 +1546,20 @@ export const useSyncStore = defineStore('sync', () => {
     pendingCount,
     lastError,
     lastCheckedAt,
+    intents,
+    unresolvedIntentCount,
+    failedIntentCount,
     init,
     enqueueCommand,
+    publishMovementCommands,
+    readMovementPublications,
     flush,
     pullChanges,
     syncNow,
     /** Reloads the whole read model after a server-side write (Bitvavo import and link). */
     refreshFromServer: () => syncNow({ full: true }),
     detach,
+    dispose,
     prepareLogout,
     logout,
     getEntityRef,
@@ -978,9 +1567,25 @@ export const useSyncStore = defineStore('sync', () => {
     findEntityRef,
     getInstrumentId,
     getUserInstrumentId,
+    peekPendingCreate,
     peekPendingCreateId,
     mergeIntoPendingCreate,
     cancelPendingCreate,
+    acceptIntent,
+    acceptPendingConfirmation,
+    deleteIntent,
+    publishIntentCommands,
+    listIntents,
+    findIntentCommand,
+    findQueuedUserInstrumentCommand,
+    completeIntentStep,
+    reopenIntentStep,
+    markIntentWaiting,
+    failIntent,
+    cancelIntentStep,
+    retryIntent,
+    discardIntent,
+    resumePendingIntents,
   }
 })
 

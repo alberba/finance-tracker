@@ -172,7 +172,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(state.pendingMovements[0].unitPrice).toBe(3210.654321)
   })
 
-  it('confirma, edita y mantiene pendientes fuera de transacciones hasta confirmar', () => {
+  it('confirma, edita y mantiene pendientes fuera de transacciones hasta confirmar', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
     const financialStore = useFinancialStateStore()
@@ -197,7 +197,7 @@ describe('reglas recurrentes y pendientes', () => {
     })
     const store = useRecurringStore()
     expect(
-      store.addRule({
+      await store.addRule({
         type: 'expense',
         accountId: 'checking',
         category: 'Vivienda',
@@ -208,12 +208,12 @@ describe('reglas recurrentes y pendientes', () => {
         startDate: '2024-01-15',
       }),
     ).toBe(true)
-    store.refreshPending('2024-02-20')
+    await store.refreshPending('2024-02-20')
     expect(store.pendingCount).toBe(2)
     expect(financialStore.transactions).toHaveLength(0)
     const pendingId = store.openPendingMovements[0].id
     expect(
-      store.editPending(pendingId, {
+      await store.editPending(pendingId, {
         date: '2024-01-16',
         accountId: 'checking',
         category: 'Vivienda',
@@ -221,14 +221,14 @@ describe('reglas recurrentes y pendientes', () => {
         amount: 925,
       }),
     ).toBe(true)
-    expect(store.confirmPending(pendingId)).toBe(true)
+    expect((await store.confirmPending(pendingId)).accepted).toBe(true)
     expect(financialStore.transactions[0].description).toBe('Alquiler editado')
     expect(financialStore.transactions[0].amount).toBe(925)
     expect(store.pendingCount).toBe(1)
     vi.unstubAllGlobals()
   })
 
-  it('edita un movimiento pendiente de inversión y permite reclasificar su tipo', () => {
+  it('edita un movimiento pendiente de inversión y permite reclasificar su tipo', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-02-20' })
     const financialStore = useFinancialStateStore()
@@ -271,7 +271,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(store.pendingCount).toBe(1)
 
     // Reclassify from expense to investment with investment account and operation fields
-    const ok = store.editPending('pm-exp', {
+    const ok = await store.editPending('pm-exp', {
       type: 'investment',
       date: '2024-02-16',
       accountId: 'broker-crypto',
@@ -300,7 +300,7 @@ describe('reglas recurrentes y pendientes', () => {
     expect(edited.amount).toBe(502.5)
 
     // Confirm the edited investment pending movement and verify transaction
-    expect(store.confirmPending('pm-exp')).toBe(true)
+    expect((await store.confirmPending('pm-exp')).accepted).toBe(true)
     expect(financialStore.transactions).toHaveLength(1)
     expect(financialStore.transactions[0]).toMatchObject({
       type: 'investment',
@@ -315,7 +315,7 @@ describe('reglas recurrentes y pendientes', () => {
 
     vi.unstubAllGlobals()
   })
-  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', () => {
+  it('edita una regla sin modificar pendientes ya generados y aplica cambios al siguiente vencimiento', async () => {
     setActivePinia(createTestPinia())
     vi.stubGlobal('window', { __FINANCE_TODAY__: '2024-01-15' })
     const financialStore = useFinancialStateStore()
@@ -340,7 +340,7 @@ describe('reglas recurrentes y pendientes', () => {
     })
     const store = useRecurringStore()
     expect(
-      store.addRule({
+      await store.addRule({
         type: 'investment',
         accountId: 'broker',
         category: 'Fondos',
@@ -361,7 +361,7 @@ describe('reglas recurrentes y pendientes', () => {
     const ruleId = store.rules[0].id
 
     expect(
-      store.updateRule(ruleId, {
+      await store.updateRule(ruleId, {
         type: 'investment',
         accountId: 'broker',
         category: 'Fondos',
@@ -392,7 +392,7 @@ describe('reglas recurrentes y pendientes', () => {
       nextOccurrenceDate: '2024-02-01',
     })
 
-    store.refreshPending('2024-02-02')
+    await store.refreshPending('2024-02-02')
     expect(store.openPendingMovements).toHaveLength(2)
     expect(store.openPendingMovements[1]).toMatchObject({
       description: 'Aporte actualizado',
@@ -450,7 +450,7 @@ describe('reglas recurrentes y pendientes', () => {
 
       const store = useRecurringStore()
       expect(
-        store.addRule({
+        await store.addRule({
           type: 'investment',
           accountId: 'broker',
           category: 'Fondos Indexados',
@@ -467,10 +467,10 @@ describe('reglas recurrentes y pendientes', () => {
           startDate: '2024-02-01',
         }),
       ).toBe(true)
-      store.refreshPending('2024-02-20')
+      await store.refreshPending('2024-02-20')
       const pendingId = store.openPendingMovements[0]?.id
       expect(pendingId).toBeTruthy()
-      expect(store.confirmPending(pendingId as string)).toBe(true)
+      expect((await store.confirmPending(pendingId as string)).accepted).toBe(true)
 
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
       expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stockevents/transactions')
@@ -488,14 +488,21 @@ describe('reglas recurrentes y pendientes', () => {
         feesCurrency: 'EUR',
         type: 'buy',
       })
-      await new Promise((resolve) => setTimeout(resolve, 0))
     } finally {
       vi.unstubAllGlobals()
     }
   })
 })
 describe('valoración de cartera', () => {
-  it('enlaza movimientos existentes al instrumento configurado', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('enlaza movimientos existentes al instrumento configurado', async () => {
+    // `updateCurrentUnits` stamps the holding with the clock; a purchase created
+    // a second later has to count on top of it, so fix only `Date`.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-07-10T12:00:00.000Z'))
     setActivePinia(createTestPinia())
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
@@ -553,7 +560,7 @@ describe('valoración de cartera', () => {
         instrument.holdingsUpdatedAt = '2026-07-10T10:00:00.000Z'
       }
     })
-    expect(marketStore.linkExistingMovements(instrumentId)).toBe(1)
+    expect((await marketStore.linkExistingMovements(instrumentId)).targets).toBe(1)
     expect(financialStore.transactions[0].instrumentId).toBe(instrumentId)
     expect(marketStore.linkedMovementCount(instrumentId)).toBe(1)
     expect(marketStore.valuation.instruments[0].units).toBe(2)
@@ -574,7 +581,7 @@ describe('valoración de cartera', () => {
         side: 'buy',
         units: 2,
         unitPrice: 100,
-        createdAt: new Date(Date.now() + 1_000).toISOString(),
+        createdAt: '2026-07-10T12:00:01.000Z',
       })
     })
     expect(marketStore.valuation.instruments[0].units).toBe(5)
@@ -635,7 +642,7 @@ describe('valoración de cartera', () => {
     expect(marketStore.valuation.instruments[0].units).toBe(1)
   })
 
-  it('enlaza AGED con AGED.MI y suma sus títulos', () => {
+  it('enlaza AGED con AGED.MI y suma sus títulos', async () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
       year: 2024,
@@ -684,11 +691,11 @@ describe('valoración de cartera', () => {
 
     const marketStore = useMarketStore()
     expect(marketStore.matchingMovementCount('aged-mi')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi')).toBe(1)
+    expect((await marketStore.linkExistingMovements('aged-mi')).targets).toBe(1)
     expect(marketStore.valuation.instruments[0].units).toBe(5)
   })
 
-  it('enlaza movimientos legacy sin símbolo por la categoría del activo', () => {
+  it('enlaza movimientos legacy sin símbolo por la categoría del activo', async () => {
     const financialStore = useFinancialStateStore()
     financialStore.replaceState({
       year: 2024,
@@ -734,7 +741,7 @@ describe('valoración de cartera', () => {
 
     const marketStore = useMarketStore()
     expect(marketStore.matchingMovementCount('aged-mi-legacy')).toBe(1)
-    expect(marketStore.linkExistingMovements('aged-mi-legacy')).toBe(1)
+    expect((await marketStore.linkExistingMovements('aged-mi-legacy')).targets).toBe(1)
     expect(financialStore.transactions[0].instrumentId).toBe('aged-mi-legacy')
   })
 

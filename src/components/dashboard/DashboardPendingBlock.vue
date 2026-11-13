@@ -62,7 +62,7 @@ const pending = computed(() => recurringStore.openPendingMovements)
           <BaseButton
             variant="ghost"
             :aria-label="`Saltar este vencimiento de ${item.description}`"
-            @click="recurringStore.skipPending(item.id)"
+            @click="void recurringStore.skipPending(item.id)"
           >
             Saltar
           </BaseButton>
