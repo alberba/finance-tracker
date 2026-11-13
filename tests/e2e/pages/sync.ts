@@ -14,7 +14,10 @@ export async function expectSyncCommand(
     const body = candidate.request().postDataJSON() as { commands: SyncCommandInput[] }
     const commands = body.commands.filter(matches)
     if (!commands.length) return false
-    expect(candidate.ok()).toBe(true)
+    // ADR 0003: a batch returns 409 when *any* command conflicts and halts.
+    // The matched command may still have been applied earlier in that batch;
+    // the assertion below is the one that proves its own outcome.
+    expect([200, 409]).toContain(candidate.status())
     const response = (await candidate.json()) as {
       results: Array<{ commandId: string; status: string }>
     }
