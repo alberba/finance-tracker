@@ -134,6 +134,9 @@ test.describe('Finance tracker E2E', () => {
 
     const tooltip = page.locator('#chart-tooltip')
     await expect(tooltip).toBeHidden()
+    // Chart.js loads asynchronously since the bundle was moved off the
+    // critical path; wait for the instance before asking it for a tooltip.
+    await expect(page.locator('#chart-networth')).toHaveAttribute('data-chart-ready', 'true')
 
     const networthHasData = await page.evaluate(() => {
       const canvas = document.getElementById('chart-networth')

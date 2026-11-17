@@ -3,7 +3,7 @@ import VerifyEmailPanel from './VerifyEmailPanel.vue'
 import AccessProviderIcon from './AccessProviderIcon.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { markAuthenticationReady } from '../../lib/client/authentication'
+import { markAuthenticationReady } from '../../lib/client/authentication-ready'
 import { useAuthenticationForm } from '../../composables/useAuthenticationForm'
 const props = defineProps<{
   invitationError?: string

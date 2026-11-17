@@ -1,25 +1,111 @@
-import {
-  Chart,
-  registerables,
-  type ChartType,
-  type ScriptableContext,
-  type TooltipModel,
-  type TooltipOptions,
+import type {
+  ChartType,
+  ScriptableContext,
+  TooltipModel,
+  TooltipOptions,
 } from 'chart.js'
 
 import { formatAxisLabel } from '../lib/format'
 import { readChartTheme, resolveColor } from './chart-theme'
 
-Chart.register(...registerables)
+type ChartModule = typeof import('chart.js')
+type ChartConstructor = ChartModule['Chart']
 
 declare global {
   interface Window {
-    Chart?: typeof Chart
+    Chart?: ChartConstructor
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.Chart = Chart
+/**
+ * Chart.js is a large dependency (it was ~71 kB gzip for all eight chart
+ * families when only line charts are rendered). Load it after the dashboard
+ * markup is already visible, and register only what `render*Chart` uses.
+ * The canvas `data-chart-*` attributes are written synchronously before the
+ * import resolves, so tests and scripts can read them without waiting.
+ */
+let chartLoader: Promise<ChartModule> | null = null
+let chartConstructor: ChartConstructor | null = null
+
+function loadChart(): Promise<ChartModule> {
+  chartLoader ??= import('chart.js').then((chart) => {
+    chart.Chart.register(
+      chart.LineController,
+      chart.LineElement,
+      chart.PointElement,
+      chart.LinearScale,
+      chart.CategoryScale,
+      chart.Filler,
+      chart.Tooltip,
+      chart.Legend,
+    )
+    chartConstructor = chart.Chart
+    if (typeof window !== 'undefined') {
+      window.Chart = chart.Chart
+    }
+    return chart
+  })
+  return chartLoader
+}
+
+/** Destroys the chart attached to a canvas, if Chart.js has already loaded. */
+export function destroyChart(canvas: HTMLCanvasElement): void {
+  // Also invalidate a pending async render: the canvas may unmount before the
+  // chart chunk resolves, and creating a chart then would leak it.
+  renderVersions.set(canvas, (renderVersions.get(canvas) ?? 0) + 1)
+  chartConstructor?.getChart(canvas)?.destroy()
+}
+
+/**
+ * Renders are async now. A canvas can be redrawn (theme change, range change)
+ * before the previous import resolves; only the latest render may create a
+ * chart, or the old one would win and leak.
+ */
+const renderVersions = new WeakMap<HTMLCanvasElement, number>()
+
+function nextRenderVersion(canvas: HTMLCanvasElement): number {
+  const version = (renderVersions.get(canvas) ?? 0) + 1
+  renderVersions.set(canvas, version)
+  return version
+}
+
+function isCurrentRender(canvas: HTMLCanvasElement, version: number): boolean {
+  return renderVersions.get(canvas) === version
+}
+
+function drawWhenReady(
+  canvas: HTMLCanvasElement,
+  version: number,
+  draw: (chart: ChartConstructor) => void,
+): void {
+  const start = (): void => {
+    void loadChart()
+      .then((chart) => {
+        if (!isCurrentRender(canvas, version)) return
+        chart.Chart.getChart(canvas)?.destroy()
+        draw(chart.Chart)
+        canvas.dataset.chartReady = 'true'
+      })
+      .catch(() => {
+        // A failed chart chunk must not take the section down; leave the canvas
+        // blank and let a later render (theme/range) retry the import.
+        chartLoader = null
+        delete canvas.dataset.chartReady
+      })
+  }
+
+  // The first chart waits for an idle window: its 200 kB chunk (69 kB gzip)
+  // must not compete with hydration or the dashboard's first paint. Redraws
+  // after a range/theme change are immediate because Chart.js is already here.
+  if (chartConstructor) {
+    start()
+    return
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(start, { timeout: 1000 })
+  } else {
+    setTimeout(start, 200)
+  }
 }
 
 type ValueFormatter = (value: number) => string
@@ -206,20 +292,12 @@ function makeExternalTooltip<TType extends ChartType>(
   }
 }
 
-function destroyExisting(canvas: HTMLCanvasElement): void {
-  const existing = Chart.getChart(canvas)
-  if (existing) {
-    existing.destroy()
-  }
-}
-
 export function renderLineChart(
   canvas: HTMLCanvasElement,
   values: number[],
   options: LineChartOptions,
 ): void {
-  destroyExisting(canvas)
-
+  const version = nextRenderVersion(canvas)
   const labels = Array.from(options.labels || [])
   const formatValue = options.formatValue
   const formatAxisValue = options.formatAxisValue || formatValue
@@ -233,45 +311,47 @@ export function renderLineChart(
   canvas.dataset.chartPointCount = String(safeValues.length)
   canvas.dataset.chartTooltips = JSON.stringify([tooltipData])
 
-  new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          data: safeValues,
-          borderColor: options.color,
-          backgroundColor: areaFill(options.color, options.fillOpacity),
-          pointBackgroundColor: options.color,
-          pointBorderColor: options.pointBorderColor || pointBorderColorVar(),
-          fill: true,
-          ...lineCommon,
-          borderWidth: options.borderWidth ?? lineCommon.borderWidth,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      layout: { padding: { top: 6, right: 4, bottom: 0, left: 0 } },
-      interaction: { mode: 'nearest', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'line'>((tooltip) => {
-            const dp = tooltip.dataPoints[0]
-            const label = dp.label || `Punto ${dp.dataIndex + 1}`
-            return `${label}: ${formatValue(tooltipRawNumber(dp))}`
-          }),
-        },
+  drawWhenReady(canvas, version, (Chart) => {
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            data: safeValues,
+            borderColor: options.color,
+            backgroundColor: areaFill(options.color, options.fillOpacity),
+            pointBackgroundColor: options.color,
+            pointBorderColor: options.pointBorderColor || pointBorderColorVar(),
+            fill: true,
+            ...lineCommon,
+            borderWidth: options.borderWidth ?? lineCommon.borderWidth,
+          },
+        ],
       },
-      scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true, {
-        axis: options.axisColor,
-        grid: options.gridColor,
-      }),
-    },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        layout: { padding: { top: 6, right: 4, bottom: 0, left: 0 } },
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: false,
+            external: makeExternalTooltip<'line'>((tooltip) => {
+              const dp = tooltip.dataPoints[0]
+              const label = dp.label || `Punto ${dp.dataIndex + 1}`
+              return `${label}: ${formatValue(tooltipRawNumber(dp))}`
+            }),
+          },
+        },
+        scales: baseScales(formatAxisValue, labels, options.includeZeroBaseline ?? true, {
+          axis: options.axisColor,
+          grid: options.gridColor,
+        }),
+      },
+    })
   })
 }
 
@@ -280,27 +360,28 @@ export function renderMultiLineChart(
   series: MultiLineSeries[],
   options: MultiLineChartOptions,
 ): void {
-  destroyExisting(canvas)
-
+  const version = nextRenderVersion(canvas)
   const labels = Array.from(options.labels || [])
   const formatValue = options.formatValue
   const formatAxisValue = options.formatAxisValue || formatValue
   const forceZeroTick = options.forceZeroTick ?? false
 
   if (!series.length) {
-    new Chart(canvas, {
-      type: 'line',
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
-    })
     canvas.dataset.chartPointCount = '0'
     canvas.dataset.chartHasZeroTick = 'false'
     canvas.dataset.chartTooltips = '[]'
+    drawWhenReady(canvas, version, (Chart) => {
+      new Chart(canvas, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        },
+      })
+    })
     return
   }
 
@@ -325,45 +406,47 @@ export function renderMultiLineChart(
   })
   canvas.dataset.chartFirstTooltip = firstTooltips.join(' | ')
 
-  new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: series.map((s) => {
-        const color = resolveColor(s.color)
-        return {
-          label: s.name,
-          data: s.values.map((v) => Number(v || 0)),
-          borderColor: color,
-          backgroundColor: color,
-          pointBackgroundColor: color,
-          pointBorderColor: pointBorderColorVar(),
-          borderDash: s.dashed ? [6, 5] : undefined,
-          ...lineCommon,
-        }
-      }),
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      layout: { padding: { top: 6, right: 4 } },
-      interaction: { mode: 'nearest', intersect: false },
-      plugins: {
-        legend: refinedLegend(series.length > 1),
-        tooltip: {
-          enabled: false,
-          external: makeExternalTooltip<'line'>((tooltip) => {
-            return tooltip.dataPoints
-              .map(
-                (dp) =>
-                  `${tooltipDatasetLabel(dp)} · ${dp.label}: ${formatValue(tooltipRawNumber(dp))}`,
-              )
-              .join(' | ')
-          }),
-        },
+  drawWhenReady(canvas, version, (Chart) => {
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: series.map((s) => {
+          const color = resolveColor(s.color)
+          return {
+            label: s.name,
+            data: s.values.map((v) => Number(v || 0)),
+            borderColor: color,
+            backgroundColor: color,
+            pointBackgroundColor: color,
+            pointBorderColor: pointBorderColorVar(),
+            borderDash: s.dashed ? [6, 5] : undefined,
+            ...lineCommon,
+          }
+        }),
       },
-      scales: baseScales(formatAxisValue, labels, forceZeroTick),
-    },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        layout: { padding: { top: 6, right: 4 } },
+        interaction: { mode: 'nearest', intersect: false },
+        plugins: {
+          legend: refinedLegend(series.length > 1),
+          tooltip: {
+            enabled: false,
+            external: makeExternalTooltip<'line'>((tooltip) => {
+              return tooltip.dataPoints
+                .map(
+                  (dp) =>
+                    `${tooltipDatasetLabel(dp)} · ${dp.label}: ${formatValue(tooltipRawNumber(dp))}`,
+                )
+                .join(' | ')
+            }),
+          },
+        },
+        scales: baseScales(formatAxisValue, labels, forceZeroTick),
+      },
+    })
   })
 }

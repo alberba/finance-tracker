@@ -8,6 +8,7 @@ import { getOrderedCategoriesForType } from '../domain/transactions/categories'
 import { resolveCategoryId, resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
 import { syncMovements } from '../lib/client/movement-commands'
 import {
+  accountingYear,
   buildMonthGroups,
   categoryBreakdown,
   monthTotals,
@@ -151,14 +152,13 @@ export const useMovementsStore = defineStore('movements', () => {
   const visibleTransactions = computed(() => monthGroups.value.flatMap((group) => group.rows))
 
   /** Movements of the selected year, whatever the filters (the tab's count). */
-  const yearCount = computed(() =>
-    buildMonthGroups(
-      financialStateStore.transactions,
-      ui.txYear,
-      { search: '', types: [], accountIds: [] },
-      ui.txSort,
-    ).reduce((sum, group) => sum + group.count, 0),
-  )
+  const yearCount = computed(() => {
+    let count = 0
+    financialStateStore.transactions.forEach((tx) => {
+      if (accountingYear(tx) === ui.txYear) count += 1
+    })
+    return count
+  })
 
   /** Totals of the month the ink band shows. */
   const bandTotals = computed(() =>
@@ -172,13 +172,17 @@ export const useMovementsStore = defineStore('movements', () => {
       (ui.txYear === currentYear() && ui.txFilterMonth >= todayMonth()),
   )
 
-  const selectedTransactions = computed(() => {
-    const selected = new Set(ui.txSelectedIds)
-    return financialStateStore.transactions.filter((item) => selected.has(item.id))
-  })
-  const selectedVisibleCount = computed(
-    () => visibleTransactions.value.filter((item) => ui.txSelectedIds.includes(item.id)).length,
+  const selectedIdSet = computed(() => new Set(ui.txSelectedIds))
+  const selectedTransactions = computed(() =>
+    financialStateStore.transactions.filter((item) => selectedIdSet.value.has(item.id)),
   )
+  const selectedVisibleCount = computed(() => {
+    let count = 0
+    visibleTransactions.value.forEach((item) => {
+      if (selectedIdSet.value.has(item.id)) count += 1
+    })
+    return count
+  })
   const selectedSum = computed(() =>
     round2(selectedTransactions.value.reduce((sum, item) => sum + signedAmount(item), 0)),
   )
@@ -201,8 +205,16 @@ export const useMovementsStore = defineStore('movements', () => {
     return categoryBreakdown(financialStateStore.transactions, ui.txYear, ui.txFilterMonth, type)
   }
 
+  /** One ordered list per type, rebuilt only when the financial state changes. */
+  const orderedCategoriesByType = computed<Record<BudgetType, string[]>>(() => ({
+    income: getOrderedCategoriesForType(financialStateStore.state, 'income'),
+    expense: getOrderedCategoriesForType(financialStateStore.state, 'expense'),
+    saving: getOrderedCategoriesForType(financialStateStore.state, 'saving'),
+    investment: getOrderedCategoriesForType(financialStateStore.state, 'investment'),
+  }))
+
   function orderedCategories(type: BudgetType): string[] {
-    return getOrderedCategoriesForType(financialStateStore.state, type)
+    return orderedCategoriesByType.value[type]
   }
 
   function setMonth(month: Month): void {

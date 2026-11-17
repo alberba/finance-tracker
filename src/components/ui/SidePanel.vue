@@ -8,10 +8,15 @@ import KickerLabel from './KickerLabel.vue'
 // screen on mobile) with a kicker and title, a scrolling body and a footer for
 // the actions. Closes with Escape, the close button or whatever the footer
 // wires to `open = false`; focus goes back to the opener.
-defineProps<{
+const props = defineProps<{
   kicker: string
   title: string
   titleId: string
+  /**
+   * Element that must regain focus on close. Lazy panels mount after the
+   * opener was hidden, so `document.activeElement` is already body by then.
+   */
+  returnFocusTo?: HTMLElement | null
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -27,7 +32,9 @@ function sync(shouldOpen: boolean): void {
   const element = dialog.value
   if (!element) return
   if (shouldOpen && !element.open) {
-    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    opener =
+      props.returnFocusTo ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null)
     element.showModal?.()
     // The closed dialog stays mounted, so every opening starts at the top of
     // the form instead of inheriting the previous scroll position.

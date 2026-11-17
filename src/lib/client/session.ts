@@ -8,6 +8,7 @@
 import { Data, Effect } from 'effect'
 
 import { readJson, sendRequest, type ClientHttp } from './http'
+import { runClientHttp } from './runtime'
 
 export interface ClientSession {
   user?: { id?: string; email?: string; isAdmin?: boolean }
@@ -42,3 +43,20 @@ export const fetchSession = (): Effect.Effect<ClientSession, SessionLookupError,
     }
     return body
   })
+
+/**
+ * Shares the startup session lookup between the shell and the workspace.
+ *
+ * Both scripts run before the per-user runtime exists and used to issue the
+ * same `/api/session` request in parallel. Only the in-flight request is
+ * shared: once it settles, a later lookup (for example after a logout) must
+ * hit the server again instead of reusing a stale identity.
+ */
+let inFlightSession: Promise<ClientSession> | null = null
+
+export function loadSession(): Promise<ClientSession> {
+  inFlightSession ??= runClientHttp(fetchSession()).finally(() => {
+    inFlightSession = null
+  })
+  return inFlightSession
+}

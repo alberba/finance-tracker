@@ -66,6 +66,14 @@ interface DraftAttachment {
 const attachments = shallowRef<DraftAttachment[]>([])
 let nextAttachmentId = 0
 
+// This panel is lazy: by the time it mounts, the launcher is hidden and
+// `document.activeElement` is body. Hand SidePanel the real opener.
+const returnFocusTo = computed(() =>
+  typeof document === 'undefined'
+    ? null
+    : document.getElementById('global-report-trigger'),
+)
+
 const attachmentRows = computed(() =>
   attachments.value.map((item) => ({
     id: item.id,
@@ -189,6 +197,7 @@ async function onSubmit(): Promise<void> {
     kicker="Ayuda a mejorar Finance Tracker"
     title="Crear reporte"
     title-id="global-report-dialog-title"
+    :return-focus-to="returnFocusTo"
   >
     <p class="text-text-muted leading-relaxed">
       Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.

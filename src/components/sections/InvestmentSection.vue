@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, watch } from 'vue'
 
-import InvestmentContributionsTab from '../investment/InvestmentContributionsTab.vue'
 import InvestmentDashboardTab from '../investment/InvestmentDashboardTab.vue'
-import InvestmentMovementsTab from '../investment/InvestmentMovementsTab.vue'
-import InvestmentRecurringTab from '../investment/InvestmentRecurringTab.vue'
 import AppSection from '../ui/AppSection.vue'
 import PageHeader from '../ui/PageHeader.vue'
 import SectionTabs, { type SectionTab } from '../ui/SectionTabs.vue'
@@ -17,7 +14,20 @@ import type { InvestmentSubTab } from '../../scripts/types'
 import { useInvestmentStore } from '../../stores/investment'
 import { useMarketStore } from '../../stores/market'
 import { useRecurringStore } from '../../stores/recurring'
+import { useStockEventsStore } from '../../stores/stockevents'
 import { useUiStore } from '../../stores/ui'
+
+// Only the default tab is static; the rest split into chunks and mount on
+// first visit, then stay mounted so unsaved state survives tab switches.
+const InvestmentMovementsTab = defineAsyncComponent(
+  () => import('../investment/InvestmentMovementsTab.vue'),
+)
+const InvestmentContributionsTab = defineAsyncComponent(
+  () => import('../investment/InvestmentContributionsTab.vue'),
+)
+const InvestmentRecurringTab = defineAsyncComponent(
+  () => import('../investment/InvestmentRecurringTab.vue'),
+)
 
 withDefaults(
   defineProps<{
@@ -29,6 +39,7 @@ withDefaults(
 const investmentStore = useInvestmentStore()
 const marketStore = useMarketStore()
 const recurringStore = useRecurringStore()
+const stockEventsStore = useStockEventsStore()
 const ui = useUiStore().ui
 const { movementRows, contributionRows } = storeToRefs(investmentStore)
 
@@ -52,6 +63,19 @@ const tabs = computed<SectionTab[]>(() => [
 ])
 
 const quoteStatus = computed(() => summarizeQuoteStatus(marketStore.valuation.instruments))
+
+const visitedTabs = reactive(new Set<string>())
+watch(
+  activeTab,
+  (tab) => {
+    visitedTabs.add(tab)
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  void stockEventsStore.initializeCredential()
+})
 </script>
 
 <template>
@@ -81,9 +105,18 @@ const quoteStatus = computed(() => summarizeQuoteStatus(marketStore.valuation.in
       />
 
       <InvestmentDashboardTab :is-active="activeTab === 'dashboard'" />
-      <InvestmentMovementsTab :is-active="activeTab === 'movements'" />
-      <InvestmentContributionsTab :is-active="activeTab === 'contributions'" />
-      <InvestmentRecurringTab :is-active="activeTab === 'recurring'" />
+      <InvestmentMovementsTab
+        v-if="visitedTabs.has('movements')"
+        :is-active="activeTab === 'movements'"
+      />
+      <InvestmentContributionsTab
+        v-if="visitedTabs.has('contributions')"
+        :is-active="activeTab === 'contributions'"
+      />
+      <InvestmentRecurringTab
+        v-if="visitedTabs.has('recurring')"
+        :is-active="activeTab === 'recurring'"
+      />
     </div>
   </AppSection>
 </template>

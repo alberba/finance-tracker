@@ -111,6 +111,8 @@ describe('ReportsPage', () => {
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-report-entry="901"]').trigger('click')
+    // ReportDetail is a lazy chunk now; wait for it to resolve before reading.
+    await vi.waitFor(() => expect(wrapper.find('[data-report-detail]').exists()).toBe(true))
     await flushPromises()
     await nextTick()
 

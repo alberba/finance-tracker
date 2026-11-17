@@ -8,11 +8,10 @@ import { getThemeController } from '../lib/client/theme'
 import { wipeAllClientData, wipeLegacyClientData } from '../lib/client/wipe'
 import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
-import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
+
 import { describeCheckAge } from '../lib/client/sync-connection'
 import { isRecurringIntentKind, runRecurringIntentAction } from '../lib/client/recurring-write'
-import { fetchSession } from '../lib/client/session'
-import { runClientHttp } from '../lib/client/runtime'
+import { loadSession } from '../lib/client/session'
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
@@ -261,22 +260,6 @@ function initSyncMenu(): void {
   const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
   const syncStore = useSyncStore(pinia)
 
-  const sessionRequest = runClientHttp(fetchSession())
-    .catch(() => null)
-    .then((body) => {
-      if (emailEl && body?.user?.email) {
-        emailEl.replaceChildren(body.user.email)
-      }
-      if (body?.user?.id) {
-        void syncStore.init(body.user.id, { email: body.user.email ?? null })
-      }
-      return body
-    })
-    .catch(() => {
-      /* Logout still clears stale local data when session lookup fails. */
-      return null
-    })
-
   if (syncStore) {
     /** The first intent that needs the user's attention (retry/discard). */
     const actionableIntent = () =>
@@ -295,6 +278,12 @@ function initSyncMenu(): void {
       null
 
     const renderStatus = () => {
+      // The workspace owns the startup session lookup; the shell only mirrors
+      // its identity. A second `/api/session` here delayed every page.
+      const email = syncStore.email
+      if (emailEl && email && emailEl.textContent !== email) {
+        emailEl.replaceChildren(email)
+      }
       if (!statusEl) {
         return
       }
@@ -358,12 +347,16 @@ function initSyncMenu(): void {
 
     syncStore.$subscribe(renderStatus)
     renderStatus()
-    setInterval(renderStatus, 1000)
+    // The age label only needs minutes, not frames; keep hidden tabs quiet.
+    setInterval(() => {
+      if (!document.hidden) renderStatus()
+    }, 30_000)
   }
 
   logoutAction?.addEventListener('click', () => {
     logoutAction.setAttribute('aria-disabled', 'true')
-    void sessionRequest
+    void loadSession()
+      .catch(() => null)
       .then(async (session) => {
         if (syncStore?.userId) {
           try {
@@ -378,6 +371,11 @@ function initSyncMenu(): void {
             }
           }
         }
+        // The auth client (better-auth + passkey) is only needed to sign out;
+        // loading it with the startup shell made every page pay for it.
+        const { authentication, requireAuthenticationResult } = await import(
+          '../lib/client/authentication'
+        )
         await requireAuthenticationResult(await authentication.signOut())
         if (syncStore?.userId) await syncStore.logout({ discardPending: true })
         else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))

@@ -1,23 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
+import { isReportsPath } from '../../scripts/app/dashboard-section-routing'
 import { useReportDialogTrigger } from '../../composables/useReportDialogTrigger'
 import { useReportsStore } from '../../stores/reports'
-import IssueReportPanel from './IssueReportPanel.vue'
+
+const IssueReportPanel = defineAsyncComponent(() => import('./IssueReportPanel.vue'))
 
 // The floating «Reportar» button (desktop; on mobile the «Más» sheet opens the
 // panel) and the report side panel it opens.
 const isOpen = defineModel<boolean>('open', { default: false })
 const reportsStore = useReportsStore()
 const hasUpdates = computed(() => reportsStore.unseenCount > 0)
+// El panel (formulario + adjuntos) solo se descarga la primera vez que se abre;
+// después queda montado para conservar el borrador y la animación de cierre.
+const hasOpenedPanel = ref(false)
+
+watch(isOpen, (open) => {
+  if (open) hasOpenedPanel.value = true
+})
 
 useReportDialogTrigger(() => {
   isOpen.value = true
 })
 
-// El store arranca aquí, una sola vez por app: sin sondeos ni intervalos.
+// El contador de novedades puede esperar al primer hueco: en el arranque
+// compite con la sesión y el bootstrap. /reportes ya refresca la lista.
 onMounted(() => {
-  void reportsStore.refresh()
+  if (isReportsPath(window.location.pathname)) return
+  const refresh = () => void reportsStore.refresh()
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(refresh, { timeout: 5000 })
+  } else {
+    setTimeout(refresh, 2000)
+  }
 })
 </script>
 
@@ -59,5 +75,5 @@ onMounted(() => {
     >Hay novedades en tus reportes</span
   >
 
-  <IssueReportPanel v-model:open="isOpen" />
+  <IssueReportPanel v-if="hasOpenedPanel" v-model:open="isOpen" />
 </template>
