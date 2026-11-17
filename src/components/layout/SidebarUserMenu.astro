@@ -52,6 +52,32 @@
     >
       Sincronizado
     </span>
+    <div
+      id="sidebar-intent-status"
+      class="border-line border-b px-3.5 py-3 text-sm"
+      data-intent-surface
+      hidden
+    >
+      <p class="text-text-muted" data-intent-message>
+        Guardado en este dispositivo
+      </p>
+      <div class="mt-2 flex flex-wrap gap-2" data-intent-actions>
+        <button
+          class="border-line text-text-main hover:bg-subtle focus-visible:outline-primary rounded-md border px-2.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+          type="button"
+          data-intent-retry
+        >
+          Reintentar
+        </button>
+        <button
+          class="text-text-muted hover:bg-subtle focus-visible:outline-primary rounded-md px-2.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+          type="button"
+          data-intent-discard
+        >
+          Descartar
+        </button>
+      </div>
+    </div>
     <p class="text-text-muted px-3.5 pt-3 pb-1 font-mono text-xs tracking-[0.16em] uppercase">
       Privacidad
     </p>

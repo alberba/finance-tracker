@@ -13,11 +13,92 @@ import type { InstrumentRowViewModel } from '../../domain/settings/view-model'
 import { searchMarketSymbols, type MarketSearchResult } from '../../services/market-api'
 import { runClientHttp } from '../../lib/client/runtime'
 import { useMarketStore } from '../../stores/market'
+import { useSyncStore } from '../../stores/sync'
+import { isUnresolvedIntent } from '../../lib/client/durable-intents'
+import { LINK_CONFIGURATION_STEP } from '../../lib/client/instrument-link'
 
 // The portfolio's visible symbol and its independent provider ticker.
 const props = defineProps<{ instrument: InstrumentRowViewModel }>()
 
 const marketStore = useMarketStore()
+const syncStore = useSyncStore()
+const linking = ref(false)
+
+/**
+ * The durable link intent for this instrument, while it is not confirmed.
+ * Accepting it is local; only the server's acknowledgement makes it confirmed.
+ */
+const linkIntent = computed(() =>
+  syncStore.intents.find((view) => {
+    if (
+      view.intent.kind !== 'instrumentLink' ||
+      view.intent.payload.instrumentId !== props.instrument.id ||
+      !isUnresolvedIntent(view.intent)
+    )
+      return false
+    return true
+  }),
+)
+/** The movable steps; the configuration dependency is not a "vinculado". */
+const linkSteps = computed(
+  () => linkIntent.value?.steps.filter((step) => step.step !== LINK_CONFIGURATION_STEP) ?? [],
+)
+const linkCounts = computed(() => {
+  if (!linkIntent.value) return null
+  return {
+    confirmed: linkSteps.value.filter((step) => step.state === 'confirmed').length,
+    pending: linkSteps.value.filter(
+      (step) => step.state !== 'confirmed' && step.state !== 'cancelled',
+    ).length,
+    total: linkSteps.value.length,
+  }
+})
+const linkFailed = computed(
+  () =>
+    linkIntent.value?.intent.failure !== null ||
+    linkIntent.value?.steps.some((step) => step.state === 'failed') === true,
+)
+const linkStatus = computed(() => {
+  const view = linkIntent.value
+  if (!view) return ''
+  if (linkFailed.value) {
+    return view.intent.failure ?? 'No se pudo completar la vinculación.'
+  }
+  if (view.intent.state === 'partial' && view.intent.failure === null) {
+    return `Resultado parcial: ${linkCounts.value?.confirmed ?? 0} de ${
+      linkCounts.value?.total ?? 0
+    } vinculados; el resto se descartó.`
+  }
+  if (view.intent.state === 'sending') {
+    return `Guardado en este dispositivo · ${linkCounts.value?.pending ?? 0} pendientes de confirmar.`
+  }
+  if (view.intent.state === 'waiting') {
+    return view.intent.waitingFor === 'catalog'
+      ? 'Guardado en este dispositivo · esperando la sincronización de la cotización.'
+      : 'Guardado en este dispositivo · pendiente de sincronizar.'
+  }
+  return 'Guardado en este dispositivo · pendiente de enviar.'
+})
+
+async function linkExistingMovements(): Promise<void> {
+  if (linking.value) return
+  linking.value = true
+  try {
+    await marketStore.linkExistingMovements(props.instrument.id)
+  } finally {
+    linking.value = false
+  }
+}
+
+async function retryLink(): Promise<void> {
+  const view = linkIntent.value
+  if (view) await syncStore.retryIntent(view.intent.id)
+}
+
+async function discardLink(): Promise<void> {
+  const view = linkIntent.value
+  if (view) await syncStore.discardIntent(view.intent.id)
+}
 
 const displaySymbol = ref(props.instrument.symbol)
 const savedTicker = computed(() =>
@@ -163,15 +244,32 @@ function useResult(result: MarketSearchResult): void {
       <BaseButton v-if="canSearch" :disabled="isSearching" @click="search">
         {{ isSearching ? 'Buscando…' : 'Buscar aproximados' }}
       </BaseButton>
-      <BaseButton
-        v-if="instrument.pending"
-        @click="marketStore.linkExistingMovements(instrument.id)"
-      >
-        Vincular movimientos
+      <BaseButton v-if="instrument.pending" :disabled="linking" @click="linkExistingMovements">
+        {{ linking ? 'Guardando…' : 'Vincular movimientos' }}
       </BaseButton>
       <BaseButton variant="danger" @click="marketStore.removeInstrument(instrument.id)">
         Quitar instrumento
       </BaseButton>
+    </div>
+
+    <div v-if="linkIntent" class="grid gap-2" data-link-intent>
+      <p
+        :class="linkFailed ? 'text-loss' : 'text-text-muted'"
+        class="text-sm"
+        :role="linkFailed ? 'alert' : 'status'"
+        data-link-intent-status
+      >
+        {{ linkStatus }}
+        <template v-if="linkFailed && linkCounts && linkCounts.total > 0">
+          ({{ linkCounts.confirmed }}/{{ linkCounts.total }} vinculados)
+        </template>
+      </p>
+      <div v-if="linkFailed" class="flex flex-wrap gap-2">
+        <BaseButton data-link-intent-retry @click="retryLink">Reintentar</BaseButton>
+        <BaseButton variant="ghost" data-link-intent-discard @click="discardLink">
+          Descartar
+        </BaseButton>
+      </div>
     </div>
   </div>
 </template>

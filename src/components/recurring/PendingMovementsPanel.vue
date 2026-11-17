@@ -32,7 +32,7 @@ const confirmOpen = computed({
 })
 
 function confirmCancel(): void {
-  if (pendingCancel.value) recurringStore.cancelPending(pendingCancel.value.id)
+  if (pendingCancel.value) void recurringStore.cancelPending(pendingCancel.value.id)
 }
 
 const accountNames = computed(
@@ -88,7 +88,7 @@ const columns: LedgerColumn<PendingMovement>[] = [
           confirmes.
         </p>
       </div>
-      <BaseButton variant="ghost" @click="recurringStore.refreshPending()">
+      <BaseButton variant="ghost" @click="void recurringStore.refreshPending()">
         Buscar vencimientos
       </BaseButton>
     </header>

@@ -2,7 +2,7 @@ import { editScenarioState } from './seed-sync-v2'
 import { test, expect } from './fixtures'
 import { LiveMarketPage } from './pages/LiveMarketPage'
 import { setSwitch } from './pages/controls'
-import { expectSyncCommand } from './pages/sync'
+import { blockSyncApi, expectSyncCommand } from './pages/sync'
 
 test.describe('precios de mercado y movimientos recurrentes', () => {
   test('mantiene gestionables las reglas históricas de ingresos y gastos', async ({
@@ -29,22 +29,20 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.reload()
     await tracker.openSettingsTab('Recurrentes')
 
-    const tab = page.locator('#settings [data-settings-recurring]')
-    const rule = tab.locator('tr[data-settings-rule-id="legacy-expense-rule"]')
+    const liveMarket = new LiveMarketPage(page)
+    const rule = liveMarket.settingsRuleRow('legacy-expense-rule')
     await expect(rule).toBeVisible()
     const toggle = rule.getByRole('switch', { name: 'Regla Alquiler histórico activa' })
     await setSwitch(toggle, false)
     await expect(toggle).not.toBeChecked()
     await rule.getByRole('button', { name: 'Editar la regla Alquiler histórico' }).click()
-    const panel = page.locator('#settings-recurring-panel')
+    const panel = liveMarket.settingsRecurringPanel
     await expect(panel.getByLabel('Descripción')).toHaveValue('Alquiler histórico')
     await panel.getByRole('button', { name: 'Cancelar' }).click()
     await expect(panel).toBeHidden()
 
     await tracker.openInvestmentRecurringTab()
-    await expect(page.locator('#investment [data-recurring-rules]')).not.toContainText(
-      'Alquiler histórico',
-    )
+    await expect(liveMarket.recurringRules).not.toContainText('Alquiler histórico')
   })
 
   test(
@@ -89,7 +87,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       })
       await tracker.openInvestmentDashboardTab()
 
-      const panel = page.locator('#investment [data-investment-quotes]')
+      const panel = liveMarket.investmentQuotes
       await expect(panel.getByText('VWCE', { exact: true })).toBeVisible()
       await expect(panel.getByText('Actualizado')).toBeVisible()
       await expect(panel.getByText('125,50 €')).toBeVisible()
@@ -147,7 +145,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
     await tracker.openInvestmentDashboardTab()
 
-    const panel = page.locator('#investment [data-investment-quotes]')
+    const panel = liveMarket.investmentQuotes
     await expect(panel.getByText('AGED.MI', { exact: true })).toBeVisible()
     await expect(panel.getByText('9,28 €')).toBeVisible()
     expect(requestedProvider).toBe('yahoo')
@@ -198,7 +196,8 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       fee: 0,
     })
     await tracker.openSettings()
-    await new LiveMarketPage(page).addInstrument({
+    const liveMarket = new LiveMarketPage(page)
+    await liveMarket.addInstrument({
       asset: 'Crypto',
       type: 'crypto',
       symbol: 'BTC',
@@ -206,7 +205,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       currency: 'EUR',
     })
     await tracker.openInvestmentDashboardTab()
-    const quotes = page.locator('#investment [data-investment-quotes]')
+    const quotes = liveMarket.investmentQuotes
     await expect(quotes.getByLabel('Títulos de BTC', { exact: true })).toHaveValue('0.09491284')
     await expect(quotes.getByText('73.000,00 €', { exact: true })).toBeVisible()
     expect(requestedSymbol).toBe('BTC-EUR')
@@ -331,9 +330,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
-    await expect(
-      page.locator('#investment [data-investment-quotes]').getByLabel('Títulos de AGED.MI'),
-    ).toHaveValue('5')
+    await expect(liveMarket.investmentQuotes.getByLabel('Títulos de AGED.MI')).toHaveValue('5')
   })
 
   test('permite vincular un movimiento legacy de ETF AGED sin símbolo', async ({
@@ -409,7 +406,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).toHaveCount(3)
+    await expect(liveMarket.dashboardPendingItems).toHaveCount(3)
     await tracker.openTransactions()
     await expect(page).toHaveURL(/\/movimientos$/)
     await expect(liveMarket.pendingPanel).toBeVisible()
@@ -439,11 +436,9 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await tracker.reload()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(2)
-    await expect(
-      liveMarket.pendingPanel
-        .locator('[data-pending-item]')
-        .filter({ hasText: 'Compra VWCE editada' }),
-    ).toHaveCount(0)
+    await expect(liveMarket.pendingItems().filter({ hasText: 'Compra VWCE editada' })).toHaveCount(
+      0,
+    )
   })
 
   test('permite editar los campos de inversión de un pendiente automatizado', async ({
@@ -474,7 +469,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     })
 
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await expect(liveMarket.dashboardPendingItems).not.toHaveCount(0)
     await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
     await liveMarket.expectPendingCount(1)
@@ -532,7 +527,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
 
     const liveMarket = new LiveMarketPage(page)
     await tracker.openDashboard()
-    await expect(liveMarket.dashboardPending.locator('[data-pending-item]')).not.toHaveCount(0)
+    await expect(liveMarket.dashboardPendingItems).not.toHaveCount(0)
     await tracker.openTransactions()
     await expect(liveMarket.pendingPanel).toBeVisible()
 
@@ -547,9 +542,10 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     )
     await typeControl.getByRole('button', { name: 'Inversión' }).click()
 
-    await expect(categorySelect.locator('option[value="Fondos Indexados"]')).toBeAttached()
+    await expect(categorySelect.getByRole('option', { name: 'Fondos Indexados' })).toBeAttached()
     await categorySelect.selectOption('Fondos Indexados')
 
+    // <optgroup> has no accessible role in a closed select: assert its markup.
     await expect(accountSelect.locator('optgroup[label="Activos de inversión"]')).toBeAttached()
     await accountSelect.selectOption({ label: 'Fondos Indexados' })
 
@@ -636,7 +632,7 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
       currency: 'EUR',
     })
     await tracker.openInvestmentDashboardTab()
-    const panel = page.locator('#investment [data-investment-quotes]')
+    const panel = liveMarket.investmentQuotes
     await expect(panel.getByText('Retrasado')).toBeVisible()
   })
 
@@ -669,8 +665,308 @@ test.describe('precios de mercado y movimientos recurrentes', () => {
     await liveMarket.closeQuote()
 
     await tracker.openInvestmentDashboardTab()
-    await expect(
-      page.locator('#investment [data-investment-quotes]').getByLabel('Títulos de LINKED'),
-    ).toHaveValue('2')
+    await expect(liveMarket.investmentQuotes.getByLabel('Títulos de LINKED')).toHaveValue('2')
+  })
+  test('guarda una vinculación sin conexión, recarga y la completa al reconectar', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const movementSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+    )
+    await tracker.addInvestmentMovement({
+      date: '2026-07-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'AGED',
+      category: 'ETF AGED',
+      unitPrice: 9,
+      units: 5,
+      fee: 0,
+    })
+    await movementSynced
+
+    // The sync endpoints are unreachable from the start: the quote is
+    // configured and linked before the server can confirm anything, which is
+    // exactly the #491 case (no manual sync step, no catalog precheck).
+    const reconnect = await blockSyncApi(page)
+    const liveMarket = new LiveMarketPage(page)
+    await tracker.openSettings()
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+      waitForSync: false,
+    })
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('1 por vincular')
+
+    // The shell still loads: the user can request the link while the server
+    // cannot confirm the configuration yet. It is stored, not failed.
+    await liveMarket.linkExistingMovements('AGED.MI')
+    await expect(row).toContainText('1 vinculados')
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText('Guardado en este dispositivo')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
+
+    // A reload cannot be done with `context.setOffline` (the shell has no
+    // service worker), but blocking the API exercises the same recovery.
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText('Guardado en este dispositivo')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
+
+    // Both listeners exist before the route is lifted: the configuration goes
+    // first and only its confirmation wakes the dependent link update.
+    const configurationSent = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
+    const linkSent = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
+    )
+    await reconnect()
+    await configurationSent
+    await linkSent
+    await expect(tracker.syncStatus).toContainText('Sincronizado')
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    const linked = liveMarket.instrument('AGED.MI')
+    await expect(linked).toContainText('1 vinculados')
+    await expect(liveMarket.linkStatus('AGED.MI')).toHaveCount(0)
+  })
+
+  test('muestra el fallo de la vinculación y lo reintenta desde el editor', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const liveMarket = new LiveMarketPage(page)
+    const movementSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+    )
+    await tracker.addInvestmentMovement({
+      date: '2026-07-10',
+      time: '09:30',
+      side: 'buy',
+      symbol: 'AGED',
+      category: 'ETF AGED',
+      unitPrice: 9,
+      units: 5,
+      fee: 0,
+    })
+    await movementSynced
+    await tracker.openSettings()
+    const configurationSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+    })
+    await configurationSynced
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('1 por vincular')
+
+    // The next movement update is rejected definitively, as a server would
+    // for a movement that no longer exists.
+    await page.route('**/api/sync', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const body = route.request().postDataJSON() as {
+        commands: Array<{ commandId: string; action: string; entityType?: string }>
+      }
+      const rejected = body.commands.filter(
+        (command) => command.action === 'update' && command.entityType === 'transaction',
+      )
+      if (!rejected.length) return route.continue()
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          results: body.commands.map((command) =>
+            rejected.some((item) => item.commandId === command.commandId)
+              ? {
+                  commandId: command.commandId,
+                  status: 'rejected',
+                  message: 'El movimiento ya no existe en el servidor.',
+                }
+              : { commandId: command.commandId, status: 'noop' },
+          ),
+          revision: 0,
+          halted: false,
+        }),
+      })
+    })
+
+    await liveMarket.linkExistingMovements('AGED.MI')
+    const status = liveMarket.linkStatus('AGED.MI')
+    await expect(status).toContainText('El movimiento ya no existe')
+    await expect(liveMarket.linkRetry('AGED.MI')).toBeVisible()
+    await expect(liveMarket.linkDiscard('AGED.MI')).toBeVisible()
+
+    await page.unroute('**/api/sync')
+    const retried = expectSyncCommand(
+      page,
+      (command) => command.action === 'update' && command.entityType === 'transaction',
+    )
+    await liveMarket.linkRetry('AGED.MI').click()
+    await retried
+    await expect(row).toContainText('1 vinculados')
+    await expect(status).toHaveCount(0)
+  })
+
+  test('descarta desde la barra lateral un vínculo parcial y conserva el confirmado', async ({
+    page,
+    tracker,
+  }) => {
+    await page.route('**/api/market/quotes', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ quotes: {} }),
+      }),
+    )
+    const liveMarket = new LiveMarketPage(page)
+    const movementsSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+      2,
+    )
+    for (const date of ['2026-07-10', '2026-07-11']) {
+      await tracker.addInvestmentMovement({
+        date,
+        time: '09:30',
+        side: 'buy',
+        symbol: 'AGED',
+        category: 'ETF AGED',
+        unitPrice: 9,
+        units: 5,
+        fee: 0,
+      })
+    }
+    await movementsSynced
+    await tracker.openSettings()
+    const configurationSynced = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'userInstrument',
+    )
+    await liveMarket.addInstrument({
+      asset: 'ETF AGED',
+      type: 'etf',
+      symbol: 'AGED.MI',
+      currency: 'EUR',
+      keepOpen: true,
+    })
+    await configurationSynced
+    const row = liveMarket.instrument('AGED.MI')
+    await expect(row).toContainText('2 por vincular')
+
+    // One of the two movement updates is rejected definitively: the link
+    // finishes with one confirmed target and one failed target.
+    let rejected = false
+    await page.route('**/api/sync', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue()
+      const body = route.request().postDataJSON() as {
+        commands: Array<{ commandId: string; action: string; entityType?: string }>
+      }
+      const updates = body.commands.filter(
+        (command) => command.action === 'update' && command.entityType === 'transaction',
+      )
+      if (rejected || updates.length === 0) return route.continue()
+      rejected = true
+      const failed = updates[0]
+      // The other commands must reach the real server: a synthetic `noop`
+      // would look confirmed locally but leave the other movement unlinked
+      // after the reload. Forward the batch without the rejected command and
+      // merge its results back in the original order.
+      const forwarded = body.commands.filter((command) => command !== failed)
+      let payload: Record<string, unknown> = { revision: 0, halted: false }
+      const remaining = new Map<string, unknown>()
+      if (forwarded.length > 0) {
+        const response = await route.fetch({
+          postData: JSON.stringify({ ...body, commands: forwarded }),
+        })
+        payload = (await response.json()) as Record<string, unknown>
+        for (const result of payload.results as Array<{ commandId: string }>) {
+          remaining.set(result.commandId, result)
+        }
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...payload,
+          results: body.commands.map((command) =>
+            command.commandId === failed.commandId
+              ? {
+                  commandId: command.commandId,
+                  status: 'rejected',
+                  message: 'El movimiento ya no existe en el servidor.',
+                }
+              : remaining.get(command.commandId),
+          ),
+        }),
+      })
+    })
+
+    await liveMarket.linkExistingMovements('AGED.MI')
+    const status = liveMarket.linkStatus('AGED.MI')
+    await expect(status).toContainText('El movimiento ya no existe')
+    await expect(status).toContainText('1/2 vinculados')
+
+    // The sidebar owns the generic intent discard. The quote panel is a top
+    // layer, so close it before opening the user menu; after the discard the
+    // confirmed link stays and the real partial state is visible again in the
+    // editor, not hidden behind a "Sincronizado".
+    await liveMarket.closeQuote()
+    await tracker.openUserMenu()
+    await expect(tracker.intentStatus).toBeVisible()
+    await tracker.discardIntentFromSidebar()
+    await expect(tracker.intentStatus).toBeHidden()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText(
+      'Resultado parcial: 1 de 2 vinculados',
+    )
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
+
+    // The partial outcome is durable: a reload drops the failed target's
+    // optimistic link (it was never confirmed), keeps the confirmed one and
+    // still shows the partial state instead of a silent retry.
+    await tracker.reload()
+    await tracker.openSettings()
+    await liveMarket.openQuotes()
+    await page.getByRole('button', { name: 'Editar cotización de AGED.MI', exact: true }).click()
+    await expect(liveMarket.linkStatus('AGED.MI')).toContainText(
+      'Resultado parcial: 1 de 2 vinculados',
+    )
+    await expect(liveMarket.instrument('AGED.MI')).toContainText('1 vinculados')
+    await expect(liveMarket.instrument('AGED.MI')).toContainText('1 por vincular')
+    await expect(liveMarket.linkRetry('AGED.MI')).toHaveCount(0)
   })
 })

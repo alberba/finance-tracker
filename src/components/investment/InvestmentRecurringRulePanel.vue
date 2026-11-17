@@ -113,7 +113,7 @@ function openEdit(rule: RecurringRule): void {
   open.value = true
 }
 
-function save(): void {
+async function save(): Promise<void> {
   if (needsAccount.value) return
   const input: NewRecurringRuleInput = {
     type: 'investment',
@@ -133,8 +133,8 @@ function save(): void {
     endDate: form.endDate,
   }
   const saved = editing.value
-    ? recurringStore.updateRule(editing.value.id, input)
-    : recurringStore.addRule(input)
+    ? await recurringStore.updateRule(editing.value.id, input)
+    : await recurringStore.addRule(input)
   if (saved) open.value = false
 }
 

@@ -120,8 +120,8 @@ function openFor(item: PendingMovement): void {
   })
 }
 
-function save(): void {
-  const saved = recurringStore.confirmPending(editingId.value, {
+async function save(): Promise<void> {
+  const saved = await recurringStore.confirmPending(editingId.value, {
     type: draft.type,
     date: draft.date,
     accountId: draft.accountId,
@@ -136,7 +136,7 @@ function save(): void {
     fee: parseDecimal(draft.fee) || 0,
     time: draft.time,
   })
-  if (saved) open.value = false
+  if (saved.accepted) open.value = false
 }
 
 defineExpose({ openFor })

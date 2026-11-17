@@ -77,18 +77,28 @@ function setupState(pendingMovements: PendingMovement[]) {
   return { financialStore, recurringStore: useRecurringStore() }
 }
 
+/**
+ * The financial decision keeps living in the store; #492 only changed when it
+ * reports acceptance. `confirmPending` now resolves after the durable
+ * reservation, so the calls below await it. The durable acceptance, restart,
+ * publication-order and repeat coverage moved to
+ * `tests/integration/client-storage/recurring-confirm-durable.test.ts` and
+ * `tests/integration/d1-v2/round-trip/recurring-durable.test.ts`.
+ */
 describe('confirmPending — editing and confirming in one step (issue #408)', () => {
-  it('applies the edit and the confirmation together', () => {
+  it('applies the edit and the confirmation together', async () => {
     const { financialStore, recurringStore } = setupState([expensePending()])
 
     expect(
-      recurringStore.confirmPending('pm-exp', {
-        date: '2024-02-03',
-        accountId: 'checking',
-        category: 'Ocio',
-        description: 'Alquiler ajustado',
-        amount: 925,
-      }),
+      (
+        await recurringStore.confirmPending('pm-exp', {
+          date: '2024-02-03',
+          accountId: 'checking',
+          category: 'Ocio',
+          description: 'Alquiler ajustado',
+          amount: 925,
+        })
+      ).accepted,
     ).toBe(true)
 
     expect(recurringStore.openPendingMovements).toHaveLength(0)
@@ -109,23 +119,25 @@ describe('confirmPending — editing and confirming in one step (issue #408)', (
     })
   })
 
-  it('recomputes a purchase from units, price and fee instead of the previous amount', () => {
+  it('recomputes a purchase from units, price and fee instead of the previous amount', async () => {
     const { financialStore, recurringStore } = setupState([investmentPending()])
 
     expect(
-      recurringStore.confirmPending('pm-inv', {
-        date: '2024-02-02',
-        accountId: 'broker',
-        category: 'Cripto',
-        description: 'Compra BTC',
-        amount: 999,
-        symbol: 'btc',
-        side: 'buy',
-        units: 0.5,
-        unitPrice: 20000,
-        fee: 10,
-        time: '10:30',
-      }),
+      (
+        await recurringStore.confirmPending('pm-inv', {
+          date: '2024-02-02',
+          accountId: 'broker',
+          category: 'Cripto',
+          description: 'Compra BTC',
+          amount: 999,
+          symbol: 'btc',
+          side: 'buy',
+          units: 0.5,
+          unitPrice: 20000,
+          fee: 10,
+          time: '10:30',
+        })
+      ).accepted,
     ).toBe(true)
 
     expect(financialStore.transactions[0]).toMatchObject({
@@ -142,22 +154,24 @@ describe('confirmPending — editing and confirming in one step (issue #408)', (
     expect(recurringStore.pendingMovements[0].amount).toBe(10010)
   })
 
-  it('recomputes a sale as a negative amount', () => {
+  it('recomputes a sale as a negative amount', async () => {
     const { financialStore, recurringStore } = setupState([investmentPending()])
 
     expect(
-      recurringStore.confirmPending('pm-inv', {
-        date: '2024-02-02',
-        accountId: 'broker',
-        category: 'Cripto',
-        description: 'Venta BTC',
-        amount: 1,
-        symbol: 'BTC',
-        side: 'sell',
-        units: 2,
-        unitPrice: 100,
-        fee: 1,
-      }),
+      (
+        await recurringStore.confirmPending('pm-inv', {
+          date: '2024-02-02',
+          accountId: 'broker',
+          category: 'Cripto',
+          description: 'Venta BTC',
+          amount: 1,
+          symbol: 'BTC',
+          side: 'sell',
+          units: 2,
+          unitPrice: 100,
+          fee: 1,
+        })
+      ).accepted,
     ).toBe(true)
 
     expect(financialStore.transactions[0]).toMatchObject({
@@ -168,23 +182,25 @@ describe('confirmPending — editing and confirming in one step (issue #408)', (
     expect(recurringStore.pendingMovements[0].amount).toBe(199)
   })
 
-  it('recalculates when an expense is reclassified as an investment', () => {
+  it('recalculates when an expense is reclassified as an investment', async () => {
     const { financialStore, recurringStore } = setupState([expensePending()])
 
     expect(
-      recurringStore.confirmPending('pm-exp', {
-        date: '2024-02-02',
-        accountId: 'broker',
-        category: 'Cripto',
-        description: 'Compra ETH',
-        amount: 50,
-        type: 'investment',
-        symbol: 'eth',
-        side: 'buy',
-        units: 2,
-        unitPrice: 90,
-        fee: 2,
-      }),
+      (
+        await recurringStore.confirmPending('pm-exp', {
+          date: '2024-02-02',
+          accountId: 'broker',
+          category: 'Cripto',
+          description: 'Compra ETH',
+          amount: 50,
+          type: 'investment',
+          symbol: 'eth',
+          side: 'buy',
+          units: 2,
+          unitPrice: 90,
+          fee: 2,
+        })
+      ).accepted,
     ).toBe(true)
 
     expect(financialStore.transactions[0]).toMatchObject({
@@ -197,62 +213,68 @@ describe('confirmPending — editing and confirming in one step (issue #408)', (
     })
   })
 
-  it('rejects a saving whose destination is its origin', () => {
+  it('rejects a saving whose destination is its origin', async () => {
     const { financialStore, recurringStore } = setupState([expensePending()])
 
     expect(
-      recurringStore.confirmPending('pm-exp', {
-        date: '2024-02-01',
-        accountId: 'checking',
-        type: 'saving',
-        destinationAccountId: 'checking',
-        category: 'Vivienda',
-        description: 'Alquiler',
-        amount: 900,
-      }),
+      (
+        await recurringStore.confirmPending('pm-exp', {
+          date: '2024-02-01',
+          accountId: 'checking',
+          type: 'saving',
+          destinationAccountId: 'checking',
+          category: 'Vivienda',
+          description: 'Alquiler',
+          amount: 900,
+        })
+      ).accepted,
     ).toBe(false)
 
     expectInvalidEdit(financialStore, recurringStore)
   })
 
-  it('rejects a non-positive amount', () => {
+  it('rejects a non-positive amount', async () => {
     const { financialStore, recurringStore } = setupState([expensePending()])
 
     expect(
-      recurringStore.confirmPending('pm-exp', {
-        date: '2024-02-01',
-        accountId: 'checking',
-        category: 'Vivienda',
-        description: 'Alquiler',
-        amount: 0,
-      }),
+      (
+        await recurringStore.confirmPending('pm-exp', {
+          date: '2024-02-01',
+          accountId: 'checking',
+          category: 'Vivienda',
+          description: 'Alquiler',
+          amount: 0,
+        })
+      ).accepted,
     ).toBe(false)
 
     expectInvalidEdit(financialStore, recurringStore)
   })
 
-  it('rejects a blank description', () => {
+  it('rejects a blank description', async () => {
     const { financialStore, recurringStore } = setupState([expensePending()])
 
     expect(
-      recurringStore.confirmPending('pm-exp', {
-        date: '2024-02-01',
-        accountId: 'checking',
-        category: 'Vivienda',
-        description: '   ',
-        amount: 900,
-      }),
+      (
+        await recurringStore.confirmPending('pm-exp', {
+          date: '2024-02-01',
+          accountId: 'checking',
+          category: 'Vivienda',
+          description: '   ',
+          amount: 900,
+        })
+      ).accepted,
     ).toBe(false)
 
     expectInvalidEdit(financialStore, recurringStore)
   })
 
-  it('confirms without editing exactly as before', () => {
+  it('confirms without editing exactly as before', async () => {
     const { financialStore, recurringStore } = setupState([
       expensePending({ description: '  Alquiler  ' }),
     ])
 
-    expect(recurringStore.confirmPending('pm-exp')).toBe(true)
+    expect((await recurringStore.confirmPending('pm-exp')).accepted).toBe(true)
 
     expect(financialStore.transactions[0]).toMatchObject({
       type: 'expense',

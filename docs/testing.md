@@ -9,11 +9,11 @@ con fidelidad.
 
 ## Capas
 
-| Capa        | Ubicación            | Entorno            | Uso                                                    |
-| ----------- | -------------------- | ------------------ | ------------------------------------------------------ |
-| Unitarias   | `tests/unit/`        | Node               | Dominio, servicios, stores y utilidades puras          |
-| Componentes | `tests/component/`   | happy-dom          | Props, eventos y estados visibles de componentes Vue   |
-| Integración | `tests/integration/` | Node + SQLite real | Repositorios, migraciones, restricciones y aislamiento |
+| Capa        | Ubicación            | Entorno                              | Uso                                                                                                  |
+| ----------- | -------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Unitarias   | `tests/unit/`        | Node                                 | Dominio, servicios, stores y utilidades puras                                                        |
+| Componentes | `tests/component/`   | happy-dom                            | Props, eventos y estados visibles de componentes Vue                                                 |
+| Integración | `tests/integration/` | Node + SQLite real, `fake-indexeddb` | Repositorios, migraciones, restricciones y aislamiento; cola y caché del cliente (`client-storage/`) |
 
 ## Comandos locales
 
@@ -37,7 +37,10 @@ propio entorno y patrones de inclusión:
 
 - `vitest.unit.config.ts`: Node para lógica sin DOM.
 - `vitest.component.config.ts`: Vue Test Utils y happy-dom.
-- `vitest.integration.config.ts`: procesos aislados para SQLite real.
+- `vitest.integration.config.ts`: procesos aislados para SQLite real y para los tests de
+  `tests/integration/client-storage/`, que importan `fake-indexeddb/auto` (cola, caché, claves y
+  reinicio del runtime del cliente; regla 11). Un test que no necesita IndexedDB real no la importa
+  y vive en unit.
 
 Los casos de la CLI de reparación necesitan un archivo para comprobar persistencia. Lo crean
 serializando el fixture SQLite ya migrado en memoria: repetir cada sentencia de migración como

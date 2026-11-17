@@ -73,7 +73,7 @@ describe('round trip: inversión', () => {
   it('keeps every field of a recurring investment rule (§3.2b)', async () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     expect(
-      useRecurringStore().addRule({
+      await useRecurringStore().addRule({
         type: 'investment',
         accountId,
         category: 'Acciones',
@@ -111,7 +111,7 @@ describe('round trip: inversión', () => {
 
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     expect(
-      useRecurringStore().addRule({
+      await useRecurringStore().addRule({
         type: 'expense',
         accountId,
         category: 'Ocio',
@@ -131,7 +131,7 @@ describe('round trip: inversión', () => {
     const reloaded = await trip.reload()
     expect(reloaded.recurringRules).toHaveLength(1)
     expect(reloaded.pendingMovements).toHaveLength(2)
-    expect(reloaded.pendingMovements.map((pending) => pending.occurrenceDate)).toEqual([
+    expect(reloaded.pendingMovements.map((pending) => pending.occurrenceDate).sort()).toEqual([
       '2026-09-01',
       '2026-10-01',
     ])
@@ -143,32 +143,26 @@ describe('round trip: inversión', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('retries creating a rule and its pending movements after an enqueue failure', async () => {
+  it('retries creating a rule and its pending movements after a local publish failure', async () => {
     Object.assign(window, { __FINANCE_TODAY__: '2026-10-01' })
     trip.setOffline(true)
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     const recurring = useRecurringStore()
-    const realEnqueue = trip.syncStore.enqueueCommand.bind(trip.syncStore)
-    let failed!: () => void
-    const failure = new Promise<void>((resolve) => {
-      failed = resolve
-    })
-    let rejectRuleCreate = true
-    trip.syncStore.enqueueCommand = async (command) => {
-      if (
-        rejectRuleCreate &&
-        command.action === 'create' &&
-        command.entityType === 'recurringRule'
-      ) {
-        rejectRuleCreate = false
-        failed()
+    // The acceptance transaction owns the rule command; the occurrences are
+    // published right after. Interrupting that publication leaves the accepted
+    // rule in the durable intent, not just in memory.
+    const realPublish = trip.syncStore.publishIntentCommands.bind(trip.syncStore)
+    let rejectPendings = true
+    trip.syncStore.publishIntentCommands = async (intentId, commands) => {
+      if (rejectPendings && commands.some((entry) => entry.step.startsWith('pending:'))) {
+        rejectPendings = false
         return null
       }
-      return realEnqueue(command)
+      return realPublish(intentId, commands)
     }
 
     expect(
-      recurring.addRule({
+      await recurring.addRule({
         type: 'expense',
         accountId,
         category: 'Ocio',
@@ -179,12 +173,25 @@ describe('round trip: inversión', () => {
         startDate: '2026-09-01',
       }),
     ).toBe(true)
-    await failure
-    trip.syncStore.enqueueCommand = realEnqueue
-    recurring.refreshPending('2026-10-01')
+    const acceptedIds = useRecurringStore()
+      .openPendingMovements.map((pending) => pending.id)
+      .sort()
+    expect(acceptedIds).toHaveLength(2)
+    trip.syncStore.publishIntentCommands = realPublish
+
+    // A restart resumes the publication from the intent: the same occurrence
+    // ids come back instead of a regenerated set.
+    const offline = await trip.reloadOffline()
+    expect(offline.recurringRules).toHaveLength(1)
+    expect(offline.pendingMovements.map((pending) => pending.id).sort()).toEqual(acceptedIds)
+    expect(
+      offline.pendingMovements.every(
+        (pending) => pending.ruleId === offline.recurringRules[0].id,
+      ),
+    ).toBe(true)
+
     trip.setOffline(false)
     const reloaded = await trip.reload()
-
     expect(reloaded.recurringRules).toHaveLength(1)
     expect(reloaded.pendingMovements).toHaveLength(2)
     expect(
@@ -195,28 +202,20 @@ describe('round trip: inversión', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('recovers missing occurrences after a pending enqueue fails and the client restarts', async () => {
+  it('recovers missing occurrences after a pendings publish fails and the client restarts', async () => {
     Object.assign(window, { __FINANCE_TODAY__: '2026-10-01' })
     trip.setOffline(true)
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
-    const realEnqueue = trip.syncStore.enqueueCommand.bind(trip.syncStore)
-    let failed!: () => void
-    const failure = new Promise<void>((resolve) => {
-      failed = resolve
-    })
-    let occurrences = 0
-    trip.syncStore.enqueueCommand = async (command) => {
-      if (
-        command.action === 'create' &&
-        command.entityType === 'pendingMovement' &&
-        ++occurrences === 2
-      ) {
-        failed()
+    const realPublish = trip.syncStore.publishIntentCommands.bind(trip.syncStore)
+    let rejectPendings = true
+    trip.syncStore.publishIntentCommands = async (intentId, commands) => {
+      if (rejectPendings && commands.some((entry) => entry.step.startsWith('pending:'))) {
+        rejectPendings = false
         return null
       }
-      return realEnqueue(command)
+      return realPublish(intentId, commands)
     }
-    useRecurringStore().addRule({
+    await useRecurringStore().addRule({
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -226,17 +225,38 @@ describe('round trip: inversión', () => {
       interval: 1,
       startDate: '2026-09-01',
     })
-    await failure
+    // Only the rule command is queued when the publication is interrupted.
+    expect(
+      (await trip.pending()).some(
+        (entry) =>
+          (entry as { command: { entityType: string } }).command.entityType ===
+          'pendingMovement',
+      ),
+    ).toBe(false)
+    trip.syncStore.publishIntentCommands = realPublish
+
+    // The restart resumes the accepted intent; the refreshed calendar must
+    // not regenerate or duplicate what the intent already decided.
     await trip.reloadOffline()
-    expect(useRecurringStore().refreshPending()).toBe(1)
+    await useRecurringStore().refreshPending()
     await trip.reloadOffline()
     trip.setOffline(false)
     const reloaded = await trip.reload()
     expect(reloaded.recurringRules).toHaveLength(1)
-    expect(reloaded.pendingMovements.map((item) => item.occurrenceDate)).toEqual([
+    expect(reloaded.pendingMovements.map((item) => item.occurrenceDate).sort()).toEqual([
       '2026-09-01',
       '2026-10-01',
     ])
+    // One create per occurrence reached the server, never two.
+    const creates = trip
+      .commandBatches()
+      .flat()
+      .filter(
+        (command) =>
+          (command as { action?: string; entityType?: string }).action === 'create' &&
+          (command as { entityType?: string }).entityType === 'pendingMovement',
+      )
+    expect(creates).toHaveLength(2)
     expect(await trip.pending()).toEqual([])
   })
 
@@ -247,7 +267,7 @@ describe('round trip: inversión', () => {
     const recurring = useRecurringStore()
     for (const description of ['Primera cuota', 'Segunda cuota']) {
       expect(
-        recurring.addRule({
+        await recurring.addRule({
           type: 'expense',
           accountId,
           category: 'Ocio',
@@ -283,7 +303,7 @@ describe('round trip: inversión', () => {
   it('persists an edit to a recurring rule whose calendar has not moved (§3.2a)', async () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     const recurring = useRecurringStore()
-    recurring.addRule({
+    await recurring.addRule({
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -296,7 +316,7 @@ describe('round trip: inversión', () => {
     const first = await trip.reload()
     const ruleId = first.recurringRules[0].id
 
-    useRecurringStore().updateRule(ruleId, {
+    await useRecurringStore().updateRule(ruleId, {
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -317,7 +337,7 @@ describe('round trip: inversión', () => {
 
   it("keeps a pending movement's type instead of calling it a gasto (§3.2c)", async () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
-    useRecurringStore().addRule({
+    await useRecurringStore().addRule({
       type: 'investment',
       accountId,
       category: 'Acciones',
@@ -346,7 +366,7 @@ describe('round trip: inversión', () => {
   it('syncs edited pending movement without losing investment operation fields', async () => {
     const { useRecurringStore } = await import('../../../../src/stores/recurring')
     const recurring = useRecurringStore()
-    recurring.addRule({
+    await recurring.addRule({
       type: 'expense',
       accountId,
       category: 'Ocio',
@@ -362,7 +382,7 @@ describe('round trip: inversión', () => {
     const pmId = reloaded.pendingMovements[0].id
 
     // Edit and reclassify to investment
-    const ok = useRecurringStore().editPending(pmId, {
+    const ok = await useRecurringStore().editPending(pmId, {
       type: 'investment',
       date: '2026-09-02',
       accountId,

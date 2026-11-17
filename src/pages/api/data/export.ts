@@ -4,26 +4,18 @@
  * WP11 rollback path. `integration_credentials` is unconditionally
  * excluded — per the plan, credentials are never exported, encrypted or
  * not (WP12 owns that table; another agent owns its files this wave).
+ *
+ * The rows come from the shared private read (`private-read.ts`); this route
+ * only adds the backup metadata and projects each movement's `tradeDetail`
+ * row as its nested `operation`.
  */
 
 import type { APIRoute } from "astro";
 import { getDb } from "../../../db/client";
-import * as accountsRepository from "../../../db/repositories/accounts";
-import * as transactionsRepository from "../../../db/repositories/transactions";
-import * as subscriptionsRepository from "../../../db/repositories/subscriptions";
-import * as recurringRulesRepository from "../../../db/repositories/recurring-rules";
-import * as pendingMovementsRepository from "../../../db/repositories/pending-movements";
-import * as budgetEntriesRepository from "../../../db/repositories/budget-entries";
-import * as goalsRepository from "../../../db/repositories/goals";
-import { runServer } from '../../../lib/server/runtime';
-import * as wealthRepository from "../../../db/repositories/wealth";
-import * as contributionsRepository from "../../../db/repositories/contributions";
-import * as marketRepository from "../../../db/repositories/market";
-import * as stockeventsSymbolMappingsRepository from "../../../db/repositories/stockevents-symbol-mappings";
-import * as stockeventsCashMappingsRepository from "../../../db/repositories/stockevents-cash-mappings";
-import * as userSettingsRepository from "../../../db/repositories/user-settings";
 import { DATA_EXPORT_FORMAT } from "../../../lib/data-export-format";
 import { jsonResponse, requirePrincipal, withApiErrorHandling } from "../../../lib/server/api-auth";
+import { readPrivateDataset } from "../../../lib/server/private-read";
+import { runServer } from "../../../lib/server/runtime";
 
 export const GET: APIRoute = async ({ locals }) =>
   withApiErrorHandling("/api/data/export", async () => {
@@ -31,99 +23,49 @@ export const GET: APIRoute = async ({ locals }) =>
     const db = getDb(locals);
     const userId = principal.userId;
 
-    const [
-      settings,
-      accounts,
-      categories,
-      twrLiquidityAccounts,
-      transactions,
-      subscriptions,
-      recurringRules,
-      pendingMovements,
-      budgetEntries,
-      goals,
-      wealthSnapshots,
-      contributions,
-      userInstruments,
-      stockeventsSymbolMappings,
-      stockeventsCashMappings,
-      stockeventsCashSyncEntries,
-    ] = await Promise.all([
-      runServer(db, userSettingsRepository.get(userId)),
-      runServer(db, accountsRepository.listByUser(userId)),
-      runServer(db, accountsRepository.listCategoriesByUser(userId)),
-      runServer(db, accountsRepository.listTwrLiquidityAccountsByUser(userId)),
-      runServer(db, transactionsRepository.listByUser(userId)),
-      runServer(db, subscriptionsRepository.listByUser(userId)),
-      runServer(db, recurringRulesRepository.listByUser(userId)),
-      runServer(db, pendingMovementsRepository.listByUser(userId)),
-      runServer(db, budgetEntriesRepository.listByUser(userId)),
-      runServer(db, goalsRepository.listByUser(userId)),
-      runServer(db, wealthRepository.listByUser(userId)),
-      runServer(db, contributionsRepository.listByUser(userId)),
-      runServer(db, marketRepository.listUserInstrumentsByUser(userId)),
-      runServer(db, stockeventsSymbolMappingsRepository.listByUser(userId)),
-      runServer(db, stockeventsCashMappingsRepository.listMappingsByUser(userId)),
-      runServer(db, stockeventsCashMappingsRepository.listSyncEntriesByUser(userId)),
-    ]);
+    const privateData = await runServer(db, readPrivateDataset(userId));
 
-    const tradeDetails = await runServer(db, transactionsRepository.listTradeDetailsByTransactions(userId,
-      transactions.map((transaction) => transaction.id),));
     // The operation travels inside its movement (ADR 0002), in the same shape
-    // the import hands back to `transactionsRepository.create`.
-    const transactionsWithOperations = transactions.map((transaction) => {
-      const detail = tradeDetails.get(transaction.id);
+    // the import hands back to `transactionsRepository.create`. It is the
+    // export's own projection of the `tradeDetail` row the shared read returns.
+    const transactionsWithOperations = privateData.transactions.map((transaction) => {
+      const { tradeDetail, ...row } = transaction;
       return {
-        ...transaction,
-        operation: detail
+        ...row,
+        operation: tradeDetail
           ? {
-              instrumentId: detail.instrumentId,
-              symbol: detail.symbol,
-              side: detail.side,
-              units: Number(detail.quantity),
-              unitPrice: detail.price,
-              fee: detail.fee,
+              instrumentId: tradeDetail.instrumentId,
+              symbol: tradeDetail.symbol,
+              side: tradeDetail.side,
+              units: Number(tradeDetail.quantity),
+              unitPrice: tradeDetail.price,
+              fee: tradeDetail.fee,
             }
           : null,
       };
     });
-
-    const wealthSnapshotsWithBalances = await Promise.all(
-      wealthSnapshots.map(async (snapshot) => ({
-        ...snapshot,
-        balances: await runServer(db, wealthRepository.listBalancesBySnapshot(userId, snapshot.id)),
-      })),
-    );
-
-    const contributionsWithAllocations = await Promise.all(
-      contributions.map(async (contribution) => ({
-        ...contribution,
-        allocations: await runServer(db, contributionsRepository.listAllocationsByContribution(userId,
-          contribution.id,)),
-      })),
-    );
 
     return jsonResponse(
       {
         format: DATA_EXPORT_FORMAT,
         exportedAt: new Date().toISOString(),
         userId,
-        settings: settings ?? null,
-        accounts,
-        categories,
-        twrLiquidityAccounts,
+        settings: privateData.settings,
+        accounts: privateData.accounts,
+        categories: privateData.categories,
+        twrLiquidityAccounts: privateData.twrLiquidityAccounts,
         transactions: transactionsWithOperations,
-        subscriptions,
-        recurringRules,
-        pendingMovements,
-        budgetEntries,
-        goals,
-        wealthSnapshots: wealthSnapshotsWithBalances,
-        contributions: contributionsWithAllocations,
-        userInstruments,
-        stockeventsSymbolMappings,
-        stockeventsCashMappings,
-        stockeventsCashSyncEntries,
+        subscriptions: privateData.subscriptions,
+        recurringRules: privateData.recurringRules,
+        pendingMovements: privateData.pendingMovements,
+        budgetEntries: privateData.budgetEntries,
+        goals: privateData.goals,
+        wealthSnapshots: privateData.wealthSnapshots,
+        contributions: privateData.contributions,
+        userInstruments: privateData.userInstruments,
+        stockeventsSymbolMappings: privateData.stockeventsSymbolMappings,
+        stockeventsCashMappings: privateData.stockeventsCashMappings,
+        stockeventsCashSyncEntries: privateData.stockeventsCashSyncEntries,
       },
       200,
     );

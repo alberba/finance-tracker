@@ -58,6 +58,79 @@ export class FinanceTrackerPage {
     private readonly options: { preserveWelcome?: boolean } = {},
   ) {}
 
+  /** `<html>`: carries the theme, demo and sidebar state attributes. */
+  get appRoot(): Locator {
+    return this.page.locator('html')
+  }
+
+  /** Hydration and bindings are complete; navigation does nothing before it. */
+  async expectReady() {
+    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+  }
+
+  /** Transient confirmation message of the last action. */
+  get toast(): Locator {
+    return this.page.locator('#toast')
+  }
+
+  /** The conflict dialog ADR 0003 removed: it must never appear. */
+  get conflictResolutionDialog(): Locator {
+    return this.page.locator('[data-conflict-resolution-dialog]')
+  }
+
+  /**
+   * The shell's global sync state. It does not confirm one concrete operation:
+   * wait for the command's own response (`expectSyncCommand`) for that.
+   */
+  get syncStatus(): Locator {
+    return this.page.locator('#sidebar-sync-status')
+  }
+
+  /** A KPI card of the dashboard, with its figure and its change against the previous period. */
+  kpi(kind: 'income' | 'expense' | 'investment') {
+    const card = this.dashboardSection.locator(`[data-kpi="${kind}"]`)
+    return {
+      card,
+      figure: card.locator(`#kpi-${kind}`),
+      change: card.locator('[data-kpi-change]'),
+    }
+  }
+
+  get netWorthChart(): Locator {
+    return this.dashboardSection.locator('#chart-networth')
+  }
+
+  get cashflowChart(): Locator {
+    return this.page.locator('#chart-cashflow')
+  }
+
+  /** The year selector of Configuración. */
+  get settingsYear(): Locator {
+    return this.section('settings').locator('#settings-year')
+  }
+
+  /** The visible entry of the section navigation (sidebar or mobile bar). */
+  navItem(sectionId: FinanceSectionId): Locator {
+    return this.page.locator(`[data-nav-item][data-section=${sectionId}]:visible`)
+  }
+
+  /** The net worth figure inside the dashboard's «Patrimonio neto» band. */
+  get netWorthKpi(): Locator {
+    return this.dashboardSection
+      .getByRole('region', { name: 'Patrimonio neto' })
+      .locator('#kpi-net-worth')
+  }
+
+  /** Collapses and expands the desktop sidebar. */
+  get sidebarToggle(): Locator {
+    return this.page.locator('#sidebar-toggle')
+  }
+
+  /** Top bar of the mobile layout. */
+  get mobileAppBar(): Locator {
+    return this.page.locator('[data-mobile-app-bar]')
+  }
+
   get dashboardSection(): Locator {
     return this.page.locator('#dashboard')
   }
@@ -98,6 +171,16 @@ export class FinanceTrackerPage {
     await expect(this.transactionPanel.getByLabel('Importe')).toBeInViewport()
   }
 
+  /** The compact «Nuevo movimiento» launcher of the registry. */
+  get newTransactionLauncher(): Locator {
+    return this.transactionsSection.locator('#tx-open-modal')
+  }
+
+  /** Net of the month in the registry's summary. */
+  get transactionsMonthNet(): Locator {
+    return this.transactionsSection.locator('#tx-month-net')
+  }
+
   /** Ledger rows of the registry, every month shown. */
   get transactionRows(): Locator {
     return this.transactionsSection.locator('[data-tx-ledger] tr[data-tx-id]')
@@ -115,26 +198,104 @@ export class FinanceTrackerPage {
     return this.page.locator('#wealth')
   }
 
+  /** Changes the monthly snapshot would record. */
+  get snapshotChanges(): Locator {
+    return this.wealthSection.locator('[data-snapshot-changes]')
+  }
+
+  get saveSnapshotButton(): Locator {
+    return this.wealthSection.locator('[data-save-snapshot]')
+  }
+
   get goalsSection(): Locator {
     return this.page.locator('#goals')
+  }
+
+  /** The saving goal summary of the dashboard. */
+  get savingsGoalSummary(): Locator {
+    return this.dashboardSection.locator('#savings-goal')
+  }
+
+  get savingGoalsEmpty(): Locator {
+    return this.goalsSection.locator('[data-saving-goals-empty]')
+  }
+
+  get savingGoalRows(): Locator {
+    return this.goalsSection.locator('[data-saving-goal-row]')
+  }
+
+  /** Side panel that creates a saving goal. */
+  get savingGoalPanel(): Locator {
+    return this.page.locator('#saving-goal-panel')
+  }
+
+  /** One category list of Configuración → Categorías (`expenseCategories`, `savingCategories`...). */
+  categoryList(kind: string): Locator {
+    return this.section('settings').locator(`[data-category-list="${kind}"]`)
+  }
+
+  /** The categories of a list, or one by name. */
+  categoryItem(list: Locator, name?: string): Locator {
+    return list.locator(name === undefined ? '[data-category]' : `[data-category="${name}"]`)
   }
 
   get dataSection(): Locator {
     return this.page.locator('#data')
   }
 
+  get dataMeta(): Locator {
+    return this.dataSection.locator('#data-meta')
+  }
+
+  /** The side panel of an account or asset in Configuración. */
+  get settingsAccountPanel(): Locator {
+    return this.page.locator('#settings-account-panel')
+  }
+
+  /** The panel of the «Cuentas» tab of Configuración. */
+  get settingsAccountsTabPanel(): Locator {
+    return this.section('settings').locator('#settings-tab-accounts')
+  }
+
+  /** Total of the wealth band for the selected month. */
+  get wealthTotal(): Locator {
+    return this.wealthSection.locator('[data-wealth-band]').locator('#wealth-total')
+  }
+
   get issueReportDialog(): Locator {
     return this.page.getByRole('dialog', { name: 'Crear reporte' })
+  }
+
+  get issueReportNotice(): Locator {
+    return this.issueReportDialog.locator('#issue-report-notice')
+  }
+
+  get issueReportAttachments(): Locator {
+    return this.issueReportDialog.locator('#issue-report-attachments')
+  }
+
+  get issueReportAttachmentList(): Locator {
+    return this.issueReportDialog.locator('#issue-report-attachment-list')
   }
 
   get reportsPage(): Locator {
     return this.page.locator('#reports')
   }
 
+  /** A report in the «Mis reportes» list, by its issue number. */
+  reportEntry(issueNumber: number): Locator {
+    return this.page.locator(`[data-report-entry="${issueNumber}"]`)
+  }
+
+  /** One message of an open report's thread. */
+  reportThreadItem(detail: Locator, id: number): Locator {
+    return detail.locator(`[data-thread-item="${id}"]`)
+  }
+
   /** Abre «Mis reportes» por su ruta real (fuera de las secciones). */
   async openReports(issueNumber?: number) {
     await this.page.goto(`/reportes${issueNumber ? `?reporte=${issueNumber}` : ''}`)
-    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.expectReady()
     await expect(
       this.reportsPage.getByRole('heading', { name: 'Mis reportes', exact: true }),
     ).toBeVisible()
@@ -142,7 +303,7 @@ export class FinanceTrackerPage {
 
   async goto() {
     await this.page.goto('/')
-    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.expectReady()
     await this.dismissWelcomeIfNeeded()
     await expect(
       this.dashboardSection.getByRole('heading', {
@@ -168,6 +329,19 @@ export class FinanceTrackerPage {
   async openSubscriptionsTab() {
     await this.openTransactions()
     await this.transactionsSection.getByRole('tab', { name: 'Suscripciones' }).click()
+  }
+
+  /** The «Suscripciones» tab content of Movimientos. */
+  get subscriptionsTab(): Locator {
+    return this.transactionsSection.locator('#transactions-tab-subscriptions')
+  }
+
+  get subscriptionsTotal(): Locator {
+    return this.subscriptionsTab.locator('[data-subscriptions-total]')
+  }
+
+  subscriptionRow(name: string): Locator {
+    return this.subscriptionsTab.locator('tr[data-subscription-id]', { hasText: name })
   }
 
   /** The subscription side panel (create and edit). */
@@ -296,9 +470,14 @@ export class FinanceTrackerPage {
     await this.open('data')
   }
 
+  /** The hidden file input that starts a backup import in Datos. */
+  get importFileInput(): Locator {
+    return this.page.locator('#import-json')
+  }
+
   /** Picks a backup file in Datos, which opens the import confirmation. */
   async chooseImportFile() {
-    await this.page.locator('#import-json').setInputFiles({
+    await this.importFileInput.setInputFiles({
       name: 'finance-tracker-copia.json',
       mimeType: 'application/json',
       buffer: Buffer.from('{}'),
@@ -308,10 +487,20 @@ export class FinanceTrackerPage {
     ).toBeVisible()
   }
 
+  /** The floating launcher of the issue report, from the `desk` breakpoint up. */
+  get globalReportTrigger(): Locator {
+    return this.page.locator('#global-report-trigger')
+  }
+
+  /** Dot on the launcher when a report has updates. */
+  get globalReportUpdates(): Locator {
+    return this.globalReportTrigger.locator('[data-reports-updates]')
+  }
+
   /** The floating launcher from the `desk` breakpoint up; the «Más» sheet below it. */
   async openGlobalReportDialog() {
     if ((this.page.viewportSize()?.width ?? 0) >= DESK_BREAKPOINT_PX) {
-      await this.page.locator('#global-report-trigger').click()
+      await this.globalReportTrigger.click()
     } else {
       await this.page.getByRole('button', { name: 'Más secciones' }).click()
       await this.page
@@ -467,6 +656,22 @@ export class FinanceTrackerPage {
     return this.page.locator('#investment-movement-panel')
   }
 
+  /** The form controls of the investment movement panel. */
+  investmentMovementFields(panel: Locator = this.investmentMovementPanel()) {
+    return {
+      date: panel.locator('#investment-movement-date'),
+      time: panel.locator('#investment-movement-time'),
+      symbol: panel.locator('#investment-movement-symbol'),
+      unitPrice: panel.locator('#investment-movement-unit-price'),
+      units: panel.locator('#investment-movement-units'),
+      fee: panel.locator('#investment-movement-fee'),
+      currency: panel.locator('#investment-movement-currency'),
+      broker: panel.locator('#investment-movement-broker'),
+      category: panel.locator('#investment-movement-category'),
+      side: (side: 'buy' | 'sell') => panel.locator(`[data-investment-side="${side}"]`),
+    }
+  }
+
   /** Opens the panel to create a movement; reuses it when it is already open. */
   async openInvestmentMovementPanel() {
     const panel = this.investmentMovementPanel()
@@ -475,6 +680,16 @@ export class FinanceTrackerPage {
     await this.investmentSection().getByRole('button', { name: 'Nuevo movimiento' }).click()
     await expect(panel).toBeVisible()
     return panel
+  }
+
+  /** Every row of the investment movements ledger. */
+  get investmentMovementRows(): Locator {
+    return this.investmentSection().locator('tr[data-investment-tx-id]')
+  }
+
+  /** Stylesheet the `@snapshot` fixture injects to pin the fonts. */
+  get snapshotFontStyle(): Locator {
+    return this.page.locator('style[data-snapshot-fonts]')
   }
 
   /** The ledger row of the first investment movement with this symbol. */
@@ -499,22 +714,20 @@ export class FinanceTrackerPage {
     stockEventsCash?: boolean
   }) {
     const section = await this.openInvestmentMovementPanel()
-    await section.locator('#investment-movement-date').fill(params.date)
-    await section.locator('#investment-movement-time').fill(params.time)
-    await section.locator(`[data-investment-side="${params.side}"]`).click()
-    await section.locator('#investment-movement-symbol').fill(params.symbol)
-    await section.locator('#investment-movement-unit-price').fill(String(params.unitPrice))
-    await section.locator('#investment-movement-units').fill(String(params.units))
-    await section.locator('#investment-movement-fee').fill(String(params.fee))
+    const fields = this.investmentMovementFields(section)
+    await fields.date.fill(params.date)
+    await fields.time.fill(params.time)
+    await fields.side(params.side).click()
+    await fields.symbol.fill(params.symbol)
+    await fields.unitPrice.fill(String(params.unitPrice))
+    await fields.units.fill(String(params.units))
+    await fields.fee.fill(String(params.fee))
     if (params.movementCurrency) {
-      await section.locator('#investment-movement-currency').fill(params.movementCurrency)
+      await fields.currency.fill(params.movementCurrency)
     }
-    await this.selectByLabelOrFirst(
-      section.locator('#investment-movement-broker'),
-      params.brokerName || 'Revolut',
-    )
+    await this.selectByLabelOrFirst(fields.broker, params.brokerName || 'Revolut')
     if (params.category !== undefined) {
-      const categorySelect = section.locator('#investment-movement-category')
+      const categorySelect = fields.category
       if (!(await categorySelect.isDisabled())) {
         await this.selectByLabelOrFirst(categorySelect, params.category)
       }
@@ -538,7 +751,7 @@ export class FinanceTrackerPage {
   async addAccount(params: { name: string; openingBalance?: number }) {
     await this.openSettingsTab('Cuentas')
     await this.section('settings').getByRole('button', { name: 'Nueva cuenta' }).click()
-    const panel = this.page.locator('#settings-account-panel')
+    const panel = this.settingsAccountPanel
     await expect(panel).toBeVisible()
     await panel.getByLabel('Nombre').fill(params.name)
     await panel.getByLabel('Saldo inicial (€)').fill(String(params.openingBalance ?? 0))
@@ -767,7 +980,11 @@ export class FinanceTrackerPage {
   /** Picks the budget tab (Gastos, Ingresos, Ahorro, Inversión). */
   async openBudgetTab(type: 'income' | 'expense' | 'saving' | 'investment') {
     await this.openBudget()
-    await this.budgetSection.locator(`[data-budget-tab="${type}"]`).click()
+    await this.budgetTab(type).click()
+  }
+
+  budgetTab(type: 'income' | 'expense' | 'saving' | 'investment'): Locator {
+    return this.budgetSection.locator(`[data-budget-tab="${type}"]`)
   }
 
   /** Picks how many months the budget table shows. */
@@ -874,7 +1091,7 @@ export class FinanceTrackerPage {
 
   async saveSnapshot() {
     await this.openWealth()
-    await this.wealthSection.locator('[data-save-snapshot]').click()
+    await this.saveSnapshotButton.click()
     await expect(
       this.page.getByRole('status').filter({ hasText: /Snapshot de .+ guardado\./ }),
     ).toBeVisible()
@@ -1043,9 +1260,21 @@ export class FinanceTrackerPage {
     return this.investmentSection().locator(`tr[data-contribution-date="${date}"]`)
   }
 
+  get contributionRows(): Locator {
+    return this.investmentSection().locator('tr[data-contribution-date]')
+  }
+
+  contributionDeleteButton(date: string): Locator {
+    return this.investmentSection().locator(`button[data-delete-contribution-date="${date}"]`)
+  }
+
+  get contributionDeleteDialog(): Locator {
+    return this.page.locator('#contribution-delete-dialog')
+  }
+
   async setContributionFlowByDate(date: string, flow: number) {
     await this.openInvestmentContributionsTab()
-    const input = this.investmentSection().locator(`input[data-contribution-flow-date="${date}"]`)
+    const input = this.contributionFlowInput(date)
     await expect(input).toBeVisible()
     await input.fill(String(flow))
     await input.press('Enter')
@@ -1054,7 +1283,7 @@ export class FinanceTrackerPage {
 
   async getContributionFlowByDate(date: string): Promise<number> {
     await this.openInvestmentContributionsTab()
-    const input = this.investmentSection().locator(`input[data-contribution-flow-date="${date}"]`)
+    const input = this.contributionFlowInput(date)
     await expect(input).toBeVisible()
     const text = await input.inputValue()
     return Number(text.replace(/\./g, '').replace(',', '.'))
@@ -1077,11 +1306,11 @@ export class FinanceTrackerPage {
   }
 
   async contributionWorkflowSetDate(date: string) {
-    await this.contributionWorkflow().locator('#contribution-workflow-date').fill(date)
+    await this.contributionWorkflowDateInput.fill(date)
   }
 
   async contributionWorkflowDateValue(): Promise<string> {
-    return this.contributionWorkflow().locator('#contribution-workflow-date').inputValue()
+    return this.contributionWorkflowDateInput.inputValue()
   }
 
   /** A step-1 row: an investment asset or a liquidity account, by name. */
@@ -1089,6 +1318,26 @@ export class FinanceTrackerPage {
     return this.contributionWorkflow().locator(`[data-contribution-snapshot-row="${kind}"]`, {
       hasText: name,
     })
+  }
+
+  /** The balance input of one asset or account row in the guided contribution's snapshot step. */
+  contributionWorkflowSnapshotInput(kind: 'investments' | 'accounts', name: string): Locator {
+    return this.contributionWorkflowSnapshotRow(kind, name).locator(
+      `input[data-contribution-snapshot-kind="${kind}"]`,
+    )
+  }
+
+  /** Every row of one kind in the snapshot step. */
+  contributionWorkflowSnapshotRows(kind: 'investments' | 'accounts'): Locator {
+    return this.contributionWorkflow().locator(`[data-contribution-snapshot-row="${kind}"]`)
+  }
+
+  get contributionWorkflowSnapshotStep(): Locator {
+    return this.contributionWorkflow().locator('#contribution-workflow-step-snapshot')
+  }
+
+  get contributionWorkflowDateInput(): Locator {
+    return this.contributionWorkflow().locator('#contribution-workflow-date')
   }
 
   async contributionWorkflowSetInvestmentSnapshot(assetName: string, value: number) {
@@ -1187,9 +1436,85 @@ export class FinanceTrackerPage {
     return this.page.locator('#investment')
   }
 
+  /** The content of one Inversión tab (it exists in the DOM even while hidden). */
+  investmentTabPanel(tab: 'dashboard' | 'movements' | 'contributions'): Locator {
+    return this.investmentSection().locator(`#investment-tab-${tab}`)
+  }
+
+  /** The positions listed in Inversión; clicking one opens its asset chart. */
+  get investmentPositions(): Locator {
+    return this.investmentSection().locator('[data-position]')
+  }
+
+  /** Label and figure of the return KPI (TWR or simple), and the portfolio's total value. */
+  get returnLabel(): Locator {
+    return this.investmentSection().locator('#inv-return-label')
+  }
+
+  get returnFigure(): Locator {
+    return this.returnLabel.locator('..').locator('#inv-return')
+  }
+
+  get totalValue(): Locator {
+    return this.investmentSection().locator('#inv-total-value')
+  }
+
+  get portfolioChart(): Locator {
+    return this.page.locator('#investment-portfolio-chart')
+  }
+
+  /** The allocation bar, and its segments (one per position). */
+  get allocationBar(): Locator {
+    return this.page.locator('#investment-allocation')
+  }
+
+  get allocationSegments(): Locator {
+    return this.allocationBar.locator('[data-segment]')
+  }
+
+  /** The month selector of the investment charts. */
+  get investmentMonthSelect(): Locator {
+    return this.page.locator('#investment-month')
+  }
+
+  get assetChart(): Locator {
+    return this.page.locator('#investment-asset-chart')
+  }
+
+  /** Header texts of the Aportes register. */
+  async contributionHeaders(): Promise<string[]> {
+    const headers = await this.investmentTabPanel('contributions')
+      .locator('thead th')
+      .allTextContents()
+    return headers.map((value) => value.trim())
+  }
+
+  /** A figure of one Aportes row; `flow` is its editable contribution input. */
+  contributionCell(
+    row: Locator,
+    cell: 'value' | 'nav' | 'period' | 'cumulative' | 'origin' | 'flow',
+  ): Locator {
+    return row.locator(
+      cell === 'flow' ? 'input[data-contribution-flow-date]' : `[data-contribution-${cell}]`,
+    )
+  }
+
+  /** The editable flow input of the Aportes row of this date. */
+  contributionFlowInput(date: string): Locator {
+    return this.investmentSection().locator(`input[data-contribution-flow-date="${date}"]`)
+  }
+
+  get contributionSummary(): Locator {
+    return this.investmentSection().locator('[data-contribution-summary]')
+  }
+
+  get contributionNavChart(): Locator {
+    return this.investmentSection().locator('#contribution-nav-chart')
+  }
+
   async reload() {
     await this.page.reload()
-    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.expectReady()
     await this.dismissWelcomeIfNeeded()
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
   }
@@ -1213,8 +1538,24 @@ export class FinanceTrackerPage {
     }
   }
 
+  /** The shell's durable-intent surface: the first failed action, with retry/discard. */
+  get intentStatus(): Locator {
+    return this.page.locator('#sidebar-intent-status')
+  }
+
+  /** Opens the user menu, where the shell shows the first failed durable action. */
+  async openUserMenu(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Abrir menú de usuario' }).click()
+  }
+
+  /** Discards the failed durable action the sidebar is currently showing. */
+  async discardIntentFromSidebar(): Promise<void> {
+    await expect(this.intentStatus).toBeVisible()
+    await this.intentStatus.getByRole('button', { name: 'Descartar' }).click()
+  }
+
   async waitForSync() {
-    const status = this.page.locator('#sidebar-sync-status')
+    const status = this.syncStatus
     await expect(status).toContainText('Sincronizado', { timeout: 15000 })
     await this.page.waitForLoadState('networkidle')
     await expect(status).toContainText('Sincronizado', { timeout: 15000 })
@@ -1223,7 +1564,7 @@ export class FinanceTrackerPage {
   private async openSection(buttonLabel: string, sectionId: string, headingText: string | RegExp) {
     // Callers often reload or navigate right before this; the nav buttons do
     // nothing until the app has booted.
-    await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
+    await this.expectReady()
     const section = this.page.locator(`#${sectionId}`)
     if (!(await section.isVisible())) {
       await this.clickNavButton(buttonLabel, sectionId)

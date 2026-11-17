@@ -10,6 +10,7 @@ import { pinia } from '../stores/pinia'
 import { useSyncStore } from '../stores/sync'
 import { authentication, requireAuthenticationResult } from '../lib/client/authentication'
 import { describeCheckAge } from '../lib/client/sync-connection'
+import { isRecurringIntentKind, runRecurringIntentAction } from '../lib/client/recurring-write'
 import { fetchSession } from '../lib/client/session'
 import { runClientHttp } from '../lib/client/runtime'
 
@@ -252,6 +253,11 @@ function initSyncMenu(): void {
 
   const emailEl = document.getElementById('sidebar-user-email')
   const statusEl = document.getElementById('sidebar-sync-status')
+  const intentEl = document.getElementById('sidebar-intent-status')
+  const intentMessageEl = intentEl?.querySelector<HTMLElement>('[data-intent-message]')
+  const intentActionsEl = intentEl?.querySelector<HTMLElement>('[data-intent-actions]')
+  const intentRetryEl = intentEl?.querySelector<HTMLButtonElement>('[data-intent-retry]')
+  const intentDiscardEl = intentEl?.querySelector<HTMLButtonElement>('[data-intent-discard]')
   const logoutAction = document.querySelector<HTMLElement>('[data-logout-action]')
   const syncStore = useSyncStore(pinia)
 
@@ -272,12 +278,38 @@ function initSyncMenu(): void {
     })
 
   if (syncStore) {
+    /** The first intent that needs the user's attention (retry/discard). */
+    const actionableIntent = () =>
+      syncStore.intents.find(
+        (view) =>
+          view.intent.failure !== null || view.steps.some((step) => step.state === 'failed'),
+      ) ?? null
+    const pendingIntent = () =>
+      actionableIntent() ??
+      syncStore.intents.find(
+        (view) =>
+          view.intent.state === 'local-saved' ||
+          view.intent.state === 'waiting' ||
+          view.intent.state === 'sending',
+      ) ??
+      null
+
     const renderStatus = () => {
       if (!statusEl) {
         return
       }
       const pending = syncStore.pendingCount
-      const label = SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus
+      const failure = actionableIntent()
+      const open = pendingIntent()
+      // Never present a local acceptance as server confirmation: while an
+      // intent is unresolved the label says so instead of "Sincronizado".
+      const label = failure
+        ? SYNC_STATUS_LABELS.error
+        : open && syncStore.syncStatus === 'idle'
+          ? open.intent.state === 'sending'
+            ? 'Sincronizando…'
+            : 'Guardado local'
+          : (SYNC_STATUS_LABELS[syncStore.syncStatus] ?? syncStore.syncStatus)
       const suffix = pending > 0 ? ` (${pending} pendiente${pending === 1 ? '' : 's'})` : ''
       const checked =
         syncStore.lastCheckedAt === null
@@ -285,7 +317,44 @@ function initSyncMenu(): void {
           : ` · ${describeCheckAge(Date.now() - syncStore.lastCheckedAt)}`
       statusEl.hidden = false
       statusEl.replaceChildren(`${label}${suffix}${checked}`)
+
+      if (intentEl) {
+        intentEl.hidden = !failure
+        if (failure && intentMessageEl) {
+          intentMessageEl.replaceChildren(
+            failure.intent.failure ?? 'No se pudo completar la vinculación.',
+          )
+        }
+        intentActionsEl?.toggleAttribute('hidden', !failure)
+        intentRetryEl?.toggleAttribute('disabled', !failure)
+        intentDiscardEl?.toggleAttribute('disabled', !failure)
+      }
     }
+
+    /**
+     * The recurring module owns the retry/discard guarantees of its intents
+     * (reopening a partially confirmed pending, keeping its reconciliation
+     * retry visible); the generic intent discard is only correct for links.
+     */
+    const runAction = (intent: { intent: { id: string; kind: string } }, action: 'retry' | 'discard') => {
+      const target = syncStore.intents.find((view) => view.intent.id === intent.intent.id)
+      if (!target) return Promise.resolve(false)
+      if (isRecurringIntentKind(target.intent.kind)) {
+        return runRecurringIntentAction(target.intent, action)
+      }
+      return action === 'retry'
+        ? syncStore.retryIntent(target.intent.id).then(() => true)
+        : syncStore.discardIntent(target.intent.id).then((result) => result !== null)
+    }
+
+    intentRetryEl?.addEventListener('click', () => {
+      const intent = actionableIntent()
+      if (intent) void runAction(intent, 'retry').then(renderStatus)
+    })
+    intentDiscardEl?.addEventListener('click', () => {
+      const intent = actionableIntent()
+      if (intent) void runAction(intent, 'discard').then(renderStatus)
+    })
 
     syncStore.$subscribe(renderStatus)
     renderStatus()

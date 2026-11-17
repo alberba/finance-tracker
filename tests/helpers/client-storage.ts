@@ -10,7 +10,9 @@
 import { Effect } from 'effect'
 
 import * as crypto from '../../src/lib/client/crypto'
+import * as durableIntents from '../../src/lib/client/durable-intents'
 import * as cache from '../../src/lib/client/idb-cache'
+import * as movementPublication from '../../src/lib/client/movement-publication'
 import * as outbox from '../../src/lib/client/outbox'
 import { ClientStorage, type ClientStorageHandles } from '../../src/lib/client/storage'
 import * as wipe from '../../src/lib/client/wipe'
@@ -22,6 +24,8 @@ export type {
   OutboxEntry,
   PendingCreateMatch,
 } from '../../src/lib/client/outbox'
+export type { IntentCommandOutcome } from '../../src/lib/client/durable-intents'
+export type { MovementPublicationInput } from '../../src/lib/client/movement-publication'
 export type { EncryptedPayload } from '../../src/lib/client/crypto'
 export { InvalidCommandError } from '../../src/lib/client/outbox'
 
@@ -159,6 +163,60 @@ export const discard = (storage: ClientStorageHandles, seq: number) =>
   runWithStorage(storage, outbox.discard(seq))
 
 export const wipeOutbox = (userId: string) => Effect.runPromise(outbox.wipeOutbox(userId))
+
+// -- movement publication --------------------------------------------------------
+
+export const publishMovementCommands = (
+  storage: ClientStorageHandles,
+  inputs: movementPublication.MovementPublicationInput[],
+  options?: Parameters<typeof movementPublication.publishMovementCommands>[1],
+) => runWithStorage(storage, movementPublication.publishMovementCommands(inputs, options))
+
+export const readMovementPublications = (storage: ClientStorageHandles, movementIds: string[]) =>
+  runWithStorage(storage, movementPublication.readMovementPublications(movementIds))
+
+// -- durable intents (#490) -----------------------------------------------------
+
+export const acceptDurableIntent = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.acceptDurableIntent>
+) => runWithStorage(storage, durableIntents.acceptDurableIntent(...args))
+
+export const listDurableIntents = (storage: ClientStorageHandles) =>
+  runWithStorage(storage, durableIntents.listDurableIntents())
+
+export const publishDurableIntentCommands = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.publishIntentCommands>
+) => runWithStorage(storage, durableIntents.publishIntentCommands(...args))
+
+export const claimDurableIntentCommands = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.claimIntentCommands>
+) => runWithStorage(storage, durableIntents.claimIntentCommands(...args))
+
+export const commitDurableIntentCommands = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.commitIntentCommands>
+) => runWithStorage(storage, durableIntents.commitIntentCommands(...args))
+
+export const completeDurableIntentStep = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.completeIntentStep>
+) => runWithStorage(storage, durableIntents.completeIntentStep(...args))
+
+export const reopenDurableIntentStep = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.reopenIntentStep>
+) => runWithStorage(storage, durableIntents.reopenIntentStep(...args))
+
+export const discardDurableIntent = (
+  storage: ClientStorageHandles,
+  ...args: Parameters<typeof durableIntents.discardDurableIntent>
+) => runWithStorage(storage, durableIntents.discardDurableIntent(...args))
+
+export const countDurableWork = (storage: ClientStorageHandles) =>
+  runWithStorage(storage, durableIntents.countDurableWork())
 
 // -- crypto and wipe -----------------------------------------------------------
 

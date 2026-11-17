@@ -77,7 +77,7 @@ function accountName(rule: RecurringRule): string {
 }
 
 function confirmDelete(): void {
-  if (pendingDelete.value) recurringStore.removeRule(pendingDelete.value.id)
+  if (pendingDelete.value) void recurringStore.removeRule(pendingDelete.value.id)
 }
 const { needsAccount } = useAccountRequirement()
 </script>
