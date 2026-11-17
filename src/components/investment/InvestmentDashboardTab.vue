@@ -135,7 +135,7 @@ const drawPortfolioChart = computed(() => {
     </div>
 
     <InkBand
-      aria-label="Situación de la cartera"
+      :accessible-label="'Situación de la cartera'"
       :label="`Valor de la cartera · ${formatShortDate(vm.asOf)}`"
       :value="formatMoney(vm.portfolioValue)"
       value-id="inv-total-value"

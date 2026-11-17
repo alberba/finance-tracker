@@ -38,12 +38,14 @@ const TYPE_OPTIONS: SegmentedOption<InstrumentType>[] = (
 ).map((value) => ({ value, label: INSTRUMENT_TYPE_LABEL[value] }))
 const providerOptions: SegmentedOption[] = QUOTE_PROVIDERS.map((item) => ({ ...item }))
 
-const form = reactive<Omit<NewInstrumentInput, 'investmentAssetId'>>({
+const form = reactive<
+  Omit<NewInstrumentInput, 'investmentAssetId' | 'quoteSymbol'> & { quoteSymbol: string }
+>({
   type: 'etf',
   symbol: props.initialSymbol,
   quoteSymbol: '',
   market: '',
-  currency: props.currency,
+  currency: props.currency ?? 'EUR',
   provider: 'yahoo',
 })
 const yahooTicker = computed(() => yahooQuoteSymbol(form))

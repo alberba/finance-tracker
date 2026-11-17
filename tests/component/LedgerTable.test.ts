@@ -31,7 +31,7 @@ function mountTable(props: Record<string, unknown> = {}, slots: Record<string, u
       rowAttrs: (row: Row) => ({ 'data-position': row.id }),
       ...props,
     },
-    slots,
+    slots: slots as never,
   })
 }
 

@@ -79,7 +79,7 @@ function rowAttrs(row: SavingGoalRowViewModel): Record<string, string> {
       </template>
 
       <template #cell-action="{ row }">
-        <IconButton :label="`Editar ${row.name}`" @click="$emit('edit', row.id)">
+        <IconButton icon="edit" :label="`Editar ${row.name}`" @click="$emit('edit', row.id)">
           <svg
             viewBox="0 0 24 24"
             class="size-4"

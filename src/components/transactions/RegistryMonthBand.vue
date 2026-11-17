@@ -39,7 +39,7 @@ const pendingNote = computed(() => {
 <template>
   <InkBand
     :label="`Neto de ${monthTitle}`"
-    :aria-label="`Neto de ${monthTitle}`"
+    :accessible-label="`Neto de ${monthTitle}`"
     :value="formatSignedMoney(totals.net)"
     value-id="tx-month-net"
     :value-tone="totals.net === 0 ? undefined : toneOf(totals.net)"

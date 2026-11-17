@@ -135,7 +135,7 @@ function edit(key: GoalKey): void {
 
       <InkBand
         label="Ritmo que cumple tus plazos de patrimonio"
-        aria-label="Ritmo necesario"
+        :accessible-label="'Ritmo necesario'"
         value-id="goals-pace"
         :value="band.value"
         :facts="band.facts"

@@ -45,6 +45,15 @@ const heading = computed(
       recover: 'Recupera tu acceso',
     })[mode.value],
 )
+const submitLabel = computed(() =>
+  mode.value === 'register'
+    ? 'Crear cuenta'
+    : mode.value === 'verify'
+      ? 'Verificar correo'
+      : mode.value === 'recover'
+        ? 'Recuperar acceso'
+        : 'Entrar en Finanzas',
+)
 const description = computed(
   () =>
     ({
@@ -171,17 +180,7 @@ const description = computed(
         :disabled="busy || (needsCode && !sent)"
         type="submit"
       >
-        {{
-          busy
-            ? 'Un momento…'
-            : mode === 'register'
-              ? 'Crear cuenta'
-              : mode === 'verify'
-                ? 'Verificar correo'
-                : mode === 'recover'
-                  ? 'Recuperar acceso'
-                  : 'Entrar en Finanzas'
-        }}
+        {{ busy ? 'Un momento…' : submitLabel }}
       </BaseButton>
     </form>
     <p

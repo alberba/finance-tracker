@@ -217,7 +217,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
     <div
       class="grid flex-none transition-[grid-template-rows,opacity,visibility,margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:duration-1"
       :class="expanded ? 'invisible mbs-0 grid-rows-[0fr] opacity-0' : '-mbs-9 grid-rows-[1fr]'"
-      :inert="expanded ? '' : undefined"
+      :inert="expanded ? true : undefined"
       :aria-hidden="expanded ? 'true' : undefined"
       data-investment-overview
       @transitionend="onCollapseEnd"
