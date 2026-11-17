@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthPrincipal } from '../../../../src/lib/server/auth/principal'
 import * as accountsRepository from '../../../../src/db/repositories/accounts'
 import * as userSettingsRepository from '../../../../src/db/repositories/user-settings'
+import * as bitvavoRepository from '../../../../src/db/repositories/bitvavo'
 import { createTestDb, type TestDatabase } from '../setup'
 import { seedUser } from '../repositories/fixtures'
 import { runWithDb } from '../../../../src/db/database'
@@ -181,13 +182,21 @@ describe('POST /api/state/reset', () => {
     const syncRepository = await import('../../../../src/db/repositories/sync')
     await runWithDb(testDb.db, syncRepository.ensureRevision(principal.userId))
     await runWithDb(testDb.db, syncRepository.bumpRevision(principal.userId))
-    await runWithDb(
+    const account = await runWithDb(
       testDb.db,
       accountsRepository.create(principal.userId, {
         name: 'Cuenta a borrar',
         kind: 'cash',
         currency: 'EUR',
         openingBalance: 42,
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      bitvavoRepository.ensureConnection(principal.userId, {
+        accountId: account.id,
+        startDate: '2025-01-01',
+        timeZone: 'Europe/Madrid',
       }),
     )
     await runWithDb(
@@ -218,6 +227,31 @@ describe('POST /api/state/reset', () => {
 
     const accounts = await runWithDb(testDb.db, accountsRepository.listByUser(principal.userId))
     expect(accounts).toEqual([])
+    expect(await runWithDb(testDb.db, bitvavoRepository.getConnection(principal.userId))).toBeUndefined()
+  })
+
+  it('rejects deleting an account still used by a Bitvavo connection', async () => {
+    const account = await runWithDb(
+      testDb.db,
+      accountsRepository.create(principal.userId, {
+        name: 'Cuenta Bitvavo',
+        kind: 'cash',
+        currency: 'EUR',
+        openingBalance: 0,
+      }),
+    )
+    await runWithDb(
+      testDb.db,
+      bitvavoRepository.ensureConnection(principal.userId, {
+        accountId: account.id,
+        startDate: '2025-01-01',
+        timeZone: 'Europe/Madrid',
+      }),
+    )
+
+    await expect(runWithDb(testDb.db, accountsRepository.remove(principal.userId, account.id))).rejects.toThrow(
+      'La cuenta tiene movimientos u otros datos asociados',
+    )
   })
 
   it('wipes owned children too, without leaving orphans or failing mid-way (§2.6)', async () => {

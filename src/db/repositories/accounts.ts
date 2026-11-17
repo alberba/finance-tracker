@@ -11,6 +11,7 @@ import { lift } from '../database'
 import { fromMinorUnits, toMinorUnits } from '../../lib/money'
 import {
   accounts,
+  bitvavoConnections,
   budgetEntries,
   categories,
   contributionAllocations,
@@ -49,8 +50,11 @@ async function isReferenced(
   id: string,
 ): Promise<boolean> {
   for (const { table, column } of refs) {
+    // Some referencing tables (e.g. bitvavo_connections) use `user_id` as
+    // their primary key and have no `id` column, so select `user_id`: every
+    // table accepted here carries it.
     const [row] = await db
-      .select({ id: table.id })
+      .select({ userId: table.userId })
       .from(table)
       .where(and(eq(column, id), eq(table.userId, userId)))
       .limit(1)
@@ -190,6 +194,7 @@ async function removeSql(
       { table: twrLiquidityAccounts, column: twrLiquidityAccounts.accountId },
       { table: contributionAllocations, column: contributionAllocations.accountId },
       { table: snapshotBalances, column: snapshotBalances.accountId },
+      { table: bitvavoConnections, column: bitvavoConnections.accountId },
     ],
     id,
   )
