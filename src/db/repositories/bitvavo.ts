@@ -97,6 +97,18 @@ async function releaseSql(db: Db, userId: string, token: string) {
     .set({ lockToken: null, lockUntil: 0 })
     .where(and(eq(bitvavoConnections.userId, userId), eq(bitvavoConnections.lockToken, token)))
 }
+/**
+ * Drops the user's Bitvavo connection and any previews it left behind.
+ *
+ * `bitvavo_connections.account_id` references `accounts(id)` without a
+ * cascade, so a reset/restore that deletes the user's accounts must remove
+ * the connection first (otherwise the FK fails with a raw constraint error).
+ * The caller owns the transaction; this function only issues the two deletes.
+ */
+async function removeConnectionSql(db: Db, userId: string) {
+  await db.delete(bitvavoPreviews).where(eq(bitvavoPreviews.userId, userId))
+  await db.delete(bitvavoConnections).where(eq(bitvavoConnections.userId, userId))
+}
 async function savePreviewSql(db: Db, userId: string, preview: BitvavoPreview) {
   await db
     .insert(bitvavoPreviews)
@@ -327,6 +339,7 @@ export const saveConnection = lift(saveConnectionSql)
 export const acquire = lift(acquireSql)
 export const renew = lift(renewSql)
 export const release = lift(releaseSql)
+export const removeConnection = lift(removeConnectionSql)
 export const savePreview = lift(savePreviewSql)
 export const getPreview = lift(getPreviewSql)
 export const reservePreview = lift(reservePreviewSql)

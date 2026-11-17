@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildPortfolioValuation } from '../../src/domain/investment/valuation'
 import { generatePendingMovements } from '../../src/domain/recurring/pending'
-import { getDueOccurrences, nextOccurrenceDate } from '../../src/domain/recurring/occurrences'
+import {
+  getDueOccurrences,
+  getNextRuleDate,
+  nextOccurrenceDate,
+} from '../../src/domain/recurring/occurrences'
 import { normalizeState } from '../../src/scripts/state'
 import type { RecurringRule, State } from '../../src/scripts/types'
 import { useFinancialStateStore } from '../../src/stores/financial-state'
@@ -78,8 +82,47 @@ describe('reglas recurrentes y pendientes', () => {
       ),
     ).toEqual(['2024-01-31'])
     expect(
-      nextOccurrenceDate(recurringRule({ frequency: 'yearly', interval: 1 }), '2024-02-29'),
+      nextOccurrenceDate(
+        recurringRule({ frequency: 'yearly', interval: 1, startDate: '2024-02-29' }),
+        '2024-02-29',
+      ),
     ).toBe('2025-02-28')
+  })
+
+  it('mantiene el día ancla al cruzar meses y años', () => {
+    const monthly = recurringRule({
+      frequency: 'monthly',
+      startDate: '2024-01-31',
+      nextOccurrenceDate: '2024-01-31',
+    })
+    expect(getDueOccurrences(monthly, '2024-03-31')).toEqual([
+      '2024-01-31',
+      '2024-02-29',
+      '2024-03-31',
+    ])
+    expect(nextOccurrenceDate(monthly, '2024-02-29')).toBe('2024-03-31')
+
+    const leapYearly = recurringRule({
+      frequency: 'yearly',
+      startDate: '2024-02-29',
+      nextOccurrenceDate: '2024-02-29',
+    })
+    expect(getDueOccurrences(leapYearly, '2028-02-29')).toEqual([
+      '2024-02-29',
+      '2025-02-28',
+      '2026-02-28',
+      '2027-02-28',
+      '2028-02-29',
+    ])
+  })
+
+  it('no genera ocurrencias anteriores al startDate tras editarlo', () => {
+    const edited = recurringRule({
+      startDate: '2024-06-01',
+      nextOccurrenceDate: '2024-02-15',
+    })
+    expect(getDueOccurrences(edited, '2024-07-01')).toEqual(['2024-06-01', '2024-07-01'])
+    expect(getNextRuleDate(edited, '2024-05-01')).toBe('2024-06-01')
   })
 
   it('genera vencimientos atrasados sin duplicarlos al recargar', () => {

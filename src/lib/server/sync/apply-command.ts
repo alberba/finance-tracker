@@ -620,22 +620,27 @@ function performMutation(
               ...stockeventsCashMappings,
             ])
           : undefined
+        const entity = {
+          ...row,
+          ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
+          ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
+        }
+        // The change log must carry the resulting row, not the patch: the
+        // other device applies it as a whole and needs `version` to keep its
+        // optimistic-concurrency guard (a patch has no version, so
+        // `applyRemoteChanges` would discard it).
         const revision = yield* recordChange(
           userId,
           'userSettings',
           userId,
           'update',
-          command.patch,
+          entity,
         )
         return {
           status: 'applied',
           entityType: 'userSettings',
           entityId: userId,
-          entity: {
-            ...row,
-            ...(twrLiquidityAccounts ? { twrLiquidityAccounts } : {}),
-            ...(cashMappings ? { stockeventsCashMappings: cashMappings } : {}),
-          },
+          entity,
           revision,
         }
       }

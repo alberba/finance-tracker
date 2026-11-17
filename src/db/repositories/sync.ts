@@ -179,6 +179,7 @@ async function listChangesSinceSql(
     .select()
     .from(syncChanges)
     .where(and(eq(syncChanges.userId, userId), gt(syncChanges.revision, since)))
+    .orderBy(syncChanges.revision)
 }
 
 async function getChangeSql(

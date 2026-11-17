@@ -67,7 +67,15 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Vitest unit, component and integration tests
-        run: pnpm test
+        run: pnpm test:coverage
+      - name: Upload coverage summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   build:
     needs: reuse
@@ -115,6 +123,13 @@ jobs:
         run: pnpm test:e2e:auth --grep @smoke --reporter=dot,html --output=test-results/auth-smoke
         env:
           PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-auth-smoke
+      # bitvavo.spec.ts and movement-commands.spec.ts are @smoke but live in
+      # testIgnore for the desktop projects: run them here with the Worker
+      # runtime that sync-v2 uses, so the PR smoke actually covers them.
+      - name: Run sync smoke contracts
+        run: pnpm test:e2e:sync-v2 --grep @smoke --reporter=dot,html --output=test-results/sync-smoke
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-sync-smoke
       - name: Upload failure report
         if: failure()
         continue-on-error: true
@@ -124,6 +139,7 @@ jobs:
           path: |
             playwright-report/
             playwright-report-auth-smoke/
+            playwright-report-sync-smoke/
             test-results/
           if-no-files-found: ignore
           retention-days: 7

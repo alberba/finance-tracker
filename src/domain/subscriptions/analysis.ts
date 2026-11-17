@@ -101,8 +101,13 @@ function buildUpcomingCharges(
       const firstCharge = parseIsoDate(subscription.nextChargeDate)
       if (!firstCharge) return []
       const charges: UpcomingSubscriptionCharge[] = []
+      // Follow the actual next charge (which may be on a different day than
+      // the contract start); the anchor is that day, not the previous drift.
+      const anchorDay = firstCharge.getUTCDate()
       let chargeDate = firstCharge
-      while (chargeDate < start) chargeDate = nextOccurrence(chargeDate, subscription.frequency)
+      while (chargeDate < start) {
+        chargeDate = nextOccurrence(chargeDate, subscription.frequency, anchorDay)
+      }
       while (chargeDate <= end) {
         const date = chargeDate.toISOString().slice(0, 10)
         charges.push({
@@ -112,20 +117,29 @@ function buildUpcomingCharges(
           amount: round2(subscription.amount),
           daysUntilCharge: utcDayNumber(chargeDate) - utcDayNumber(start),
         })
-        chargeDate = nextOccurrence(chargeDate, subscription.frequency)
+        chargeDate = nextOccurrence(chargeDate, subscription.frequency, anchorDay)
       }
       return charges
     })
     .sort((a, b) => a.daysUntilCharge - b.daysUntilCharge || a.name.localeCompare(b.name))
 }
 
-function nextOccurrence(date: Date, frequency: SubscriptionFrequency): Date {
-  const next = new Date(date)
-  if (frequency === 'weekly') next.setUTCDate(next.getUTCDate() + 7)
-  else if (frequency === 'monthly') next.setUTCMonth(next.getUTCMonth() + 1)
-  else if (frequency === 'quarterly') next.setUTCMonth(next.getUTCMonth() + 3)
-  else next.setUTCFullYear(next.getUTCFullYear() + 1)
-  return next
+function nextOccurrence(
+  date: Date,
+  frequency: SubscriptionFrequency,
+  anchorDay: number,
+): Date {
+  if (frequency === 'weekly') {
+    const next = new Date(date)
+    next.setUTCDate(next.getUTCDate() + 7)
+    return next
+  }
+  const months = frequency === 'monthly' ? 1 : frequency === 'quarterly' ? 3 : 12
+  const targetMonth = date.getUTCMonth() + months
+  const targetYear = date.getUTCFullYear() + Math.floor(targetMonth / 12)
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12
+  const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate()
+  return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(anchorDay, lastDay)))
 }
 
 function parseIsoDate(value: string): Date | null {

@@ -131,7 +131,7 @@ function assetMovements(state: State, position: InvestmentPosition): Transaction
   return state.transactions
     .filter(
       (tx): tx is Transaction =>
-        tx.type === 'investment' && matchesInvestmentAsset(tx.category, asset),
+        tx.type === 'investment' && matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
     )
     .sort(
       (a, b) =>

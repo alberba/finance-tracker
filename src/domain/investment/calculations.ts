@@ -32,7 +32,14 @@ function snapshots(state: State): Record<string, Snapshot> {
 }
 
 export function computeInvestmentValue(state: State, assetId: string, month: MonthOrStart): number {
-  return coreInvestmentValue(assetId, month, assets(state), transactions(state), snapshots(state))
+  return coreInvestmentValue(
+    assetId,
+    month,
+    assets(state),
+    transactions(state),
+    snapshots(state),
+    state.instruments,
+  )
 }
 
 export function computeAccountBalance(state: State, accountId: string, month: MonthOrStart): number {
@@ -47,6 +54,7 @@ export function wealthByMonth(state: State, month: MonthOrStart): WealthSnapshot
     liabilities(state),
     transactions(state),
     snapshots(state),
+    state.instruments,
   )
 }
 
@@ -95,7 +103,7 @@ export function computeInvestedCapitalByAsset(state: State, assetId: string, mon
   const contributions = state.transactions.reduce((sum, item) => {
     if (item.type !== 'investment') return sum
     if (Number(item.month) > month) return sum
-    if (!matchesInvestmentAsset(item.category, asset as Entity)) return sum
+    if (!matchesInvestmentAsset(item.category, asset as Entity, item.instrumentId, state.instruments)) return sum
     return sum + Number(item.amount || 0)
   }, 0)
   return round2(openingCapital + contributions)

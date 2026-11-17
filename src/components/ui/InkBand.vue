@@ -21,7 +21,8 @@ const props = defineProps<{
   label: string
   /** Formatted figure; its decimals and currency render smaller. */
   value: string
-  ariaLabel: string
+  /** Accessible name for the band; rendered as `aria-label`. */
+  accessibleLabel: string
   valueId?: string
   chip?: { text: string; tone: Tone } | null
   /** Colors the headline figure as a gain or a loss (it carries its sign too). */
@@ -45,7 +46,7 @@ const factClass = computed(() =>
 <template>
   <section
     class="bg-ink border-ink-line text-ink-text grid gap-5 rounded-lg border px-5 py-6 sm:px-9 sm:py-8 lg:flex lg:items-end lg:gap-0"
-    :aria-label="ariaLabel"
+    :aria-label="accessibleLabel"
   >
     <div class="grid gap-2.5 lg:flex-[1.6] lg:pr-8">
       <slot name="label">

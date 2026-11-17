@@ -61,6 +61,25 @@ describe('análisis de suscripciones', () => {
     ])
   })
 
+  it('conserva el ancla de fin de mes en el pronóstico', () => {
+    const analysis = buildSubscriptionAnalysis(
+      [
+        subscription({
+          frequency: 'monthly',
+          amount: 10,
+          startDate: '2026-01-31',
+          nextChargeDate: '2026-01-31',
+        }),
+      ],
+      '2026-01-31',
+    )
+
+    expect(analysis.upcomingCharges.map((charge) => charge.date)).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+    ])
+  })
+
   it('incluye todas las ocurrencias dentro de los próximos 30 días', () => {
     const analysis = buildSubscriptionAnalysis(
       [subscription({ frequency: 'weekly', amount: 8, nextChargeDate: '2026-08-13' })],

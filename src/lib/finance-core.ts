@@ -15,6 +15,8 @@ export interface Transaction {
   category: string;
   description?: string;
   amount: number;
+  /** Explicit link to an instrument; wins over `category` for asset matching. */
+  instrumentId?: string;
 }
 
 export interface Entity {
@@ -206,9 +208,28 @@ export function computeAccountBalance(
   return round2(balance);
 }
 
-export function matchesInvestmentAsset(category: string, asset: Entity): boolean {
+type InstrumentAssetLink = { id: string; investmentAssetId: string };
+
+/**
+ * Whether a movement belongs to an investment asset. An explicit
+ * `instrumentId` wins over the category: the category is a label the user can
+ * rename, while the instrument carries the real asset link. Category matching
+ * stays as the fallback for legacy movements without an instrument.
+ */
+export function matchesInvestmentAsset(
+  category: string,
+  asset: Entity,
+  instrumentId?: string,
+  instruments?: InstrumentAssetLink[],
+): boolean {
   if (!category || !asset) {
     return false;
+  }
+  if (instrumentId && instruments) {
+    const instrument = instruments.find((item) => item.id === instrumentId);
+    if (instrument) {
+      return instrument.investmentAssetId === asset.id;
+    }
   }
   const categorySlug = slug(category);
   return (
@@ -223,6 +244,7 @@ export function computeInvestmentValue(
   assets: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
+  instruments?: InstrumentAssetLink[],
 ): number {
   const asset = assets.find((item) => item.id === assetId);
   if (!asset) {
@@ -251,7 +273,7 @@ export function computeInvestmentValue(
     if (txMonth <= startMonth || txMonth > month) {
       return;
     }
-    if (!matchesInvestmentAsset(item.category, asset)) {
+    if (!matchesInvestmentAsset(item.category, asset, item.instrumentId, instruments)) {
       return;
     }
     value += Number(item.amount || 0);
@@ -291,6 +313,7 @@ export function getWealthByMonth(
   liabilities: Entity[],
   transactions: Transaction[],
   snapshots: Record<string, Snapshot>,
+  instruments?: InstrumentAssetLink[],
 ): WealthSnapshot {
   const liquidity = accounts.reduce(
     (sum, item) =>
@@ -307,6 +330,7 @@ export function getWealthByMonth(
         investmentAssets,
         transactions,
         snapshots,
+        instruments,
       ),
     0,
   );

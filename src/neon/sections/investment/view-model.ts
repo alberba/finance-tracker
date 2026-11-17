@@ -730,7 +730,7 @@ export function positionDetail(
   const asset = state.investmentAssets.find((candidate) => candidate.id === position.id)
   const movements = state.transactions
     .filter(
-      (tx) => tx.type === 'investment' && !!asset && matchesInvestmentAsset(tx.category, asset),
+      (tx) => tx.type === 'investment' && !!asset && matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
     )
     .sort(
       (a, b) =>

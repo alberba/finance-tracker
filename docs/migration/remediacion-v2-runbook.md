@@ -1,5 +1,7 @@
 # Runbook — remediación de persistencia v2
 
+> **Obsoleto para producción (2026-11-17).** Opera sobre D1/Workers y usa `pnpm d1:migrate:remote:v2`, que ya no existe; producción es Docker + SQLite (`docs/operations/self-hosting.md#producción-en-oracle`). Se conserva como registro histórico. Para una reparación actual, usar `pnpm db:repair` sobre una copia y seguir el runbook de SQLite que sustituya a este.
+
 > Sustituye a `docs/archive/cutover-runbook.md` para esta fase. Aquel documento describe el
 > cutover v1 → v2, que ya se ejecutó, y está desactualizado en varios pasos
 > (llega a pedir comprobar el `ConflictResolutionDialog`, que #139 borró con el

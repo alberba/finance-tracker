@@ -84,14 +84,24 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
     if (!month) {
       return
     }
-    const portfolioValue = getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds)
-    if (portfolioValue <= 0) {
-      return
-    }
     const date = toSnapshotDate(state.year, month)
     const existing = state.contributions.find(
       (item) => String(item.portfolioDate || item.date) === date,
     )
+    // `applyContributionSave` stores the portfolio value **before** the flow.
+    // The snapshot itself is already post-flow, so prefer the saved value:
+    // using the snapshot total and adding the flow again double-counts it and
+    // turns a flat month into a fake loss.
+    const savedPortfolioValue = existing
+      ? round2(parseFloatSafe(existing.portfolioValue, 0))
+      : 0
+    const portfolioValue =
+      savedPortfolioValue > 0
+        ? savedPortfolioValue
+        : getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds)
+    if (portfolioValue <= 0) {
+      return
+    }
     const derived = deriveContributionFlow(existing || {})
     const flow = round2(derived.flow)
     const row: Contribution = {
@@ -196,6 +206,7 @@ export function buildWorkflowSnapshotState(
             state.investmentAssets,
             state.transactions,
             state.snapshots,
+            state.instruments,
           ),
       ),
     })),

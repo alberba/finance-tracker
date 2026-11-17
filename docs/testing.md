@@ -41,9 +41,12 @@ serializando el fixture SQLite ya migrado en memoria: repetir cada sentencia de 
 una transacción de disco hacía que la preparación agotase el timeout bajo carga. La CLI sigue
 abriendo el archivo real y los casos de simulación y ejecución comprueban sus datos al reabrirlo.
 
-El informe de coverage incluye componentes, composables, dominio, librerías, servicios y stores. Los
-umbrales representan el mínimo actual y deben subir con código nuevo; no se deben excluir módulos
-solo para mejorar el porcentaje. El HTML se escribe en `coverage/`.
+El informe de coverage incluye las capas que contienen reglas: composables, dominio, librerías,
+view-models de `src/neon`, `src/db`, `src/pages/api`, servicios, stores y `middleware.ts`. Deja fuera
+la presentación (`.vue`): se cubre con E2E y el árbol antiguo está congelado. Los umbrales
+(80/72/78/82) están justo por debajo de la medición actual y deben subir con tests de comportamiento,
+no con casos creados solo para tocar líneas. `pnpm check` ejecuta además `vue-tsc` sobre los SFC.
+El HTML se escribe en `coverage/`.
 
 ## Criterios para tests nuevos
 

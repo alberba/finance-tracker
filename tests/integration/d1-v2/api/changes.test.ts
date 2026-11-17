@@ -3,6 +3,7 @@ import type { AuthPrincipal } from "../../../../src/lib/server/auth/principal";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedUser } from "../repositories/fixtures";
 import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
+import * as syncRepository from "../../../../src/db/repositories/sync";
 import { runWithDb } from "../../../../src/db/database"
 
 let currentDb: TestDatabase["db"];
@@ -68,6 +69,32 @@ describe("GET /api/changes", () => {
     expect(body.revision).toBe(2);
   });
 
+  it("orders changes by revision even when they were written out of order", async () => {
+    await runWithDb(testDb.db, syncRepository.createChange(principal.userId, {
+      revision: 2,
+      entityType: "category",
+      entityId: "second",
+      changeType: "create",
+      payload: JSON.stringify({ id: "second" }),
+    }));
+    await runWithDb(testDb.db, syncRepository.createChange(principal.userId, {
+      revision: 1,
+      entityType: "category",
+      entityId: "first",
+      changeType: "create",
+      payload: JSON.stringify({ id: "first" }),
+    }));
+
+    const { GET } = await import("../../../../src/pages/api/changes");
+    const response = await GET({
+      request: new Request("https://example.test/api/changes?since=0"),
+      locals: { principal },
+    } as never);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.changes.map((change: { revision: number }) => change.revision)).toEqual([1, 2]);
+  });
+
   it("accepts 'cursor' as an alias for 'since'", async () => {
     const { GET } = await import("../../../../src/pages/api/changes");
     const response = await GET({
@@ -75,6 +102,15 @@ describe("GET /api/changes", () => {
       locals: { principal },
     } as never);
     expect(response.status).toBe(200);
+  });
+
+  it("returns 400 for a non-integer since/cursor", async () => {
+    const { GET } = await import("../../../../src/pages/api/changes");
+    const response = await GET({
+      request: new Request("https://example.test/api/changes?since=1.5"),
+      locals: { principal },
+    } as never);
+    expect(response.status).toBe(400);
   });
 
   it("returns 400 for an invalid since/cursor", async () => {

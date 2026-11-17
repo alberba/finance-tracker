@@ -17,7 +17,7 @@ No revises a mano nada de esto; falla solo en CI.
   que toca (`pnpm exec prettier --write <rutas>`), nunca un directorio entero.
 - Lint: `eslint.config.ts` (TypeScript, Vue, Astro, CSS con tokens Tailwind 4, también en los
   bloques `<style>` de Vue).
-- Tipos: `pnpm check` (`astro check`).
+- Tipos: `pnpm check` (`astro check` + `vue-tsc --noEmit`, incluidos los SFC Vue).
 
 Una observación de revisión sobre comillas, indentación o import order es ruido.
 

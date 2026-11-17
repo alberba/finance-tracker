@@ -66,6 +66,40 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
     expect(oro.weight).toBeCloseTo((200 / 2400) * 100)
   })
 
+  it('atribuye el movimiento por instrumentId aunque la categoría no coincida', () => {
+    const state = portfolio({
+      investmentAssets: [{ id: 'acciones', name: 'Acciones', openingBalance: 0 }],
+      instruments: [
+        {
+          id: 'inst-aapl',
+          investmentAssetId: 'acciones',
+          type: 'stock',
+          symbol: 'AAPL',
+          market: 'NASDAQ',
+          currency: 'USD',
+          provider: 'yahoo',
+          active: true,
+        },
+      ],
+      transactions: [
+        {
+          ...buy('t-aapl', 'AAPL', '2026-01-10', 1, 100, 'AAPL'),
+          instrumentId: 'inst-aapl',
+        },
+      ],
+    })
+
+    const vm = buildInvestmentDashboardViewModel(state, 2, 'simple')
+    expect(vm.positions).toHaveLength(1)
+    expect(vm.positions[0]).toMatchObject({
+      id: 'acciones',
+      value: 100,
+      invested: 100,
+      units: 1,
+      symbol: 'AAPL',
+    })
+  })
+
   it('omite los activos sin valor en el mes', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 1, 'simple')
 

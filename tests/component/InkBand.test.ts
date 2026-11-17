@@ -12,7 +12,7 @@ describe('InkBand', () => {
         label: 'Valor de la cartera · 31 jul 2026',
         value: `11.062,68${NBSP}€`,
         valueId: 'total',
-        ariaLabel: 'Situación de la cartera',
+        accessibleLabel: 'Situación de la cartera',
       },
     })
 
@@ -27,7 +27,7 @@ describe('InkBand', () => {
       props: {
         label: 'Valor',
         value: '1,00 €',
-        ariaLabel: 'x',
+        accessibleLabel: 'x',
         chip: { text: '−0,42 % hoy', tone: 'loss' },
       },
     })
@@ -42,7 +42,7 @@ describe('InkBand', () => {
       props: {
         label: 'Valor',
         value: '1,00 €',
-        ariaLabel: 'x',
+        accessibleLabel: 'x',
         facts: [
           { label: 'Capital invertido', value: '10,00 €', valueId: 'capital' },
           {
@@ -62,7 +62,7 @@ describe('InkBand', () => {
   })
 
   it('sin chip ni datos solo muestra la cifra', () => {
-    const wrapper = mount(InkBand, { props: { label: 'Valor', value: '1,00 €', ariaLabel: 'x' } })
+    const wrapper = mount(InkBand, { props: { label: 'Valor', value: '1,00 €', accessibleLabel: 'x' } })
 
     expect(wrapper.find('[data-ink-chip]').exists()).toBe(false)
     expect(wrapper.findAll('p')).toHaveLength(2)
@@ -72,7 +72,7 @@ describe('InkBand', () => {
     const wrapper = mount(InkBand, {
       props: {
         label: 'Neto',
-        ariaLabel: 'Neto',
+        accessibleLabel: 'Neto',
         value: '+1.274,01 €',
         valueId: 'net',
         valueTone: 'gain',

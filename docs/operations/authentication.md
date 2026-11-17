@@ -1,10 +1,10 @@
 # Autenticación integrada (#275)
 
-Better Auth 1.7.7, su plugin passkey 1.7.7 y Resend 6.32.1 están fijados en el
-lockfile. `@better-auth/utils` 0.4.2 fija el peer requerido por core/passkey; Better
+Better Auth 1.7.18, su plugin passkey 1.7.18 y Resend 6.37.0 están fijados en el
+lockfile. `@better-auth/utils` 0.5.1 fija el peer requerido por core/passkey; Better
 Auth resuelve su dependencia propia. Producción corre Node + SQLite en Docker (ver
 [self-hosting](self-hosting.md#producción-en-oracle)); Workers/D1 solo quedan para
-desarrollo, `pnpm preview` y tests. Drizzle 0.45.3. Las migraciones 0007–0009 son aditivas y
+desarrollo, `pnpm preview` y tests. Drizzle 0.45.4. Las migraciones 0007–0009 son aditivas y
 conservan las claves financieras.
 
 ## Contratos

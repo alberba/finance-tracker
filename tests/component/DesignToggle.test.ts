@@ -46,7 +46,10 @@ describe.each(toggles)('DesignToggle del diseño %s', (_name, component, extra) 
 
     await wrapper.get('[data-design-option="neon"]').trigger('click')
 
-    expect(document.cookie).not.toContain(DESIGN_COOKIE)
+    // The cleanup leaves an empty `finance-design=` cookie in happy-dom; the
+    // guarantee is that no design value was written, not that the name is absent.
+    expect(document.cookie).not.toContain(`${DESIGN_COOKIE}=legacy`)
+    expect(document.cookie).not.toContain(`${DESIGN_COOKIE}=neon`)
     expect(reload).not.toHaveBeenCalled()
   })
 })

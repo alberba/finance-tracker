@@ -5,6 +5,8 @@ import { applySyncBatch } from "../../../../src/lib/server/sync/apply-command";
 import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedUser } from "../repositories/fixtures";
 import { runWithDb } from '../../../../src/db/database'
+import * as syncRepository from "../../../../src/db/repositories/sync"
+import { applyRemoteChanges, emptyReadModel } from "../../../../src/lib/client/sync-read-model"
 
 /**
  * `user_settings` has no `entityId` to address, so `baseVersion` is its only
@@ -39,6 +41,17 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");
+
+    // The change log must carry the resulting row (including `version`), not
+    // the patch: otherwise another device throws the settings away and loses
+    // the version guard for its next write.
+    const changes = await runWithDb(testDb.db, syncRepository.listChangesSince(userId, 0));
+    const settingsChange = changes.find((change) => change.entityType === "userSettings");
+    expect(settingsChange).toBeDefined();
+    const payload = JSON.parse(settingsChange!.payload!);
+    expect(payload).toMatchObject({ currency: "USD", version: settings.version + 1 });
+    const projected = applyRemoteChanges(emptyReadModel(), [settingsChange!], settingsChange!.revision);
+    expect(projected.settings).toMatchObject({ currency: "USD", version: settings.version + 1 });
   });
 
   it("conflicts on a stale baseVersion, reports the stored version and leaves the row alone", async () => {
@@ -119,5 +132,6 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
 
     expect(result.results[0].status).toBe("applied");
     expect((await runWithDb(testDb.db, userSettingsRepository.get(userId)))?.currency).toBe("USD");
+
   });
 });

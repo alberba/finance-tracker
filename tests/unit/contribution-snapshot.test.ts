@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   applyContributionSave,
+  buildContributionMetricRows,
   buildWorkflowSnapshotState,
 } from '../../src/domain/investment/contributions'
 import { normalizeState } from '../../src/scripts/state'
@@ -152,5 +153,52 @@ describe('contribution snapshot defaults', () => {
       expect(state.contributions).toHaveLength(1)
       expect(state.contributions[0].portfolioValue).toBe(2200)
     })
+  })
+})
+
+
+describe('TWR desde snapshots guardados', () => {
+  it('no cuenta dos veces el flujo cuando el mercado no se mueve', () => {
+    let state = normalizeState({
+      year: 2026,
+      accounts: [{ id: 'cash', name: 'MyInvestor', openingBalance: 1200 }],
+      investmentAssets: [{ id: 'fund', name: 'Fund', openingBalance: 1000 }],
+      twrLiquidityAccountIds: ['cash'],
+      transactions: [],
+      contributions: [],
+      snapshots: {},
+    })
+
+    function save(date: string, month: 1 | 2, amount: number): void {
+      const workflow = buildWorkflowSnapshotState(state, month, date)
+      const result = applyContributionSave(state, {
+        month,
+        date,
+        snapshotInputs: [
+          ...workflow.investments.map((item) => ({
+            kind: 'investments' as const,
+            id: item.id,
+            value: item.value,
+          })),
+          ...workflow.liquidity.map((item) => ({
+            kind: 'accounts' as const,
+            id: item.id,
+            value: item.value,
+          })),
+        ],
+        allocations: amount > 0 ? [{ accountId: 'cash', amount }] : [],
+        warnings: [],
+      })
+      if (!result.state) throw new Error(result.error)
+      state = result.state
+    }
+
+    save('2026-01-31', 1, 100)
+    save('2026-02-28', 2, 0)
+
+    const rows = buildContributionMetricRows(state)
+    expect(rows).toHaveLength(2)
+    expect(rows[1].periodReturn).toBeCloseTo(0, 6)
+    expect(rows[1].cumulativeReturn).toBeCloseTo(0, 6)
   })
 })
