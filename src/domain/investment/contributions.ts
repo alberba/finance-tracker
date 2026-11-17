@@ -206,6 +206,7 @@ export function buildWorkflowSnapshotState(
             state.investmentAssets,
             state.transactions,
             state.snapshots,
+            state.instruments,
           ),
       ),
     })),

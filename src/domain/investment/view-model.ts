@@ -84,7 +84,7 @@ function buildPositionDetail(state: State, asset: Entity, month: Month): Positio
       (tx) =>
         tx.type === 'investment' &&
         Number(tx.month) <= month &&
-        matchesInvestmentAsset(tx.category, asset),
+        matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
     )
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))
 
