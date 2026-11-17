@@ -74,6 +74,9 @@ describe('authentication form', () => {
     form.changeMode('code')
     form.email.value = 'first@example.test'
     const sending = form.sendCode()
+    // The auth client now loads on demand, so the request starts one import
+    // later; wait for it before simulating an edit while it is in flight.
+    await vi.waitFor(() => expect(client.sendCode).toHaveBeenCalled())
     form.email.value = 'second@example.test'
     finish()
     await sending

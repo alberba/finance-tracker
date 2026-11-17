@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
 import { useReportsRoute } from '../../composables/useReportsRoute'
 import { useReportThread } from '../../composables/useReportThread'
@@ -9,8 +9,9 @@ import { useReportsStore } from '../../stores/reports'
 import AppSection from '../ui/AppSection.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import PageHeader from '../ui/PageHeader.vue'
-import ReportDetail from './ReportDetail.vue'
 import ReportList from './ReportList.vue'
+
+const ReportDetail = defineAsyncComponent(() => import('./ReportDetail.vue'))
 
 // «Mis reportes» (#340): lista e hilo en una sola pantalla de trabajo. No es
 // una sección de `APP_SECTIONS`: el shell monta esta página en `/reportes`.
@@ -66,7 +67,7 @@ async function back(): Promise<void> {
       </PageHeader>
 
       <div
-        v-if="reportsStore.status === 'loading'"
+        v-if="reportsStore.status === 'loading' && reportsStore.reports.length === 0"
         class="mx-auto grid w-full max-w-6xl gap-3"
         aria-busy="true"
         aria-live="polite"

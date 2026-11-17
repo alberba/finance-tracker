@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, defineAsyncComponent, onMounted, reactive, watch } from 'vue'
 
-import ConnectionsPanel from '../settings/ConnectionsPanel.vue'
 import SettingsAccountsTab from '../settings/SettingsAccountsTab.vue'
-import SettingsAssetsTab from '../settings/SettingsAssetsTab.vue'
-import SettingsCategoriesTab from '../settings/SettingsCategoriesTab.vue'
-import SettingsLiabilitiesTab from '../settings/SettingsLiabilitiesTab.vue'
-import SettingsPreferencesTab from '../settings/SettingsPreferencesTab.vue'
-import SettingsQuotesTab from '../settings/SettingsQuotesTab.vue'
-import SettingsRecurringTab from '../settings/SettingsRecurringTab.vue'
 import AppSection from '../ui/AppSection.vue'
 import PageHeader from '../ui/PageHeader.vue'
 import SectionTabs, { type SectionTab } from '../ui/SectionTabs.vue'
@@ -19,6 +12,30 @@ import { useSettingsAssets } from '../../composables/useSettingsAssets'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 import { useStockEventsStore } from '../../stores/stockevents'
+
+// Only Cuentas is static; the rest split into chunks and mount on first visit,
+// then stay mounted so unsaved state survives tab switches.
+const SettingsAssetsTab = defineAsyncComponent(
+  () => import('../settings/SettingsAssetsTab.vue'),
+)
+const SettingsQuotesTab = defineAsyncComponent(
+  () => import('../settings/SettingsQuotesTab.vue'),
+)
+const SettingsLiabilitiesTab = defineAsyncComponent(
+  () => import('../settings/SettingsLiabilitiesTab.vue'),
+)
+const SettingsCategoriesTab = defineAsyncComponent(
+  () => import('../settings/SettingsCategoriesTab.vue'),
+)
+const SettingsRecurringTab = defineAsyncComponent(
+  () => import('../settings/SettingsRecurringTab.vue'),
+)
+const SettingsPreferencesTab = defineAsyncComponent(
+  () => import('../settings/SettingsPreferencesTab.vue'),
+)
+const ConnectionsPanel = defineAsyncComponent(
+  () => import('../settings/ConnectionsPanel.vue'),
+)
 
 // Configuración by entity: each account, asset and rule with all that hangs
 // from it in one card, instead of spread across blocks by feature.
@@ -75,6 +92,15 @@ onMounted(async () => {
   await stockEventsStore.initializeCredential()
   if (stockEventsStore.credentialConfigured) await stockEventsStore.loadWatchlists()
 })
+
+const visitedTabs = reactive(new Set<string>())
+watch(
+  activeTab,
+  (tab) => {
+    visitedTabs.add(tab)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -110,13 +136,28 @@ onMounted(async () => {
       />
 
       <SettingsAccountsTab :is-active="activeTab === 'accounts'" />
-      <SettingsAssetsTab :is-active="activeTab === 'assets'" />
-      <SettingsQuotesTab :is-active="activeTab === 'quotes'" />
-      <SettingsLiabilitiesTab :is-active="activeTab === 'liabilities'" />
-      <SettingsCategoriesTab :is-active="activeTab === 'categories'" />
-      <SettingsRecurringTab :is-active="activeTab === 'recurring'" />
-      <SettingsPreferencesTab :is-active="activeTab === 'preferences'" />
-      <ConnectionsPanel :is-active="activeTab === 'connections'" />
+      <SettingsAssetsTab v-if="visitedTabs.has('assets')" :is-active="activeTab === 'assets'" />
+      <SettingsQuotesTab v-if="visitedTabs.has('quotes')" :is-active="activeTab === 'quotes'" />
+      <SettingsLiabilitiesTab
+        v-if="visitedTabs.has('liabilities')"
+        :is-active="activeTab === 'liabilities'"
+      />
+      <SettingsCategoriesTab
+        v-if="visitedTabs.has('categories')"
+        :is-active="activeTab === 'categories'"
+      />
+      <SettingsRecurringTab
+        v-if="visitedTabs.has('recurring')"
+        :is-active="activeTab === 'recurring'"
+      />
+      <SettingsPreferencesTab
+        v-if="visitedTabs.has('preferences')"
+        :is-active="activeTab === 'preferences'"
+      />
+      <ConnectionsPanel
+        v-if="visitedTabs.has('connections')"
+        :is-active="activeTab === 'connections'"
+      />
     </div>
   </AppSection>
 </template>

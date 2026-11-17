@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import SetupRequirement from '../onboarding/SetupRequirement.vue'
 import { useAccountRequirement } from '../../composables/useAccountRequirement'
-import { computed, useTemplateRef, watch } from 'vue'
+import { computed, defineAsyncComponent, reactive, useTemplateRef, watch } from 'vue'
 
 import AppSection from '../ui/AppSection.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import PageHeader from '../ui/PageHeader.vue'
 import SectionTabs from '../ui/SectionTabs.vue'
 import SubscriptionPanel from '../transactions/SubscriptionPanel.vue'
-import SubscriptionsTab from '../transactions/SubscriptionsTab.vue'
 import TransactionPanel from '../transactions/TransactionPanel.vue'
 import TransactionsRegistry from '../transactions/TransactionsRegistry.vue'
 import type { TransactionsSubTab } from '../../scripts/types'
@@ -30,6 +29,19 @@ const tab = computed<string>({
     ui.txTab = value as TransactionsSubTab
   },
 })
+// Suscripciones is a separate chunk: most visits only open the registry.
+const SubscriptionsTab = defineAsyncComponent(
+  () => import('../transactions/SubscriptionsTab.vue'),
+)
+const visitedTabs = reactive(new Set<string>())
+watch(
+  tab,
+  (current) => {
+    visitedTabs.add(current)
+  },
+  { immediate: true },
+)
+
 const tabs = computed(() => [
   {
     id: 'registry',
@@ -109,6 +121,7 @@ watch(
       />
 
       <div
+        v-if="visitedTabs.has('registry')"
         id="transactions-tab-registry"
         role="tabpanel"
         aria-labelledby="transactions-tab-registry-button"
@@ -117,6 +130,7 @@ watch(
         <TransactionsRegistry @edit="transactionPanel?.openEdit($event)" />
       </div>
       <div
+        v-if="visitedTabs.has('subscriptions')"
         id="transactions-tab-subscriptions"
         role="tabpanel"
         aria-labelledby="transactions-tab-subscriptions-button"

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
+import { destroyChart } from '../../scripts/charts'
+
 // `draw` is expected to be a computed-returned closure that captures the
 // current chart data, so a new function identity signals "data changed".
 const props = defineProps<{
@@ -32,6 +34,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   themeObserver?.disconnect()
   themeObserver = null
+  if (canvasRef.value) destroyChart(canvasRef.value)
 })
 </script>
 
