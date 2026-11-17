@@ -1,5 +1,7 @@
 # Performance optimization report
 
+> **Histórico (2026-08-08).** Mide el build Cloudflare con `?demo=1`, anterior al dashboard neón y al runtime Node + SQLite de producción. No usar sus cifras como estado actual.
+
 Date: 2026-08-08
 
 ## Outcome

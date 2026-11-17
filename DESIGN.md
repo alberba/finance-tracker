@@ -2,7 +2,7 @@
 
 > neón de garaje: taller a oscuras, una lámpara naranja sobre el banco
 
-**Theme:** dark por defecto · cuatro temas seleccionables: oscuro suave (por defecto en oscuro), oscuro fuerte, claro hueso y claro melocotón (por defecto en claro)
+**Theme:** dark por defecto. Objetivo: cuatro temas seleccionables (oscuro suave, oscuro fuerte, claro hueso y claro melocotón); hoy el selector solo ofrece claro/oscuro/sistema y los cuatro temas llegan en #445.
 
 Fuente: canvas «Dashboard · nueva dirección» (páginas 3 App, 4 Páginas · oscuro, 6–8 alternativas; Objetivos excluido). Las medidas salen del markup de los artboards; los roles y recomendaciones son interpretación. Los ejemplos HTML son reconstrucciones. Las decisiones de la página **10 · Sistema · decisiones** del canvas están todas resueltas.
 

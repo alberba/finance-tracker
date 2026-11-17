@@ -36,7 +36,7 @@ pnpm local:up
 `local:up` usa Astro en desarrollo con hot reload; `pnpm local:up:prod` prueba la compilación de producción.
 Abre la URL que muestra `local:up` y usa el correo y la contraseña de `.env.selfhost`.
 Cada worktree usa su propio puerto y volumen; el checkout principal usa el puerto 4321.
-SQLite se guarda en un volumen persistente. Es la misma imagen que corre en producción (Oracle).
+SQLite se guarda en un volumen persistente. `local:up` usa el target `development`; `local:up:prod` usa la imagen de producción (Oracle).
 Consulta [la guía de ejecución local y self-hosting](docs/operations/self-hosting.md).
 
 ## Ejecutar en local (Astro)
@@ -119,7 +119,7 @@ peticiones y no existe un selector de protocolo de persistencia.
 
 ```bash
 pnpm build
-pnpm astro check
+pnpm check
 ```
 
 ## Sentry
