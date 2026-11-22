@@ -8,7 +8,10 @@ import NavIcon from './NavIcon.astro'
  * Bottom bar of the mobile frame (DESIGN.md, «Barra inferior móvil»): three
  * sections and «Más», four equal columns. `data-primary-sections` tells the
  * shell's navigation script which sections the bar already shows, so «Más»
- * lights up for every other one.
+ * lights up for every other one. «Más» carries a dot while a report has news
+ * the person has not read (artboard «hoja «Más» con novedades · móvil»):
+ * src/scripts/app/reports-badge.ts shows `[data-reports-badge-dot]` and writes
+ * the sentence the button is described by into `[data-reports-count-spoken]`.
  */
 export interface Props {
   activeSection: SectionId | null
@@ -54,9 +57,10 @@ const PILL =
     aria-label="Más secciones"
     aria-haspopup="dialog"
     aria-controls="mobile-more-menu"
+    aria-describedby="more-reports-updates"
     aria-expanded="false"
   >
-    <span class={PILL}>
+    <span class={`${PILL} relative`}>
       <svg
         class="size-5.5"
         viewBox="0 0 24 24"
@@ -69,7 +73,14 @@ const PILL =
       >
         <path d="M5 12h.01M12 12h.01M19 12h.01" />
       </svg>
+      <span
+        class="bg-accent ring-panel absolute inset-bs-0.5 inset-e-3 size-2.25 rounded-full ring-2"
+        data-reports-badge-dot
+        aria-hidden="true"
+        hidden
+      ></span>
     </span>
     <span class="max-w-full truncate">Más</span>
+    <span id="more-reports-updates" class="sr-only" data-reports-count-spoken></span>
   </button>
 </nav>

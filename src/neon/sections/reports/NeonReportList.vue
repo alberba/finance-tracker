@@ -34,11 +34,11 @@ function onSelect(event: MouseEvent, issueNumber: number): void {
 
 <template>
   <section
-    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-2.5 overflow-clip border px-6 pt-[22px] pb-3 [animation-delay:70ms] @max-lg:px-3 @max-lg:pt-4"
+    class="bg-panel border-line rounded-card motion-safe:animate-rise flex min-w-0 flex-col gap-2.5 overflow-clip border px-6 pt-[22px] pb-3 [animation-delay:70ms] @max-lg:px-3 @max-lg:pt-3 @max-lg:pb-1.5"
     aria-labelledby="reports-list-title"
     data-report-list
   >
-    <div class="flex items-baseline justify-between gap-3">
+    <div class="flex items-baseline justify-between gap-3 @max-lg:px-1 @max-lg:pt-1 @max-lg:pb-0.5">
       <h2 id="reports-list-title" class="text-block-title font-extrabold">Tus reportes</h2>
       <p class="text-muted text-meta">
         <span class="font-display text-soft text-meta font-semibold">{{ counts.sent }}</span>
