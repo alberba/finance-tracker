@@ -1,0 +1,6 @@
+{
+  "files": ["src/components/FinanceTrackerShell.astro"],
+  "insertBefore": "</body>",
+  "commentSyntax": "html",
+  "cspChecked": true
+}

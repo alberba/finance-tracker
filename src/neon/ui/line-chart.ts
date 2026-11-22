@@ -17,12 +17,16 @@ export interface LineChartGeometry {
   ticks: Array<{ value: number; top: number }>
   /** Where the last point sits, as a share of the height from above (0–100). */
   lastTop: number
+  /** Every point of the line: `x` is the share of the width (0–100), `top` of the height from above. */
+  points: Array<{ x: number; top: number }>
 }
 
 /** The geometry with what to write around it: month labels, gridline values and a name. */
 export interface LabelledLineChart extends LineChartGeometry {
   labels: string[]
   tickLabels: string[]
+  /** What each point reads when the chart is explored: its date and its value, written out. */
+  readings: Array<{ name: string; value: string }>
   /** What the chart shows, for screen readers. */
   label: string
 }
@@ -39,7 +43,7 @@ const round1 = (value: number) => Math.round(value * 10) / 10
 const round2 = (value: number) => Math.round(value * 100) / 100
 
 export function buildLineChart(values: readonly number[]): LineChartGeometry {
-  if (values.length < 2) return { line: '', area: '', ticks: [], lastTop: 50 }
+  if (values.length < 2) return { line: '', area: '', ticks: [], lastTop: 50, points: [] }
   const min = Math.min(...values)
   const max = Math.max(...values)
   const span = max - min || Math.abs(max) * 0.1 || 1
@@ -59,5 +63,9 @@ export function buildLineChart(values: readonly number[]): LineChartGeometry {
     area: `${line} L${CHART_WIDTH} ${CHART_HEIGHT} L0 ${CHART_HEIGHT} Z`,
     ticks,
     lastTop: round2((y(values[values.length - 1]) / CHART_HEIGHT) * 100),
+    points: values.map((value, index) => ({
+      x: round2((index / (values.length - 1)) * 100),
+      top: round2((y(value) / CHART_HEIGHT) * 100),
+    })),
   }
 }

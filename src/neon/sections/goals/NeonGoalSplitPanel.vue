@@ -71,7 +71,12 @@ const iconButton =
 
 <template>
   <NeonDetailPanel v-model:open="open" title="Repartir el ahorro">
-    <form :id="FORM_ID" class="grid grid-cols-[minmax(0,1fr)] gap-[22px]" autocomplete="off" @submit.prevent="save">
+    <form
+      :id="FORM_ID"
+      class="grid grid-cols-[minmax(0,1fr)] gap-[22px]"
+      autocomplete="off"
+      @submit.prevent="save"
+    >
       <label class="text-muted grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2 text-[13px] font-bold">
         Ahorras al mes
         <span class="border-ctrl-line flex items-baseline gap-2 border-b-2">
@@ -145,7 +150,7 @@ const iconButton =
                 :value="shareText(row.id)"
                 inputmode="decimal"
                 :aria-label="`Al mes para ${row.name}`"
-                class="font-display text-text pointer-coarse:min-h-11 min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none"
+                class="font-display text-text min-w-0 flex-1 bg-transparent text-end text-[15px] font-semibold outline-none pointer-coarse:min-h-11"
                 @input="type(row.id, ($event.target as HTMLInputElement).value)"
               />
               <span class="text-muted text-[14px]" aria-hidden="true">€</span>

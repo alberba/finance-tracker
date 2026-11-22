@@ -260,6 +260,16 @@
     font-family: inherit;
     letter-spacing: inherit;
   }
+
+  /* Tailwind 4's preflight leaves buttons with the arrow; every control that
+     acts shows the hand, unless it is disabled. A utility (`cursor-not-allowed`,
+     `cursor-text`) still wins: this sits in the base layer. */
+  [data-ui='neon'] button:not(:disabled):not([aria-disabled='true']),
+  [data-ui='neon'] a[href]:not([aria-disabled='true']),
+  [data-ui='neon'] [role='button']:not([aria-disabled='true']),
+  [data-ui='neon'] summary {
+    cursor: pointer;
+  }
 }
 
 /* Utilities with names the old design doesn't have (bg-side, text-soft,

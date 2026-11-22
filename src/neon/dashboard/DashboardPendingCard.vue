@@ -5,6 +5,7 @@ import type { SectionId } from '../../scripts/types'
 import { useRecurringStore } from '../../stores/recurring'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
+import NeonFitList from '../ui/NeonFitList.vue'
 import type { NeonDashboardViewModel } from './view-model'
 
 // «Por confirmar»: the due dates of the recurring rules, outside the balances
@@ -27,7 +28,7 @@ function edit(id: string, event: MouseEvent): void {
 
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' } as const
 const linkButton =
-  'outline-accent rounded-pill min-h-11 text-sm font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2'
+  'outline-accent rounded-pill min-h-11 text-sm font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.96]'
 </script>
 
 <template>
@@ -52,13 +53,18 @@ const linkButton =
       </button>
     </template>
 
-    <p class="text-muted text-note -mt-1.5">
+    <p v-if="pending.count" class="text-muted text-note -mt-1.5 text-pretty">
       Vencimientos de tus reglas recurrentes. No cuentan en los saldos hasta que los confirmes.
     </p>
-    <NeonEmptyState v-if="!pending.count">
-      Nada por confirmar. Los próximos vencimientos aparecerán aquí el día que toquen.
-    </NeonEmptyState>
-    <ul v-else>
+    <div v-if="!pending.count" class="grid flex-1">
+      <NeonEmptyState
+        class="content-center justify-items-center! border-transparent! text-center text-pretty"
+      >
+        Nada por confirmar. Los próximos vencimientos de tus reglas recurrentes aparecerán aquí el
+        día que toquen.
+      </NeonEmptyState>
+    </div>
+    <NeonFitList v-else>
       <li
         v-for="item in pending.items"
         :key="item.id"
@@ -96,7 +102,7 @@ const linkButton =
           </button>
         </div>
       </li>
-    </ul>
+    </NeonFitList>
     <a
       v-if="pending.moreLabel"
       :href="getPathFromSection('transactions')"

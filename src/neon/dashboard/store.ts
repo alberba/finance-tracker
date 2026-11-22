@@ -6,7 +6,7 @@ import type { SectionId } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 import { useUiStore } from '../../stores/ui'
-import { buildNeonDashboardViewModel, type RecentFilter, type WealthRange } from './view-model'
+import { buildNeonDashboardViewModel, type WealthRange } from './view-model'
 
 /**
  * Presentation state of the new dashboard. A store rather than component
@@ -19,14 +19,12 @@ export const useNeonDashboardStore = defineStore('neon-dashboard', () => {
   const uiStore = useUiStore()
   const { navigateTo } = useSectionNavigation()
   const range = shallowRef<WealthRange>('1a')
-  const recentFilter = shallowRef<RecentFilter>('all')
 
   const viewModel = computed(() =>
     buildNeonDashboardViewModel({
       state: financialStateStore.state,
       pending: recurringStore.openPendingMovements,
       range: range.value,
-      recentFilter: recentFilter.value,
       today: recurringStore.resolveToday(),
     }),
   )
@@ -47,7 +45,6 @@ export const useNeonDashboardStore = defineStore('neon-dashboard', () => {
   return {
     viewModel,
     range,
-    recentFilter,
     searchMovements,
     confirmAllPending,
     navigate: (section: SectionId) => navigateTo(section),

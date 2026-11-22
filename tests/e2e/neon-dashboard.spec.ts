@@ -78,18 +78,21 @@ test('confirma un pendiente uno a uno y luego todos a la vez', async ({ page, tr
   await tracker.reload()
 
   const pending = card(page, 'Por confirmar')
-  await expect(pending.locator('[data-dashboard-pending-item]')).toHaveCount(3)
+  await expect(pending.getByRole('listitem').first()).toBeVisible()
 
   const isConfirmation = (command: Parameters<Parameters<typeof expectSyncCommand>[1]>[0]) =>
     command.action === 'update' &&
     command.entityType === 'pendingMovement' &&
     command.patch.status === 'confirmed'
 
+  // The compact card only displays rows that fit. Confirm one visible item
+  // before checking that the bulk action also handles items outside the list.
+  const confirmFirst = pending.getByRole('button', { name: /^Confirmar (?!todo$)/ }).first()
+  const confirmedLabel = await confirmFirst.getAttribute('aria-label')
   const one = expectSyncCommand(page, isConfirmation)
-  await pending.getByRole('button', { name: 'Confirmar Alquiler' }).click()
+  await confirmFirst.click()
   await one
-  await expect(pending.locator('[data-dashboard-pending-item]')).toHaveCount(2)
-  await expect(pending.getByText('Alquiler')).toHaveCount(0)
+  await expect(pending.getByRole('button', { name: confirmedLabel!, exact: true })).toHaveCount(0)
 
   const rest = expectSyncCommand(page, isConfirmation, 2)
   await pending.getByRole('button', { name: 'Confirmar todo' }).click()
@@ -151,4 +154,49 @@ test('va a una sección desde el enlace de un bloque y vuelve con atrás', async
   await expect(
     tracker.dashboardSection.getByRole('heading', { level: 1, name: 'Así va julio' }),
   ).toBeVisible()
+})
+
+test('guarda el tamaño y los widgets del inicio y permite restablecerlos tras recargar', async ({
+  page,
+  tracker,
+}) => {
+  await dashboard(page).getByRole('button', { name: 'Editar distribución', exact: true }).click()
+  const resized = expectSyncCommand(
+    page,
+    (command) =>
+      command.action === 'settingsUpdate' &&
+      command.patch.dashboardLayout?.items.some((item) => item.id === 'month' && item.w === 3) ===
+        true,
+  )
+  await dashboard(page)
+    .getByRole('group', { name: /^Te quedan\. Flechas/ })
+    .press('Shift+ArrowRight')
+  await resized
+
+  const saved = expectSyncCommand(
+    page,
+    (command) =>
+      command.action === 'settingsUpdate' &&
+      command.patch.dashboardLayout?.items.every((item) => item.id !== 'goals') === true,
+  )
+  await dashboard(page)
+    .getByRole('button', { name: 'Quitar Objetivos del inicio', exact: true })
+    .click()
+  await saved
+  await tracker.reload()
+  await expect(card(page, 'Objetivos')).toHaveCount(0)
+  const monthWidget = dashboard(page).locator('[data-widget="month"]')
+  await expect(monthWidget).toHaveCSS('--w', '3')
+  await dashboard(page).getByRole('button', { name: 'Editar distribución', exact: true }).click()
+  const bar = dashboard(page).getByRole('region', { name: 'Edición del inicio' })
+  await bar.getByRole('button', { name: 'Restablecer', exact: true }).click()
+  const reset = expectSyncCommand(
+    page,
+    (command) => command.action === 'settingsUpdate' && command.patch.dashboardLayout === null,
+  )
+  await bar.getByRole('button', { name: 'Restablecer', exact: true }).click()
+  await reset
+  await tracker.reload()
+  await expect(card(page, 'Objetivos')).toBeVisible()
+  await expect(monthWidget).toHaveCSS('--w', '2')
 })

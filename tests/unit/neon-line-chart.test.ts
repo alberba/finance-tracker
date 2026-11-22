@@ -11,6 +11,13 @@ describe('buildLineChart', () => {
     expect(chart.lastTop).toBe(9.08)
   })
 
+  it('gives every point its place as a share of the width and of the height', () => {
+    const { points } = buildLineChart([100, 150, 200])
+    expect(points.map((point) => point.x)).toEqual([0, 50, 100])
+    expect(points[2].top).toBe(9.08)
+    expect(points[0].top).toBeGreaterThan(points[1].top)
+  })
+
   it('puts gridlines on round values inside the range', () => {
     expect(buildLineChart([100, 200]).ticks.map((tick) => tick.value)).toEqual([100, 150, 200])
   })
@@ -22,6 +29,6 @@ describe('buildLineChart', () => {
   })
 
   it('draws nothing with a single point', () => {
-    expect(buildLineChart([10])).toEqual({ line: '', area: '', ticks: [], lastTop: 50 })
+    expect(buildLineChart([10])).toEqual({ line: '', area: '', ticks: [], lastTop: 50, points: [] })
   })
 })

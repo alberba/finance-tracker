@@ -24,7 +24,6 @@ import { buildLineChart, type LabelledLineChart } from '../ui/line-chart'
  */
 
 export type WealthRange = '1m' | '6m' | '1a'
-export type RecentFilter = 'all' | TransactionType
 /** Gain, loss or neither: the text color of a figure. */
 export type FigureTone = 'gain' | 'loss' | 'neutral'
 
@@ -120,14 +119,6 @@ export const WEALTH_RANGES: ReadonlyArray<{ value: WealthRange; label: string }>
   { value: '1a', label: '1A' },
 ]
 
-export const RECENT_FILTERS: ReadonlyArray<{ value: RecentFilter; label: string }> = [
-  { value: 'all', label: 'Todos' },
-  { value: 'expense', label: 'Gastos' },
-  { value: 'income', label: 'Ingresos' },
-  { value: 'investment', label: 'Inversión' },
-  { value: 'saving', label: 'Ahorro' },
-]
-
 const SHORT_MONTHS = [
   'ene',
   'feb',
@@ -179,14 +170,12 @@ export function buildNeonDashboardViewModel({
   state,
   pending,
   range,
-  recentFilter,
   today,
 }: {
   state: State
   /** The open pending movements, in the order to show them. */
   pending: readonly PendingMovement[]
   range: WealthRange
-  recentFilter: RecentFilter
   today: string
 }): NeonDashboardViewModel {
   const currency = state.currency || 'EUR'
@@ -213,7 +202,7 @@ export function buildNeonDashboardViewModel({
     lede,
     month: {
       name: monthName,
-      status: monthStatus(period, today),
+      status: monthStatus(period),
       leftLabel: period.phase === 'closed' ? 'Te quedaron' : 'Te quedan',
       left: { text: money(left), tone: left < 0 ? 'loss' : 'neutral' },
       income: money(totals.income),
@@ -238,17 +227,17 @@ export function buildNeonDashboardViewModel({
     },
     wealth: wealthBlock(state, period, range, money, signed),
     investments: investmentsBlock(state, period, money, signed),
-    recent: recentBlock(state.transactions, period, recentFilter, money),
+    recent: recentBlock(state.transactions, period, money),
     categories: categoriesBlock(state, period, money),
     goals: goalsBlock(state, period, money, today),
   }
 }
 
-function monthStatus(period: ReturnType<typeof shownPeriod>, today: string): string {
+function monthStatus(period: ReturnType<typeof shownPeriod>): string {
   if (period.phase === 'closed') return 'Mes cerrado'
   if (period.phase === 'coming') return 'Mes por empezar'
-  const days = new Date(Date.UTC(period.year, period.month, 0)).getUTCDate()
-  return `día ${Number(today.slice(8, 10))} de ${days}`
+  // The month in progress needs no label: the title already names it.
+  return ''
 }
 
 function incomeSplit(
@@ -345,6 +334,7 @@ function spendingPace(
 function chart(
   values: number[],
   labels: string[],
+  names: string[],
   money: (value: number) => string,
   axis: (value: number) => string,
   name: string,
@@ -354,6 +344,7 @@ function chart(
     ...geometry,
     labels,
     tickLabels: geometry.ticks.map((tick) => axis(tick.value)),
+    readings: values.map((value, index) => ({ name: names[index] ?? '', value: money(value) })),
     label: values.length
       ? `Evolución ${name}: de ${money(values[0])} a ${money(values[values.length - 1])}`
       : `Evolución ${name}: sin datos`,
@@ -403,6 +394,7 @@ function wealthBlock(
     chart: chart(
       nets.slice(start),
       months.slice(start).map((month) => SHORT_MONTHS[monthIndex(month)]),
+      months.slice(start).map((month) => formatMonthName(month)),
       money,
       (value) => formatCompactMoney(value, state.currency || 'EUR'),
       'del patrimonio',
@@ -425,7 +417,7 @@ function investmentsBlock(
   const rest = ranked.slice(POSITION_LIMIT).reduce((sum, position) => sum + position.weight, 0)
   if (rest > 0) shown.push({ name: 'Otros', weight: round2(rest) })
   const values = portfolio.valueSeries[0]?.values ?? []
-  const labels = portfolio.chartLabels.map((label, index) =>
+  const labels = portfolio.chartLabels.map((_, index) =>
     index === 0 ? 'ini' : SHORT_MONTHS[(index - 1) % 12],
   )
 
@@ -442,6 +434,9 @@ function investmentsBlock(
     chart: chart(
       values,
       labels,
+      portfolio.chartLabels.map((_, index) =>
+        index === 0 ? 'Inicio' : formatMonthName(ALL_MONTHS[(index - 1) % 12]),
+      ),
       money,
       (value) => formatCompactMoney(value, state.currency || 'EUR'),
       'de la cartera',
@@ -453,11 +448,10 @@ function investmentsBlock(
 function recentBlock(
   transactions: Transaction[],
   period: Period,
-  filter: RecentFilter,
   money: (value: number) => string,
 ): NeonDashboardViewModel['recent'] {
   const items = transactions
-    .filter((tx) => inPeriod(tx, period) && (filter === 'all' || tx.type === filter))
+    .filter((tx) => inPeriod(tx, period))
     .sort(
       (a, b) =>
         String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)),
@@ -477,15 +471,7 @@ function recentBlock(
       }
     })
 
-  return {
-    items,
-    empty:
-      filter === 'saving'
-        ? 'Aún no has apartado nada este mes.'
-        : filter === 'all'
-          ? 'Aún no hay movimientos este mes.'
-          : 'No hay movimientos de este tipo este mes.',
-  }
+  return { items, empty: 'Aún no hay movimientos este mes.' }
 }
 
 function categoriesBlock(
@@ -537,9 +523,11 @@ function goalsBlock(
         name: row.name,
         progress: formatPercent(progress, { digits: 0 }),
         width: round2(progress),
+        // The goals are all net worth goals: today's net worth is already in the
+        // Patrimonio block, so the row only carries what is left to say.
         detail: row.met
-          ? `${money(Math.max(row.current, 0))} · objetivo alcanzado`
-          : `${money(Math.max(row.current, 0))} de ${money(row.target)} · para ${row.goal.targetYear}`,
+          ? 'Objetivo alcanzado'
+          : `de ${money(row.target)} · para ${row.goal.targetYear}`,
       }
     })
 }

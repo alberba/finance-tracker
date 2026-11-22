@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NeonChartSeries from '../../ui/NeonChartSeries.vue'
 import { AXIS_LABEL_LEFT, END_LABEL_LEFT, type PortfolioChart } from './view-model'
 
 // The cover's evolution chart: the portfolio over the period, against what
@@ -26,18 +27,20 @@ defineProps<{ chart: PortfolioChart }>()
           stroke="var(--color-ctrl-line)"
           stroke-width="1.5"
         />
-        <path
-          v-for="line in chart.lines"
-          :key="line.key"
-          :d="line.d"
-          fill="none"
-          :stroke="line.dashed ? 'var(--color-faint)' : 'var(--color-accent)'"
-          :stroke-width="line.dashed ? 1 : 2.5"
-          :stroke-dasharray="line.dashed ? '4 4' : undefined"
-          stroke-linejoin="round"
-          stroke-linecap="round"
-          vector-effect="non-scaling-stroke"
-        />
+        <template v-for="line in chart.lines" :key="line.key">
+          <NeonChartSeries v-if="!line.dashed" :line="line.d" />
+          <path
+            v-else
+            :d="line.d"
+            fill="none"
+            stroke="var(--color-faint)"
+            stroke-width="1"
+            stroke-dasharray="4 4"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            vector-effect="non-scaling-stroke"
+          />
+        </template>
         <circle
           v-if="chart.drop"
           :cx="chart.drop.x"

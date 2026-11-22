@@ -33,6 +33,7 @@
  */
 
 import { Schema } from 'effect'
+import { dashboardLayoutSchema } from '../../dashboard-layout'
 
 import { validator, type Validator } from '../../schema'
 
@@ -443,6 +444,7 @@ export const settingsUpdateCommandSchema = validator(
       onboardingAccountCompleted: optionalBoolean,
       onboardingMovementCompleted: optionalBoolean,
       onboardingCompleted: optionalBoolean,
+      dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,
       theme: optionalText,

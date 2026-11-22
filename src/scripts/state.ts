@@ -1,3 +1,4 @@
+import { parseDashboardLayout } from '../lib/dashboard-layout'
 import { remoteOperationSchema } from '../lib/bitvavo-types'
 import { asMonth } from '../lib/month'
 import { FINANCE_TRACKER_SEED } from '../data/seed'
@@ -53,6 +54,7 @@ export const EMPTY_STATE_SEED = {
   onboardingAccountCompleted: false,
   onboardingMovementCompleted: false,
   onboardingCompleted: false,
+  dashboardLayout: null,
   currency: 'EUR',
   twrLiquidityAccountIds: [],
   accounts: [],
@@ -159,6 +161,7 @@ export function normalizeState(candidate: unknown): State {
     onboardingAccountCompleted: input?.onboardingAccountCompleted === true,
     onboardingMovementCompleted: input?.onboardingMovementCompleted === true,
     onboardingCompleted: input?.onboardingCompleted === true,
+    dashboardLayout: parseDashboardLayout(input?.dashboardLayout),
     twrLiquidityAccountIds,
     accounts,
     investmentAssets: normalizeEntities(input?.investmentAssets || base.investmentAssets || []),

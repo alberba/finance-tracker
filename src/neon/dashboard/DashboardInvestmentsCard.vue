@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, shallowRef } from 'vue'
+
 import type { SectionId } from '../../scripts/types'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
@@ -9,13 +11,23 @@ import type { NeonDashboardViewModel } from './view-model'
 // Inversiones: the portfolio's value and total gain, how it is split and how
 // it went this year. Quotes are never shown as real time: the note says when
 // they were taken, or that they are late.
-defineProps<{ investments: NeonDashboardViewModel['investments'] }>()
+const props = defineProps<{ investments: NeonDashboardViewModel['investments'] }>()
 const emit = defineEmits<{ navigate: [section: SectionId] }>()
 
 const quotes = useQuotesNote()
+const hovered = shallowRef<number | null>(null)
+// The figure follows the point being read on the chart.
+const figure = computed(() =>
+  hovered.value !== null
+    ? (props.investments.chart.readings[hovered.value]?.value ?? props.investments.value)
+    : props.investments.value,
+)
 
 const SWATCHES = ['bg-lilac', 'bg-lilac2', 'bg-peach', 'bg-lilac3', 'bg-neutral-bar'] as const
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' } as const
+// The total gain is today's: while another point is read it steps back so it is
+// not taken for that point's.
+const FADE = 'motion-safe:transition-opacity motion-safe:duration-160'
 </script>
 
 <template>
@@ -34,32 +46,19 @@ const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' }
         <span
           class="font-display text-figure-block text-text font-semibold whitespace-nowrap tabular-nums"
         >
-          {{ investments.value }}
+          {{ figure }}
         </span>
-        <span v-if="investments.gain" class="text-muted text-note">
+        <span
+          v-if="investments.gain"
+          class="text-muted text-note"
+          :class="[FADE, hovered !== null && 'opacity-40']"
+        >
           Ganancia total
           <b class="font-extrabold" :class="TONE_TEXT[investments.gain.tone]">{{
             investments.gain.text
           }}</b>
         </span>
-        <span
-          v-if="quotes"
-          class="text-meta inline-flex items-center gap-1.5"
-          :class="quotes.late ? 'text-soft' : 'text-muted'"
-        >
-          <svg
-            class="size-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 2" />
-          </svg>
+        <span v-if="quotes" class="text-meta" :class="quotes.late ? 'text-soft' : 'text-muted'">
           {{ quotes.text }}
         </span>
       </div>
@@ -86,7 +85,12 @@ const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' }
           {{ position.name }} {{ position.share }}
         </li>
       </ul>
-      <NeonLineChart v-if="investments.chart.line" :chart="investments.chart" tone="lilac" />
+      <NeonLineChart
+        v-if="investments.chart.line"
+        v-model:active="hovered"
+        :chart="investments.chart"
+        tone="lilac"
+      />
     </template>
   </NeonCard>
 </template>

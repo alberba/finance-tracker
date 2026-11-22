@@ -1,3 +1,4 @@
+import type { DashboardLayoutPreference } from '../lib/dashboard-layout'
 import type { Month } from '../lib/month'
 
 export const TRANSACTION_TYPES = ['income', 'expense', 'saving', 'investment'] as const
@@ -242,6 +243,7 @@ export interface StateMeta {
 }
 
 export interface State {
+  dashboardLayout: DashboardLayoutPreference | null
   onboardingPresented: boolean
   onboardingDismissed: boolean
   onboardingAccountCompleted: boolean

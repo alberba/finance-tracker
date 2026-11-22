@@ -6,6 +6,9 @@ import { createTestDb, type TestDatabase } from "../setup";
 import { seedAccount, seedUser } from "../repositories/fixtures";
 import { runWithDb } from '../../../../src/db/database'
 import * as syncRepository from "../../../../src/db/repositories/sync"
+import { projectSyncV2State } from '../../../../src/lib/client/v2-state-projection'
+import { applyPendingCommands } from '../../../../src/lib/client/pending-overlay'
+import { settingsUpdateCommandSchema } from '../../../../src/lib/server/sync/command-schemas'
 import { applyRemoteChanges, emptyReadModel } from "../../../../src/lib/client/sync-read-model"
 
 /**
@@ -135,3 +138,41 @@ describe("settingsUpdate carries optimistic concurrency (audit §6.4)", () => {
 
   });
 });
+
+describe('dashboard layout through sync', () => {
+  it('survives the outbox schema, offline projection, storage and remote changes', async () => {
+    const database = createTestDb()
+    try {
+      const user = await seedUser(database.db)
+      const layout = { version: 1 as const, items: [{ id: 'goals', col: 0, row: 0, w: 2, h: 3 }] }
+      const command = settingsUpdateCommandSchema.parse({
+        commandId: 'layout-save',
+        action: 'settingsUpdate',
+        patch: { dashboardLayout: layout },
+      })
+      expect(
+        projectSyncV2State(applyPendingCommands(emptyReadModel(), [command])).dashboardLayout,
+      ).toEqual(layout)
+      const result = await runWithDb(database.db, applySyncBatch(user.id, [command]))
+      expect(result.results[0].status).toBe('applied')
+      expect(
+        (await runWithDb(database.db, userSettingsRepository.get(user.id)))?.dashboardLayout,
+      ).toEqual(layout)
+      const changes = await runWithDb(database.db, syncRepository.listChangesSince(user.id, 0))
+      const remote = applyRemoteChanges(emptyReadModel(), changes, result.revision)
+      expect(projectSyncV2State(remote).dashboardLayout).toEqual(layout)
+      const reset = settingsUpdateCommandSchema.parse({
+        commandId: 'layout-reset',
+        action: 'settingsUpdate',
+        patch: { dashboardLayout: null },
+      })
+      expect(projectSyncV2State(applyPendingCommands(remote, [reset])).dashboardLayout).toBeNull()
+      await runWithDb(database.db, applySyncBatch(user.id, [reset]))
+      expect(
+        (await runWithDb(database.db, userSettingsRepository.get(user.id)))?.dashboardLayout,
+      ).toBeNull()
+    } finally {
+      database.close()
+    }
+  })
+})

@@ -1,5 +1,7 @@
 /** `user_settings` repository (WP6) — one row per user, currency/locale/theme prefs. */
 
+import type { DashboardLayoutPreference } from '../../lib/dashboard-layout'
+
 import { and, eq } from 'drizzle-orm'
 import { lift } from '../database'
 import { userSettings } from '../schema'
@@ -11,6 +13,7 @@ export interface CreateUserSettingsInput {
   currency?: string
   locale?: string | null
   theme?: string | null
+  dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
   onboardingAccountCompleted?: boolean
@@ -24,6 +27,7 @@ export interface UpdateUserSettingsInput {
   currency?: string
   locale?: string | null
   theme?: string | null
+  dashboardLayout?: DashboardLayoutPreference | null
   onboardingPresented?: boolean
   onboardingDismissed?: boolean
   onboardingAccountCompleted?: boolean
@@ -51,6 +55,7 @@ async function createSql(
       currency: input.currency ?? 'EUR',
       locale: input.locale ?? null,
       theme: input.theme ?? null,
+      dashboardLayout: input.dashboardLayout ?? null,
       onboardingPresented: input.onboardingPresented ? 1 : 0,
       onboardingDismissed: input.onboardingDismissed ? 1 : 0,
       onboardingAccountCompleted: input.onboardingAccountCompleted ? 1 : 0,
@@ -81,6 +86,8 @@ async function updateSql(
       currency: input.currency ?? existing.currency,
       locale: input.locale === undefined ? existing.locale : input.locale,
       theme: input.theme === undefined ? existing.theme : input.theme,
+      dashboardLayout:
+        input.dashboardLayout === undefined ? existing.dashboardLayout : input.dashboardLayout,
       stockeventsEnabled:
         input.stockeventsEnabled === undefined
           ? existing.stockeventsEnabled

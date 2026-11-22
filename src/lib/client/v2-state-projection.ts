@@ -112,6 +112,7 @@ export function projectSyncV2State(
     onboardingAccountCompleted: bootstrap.settings?.onboardingAccountCompleted === 1,
     onboardingMovementCompleted: bootstrap.settings?.onboardingMovementCompleted === 1,
     onboardingCompleted: bootstrap.settings?.onboardingCompleted === 1,
+    dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
     twrLiquidityAccountIds: [],
     accounts: [],
     investmentAssets: [],
@@ -182,8 +183,7 @@ export function projectSyncV2State(
     return {
       id: legacyId(transaction),
       date: String(transaction.date),
-      month:
-        asMonth(transaction.accountingMonth) ?? monthFromISO(String(transaction.date)) ?? 1,
+      month: asMonth(transaction.accountingMonth) ?? monthFromISO(String(transaction.date)) ?? 1,
       type: String(transaction.type) as State['transactions'][number]['type'],
       accountId:
         accountIds.get(String(transaction.accountId)) || String(transaction.accountId || ''),

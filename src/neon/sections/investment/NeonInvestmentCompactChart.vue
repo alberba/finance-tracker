@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
 
+import NeonChartSeries from '../../ui/NeonChartSeries.vue'
 import type { CompactChart } from './view-model'
 
 // The cover's chart on the mobile frame (artboard «Inversión · móvil · Pixel
@@ -13,7 +14,6 @@ import type { CompactChart } from './view-model'
 const props = defineProps<{ chart: CompactChart; when: string | null }>()
 const hot = defineModel<number | null>('hot', { required: true })
 
-const gradientId = `compact-area-${useId()}`
 const last = computed(() => props.chart.points.length - 1)
 const current = computed(() => hot.value ?? last.value)
 const point = computed(() => props.chart.points[current.value])
@@ -60,26 +60,20 @@ function onKey(event: KeyboardEvent): void {
       :aria-label="chart.label"
       class="absolute inset-0 block size-full overflow-visible"
     >
-      <defs>
-        <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="var(--color-accent)" stop-opacity="0.42" />
-          <stop offset="0.55" stop-color="var(--color-accent)" stop-opacity="0.14" />
-          <stop offset="1" stop-color="var(--color-accent)" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      <path :d="chart.area" :fill="`url(#${gradientId})`" stroke="none" />
-      <path
-        v-for="line in chart.lines"
-        :key="line.key"
-        :d="line.d"
-        fill="none"
-        :stroke="line.dashed ? 'var(--color-faint)' : 'var(--color-accent)'"
-        :stroke-width="line.dashed ? 1 : 2.5"
-        :stroke-dasharray="line.dashed ? '4 4' : undefined"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        vector-effect="non-scaling-stroke"
-      />
+      <template v-for="line in chart.lines" :key="line.key">
+        <NeonChartSeries v-if="!line.dashed" :line="line.d" :area="chart.area" />
+        <path
+          v-else
+          :d="line.d"
+          fill="none"
+          stroke="var(--color-faint)"
+          stroke-width="1"
+          stroke-dasharray="4 4"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+          vector-effect="non-scaling-stroke"
+        />
+      </template>
     </svg>
     <span
       v-if="hot !== null"

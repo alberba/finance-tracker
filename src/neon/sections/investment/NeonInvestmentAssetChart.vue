@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
+
+import NeonChartSeries from '../../ui/NeonChartSeries.vue'
 
 import type { AssetChart } from './asset-view-model'
 
@@ -15,7 +17,6 @@ const props = withDefaults(defineProps<{ chart: AssetChart; touch?: boolean }>()
 })
 const hot = defineModel<number | null>('hot', { required: true })
 
-const gradientId = `asset-area-${useId()}`
 const points = computed(() => props.chart.points)
 const current = computed(() => hot.value ?? points.value.length - 1)
 const reading = computed(() => points.value[current.value])
@@ -71,13 +72,6 @@ function onKey(event: KeyboardEvent): void {
       :aria-label="chart.label"
       class="block h-auto overflow-visible"
     >
-      <defs>
-        <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="var(--color-accent)" stop-opacity="0.42" />
-          <stop offset="0.55" stop-color="var(--color-accent)" stop-opacity="0.14" />
-          <stop offset="1" stop-color="var(--color-accent)" stop-opacity="0" />
-        </linearGradient>
-      </defs>
       <path
         v-if="chart.average"
         :d="chart.average.d"
@@ -86,16 +80,7 @@ function onKey(event: KeyboardEvent): void {
         stroke-width="1"
         stroke-dasharray="4 4"
       />
-      <path :d="chart.area" :fill="`url(#${gradientId})`" stroke="none" />
-      <path
-        :d="chart.line"
-        fill="none"
-        stroke="var(--color-accent)"
-        stroke-width="2.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-        vector-effect="non-scaling-stroke"
-      />
+      <NeonChartSeries :line="chart.line" :area="chart.area" />
       <template v-for="(point, index) in points" :key="index">
         <circle
           v-if="point.operation"

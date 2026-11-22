@@ -2,6 +2,7 @@
 import type { SectionId } from '../../scripts/types'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
+import NeonFitList from '../ui/NeonFitList.vue'
 import NeonProgressBar from '../ui/NeonProgressBar.vue'
 import type { NeonDashboardViewModel } from './view-model'
 
@@ -19,7 +20,7 @@ const emit = defineEmits<{ navigate: [section: SectionId] }>()
     @navigate="emit('navigate', $event)"
   >
     <NeonEmptyState v-if="!goals.length">Aún no tienes objetivos definidos.</NeonEmptyState>
-    <ul v-else>
+    <NeonFitList v-else>
       <li
         v-for="goal in goals"
         :key="goal.key"
@@ -34,6 +35,6 @@ const emit = defineEmits<{ navigate: [section: SectionId] }>()
         <NeonProgressBar :value="goal.width" />
         <span class="text-muted text-meta">{{ goal.detail }}</span>
       </li>
-    </ul>
+    </NeonFitList>
   </NeonCard>
 </template>

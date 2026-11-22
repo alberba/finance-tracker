@@ -83,3 +83,9 @@ el compilador no siempre marca. Tras `pnpm check`, busca el tipo con `grep -rn` 
 `tests/integration/d1-v2/round-trip/` ejecuta los stores reales contra SQLite con
 `migrations-v2/` aplicadas y cubre la ida y la vuelta completas. Un campo nuevo lleva su caso en el
 fichero de su entidad.
+
+La distribución del inicio de escritorio viaja como un único ajuste JSON versionado,
+`dashboardLayout`. El comando `settingsUpdate` reemplaza el documento entero. `null` delega en
+la distribución por defecto, mientras que `{ version: 1, items: [] }` conserva un inicio vacío.
+La cola pendiente proyecta el mismo valor antes de que lo confirme el servidor. El estado y la
+copia JSON conservan el documento, y el diseño interpreta los widgets y sus tamaños mínimos.

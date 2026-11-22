@@ -77,6 +77,7 @@
  *   intentionally not routed through the sync command outbox.
  */
 
+import type { DashboardLayoutPreference } from '../dashboard-layout'
 import type { Month } from '../month'
 import { useSyncStore } from '../../stores/sync'
 import type { SyncEntityType } from '../server/sync/command-schemas'
@@ -312,6 +313,7 @@ export async function syncRemoveByKey(
  * the server reads as "create it".
  */
 export async function syncSettingsUpdate(patch: {
+  dashboardLayout?: DashboardLayoutPreference | null
   currency?: string
   locale?: string | null
   theme?: string | null

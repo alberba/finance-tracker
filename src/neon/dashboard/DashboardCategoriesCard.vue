@@ -2,6 +2,7 @@
 import type { SectionId } from '../../scripts/types'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
+import NeonFitList from '../ui/NeonFitList.vue'
 import NeonProgressBar from '../ui/NeonProgressBar.vue'
 import type { NeonDashboardViewModel } from './view-model'
 
@@ -22,7 +23,7 @@ const emit = defineEmits<{ navigate: [section: SectionId] }>()
     <NeonEmptyState v-if="!categories.length">
       Aún no hay gastos ni límites este mes.
     </NeonEmptyState>
-    <ul v-else>
+    <NeonFitList v-else>
       <li
         v-for="item in categories"
         :key="item.category"
@@ -31,12 +32,16 @@ const emit = defineEmits<{ navigate: [section: SectionId] }>()
         <div class="flex items-baseline justify-between gap-3">
           <span class="font-bold">{{ item.category }}</span>
           <span class="text-muted text-meta whitespace-nowrap">
-            <b :class="item.over ? 'text-loss' : 'text-text'">{{ item.spent }}</b>
-            {{ item.limit ? `/ ${item.limit}` : '· sin límite' }}
+            <b
+              class="font-display text-figure-row font-semibold"
+              :class="item.over ? 'text-loss' : 'text-text'"
+              >{{ item.spent }}</b
+            >
+            {{ item.limit ? `de ${item.limit}` : '· sin límite' }}
           </span>
         </div>
         <NeonProgressBar v-if="item.limit" :value="item.width" :over="item.over" />
       </li>
-    </ul>
+    </NeonFitList>
   </NeonCard>
 </template>

@@ -119,7 +119,12 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 
 <template>
   <NeonDetailPanel v-model:open="open" :title="goal ? goal.name : 'Nuevo objetivo'">
-    <form :id="FORM_ID" class="grid grid-cols-[minmax(0,1fr)] gap-[22px]" autocomplete="off" @submit.prevent="save">
+    <form
+      :id="FORM_ID"
+      class="grid grid-cols-[minmax(0,1fr)] gap-[22px]"
+      autocomplete="off"
+      @submit.prevent="save"
+    >
       <label :class="labelClass">
         Nombre
         <input
@@ -153,7 +158,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
             :key="when.due"
             type="button"
             :aria-pressed="form.due === when.due"
-            class="rounded-pill outline-accent pointer-coarse:min-h-11 min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2"
+            class="rounded-pill outline-accent min-h-[38px] border px-3.5 text-[13px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
             :class="
               form.due === when.due
                 ? 'bg-sel-bg text-sel-text border-sel-border'

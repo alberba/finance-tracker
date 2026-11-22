@@ -25,6 +25,7 @@ function createState(subscription: Subscription): State {
   return {
     meta: { source: 'test', generatedAt: '2026-01-01T00:00:00.000Z', version: 1, savedAt: null },
     onboardingPresented: false,
+    dashboardLayout: null,
     onboardingDismissed: false,
     onboardingAccountCompleted: false,
     onboardingMovementCompleted: false,

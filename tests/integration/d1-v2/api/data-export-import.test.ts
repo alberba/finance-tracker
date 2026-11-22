@@ -309,6 +309,7 @@ async function seedFullDataset(db: TestDatabase['db'], userId: string): Promise<
     currency: 'EUR',
     locale: 'es-ES',
     theme: 'dark',
+    dashboardLayout: { version: 1, items: [{ id: 'goals', col: 0, row: 0, w: 2, h: 3 }] },
     stockeventsEnabled: true,
     stockeventsTradesToCash: false,
   }))

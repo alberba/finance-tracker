@@ -73,7 +73,6 @@ function build(
     state: state(overrides),
     pending: [],
     range: '1a',
-    recentFilter: 'all',
     today: TODAY,
     ...options,
   })
@@ -91,7 +90,7 @@ describe('the month the dashboard shows', () => {
     const vm = build()
     expect(vm.title).toBe('Así va octubre')
     expect(vm.month.name).toBe('Octubre')
-    expect(vm.month.status).toBe('día 9 de 31')
+    expect(vm.month.status).toBe('')
   })
 
   it('is December, closed, for a past year', () => {
@@ -325,19 +324,8 @@ describe('the recent movements', () => {
     ])
   })
 
-  it('keeps only the type of the filter', () => {
-    const vm = build({ transactions }, { recentFilter: 'expense' })
-    expect(vm.recent.items.map((item) => item.description)).toEqual(['Alquiler'])
-  })
-
   it('says why the list is empty', () => {
-    expect(build({ transactions }, { recentFilter: 'saving' }).recent.items).toHaveLength(1)
-    expect(build({}, { recentFilter: 'saving' }).recent.empty).toBe(
-      'Aún no has apartado nada este mes.',
-    )
-    expect(build({}, { recentFilter: 'income' }).recent.empty).toBe(
-      'No hay movimientos de este tipo este mes.',
-    )
+    expect(build({}).recent.empty).toBe('Aún no hay movimientos este mes.')
   })
 })
 
@@ -398,8 +386,8 @@ describe('Objetivos', () => {
     expect(
       vm.goals.map(({ name, progress, width, detail }) => [name, progress, width, detail]),
     ).toEqual([
-      ['Fondo de emergencia', '50 %', 50, '10.000,00 € de 20.000,00 € · para 2027'],
-      ['Colchón', '100 %', 100, '10.000,00 € · objetivo alcanzado'],
+      ['Fondo de emergencia', '50 %', 50, 'de 20.000,00 € · para 2027'],
+      ['Colchón', '100 %', 100, 'Objetivo alcanzado'],
     ])
   })
 

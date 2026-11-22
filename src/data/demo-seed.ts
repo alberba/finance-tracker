@@ -290,6 +290,7 @@ export function buildDemoSeed(now: Date = new Date()): State {
       version: 1,
       savedAt: null,
     },
+    dashboardLayout: null,
     onboardingPresented: false,
     onboardingDismissed: false,
     onboardingAccountCompleted: false,

@@ -8,6 +8,7 @@
  */
 
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import type { DashboardLayoutPreference } from '../../lib/dashboard-layout'
 import { idColumn, createdAtColumn, updatedAtColumn, versionColumn } from './_helpers'
 
 /** A financial account holder. */
@@ -53,6 +54,7 @@ export const userSettings = sqliteTable(
     currency: text('currency').notNull().default('EUR'),
     locale: text('locale'),
     theme: text('theme'),
+    dashboardLayout: text('dashboard_layout', { mode: 'json' }).$type<DashboardLayoutPreference>(),
     stockeventsEnabled: integer('stockevents_enabled').notNull().default(0),
     stockeventsTradesToCash: integer('stockevents_trades_to_cash').notNull().default(0),
     onboardingPresented: integer('onboarding_presented').notNull().default(0),
