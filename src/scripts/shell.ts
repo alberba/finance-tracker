@@ -2,6 +2,7 @@ import { isDemoMode, setDemoModeEnabled } from './demo-mode'
 import { requestReportDialogOpen } from './report-dialog'
 import { useSectionNavigation } from '../composables/useSectionNavigation'
 import { initReportsBadge } from './app/reports-badge'
+import { getNeonThemeController } from '../lib/client/neon-theme'
 import { getThemeController } from '../lib/client/theme'
 import { logOut } from './app/logout'
 import { pinia } from '../stores/pinia'
@@ -62,9 +63,15 @@ function repaintThemeAwareCharts(): void {
   }
 }
 
-/** Starts the theme controller (so "Sistema" tracks the OS) and repaints charts on change. */
+/**
+ * Starts the controller of the design on screen (so a theme with no choice
+ * tracks the OS) and repaints charts on change. Each design owns its theme
+ * attribute and storage key, so only one controller ever runs.
+ */
 function initTheme(): void {
-  getThemeController().subscribe(repaintThemeAwareCharts)
+  const controller =
+    document.documentElement.dataset.ui === 'neon' ? getNeonThemeController() : getThemeController()
+  controller.subscribe(repaintThemeAwareCharts)
 }
 
 function initMobileMoreMenu(): void {
