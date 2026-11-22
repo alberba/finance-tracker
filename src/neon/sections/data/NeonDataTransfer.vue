@@ -21,7 +21,11 @@ import {
 // «Entrada y salida» (artboard «Datos · 2560 px»): two tiles side by side.
 // Importar opens the import flow under them; Exportar lists the two files the
 // app can hand over and what a copy holds. The last import and export of this
-// visit are noted at the foot of each tile.
+// visit are noted at the foot of each tile. In the mobile frame (artboard
+// «Datos · móvil · Pixel 10») the tiles become three rows: Importar, which
+// opens the same flow, and one row per file, which exports it at once.
+withDefaults(defineProps<{ mobile?: boolean }>(), { mobile: false })
+
 const dataStore = useDataStore()
 const syncStore = useSyncStore()
 const { summary } = storeToRefs(dataStore)
@@ -103,6 +107,36 @@ function exportCsv(): void {
   lastExport.value = 'Último: CSV exportado.'
 }
 
+const IMPORT_ICON = 'M12 20V9M7 13l5-5 5 5M5 4h14'
+const EXPORT_ICON = 'M12 4v11M7 11l5 5 5-5M5 20h14'
+const mobileRows = [
+  {
+    id: 'import-toggle',
+    /** Opens the import flow under the rows instead of acting at once. */
+    expands: true,
+    label: 'Importar',
+    description: backsUpServerData ? 'Archivo JSON o Bitvavo' : 'Archivo JSON',
+    icon: IMPORT_ICON,
+    action: toggleImport,
+  },
+  {
+    id: 'export-json',
+    expands: false,
+    label: 'Exportar copia completa',
+    description: 'JSON. Es el archivo que puedes importar.',
+    icon: EXPORT_ICON,
+    action: exportJson,
+  },
+  {
+    id: 'export-transactions-csv',
+    expands: false,
+    label: 'Exportar movimientos',
+    description: 'CSV para una hoja de cálculo. No se puede importar.',
+    icon: EXPORT_ICON,
+    action: exportCsv,
+  },
+]
+
 function syncNow(): void {
   void syncStore.syncNow()
 }
@@ -116,7 +150,60 @@ function syncNow(): void {
   >
     <p class="text-muted text-note -mt-2">Lo que entra y sale de tu espacio.</p>
 
-    <div class="grid grid-cols-1 gap-3.5 @min-[760px]:grid-cols-2">
+    <template v-if="mobile">
+      <ul class="flex list-none flex-col">
+        <li v-for="row in mobileRows" :key="row.id" class="border-line border-t last:border-b">
+          <button
+            :id="row.id"
+            type="button"
+            class="text-text outline-accent flex min-h-16 w-full items-center gap-3 py-2.5 text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+            :aria-expanded="row.expands ? importOpen : undefined"
+            :aria-controls="row.expands ? 'data-import-flow' : undefined"
+            :data-import-toggle="row.expands ? '' : undefined"
+            @click="row.action"
+          >
+            <span
+              class="bg-panel2 text-accent-text grid size-10 shrink-0 place-items-center rounded-full"
+              aria-hidden="true"
+            >
+              <svg
+                class="size-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path :d="row.icon" />
+              </svg>
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-[16px] font-bold">{{ row.label }}</span>
+              <span class="text-muted text-meta">{{ row.description }}</span>
+            </span>
+            <svg
+              v-if="row.expands"
+              class="text-muted size-[18px] shrink-0 motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out"
+              :class="{ 'rotate-90': importOpen }"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </li>
+      </ul>
+      <p v-if="lastImport" class="text-muted text-meta" data-last-import>{{ lastImport }}</p>
+      <p v-if="lastExport" class="text-muted text-meta" data-last-export>{{ lastExport }}</p>
+    </template>
+
+    <div v-else class="grid grid-cols-1 gap-3.5 @min-[760px]:grid-cols-2">
       <button
         type="button"
         class="bg-panel2 text-text outline-accent flex min-w-0 flex-col items-start gap-3 rounded-[18px] p-[22px] text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"

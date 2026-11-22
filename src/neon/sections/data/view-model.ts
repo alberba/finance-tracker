@@ -86,6 +86,15 @@ export function pendingWord(pendingCount: number): string {
   return pendingCount === 1 ? 'cambio pendiente' : 'cambios pendientes'
 }
 
+/**
+ * The mobile toggle under the sync line (artboard «Datos · móvil · Pixel 10»):
+ * the queue stays folded until asked for.
+ */
+export function queueToggleLabel(open: boolean, pendingCount: number): string {
+  if (pendingCount === 1) return open ? 'Ocultar el cambio pendiente' : 'Ver el cambio pendiente'
+  return open ? 'Ocultar cambios pendientes' : `Ver los ${pendingCount} cambios pendientes`
+}
+
 function pendingLabel(pendingCount: number): string {
   return pendingCount === 1 ? '1 pendiente' : `${pendingCount} pendientes`
 }
