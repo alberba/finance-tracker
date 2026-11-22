@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue'
+import { computed, ref } from 'vue'
 
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailHeader from '../../ui/NeonDetailHeader.vue'
+import { OPERATION_ICONS } from './asset-icons'
 import { type AssetDetail } from './asset-view-model'
+import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
+import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
 import { TONE_TEXT } from './view-model'
 
 // The detail of an asset in the new Inversión (artboard «Inversión · detalle de
@@ -21,47 +24,13 @@ const emit = defineEmits<{
   declareAll: []
 }>()
 
-const gradientId = `asset-area-${useId()}`
-const ICONS = {
-  buy: 'M12 5v14M6 13l6 6 6-6',
-  sell: 'M12 19V5M6 11l6-6 6 6',
-  other: 'M12 5v14M5 12h14',
-}
-
 // The chart rests on today's point; moving over it (or the arrow keys) reads
-// another one.
+// another one, and the line above it says which.
 const hot = ref<number | null>(null)
-const points = computed(() => props.detail.chart?.points ?? [])
-const current = computed(() => hot.value ?? points.value.length - 1)
-const reading = computed(() => points.value[current.value])
-
-function nearest(event: PointerEvent): number {
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const share = ((event.clientX - box.left) / box.width) * 100
-  let best = 0
-  points.value.forEach((point, index) => {
-    if (Math.abs(point.left - share) < Math.abs(points.value[best].left - share)) best = index
-  })
-  return best
-}
-
-function onPointer(event: PointerEvent): void {
-  if (event.pointerType !== 'mouse') return
-  hot.value = nearest(event)
-}
-
-function onKey(event: KeyboardEvent): void {
-  const last = points.value.length - 1
-  let next: number | null = null
-  if (event.key === 'ArrowLeft') next = Math.max(0, current.value - 1)
-  else if (event.key === 'ArrowRight') next = Math.min(last, current.value + 1)
-  else if (event.key === 'Home') next = 0
-  else if (event.key === 'End') next = last
-  else if (event.key === 'Escape') hot.value = null
-  if (next === null) return
-  event.preventDefault()
-  hot.value = next
-}
+const reading = computed(() => {
+  const points = props.detail.chart?.points ?? []
+  return points[hot.value ?? points.length - 1]
+})
 
 function onBack(event: MouseEvent): void {
   event.preventDefault()
@@ -148,102 +117,7 @@ function onBack(event: MouseEvent): void {
             <span :class="TONE_TEXT[reading.deltaTone]">{{ reading.delta }}</span>
             <span v-if="reading.note">{{ reading.note }}</span>
           </p>
-          <div
-            class="outline-accent relative min-w-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4"
-            tabindex="0"
-            role="group"
-            aria-roledescription="gráfica interactiva"
-            aria-label="Gráfica del precio. Flechas izquierda y derecha para recorrer las operaciones, Escape para volver a hoy."
-            data-asset-chart
-            @keydown="onKey"
-            @blur="hot = null"
-          >
-            <svg
-              :viewBox="detail.chart.viewBox"
-              width="100%"
-              role="img"
-              :aria-label="detail.chart.label"
-              class="block h-auto overflow-visible"
-            >
-              <defs>
-                <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="var(--color-accent)" stop-opacity="0.42" />
-                  <stop offset="0.55" stop-color="var(--color-accent)" stop-opacity="0.14" />
-                  <stop offset="1" stop-color="var(--color-accent)" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <path
-                v-if="detail.chart.average"
-                :d="detail.chart.average.d"
-                fill="none"
-                stroke="var(--color-faint)"
-                stroke-width="1"
-                stroke-dasharray="4 4"
-              />
-              <path :d="detail.chart.area" :fill="`url(#${gradientId})`" stroke="none" />
-              <path
-                :d="detail.chart.line"
-                fill="none"
-                stroke="var(--color-accent)"
-                stroke-width="2.5"
-                stroke-linejoin="round"
-                stroke-linecap="round"
-                vector-effect="non-scaling-stroke"
-              />
-              <template v-for="(point, index) in points" :key="index">
-                <circle
-                  v-if="point.operation"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="5.5"
-                  :fill="point.operation === 'sell' ? 'var(--color-bg)' : 'var(--color-text)'"
-                  :stroke="point.declared ? 'var(--color-text)' : 'var(--color-accent)'"
-                  :stroke-width="point.declared ? 2 : 3"
-                />
-              </template>
-              <circle
-                v-if="hot === null"
-                :cx="reading.x"
-                :cy="reading.y"
-                r="5.5"
-                fill="var(--color-text)"
-                stroke="var(--color-bg)"
-                stroke-width="2.5"
-              />
-              <circle
-                v-else
-                :cx="reading.x"
-                :cy="reading.y"
-                r="6"
-                fill="var(--color-bg)"
-                stroke="var(--color-text)"
-                stroke-width="2.5"
-              />
-            </svg>
-            <span
-              v-if="detail.chart.average"
-              class="text-muted pointer-events-none absolute inset-s-2 -translate-y-full pb-1.5 text-xs font-bold"
-              :style="{ insetBlockStart: `${detail.chart.average.top}%` }"
-              aria-hidden="true"
-            >
-              Tu precio medio
-            </span>
-            <span
-              v-for="tick in detail.chart.ticks"
-              :key="tick.left"
-              class="text-muted pointer-events-none absolute inset-bs-[97%] -translate-x-1/2 -translate-y-1/2 text-xs leading-none font-bold"
-              :style="{ insetInlineStart: `${tick.left}%` }"
-              aria-hidden="true"
-            >
-              {{ tick.text }}
-            </span>
-            <div
-              class="absolute inset-0 cursor-crosshair"
-              aria-hidden="true"
-              @pointermove="onPointer"
-              @pointerleave="hot = null"
-            ></div>
-          </div>
+          <NeonInvestmentAssetChart v-model:hot="hot" :chart="detail.chart" />
         </template>
         <p v-else class="text-muted text-note m-0">
           Aún no hay operaciones con precio para dibujar la gráfica.
@@ -304,7 +178,7 @@ function onBack(event: MouseEvent): void {
               stroke-linejoin="round"
               aria-hidden="true"
             >
-              <path :d="ICONS.buy" />
+              <path :d="OPERATION_ICONS.buy" />
             </svg>
           </button>
           <button
@@ -323,7 +197,7 @@ function onBack(event: MouseEvent): void {
               stroke-linejoin="round"
               aria-hidden="true"
             >
-              <path :d="ICONS.sell" />
+              <path :d="OPERATION_ICONS.sell" />
             </svg>
           </button>
         </div>
@@ -332,73 +206,7 @@ function onBack(event: MouseEvent): void {
         </NeonButton>
       </div>
 
-      <p v-if="!detail.years.length" class="text-muted text-note m-0">
-        Aún no hay operaciones apuntadas.
-      </p>
-      <div v-for="year in detail.years" :key="year.year" class="grid gap-1" data-asset-year>
-        <div class="mt-3.5 flex items-baseline justify-between gap-x-5 gap-y-0.5">
-          <h3 class="text-muted text-label tracking-label m-0 flex-none font-extrabold uppercase">
-            {{ year.year }}
-          </h3>
-          <span class="text-muted text-meta min-w-0 truncate font-bold tabular-nums">
-            {{ year.sum }}
-          </span>
-        </div>
-        <ul class="m-0 list-none p-0">
-          <li
-            v-for="row in year.rows"
-            :key="row.id"
-            class="border-line grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 border-t py-2.5 [grid-template-areas:'i_o_t'_'i_d_q'_'i_f_q']"
-            :data-asset-movement="row.id"
-          >
-            <span
-              class="flex items-center self-center [grid-area:i]"
-              :class="row.side === 'sell' ? 'text-soft' : 'text-text'"
-              aria-hidden="true"
-            >
-              <svg
-                class="size-7"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path :d="ICONS[row.side ?? 'other']" />
-              </svg>
-            </span>
-            <span
-              class="text-note min-w-0 truncate font-bold [grid-area:o]"
-              :class="row.side === 'sell' ? 'text-soft' : 'text-text'"
-            >
-              {{ row.operation }}
-            </span>
-            <span
-              class="text-muted text-note font-bold whitespace-nowrap tabular-nums [grid-area:d]"
-            >
-              {{ row.day }}
-            </span>
-            <span
-              v-if="row.fee"
-              class="text-muted text-meta whitespace-nowrap tabular-nums [grid-area:f]"
-            >
-              {{ row.fee }}
-            </span>
-            <span
-              v-if="row.quantity"
-              class="text-muted text-meta text-end font-bold whitespace-nowrap tabular-nums [grid-area:q]"
-            >
-              {{ row.quantity }}
-            </span>
-            <span
-              class="font-display text-figure-row text-end font-semibold whitespace-nowrap tabular-nums [grid-area:t]"
-            >
-              {{ row.total }}
-            </span>
-          </li>
-        </ul>
-      </div>
+      <NeonInvestmentAssetYears :years="detail.years" />
     </section>
   </div>
 </template>

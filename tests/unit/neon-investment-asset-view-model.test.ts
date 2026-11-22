@@ -194,3 +194,59 @@ describe('assetDetail · gráfica de precio', () => {
     )
   })
 })
+
+describe('assetDetail · móvil', () => {
+  it('cuenta los títulos que se tienen', () => {
+    expect(detailOf('fondos')?.units).toEqual({ count: '15', word: 'títulos' })
+  })
+
+  it('un activo sin títulos no los cuenta', () => {
+    expect(detailOf('oro')?.units).toBeNull()
+  })
+
+  it('resume tu posición con el precio medio, el resultado y lo que has puesto', () => {
+    const position = detailOf('fondos')?.position
+    expect(position?.rows.map(({ label, value, note }) => [label, value, note])).toEqual([
+      ['Precio medio', '110,00\u00a0€', ''],
+      ['Resultado', '−870,50\u00a0€', '−30,5\u00a0%'],
+      ['Has puesto', '2.850,50\u00a0€', ''],
+    ])
+    expect(position?.rows[1].tone).toBe('loss')
+  })
+
+  it('el anillo enseña lo que vale el activo y su peso en la cartera', () => {
+    expect(detailOf('fondos')?.position.ring).toEqual({
+      share: 91.67,
+      value: '1.980\u00a0€',
+      weight: '91,7\u00a0%',
+      label: '1.980,00\u00a0€, el 91,7\u00a0% de la cartera',
+    })
+  })
+})
+
+describe('assetDetail · gráfica compacta', () => {
+  const compactOf = (id: string, state = portfolio()) =>
+    assetDetail(state, buildInvestmentDashboardViewModel(state, 3, 'simple'), id, {
+      compact: true,
+    })
+
+  it('dibuja la gráfica a la proporción del móvil, con los mismos puntos', () => {
+    const chart = compactOf('fondos')?.chart
+    expect(chart?.viewBox).toBe('0 0 412 266')
+    expect(chart?.points.map((point) => point.date)).toEqual([
+      '10 ene 2026',
+      '15 feb 2026',
+      '5 mar 2026',
+      'Hoy',
+    ])
+    for (const point of chart?.points ?? []) {
+      expect(point.x).toBeGreaterThan(0)
+      expect(point.x).toBeLessThan(412)
+      expect(point.y).toBeLessThan(266)
+    }
+  })
+
+  it('sin la opción, la gráfica sigue siendo la de escritorio', () => {
+    expect(detailOf('fondos')?.chart?.viewBox).toBe('0 0 880 280')
+  })
+})
