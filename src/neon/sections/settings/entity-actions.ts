@@ -76,7 +76,7 @@ export function useEntityActions(kind: EntityKind) {
   function add(name: string, balanceText: string, symbol = ''): boolean {
     const opening = openingBalanceText(balanceText)
     if (opening === null) {
-      showToast('El saldo inicial no es un número.')
+      showToast(`El ${words.balance.toLowerCase()} no es un número.`)
       return false
     }
     if (!settingsStore.addEntity(kind, name, opening)) return false

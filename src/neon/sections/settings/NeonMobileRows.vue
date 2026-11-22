@@ -1,4 +1,6 @@
 <script setup lang="ts" generic="Row extends MobileRow">
+import { MOBILE_CARD, PRESS, TOTAL_FIGURE } from './table-styles'
+
 // The list of one apartado in the mobile frame (artboard «Configuración ·
 // móvil · Pixel 10»): one row per element with its name, a line under it and
 // its amount, a bin to remove it and, at the end, the total and the row that
@@ -22,20 +24,15 @@ defineProps<{
   /** «Editar Cuenta nómina»; without it the rows are not tappable. */
   editLabel?: (row: Row) => string
   addLabel?: string
-  total?: { label: string; value: string; tone?: 'gain' | 'loss'; hook: string }
+  total?: { label: string; value: string; hook: string }
 }>()
 const emit = defineEmits<{ edit: [row: Row]; remove: [row: Row]; add: [] }>()
 
 const ROW = 'border-line flex min-h-16 min-w-0 items-center gap-3 border-t py-2.5'
-const PRESS =
-  'outline-accent focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]'
 </script>
 
 <template>
-  <section
-    :aria-label="label"
-    class="bg-panel border-line rounded-card motion-safe:animate-rise min-w-0 border px-3 pbs-1 pbe-1.5"
-  >
+  <section :aria-label="label" :class="MOBILE_CARD">
     <ul class="grid min-w-0">
       <li v-for="row in rows" :key="row.id" :class="ROW" :data-settings-row="row.id">
         <component
@@ -47,7 +44,7 @@ const PRESS =
           @click="editLabel && emit('edit', row)"
         >
           <span class="grid min-w-0 flex-1 gap-0.5" :class="row.muted ? 'opacity-60' : ''">
-            <span class="truncate text-[16px] font-bold">{{ row.title }}</span>
+            <span class="text-row truncate font-bold">{{ row.title }}</span>
             <span class="text-muted text-meta truncate">{{ row.meta }}</span>
           </span>
           <span
@@ -83,20 +80,14 @@ const PRESS =
       </li>
       <li v-if="total" :class="ROW">
         <span class="text-soft min-w-0 flex-1 text-[15px] font-bold">{{ total.label }}</span>
-        <span
-          class="font-display shrink-0 text-[17px] font-semibold tracking-[-0.02em] whitespace-nowrap"
-          :class="
-            total.tone === 'gain' ? 'text-gain' : total.tone === 'loss' ? 'text-loss' : 'text-text'
-          "
-          :data-settings-total="total.hook"
-        >
+        <span :class="[TOTAL_FIGURE, 'shrink-0']" :data-settings-total="total.hook">
           {{ total.value }}
         </span>
       </li>
       <li v-if="addLabel" class="border-line border-t">
         <button
           type="button"
-          class="text-accent-text rounded-field flex min-h-16 w-full items-center gap-3 px-0.5 text-start text-[16px] font-extrabold"
+          class="text-accent-text rounded-field text-row flex min-h-16 w-full items-center gap-3 px-0.5 text-start font-extrabold"
           :class="PRESS"
           @click="emit('add')"
         >

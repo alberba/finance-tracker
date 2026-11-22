@@ -45,8 +45,8 @@ function submit(): void {
 }
 
 const fieldClass =
-  'min-w-0 bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] w-full border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
-const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
+  'min-w-0 bg-panel border-ctrl-line text-text outline-accent rounded-field min-h-[46px] w-full border px-3.5 text-row font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
+const labelClass = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
 </script>
 
 <template>

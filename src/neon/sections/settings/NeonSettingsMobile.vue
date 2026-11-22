@@ -20,6 +20,7 @@ import NeonPreferencesBlock from './NeonPreferencesBlock.vue'
 import NeonRuleFormPanel from './NeonRuleFormPanel.vue'
 import NeonSecurityBlock from './NeonSecurityBlock.vue'
 import { BARE_BLOCK } from './settings-layout'
+import { MOBILE_CARD, PRESS } from './table-styles'
 import {
   accountMeta,
   assetMeta,
@@ -165,11 +166,6 @@ const ruleOpen = ref(false)
 function newRule(): void {
   if (!needsAccount.value) ruleOpen.value = true
 }
-
-const CARD =
-  'bg-panel border-line rounded-card motion-safe:animate-rise min-w-0 border px-3 pbs-1 pbe-1.5'
-const PRESS =
-  'outline-accent focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]'
 </script>
 
 <template>
@@ -181,7 +177,7 @@ const PRESS =
       <h1
         id="settings-title"
         tabindex="-1"
-        class="font-display motion-safe:animate-rise text-[30px] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
+        class="font-display text-h1 motion-safe:animate-rise font-bold outline-none"
       >
         Configuración
       </h1>
@@ -189,7 +185,7 @@ const PRESS =
         Cada cuenta, activo y regla con todo lo suyo en un solo sitio.
       </p>
     </header>
-    <nav aria-label="Ajustes" :class="CARD">
+    <nav aria-label="Ajustes" :class="MOBILE_CARD">
       <template v-for="group in groups" :key="group.title">
         <h2
           class="text-muted text-label tracking-label px-1 pbs-[18px] pbe-1.5 font-sans font-extrabold uppercase"
@@ -222,7 +218,7 @@ const PRESS =
                 </svg>
               </span>
               <span class="grid min-w-0 flex-1 gap-0.5">
-                <span class="truncate text-[16px] font-bold">{{ item.label }}</span>
+                <span class="text-row truncate font-bold">{{ item.label }}</span>
                 <span class="text-muted text-meta truncate" :data-settings-meta="item.id">
                   {{ item.meta }}
                 </span>
@@ -250,7 +246,7 @@ const PRESS =
     <div>
       <button
         type="button"
-        class="text-accent-text inline-flex min-h-11 items-center gap-0.5 pe-3 text-[16px] font-extrabold"
+        class="text-accent-text text-row inline-flex min-h-11 items-center gap-0.5 pe-3 font-extrabold"
         :class="PRESS"
         @click="view = null"
       >
@@ -273,7 +269,7 @@ const PRESS =
       <h1
         id="settings-title"
         tabindex="-1"
-        class="font-display text-[22px] leading-[1.15] font-bold tracking-[-0.03em] outline-none"
+        class="font-display text-h1-detail tracking-h1 leading-[1.15] font-bold outline-none"
       >
         {{ current.label }}
       </h1>
@@ -318,7 +314,7 @@ const PRESS =
           v-for="tab in CATEGORY_TABS"
           :key="tab.key"
           type="button"
-          class="rounded-pill min-h-9 px-3 text-[14px] font-extrabold pointer-coarse:min-h-11"
+          class="rounded-pill text-note min-h-9 px-3 font-extrabold pointer-coarse:min-h-11"
           :class="[PRESS, tab.key === categoryTab ? 'bg-sel-bg text-sel-text' : 'text-soft']"
           :aria-pressed="tab.key === categoryTab"
           @click="categoryTab = tab.key"
@@ -326,7 +322,7 @@ const PRESS =
           {{ tab.label }}
         </button>
       </div>
-      <div :class="[CARD, 'pbs-3']">
+      <div :class="[MOBILE_CARD, 'pbs-3']">
         <NeonCategoryList
           :key="category.key"
           :title="category.label"
@@ -366,14 +362,14 @@ const PRESS =
       <NeonRuleFormPanel v-model:open="ruleOpen" description="" />
     </template>
 
-    <div v-else-if="current.id === 'preferencias'" :class="CARD">
+    <div v-else-if="current.id === 'preferencias'" :class="MOBILE_CARD">
       <NeonPreferencesBlock />
     </div>
-    <div v-else-if="current.id === 'seguridad'" :class="[CARD, 'pbs-3']">
+    <div v-else-if="current.id === 'seguridad'" :class="[MOBILE_CARD, 'pbs-3']">
       <NeonSecurityBlock />
     </div>
     <NeonConnectionsBlock v-else-if="current.id === 'conexiones'" />
-    <div v-else-if="current.id === 'cuenta'" :class="CARD">
+    <div v-else-if="current.id === 'cuenta'" :class="MOBILE_CARD">
       <NeonAccountBlock />
     </div>
 
