@@ -41,7 +41,13 @@ const design = parseDesign(Astro.cookies.get(DESIGN_COOKIE)?.value)
           const prefersDark =
             window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
           if (neon) {
-            const stored = localStorage.getItem('neon-theme')
+            // Blocked storage still honours the system.
+            let stored = null
+            try {
+              stored = localStorage.getItem('neon-theme')
+            } catch {
+              /* Storage blocked: no stored choice. */
+            }
             root.dataset.theme = [
               'oscuro-suave',
               'oscuro-fuerte',

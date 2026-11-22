@@ -1,6 +1,6 @@
 /**
  * Theme of the new design (DESIGN.md, Temas): one of four named themes. With
- * no choice stored the system decides: «oscuro suave», or «claro melocotón"
+ * no choice stored the system decides: «oscuro suave», or «claro melocotón»
  * if it asks for light. The pre-paint script in FinanceTrackerShell.astro
  * (and the login page's) applies the same rule before the first frame; this
  * controller takes over once the app loads and is the only writer of
