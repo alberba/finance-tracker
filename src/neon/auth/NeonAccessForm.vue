@@ -75,6 +75,16 @@ const METHODS = [
 ] as const
 const signingIn = computed(() => mode.value === 'password' || mode.value === 'code')
 const offersProviders = computed(() => signingIn.value || mode.value === 'register')
+/** The other ways in, as Botón de icono: the OAuth ones only when configured. */
+const providers = computed(() => [
+  ...(props.googleEnabled
+    ? [{ id: 'google', label: 'Continuar con Google', signIn: () => social('google') } as const]
+    : []),
+  ...(props.githubEnabled
+    ? [{ id: 'github', label: 'Continuar con GitHub', signIn: () => social('github') } as const]
+    : []),
+  { id: 'passkey', label: 'Entrar con passkey', signIn: passkey } as const,
+])
 
 const heading = ref<HTMLHeadingElement>()
 watch(mode, () => nextTick(() => heading.value?.focus({ preventScroll: true })))
@@ -105,7 +115,7 @@ onMounted(markAuthenticationReady)
         v-for="method in METHODS"
         :key="method.value"
         type="button"
-        class="rounded-pill text-soft pointer-fine:hover:text-text aria-pressed:bg-sel-bg aria-pressed:text-sel-text outline-accent min-h-9 min-w-0 flex-1 px-3 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed motion-safe:transition-[transform,background-color,color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96] pointer-coarse:min-h-11"
+        class="rounded-pill text-soft pointer-fine:hover:text-text aria-pressed:bg-sel-bg aria-pressed:text-sel-text outline-accent min-h-9 min-w-0 flex-1 px-2 text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed motion-safe:transition-[transform,background-color,color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96] pointer-coarse:min-h-11"
         :aria-pressed="mode === method.value"
         :disabled="busy"
         @click="changeMode(method.value)"
@@ -199,33 +209,15 @@ onMounted(markAuthenticationReady)
       <p class="text-label text-muted tracking-label font-extrabold uppercase">O entra con</p>
       <div class="flex gap-3">
         <button
-          v-if="googleEnabled"
+          v-for="provider in providers"
+          :key="provider.id"
           type="button"
           class="border-ctrl-line text-text pointer-fine:hover:bg-panel2 outline-accent grid size-11 cursor-pointer place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
-          aria-label="Continuar con Google"
+          :aria-label="provider.label"
           :disabled="busy"
-          @click="social('google')"
+          @click="provider.signIn"
         >
-          <NeonProviderIcon provider="google" />
-        </button>
-        <button
-          v-if="githubEnabled"
-          type="button"
-          class="border-ctrl-line text-text pointer-fine:hover:bg-panel2 outline-accent grid size-11 cursor-pointer place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
-          aria-label="Continuar con GitHub"
-          :disabled="busy"
-          @click="social('github')"
-        >
-          <NeonProviderIcon provider="github" />
-        </button>
-        <button
-          type="button"
-          class="border-ctrl-line text-text pointer-fine:hover:bg-panel2 outline-accent grid size-11 cursor-pointer place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
-          aria-label="Entrar con passkey"
-          :disabled="busy"
-          @click="passkey"
-        >
-          <NeonProviderIcon provider="passkey" />
+          <NeonProviderIcon :provider="provider.id" />
         </button>
       </div>
     </div>
@@ -243,11 +235,7 @@ onMounted(markAuthenticationReady)
           >Entrar</NeonButton
         >
       </template>
-      <NeonButton
-        v-if="signingIn || mode === 'register'"
-        :disabled="busy"
-        @click="changeMode('recover')"
-      >
+      <NeonButton v-if="offersProviders" :disabled="busy" @click="changeMode('recover')">
         Recuperar acceso
       </NeonButton>
       <NeonButton v-else :disabled="busy" @click="changeMode('password')">

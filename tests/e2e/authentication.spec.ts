@@ -75,7 +75,7 @@ test('the new login shows the error for wrong credentials and stays on /login @s
   await page.getByLabel('Correo electrónico').fill(email)
   await page.getByLabel('Contraseña', { exact: true }).fill('not-the-password')
   await page.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
-  await expect(page.getByRole('alert')).not.toBeEmpty()
+  await expect(page.getByRole('alert')).toHaveText('El correo o la contraseña no son correctos.')
   await expect(page).toHaveURL(/\/login$/)
   expect((await page.request.get('/api/session')).status()).toBe(401)
 })
