@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { useSecuritySettings } from '../../../composables/useSecuritySettings'
 import { useSettingsAssets } from '../../../composables/useSettingsAssets'
 import { buildAccountRows } from '../../../domain/settings/view-model'
@@ -9,6 +10,7 @@ import { useRecurringStore } from '../../../stores/recurring'
 import { useStockEventsStore } from '../../../stores/stockevents'
 import { useUiStore } from '../../../stores/ui'
 import NeonConfirmDialog from '../../ui/NeonConfirmDialog.vue'
+import { FRAME_QUERY } from '../../ui/sheet-drag'
 import NeonAccountBlock from './NeonAccountBlock.vue'
 import NeonAccountsBlock from './NeonAccountsBlock.vue'
 import NeonAssetsBlock from './NeonAssetsBlock.vue'
@@ -18,6 +20,7 @@ import NeonLiabilitiesBlock from './NeonLiabilitiesBlock.vue'
 import NeonPreferencesBlock from './NeonPreferencesBlock.vue'
 import NeonRulesBlock from './NeonRulesBlock.vue'
 import NeonSecurityBlock from './NeonSecurityBlock.vue'
+import NeonSettingsMobile from './NeonSettingsMobile.vue'
 import type { PendingDeletion } from './deletion'
 import { scrollToId, useScrollSpy } from './use-scroll-spy'
 import {
@@ -25,6 +28,7 @@ import {
   alertsLabel,
   assetsTable,
   liabilitiesTable,
+  type MobilePartId,
   partCounts,
   rulesTable,
   SETTINGS_PARTS,
@@ -34,8 +38,14 @@ import {
 // Configuración in the new design (artboard «Configuración · 2560 px», #443):
 // one page with an index of its apartados on the left and, on the right, a
 // panel with each of them in turn. Tables edit in place; the index follows the
-// scroll and takes you to an apartado.
+// scroll and takes you to an apartado. The mobile frame gets its own
+// composition of the same tables (NeonSettingsMobile, #444): it is the frame,
+// not the container, that decides, so its media query picks.
 withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: false })
+
+const desktopFrame = useMediaQuery(FRAME_QUERY)
+/** The apartado open on its own mobile screen; null shows the index. */
+const mobileView = ref<MobilePartId | null>(null)
 
 const financialStateStore = useFinancialStateStore()
 const recurringStore = useRecurringStore()
@@ -76,7 +86,8 @@ onMounted(async () => {
   await stockEventsStore.initializeCredential()
   if (stockEventsStore.credentialConfigured) await stockEventsStore.loadWatchlists()
   const target = FROM_TAB[uiStore.settingsTab]
-  if (target) {
+  if (target && !desktopFrame.value) mobileView.value = target
+  else if (target) {
     await nextTick()
     goTo(target)
   }
@@ -109,7 +120,19 @@ function confirmDeletion(): void {
     class="@container mx-auto grid w-full max-w-[1640px] min-w-0 content-start gap-7"
     aria-labelledby="settings-title"
   >
-    <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3.5">
+    <NeonSettingsMobile
+      v-if="!desktopFrame"
+      v-model:view="mobileView"
+      :is-active="isActive"
+      :accounts="accounts"
+      :assets="assetRows"
+      :liabilities="liabilities"
+      :rules="rules"
+      :counts="counts"
+      :security="securityAvailable"
+      @ask="ask"
+    />
+    <header v-if="desktopFrame" class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3.5">
       <div class="grid min-w-0 gap-1.5">
         <p class="text-muted text-label tracking-label font-sans font-extrabold uppercase">
           Datos maestros
@@ -137,7 +160,7 @@ function confirmDeletion(): void {
       </button>
     </header>
 
-    <div class="grid items-start gap-5 @3xl:grid-cols-[232px_minmax(0,1fr)]">
+    <div v-if="desktopFrame" class="grid items-start gap-5 @3xl:grid-cols-[232px_minmax(0,1fr)]">
       <nav
         aria-label="Índice de configuración"
         class="flex gap-1 overflow-x-auto @3xl:sticky @3xl:top-6 @3xl:flex-col @3xl:overflow-visible"

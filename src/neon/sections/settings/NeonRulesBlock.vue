@@ -5,7 +5,7 @@ import { useAccountRequirement } from '../../../composables/useAccountRequiremen
 import { useRecurringStore } from '../../../stores/recurring'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonSwitch from '../../ui/NeonSwitch.vue'
-import type { PendingDeletion } from './deletion'
+import { ruleDeletion, type PendingDeletion } from './deletion'
 import NeonRuleFormPanel from './NeonRuleFormPanel.vue'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
@@ -23,12 +23,10 @@ const { needsAccount } = useAccountRequirement()
 const COLUMNS = 'grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_150px_170px_150px_112px]'
 
 function askDelete(row: RuleRow): void {
-  emit('ask', {
-    title: '¿Eliminar esta regla?',
-    confirmLabel: 'Eliminar regla',
-    message: `${row.name}, ${row.amount}. Deja de generar pendientes; los movimientos ya registrados se mantienen. Si solo quieres detenerla, páusala.`,
-    run: () => recurringStore.removeRule(row.id),
-  })
+  emit(
+    'ask',
+    ruleDeletion(row, () => recurringStore.removeRule(row.id)),
+  )
 }
 
 const description = ref('')

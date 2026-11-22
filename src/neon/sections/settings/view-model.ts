@@ -279,3 +279,109 @@ export function partCounts(
     conexiones: 2,
   }
 }
+
+// ---- Mobile (artboard «Configuración · móvil · Pixel 10», #444) ----
+// The mobile frame shows an index of the apartados, grouped, each with a line
+// of what it holds; tapping one opens it on its own screen.
+
+/** «Cuenta» has no place in the desktop index (it closes the page there), but it does in mobile. */
+export const ACCOUNT_PART = {
+  id: 'cuenta',
+  label: 'Cuenta',
+  icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+} as const
+
+export type MobilePartId = SettingsPartId | typeof ACCOUNT_PART.id
+
+/** What each apartado is for: the line under its title. */
+export const PART_DESCRIPTIONS: Record<MobilePartId, string> = {
+  cuentas: 'Saldo de partida de cada cuenta y si cuenta como liquidez de la cartera.',
+  activos: 'Valor de partida, de dónde sale su cotización y cómo llega a Stock Events.',
+  pasivos: 'Préstamos y deudas con el importe del que parten.',
+  categorias: 'Con qué se clasifican los movimientos. El orden es el de los desplegables.',
+  recurrentes:
+    'Reglas que generan movimientos pendientes. Las compras recurrentes viven en Inversión.',
+  preferencias: 'Año de trabajo, moneda del tracker.',
+  seguridad: 'Cómo entras, en qué dispositivos estás y quién puede registrarse.',
+  conexiones: 'Gestiona los servicios conectados a tu tracker.',
+  cuenta: 'Con quién has entrado y cómo salir de este dispositivo.',
+}
+
+export interface MobileIndexItem {
+  id: MobilePartId
+  label: string
+  icon: string
+  meta: string
+}
+
+export interface MobileIndexGroup {
+  title: string
+  items: MobileIndexItem[]
+}
+
+function counted(count: number | null, one: string, many: string, none = `Sin ${many}`): string {
+  if (!count) return none
+  return `${count} ${count === 1 ? one : many}`
+}
+
+/** The index of the mobile frame: «Datos maestros» and «App y cuenta». */
+export function mobileIndex(input: {
+  counts: Record<SettingsPartId, number | null>
+  alerts: number
+  year: number
+  currency: string
+  /** «Acceso y seguridad» exists (Better Auth sign-in). */
+  security: boolean
+  /** «Cuenta» exists (not in the demo). */
+  account: boolean
+}): MobileIndexGroup[] {
+  const { counts } = input
+  const alerts = input.alerts ? ` · ${counted(input.alerts, 'aviso', 'avisos')}` : ''
+  const meta: Record<MobilePartId, string> = {
+    cuentas: counted(counts.cuentas, 'cuenta', 'cuentas'),
+    activos: counted(counts.activos, 'activo', 'activos') + alerts,
+    pasivos: counted(counts.pasivos, 'pasivo', 'pasivos'),
+    categorias: counted(counts.categorias, 'categoría', 'categorías'),
+    recurrentes: counted(counts.recurrentes, 'regla', 'reglas'),
+    preferencias: `${input.currency} · ${input.year}`,
+    seguridad: 'Métodos de acceso y sesiones',
+    conexiones: counted(counts.conexiones, 'servicio', 'servicios'),
+    cuenta: 'Cerrar sesión en este dispositivo',
+  }
+  const parts = [...SETTINGS_PARTS, ACCOUNT_PART]
+  const item = (id: MobilePartId): MobileIndexItem => {
+    const part = parts.find((candidate) => candidate.id === id)!
+    return { id, label: part.label, icon: part.icon, meta: meta[id] }
+  }
+  const app: MobilePartId[] = ['preferencias', 'seguridad', 'conexiones', 'cuenta']
+  return [
+    {
+      title: 'Datos maestros',
+      items: (['cuentas', 'activos', 'pasivos', 'categorias', 'recurrentes'] as const).map(item),
+    },
+    {
+      title: 'App y cuenta',
+      items: app
+        .filter(
+          (id) => (id !== 'seguridad' || input.security) && (id !== 'cuenta' || input.account),
+        )
+        .map(item),
+    },
+  ]
+}
+
+/** The line under an account in the mobile list. */
+export function accountMeta(row: AccountRow): string {
+  return row.liquidity === '—' ? 'Fuera de la liquidez' : `En liquidez · ${row.list}`
+}
+
+/** The line under an asset in the mobile list: its symbol and its source, or what to review. */
+export function assetMeta(row: AssetRow): string {
+  const parts = [row.symbol, row.warn ? row.sync : row.provider].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Sin cotización'
+}
+
+/** The line under a rule in the mobile list. */
+export function ruleMeta(row: RuleRow): string {
+  return `${row.frequency} · ${row.next}`
+}

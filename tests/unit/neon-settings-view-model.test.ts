@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  accountMeta,
   accountsTable,
   alertsLabel,
   openingBalanceText,
+  assetMeta,
   assetsTable,
   liabilitiesTable,
+  mobileIndex,
   parseAmount,
   parseCurrency,
   parseYear,
   partCounts,
+  ruleMeta,
   rulesTable,
 } from '../../src/neon/sections/settings/view-model'
 import type { RecurringRule } from '../../src/scripts/types'
@@ -219,5 +223,85 @@ describe('contadores del índice', () => {
       preferencias: null,
       seguridad: null,
     })
+  })
+})
+
+describe('índice móvil', () => {
+  const counts = {
+    cuentas: 5,
+    activos: 1,
+    pasivos: 1,
+    categorias: 14,
+    recurrentes: 0,
+    preferencias: null,
+    seguridad: null,
+    conexiones: 2,
+  }
+  const base = { counts, alerts: 0, year: 2026, currency: 'EUR', security: true, account: true }
+
+  it('agrupa los datos maestros y la app y cuenta, con una línea por apartado', () => {
+    const groups = mobileIndex(base)
+    expect(groups.map((group) => group.title)).toEqual(['Datos maestros', 'App y cuenta'])
+    expect(groups[0].items.map((item) => [item.id, item.meta])).toEqual([
+      ['cuentas', '5 cuentas'],
+      ['activos', '1 activo'],
+      ['pasivos', '1 pasivo'],
+      ['categorias', '14 categorías'],
+      ['recurrentes', 'Sin reglas'],
+    ])
+    expect(groups[1].items.map((item) => [item.id, item.meta])).toEqual([
+      ['preferencias', 'EUR · 2026'],
+      ['seguridad', 'Métodos de acceso y sesiones'],
+      ['conexiones', '2 servicios'],
+      ['cuenta', 'Cerrar sesión en este dispositivo'],
+    ])
+  })
+
+  it('suma el aviso a la línea de Activos', () => {
+    const [masters] = mobileIndex({ ...base, alerts: 2, counts: { ...counts, activos: 5 } })
+    expect(masters.items.find((item) => item.id === 'activos')?.meta).toBe('5 activos · 2 avisos')
+  })
+
+  it('deja fuera la seguridad y la cuenta donde no existen', () => {
+    const [, app] = mobileIndex({ ...base, security: false, account: false })
+    expect(app.items.map((item) => item.id)).toEqual(['preferencias', 'conexiones'])
+  })
+})
+
+describe('filas móviles', () => {
+  it('dice si una cuenta cuenta como liquidez y con qué lista', () => {
+    const { rows } = accountsTable(
+      [
+        { id: 'a', name: 'Nómina', openingBalance: 0, twrLiquidity: true, cashWatchlistId: '' },
+        { id: 'b', name: 'Hucha', openingBalance: 0, twrLiquidity: false, cashWatchlistId: '' },
+      ],
+      () => '',
+    )
+    expect(rows.map(accountMeta)).toEqual(['En liquidez · Sin lista', 'Fuera de la liquidez'])
+  })
+
+  it('describe un activo por su símbolo y su origen, o por su aviso', () => {
+    const row = {
+      id: 'v',
+      name: 'VWCE',
+      openingBalance: 0,
+      kind: 'ETF',
+      symbol: 'VWCE',
+      provider: 'Yahoo Finance',
+      linked: 3,
+      pending: 0,
+      sync: 'Sincronizado',
+      warn: false,
+    }
+    expect(assetMeta(row)).toBe('VWCE · Yahoo Finance')
+    expect(assetMeta({ ...row, warn: true, sync: 'Revisar 2 movimientos' })).toBe(
+      'VWCE · Revisar 2 movimientos',
+    )
+    expect(assetMeta({ ...row, symbol: '', provider: '' })).toBe('Sin cotización')
+  })
+
+  it('pone la frecuencia y el próximo vencimiento de una regla', () => {
+    const { rows } = rulesTable([rule({})], [])
+    expect(ruleMeta(rows[0])).toBe(`${rows[0].frequency} · ${rows[0].next}`)
   })
 })

@@ -2,14 +2,14 @@
 import { ref } from 'vue'
 
 import { formatMoney } from '../../../lib/format'
-import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
-import { openingBalanceText, parseAmount, type AccountRow, type AccountsTable } from './view-model'
+import { parseAmount, type AccountRow, type AccountsTable } from './view-model'
 import type { PendingDeletion } from './deletion'
+import { useEntityActions } from './entity-actions'
 
 // Cuentas: the starting balance of each account and whether its cash counts as
 // liquidity of the portfolio. Name and balance are edited in place.
@@ -17,7 +17,7 @@ defineProps<{ table: AccountsTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
-const { showToast } = useToast()
+const actions = useEntityActions('accounts')
 const COLUMNS = 'grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_190px_112px]'
 
 function rename(row: AccountRow, name: string): void {
@@ -30,21 +30,14 @@ function rebalance(row: AccountRow, text: string): void {
 }
 
 function askDelete(row: AccountRow): void {
-  emit('ask', {
-    title: '¿Eliminar esta cuenta?',
-    confirmLabel: 'Eliminar cuenta',
-    message: `${row.name}, con su saldo inicial de ${formatMoney(row.openingBalance)}. Se eliminan también sus movimientos y suscripciones. No se puede deshacer.`,
-    run: () => settingsStore.removeEntity('accounts', row.id),
-  })
+  emit('ask', actions.deletion(row))
 }
 
 const name = ref('')
 const balance = ref('')
 
 function add(): void {
-  const opening = openingBalanceText(balance.value)
-  if (opening === null) return void showToast('El saldo inicial no es un número.')
-  if (settingsStore.addEntity('accounts', name.value, opening)) {
+  if (actions.add(name.value, balance.value)) {
     name.value = ''
     balance.value = ''
   }
