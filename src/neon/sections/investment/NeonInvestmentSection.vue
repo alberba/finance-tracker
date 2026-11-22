@@ -20,11 +20,11 @@ import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { assetDetail } from './asset-view-model'
 import { startPage, useAssetRoute } from './asset-route'
 import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
+import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
 import NeonInvestmentControls from './NeonInvestmentControls.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
-import NeonInvestmentPositionDetail from './NeonInvestmentPositionDetail.vue'
 import NeonInvestmentPositions from './NeonInvestmentPositions.vue'
 import {
   compactChart,
@@ -35,7 +35,6 @@ import {
   periodFigures,
   periodOptions,
   portfolioChart,
-  positionDetail,
   positionRows,
   quoteNotice,
   sortPositions,
@@ -53,11 +52,12 @@ import {
 // are late. Return mode and month are the investment store's, shared with the
 // old design.
 //
-// A position opens its detail. On the desktop frame that is the asset page
-// (NeonInvestmentAsset, artboard «Inversión · detalle de activo (VWCE) · 2560
-// px», #439), a history entry of its own at `/inversion?activo=<id>`: the arrow
-// and the browser's back button both return to the cover. The mobile frame
-// keeps the shared detail panel until its own detail arrives (#440).
+// A position opens its detail, a history entry of its own at
+// `/inversion?activo=<id>`: the arrow and the browser's back button both return
+// to the cover. On the desktop frame that is NeonInvestmentAsset (artboard
+// «Inversión · detalle de activo (VWCE) · 2560 px», #439); on the mobile frame,
+// NeonInvestmentAssetMobile (the same artboard, «móvil · Pixel 10», #440), from
+// the same view model, with its movements as a second entry.
 //
 // The mobile frame gets its own composition (NeonInvestmentMobile, artboard
 // «Inversión · móvil · Pixel 10», #438) from the same view model: there
@@ -129,14 +129,14 @@ const cards = computed<Card[]>(() => [
 
 const route = useAssetRoute()
 const asset = computed(() =>
-  desktopFrame.value && route.selected.value
-    ? assetDetail(state.value, vm.value, route.selected.value)
+  route.selected.value
+    ? assetDetail(state.value, vm.value, route.selected.value, { compact: !desktopFrame.value })
     : null,
 )
 
-// Opening or leaving the detail starts a new page.
+// Opening or leaving the detail, or its movements, starts a new page.
 watch(
-  () => asset.value?.id ?? null,
+  () => [asset.value?.id ?? null, route.movements.value && !desktopFrame.value],
   async () => {
     await nextTick()
     if (props.isActive) startPage('investment-title')
@@ -149,25 +149,6 @@ watch(
     if (!active) route.reset()
   },
 )
-
-// The panel keeps the last position while it slides out.
-const openId = ref<string | null>(null)
-const shownId = ref<string | null>(null)
-const detailOpen = computed({
-  get: () => openId.value !== null,
-  set: (open) => {
-    if (!open) openId.value = null
-  },
-})
-const shown = computed(() => vm.value.positions.find((position) => position.id === shownId.value))
-const detail = computed(() =>
-  shownId.value ? positionDetail(state.value, vm.value, shownId.value) : null,
-)
-
-function openPosition(id: string): void {
-  if (desktopFrame.value) route.open(id)
-  else openId.value = shownId.value = id
-}
 
 function sortBy(key: SortKey, direction: SortDirection): void {
   sortKey.value = key
@@ -182,8 +163,20 @@ function sortBy(key: SortKey, direction: SortDirection): void {
     class="@container grid min-w-0 content-start gap-[26px]"
     aria-labelledby="investment-title"
   >
+    <NeonInvestmentAssetMobile
+      v-if="!desktopFrame && asset"
+      :detail="asset"
+      :movements="route.movements.value"
+      @back="route.close"
+      @open-movements="route.openMovements"
+      @close-movements="route.closeMovements"
+      @buy="openEntrySheet()"
+      @sell="openEntrySheet()"
+      @declare-all="investmentStore.markDeclared(asset.undeclared)"
+    />
+
     <NeonInvestmentMobile
-      v-if="!desktopFrame"
+      v-else-if="!desktopFrame"
       :empty="empty"
       :notice="notice"
       :value-label="figures[1].label"
@@ -194,7 +187,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       :method="method"
       :rows="rows"
       :cards="cards"
-      @open="openPosition"
+      @open="route.open"
       @month="investmentStore.setMonth"
       @method="investmentStore.setReturnMode"
     />
@@ -305,19 +298,12 @@ function sortBy(key: SortKey, direction: SortDirection): void {
           :rows="rows"
           :sort-key="sortKey"
           :sort-direction="sortDirection"
-          @open="openPosition"
+          @open="route.open"
           @sort="sortBy"
         />
 
         <NeonInvestmentCards :cards="cards" />
       </template>
     </template>
-
-    <NeonInvestmentPositionDetail
-      v-model:open="detailOpen"
-      :title="shown?.name ?? ''"
-      :kicker="shown?.symbol ?? 'Posición'"
-      :detail="detail"
-    />
   </section>
 </template>

@@ -15,7 +15,9 @@ import NeonSearchButton from './NeonSearchButton.vue'
  * sidebar instead.
  *
  * Inside the detail of an element (an asset) the bar keeps only the arrow back
- * and the symbol, «‹ VWCE» (DESIGN.md, «Cabecera de detalle»): pass `detail`.
+ * and the symbol, «‹ VWCE» (DESIGN.md, «Cabecera de detalle»): pass `detail`,
+ * or, for a detail opened without a page load, teleport it into the title slot
+ * with `NeonBarDetail` (`[data-bar-detail]`), which hides the controls on the right.
  */
 export interface Props {
   detail?: { label: string; backHref: string; backLabel: string }
@@ -46,10 +48,13 @@ const { detail } = Astro.props
             .
           </span>
         </p>
-        <div class="absolute inset-0 flex items-center" data-bar-figure-slot></div>
+        <div
+          class="absolute inset-0 flex items-center group-has-[[data-bar-detail]]/bar:hidden"
+          data-bar-figure-slot
+        ></div>
         <div class="flex min-w-0 items-center" data-bar-title-slot></div>
       </div>
-      <div class="flex">
+      <div class="flex group-has-[[data-bar-detail]]/bar:hidden">
         <NeonPendingMenu client:only="vue" />
         <NeonSearchButton client:only="vue" />
       </div>

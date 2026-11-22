@@ -2,8 +2,8 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 /**
- * The cover of Inversión in the mobile frame of the new design (#438), in the
- * mobile project. No cookie: the new design is the default. The clock sits on
+ * The cover of Inversión in the mobile frame of the new design (#438), and an
+ * asset's detail (#440), in the mobile project. No cookie: the new design is the default. The clock sits on
  * 20 March 2026, the newest month of the seed. Figures are the view-model's
  * unit tests'; here, what the user does and what they get.
  */
@@ -18,18 +18,50 @@ test.beforeEach(async ({ tracker }) => {
   await tracker.openInvestment()
 })
 
-test('abre una posición desde la lista móvil y llega a su detalle', async ({ page }) => {
+test('abre un activo desde la portada, entra en sus movimientos y vuelve con atrás y con la flecha', async ({
+  page,
+}) => {
+  const bar = page.locator('[data-mobile-app-bar]')
   await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
-  await expect(section(page).locator('[data-investment-value]')).toContainText('€')
 
   await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-  const detail = page.getByRole('dialog', { name: 'Fondos Indexados' })
-  await expect(detail).toBeVisible()
-  await expect(detail.getByRole('heading', { name: 'Operaciones' })).toBeVisible()
-  await expect(detail.getByText('Aportación fondo indexado').first()).toBeVisible()
+  await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
+  // The detail header in the top bar: the arrow and the asset, nothing on the right.
+  await expect(bar.getByRole('link', { name: 'Volver a Inversión' })).toBeVisible()
+  await expect(bar.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Buscar' })).toBeHidden()
+  await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toHaveCount(0)
+  await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
+  await expect(section(page).getByText('Has puesto')).toBeVisible()
 
-  await detail.getByRole('button', { name: 'Cerrar' }).click()
-  await expect(detail).toBeHidden()
+  await section(page)
+    .getByRole('button', { name: /^Ver tus movimientos/ })
+    .click()
+  await expect(page).toHaveURL(/vista=movimientos/)
+  await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+  await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
+  await expect(section(page).getByRole('button', { name: 'Comprar' })).toBeVisible()
+
+  // Back goes from the movements to the summary, the arrow from there to the cover.
+  await page.goBack()
+  await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
+  await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
+  await bar.getByRole('link', { name: 'Volver a Inversión' }).click()
+  await expect(page).toHaveURL(/\/inversion$/)
+  await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Buscar' })).toBeVisible()
+
+  // From the movements, the arrow goes back to the summary.
+  await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+  await section(page)
+    .getByRole('button', { name: /^Ver tus movimientos/ })
+    .click()
+  await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+  await bar.getByRole('link', { name: /^Volver a / }).click()
+  await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL(/\/inversion$/)
+  await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
 })
 
 test('la hoja de posiciones oculta el gráfico y los chips al abrirla y los devuelve al cerrarla', async ({
@@ -123,7 +155,14 @@ test('todos los controles de la portada miden al menos 44 px con puntero táctil
   expect(await tooSmall(`#investment :is(${CONTROLS})`)).toEqual([])
   await page.keyboard.press('Escape')
 
+  // The asset's detail: its summary, its movements and the bar's arrow.
+  const DETAIL = `:is(#investment, [data-mobile-app-bar]) :is(${CONTROLS})`
   await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-  await expect(page.getByRole('dialog', { name: 'Fondos Indexados' })).toBeVisible()
-  expect(await tooSmall(`dialog[open] :is(${CONTROLS})`)).toEqual([])
+  await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
+  expect(await tooSmall(DETAIL)).toEqual([])
+  await section(page)
+    .getByRole('button', { name: /^Ver tus movimientos/ })
+    .click()
+  await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+  expect(await tooSmall(DETAIL)).toEqual([])
 })

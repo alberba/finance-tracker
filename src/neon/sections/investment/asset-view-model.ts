@@ -7,6 +7,7 @@ import {
   formatDayMonth,
   formatDecimal,
   formatMoney,
+  formatNumber,
   formatPercent,
   formatShortDate,
   formatSignedMoney,
@@ -19,6 +20,9 @@ import { signedPct, toneOf, type Tone } from './view-model'
 // against the operations that were made, a few figures and the operations
 // themselves by year. Everything here is words and figures already formatted;
 // the components only lay them out.
+//
+// The mobile frame asks for a compact chart (`{ compact: true }`, #440); the rest
+// is the same detail.
 //
 // The app keeps no price history per asset, so the price line is drawn through
 // what is known: the price of each operation and today's price (the position's
@@ -72,6 +76,19 @@ export interface AssetFact {
   tone: Tone
 }
 
+/** «Tu posición» on the mobile frame: a few rows and a ring of its weight. */
+export interface AssetPosition {
+  rows: AssetFact[]
+  ring: {
+    /** Weight in the portfolio, 0–100. */
+    share: number
+    /** Whole euros, to fit inside the ring: «1.980 €». */
+    value: string
+    weight: string
+    label: string
+  }
+}
+
 export interface AssetMovementRow {
   id: string
   /** «15 feb». */
@@ -101,15 +118,33 @@ export interface AssetDetail {
   figures: AssetFigure[]
   chart: AssetChart | null
   facts: AssetFact[]
+  /** The units held, «15» and «títulos»; null for an asset without units. */
+  units: { count: string; word: string } | null
+  position: AssetPosition
   count: string
   /** Ids of the operations not yet declared. */
   undeclared: string[]
   years: AssetYear[]
 }
 
-const VIEW_WIDTH = 880
-const VIEW_HEIGHT = 280
-const PAD = { left: 8, right: 24, top: 16, bottom: 28 }
+interface ChartFrame {
+  width: number
+  height: number
+  pad: { left: number; right: number; top: number; bottom: number }
+}
+
+/** The desktop chart, beside «En cifras». */
+const WIDE: ChartFrame = {
+  width: 880,
+  height: 280,
+  pad: { left: 8, right: 24, top: 16, bottom: 28 },
+}
+/** The mobile chart, edge to edge under the price (artboard «… móvil · Pixel 10»). */
+const COMPACT: ChartFrame = {
+  width: 412,
+  height: 266,
+  pad: { left: 14, right: 14, top: 24, bottom: 34 },
+}
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 /** Units held, or null when the asset has no units. */
@@ -131,7 +166,8 @@ function assetMovements(state: State, position: InvestmentPosition): Transaction
   return state.transactions
     .filter(
       (tx): tx is Transaction =>
-        tx.type === 'investment' && matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
+        tx.type === 'investment' &&
+        matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
     )
     .sort(
       (a, b) =>
@@ -225,7 +261,9 @@ export function assetChart(
   position: InvestmentPosition,
   movements: readonly Transaction[],
   asOf: string,
+  frame: ChartFrame = WIDE,
 ): AssetChart | null {
+  const { width, height, pad: inset } = frame
   const operations = movements
     .filter((tx) => isOperation(tx) && Number(tx.unitPrice) > 0)
     .map((tx) => ({ tx, time: parseDay(tx.date), price: Number(tx.unitPrice) }))
@@ -257,15 +295,15 @@ export function assetChart(
   }
 
   const first = operations[0].time
-  const plotWidth = VIEW_WIDTH - PAD.left - PAD.right
-  const plotHeight = VIEW_HEIGHT - PAD.top - PAD.bottom
-  const x = (time: number) => round1(PAD.left + ((time - first) / (today - first)) * plotWidth)
-  const y = (price: number) => round1(PAD.top + (1 - (price - low) / (high - low)) * plotHeight)
+  const plotWidth = width - inset.left - inset.right
+  const plotHeight = height - inset.top - inset.bottom
+  const x = (time: number) => round1(inset.left + ((time - first) / (today - first)) * plotWidth)
+  const y = (price: number) => round1(inset.top + (1 - (price - low) / (high - low)) * plotHeight)
 
   const line = sequence
     .map((point, index) => `${index ? 'L' : 'M'}${x(point.time)} ${y(point.price)}`)
     .join(' ')
-  const baseline = VIEW_HEIGHT - PAD.bottom
+  const baseline = height - inset.bottom
   const area = `${line} L${x(today)} ${baseline} L${x(first)} ${baseline} Z`
 
   const points = sequence.map<AssetPoint>((point) => {
@@ -274,8 +312,8 @@ export function assetChart(
     return {
       x: x(point.time),
       y: y(point.price),
-      left: share(x(point.time), VIEW_WIDTH),
-      top: share(y(point.price), VIEW_HEIGHT),
+      left: share(x(point.time), width),
+      top: share(y(point.price), height),
       date: point.tx ? formatShortDate(point.tx.date) : 'Hoy',
       price: formatMoney(round2(point.price)),
       delta: average ? `${signedPct(versusAverage)} frente a tu media` : '',
@@ -291,17 +329,17 @@ export function assetChart(
   const averageInside = average !== null && average > low && average < high
   const history = `${formatShortDate(operations[0].tx.date)} – hoy`
   return {
-    viewBox: `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`,
+    viewBox: `0 0 ${width} ${height}`,
     line,
     area,
     average: averageInside
       ? {
-          d: `M${PAD.left} ${y(average)} H${VIEW_WIDTH - PAD.right}`,
-          top: share(y(average), VIEW_HEIGHT),
+          d: `M${inset.left} ${y(average)} H${width - inset.right}`,
+          top: share(y(average), height),
         }
       : null,
     ticks: tickLabels(first, today).map(({ time, text }) => ({
-      left: share(x(time), VIEW_WIDTH),
+      left: share(x(time), width),
       text,
     })),
     points,
@@ -347,6 +385,44 @@ function assetFacts(position: InvestmentPosition, movements: readonly Transactio
   return facts
 }
 
+function unitsHeld(position: InvestmentPosition): AssetDetail['units'] {
+  const units = heldUnits(position)
+  return units === null
+    ? null
+    : { count: formatDecimal(units), word: units === 1 ? 'título' : 'títulos' }
+}
+
+function assetPosition(position: InvestmentPosition): AssetPosition {
+  const weight = formatPercent(position.weight, { digits: 1 })
+  const rows: AssetFact[] = []
+  if (position.averagePrice !== null) {
+    rows.push({
+      label: 'Precio medio',
+      value: formatMoney(position.averagePrice),
+      note: '',
+      tone: 'neutral',
+    })
+  }
+  rows.push(
+    {
+      label: 'Resultado',
+      value: formatSignedMoney(position.gain),
+      note: position.invested > 0 ? signedPct(position.returnPct) : '',
+      tone: toneOf(position.gain),
+    },
+    { label: 'Has puesto', value: formatMoney(position.invested), note: '', tone: 'neutral' },
+  )
+  return {
+    rows,
+    ring: {
+      share: round2(Math.min(100, Math.max(0, position.weight))),
+      value: `${formatNumber(Math.round(position.value))}\u00a0€`,
+      weight,
+      label: `${formatMoney(position.value)}, el ${weight} de la cartera`,
+    },
+  }
+}
+
 /**
  * What an asset's detail shows. Null when the position is no longer in the
  * portfolio.
@@ -355,6 +431,7 @@ export function assetDetail(
   state: State,
   vm: InvestmentDashboardViewModel,
   positionId: string,
+  { compact = false }: { compact?: boolean } = {},
 ): AssetDetail | null {
   const position = vm.positions.find((candidate) => candidate.id === positionId)
   if (!position) return null
@@ -388,8 +465,10 @@ export function assetDetail(
         tone: 'neutral',
       },
     ],
-    chart: assetChart(position, movements, vm.asOf),
+    chart: assetChart(position, movements, vm.asOf, compact ? COMPACT : WIDE),
     facts: assetFacts(position, movements),
+    units: unitsHeld(position),
+    position: assetPosition(position),
     count: `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}${
       undeclared.length ? ` · ${undeclared.length} sin declarar` : ''
     }`,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, shallowRef } from 'vue'
+import { useBarTitleSlot } from './bar-title-slot'
 
 // The title of a section in the mobile top bar (DESIGN.md, «Barra superior
 // móvil»): the bar is static markup of the frame, so this teleports the title
@@ -7,10 +7,7 @@ import { onMounted, shallowRef } from 'vue'
 // visual copy: the page keeps its own heading for screen readers and focus.
 defineProps<{ title: string }>()
 
-const slot = shallowRef<HTMLElement | null>(null)
-onMounted(() => {
-  slot.value = document.querySelector<HTMLElement>('[data-bar-title-slot]')
-})
+const slot = useBarTitleSlot()
 </script>
 
 <template>

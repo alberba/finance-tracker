@@ -19,11 +19,7 @@ import {
   formatStamp,
   MINUS,
 } from '../../../lib/format'
-import {
-  computeContributionMetrics,
-  matchesInvestmentAsset,
-  type ContributionEntry,
-} from '../../../lib/finance-core'
+import { computeContributionMetrics, type ContributionEntry } from '../../../lib/finance-core'
 import { ALL_MONTHS, YEAR_START, type Month, type MonthOrStart } from '../../../lib/month'
 import { toSnapshotDate } from '../../../scripts/contribution-workflow'
 import { niceStep } from '../../ui/line-chart'
@@ -679,82 +675,6 @@ export function periodOptions(year: number, now: Date): PeriodOption[] {
     label: formatMonthName(month),
     latest: month === months.at(-1),
   }))
-}
-
-export interface PositionDetail {
-  figures: CardRow[]
-  movements: Array<{ id: string; title: string; meta: string; amount: string }>
-}
-
-/** How many of a position's operations its detail lists. */
-const DETAIL_MOVEMENTS = 12
-
-/**
- * What a position's detail shows: its figures and its latest operations,
- * newest first. Null when the position is no longer in the portfolio.
- */
-export function positionDetail(
-  state: State,
-  vm: InvestmentDashboardViewModel,
-  positionId: string,
-): PositionDetail | null {
-  const position = vm.positions.find((candidate) => candidate.id === positionId)
-  if (!position) return null
-  const units = position.units !== null && position.units > 0 ? position.units : null
-  const figures: CardRow[] = [
-    { label: 'Valor', value: formatMoney(position.value), tone: 'neutral' },
-    {
-      label: 'Resultado',
-      value: `${formatSignedMoney(position.gain)} · ${signedPct(position.returnPct)}`,
-      tone: toneOf(position.gain),
-    },
-  ]
-  if (units !== null)
-    figures.push({ label: 'Títulos', value: formatDecimal(units), tone: 'neutral' })
-  if (position.averagePrice !== null) {
-    figures.push({
-      label: 'Precio medio de compra',
-      value: formatMoney(position.averagePrice),
-      tone: 'neutral',
-    })
-  }
-  figures.push(
-    { label: 'Invertido', value: formatMoney(position.invested), tone: 'neutral' },
-    {
-      label: 'Peso en la cartera',
-      value: formatPercent(position.weight, { digits: 1 }),
-      tone: 'neutral',
-    },
-  )
-
-  const asset = state.investmentAssets.find((candidate) => candidate.id === position.id)
-  const movements = state.transactions
-    .filter(
-      (tx) => tx.type === 'investment' && !!asset && matchesInvestmentAsset(tx.category, asset, tx.instrumentId, state.instruments),
-    )
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')),
-    )
-    .slice(0, DETAIL_MOVEMENTS)
-    .map((tx) => {
-      const txUnits = Number(tx.units)
-      const operation = tx.side === 'sell' ? 'Venta' : 'Compra'
-      const fee = Number(tx.fee) || 0
-      return {
-        id: tx.id,
-        title:
-          tx.side && txUnits > 0
-            ? `${operation} · ${formatDecimal(txUnits)} ${txUnits === 1 ? 'título' : 'títulos'}`
-            : tx.description || operation,
-        meta:
-          fee > 0
-            ? `${formatShortDate(tx.date)} · comisión ${formatMoney(fee)}`
-            : formatShortDate(tx.date),
-        amount: formatMoney(tx.amount),
-      }
-    })
-  return { figures, movements }
 }
 
 /**

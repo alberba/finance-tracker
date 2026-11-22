@@ -12,7 +12,6 @@ import {
   maxDrawdown,
   periodFigures,
   portfolioChart,
-  positionDetail,
   positionRows,
   sortLabel,
   sortPositions,
@@ -388,34 +387,6 @@ describe('periodOptions', () => {
     const options = periodOptions(2025, new Date(2026, 2, 20))
     expect(options).toHaveLength(12)
     expect(options.at(-1)?.latest).toBe(true)
-  })
-})
-
-describe('positionDetail', () => {
-  it('reúne las cifras de la posición y sus operaciones, de la más reciente a la más antigua', () => {
-    const vm = simple()
-    const detail = positionDetail(portfolio(), vm, 'fondos')
-    expect(detail?.figures).toEqual([
-      { label: 'Valor', value: '2.640,00\u00a0€', tone: 'neutral' },
-      { label: 'Resultado', value: '+440,00\u00a0€ · +20,0\u00a0%', tone: 'gain' },
-      { label: 'Títulos', value: '20', tone: 'neutral' },
-      { label: 'Precio medio de compra', value: '110,00\u00a0€', tone: 'neutral' },
-      { label: 'Invertido', value: '2.200,00\u00a0€', tone: 'neutral' },
-      { label: 'Peso en la cartera', value: '93,6\u00a0%', tone: 'neutral' },
-    ])
-    expect(detail?.movements).toEqual([
-      { id: 't2', title: 'Compra · 10 títulos', meta: '15 feb 2026', amount: '1.200,00\u00a0€' },
-      {
-        id: 't1',
-        title: 'Compra · 10 títulos',
-        meta: '10 ene 2026 · comisión 1,50\u00a0€',
-        amount: '1.000,00\u00a0€',
-      },
-    ])
-  })
-
-  it('una posición que ya no está no tiene detalle', () => {
-    expect(positionDetail(portfolio(), simple(), 'nada')).toBeNull()
   })
 })
 
