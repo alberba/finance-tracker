@@ -6,11 +6,12 @@ import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
+import NeonThemePicker from './NeonThemePicker.vue'
 import { parseCurrency, parseYear } from './view-model'
 
-// Preferencias: the working year and the currency every figure is calculated
-// in. The theme has its own place, in the ticket of the theme picker. In a
-// narrow container (the mobile frame) the fields shrink and «Guardar» spans it.
+// Preferencias: the theme (one of the four of DESIGN.md, applied at once), the
+// working year and the currency every figure is calculated in. In a narrow
+// container (the mobile frame) the fields shrink and «Guardar» spans it.
 const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 const { viewModel } = storeToRefs(settingsStore)
@@ -47,9 +48,18 @@ const ROW =
   <NeonSettingsBlock
     id="preferencias"
     title="Preferencias"
-    description="Año de trabajo, moneda del tracker."
+    description="Tema, año de trabajo y moneda del tracker."
   >
     <div class="grid min-w-0" data-settings-preferences>
+      <div class="border-line grid min-w-0 gap-2.5 border-t py-2.5">
+        <div class="grid gap-0.5">
+          <span class="text-[16px] font-bold">Tema</span>
+          <span class="text-muted text-meta"
+            >Se aplica al momento y se recuerda en este dispositivo</span
+          >
+        </div>
+        <NeonThemePicker />
+      </div>
       <div :class="ROW">
         <label for="settings-year" class="grid gap-0.5">
           <span class="text-[16px] font-bold">Año de trabajo</span>

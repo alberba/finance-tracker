@@ -2,6 +2,7 @@ import { INSTRUMENT_TYPE_LABEL, providerLabel } from '../../../domain/investment
 import { ruleMonthlyEquivalent } from '../../../domain/investment/view-model'
 import { frequencyText } from '../../../domain/recurring/occurrences'
 import type { AssetRowViewModel, StockEventsSyncSummary } from '../../../domain/settings/view-model'
+import type { NeonTheme } from '../../../lib/client/neon-theme'
 import { formatMoney, formatShortDate, formatSignedMoney } from '../../../lib/format'
 import { parseDecimal } from '../../../lib/number'
 import type { Entity, RecurringRule, State } from '../../../scripts/types'
@@ -385,3 +386,11 @@ export function assetMeta(row: AssetRow): string {
 export function ruleMeta(row: RuleRow): string {
   return `${row.frequency} · ${row.next}`
 }
+
+/** The four themes of DESIGN.md (Temas), in the order Preferencias offers them. */
+export const THEME_CHOICES: ReadonlyArray<{ value: NeonTheme; label: string }> = [
+  { value: 'oscuro-suave', label: 'Oscuro suave' },
+  { value: 'oscuro-fuerte', label: 'Oscuro fuerte' },
+  { value: 'claro-hueso', label: 'Claro hueso' },
+  { value: 'claro-melocoton', label: 'Claro melocotón' },
+]

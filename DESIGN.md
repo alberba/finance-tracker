@@ -2,7 +2,7 @@
 
 > neón de garaje: taller a oscuras, una lámpara naranja sobre el banco
 
-**Theme:** dark por defecto. Objetivo: cuatro temas seleccionables (oscuro suave, oscuro fuerte, claro hueso y claro melocotón); hoy el selector solo ofrece claro/oscuro/sistema y los cuatro temas llegan en #445.
+**Theme:** dark por defecto, con cuatro temas seleccionables (oscuro suave, oscuro fuerte, claro hueso y claro melocotón), que se eligen en Configuración › Preferencias.
 
 Fuente: canvas «Dashboard · nueva dirección» (páginas 3 App, 4 Páginas · oscuro, 6–8 alternativas; Objetivos excluido). Las medidas salen del markup de los artboards; los roles y recomendaciones son interpretación. Los ejemplos HTML son reconstrucciones. Las decisiones de la página **10 · Sistema · decisiones** del canvas están todas resueltas.
 
@@ -41,7 +41,7 @@ Valores del tema por defecto (oscuro suave). Los otros tres temas redefinen los 
 
 ## Temas
 
-El usuario elige el tema; `oscuro-suave` es el por defecto y `claro-melocoton` el que se aplica si el sistema pide modo claro. Todos comparten tipografía, formas y movimiento: solo cambian los tokens de color, la opacidad del área y la sombra. Los temas claros usan `--color-accent-text` para todo acento que sea texto, porque el naranja de relleno no alcanza 4.5:1 sobre fondo claro.
+El usuario elige el tema en Configuración › Preferencias y se aplica al momento; se guarda en el dispositivo (`localStorage`, clave `neon-theme`) y el script previo al primer pintado lo aplica sin parpadeo. `oscuro-suave` es el por defecto y `claro-melocoton` el que se aplica si el sistema pide modo claro y no hay elección. El marco nuevo no tiene el selector sol/pantalla/luna de la cabecera; el diseño antiguo conserva el suyo, con su propia clave (`theme`). Todos comparten tipografía, formas y movimiento: solo cambian los tokens de color, la opacidad del área y la sombra. Los temas claros usan `--color-accent-text` para todo acento que sea texto, porque el naranja de relleno no alcanza 4.5:1 sobre fondo claro.
 
 | Token                     | Oscuro suave                  | Oscuro fuerte                  | Claro hueso                       | Claro melocotón                    |
 | ------------------------- | ----------------------------- | ------------------------------ | --------------------------------- | ---------------------------------- |

@@ -3,10 +3,10 @@
    the toggle sets), so none of it reaches the old design; the guard in
    tests/unit/styles-guards.test.ts fails on a rule outside that scope.
    Four themes: the unmarked block is «oscuro suave», the default; the others
-   are picked with `data-theme`. Until the theme ticket adds the picker, the
-   theme follows the app's light/dark attribute (the system unless the user
-   chose one): dark paints «oscuro suave» and light paints «claro melocotón».
-   The four named values stay selectable for that ticket.
+   are picked with `data-theme`, which the pre-paint script and the controller
+   (src/lib/client/neon-theme.ts) always set to one of the four names: the
+   user's choice in Configuración, else «oscuro suave», or «claro melocotón»
+   if the system asks for light.
 
    Names this file shares with the old @theme (--color-panel, --color-line,
    --color-accent, --color-gain, --color-loss, --font-*) are redefined inside
@@ -117,8 +117,7 @@
     color-scheme: light;
   }
 
-  [data-ui='neon'][data-theme='claro-melocoton'],
-  [data-ui='neon'][data-theme='light'] {
+  [data-ui='neon'][data-theme='claro-melocoton'] {
     --color-bg: #f7ebe2;
     --color-side: #f7ebe2;
     --color-side-line: #ebd8cb;
