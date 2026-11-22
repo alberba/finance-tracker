@@ -16,6 +16,7 @@ import {
   needsResolution,
   pendingWord,
   queueRows,
+  queueToggleLabel,
   sinceLabel,
   syncView,
   type SyncInput,
@@ -185,6 +186,18 @@ describe('queueRows', () => {
       entry(9, { action: 'remove', entityType: 'transaction', entityId: 'b' }),
     ])
     expect(rows.map((row) => row.key)).toEqual([7, 9])
+  })
+})
+
+describe('queueToggleLabel', () => {
+  it('offers to show the changes still waiting, counted', () => {
+    expect(queueToggleLabel(false, 2)).toBe('Ver los 2 cambios pendientes')
+    expect(queueToggleLabel(false, 1)).toBe('Ver el cambio pendiente')
+  })
+
+  it('offers to hide them once they are shown', () => {
+    expect(queueToggleLabel(true, 2)).toBe('Ocultar cambios pendientes')
+    expect(queueToggleLabel(true, 1)).toBe('Ocultar el cambio pendiente')
   })
 })
 

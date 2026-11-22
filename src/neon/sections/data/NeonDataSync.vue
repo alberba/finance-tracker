@@ -1,47 +1,13 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-
-import { useDataStore } from '../../../stores/data'
-import { useSyncStore } from '../../../stores/sync'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonCard from '../../ui/NeonCard.vue'
-import { queueRows, syncView, type QueueRow } from './view-model'
+import { SYNC_DOT_CLASS, useDataSync } from './use-data-sync'
 
 // «Sincronización» (artboard «Datos · 2560 px»): whether this device holds the
 // latest data, how many changes still wait to be sent and what they are, and
-// the button that sends them now. The demo keeps its data in the browser and
-// has no server to sync with.
-const syncStore = useSyncStore()
-const { connection, syncStatus, pendingCount, lastCheckedAt } = storeToRefs(syncStore)
-const demo = !useDataStore().backsUpServerData
-
-const now = ref(Date.now())
-let ticker: ReturnType<typeof setInterval> | undefined
-onMounted(() => (ticker = setInterval(() => (now.value = Date.now()), 5000)))
-onBeforeUnmount(() => clearInterval(ticker))
-
-const view = computed(() =>
-  syncView({
-    demo,
-    online: connection.value === 'online',
-    status: syncStatus.value,
-    pendingCount: pendingCount.value,
-    lastCheckedAt: lastCheckedAt.value,
-    now: now.value,
-  }),
-)
-
-const queue = ref<QueueRow[]>([])
-watch(
-  [pendingCount, syncStatus],
-  async () => {
-    queue.value = pendingCount.value > 0 ? queueRows(await syncStore.listPending()) : []
-  },
-  { immediate: true },
-)
-
-const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
+// the button that sends them now. The mobile frame shows the same state as a
+// single line (NeonDataSyncLine).
+const { demo, view, queue, syncing, syncNow } = useDataSync()
 </script>
 
 <template>
@@ -52,7 +18,11 @@ const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
     data-data-sync
   >
     <div class="flex min-w-0 flex-wrap items-center gap-2.5" role="status" data-sync-state>
-      <span class="size-2.5 shrink-0 rounded-full" :class="DOT[view.dot]" aria-hidden="true"></span>
+      <span
+        class="size-2.5 shrink-0 rounded-full"
+        :class="SYNC_DOT_CLASS[view.dot]"
+        aria-hidden="true"
+      ></span>
       <span class="text-[16px] font-bold" data-sync-label>{{ view.label }}</span>
       <span v-if="view.meta" class="text-muted text-meta">{{ view.meta }}</span>
     </div>
@@ -88,8 +58,8 @@ const DOT = { ok: 'bg-gain', pending: 'bg-accent', idle: 'bg-soft' } as const
       variant="primary"
       class="mt-auto self-start"
       :disabled="!view.canSync"
-      :aria-busy="syncStatus === 'syncing'"
-      @click="syncStore.syncNow()"
+      :aria-busy="syncing"
+      @click="syncNow"
     >
       {{ view.button }}
     </NeonButton>
