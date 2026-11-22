@@ -61,7 +61,7 @@ watch(bitvavoOpen, async (open) => {
     >
       <li v-for="provider in providers" :key="provider.id" class="flex">
         <article
-          class="bg-panel border-line rounded-card flex min-w-0 flex-1 flex-col gap-3.5 border px-6 py-[22px]"
+          class="bg-panel border-line rounded-card flex min-w-0 flex-1 flex-col gap-3 border px-3 py-4 @lg:gap-3.5 @lg:px-6 @lg:py-[22px]"
         >
           <div class="flex items-center gap-3.5">
             <span

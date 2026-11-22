@@ -9,7 +9,8 @@ import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import { parseCurrency, parseYear } from './view-model'
 
 // Preferencias: the working year and the currency every figure is calculated
-// in. The theme has its own place, in the ticket of the theme picker.
+// in. The theme has its own place, in the ticket of the theme picker. In a
+// narrow container (the mobile frame) the fields shrink and «Guardar» spans it.
 const settingsStore = useSettingsStore()
 const { showToast } = useToast()
 const { viewModel } = storeToRefs(settingsStore)
@@ -39,7 +40,7 @@ function save(): void {
 const INPUT =
   'border-ctrl-line bg-panel text-text rounded-field outline-accent box-border min-h-[46px] w-full min-w-0 border px-3.5 text-end text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
 const ROW =
-  'border-line grid min-h-16 min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,300px)] items-center gap-x-3 border-t py-2.5'
+  'border-line grid min-h-16 min-w-0 grid-cols-[minmax(0,1fr)_112px] items-center @lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)] gap-x-3 border-t py-2.5'
 </script>
 
 <template>
@@ -78,7 +79,7 @@ const ROW =
         />
       </div>
     </div>
-    <div class="flex justify-end pbs-1.5">
+    <div class="grid pbs-1.5 pbe-2 @lg:flex @lg:justify-end @lg:pbe-0">
       <NeonButton variant="primary" @click="save">Guardar ajustes</NeonButton>
     </div>
   </NeonSettingsBlock>
