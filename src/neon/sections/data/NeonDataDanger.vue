@@ -32,7 +32,13 @@ async function startFresh(): Promise<void> {
       </p>
     </div>
 
-    <NeonButton v-if="!confirming" id="start-fresh" danger @click="confirming = true">
+    <NeonButton
+      v-if="!confirming"
+      id="start-fresh"
+      danger
+      class="@max-lg:w-full"
+      @click="confirming = true"
+    >
       Empezar de cero
     </NeonButton>
 
@@ -48,8 +54,10 @@ async function startFresh(): Promise<void> {
         conservar lo de ahora, exporta antes una copia.
       </p>
       <div class="flex flex-wrap gap-2.5">
-        <NeonButton @click="confirming = false">Cancelar</NeonButton>
-        <NeonButton danger @click="startFresh">Crear espacio vacío</NeonButton>
+        <NeonButton class="flex-[1_1_140px]" @click="confirming = false">Cancelar</NeonButton>
+        <NeonButton danger class="flex-[1_1_180px]" @click="startFresh">
+          Crear espacio vacío
+        </NeonButton>
       </div>
     </div>
   </section>
