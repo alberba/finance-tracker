@@ -50,7 +50,10 @@ panel de alta, pero el seguimiento vive en la página `/reportes` (fuera de `APP
 `components/reports/ReportsPage.vue` en lugar de la sección (con el diseño nuevo,
 `neon/sections/reports/NeonReportsSection.vue` y el botón `neon/layout/NeonReportLauncher.vue`; la
 página no está en `MIGRATED_SECTIONS`, la elige solo el interruptor) y `stores/ui.ts` guarda
-`page: 'section' | 'reports'`. Ver la [guía de reportes](../context/tabs/reportes.md).
+`page: 'section' | 'reports'`. En el marco móvil nuevo no hay botón flotante: la hoja «Más»
+(`neon/layout/NeonMoreSheet.astro`) lleva «Crear reporte» y «Mis reportes» con el contador de
+novedades, y la barra inferior un punto sobre «Más»; `src/scripts/app/reports-badge.ts` los pinta
+(texto en `domain/reports/unseen-badge.ts`). Ver la [guía de reportes](../context/tabs/reportes.md).
 
 El informe mensual tampoco es una sección ni una página: «Exportar» en los filtros de Movimientos abre `components/transactions/MonthlyReportPanel.vue`. El periodo se filtra por la fecha del movimiento, no por el mes contable, y hereda la búsqueda, el tipo y la cuenta del registro, pero no el año. El PDF lo construye `domain/monthly-report/pdf-document.ts` y lo genera `lib/client/monthly-report-pdf.ts` con pdfmake y las fuentes de `assets/fonts/report`, cargados al descargar y precargados por el service worker ([ADR 0009](../adr/0009-el-informe-es-un-pdf-generado-en-el-cliente-con-pdfmake.md)).
 

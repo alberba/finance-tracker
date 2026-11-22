@@ -70,7 +70,9 @@ async function back(): Promise<void> {
         >
           Mis reportes
         </h1>
-        <p class="text-soft motion-safe:animate-rise max-w-155 text-[16px] [animation-delay:70ms]">
+        <p
+          class="text-soft motion-safe:animate-rise max-w-155 text-[16px] [animation-delay:70ms] @max-lg:text-[15px]"
+        >
           Sigue el estado de lo que has enviado y aclara lo que haga falta.
         </p>
       </header>
@@ -105,7 +107,7 @@ async function back(): Promise<void> {
         <li
           v-for="width in ['72%', '54%', '64%', '46%']"
           :key="width"
-          class="border-line flex min-h-22 items-center gap-3 border-t py-3"
+          class="border-line flex min-h-16 items-center gap-3 border-t py-3"
         >
           <span class="flex min-w-0 flex-1 flex-col gap-2">
             <span

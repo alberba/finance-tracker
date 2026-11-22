@@ -5,6 +5,7 @@
 
 import { watch } from 'vue'
 
+import { unseenBadge } from '../../domain/reports/unseen-badge'
 import { pinia } from '../../stores/pinia'
 import { useReportsStore } from '../../stores/reports'
 
@@ -14,12 +15,24 @@ export function initReportsBadge(): void {
   watch(
     () => store.unseenCount,
     (count) => {
-      document.querySelectorAll<HTMLElement>('[data-reports-badge]').forEach((badge) => {
-        badge.textContent = count > 9 ? '9+' : String(count)
-        badge.hidden = count === 0
+      const badge = unseenBadge(count)
+      document.querySelectorAll<HTMLElement>('[data-reports-badge]').forEach((legacy) => {
+        legacy.textContent = badge?.text ?? '0'
+        legacy.hidden = badge === null
       })
       document.querySelectorAll<HTMLElement>('[data-reports-badge-dot]').forEach((dot) => {
         dot.hidden = count === 0
+      })
+      // The new design's markup: a pill holding the visible count and its
+      // spoken sentence, and a description of the «Más» button for the news.
+      document.querySelectorAll<HTMLElement>('[data-reports-count-badge]').forEach((pill) => {
+        pill.hidden = badge === null
+      })
+      document.querySelectorAll<HTMLElement>('[data-reports-count]').forEach((text) => {
+        text.textContent = badge?.text ?? ''
+      })
+      document.querySelectorAll<HTMLElement>('[data-reports-count-spoken]').forEach((spoken) => {
+        spoken.textContent = badge?.spoken ?? ''
       })
       const more = document.querySelector<HTMLElement>('[data-mobile-more-trigger]')
       if (more) more.dataset.reportsUpdates = count > 0 ? 'true' : 'false'
