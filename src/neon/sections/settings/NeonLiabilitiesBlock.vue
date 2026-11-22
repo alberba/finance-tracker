@@ -3,21 +3,21 @@ import { ref } from 'vue'
 
 import { formatMoney } from '../../../lib/format'
 import type { Entity } from '../../../scripts/types'
-import { useToast } from '../../../composables/useToast'
 import { useSettingsStore } from '../../../stores/settings'
 import NeonButton from '../../ui/NeonButton.vue'
 import type { PendingDeletion } from './deletion'
+import { useEntityActions } from './entity-actions'
 import NeonSettingsBlock from './NeonSettingsBlock.vue'
 import NeonSettingsField from './NeonSettingsField.vue'
 import { DATA_ROW, HEAD_ROW, PLAIN_ROW, TABLE_SCROLL, TOTAL_FIGURE } from './table-styles'
-import { openingBalanceText, parseAmount, type LiabilitiesTable } from './view-model'
+import { parseAmount, type LiabilitiesTable } from './view-model'
 
 // Pasivos: loans and debts with the amount they start from, edited in place.
 defineProps<{ table: LiabilitiesTable }>()
 const emit = defineEmits<{ ask: [deletion: PendingDeletion] }>()
 
 const settingsStore = useSettingsStore()
-const { showToast } = useToast()
+const actions = useEntityActions('liabilities')
 const COLUMNS = 'grid-cols-[minmax(0,2fr)_190px_112px]'
 
 function rename(row: Entity, name: string): void {
@@ -30,21 +30,14 @@ function rebalance(row: Entity, text: string): void {
 }
 
 function askDelete(row: Entity): void {
-  emit('ask', {
-    title: '¿Eliminar este pasivo?',
-    confirmLabel: 'Eliminar pasivo',
-    message: `${row.name}, con su importe inicial de ${formatMoney(row.openingBalance)}. No se puede deshacer.`,
-    run: () => settingsStore.removeEntity('liabilities', row.id),
-  })
+  emit('ask', actions.deletion(row))
 }
 
 const name = ref('')
 const balance = ref('')
 
 function add(): void {
-  const opening = openingBalanceText(balance.value)
-  if (opening === null) return void showToast('El saldo inicial no es un número.')
-  if (settingsStore.addEntity('liabilities', name.value, opening)) {
+  if (actions.add(name.value, balance.value)) {
     name.value = ''
     balance.value = ''
   }
