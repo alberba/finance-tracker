@@ -9,8 +9,12 @@ import { fitCount } from './fit-list'
 // given. The rows are the `<li>` of the slot. The list takes the space left
 // in its card (`flex-1`); in a box with no fixed height, as when the widgets
 // stack, everything fits. Hidden rows are `hidden`, so they leave the tab
-// order and the reading order too.
+// order and the reading order too. On a bigger screen the box is bigger, so
+// the list shows more rows: it fills the room, it does not stop at a count.
+// `fitted` tells the card how many rows are in view, for a «see all» link when
+// some are left out.
 const list = useTemplateRef<HTMLElement>('list')
+const emit = defineEmits<{ fitted: [count: number] }>()
 
 function fit(): void {
   const element = list.value
@@ -24,24 +28,40 @@ function fit(): void {
     element.clientHeight,
   )
   rows.forEach((row, index) => (row.hidden = index >= count))
+  // A row that opens or folds (row-motion.ts) changes height over several
+  // frames: the list refits as it goes, so a row pushed out hides in time.
+  for (const row of rows) observer?.observe(row)
+  emit('fitted', count)
 }
 
 let observer: ResizeObserver | undefined
+// A row that has folded away leaves the list outside a render.
+let mutations: MutationObserver | undefined
 onMounted(() => {
-  fit()
   if (typeof ResizeObserver !== 'undefined' && list.value) {
     observer = new ResizeObserver(fit)
     observer.observe(list.value)
   }
+  if (typeof MutationObserver !== 'undefined' && list.value) {
+    mutations = new MutationObserver(fit)
+    mutations.observe(list.value, { childList: true })
+  }
+  fit()
   // The web fonts change the height of the rows when they arrive.
   void document.fonts?.ready.then(fit)
 })
 onUpdated(fit)
-onBeforeUnmount(() => observer?.disconnect())
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  mutations?.disconnect()
+})
 </script>
 
 <template>
-  <ul ref="list" class="relative min-h-0 flex-1 overflow-hidden">
+  <!-- The rows' hover highlight sticks out 12px on each side of the text (-mx-3): the
+       list gives that room back as padding, so overflow-hidden clips only the rows
+       that do not fit and never the rounded corners of the one under the pointer. -->
+  <ul ref="list" class="relative -mx-3 min-h-0 flex-1 overflow-hidden px-3">
     <slot />
   </ul>
 </template>

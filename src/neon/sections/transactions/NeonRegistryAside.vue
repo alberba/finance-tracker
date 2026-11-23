@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NeonFigure from '../../ui/NeonFigure.vue'
 import type { Breakdown, FilterSummary } from './registry-view-model'
 
 // «Resumen del filtro»: the month the registry starts from, with arrows to
@@ -64,11 +65,8 @@ const arrowClass =
     </div>
     <div class="grid gap-2">
       <p class="text-muted text-[14px] font-bold">{{ summary.label }}</p>
-      <p
-        class="font-display text-[clamp(34px,3.4cqi,44px)] leading-none font-semibold tracking-[-0.04em] whitespace-nowrap tabular-nums"
-        data-registry-total
-      >
-        {{ summary.total }}
+      <p class="text-figure-lg font-semibold" data-registry-total>
+        <NeonFigure :value="summary.total" />
       </p>
       <p class="text-soft text-[15px]">{{ summary.count }}</p>
     </div>
@@ -78,9 +76,9 @@ const arrowClass =
         <li v-for="row in breakdown.rows" :key="row.name" class="grid min-w-0 gap-[7px]">
           <div class="flex min-w-0 items-baseline justify-between gap-3 text-[15px]">
             <span class="min-w-0 truncate font-semibold">{{ row.name }}</span>
-            <span class="font-bold whitespace-nowrap tabular-nums">
+            <span class="font-display font-semibold whitespace-nowrap tabular-nums">
               {{ row.amount }}
-              <span class="text-muted text-[13px] font-semibold">{{ row.share }}</span>
+              <span class="text-muted text-[13px]">{{ row.share }}</span>
             </span>
           </div>
           <div class="bg-line rounded-pill h-1.5 overflow-hidden" aria-hidden="true">

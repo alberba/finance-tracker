@@ -365,7 +365,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
   <dialog
     id="neon-entry-sheet"
     ref="dialog"
-    class="neon-entry bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[380px] frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 flex-col overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex"
+    class="neon-entry bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-(--ui-dvh) frame:max-h-(--ui-dvh) frame:w-[380px] frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 flex-col overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex"
     aria-labelledby="neon-entry-title"
     @cancel="onCancel"
     @click="onScrimClick"

@@ -87,5 +87,7 @@ fichero de su entidad.
 La distribución del inicio de escritorio viaja como un único ajuste JSON versionado,
 `dashboardLayout`. El comando `settingsUpdate` reemplaza el documento entero. `null` delega en
 la distribución por defecto, mientras que `{ version: 1, items: [] }` conserva un inicio vacío.
+Cada elemento lleva su casilla (`id`, `col`, `row`, `w`, `h`) y, en los widgets con gráfica,
+un `chart: 'end'` opcional cuando la gráfica va después de las cifras; sin él va antes.
 La cola pendiente proyecta el mismo valor antes de que lo confirme el servidor. El estado y la
 copia JSON conservan el documento, y el diseño interpreta los widgets y sus tamaños mínimos.

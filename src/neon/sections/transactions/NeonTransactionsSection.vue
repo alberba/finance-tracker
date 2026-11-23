@@ -87,7 +87,7 @@ watch(
         <p class="text-muted text-label tracking-label font-extrabold uppercase">{{ dateLabel }}</p>
         <h1
           id="transactions-title"
-          class="font-display text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em]"
+          class="font-display text-h1 font-bold"
         >
           Movimientos
         </h1>
@@ -131,7 +131,7 @@ watch(
           :aria-selected="ui.txTab === tab.id"
           :aria-controls="`transactions-tab-${tab.id}`"
           :tabindex="ui.txTab === tab.id ? 0 : -1"
-          class="outline-accent rounded-pill inline-flex min-h-[38px] items-center gap-2 px-4 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
+          class="outline-accent rounded-pill inline-flex min-h-[36px] items-center gap-2 px-2 text-[14px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-coarse:min-h-11"
           :class="ui.txTab === tab.id ? 'bg-sel-bg text-sel-text' : 'text-soft'"
           @click="pickTab(tab.id)"
         >

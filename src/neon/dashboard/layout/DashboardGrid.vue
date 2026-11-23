@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed, onBeforeUpdate, onUpdated, useTemplateRef } from 'vue'
 
-import { GRID_COLUMNS, type LayoutItem } from './engine'
+import { GRID_COLUMNS, type ChartSide, type LayoutItem } from './engine'
 import { WIDGETS, type WidgetId } from './widgets'
 
 // The home's grid (DESIGN.md, «Inicio en escritorio»): six columns of square
@@ -10,7 +10,8 @@ import { WIDGETS, type WidgetId } from './widgets'
 // stack in reading order. Editing draws the cells, one more row than is used,
 // and puts a layer over each widget with what it takes to edit it: it can be
 // dragged, its corner resized, a button takes it off; the widget itself goes
-// inert, so nothing in it takes the focus or the click.
+// inert, so nothing in it takes the focus or the click. A widget with a chart
+// also gets a button that moves the chart to the other side of its figures.
 const props = defineProps<{
   items: LayoutItem[]
   editing: boolean
@@ -21,10 +22,50 @@ const emit = defineEmits<{
   resizeStart: [item: LayoutItem, event: PointerEvent]
   widgetKey: [item: LayoutItem, event: KeyboardEvent]
   remove: [id: WidgetId]
+  chart: [id: WidgetId, side: ChartSide]
 }>()
 
 const grid = useTemplateRef<HTMLElement>('grid')
 defineExpose({ element: grid })
+
+// When the layout changes (a widget dragged, resized or taken off) the others
+// slide to their new cells instead of jumping (DESIGN.md, «Inicio en
+// escritorio»): each one is measured before the change and, after it, moved
+// back to where it was and let go. A widget whose size changed just takes its
+// new box. Offsets, not client rects: they ignore the frame's zoom.
+const SLIDE = { duration: 280, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }
+const before = new Map<string, { left: number; top: number; width: number; height: number }>()
+
+function widgets(): HTMLElement[] {
+  return Array.from(grid.value?.querySelectorAll<HTMLElement>(':scope > [data-widget]') ?? [])
+}
+
+function box(widget: HTMLElement) {
+  return {
+    left: widget.offsetLeft,
+    top: widget.offsetTop,
+    width: widget.offsetWidth,
+    height: widget.offsetHeight,
+  }
+}
+
+onBeforeUpdate(() => {
+  before.clear()
+  for (const widget of widgets()) before.set(widget.dataset.widget ?? '', box(widget))
+})
+
+onUpdated(() => {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  for (const widget of widgets()) {
+    const was = before.get(widget.dataset.widget ?? '')
+    if (!was) continue
+    const now = box(widget)
+    const dx = was.left - now.left
+    const dy = was.top - now.top
+    if ((!dx && !dy) || was.width !== now.width || was.height !== now.height) continue
+    widget.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], SLIDE)
+  }
+})
 
 const rows = computed(() => props.items.reduce((max, item) => Math.max(max, item.row + item.h), 0))
 // While editing there is always an empty row to drag into.
@@ -108,6 +149,30 @@ function cell(item: LayoutItem, index: number) {
             aria-hidden="true"
           >
             <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <button
+          v-if="WIDGETS[item.id].chart"
+          type="button"
+          class="bg-panel2 text-muted hover:text-text border-line outline-accent absolute inset-e-14 inset-bs-2 grid size-10 cursor-pointer place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.94] pointer-coarse:inset-e-15 pointer-coarse:size-11"
+          :aria-label="`${WIDGETS[item.id].title}: poner la gráfica a la ${item.chart === 'end' ? 'izquierda' : 'derecha'} de las cifras`"
+          :title="`Gráfica a la ${item.chart === 'end' ? 'izquierda' : 'derecha'}`"
+          data-widget-chart-side
+          @pointerdown.stop
+          @click="emit('chart', item.id, item.chart === 'end' ? 'start' : 'end')"
+        >
+          <!-- Two panes swapping places: the chart's side flips. -->
+          <svg
+            class="size-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 8h13l-3-3M20 16H7l3 3" />
           </svg>
         </button>
         <span

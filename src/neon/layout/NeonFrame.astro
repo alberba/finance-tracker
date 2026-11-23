@@ -2,6 +2,7 @@
 import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
 import NeonBottomBar from './NeonBottomBar.astro'
+import NeonDemoBanner from './NeonDemoBanner.astro'
 import NeonEntrySheet from '../entry/NeonEntrySheet.vue'
 import NeonFab from './NeonFab.vue'
 import NeonMoreSheet from './NeonMoreSheet.astro'
@@ -13,8 +14,8 @@ import type { Props as NeonTopBarProps } from './NeonTopBar.astro'
  * Desktop frame of the new design (DESIGN.md, Layout): the 236px sidebar and a
  * fluid main area, `max-width: 1640px` and centred. One media query decides the
  * frame (`frame:`): from it up the sidebar shows, below it the mobile frame
- * (top bar, bottom bar, «Más» sheet and the «Apuntar» button). `banner` is the
- * strip above the content; `detail` turns the mobile top bar into the detail
+ * (top bar, bottom bar, «Más» sheet and the «Apuntar» button). The demo strip
+ * sits above the content; `detail` turns the mobile top bar into the detail
  * header («‹ VWCE», see NeonTopBar).
  */
 export interface Props {
@@ -32,7 +33,7 @@ const { activeSection, design, detail } = Astro.props
 >
   Saltar al contenido
 </a>
-<div class="frame:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] frame:content-stretch grid min-h-dvh grid-cols-1 content-start overflow-x-clip">
+<div class="frame:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] frame:content-stretch grid min-h-(--ui-dvh) grid-cols-1 content-start overflow-x-clip">
   <div id="nav-tabs" class="contents">
     <NeonSidebar activeSection={activeSection} design={design} />
     <NeonTopBar detail={detail} />
@@ -43,7 +44,7 @@ const { activeSection, design, detail } = Astro.props
   <NeonEntrySheet client:only="vue" />
 
   <div class="flex min-w-0 flex-col">
-    <slot name="banner" />
+    <NeonDemoBanner />
     <!-- Percent padding resolves against the column's width, so it scales like
          the `cqi` of DESIGN.md without making a container (which would anchor
          the fixed launcher and panels to it). -->

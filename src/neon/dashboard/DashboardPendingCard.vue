@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+
 import { getPathFromSection } from '../../scripts/app/dashboard-section-routing'
 import { useEntrySheet } from '../../composables/useEntrySheet'
 import type { SectionId } from '../../scripts/types'
@@ -6,12 +8,13 @@ import { useRecurringStore } from '../../stores/recurring'
 import NeonCard from '../ui/NeonCard.vue'
 import NeonEmptyState from '../ui/NeonEmptyState.vue'
 import NeonFitList from '../ui/NeonFitList.vue'
+import { rowDelay, rowEnter, rowLeave } from '../ui/row-motion'
 import type { NeonDashboardViewModel } from './view-model'
 
 // «Por confirmar»: the due dates of the recurring rules, outside the balances
 // until confirmed. Each one is confirmed as it is, or edited in the entry sheet
 // and confirmed there; «Confirmar todo» takes them all at once.
-defineProps<{ pending: NeonDashboardViewModel['pending'] }>()
+const props = defineProps<{ pending: NeonDashboardViewModel['pending'] }>()
 const emit = defineEmits<{ confirmAll: []; navigate: [section: SectionId] }>()
 
 const recurringStore = useRecurringStore()
@@ -25,6 +28,42 @@ function edit(id: string, event: MouseEvent): void {
     ?.querySelector<HTMLElement>('h2')
   if (item) openPendingEdit(item, title)
 }
+
+// Confirming one marks it as done for a moment before it folds away, so the
+// row reads as moved to Movimientos rather than gone. The focus goes back to
+// the card title, as the row it was on is leaving.
+const CONFIRM_HOLD = 450
+const confirming = ref<ReadonlySet<string>>(new Set())
+
+function confirm(id: string, event: MouseEvent): void {
+  if (confirming.value.has(id)) return
+  const title = (event.currentTarget as HTMLElement)
+    .closest('section')
+    ?.querySelector<HTMLElement>('h2')
+  // The pressed button is about to be replaced: the focus waits on the title.
+  title?.setAttribute('tabindex', '-1')
+  title?.focus({ preventScroll: true })
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    recurringStore.confirmPending(id)
+    return
+  }
+  confirming.value = new Set([...confirming.value, id])
+  setTimeout(() => {
+    recurringStore.confirmPending(id)
+    confirming.value = new Set([...confirming.value].filter((other) => other !== id))
+  }, CONFIRM_HOLD)
+}
+
+// How many rows the box shows: when it cannot show them all, the link to the
+// full list appears (the card does not scroll).
+const fitted = ref(Infinity)
+const moreLabel = computed(
+  () =>
+    props.pending.moreLabel ??
+    (fitted.value < props.pending.items.length
+      ? `Ver los ${props.pending.count} pendientes`
+      : null),
+)
 
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss', neutral: 'text-text' } as const
 const linkButton =
@@ -64,52 +103,76 @@ const linkButton =
         día que toquen.
       </NeonEmptyState>
     </div>
-    <NeonFitList v-else>
-      <li
-        v-for="item in pending.items"
-        :key="item.id"
-        class="border-line flex min-h-16 flex-col gap-0.5 border-t pbs-2.5"
-        :data-dashboard-pending-item="item.id"
-      >
-        <div class="flex items-baseline justify-between gap-3">
-          <span class="text-row font-bold">{{ item.description }}</span>
-          <span
-            class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
-            :class="TONE_TEXT[item.tone]"
-          >
-            {{ item.amount }}
-          </span>
-        </div>
-        <div class="flex items-center justify-between gap-1">
-          <span class="text-muted text-meta min-w-0 flex-1">{{ item.due }}</span>
-          <button
-            type="button"
-            class="text-soft px-3"
-            :class="linkButton"
-            :aria-label="`Editar ${item.description} antes de confirmar`"
-            @click="edit(item.id, $event)"
-          >
-            Editar
-          </button>
-          <button
-            type="button"
-            class="text-text -me-3 px-3"
-            :class="linkButton"
-            :aria-label="`Confirmar ${item.description}`"
-            @click="recurringStore.confirmPending(item.id)"
-          >
-            Confirmar
-          </button>
-        </div>
-      </li>
+    <NeonFitList v-else @fitted="fitted = $event">
+      <TransitionGroup :css="false" @enter="rowEnter" @leave="rowLeave">
+        <li
+          v-for="(item, index) in pending.items"
+          :key="item.id"
+          class="border-line motion-safe:animate-row flex min-h-16 flex-col gap-0.5 border-t pbs-2.5"
+          :style="{ animationDelay: `${rowDelay(index)}ms` }"
+          :data-dashboard-pending-item="item.id"
+        >
+          <div class="flex items-baseline justify-between gap-3">
+            <span class="text-row font-bold">{{ item.description }}</span>
+            <span
+              class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
+              :class="TONE_TEXT[item.tone]"
+            >
+              {{ item.amount }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="text-muted text-meta min-w-0 flex-1">{{ item.due }}</span>
+            <span
+              v-if="confirming.has(item.id)"
+              class="text-gain motion-safe:animate-swap inline-flex min-h-11 items-center gap-1.5 text-sm font-extrabold"
+              role="status"
+            >
+              <svg
+                class="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+              Confirmado
+            </span>
+            <template v-else>
+              <button
+                type="button"
+                class="text-soft px-3"
+                :class="linkButton"
+                :aria-label="`Editar ${item.description} antes de confirmar`"
+                @click="edit(item.id, $event)"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                class="text-text -me-3 px-3"
+                :class="linkButton"
+                :aria-label="`Confirmar ${item.description}`"
+                @click="confirm(item.id, $event)"
+              >
+                Confirmar
+              </button>
+            </template>
+          </div>
+        </li>
+      </TransitionGroup>
     </NeonFitList>
     <a
-      v-if="pending.moreLabel"
+      v-if="moreLabel"
       :href="getPathFromSection('transactions')"
       class="text-text outline-accent inline-flex min-h-11 items-center self-start text-sm font-extrabold underline underline-offset-4 focus-visible:outline-2"
       @click.prevent="emit('navigate', 'transactions')"
     >
-      {{ pending.moreLabel }}
+      {{ moreLabel }}
     </a>
   </NeonCard>
 </template>

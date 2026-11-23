@@ -258,9 +258,11 @@ describe('«Por confirmar»', () => {
       ['Spotify', '−17,99 €'],
       ['Devolución', '+100,00 €'],
       ['Gimnasio', '−39,90 €'],
+      ['DCA', '−600,00 €'],
     ])
     expect(vm.pending.items[0].due).toBe('vence el 12 oct')
-    expect(vm.pending.moreLabel).toBe('Ver los 4 pendientes')
+    // Every one goes to the card, which shows the ones that fit.
+    expect(vm.pending.moreLabel).toBeNull()
   })
 
   it('has no «more» link with three or fewer', () => {
@@ -278,30 +280,98 @@ describe('Patrimonio', () => {
       ]),
     )
 
-  it('gives the net worth with its change this month and this year', () => {
+  it('gives the net worth with its change this month and since the start of the range', () => {
     const vm = build({ snapshots: months([100000, 0, 0, 0, 0, 0, 0, 0, 146180.37, 148320.57]) })
     expect(vm.wealth.value).toBe('148.320,57 €')
     expect(vm.wealth.monthChange).toEqual({ text: '+2.140,20 € (+1,5 %)', tone: 'gain' })
-    expect(vm.wealth.yearChange).toEqual({ text: '+48.320,57 €', tone: 'gain' })
+    expect(vm.wealth.periodChange).toEqual({
+      text: '+48,3 %',
+      tone: 'gain',
+      label: 'en lo que va de año',
+    })
   })
 
-  it('draws the range picked: two months, six or the year so far', () => {
+  it('measures the change from the first month the range draws, and drops it on «1m»', () => {
+    const snapshots = months([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => n * 1000))
+    // 3m: July (7.000) to October (10.000).
+    expect(build({ snapshots }, { range: '3m' }).wealth.periodChange).toEqual({
+      text: '+42,9 %',
+      tone: 'gain',
+      label: 'en 3 meses',
+    })
+    expect(build({ snapshots }, { range: '6m' }).wealth.periodChange?.label).toBe('en 6 meses')
+    expect(build({ snapshots }, { range: '1m' }).wealth.periodChange).toBeNull()
+  })
+
+  it('gives each point its own two changes, also for a screen reader', () => {
+    const snapshots = months([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => n * 1000))
+    const { steps, chart } = build({ snapshots }, { range: '3m' }).wealth
+    // July opens the range: its month change is against June, nothing since July yet.
+    expect(steps[0]).toEqual({
+      month: { text: '+1.000,00 € (+16,7 %)', tone: 'gain', label: 'en julio' },
+      period: null,
+    })
+    expect(steps[1].period).toEqual({ text: '+14,3 %', tone: 'gain', label: 'desde julio' })
+    expect(chart.readings[1].note).toBe('+1.000,00 € (+14,3 %) en agosto, +14,3 % desde julio')
+  })
+
+  it('tones a change of zero as neutral', () => {
+    const vm = build({ snapshots: months([1000, 1000]) })
+    expect(vm.wealth.monthChange?.tone).toBe('neutral')
+  })
+
+  it('draws the range picked: two months, four, seven or the year so far', () => {
     const snapshots = months([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => n * 1000))
     expect(build({ snapshots }, { range: '1m' }).wealth.chart.labels).toEqual(['sep', 'oct'])
-    expect(build({ snapshots }, { range: '6m' }).wealth.chart.labels).toEqual([
-      'may',
-      'jun',
+    expect(build({ snapshots }, { range: '3m' }).wealth.chart.labels).toEqual([
       'jul',
       'ago',
       'sep',
       'oct',
     ])
+    expect(build({ snapshots }, { range: '6m' }).wealth.chart.labels).toHaveLength(7)
     expect(build({ snapshots }, { range: '1a' }).wealth.chart.labels).toHaveLength(10)
+  })
+
+  it('names the months the range covers, inside the year', () => {
+    expect(build({}, { range: '3m' }).rangeSpan).toBe('jul – oct 2026')
+    expect(build({}, { range: '1a' }).rangeSpan).toBe('ene – oct 2026')
+  })
+
+  it('starts the range at a month picked by hand, up to today', () => {
+    const snapshots = months([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => n * 1000))
+    const vm = build({ snapshots }, { range: 'from-5' })
+    expect(vm.rangeLabel).toBe('desde mayo')
+    expect(vm.rangeSpan).toBe('may – oct 2026')
+    expect(vm.wealth.chart.labels).toEqual(['may', 'jun', 'jul', 'ago', 'sep', 'oct'])
+    // May (5.000) to October (10.000).
+    expect(vm.wealth.periodChange).toEqual({ text: '+100,0 %', tone: 'gain', label: 'desde mayo' })
+  })
+
+  it('lays the year out as months to start from: lit inside the range, closed from today on', () => {
+    const vm = build({}, { range: 'from-5' })
+    expect(vm.rangeMonths).toHaveLength(12)
+    expect(vm.rangeMonths.filter((m) => m.lit).map((m) => m.initial)).toEqual([
+      'M',
+      'J',
+      'J',
+      'A',
+      'S',
+      'O',
+    ])
+    expect(vm.rangeMonths.filter((m) => m.disabled).map((m) => m.value)).toEqual([
+      'from-10',
+      'from-11',
+      'from-12',
+    ])
+    expect(build({}, { range: '1a' }).rangeLabel).toBe('último año')
   })
 
   it('names the evolution for screen readers', () => {
     const vm = build({ snapshots: months([1000, 1500]) }, { today: '2026-02-10', range: '1m' })
-    expect(vm.wealth.chart.label).toBe('Evolución del patrimonio: de 1.000,00 € a 1.500,00 €')
+    expect(vm.wealth.chart.label).toBe(
+      'Evolución del patrimonio de enero a febrero: de 1.000,00 € a 1.500,00 €',
+    )
   })
 })
 
@@ -417,5 +487,13 @@ describe('Inversiones', () => {
       ['Fondo 4', '10,0 %'],
       ['Otros', '5,0 %'],
     ])
+  })
+
+  it('measures the gain against what was put in, and leaves the start of the year unlabelled', () => {
+    const assets = [{ id: 'asset-0', name: 'Fondo', openingBalance: 4000 }]
+    const vm = build({ investmentAssets: assets } as unknown as Partial<State>)
+    expect(vm.investments.invested).toBe('4.000,00\u00a0€')
+    expect(vm.investments.chart.labels[0]).toBe('inicio')
+    expect(vm.investments.chart.readings[0].name).toBe('Inicio')
   })
 })

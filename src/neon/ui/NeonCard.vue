@@ -25,14 +25,14 @@ function follow(event: MouseEvent): void {
 
 <template>
   <section
-    class="bg-panel text-text border-line rounded-card flex min-w-0 flex-col gap-3.5 border px-6 py-[22px] @max-lg:px-3 @max-lg:py-4"
+    class="bg-panel text-text border-line rounded-card flex min-w-0 flex-col gap-3.5 border px-8 py-8 @max-lg:px-3 @max-lg:py-4"
     :aria-labelledby="titleId"
   >
     <div class="flex flex-wrap items-center justify-between gap-2.5">
       <div class="flex items-center gap-2.5">
         <h2
           :id="titleId"
-          class="text-block-title text-text font-sans font-extrabold tracking-normal"
+          class="text-block-title frame:text-card-title text-text font-sans font-extrabold tracking-normal"
         >
           {{ title }}
         </h2>

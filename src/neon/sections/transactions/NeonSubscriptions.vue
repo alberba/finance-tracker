@@ -10,6 +10,7 @@ import { useMovementsStore } from '../../../stores/movements'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
+import NeonFigure from '../../ui/NeonFigure.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
 import {
   FREQUENCY_OPTIONS,
@@ -228,10 +229,8 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
       >
         <div v-if="desktopFrame" class="grid gap-2">
           <p class="text-muted text-[14px] font-bold">Comprometido al mes</p>
-          <p
-            class="font-display text-[clamp(34px,3.4cqi,44px)] leading-none font-semibold tracking-[-0.04em] whitespace-nowrap tabular-nums"
-          >
-            {{ summary.monthly }}
+          <p class="text-figure-lg font-semibold">
+            <NeonFigure :value="summary.monthly" />
           </p>
           <p class="text-soft text-[15px]">{{ summary.line }}</p>
         </div>

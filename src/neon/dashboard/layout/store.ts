@@ -12,7 +12,9 @@ import {
   addItem,
   removeItem,
   sameItems,
+  setChartSide,
   settle,
+  type ChartSide,
   type DashboardLayout,
   type LayoutItem,
 } from './engine'
@@ -97,6 +99,13 @@ export const useDashboardLayoutStore = defineStore('neon-dashboard-layout', () =
     commit(addItem(layout.value.items, id), `${WIDGETS[id].title} añadido al inicio.`)
   }
 
+  function setChart(id: WidgetId, side: ChartSide): void {
+    commit(
+      setChartSide(layout.value.items, id, side),
+      `${WIDGETS[id].title}: gráfica a la ${side === 'start' ? 'izquierda' : 'derecha'} de las cifras.`,
+    )
+  }
+
   function reset(): void {
     saveLayout(null)
     preview.value = null
@@ -120,6 +129,7 @@ export const useDashboardLayoutStore = defineStore('neon-dashboard-layout', () =
     commit,
     remove,
     add,
+    setChart,
     reset,
   }
 })

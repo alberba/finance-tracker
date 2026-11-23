@@ -13,8 +13,13 @@ import { WIDGETS, isWidgetId, type CellSize, type WidgetId } from './widgets'
  */
 export const GRID_COLUMNS = 6
 
+/** Which side of a widget's figures its chart goes on: before them (`start`, the default) or after (`end`). */
+export type ChartSide = 'start' | 'end'
+
 export interface LayoutItem extends CellSize {
   id: WidgetId
+  /** Only for widgets with a chart, and only when it is not the default. */
+  chart?: ChartSide
   /** 0-based column of its left edge. */
   col: number
   /** 0-based row of its top edge. */
@@ -53,6 +58,7 @@ function clampItem(item: LayoutItem): LayoutItem {
   const h = Math.max(Math.round(item.h), min.h)
   return {
     id: item.id,
+    ...(item.chart === 'end' && WIDGETS[item.id].chart ? { chart: item.chart } : {}),
     w,
     h,
     col: Math.min(Math.max(Math.round(item.col), 0), GRID_COLUMNS - w),
@@ -128,7 +134,8 @@ export function insertItem(
 
 /** Whether two lists put the same widgets in the same cells, whatever order they are in. */
 export function sameItems(a: readonly LayoutItem[], b: readonly LayoutItem[]): boolean {
-  const key = (item: LayoutItem) => `${item.id}:${item.col},${item.row},${item.w},${item.h}`
+  const key = (item: LayoutItem) =>
+    `${item.id}:${item.col},${item.row},${item.w},${item.h},${item.chart ?? 'start'}`
   const left = a.map(key).sort()
   const right = b.map(key).sort()
   return left.length === right.length && left.every((entry, index) => entry === right[index])
@@ -177,6 +184,19 @@ export function settle(items: readonly LayoutItem[]): LayoutItem[] {
 }
 
 /** Takes a widget off the home; what was below it floats up. */
+/** `id` with its chart on `side` of its figures; the rest as it was. */
+export function setChartSide(
+  items: readonly LayoutItem[],
+  id: WidgetId,
+  side: ChartSide,
+): LayoutItem[] {
+  return items.map((item) => {
+    if (item.id !== id) return item
+    const placed = { id: item.id, col: item.col, row: item.row, w: item.w, h: item.h }
+    return side === 'end' ? { ...placed, chart: side } : placed
+  })
+}
+
 export function removeItem(items: readonly LayoutItem[], id: WidgetId): LayoutItem[] {
   return compact(items.filter((item) => item.id !== id))
 }
@@ -227,6 +247,7 @@ function parseItem(value: unknown): LayoutItem | null {
     row: raw.row as number,
     w: raw.w as number,
     h: raw.h as number,
+    ...(raw.chart === 'end' ? { chart: 'end' as const } : {}),
   })
 }
 

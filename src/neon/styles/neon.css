@@ -47,6 +47,8 @@
     --color-sel-text: #1b1a18;
     --color-sel-border: #e6e1d7;
     --area-opacity: 0.12;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0.07) calc(c * 1.2) h);
     --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
@@ -80,6 +82,8 @@
     --color-sel-text: #121110;
     --color-sel-border: #f2eee6;
     --area-opacity: 0.14;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0.06) calc(c * 1.15) h);
     --shadow-float: 0 24px 60px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }
@@ -113,6 +117,8 @@
     --color-sel-text: #8e3510;
     --color-sel-border: #f2c2a8;
     --area-opacity: 0.16;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0) calc(c * 1.2) h);
     --shadow-float: 0 20px 50px rgba(60, 40, 20, 0.14);
     color-scheme: light;
   }
@@ -146,6 +152,8 @@
     --color-sel-text: #8e3510;
     --color-sel-border: #f7c3a6;
     --area-opacity: 0.18;
+    /* The chart's trace: the lamp turned up, lighter on the dark themes and more saturated on all. */
+    --color-accent-bright: oklch(from var(--color-accent) calc(l + 0) calc(c * 1.2) h);
     --shadow-float: 0 22px 50px rgba(140, 70, 30, 0.16);
     color-scheme: light;
   }
@@ -242,6 +250,51 @@
   }
 }
 
+/* Desktop density. The sizes are fixed px, tuned for the full-width layout
+   (sidebar plus the 1640px page, about 1920px). Below that the cards narrow
+   but the type would not, so the whole design zooms out in step with the
+   window (≈ width / 1920), like the browser's own zoom, and keeps the
+   proportions of a wide screen. Phones keep 1. Zoom also shrinks viewport
+   units, so a full-height box uses `--ui-dvh`. */
+@layer base {
+  [data-ui='neon'] {
+    --ui-zoom: 1;
+    --ui-dvh: calc(100dvh / var(--ui-zoom));
+    /* eslint-disable-next-line css/use-baseline -- Chrome and Safari for years, Firefox since 126 (May 2024). */
+    zoom: var(--ui-zoom);
+  }
+
+  @media (min-width: 61.3125rem) {
+    [data-ui='neon'] {
+      --ui-zoom: 0.72;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    [data-ui='neon'] {
+      --ui-zoom: 0.78;
+    }
+  }
+
+  @media (min-width: 1600px) {
+    [data-ui='neon'] {
+      --ui-zoom: 0.85;
+    }
+  }
+
+  @media (min-width: 1760px) {
+    [data-ui='neon'] {
+      --ui-zoom: 0.92;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    [data-ui='neon'] {
+      --ui-zoom: 1;
+    }
+  }
+}
+
 /* Page base of the new design: canvas, text and font. Scoped, so the old
    body rule keeps painting the old design. */
 @layer base {
@@ -327,6 +380,10 @@
   --text-lede: 16px;
   --text-row: 16px;
   --text-block-title: 18px;
+  /* Card title on desktop, scaled by the desktop zoom like everything else.
+     Phones keep the block title. */
+  --text-card-title: 22px;
+  --text-card-title--line-height: 1.2;
   --text-note: 14px;
   --text-delta: 14px;
   --text-figure-row: 16px;
@@ -356,6 +413,78 @@
   --animate-fade-in: neon-fade-in 260ms ease-out;
   /* Blocks rise 14px as they come in (`anim-rise`), staggered 70ms by the caller. */
   --animate-rise: neon-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* An evolution chart draws itself from left to right when it first shows
+     (`anim-draw`); today's dot lights up as the line reaches it (`anim-dot`). */
+  --animate-draw: neon-draw 1500ms cubic-bezier(0.23, 1, 0.32, 1) 120ms backwards;
+  --animate-dot: neon-dot 320ms cubic-bezier(0.22, 1, 0.36, 1) 1000ms backwards;
+  /* A bar draws itself up to its value, as the line does (`anim-wipe`); the
+     month columns of «Te quedan» grow from their base (`anim-grow`); the rows of
+     a list come in after their card (`anim-row`). The caller sets the delay. */
+  --animate-wipe: neon-wipe 1100ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  --animate-grow: neon-grow 700ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  /* A bar split in shares grows as one from its start, every share at its
+     proportion, instead of being uncovered share by share (`anim-stretch`). */
+  --animate-stretch: neon-stretch 1100ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  --animate-row: neon-row 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  /* A figure that changes in place (`anim-swap`): the new value settles in. */
+  --animate-swap: neon-swap 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The clip runs past every edge so the stroke and the top of the line are never
+   cut; with `backwards` it only holds before the start, never after the end. */
+@keyframes neon-draw {
+  from {
+    clip-path: inset(-10% 100% -10% -10%);
+  }
+  /* Ends just past the right edge (the stroke's half width), not 10% out:
+     the line must arrive with the end of the curve, or the ease-out happens
+     off-view and the line stops dead. */
+  to {
+    clip-path: inset(-10% -2px -10% -10%);
+  }
+}
+
+@keyframes neon-dot {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+
+@keyframes neon-wipe {
+  from {
+    clip-path: inset(0 100% 0 0 round 999px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+}
+
+@keyframes neon-stretch {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes neon-grow {
+  from {
+    scale: 1 0;
+  }
+}
+
+@keyframes neon-row {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@keyframes neon-swap {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+    filter: blur(2px);
+  }
 }
 
 @keyframes neon-rise {

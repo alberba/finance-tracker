@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
+import { useMovementDetailRequest } from '../../../composables/useMovementDetailRequest'
 import { foldMonthGroups, hasTypeRestriction } from '../../../domain/transactions/registry'
 import { formatMonthYear } from '../../../lib/format'
 import { atMonth } from '../../../lib/month'
@@ -44,7 +45,7 @@ import {
 //
 // On the mobile frame (artboard «Movimientos · móvil», #432) the aside gives
 // way to one centered month line between the filters and the ledger, and the
-// two actions turn into pills under it.
+// two actions go under it, as secondary buttons.
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
 const ui = useUiStore().ui
@@ -138,6 +139,16 @@ function openDetail(id: string): void {
   detailOpen.value = true
 }
 
+// A movement asked for from elsewhere (a row of the home) opens on arrival.
+const detailRequest = useMovementDetailRequest()
+watch(
+  detailRequest.requested,
+  (id) => {
+    if (id) openDetail(detailRequest.take()!)
+  },
+  { immediate: true },
+)
+
 // After an edit the panel shows the saved data.
 watch(
   () => financialStateStore.transactions,
@@ -205,8 +216,6 @@ onBeforeUnmount(() => movementsStore.clearSelection())
 const reportOpen = ref(false)
 const desktopFrame = useMediaQuery(FRAME_QUERY)
 
-const pillClass =
-  'outline-accent rounded-pill pointer-coarse:min-h-11 inline-flex min-h-[38px] items-center border px-4 text-[14px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]'
 </script>
 
 <template>
@@ -233,27 +242,14 @@ const pillClass =
           @step="movementsStore.stepMonth"
         >
           <template #actions>
-            <button
-              type="button"
-              :class="[pillClass, 'border-ctrl-line text-text']"
-              @click="reportOpen = true"
-            >
-              Exportar
-            </button>
-            <button
-              type="button"
+            <NeonButton @click="reportOpen = true">Exportar</NeonButton>
+            <NeonButton
               :aria-pressed="selecting"
               :disabled="!selecting && !months.length"
-              :class="[
-                pillClass,
-                selecting
-                  ? 'bg-sel-bg border-sel-border text-sel-text'
-                  : 'border-ctrl-line text-text',
-              ]"
               @click="selecting ? stopSelecting() : startSelecting()"
             >
               {{ selecting ? 'Listo' : 'Seleccionar' }}
-            </button>
+            </NeonButton>
           </template>
         </NeonRegistryMonthLine>
         <NeonLedger

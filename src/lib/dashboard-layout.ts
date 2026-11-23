@@ -12,6 +12,9 @@ export const dashboardLayoutSchema = Schema.Struct({
       row: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       w: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
       h: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+      // Widgets with a chart (Patrimonio, Inversiones): which side of the figures
+      // the chart goes on. Missing means the default, before them.
+      chart: Schema.optional(Schema.Literals(['start', 'end'])),
     }),
   ),
 })

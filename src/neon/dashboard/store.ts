@@ -6,11 +6,11 @@ import type { SectionId } from '../../scripts/types'
 import { useFinancialStateStore } from '../../stores/financial-state'
 import { useRecurringStore } from '../../stores/recurring'
 import { useUiStore } from '../../stores/ui'
-import { buildNeonDashboardViewModel, type WealthRange } from './view-model'
+import { buildNeonDashboardViewModel, type ChartRange } from './view-model'
 
 /**
  * Presentation state of the new dashboard. A store rather than component
- * state so the net worth range survives leaving the section and coming back:
+ * state so the chart range survives leaving the section and coming back:
  * the section unmounts on every navigation, the store does not.
  */
 export const useNeonDashboardStore = defineStore('neon-dashboard', () => {
@@ -18,7 +18,7 @@ export const useNeonDashboardStore = defineStore('neon-dashboard', () => {
   const recurringStore = useRecurringStore()
   const uiStore = useUiStore()
   const { navigateTo } = useSectionNavigation()
-  const range = shallowRef<WealthRange>('1a')
+  const range = shallowRef<ChartRange>('1a')
 
   const viewModel = computed(() =>
     buildNeonDashboardViewModel({

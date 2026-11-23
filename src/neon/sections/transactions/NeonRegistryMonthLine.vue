@@ -67,7 +67,7 @@ const arrowClass =
         >{{ summary.total }}</span
       >
     </p>
-    <div class="flex justify-end gap-2">
+    <div class="flex justify-end gap-1">
       <slot name="actions" />
     </div>
   </section>

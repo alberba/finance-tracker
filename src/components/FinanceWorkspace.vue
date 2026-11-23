@@ -7,8 +7,10 @@ import type { Design } from '../lib/design'
 import NeonDashboardSection from '../neon/dashboard/NeonDashboardSection.vue'
 import NeonReportLauncher from '../neon/layout/NeonReportLauncher.vue'
 import type { SectionId } from '../scripts/types'
+import { useFinancialStateStore } from '../stores/financial-state'
 import { useStockEventsStore } from '../stores/stockevents'
 import { useUiStore } from '../stores/ui'
+import { useFinanceReady } from '../composables/useFinanceReady'
 import DashboardSection from './sections/DashboardSection.vue'
 import WelcomeLauncher from './onboarding/WelcomeLauncher.vue'
 import GlobalReportLauncher from './reports/GlobalReportLauncher.vue'
@@ -120,13 +122,21 @@ const activeSectionComponent = computed(() => {
   return neon && sectionDesign(section, props.design) === 'neon' ? neon : sectionComponents[section]
 })
 const isReportsPage = computed(() => uiStore.page === 'reports')
+// A section shows once the shell has the data (sync, or the demo's local copy),
+// not before: mounted on the empty state it would draw its empty cards and
+// then jump when the data arrives, its entrance spent on nothing. If loading
+// fails, it shows anyway, with whatever the client has.
+const financeReady = useFinanceReady()
+const financialStateStore = useFinancialStateStore()
+const canShow = computed(() => financeReady.value || financialStateStore.status === 'error')
 const isReportDialogOpen = shallowRef(false)
 </script>
 
 <template>
   <div class="contents" data-finance-workspace>
     <WelcomeLauncher />
-    <template v-if="isReportsPage">
+    <template v-if="!canShow" />
+    <template v-else-if="isReportsPage">
       <NeonReportsPage v-if="design === 'neon'" />
       <ReportsPage v-else />
     </template>

@@ -244,11 +244,11 @@ const ROW = 'border-line flex min-h-16 items-center gap-3 border-t px-1 py-2.5'
             {{ viewModel.wealth.monthChange.text }} este mes
           </span>
         </p>
-        <p v-if="viewModel.wealth.yearChange" class="text-muted text-meta">
-          <b class="font-extrabold" :class="TONE_TEXT[viewModel.wealth.yearChange.tone]">{{
-            viewModel.wealth.yearChange.text
+        <p v-if="viewModel.wealth.periodChange" class="text-muted text-meta">
+          <b class="font-extrabold" :class="TONE_TEXT[viewModel.wealth.periodChange.tone]">{{
+            viewModel.wealth.periodChange.text
           }}</b>
-          en lo que va de año
+          {{ viewModel.wealth.periodChange.label }}
         </p>
       </div>
       <a

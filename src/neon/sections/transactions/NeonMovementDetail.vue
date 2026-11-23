@@ -159,7 +159,13 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
         <div v-if="detail.budget" class="border-line grid gap-2 border-t pbs-[9px]">
           <div class="flex items-baseline justify-between gap-3 text-[14px]">
             <span class="font-extrabold">{{ detail.budget.title }}</span>
-            <span class="text-soft tabular-nums">{{ detail.budget.text }}</span>
+            <span class="text-soft whitespace-nowrap">
+              <span class="font-display font-semibold tabular-nums">{{ detail.budget.spent }}</span>
+              de
+              <span class="font-display font-semibold tabular-nums">{{
+                detail.budget.planned
+              }}</span>
+            </span>
           </div>
           <div class="bg-line rounded-pill h-1.5 overflow-hidden" aria-hidden="true">
             <span
@@ -177,7 +183,7 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
             class="text-soft flex justify-between gap-3 py-[3px] text-[14px] tabular-nums"
           >
             <span>{{ item.label }}</span>
-            <span>{{ item.value }}</span>
+            <span class="font-display font-semibold whitespace-nowrap">{{ item.value }}</span>
           </div>
         </div>
         <p v-if="locked" class="text-muted text-[14px]">

@@ -95,6 +95,20 @@ describe('dashboard layout store', () => {
 })
 
 describe('dashboard layout persistence', () => {
+  it('moves a chart to the other side of its figures and keeps it', () => {
+    const store = useDashboardLayoutStore()
+    store.setChart('investments', 'end')
+    expect(store.layout.items.find((item) => item.id === 'investments')?.chart).toBe('end')
+    expect(store.announcement).toBe('Inversiones: gráfica a la derecha de las cifras.')
+    expect(syncSettingsUpdate).toHaveBeenCalledWith({
+      dashboardLayout: expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: 'investments', chart: 'end' }),
+        ]),
+      }),
+    })
+  })
+
   it('loads the shared snapshot and reacts to changes from sync', () => {
     const financial = useFinancialStateStore()
     const store = useDashboardLayoutStore()

@@ -140,7 +140,7 @@ function onDragEnd(event: PointerEvent): void {
 <template>
   <dialog
     ref="dialog"
-    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-dvh frame:max-h-dvh frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
+    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-(--ui-dvh) frame:max-h-(--ui-dvh) frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
     :aria-label="title"
     @cancel="onCancel"
     @click="onScrimClick"

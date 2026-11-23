@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { categoryIcon } from '../../ui/category-icons'
+import { rowDelay, rowEnter, rowLeave } from '../../ui/row-motion'
 import type { AmountTone, LedgerMonthView } from './registry-view-model'
 import NeonButton from '../../ui/NeonButton.vue'
 
@@ -40,6 +43,16 @@ const TONE: Record<AmountTone, string> = {
   text: 'text-text',
 }
 
+// Where each row stands in the ledger, top to bottom: the first rows come in
+// one after another (`anim-row`); one added or removed later opens or folds
+// its room (row-motion.ts).
+const rowOrder = computed(() => {
+  const order = new Map<string, number>()
+  for (const month of props.months)
+    for (const day of month.days) for (const row of day.rows) order.set(row.id, order.size)
+  return order
+})
+
 const CHIP_TONE: Record<string, string> = {
   expense: 'text-soft',
   income: 'text-gain',
@@ -63,7 +76,12 @@ const CHIP_TONE: Record<string, string> = {
         <h2 :id="`tx-month-${month.month}`" class="text-[18px] font-extrabold">
           {{ month.title }}
         </h2>
-        <p class="text-muted text-[14px] font-bold tabular-nums">{{ month.summary }}</p>
+        <p class="text-muted text-[14px] font-bold">
+          {{ month.count }} · neto
+          <span class="font-display font-semibold whitespace-nowrap tabular-nums">{{
+            month.net
+          }}</span>
+        </p>
       </header>
       <div v-for="day in month.days" :key="day.date" role="group" :aria-label="day.label">
         <div
@@ -73,88 +91,92 @@ const CHIP_TONE: Record<string, string> = {
           <span class="text-muted text-label tracking-label font-extrabold uppercase">
             {{ day.label }}
           </span>
-          <span class="text-muted text-[14px] font-bold whitespace-nowrap tabular-nums">
-            {{ day.net }}
+          <span class="text-muted text-[14px] font-bold whitespace-nowrap">
+            Neto
+            <span class="font-display font-semibold tabular-nums">{{ day.net }}</span>
           </span>
         </div>
-        <button
-          v-for="row in day.rows"
-          :key="row.id"
-          type="button"
-          class="neon-ledger-row border-line text-text outline-accent grid min-h-16 w-full items-center gap-3 border-t px-3.5 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-colors @min-[560px]/registry:px-6"
-          :class="
-            openId === row.id || isSelected(row.id)
-              ? 'bg-panel2 shadow-[inset_3px_0_0_var(--color-accent)]'
-              : 'hover:bg-panel2/60'
-          "
-          :aria-label="row.label"
-          :role="selecting ? 'checkbox' : undefined"
-          :aria-checked="selecting ? isSelected(row.id) : undefined"
-          :aria-haspopup="selecting ? undefined : 'dialog'"
-          :data-tx-id="row.id"
-          @click="press(row.id, $event.currentTarget as HTMLElement)"
-        >
-          <span
-            v-if="selecting"
-            class="grid size-10 place-items-center rounded-full border-2"
+        <TransitionGroup :css="false" @enter="rowEnter" @leave="rowLeave">
+          <button
+            v-for="row in day.rows"
+            :key="row.id"
+            type="button"
+            class="neon-ledger-row border-line text-text outline-accent motion-safe:animate-row grid min-h-16 w-full items-center gap-3 border-t px-3.5 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-colors @min-[560px]/registry:px-6"
+            :style="{ animationDelay: `${rowDelay(rowOrder.get(row.id) ?? 0)}ms` }"
             :class="
-              isSelected(row.id)
-                ? 'bg-accent border-accent text-on-accent'
-                : 'border-ctrl-line text-transparent'
+              openId === row.id || isSelected(row.id)
+                ? 'bg-panel2 shadow-[inset_3px_0_0_var(--color-accent)]'
+                : 'hover:bg-panel2/60'
             "
-            aria-hidden="true"
-            data-tx-check
+            :aria-label="row.label"
+            :role="selecting ? 'checkbox' : undefined"
+            :aria-checked="selecting ? isSelected(row.id) : undefined"
+            :aria-haspopup="selecting ? undefined : 'dialog'"
+            :data-tx-id="row.id"
+            @click="press(row.id, $event.currentTarget as HTMLElement)"
           >
-            <svg
-              class="size-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <span
+              v-if="selecting"
+              class="grid size-10 place-items-center rounded-full border-2"
+              :class="
+                isSelected(row.id)
+                  ? 'bg-accent border-accent text-on-accent'
+                  : 'border-ctrl-line text-transparent'
+              "
+              aria-hidden="true"
+              data-tx-check
             >
-              <path d="M5 12.5l4.5 4.5L19 7.5" />
-            </svg>
-          </span>
-          <span
-            v-else
-            class="bg-panel2 grid size-10 place-items-center rounded-full"
-            :class="CHIP_TONE[row.type]"
-            aria-hidden="true"
-          >
-            <svg
-              class="size-[19px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              <svg
+                class="size-[18px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            </span>
+            <span
+              v-else
+              class="bg-panel2 grid size-10 place-items-center rounded-full"
+              :class="CHIP_TONE[row.type]"
+              aria-hidden="true"
             >
-              <path :d="categoryIcon(row.type, row.category)" />
-            </svg>
-          </span>
-          <span class="grid min-w-0 gap-0.5">
-            <span class="truncate text-[16px] font-bold" data-tx-description>
-              {{ row.description }}
+              <svg
+                class="size-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path :d="categoryIcon(row.type, row.category)" />
+              </svg>
             </span>
-            <span class="text-muted truncate text-[13px]">
-              {{ row.meta }}
-              <template v-if="row.remote"> · Bitvavo</template>
+            <span class="grid min-w-0 gap-0.5">
+              <span class="truncate text-[16px] font-bold" data-tx-description>
+                {{ row.description }}
+              </span>
+              <span class="text-muted truncate text-[13px]">
+                {{ row.meta }}
+                <template v-if="row.remote"> · Bitvavo</template>
+              </span>
             </span>
-          </span>
-          <span class="neon-ledger-category text-soft truncate text-[15px]">{{
-            row.category
-          }}</span>
-          <span
-            class="font-display text-end text-[17px] font-semibold whitespace-nowrap tabular-nums"
-            :class="TONE[row.tone]"
-            data-tx-amount
-          >
-            {{ row.amount }}
-          </span>
-        </button>
+            <span class="neon-ledger-category text-soft truncate text-[15px]">{{
+              row.category
+            }}</span>
+            <span
+              class="font-display text-end text-[17px] font-semibold whitespace-nowrap tabular-nums"
+              :class="TONE[row.tone]"
+              data-tx-amount
+            >
+              {{ row.amount }}
+            </span>
+          </button>
+        </TransitionGroup>
       </div>
     </section>
     <NeonButton

@@ -31,10 +31,18 @@ export interface WidgetSpec {
   min: CellSize
   /** The default size, including when it is added back from the catalog. */
   initial: CellSize
+  /** It draws a chart beside its figures, on either side (`LayoutItem.chart`). */
+  chart?: true
 }
 
 export const WIDGETS: Readonly<Record<WidgetId, WidgetSpec>> = {
-  wealth: { id: 'wealth', title: 'Patrimonio', min: { w: 3, h: 2 }, initial: { w: 4, h: 2 } },
+  wealth: {
+    id: 'wealth',
+    title: 'Patrimonio',
+    min: { w: 3, h: 2 },
+    initial: { w: 4, h: 2 },
+    chart: true,
+  },
   month: { id: 'month', title: 'Te quedan', min: { w: 2, h: 2 }, initial: { w: 2, h: 2 } },
   recent: { id: 'recent', title: 'Movimientos', min: { w: 2, h: 2 }, initial: { w: 2, h: 2 } },
   investments: {
@@ -42,6 +50,7 @@ export const WIDGETS: Readonly<Record<WidgetId, WidgetSpec>> = {
     title: 'Inversiones',
     min: { w: 3, h: 2 },
     initial: { w: 4, h: 2 },
+    chart: true,
   },
   pending: { id: 'pending', title: 'Por confirmar', min: { w: 2, h: 2 }, initial: { w: 2, h: 2 } },
   categories: {

@@ -17,6 +17,7 @@ import {
   resizeItem,
   settle,
   sameItems,
+  setChartSide,
   stepItem,
   type LayoutItem,
 } from '../../src/neon/dashboard/layout/engine'
@@ -501,5 +502,30 @@ describe('sameItems', () => {
     expect(sameItems(a, b)).toBe(true)
     expect(sameItems(a, [item('wealth', 0, 0, 3, 3)])).toBe(false)
     expect(sameItems(a, [a[0], item('goals', 3, 0, 2, 4)])).toBe(false)
+  })
+})
+
+describe('chart side', () => {
+  it('keeps the chart after the figures through moves, and only for widgets with a chart', () => {
+    const items = setChartSide(defaultLayout().items, 'wealth', 'end')
+    expect(items.find((entry) => entry.id === 'wealth')?.chart).toBe('end')
+    expect(sameItems(items, defaultLayout().items)).toBe(false)
+    const moved = settle(moveItem(items, 'wealth', 2, 4))
+    expect(moved.find((entry) => entry.id === 'wealth')?.chart).toBe('end')
+    expect(
+      setChartSide(items, 'wealth', 'start').find((entry) => entry.id === 'wealth'),
+    ).not.toHaveProperty('chart')
+  })
+
+  it('reads the side back from storage and ignores it where it does not apply', () => {
+    const layout = normalizeLayout({
+      version: 1,
+      items: [
+        { id: 'investments', col: 0, row: 0, w: 4, h: 2, chart: 'end' },
+        { id: 'goals', col: 4, row: 0, w: 2, h: 2, chart: 'end' },
+        { id: 'wealth', col: 0, row: 2, w: 4, h: 2, chart: 'sideways' },
+      ],
+    })
+    expect(layout?.items.map((entry) => entry.chart)).toEqual(['end', undefined, undefined])
   })
 })

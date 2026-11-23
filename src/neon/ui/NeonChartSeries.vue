@@ -23,8 +23,18 @@ const gradientId = `series-${useId()}`
   <g>
     <defs>
       <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" :stop-color="color" stop-opacity="0.42" />
-        <stop offset="0.55" :stop-color="color" stop-opacity="0.14" />
+        <!-- A light veil, set per theme by --area-opacity: the line carries the
+             data and the fill only says which side is below it. -->
+        <stop
+          offset="0"
+          :stop-color="color"
+          style="stop-opacity: calc(var(--area-opacity, 0.14) * 1.5)"
+        />
+        <stop
+          offset="0.6"
+          :stop-color="color"
+          style="stop-opacity: calc(var(--area-opacity, 0.14) * 0.5)"
+        />
         <stop offset="1" :stop-color="color" stop-opacity="0" />
       </linearGradient>
     </defs>
@@ -33,7 +43,7 @@ const gradientId = `series-${useId()}`
       :d="line"
       fill="none"
       :stroke="color"
-      stroke-width="2.5"
+      stroke-width="2"
       stroke-linecap="round"
       stroke-linejoin="round"
       vector-effect="non-scaling-stroke"

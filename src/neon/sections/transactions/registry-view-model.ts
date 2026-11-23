@@ -157,6 +157,7 @@ export interface LedgerRowView {
 export interface LedgerDayView {
   date: string
   label: string
+  /** The day's net, the figure alone («−112,77 €»); the template adds «Neto». */
   net: string
   rows: LedgerRowView[]
 }
@@ -164,7 +165,9 @@ export interface LedgerDayView {
 export interface LedgerMonthView {
   month: Month
   title: string
-  summary: string
+  /** «12 movimientos»; the net goes apart so it can take the figure font. */
+  count: string
+  net: string
   days: LedgerDayView[]
 }
 
@@ -211,12 +214,13 @@ export function buildLedgerMonths(groups: MonthGroup[], context: LedgerContext):
       day.rows.push(ledgerRow(tx, context))
     })
     days.forEach((day) => {
-      day.net = `Neto ${formatSignedMoney(nets.get(day.date) ?? 0, context.currency)}`
+      day.net = formatSignedMoney(nets.get(day.date) ?? 0, context.currency)
     })
     return {
       month: group.month,
       title: formatMonthYear(group.month, context.year),
-      summary: `${plural(group.count, 'movimiento', 'movimientos')} · neto ${formatSignedMoney(group.net, context.currency)}`,
+      count: plural(group.count, 'movimiento', 'movimientos'),
+      net: formatSignedMoney(group.net, context.currency),
       days,
     }
   })
@@ -319,7 +323,9 @@ export interface DetailField {
 
 export interface BudgetUse {
   title: string
-  text: string
+  /** What the category spent that month and its budget, figures alone. */
+  spent: string
+  planned: string
   /** Bar width, 0–100. */
   width: number
   over: boolean
@@ -389,7 +395,8 @@ export function movementDetail(
     )
     budget = {
       title: `${tx.category} · ${formatMonthName(tx.month).toLowerCase()}`,
-      text: `${formatMoney(spent, context.currency)} de ${formatMoney(planned, context.currency)}`,
+      spent: formatMoney(spent, context.currency),
+      planned: formatMoney(planned, context.currency),
       width: Math.min(100, Math.round((spent / planned) * 100)),
       over: spent > planned,
     }

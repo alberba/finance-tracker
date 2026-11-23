@@ -13,6 +13,7 @@ import DashboardInvestmentsCard from './DashboardInvestmentsCard.vue'
 import DashboardMobile from './DashboardMobile.vue'
 import DashboardMonthCard from './DashboardMonthCard.vue'
 import DashboardPendingCard from './DashboardPendingCard.vue'
+import DashboardRangePicker from './DashboardRangePicker.vue'
 import DashboardRecentCard from './DashboardRecentCard.vue'
 import DashboardWealthCard from './DashboardWealthCard.vue'
 import DashboardCatalog from './layout/DashboardCatalog.vue'
@@ -103,18 +104,21 @@ function search(): void {
     data-neon-section
   >
     <DashboardMobile v-if="!desktopFrame" :view-model="viewModel" @navigate="store.navigate" />
-    <header v-else class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+    <header v-else class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
       <div class="flex flex-col gap-1">
-        <p class="text-muted text-label tracking-label font-extrabold uppercase">
-          {{ viewModel.date }}
-        </p>
         <div class="flex items-center gap-3">
           <h1
             id="dashboard-title"
-            class="font-display text-h1 text-text motion-safe:animate-rise font-bold text-balance"
+            class="text-text motion-safe:animate-rise font-sans text-[26px] leading-[1.15] font-extrabold tracking-tight text-balance"
           >
-            {{ viewModel.title }}
+            Dashboard
           </h1>
+          <DashboardRangePicker
+            v-model="range"
+            :label="viewModel.rangeLabel"
+            :options="viewModel.rangeOptions"
+            :months="viewModel.rangeMonths"
+          />
           <button
             ref="editToggle"
             type="button"
@@ -142,7 +146,6 @@ function search(): void {
             </svg>
           </button>
         </div>
-        <p class="text-soft text-lede mbs-1 text-pretty">{{ viewModel.lede }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2.5">
         <form role="search" class="contents" @submit.prevent="search">
@@ -243,14 +246,14 @@ function search(): void {
       @resize-start="gestures.beginResize"
       @widget-key="gestures.onWidgetKey"
       @remove="removeWidget"
+      @chart="layoutStore.setChart"
     >
       <template #widget="{ item }">
         <DashboardWealthCard
           v-if="item.id === 'wealth'"
-          v-model:range="range"
           :wealth="viewModel.wealth"
+          :chart-side="item.chart"
           class="h-full"
-          @navigate="store.navigate"
         />
         <DashboardMonthCard
           v-else-if="item.id === 'month'"
@@ -267,8 +270,8 @@ function search(): void {
         <DashboardInvestmentsCard
           v-else-if="item.id === 'investments'"
           :investments="viewModel.investments"
+          :chart-side="item.chart"
           class="h-full"
-          @navigate="store.navigate"
         />
         <DashboardPendingCard
           v-else-if="item.id === 'pending'"
