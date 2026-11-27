@@ -16,7 +16,7 @@ test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
 const section = (page: Page) => page.locator('#budget')
 const card = (page: Page, category: string) =>
   section(page).locator(`[data-budget-category="${category}"]`)
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Apuntar' })
+const sheet = (page: Page) => page.getByRole('dialog', { name: 'Nuevo movimiento' })
 
 /** Leaves one category with no budget and a single March expense. */
 async function resetCategory(
@@ -64,7 +64,8 @@ test.describe('Presupuesto en el diseño nuevo', () => {
         .getByRole('button', { name: /Este mes/ })
         .click()
       await expect(card(page, 'Salud').locator('[data-budget-left]')).toHaveText('90,00 €')
-      await expect(card(page, 'Salud').locator('[data-budget-status]')).toHaveText('Holgado')
+      // A category on track carries no status: only what goes off it does.
+      await expect(card(page, 'Salud').locator('[data-budget-status]')).toHaveCount(0)
 
       await tracker.reload()
       await tracker.openBudget()
@@ -77,14 +78,46 @@ test.describe('Presupuesto en el diseño nuevo', () => {
     },
   )
 
+  test('abre el detalle de una categoría junto a su fila y pasa a otra sin cerrarlo', async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.goto()
+    await tracker.openBudget()
+
+    await card(page, 'Ocio').click()
+    const ocio = page.getByRole('dialog', { name: 'Ocio' })
+    await expect(ocio).toBeVisible()
+    const box = (await ocio.boundingBox())!
+    // Past the end edge of the ledger, not over it.
+    const edge = await card(page, 'Ocio').evaluate(
+      (row) => row.closest('section')!.getBoundingClientRect().right,
+    )
+    expect(box.x).toBeGreaterThan(edge)
+
+    // No scrim: the next row takes it there in one press.
+    await card(page, 'Salud').click()
+    await expect(ocio).toBeHidden()
+    await expect(page.getByRole('dialog', { name: 'Salud' })).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Salud' })).toBeHidden()
+    await expect(card(page, 'Salud')).toBeFocused()
+  })
+
   test('ve una categoría pasada de límite tras apuntar un gasto', async ({ page, tracker }) => {
     await resetCategory(page, tracker, 'Regalo', { plan: 20 })
     await expect(card(page, 'Regalo').locator('[data-budget-left]')).toHaveText('20,00 €')
 
-    await page.locator('[data-sidebar-apuntar]').click()
+    await tracker.openDashboard()
+    await page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true }).click()
     await expect(sheet(page)).toBeVisible()
     await sheet(page).getByRole('textbox', { name: 'Importe' }).fill('25')
-    await sheet(page).getByLabel('Categoría').selectOption('Regalo')
+    await sheet(page).getByRole('button', { name: 'Categoría', exact: true }).click()
+    await sheet(page)
+      .getByRole('dialog', { name: 'Categoría', exact: true })
+      .getByRole('button', { name: 'Regalo', exact: true })
+      .click()
     await sheet(page).getByLabel('Descripción').fill('Regalo de cumpleaños')
     const saved = expectSyncCommand(
       page,
@@ -95,10 +128,10 @@ test.describe('Presupuesto en el diseño nuevo', () => {
     )
     await sheet(page).getByRole('button', { name: 'Guardar' }).click()
     await saved
+    await tracker.openBudget()
 
     await expect(card(page, 'Regalo').locator('[data-budget-status]')).toHaveText('Pasado')
-    await expect(card(page, 'Regalo').locator('[data-budget-left]')).toHaveText('5,00 €')
-    await expect(card(page, 'Regalo')).toContainText('por encima de 20,00 €')
+    await expect(card(page, 'Regalo').locator('[data-budget-left]')).toHaveText('−5,00 €')
   })
 
   test('planifica los doce meses de una categoría desde su panel', async ({ page, tracker }) => {

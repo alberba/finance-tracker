@@ -121,11 +121,35 @@ test('revisa el mes categoría a categoría y aplica los cambios', async ({ page
   ).toBeVisible()
 })
 
-test('prepara el mes siguiente desde la hoja de un grupo y lo guarda', async ({
+test('prepara el mes, consulta suscripciones y vuelve al borrador para guardarlo', async ({
   page,
   tracker,
 }) => {
   await tracker.goto()
+  await editScenarioState(page, (state) => {
+    const monthly = {
+      id: 'e2e-plan-monthly',
+      name: 'Servicio mensual',
+      amount: 8,
+      accountId: state.accounts[0].id,
+      category: 'Ocio',
+      frequency: 'monthly' as const,
+      startDate: '2026-04-07',
+      nextChargeDate: '2026-04-07',
+      active: true,
+    }
+    state.subscriptions = [
+      monthly,
+      {
+        ...monthly,
+        id: 'e2e-plan-quarterly',
+        name: 'Cuota trimestral',
+        frequency: 'quarterly',
+        amount: 25,
+      },
+      { ...monthly, id: 'e2e-plan-paused', name: 'Servicio pausado', active: false, amount: 50 },
+    ]
+  })
   await tracker.openBudget()
   await section(page)
     .getByRole('button', { name: /Preparar abril/ })
@@ -134,7 +158,8 @@ test('prepara el mes siguiente desde la hoja de un grupo y lo guarda', async ({
     section(page).getByRole('heading', { name: 'Presupuesto de abril', level: 1 }),
   ).toBeVisible()
 
-  await section(page).locator('[data-prepare-group="expense"]').click()
+  const expenses = section(page).locator('[data-prepare-group="expense"]')
+  await expenses.click()
   const sheet = page.getByRole('dialog', { name: 'Gastos' })
   await sheet
     .getByRole('button', { name: /^Sumar/ })
@@ -142,6 +167,32 @@ test('prepara el mes siguiente desde la hoja de un grupo y lo guarda', async ({
     .click()
   await sheet.getByRole('button', { name: 'Listo' }).click()
   await expect(sheet).toBeHidden()
+
+  const draft = await expenses.innerText()
+  const shortcut = section(page).getByRole('button', { name: /^Ver suscripciones/ })
+  await expect(shortcut).toContainText('Cobros previstos en abril')
+  await expect(shortcut).toContainText('33,00 €')
+  await shortcut.click()
+  const subscriptions = page.getByRole('tab', { name: /^Suscripciones/, selected: true })
+  await expect(subscriptions).toBeFocused()
+  const panel = page.getByRole('tabpanel', { name: /^Suscripciones/ })
+  await expect(panel).toBeVisible()
+  await expect(panel.getByRole('button', { name: /^Servicio mensual/ })).toHaveAccessibleName(
+    'Servicio mensual Próximo 7 abr 8,00 € al mes',
+  )
+  await expect(panel.getByRole('button', { name: /^Cuota trimestral/ })).toContainText(
+    '25,00 € cada trimestre',
+  )
+  const upcoming = panel.getByRole('region', { name: 'Próximos cobros' })
+  const chart = panel.getByRole('region', { name: 'Próximos 12 meses' })
+  await expect(upcoming.getByRole('listitem')).toHaveCount(4)
+  const maximum = chart.getByRole('paragraph').filter({ hasText: 'Máximo' })
+  await expect(maximum).toHaveCount(1)
+  await expect(maximum.getByText('33,00 €')).toBeVisible()
+  await expect(chart.getByText('Resto de marzo desde hoy.')).toBeVisible()
+  expect((await upcoming.boundingBox())!.y).toBeLessThan((await chart.boundingBox())!.y)
+  await page.goBack()
+  await expect(expenses).toHaveText(draft, { useInnerText: true })
 
   const saved = expectSyncCommand(page, budgetEntry)
   await section(page).getByRole('button', { name: 'Guardar' }).click()

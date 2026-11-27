@@ -292,9 +292,8 @@ export function categoryDetail(row: BudgetRow, position: MonthPosition): Categor
   const closedTotal = closed.reduce((sum, cell) => sum + (cell.actual ?? 0), 0)
   const shown = row.cells.filter((cell) => cell.actual !== null)
   const yearToDate = round2(shown.reduce((sum, cell) => sum + (cell.actual ?? 0), 0))
-  const max =
-    Math.max(plan, ...shown.map((cell) => cell.actual ?? 0), ...closed.map((c) => c.planned), 1) *
-    1.1
+  // Only the current budget is drawn, so only it and the bars set the scale.
+  const max = Math.max(plan, ...shown.map((cell) => cell.actual ?? 0), 1) * 1.1
   const pct = (value: number) => round1((value / max) * 100)
   return {
     category: row.category,

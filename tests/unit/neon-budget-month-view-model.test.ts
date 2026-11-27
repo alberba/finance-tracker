@@ -247,6 +247,19 @@ describe('categoryDetail', () => {
     expect(detail.bars[8].kind).toBe('over')
   })
 
+  it('scales the bars to them and the current budget, not to past budgets', () => {
+    const view = buildBudgetViewModel(
+      state(OCTOBER, { Regalos: [1000, ...Array<number>(11).fill(50)] }),
+      NOW,
+    )
+    const detail = categoryDetail(
+      view.types.expense.rows.find((r) => r.category === 'Regalos')!,
+      monthPosition(view, NOW),
+    )
+    expect(detail.planLine).toBe(90.9)
+    expect(detail.bars[9].height).toBe(63.6)
+  })
+
   it('reads how often the budget fell short', () => {
     expect(detailReading(0, 0)).toBe('')
     expect(detailReading(1, 9)).toBe('Se pasó un mes.')

@@ -7,6 +7,7 @@ import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { useNeonBudgetScreens } from './budget-screens'
+import NeonBudgetSubscriptionLink from './NeonBudgetSubscriptionLink.vue'
 import NeonCents from './NeonCents.vue'
 import { usePrepareSession } from './prepare-session'
 import {
@@ -26,6 +27,7 @@ import {
 // and the saving are the desktop screen's.
 const screens = useNeonBudgetScreens()
 const {
+  view,
   target,
   groups,
   figure,
@@ -209,6 +211,8 @@ const iconButton =
           </span>
         </button>
       </div>
+
+      <NeonBudgetSubscriptionLink :year="view.year" :month="target" />
 
       <ul class="grid gap-3">
         <li v-for="group in spendGroups" :key="group.type" class="grid">
