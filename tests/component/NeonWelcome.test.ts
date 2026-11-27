@@ -1,4 +1,4 @@
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
@@ -23,7 +23,6 @@ vi.mock('../../src/composables/useSetupNavigation', () => ({
 }))
 
 const { default: NeonWelcome } = await import('../../src/neon/onboarding/NeonWelcome.vue')
-const { default: NeonDetailPanel } = await import('../../src/neon/ui/NeonDetailPanel.vue')
 
 function button(wrapper: ReturnType<typeof mount>, name: string) {
   return wrapper.findAll('button').find((item) => item.text() === name)!
@@ -31,8 +30,7 @@ function button(wrapper: ReturnType<typeof mount>, name: string) {
 
 /** The panel finished closing: the step it was closed for goes on. */
 function finishClosing(wrapper: ReturnType<typeof mount>) {
-  // astro check types the dynamically imported SFC loosely: name the wrapper type.
-  ;(wrapper.findComponent(NeonDetailPanel) as VueWrapper).vm.$emit('closed')
+  wrapper.findComponent({ name: 'NeonDetailPanel' }).vm.$emit('closed')
 }
 
 describe('NeonWelcome', () => {
