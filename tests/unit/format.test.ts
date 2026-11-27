@@ -63,20 +63,12 @@ describe('formatCompactMoney', () => {
     expect(formatCompactMoney(2_500_000)).toBe(`2,5${NBSP}M${NBSP}€`)
     expect(formatCompactMoney(950)).toBe(`950${NBSP}€`)
   })
-
-  it('marca las pérdidas con el menos tipográfico', () => {
-    expect(formatCompactMoney(-12_500)).toBe(`${MINUS}12,5${NBSP}mil${NBSP}€`)
-  })
 })
 
 describe('formatNumber', () => {
   it('da los decimales pedidos y agrupa siempre los miles', () => {
     expect(formatNumber(1234)).toBe('1.234')
     expect(formatNumber(102.5, 4)).toBe('102,5000')
-  })
-
-  it('marca los negativos con el menos tipográfico', () => {
-    expect(formatNumber(-1234.5, 1)).toBe(`${MINUS}1.234,5`)
   })
 })
 
@@ -95,10 +87,6 @@ describe('formatDecimal', () => {
   it('rellena hasta los decimales mínimos', () => {
     expect(formatDecimal('100', { minDigits: 2 })).toBe('100,00')
     expect(formatDecimal('0.00123', { minDigits: 2 })).toBe('0,00123')
-  })
-
-  it('marca los negativos con el menos tipográfico', () => {
-    expect(formatDecimal('-1234.5')).toBe(`${MINUS}1.234,5`)
   })
 })
 

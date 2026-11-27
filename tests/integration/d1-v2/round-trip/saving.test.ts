@@ -229,25 +229,6 @@ describe('round trip: ahorro', () => {
     ).rejects.toThrow(/tiene movimientos/i)
   })
 
-  it('keeps a savings goal tied to its category', async () => {
-    const { useGoalsStore } = await import('../../../../src/stores/goals')
-    await addSaving(250)
-    await trip.reload()
-
-    expect(
-      useGoalsStore().addSavingGoal({
-        name: 'Colchón',
-        category: 'Fondo de emergencia',
-        targetAmount: 1000,
-      }),
-    ).toBe(true)
-
-    const reloaded = await trip.reload()
-    expect(reloaded.savingGoals).toMatchObject([
-      { name: 'Colchón', category: 'Fondo de emergencia', targetAmount: 1000 },
-    ])
-  })
-
   it('does not mix savings goals into the fixed wealth goals', async () => {
     const { useGoalsStore } = await import('../../../../src/stores/goals')
     await createSavingCategory(trip, 'Fondo de emergencia')

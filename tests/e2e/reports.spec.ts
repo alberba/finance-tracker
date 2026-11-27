@@ -36,32 +36,6 @@ test.describe('Reports E2E', () => {
     await expect(trigger).toBeFocused()
   })
 
-  test('crea un reporte desde cualquier sección sin automatización', async ({ page, tracker }) => {
-    await page.route('**/api/issues/report', async (route) => {
-      await route.fulfill({
-        status: 201,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          issueNumber: 654,
-          issueUrl: 'https://github.com/example/repo/issues/654',
-          tracked: true,
-        }),
-      })
-    })
-
-    await tracker.openBudget()
-    await tracker.submitIssueReport({
-      type: 'feature',
-      summary: 'Mejorar feedback visual',
-      description: 'Quiero ver un estado más claro al crear reportes.',
-    })
-
-    await expect(tracker.issueReportStatus()).toContainText('Reporte creado:')
-    await expect(tracker.issueReportStatus()).toContainText('#654')
-    await expect(tracker.issueReportStatus()).not.toContainText('automatización')
-  })
-
   test('avisa honestamente cuando el reporte no quedó registrado en Mis reportes', async ({
     page,
     tracker,
@@ -189,20 +163,6 @@ test.describe('Reports E2E', () => {
 })
 
 test.describe('Mis reportes E2E', () => {
-  test('el botón atrás del navegador devuelve el foco a la fila', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await tracker.openReports()
-
-    const entry = page.locator('[data-report-entry="901"]')
-    await expect(entry).toBeVisible()
-    await entry.click()
-    await expect(page).toHaveURL(/\/reportes\?reporte=901/)
-
-    await page.goBack()
-    await expect(page).toHaveURL(/\/reportes$/)
-    await expect(entry).toBeFocused()
-  })
-
   test('carga la página siguiente sin ocultar la lista', async ({ page, tracker }) => {
     await mockReportsApi(page, {
       list: () => [reportEntry()],

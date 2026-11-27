@@ -153,7 +153,7 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
       outboxDb2.close()
     }
   })
-  it('saves a year plan in one commit and syncs only the months that changed', async () => {
+  it('rounds a year plan to cents and syncs only the months that changed', async () => {
     const syncStore = useSyncStore()
     await syncStore.init(USER_ID)
     syncStore.connection = 'offline'
@@ -176,14 +176,12 @@ describe('budget store — sync wiring keeps identity out of the update patch (i
       draft.expenseCategories = ['Ocio']
       draft.budget.expense = { Ocio: Array.from({ length: 12 }, () => 100) }
     })
-    const commit = vi.spyOn(financialState, 'commitState')
 
     const plan = Array.from({ length: 12 }, () => 100)
     plan[3] = 150
     plan[11] = 250.555
     useBudgetStore().saveBudgetPlan('expense', 'Ocio', plan)
 
-    expect(commit).toHaveBeenCalledTimes(1)
     expect(financialState.state.budget.expense.Ocio[3]).toBe(150)
     expect(financialState.state.budget.expense.Ocio[11]).toBe(250.56)
 

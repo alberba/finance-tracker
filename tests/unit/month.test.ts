@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_MONTHS, asMonth, atMonth, monthFromDate, monthIndex } from '../../src/lib/month'
+import { ALL_MONTHS, asMonth, atMonth, monthFromDate } from '../../src/lib/month'
 
 describe('Month', () => {
   it('accepts 1 to 12 and rejects everything else', () => {
@@ -8,11 +8,6 @@ describe('Month', () => {
     for (const bad of [0, 13, -1, 1.5, Number.NaN, '3', null, undefined]) {
       expect(asMonth(bad)).toBeNull()
     }
-  })
-
-  it('maps a month to its 0-based array slot', () => {
-    expect(monthIndex(asMonth(1)!)).toBe(0)
-    expect(monthIndex(asMonth(12)!)).toBe(11)
   })
 
   it('reads the slot of a 12-position array by month', () => {

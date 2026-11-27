@@ -39,11 +39,9 @@ function dayMonth(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00Z`))
 }
 
+// The browser runs with timezoneId UTC (playwright.shared.ts), so "today" is the UTC date.
 function todayLocal(): string {
-  const today = new Date()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${today.getFullYear()}-${month}-${day}`
+  return new Date().toISOString().slice(0, 10)
 }
 
 const list = (page: Page) => page.locator('#transactions [data-subscription-list]')

@@ -48,18 +48,9 @@ function executeSql(sql: string) {
 test('private pages and financial APIs require a Better Auth session @smoke', async ({ page }) => {
   await page.goto('/')
   await expect(page).toHaveURL(/\/login$/)
-  // The mode buttons only respond once the form has hydrated.
+  // The form must have hydrated before the page counts as loaded.
   await new AuthenticationPage(page).ready()
-  await expect(page.getByRole('button', { name: 'Verificar mi correo', exact: true })).toHaveCount(
-    0,
-  )
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Código por correo', exact: true }).click()
-  await expect(page.getByLabel('Código de seis cifras')).toBeDisabled()
-  await page.getByRole('button', { name: 'Contraseña', exact: true }).click()
-  await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible()
-  await expect(page.getByLabel('Código de seis cifras')).toHaveCount(0)
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
 })
 

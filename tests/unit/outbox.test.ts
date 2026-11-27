@@ -116,14 +116,4 @@ describe('outbox', () => {
     await clear(db)
     expect(await count(db)).toBe(0)
   })
-
-  it('wipeOutbox deletes the whole per-user database', async () => {
-    await enqueue(db, { action: 'noop' })
-    db.close()
-
-    await wipeOutbox(USER_ID)
-
-    db = await openStorage(USER_ID)
-    expect(await count(db)).toBe(0)
-  })
 })

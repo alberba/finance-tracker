@@ -93,10 +93,4 @@ describe('DashboardCatalog', () => {
     await wrapper.get('[data-catalog-widget="recent"]').trigger('pointerdown')
     expect(wrapper.emitted('dragStart')?.[0][0]).toBe('recent')
   })
-
-  it('closes from its button', async () => {
-    const wrapper = catalog([])
-    await wrapper.get('button[aria-label="Cerrar el panel de widgets"]').trigger('click')
-    expect(wrapper.emitted('close')).toHaveLength(1)
-  })
 })

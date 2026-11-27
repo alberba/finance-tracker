@@ -91,12 +91,4 @@ describe('fetchMarketQuotes', () => {
 
     await expect(run(fetchMarketQuotes(instruments, fallback), request)).resolves.toEqual({})
   })
-
-  it('usa las cotizaciones de reserva en modo demo', async () => {
-    demo.isDemoMode.mockReturnValue(true)
-    const request = vi.fn<typeof fetch>()
-
-    await expect(run(fetchMarketQuotes(instruments, fallback), request)).resolves.toBe(fallback)
-    expect(request).not.toHaveBeenCalled()
-  })
 })

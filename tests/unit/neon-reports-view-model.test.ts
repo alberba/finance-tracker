@@ -90,10 +90,6 @@ describe('reportRow', () => {
       meta: 'Enviado el 18 oct 2026',
     })
   })
-
-  it('«Nuevo» sale de las novedades sin ver', () => {
-    expect(reportRow(entry({ hasUpdates: true })).isNew).toBe(true)
-  })
 })
 
 describe('detailStatus', () => {

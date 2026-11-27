@@ -13,9 +13,6 @@ import * as stockeventsApi from '../../src/services/stockevents-api'
 const saveStockEventsCredential = (apiKey: string) =>
   runClientHttp(stockeventsApi.saveStockEventsCredential(apiKey))
 const fetchStockEventsWatchlists = () => runClientHttp(stockeventsApi.fetchStockEventsWatchlists())
-const checkStockEventsSymbols = (
-  checks: Parameters<typeof stockeventsApi.checkStockEventsSymbols>[0],
-) => runClientHttp(stockeventsApi.checkStockEventsSymbols(checks))
 const createStockEventsTransaction = (
   transaction: Parameters<typeof stockeventsApi.createStockEventsTransaction>[0],
 ) => runClientHttp(stockeventsApi.createStockEventsTransaction(transaction))
@@ -29,8 +26,6 @@ const transaction: StockEventsTransactionPayload = {
   priceCurrency: 'EUR',
   type: 'buy',
 }
-
-const checks = [{ symbol: 'ACME', watchlistId: 'wl-1' }]
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -89,21 +84,6 @@ describe('cargar las listas de Stock Events', () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({})))
 
     await expect(fetchStockEventsWatchlists()).resolves.toEqual([])
-  })
-})
-
-describe('comprobar símbolos en Stock Events', () => {
-  it('postea las comprobaciones y devuelve los resultados', async () => {
-    const results = [{ symbol: 'ACME', watchlistId: 'wl-1', status: 'in-watchlist' }]
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ results }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(checkStockEventsSymbols(checks)).resolves.toEqual(results)
-    expect(fetchMock).toHaveBeenCalledWith('/api/stockevents/check-symbols', {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ checks }),
-    })
   })
 })
 

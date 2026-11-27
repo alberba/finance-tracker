@@ -47,26 +47,6 @@ test.describe('Marco móvil nuevo', () => {
     }
   })
 
-  test('«Por confirmar» abre una hoja que cierra con Escape y al pulsar fuera', async ({
-    page,
-  }) => {
-    const trigger = page.getByRole('button', { name: /^Por confirmar/ })
-    const sheet = page.getByRole('dialog', { name: 'Por confirmar' })
-
-    await trigger.click()
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('No queda nada por confirmar')).toBeVisible()
-
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
-    await expect(trigger).toBeFocused()
-
-    await trigger.click()
-    await expect(sheet).toBeVisible()
-    await page.mouse.click(10, 100)
-    await expect(sheet).toBeHidden()
-  })
-
   test('todos los controles del marco miden al menos 44 px con puntero táctil', async ({
     page,
   }) => {

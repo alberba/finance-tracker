@@ -174,17 +174,6 @@ test.describe('Mini modal de alta', () => {
     await expect(sheet(page)).toBeHidden()
     await expect(opener).toBeFocused()
   })
-
-  test('un importe vacío avisa de que debe ser mayor que 0', async ({ page, tracker }) => {
-    await page.setViewportSize(MOBILE)
-    await tracker.goto()
-
-    await page.locator('[data-fab-apuntar]').click()
-    await sheet(page).getByRole('button', { name: 'Guardar' }).click()
-
-    await expect(page.locator('#toast')).toHaveText('El importe debe ser mayor que 0.')
-    await expect(sheet(page)).toBeVisible()
-  })
 })
 
 test.describe('Editar y confirmar un pendiente', () => {

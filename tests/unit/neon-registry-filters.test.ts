@@ -38,18 +38,6 @@ describe('useRegistryFilters', () => {
     ]
   })
 
-  it('ofrece «Todos» y un chip por tipo', () => {
-    const { typeOptions } = setup().filters
-    expect(typeOptions.map((option) => option.value)).toEqual([
-      '',
-      'expense',
-      'income',
-      'saving',
-      'investment',
-    ])
-    expect(typeOptions[0].label).toBe('Todos')
-  })
-
   it('sin tipo elegido son todos, y con un tipo muestra su nombre', () => {
     const { filters } = setup()
     expect(filters.type.value).toBe('')

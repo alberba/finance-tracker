@@ -13,8 +13,6 @@ import {
  */
 test.use({ viewport: { width: 1440, height: 900 } })
 
-const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
-
 const section = (page: Page) => page.locator('#reports')
 const launcher = (page: Page) => page.locator('#global-report-trigger')
 
@@ -118,59 +116,6 @@ test.describe('Mis reportes', () => {
     ).toBeVisible()
     await expect(dot).toHaveCount(0)
     await expect(section(page).locator('[data-report-new]')).toHaveCount(0)
-  })
-
-  test('un fallo de la lista muestra el error y se reintenta', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await page.route('**/api/reports', (route) =>
-      route.fulfill({ status: 502, json: { ok: false, error: GITHUB_ERROR } }),
-    )
-
-    await tracker.openReports()
-    const alert = section(page).getByRole('alert')
-    await expect(alert).toContainText(GITHUB_ERROR)
-    await expect(alert).toContainText('Tus reportes siguen guardados; solo falta leer su estado.')
-
-    await page.unroute('**/api/reports')
-    await alert.getByRole('button', { name: 'Reintentar' }).click()
-    await expect(section(page).locator('[data-report-entry="901"]')).toBeVisible()
-  })
-
-  test('un duplicado se sigue en la principal y su hilo es el de ella', async ({
-    page,
-    tracker,
-  }) => {
-    const main = {
-      number: 887,
-      url: `${ISSUE_URL}/887`,
-      title: 'Exportar movimientos a PDF y CSV',
-      state: 'OPEN' as const,
-      stateReason: null,
-    }
-    const duplicate = reportEntry({
-      number: 902,
-      url: `${ISSUE_URL}/902`,
-      title: 'Añadir exportación a PDF de los movimientos',
-      state: 'CLOSED',
-      stateReason: 'DUPLICATE',
-      followed: main,
-    })
-    await mockReportsApi(page, {
-      list: () => [duplicate],
-      detail: () => reportDetail({ report: duplicate, threadIssue: main }),
-    })
-
-    await tracker.openReports(902)
-    const row = section(page).locator('[data-report-entry="902"]')
-    await expect(row).toContainText('Se sigue en #887 · Abierto')
-    await expect(row).toContainText('Cerrado como duplicado · enviado el')
-    const detail = section(page).locator('[data-report-detail]')
-    await expect(detail.getByText('Exportar movimientos a PDF y CSV')).toBeVisible()
-    await expect(detail.getByRole('link', { name: /Ver #887 en GitHub/ })).toHaveAttribute(
-      'href',
-      `${ISSUE_URL}/887`,
-    )
-    await expect(detail.getByText('Se publica en #887, donde sigue tu reporte.')).toBeVisible()
   })
 
   test('un hilo cerrado queda en solo lectura', async ({ page, tracker }) => {

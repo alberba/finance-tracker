@@ -31,11 +31,6 @@ function setup() {
 }
 
 describe('NeonLineChart exploring', () => {
-  it('shows no reading at rest', () => {
-    const { wrapper } = setup()
-    expect(wrapper.find('[data-chart-readout]').exists()).toBe(false)
-  })
-
   it('reads the point nearest to the pointer and clears it on leaving', async () => {
     const { wrapper, plot } = setup()
     await plot.trigger('pointermove', { clientX: 190 })

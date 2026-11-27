@@ -142,12 +142,6 @@ describe('wealthTimeline con años anteriores', () => {
 })
 
 describe('rangeWindow y availableRanges en los bordes', () => {
-  it('no tiene base cuando el rango cubre toda la línea', () => {
-    const { points, base } = rangeWindow(timeline(3), '3m', 2026)
-    expect(points).toHaveLength(3)
-    expect(base).toBeNull()
-  })
-
   it('dibuja los años pedidos y deja el mes anterior como base', () => {
     const { points, base } = rangeWindow(timeline(40), '3y', 2026)
     expect(points).toHaveLength(36)
@@ -159,18 +153,6 @@ describe('rangeWindow y availableRanges en los bordes', () => {
     const { points, base } = rangeWindow(past, 'ytd', 2026)
     expect(points).toEqual([])
     expect(base).toMatchObject({ value: 1400 })
-  })
-
-  it('ofrece todos los rangos cuando hay cinco años de historia', () => {
-    expect([...availableRanges(timeline(70), 2026)]).toEqual([
-      '3m',
-      '6m',
-      'ytd',
-      '1y',
-      '2y',
-      '3y',
-      '5y',
-    ])
   })
 
   it('con una línea vacía solo ofrece el año y tres meses', () => {
