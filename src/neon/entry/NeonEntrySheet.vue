@@ -363,6 +363,90 @@ let resizeObserver: ResizeObserver | undefined
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
 
+// On a phone the sheet grows out of what opened it (the FAB, Comprar…): its
+// box is clipped to that button, in the button's colour, and opens to the full
+// sheet as the colour turns to the panel and the content fades in. Closing runs
+// it back into the button. A sheet dragged down leaves by its edge instead.
+const MORPH_EASE = 'cubic-bezier(0.2, 0, 0, 1)'
+let morphing: Animation[] = []
+
+function morphKeyframes(
+  element: HTMLElement,
+): { shape: Keyframe[]; colour: Keyframe[]; content: Keyframe[] } | null {
+  if (!narrow.value || !opener?.isConnected) return null
+  const from = opener.getBoundingClientRect()
+  if (!from.width || !from.height) return null
+  const box = element.getBoundingClientRect()
+  const openerStyle = getComputedStyle(opener)
+  const radius = Math.min(parseFloat(openerStyle.borderTopLeftRadius) || 0, from.height / 2)
+  const sheetRadius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0
+  const panel = getComputedStyle(element).backgroundColor
+  const colour = /rgba?\(.*,\s*0\)$|transparent/.test(openerStyle.backgroundColor)
+    ? panel
+    : openerStyle.backgroundColor
+  const start = `inset(${from.top - box.top}px ${box.right - from.right}px ${box.bottom - from.bottom}px ${from.left - box.left}px round ${radius}px)`
+  const end = `inset(0px 0px 0px 0px round ${sheetRadius}px ${sheetRadius}px 0px 0px)`
+  return {
+    shape: [{ clipPath: start }, { clipPath: end }],
+    // Linear, apart from the shape's easing: the colour turns while it grows.
+    colour: [
+      { backgroundColor: colour },
+      { backgroundColor: panel, offset: 0.4 },
+      { backgroundColor: panel },
+    ],
+    content: [{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1 }],
+  }
+}
+
+function stopMorph(): void {
+  morphing.forEach((animation) => animation.cancel())
+  morphing = []
+}
+
+/** Grows the sheet out of its opener; false when there is nothing to grow from. */
+function morphIn(element: HTMLElement): boolean {
+  stopMorph()
+  if (reducedMotion()) return false
+  const frames = morphKeyframes(element)
+  if (!frames) return false
+  element.setAttribute('data-morph', '')
+  morphing = [
+    element.animate(frames.shape, { duration: 460, easing: MORPH_EASE }),
+    element.animate(frames.colour, { duration: 460, easing: 'linear' }),
+    ...[...element.children].map((child) =>
+      child.animate(frames.content, { duration: 460, easing: 'linear' }),
+    ),
+  ]
+  return true
+}
+
+/** Runs the sheet back into its opener, then `done`; false when it can't. */
+function morphOut(element: HTMLElement, done: () => void): boolean {
+  if (reducedMotion() || element.style.transform) return false
+  const frames = morphKeyframes(element)
+  if (!frames) return false
+  stopMorph()
+  element.setAttribute('data-morph', '')
+  const options = {
+    duration: 300,
+    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    fill: 'forwards',
+  } as const
+  const shape = element.animate([...frames.shape].reverse(), options)
+  morphing = [
+    shape,
+    element.animate([...frames.colour].reverse(), { ...options, easing: 'linear' }),
+    ...[...element.children].map((child) =>
+      child.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }], {
+        ...options,
+        easing: 'linear',
+      }),
+    ),
+  ]
+  shape.finished.then(done, () => {})
+  return true
+}
+
 function placeMiniModal(): void {
   const element = dialog.value
   if (!element?.open || sheet.value) return
@@ -430,9 +514,13 @@ function present(): void {
   }
   if (scrollArea.value) scrollArea.value.scrollTop = 0
   if (timing.value) timing.value.open = false
+  element.removeAttribute('data-morph')
+  stopMorph()
   if (!sheet.value) {
     placeMiniModal()
     element.setAttribute('data-entering', '')
+  } else {
+    morphIn(element)
   }
   void nextTick(() => {
     // The keypad needs no field: the focus rests on the amount, and no system
@@ -456,12 +544,15 @@ function dismiss(): void {
   const finish = () => {
     element.removeAttribute('data-closing')
     element.removeAttribute('data-entering')
+    element.removeAttribute('data-morph')
+    stopMorph()
     element.close()
     resetDrag()
     opener?.focus()
     opener = null
   }
   if (reducedMotion()) return finish()
+  if (morphOut(element, finish)) return
   element.setAttribute('data-closing', '')
   closeTimer = setTimeout(finish, EXIT_MS)
 }
@@ -1181,6 +1272,11 @@ const labelClass = ENTRY_LABEL_CLASS
 
   .entry-review[data-closing] {
     animation: neon-entry-out 200ms var(--ease-out) forwards;
+  }
+
+  /* Growing out of its opener (morphIn) instead of sliding up. */
+  .entry-review[data-morph] {
+    animation: none;
   }
 }
 
