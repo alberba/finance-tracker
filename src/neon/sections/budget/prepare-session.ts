@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, toRefs, watch } from 'vue'
 
 import { formatMonthName } from '../../../lib/format'
 import { asMonth } from '../../../lib/month'
@@ -36,17 +36,15 @@ export function usePrepareSession() {
   const rows = computed(() => allRows(groups.value))
   const saved = computed(() => hasSavedPlan(groups.value))
 
-  const chosenStart = ref<StartMode | null>(null)
+  // The budget section unmounts when opening the subscriptions list.
+  const { chosenStart, edited, drafts, repeat, confirmation } = toRefs(screens.prepareDraft)
+  watch([() => view.value.year, target], ([year, month]) => screens.setPreparePeriod(year, month), {
+    immediate: true,
+  })
   const start = computed<StartMode>(() => {
     const chosen = chosenStart.value
     return chosen && (chosen !== 'saved' || saved.value) ? chosen : defaultStart(groups.value)
   })
-  // Values edited by hand over the seed, and the raw text of the field being typed.
-  const edited = ref<Record<string, number>>({})
-  const drafts = ref<Record<string, string>>({})
-  const repeat = ref(false)
-  const confirmation = ref('')
-
   const values = computed(() =>
     Object.fromEntries(
       rows.value.map((row) => [row.key, edited.value[row.key] ?? seedValue(row, start.value)]),

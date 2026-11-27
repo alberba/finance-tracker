@@ -4,6 +4,7 @@ import { formatDecimalInput } from '../../../lib/number'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { useNeonBudgetScreens } from './budget-screens'
+import NeonBudgetSubscriptionLink from './NeonBudgetSubscriptionLink.vue'
 import { usePrepareSession } from './prepare-session'
 import {
   barLabel,
@@ -125,6 +126,7 @@ const iconButton =
 
       <div class="grid min-w-0 items-start gap-5 @[980px]:grid-cols-[minmax(0,1fr)_440px]">
         <div class="grid min-w-0 gap-4">
+          <NeonBudgetSubscriptionLink :year="view.year" :month="target" />
           <section
             v-for="group in groups"
             :key="group.type"

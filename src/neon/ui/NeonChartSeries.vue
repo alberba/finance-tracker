@@ -9,11 +9,13 @@ withDefaults(
   defineProps<{
     /** `M x y L x y …` in the chart's view box. */
     line: string
+    /** The last segment, dashed while its value is provisional. */
+    tail?: string
     /** The line closed along the bottom; without it the series has no fill. */
     area?: string
     color?: string
   }>(),
-  { area: '', color: 'var(--color-accent)' },
+  { area: '', tail: '', color: 'var(--color-accent)' },
 )
 
 const gradientId = `series-${useId()}`
@@ -40,12 +42,15 @@ const gradientId = `series-${useId()}`
     </defs>
     <path v-if="area" :d="area" :fill="`url(#${gradientId})`" stroke="none" />
     <path
-      :d="line"
+      v-for="segment in [{ path: line, dashed: false }, { path: tail, dashed: true }].filter(({ path }) => path)"
+      :key="String(segment.dashed)"
+      :d="segment.path"
       fill="none"
       :stroke="color"
       stroke-width="2"
       stroke-linecap="round"
       stroke-linejoin="round"
+      :stroke-dasharray="segment.dashed ? '4 4' : undefined"
       vector-effect="non-scaling-stroke"
     />
   </g>

@@ -114,10 +114,11 @@ function search(): void {
             Dashboard
           </h1>
           <DashboardRangePicker
-            v-model="range"
+            :range="viewModel.selectedRange"
             :label="viewModel.rangeLabel"
             :options="viewModel.rangeOptions"
-            :months="viewModel.rangeMonths"
+            :range-bounds="viewModel.rangeBounds"
+            @pick="range = $event"
           />
           <button
             ref="editToggle"

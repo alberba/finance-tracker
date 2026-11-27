@@ -79,7 +79,7 @@ function open(month: Month): void {
       Patrimonio
     </button>
 
-    <header class="grid gap-1.5">
+    <header class="motion-safe:animate-rise grid gap-1.5">
       <p class="text-muted text-label tracking-label font-extrabold uppercase">
         Balance patrimonial · {{ year }}
       </p>
@@ -97,7 +97,7 @@ function open(month: Month): void {
 
     <section
       aria-label="Ecuación del balance"
-      class="border-line grid gap-3 border-y py-4"
+      class="border-line motion-safe:animate-rise grid gap-3 border-y py-4 motion-safe:[animation-delay:50ms]"
       data-wealth-equation
     >
       <div class="flex items-baseline justify-between gap-3">

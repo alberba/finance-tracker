@@ -6,7 +6,6 @@ import {
   type WealthViewModel,
 } from '../../../domain/wealth/view-model'
 import {
-  formatCompactMoney,
   formatMoney,
   formatMonthName,
   formatNumber,
@@ -14,7 +13,7 @@ import {
   formatPercent,
   formatSignedMoney,
 } from '../../../lib/format'
-import { atMonth, monthIndex, type Month } from '../../../lib/month'
+import { atMonth, type Month } from '../../../lib/month'
 import { round2 } from '../../../lib/number'
 import type { SnapshotKind } from '../../../scripts/types'
 
@@ -80,144 +79,24 @@ export function closeStatus(
   return { closed, text: `${formatMonthName(month)} ${closed ? 'cerrado' : 'sin cerrar'}` }
 }
 
-export type EvolutionPeriod = 'month' | 'quarter'
-export type EvolutionKind = 'line' | 'bars'
-
 export interface EvolutionPoint {
   month: Month
-  /** «Ene», «T2». */
-  label: string
-  /** The value in short under the label, when there are few points; empty otherwise. */
-  sub: string
   value: number
-  /** The month has no stored balance yet: the dot or bar is hollow. */
   open: boolean
-  /** Position in the plot, in percent: x from the left, y from the top. */
-  x: number
-  y: number
+  monthChange: number | null
+  yearChange: number
 }
 
-export interface EvolutionChart {
-  points: EvolutionPoint[]
-  ticks: { top: number; label: string }[]
-  /** «+600,00 € desde enero. El último dato aún no está cerrado.» */
-  note: string
-  /** The same move in whole euros, for a short line: «+600 €» «desde enero». */
-  delta: { text: string; since: string; tone: FigureTone } | null
-  /** What the chart says, for a screen reader. */
-  label: string
-}
-
-const SHORT_SUBS_UP_TO = 8
-const MAX_STEPS = 4
-
-/** The smallest round step (1, 2, 2.5 or 5 times a power of ten) that spans lo–hi in four. */
-function scale(
-  min: number,
-  max: number,
-  fromZero: boolean,
-): { lo: number; hi: number; step: number } {
-  const span = Math.max(max - (fromZero ? Math.min(0, min) : min), 1)
-  let power = 10 ** Math.floor(Math.log10(span / MAX_STEPS))
-  for (;;) {
-    for (const factor of [1, 2, 2.5, 5]) {
-      const step = factor * power
-      const lo = fromZero && min >= 0 ? 0 : Math.floor(min / step) * step
-      let hi = Math.ceil(max / step) * step
-      if (hi === lo) hi = lo + step
-      if ((hi - lo) / step <= MAX_STEPS) return { lo, hi, step }
-    }
-    power *= 10
-  }
-}
-
-/** A move in whole euros for a short line: «+600 €» with what it is measured from. */
-function whole(moved: number, since: string): { text: string; since: string; tone: FigureTone } {
-  const amount = round2(moved)
-  return {
-    text: `${amount > 0 ? '+' : amount < 0 ? '−' : ''}${formatWholeAmount(Math.abs(amount))}\u00a0€`,
-    since,
-    tone: figureTone(amount),
-  }
-}
-
-/** What the cover reads while a finger is on one point of the chart. */
-export interface ScrubReading {
-  /** «Marzo», «T2». */
-  name: string
-  value: number
-  /** The move since the first point, like the line under the figure at rest. */
-  delta: { text: string; since: string; tone: FigureTone }
-}
-
-/** The reading at point `index` of `chart`: its value, its name and its move since the first. */
-export function scrubReading(
-  chart: EvolutionChart,
-  index: number,
-  period: EvolutionPeriod,
-): ScrubReading | null {
-  const first = chart.points[0]
-  const point = chart.points[index]
-  if (!first || !point) return null
-  const firstName = period === 'month' ? formatMonthName(first.month).toLowerCase() : first.label
-  return {
-    name: period === 'month' ? formatMonthName(point.month) : point.label,
-    value: point.value,
-    delta: whole(point.value - first.value, `desde ${firstName}`),
-  }
-}
-
-/** The net worth at the close of each month (or quarter) of the year so far. */
-export function evolution(
-  view: WealthViewModel,
-  period: EvolutionPeriod,
-  kind: EvolutionKind,
-): EvolutionChart {
-  const months = view.history.months
-  const last = months[months.length - 1]
-  const shown = months.filter((month) =>
-    period === 'month' ? true : month % 3 === 0 || month === last,
-  )
-  const values = shown.map((month) => monthTotals(view, month).net)
-  if (!shown.length) return { points: [], ticks: [], note: '', delta: null, label: '' }
-
-  const { lo, hi, step } = scale(Math.min(...values), Math.max(...values), kind === 'bars')
-  const y = (value: number) => 100 - ((value - lo) / (hi - lo)) * 100
-  const ticks: EvolutionChart['ticks'] = []
-  for (let value = lo; value <= hi + step / 2; value += step) {
-    ticks.push({ top: y(value), label: formatCompactMoney(value) })
-  }
-  const width = 100 / shown.length
-  const labelOf = (month: Month) =>
-    period === 'month'
-      ? formatMonthName(month).slice(0, 3)
-      : `T${Math.floor(monthIndex(month) / 3) + 1}`
-  const points = shown.map((month, index) => ({
+/** Changes are based on the year's history, even when the chart shows only six months. */
+export function evolution(view: WealthViewModel): EvolutionPoint[] {
+  const values = view.history.months.map((month) => monthTotals(view, month).net)
+  return view.history.months.map((month, index) => ({
     month,
-    label: labelOf(month),
-    sub: shown.length <= SHORT_SUBS_UP_TO ? formatCompactMoney(values[index]) : '',
     value: values[index],
     open: !atMonth(view.months, month).saved,
-    x: (index + 0.5) * width,
-    y: y(values[index]),
+    monthChange: index === 0 ? null : round2(values[index] - values[index - 1]),
+    yearChange: round2(values[index] - values[0]),
   }))
-
-  const first = points[0]
-  const latest = points[points.length - 1]
-  const firstName = period === 'month' ? formatMonthName(first.month).toLowerCase() : first.label
-  const note =
-    `${formatSignedMoney(latest.value - first.value)} desde ${firstName}.` +
-    (latest.open ? ' El último dato aún no está cerrado.' : '')
-  const delta = whole(latest.value - first.value, `desde ${firstName}`)
-  const label =
-    `Patrimonio por ${period === 'month' ? 'mes' : 'trimestre'}: ` +
-    points
-      .map((point) => {
-        const name = period === 'month' ? formatMonthName(point.month).toLowerCase() : point.label
-        return `${name} ${formatMoney(point.value)}`
-      })
-      .join(', ')
-  return { points, ticks, note, delta, label }
 }
 
 export type MixTone = 'lilac' | 'lilac2' | 'lilac3' | 'peach'
@@ -241,7 +120,7 @@ const MIX_SHOWN = 3
 export function composition(
   view: WealthViewModel,
   month: Month,
-): { segments: MixSegment[]; note: string; label: string } {
+): { segments: MixSegment[]; label: string } {
   const index = column(view, month)
   const assets = view.history.rows
     .filter((row) => row.kind === 'item' && row.group !== 'liabilities')
@@ -249,8 +128,7 @@ export function composition(
     .filter((asset) => asset.value > 0)
     .sort((a, b) => b.value - a.value)
   const total = round2(assets.reduce((sum, asset) => sum + asset.value, 0))
-  if (!assets.length)
-    return { segments: [], note: 'Todavía no tienes activos con saldo.', label: '' }
+  if (!assets.length) return { segments: [], label: '' }
 
   const head = assets.length > MIX_SHOWN + 1 ? assets.slice(0, MIX_SHOWN) : assets
   const rest = assets.slice(head.length)
@@ -274,10 +152,8 @@ export function composition(
     weight: total > 0 ? part.value / total : 0,
     tone: MIX_TONES[i],
   }))
-  const top = segments[0]
   return {
     segments,
-    note: `${formatMoney(total)} en activos. ${top.name} pesa más: ${top.pct}.`,
     label: `Reparto de los activos: ${segments.map((s) => `${s.name} ${s.pct}`).join(', ')}`,
   }
 }
@@ -576,13 +452,4 @@ export function closeCard(
         note: 'Apunta el saldo real de cada cuenta a fin de mes para que el balance cuadre.',
         action: `Cerrar ${lower}`,
       }
-}
-
-/** «Saldos calculados a 10 de octubre.» while the month runs; its close otherwise. */
-export function balanceDate(year: number, month: Month, today: Date): string {
-  const lower = formatMonthName(month).toLowerCase()
-  const running = today.getFullYear() === year && today.getMonth() + 1 === month
-  return running
-    ? `Saldos calculados a ${today.getDate()} de ${lower}.`
-    : `Saldos al cierre de ${lower}.`
 }

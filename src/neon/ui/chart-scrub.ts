@@ -28,18 +28,23 @@ export function nearestPoint(positions: readonly number[], percent: number): num
  */
 export function useChartScrub(
   host: Ref<HTMLElement | null>,
-  plot: Ref<HTMLElement | null>,
+  plot: Ref<Element | null>,
   positions: () => readonly number[],
+  tap: (index: number) => void,
 ): { index: Ref<number | null> } {
   const index = ref<number | null>(null)
   let timer: ReturnType<typeof setTimeout> | undefined
   let pointer: { id: number; x: number; y: number } | null = null
   let active = false
 
-  function read(clientX: number): void {
+  function find(clientX: number): number {
     const rect = plot.value?.getBoundingClientRect()
-    if (!rect?.width) return
-    const found = nearestPoint(positions(), ((clientX - rect.left) / rect.width) * 100)
+    if (!rect?.width) return -1
+    return nearestPoint(positions(), ((clientX - rect.left) / rect.width) * 100)
+  }
+
+  function read(clientX: number): void {
+    const found = find(clientX)
     index.value = found < 0 ? null : found
   }
 
@@ -52,7 +57,7 @@ export function useChartScrub(
   }
 
   function down(event: PointerEvent): void {
-    if (!event.isPrimary || (event.target as Element).closest('button, a, input')) return
+    if (!event.isPrimary || event.pointerType !== 'touch') return
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY }
     timer = setTimeout(() => {
       if (!pointer) return
@@ -60,6 +65,15 @@ export function useChartScrub(
       host.value?.setPointerCapture?.(pointer.id)
       read(pointer.x)
     }, SCRUB_HOLD_MS)
+  }
+
+  function up(event: PointerEvent): void {
+    if (!pointer || event.pointerId !== pointer.id) return
+    if (!active && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) <= SCRUB_SLOP) {
+      const found = find(event.clientX)
+      if (found >= 0) tap(found)
+    }
+    stop()
   }
 
   function move(event: PointerEvent): void {
@@ -83,7 +97,7 @@ export function useChartScrub(
     const toggle = on ? el.addEventListener.bind(el) : el.removeEventListener.bind(el)
     toggle('pointerdown', down as EventListener)
     toggle('pointermove', move as EventListener)
-    toggle('pointerup', stop)
+    toggle('pointerup', up as EventListener)
     toggle('pointercancel', stop)
     toggle('touchmove', touch as EventListener, { passive: false })
   }

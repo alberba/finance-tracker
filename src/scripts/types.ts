@@ -270,6 +270,8 @@ export interface State {
   transactions: Transaction[]
   subscriptions: Subscription[]
   snapshots: Record<string, SnapshotRow>
+  /** Sync snapshots outside the active accounting year, grouped by year and month. */
+  historicalSnapshots?: Record<string, Record<string, SnapshotRow>>
   budget: Record<BudgetType, Record<string, number[]>>
   goals: Record<GoalKey, Goal>
   savingGoals: SavingGoal[]

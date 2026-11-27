@@ -4,16 +4,12 @@ import type { HoldingGroup } from './view-model'
 
 // «Lo que tienes»: one card per group (cash, investment, debt) with its total
 // and its accounts as ledger rows. A row opens that account's detail.
-defineProps<{ groups: HoldingGroup[]; date: string }>()
+defineProps<{ groups: HoldingGroup[] }>()
 const emit = defineEmits<{ open: [kind: SnapshotKind, id: string] }>()
 </script>
 
 <template>
-  <section aria-labelledby="wealth-have-title" class="grid min-w-0 gap-3">
-    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5">
-      <h2 id="wealth-have-title" class="text-block-title font-extrabold">Lo que tienes</h2>
-      <p class="text-muted text-note">{{ date }}</p>
-    </div>
+  <section aria-label="Lo que tienes" class="grid min-w-0 gap-3">
     <div
       class="grid min-w-0 grid-cols-1 items-start gap-3.5 @min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)]"
     >
@@ -42,6 +38,7 @@ const emit = defineEmits<{ open: [kind: SnapshotKind, id: string] }>()
               type="button"
               class="text-text outline-accent hover:bg-panel2/60 grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2"
               :aria-label="`${row.name}: ${row.value}. Ver mes a mes`"
+              :data-wealth-account="`${row.kind}:${row.id}`"
               @click="emit('open', row.kind, row.id)"
             >
               <span class="grid min-w-0 gap-px">

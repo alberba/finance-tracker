@@ -7,7 +7,6 @@ import type { SnapshotKind } from '../../../scripts/types'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useWealthStore } from '../../../stores/wealth'
 import {
-  balanceDate,
   closeCard,
   closeStatus,
   composition,
@@ -17,6 +16,7 @@ import {
   monthTotals,
   type MonthTotals,
 } from './view-model'
+import { wealthTimeline } from './evolution-range'
 import { useNeonWealthScreens, type MonthsView } from './wealth-screens'
 
 // What the cover of Patrimonio reads, shared by its two compositions (desktop
@@ -26,7 +26,7 @@ export function useWealthCover() {
   const financialStateStore = useFinancialStateStore()
   const wealthStore = useWealthStore()
   const screens = useNeonWealthScreens()
-  const { period, chartKind } = storeToRefs(screens)
+  const { range } = storeToRefs(screens)
 
   const month = computed(() => coverMonth(wealthStore.viewModel))
   // The shared view-model reads the rows at the month the snapshot editor is on;
@@ -42,10 +42,12 @@ export function useWealthCover() {
   const totals = computed<MonthTotals>(() => monthTotals(view.value, month.value))
   const status = computed(() => closeStatus(view.value, month.value))
   const card = computed(() => closeCard(view.value, month.value))
-  const chart = computed(() => evolution(view.value, period.value, chartKind.value))
+  // The net worth month by month, earlier years included, for the chart's ranges.
+  const chart = computed(() =>
+    wealthTimeline(financialStateStore.state, evolution(view.value), financialStateStore.year),
+  )
   const mix = computed(() => composition(view.value, month.value))
   const groups = computed(() => holdings(view.value, month.value))
-  const date = computed(() => balanceDate(financialStateStore.year, month.value, new Date()))
 
   function openMonths(monthsView: MonthsView = 'close'): void {
     wealthStore.setMonth(month.value)
@@ -68,6 +70,7 @@ export function useWealthCover() {
 
   return {
     year: computed(() => financialStateStore.year),
+    currency: computed(() => financialStateStore.currency),
     month,
     view,
     monthLower,
@@ -78,9 +81,7 @@ export function useWealthCover() {
     chart,
     mix,
     groups,
-    date,
-    period,
-    chartKind,
+    range,
     openMonths,
     shownAccount,
     detailOpen,

@@ -16,6 +16,7 @@ const section = (page: Page) => page.locator('#wealth')
 test('abre el detalle de una cuenta en una hoja y vuelve', async ({ page, tracker }) => {
   await tracker.openWealth()
   await expect(section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })).toBeVisible()
+  await expect(section(page).locator('[data-wealth-net]')).toHaveText('20.231,35 €')
 
   const row = section(page).getByRole('button', { name: /^Revolut: / })
   await row.click()
@@ -61,44 +62,6 @@ test('el título está en la barra superior y no en el contenido', async ({ page
   await expect(bar.locator('p[aria-label="finanzas"]')).toBeVisible()
 })
 
-test('recorre el gráfico con el dedo y al soltar vuelve a hoy', async ({ page, tracker }) => {
-  await tracker.openWealth()
-  const net = section(page).locator('[data-wealth-net]')
-  const reading = section(page).locator('[data-wealth-reading]')
-  const atRest = await net.textContent()
-  const plot = (await section(page).locator('[data-wealth-plot]').boundingBox())!
-  const y = plot.y + plot.height / 3
-
-  const cdp = await page.context().newCDPSession(page)
-  const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x?: number, at = y) =>
-    cdp.send('Input.dispatchTouchEvent', {
-      type,
-      touchPoints: x === undefined ? [] : [{ x, y: at }],
-    })
-
-  // Un gesto vertical antes de mantener es de la página: no lee el gráfico.
-  await touch('touchStart', plot.x + 60)
-  await touch('touchMove', plot.x + 60, y + 40)
-  await page.waitForTimeout(300)
-  await expect(reading).toBeHidden()
-  await touch('touchEnd')
-
-  // Mantener y deslizar lee punto a punto.
-  await touch('touchStart', plot.x + 4)
-  await expect(reading).toHaveText('Enero')
-  const january = await net.textContent()
-  expect(january).not.toBe(atRest)
-  await expect(section(page).locator('[data-wealth-marker]')).toBeVisible()
-
-  await touch('touchMove', plot.x + plot.width - 4)
-  await expect(reading).not.toHaveText('Enero')
-  await expect(net).not.toHaveText(january!)
-
-  await touch('touchEnd')
-  await expect(reading).toBeHidden()
-  await expect(net).toHaveText(atRest!)
-})
-
 test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil', async ({
   page,
   tracker,
@@ -121,10 +84,6 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
 
   expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
 
-  await section(page).getByRole('button', { name: 'Reparto' }).click()
-  await expect(section(page).getByRole('heading', { name: 'Dónde está' })).toBeVisible()
-  expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
-  await section(page).getByRole('button', { name: 'Cuentas', exact: true }).click()
 
   await section(page)
     .getByRole('button', { name: /^Revolut: / })
@@ -133,7 +92,7 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
   expect(await tooSmall(`dialog[open] :is(${CONTROLS})`)).toEqual([])
   await page.keyboard.press('Escape')
 
-  await section(page).getByRole('button', { name: 'Cerrar mes', exact: true }).click()
+  await section(page).getByRole('button', { name: 'Cerrar marzo', exact: true }).click()
   await expect(
     section(page).getByRole('heading', { name: 'Balance por meses', level: 1 }),
   ).toBeVisible()

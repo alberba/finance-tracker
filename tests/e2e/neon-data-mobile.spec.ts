@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import type { Month } from '../../src/lib/month'
 import { test, expect } from './fixtures'
+import { typeOnKeypad } from './entry-keypad'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
@@ -80,9 +81,9 @@ test('enseña la cola sin conexión bajo la línea de sincronización y la enví
   await expect(sync.locator('[data-sync-label]')).toHaveText('Sin conexión')
 
   await page.locator('[data-fab-apuntar]').click()
-  const sheet = page.getByRole('dialog', { name: 'Apuntar' })
-  await sheet.getByRole('textbox', { name: 'Importe' }).fill('12,5')
-  await sheet.getByLabel('Descripción').fill('e2e-cola')
+  const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+  await typeOnKeypad(sheet, '12,5')
+  await sheet.getByLabel('Nota').fill('e2e-cola')
   await sheet.getByRole('button', { name: 'Guardar' }).click()
   await expect(sheet).toBeHidden()
 

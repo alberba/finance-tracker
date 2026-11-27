@@ -27,7 +27,7 @@ export interface LabelledLineChart extends LineChartGeometry {
   tickLabels: string[]
   /** What each point reads when the chart is explored: its date and its value, written out. */
   /** Per point: its date, its amount and, optionally, what a screen reader adds after them. */
-  readings: Array<{ name: string; value: string; note?: string }>
+  readings: Array<{ name: string; value: string; note?: string; open?: boolean }>
   /** What the chart shows, for screen readers. */
   label: string
 }

@@ -14,6 +14,19 @@ const read = (path: string) => readFileSync(new URL(`../../src/${path}`, import.
 
 const NEON_SCOPE = /^\[data-ui=(['"])neon\1\]/
 
+/** The selectors of a list, split on the commas outside parentheses (`:is(a, b)` is one). */
+function topLevelSelectors(prelude: string): string[] {
+  const selectors = ['']
+  let depth = 0
+  for (const char of prelude) {
+    if (char === '(') depth++
+    if (char === ')') depth--
+    if (char === ',' && depth === 0) selectors.push('')
+    else selectors[selectors.length - 1] += char
+  }
+  return selectors
+}
+
 /** Rules of a new-design sheet that are not under `[data-ui="neon"]` or the `neon:` variant. */
 function unscopedNeonRules(css: string): string[] {
   return parseCss(css)
@@ -22,7 +35,7 @@ function unscopedNeonRules(css: string): string[] {
       // Steps of a keyframes rule are not selectors.
       if (ancestors.some((ancestor) => /^@keyframes\b/.test(ancestor))) return false
       if (ancestors.includes('@variant neon')) return false
-      return prelude.split(',').some((selector) => !NEON_SCOPE.test(selector.trim()))
+      return topLevelSelectors(prelude).some((selector) => !NEON_SCOPE.test(selector.trim()))
     })
     .map(({ prelude }) => prelude)
 }

@@ -54,7 +54,7 @@ const LEDGER = { year: 2026, today: '2026-10-09', currency: 'EUR', accountName }
 
 describe('extra filters', () => {
   it('keeps the exact day and the amount range, inclusive, by the absolute amount', () => {
-    const matches = extraMatcher({ date: '', min: '10', max: '64,32' })
+    const matches = extraMatcher({ date: '', min: '10', max: '64,32', category: '' })
     expect(matches(tx('a', '2026-10-01', 'expense', 64.32))).toBe(true)
     expect(matches(tx('b', '2026-10-01', 'expense', 9.99))).toBe(false)
     expect(matches(tx('c', '2026-10-01', 'investment', -70))).toBe(false)
@@ -73,10 +73,10 @@ describe('extra filters', () => {
     )
     const september = group(9, [tx('renfe', '2026-09-05', 'expense', 22.8)], -22.8)
 
-    const narrowed = narrowMonthGroups([october, september], { date: '', min: '40', max: '' })
+    const narrowed = narrowMonthGroups([october, september], { date: '', min: '40', max: '', category: '' })
 
     expect(narrowed).toEqual([{ ...october, rows: october.rows, count: 2, net: 3371.4 }])
-    expect(narrowMonthGroups([october], { date: '', min: '', max: '100' })[0]).toMatchObject({
+    expect(narrowMonthGroups([october], { date: '', min: '', max: '100', category: '' })[0]).toMatchObject({
       count: 1,
       net: -48.6,
     })
@@ -84,7 +84,7 @@ describe('extra filters', () => {
 
   it('counts the active filters of «Más filtros»', () => {
     expect(moreFiltersLabel([], NO_EXTRA_FILTERS)).toBe('Más filtros')
-    expect(moreFiltersLabel(['tarjeta'], { date: '2026-10-01', min: ' ', max: '5' })).toBe(
+    expect(moreFiltersLabel(['tarjeta'], { date: '2026-10-01', min: ' ', max: '5', category: '' })).toBe(
       'Más filtros · 3',
     )
   })
@@ -117,10 +117,10 @@ describe('ledger', () => {
     const [month] = buildLedgerMonths([group(10, rows, 3055.68)], LEDGER)
 
     expect(month.title).toBe('Octubre 2026')
-    expect(month.summary).toBe('4 movimientos · neto +3.055,68 €')
+    expect(month).toMatchObject({ count: '4 movimientos', net: '+3.055,68 €' })
     expect(month.days.map((day) => [day.label, day.net, day.rows.length])).toEqual([
-      ['Hoy', 'Neto −64,32 €', 1],
-      ['Ayer', 'Neto +3.120,00 €', 3],
+      ['Hoy', '−64,32 €', 1],
+      ['Ayer', '+3.120,00 €', 3],
     ])
     expect(month.days[1].rows.map((row) => [row.amount, row.tone])).toEqual([
       ['−300,00 €', 'lilac'],
@@ -178,10 +178,15 @@ describe('category breakdown', () => {
     expect(categoryBreakdown(rows, [])).toEqual({
       title: 'Gastos por categoría',
       rows: [
-        { name: 'Casa', amount: '650,00 €', share: '65,0 %', width: 65 },
-        { name: 'Súper', amount: '350,00 €', share: '35,0 %', width: 35 },
+        { name: 'Casa', count: 1, amount: '650,00 €', share: '65,0 %', width: 65 },
+        { name: 'Súper', count: 2, amount: '350,00 €', share: '35,0 %', width: 35 },
       ],
     })
+  })
+
+  it('narrows to the category picked in the split', () => {
+    const matches = extraMatcher({ ...NO_EXTRA_FILTERS, category: 'Súper' })
+    expect(rows.filter(matches).map((row) => row.id)).toEqual(['b', 'c'])
   })
 
   it('splits the chosen type', () => {
@@ -211,7 +216,13 @@ describe('movement detail', () => {
       title: 'Mercadona',
       kicker: 'Gasto',
       amount: '−64,32 €',
-      budget: { title: 'Súper · octubre', text: '453,47 € de 400,00 €', width: 100, over: true },
+      budget: {
+        title: 'Súper · octubre',
+        spent: '453,47 €',
+        planned: '400,00 €',
+        width: 100,
+        over: true,
+      },
       sameTitle: 'Más de Mercadona',
       same: [
         { label: '2 de octubre de 2026', value: '−89,15 €' },
@@ -302,30 +313,62 @@ describe('subscriptions', () => {
     }),
   ]
 
-  it('lists active subscriptions first, with their state and next charge', () => {
-    expect(subscriptionRows(list, accountName).map((row) => [row.name, row.status])).toEqual([
-      ['Netflix', 'Activa · próximo 1 nov'],
-      ['Seguro', 'Activa · próximo 1 mar'],
-      ['Revista', 'Pausada'],
+  it('lists the active ones by what they cost per month, then the paused ones', () => {
+    const rows = subscriptionRows(list, accountName, '2026-10-09')
+    expect(rows.map((row) => [row.name, row.monthly, row.next, row.when])).toEqual([
+      ['Netflix', '13,99 €', '1 nov', 'en 23 días'],
+      ['Seguro', '10,00 €', '1 mar', 'en 5 meses'],
+      ['Revista', '4,50 €', '—', ''],
     ])
-    expect(subscriptionRows(list, accountName)[0].meta).toBe('Ocio · Tarjeta · Mensual')
+    expect(rows[0].periodicCharge).toBe('')
+    expect(rows[1]).toMatchObject({
+      meta: 'Ocio · Tarjeta',
+      frequency: 'Anual',
+      amount: '120,00 €',
+      periodicCharge: '120,00 € al año',
+    })
   })
 
-  it('sums what the active ones commit each month and the next 30 days of charges', () => {
-    expect(subscriptionsSummary(list, '2026-10-09')).toEqual({
+  it('follows a stored next charge that fell behind to the next one', () => {
+    const [row] = subscriptionRows(
+      [subscription({ frequency: 'yearly', nextChargeDate: '2025-03-01' })],
+      accountName,
+      '2026-10-09',
+    )
+    expect(row.next).toBe('1 mar')
+  })
+
+  it('sums the commitment and lists the next four charges chronologically, including repeats', () => {
+    const summary = subscriptionsSummary(list, '2026-10-09')
+    expect(summary).toMatchObject({
       monthly: '23,99 €',
       annual: '287,88 €',
-      line: 'Proyección anual 287,88 € · 2 activas',
-      next30: '1 cobro · 13,99 €',
+      line: '287,88 € al año · 2 activas',
+      paused: 'Dejas de pagar 54,00 € al año',
+      partialMonth: 'Resto de octubre',
       upcoming: [
-        {
-          id: 'Netflix:2026-11-01',
-          date: '1 nov',
-          name: 'Netflix',
-          when: 'en 23 días',
-          amount: '13,99 €',
-        },
+        { date: '1 nov', name: 'Netflix', when: 'en 23 días', amount: '13,99 €' },
+        { date: '1 dic', name: 'Netflix', amount: '13,99 €' },
+        { date: '1 ene', name: 'Netflix', amount: '13,99 €' },
+        { date: '1 feb', name: 'Netflix', amount: '13,99 €' },
       ],
     })
+    expect(summary.months.map((month) => [month.label, month.amount, month.peak])).toEqual([
+      ['oct', '0,00 €', false],
+      ['nov', '13,99 €', false],
+      ['dic', '13,99 €', false],
+      ['ene', '13,99 €', false],
+      ['feb', '13,99 €', false],
+      ['mar', '133,99 €', true],
+      ['abr', '13,99 €', false],
+      ['may', '13,99 €', false],
+      ['jun', '13,99 €', false],
+      ['jul', '13,99 €', false],
+      ['ago', '13,99 €', false],
+      ['sep', '13,99 €', false],
+    ])
+    expect(summary.months[0].title).toBe('Resto de octubre de 2026: 0,00 €')
+    expect(summary.months[5].title).toBe('Marzo de 2027: 133,99 €')
+    expect(subscriptionsSummary(list, '2026-10-01').partialMonth).toBe('')
   })
 })

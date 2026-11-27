@@ -3,6 +3,7 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import type { RecurringRule } from '../../src/scripts/types'
+import { typeOnKeypad } from './entry-keypad'
 
 /**
  * Recorridos del dashboard nuevo en el marco móvil (#430), en el proyecto
@@ -54,9 +55,9 @@ test('apuntar un gasto desde el FAB baja «Te quedan» ese importe', async ({ pa
   const before = amountOf(await left(page).innerText())
 
   await page.locator('[data-fab-apuntar]').click()
-  const sheet = page.getByRole('dialog', { name: 'Apuntar' })
-  await sheet.getByRole('textbox', { name: 'Importe' }).fill('12,34')
-  await sheet.getByLabel('Descripción').fill('Café del móvil')
+  const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+  await typeOnKeypad(sheet, '12,34')
+  await sheet.getByLabel('Nota').fill('Café del móvil')
   const created = expectSyncCommand(
     page,
     (command) => command.action === 'create' && command.entityType === 'transaction',

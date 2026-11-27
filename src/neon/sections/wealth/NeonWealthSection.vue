@@ -34,7 +34,7 @@ watch(screen, async () => {
   <section
     v-show="isActive"
     id="wealth"
-    class="@container grid min-w-0 content-start gap-5"
+    class="@container relative grid min-w-0 content-start gap-5"
     aria-labelledby="wealth-title"
   >
     <template v-if="desktopFrame">

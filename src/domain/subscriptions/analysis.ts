@@ -93,8 +93,29 @@ function buildUpcomingCharges(
   todayIso: string,
 ): UpcomingSubscriptionCharge[] {
   const start = parseIsoDate(todayIso)
+  return start ? projectCharges(subscriptions, todayIso, addUtcDays(start, 30)) : []
+}
+
+/**
+ * Every charge of the given subscriptions from today up to `endIso`, both
+ * included, soonest first. It does not look at `active`: the caller filters.
+ */
+export function projectSubscriptionCharges(
+  subscriptions: Subscription[],
+  todayIso: string,
+  endIso: string,
+): UpcomingSubscriptionCharge[] {
+  const end = parseIsoDate(endIso)
+  return end ? projectCharges(subscriptions, todayIso, end) : []
+}
+
+function projectCharges(
+  subscriptions: Subscription[],
+  todayIso: string,
+  end: Date,
+): UpcomingSubscriptionCharge[] {
+  const start = parseIsoDate(todayIso)
   if (!start) return []
-  const end = addUtcDays(start, 30)
 
   return subscriptions
     .flatMap((subscription) => {

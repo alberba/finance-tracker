@@ -5,7 +5,7 @@ import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 import {
   ACCOUNT_FILTERS,
-  mobileAccounts,
+  mobileAccountGroups,
   monthHistory,
 } from '../../src/neon/sections/wealth/mobile-view-model'
 
@@ -53,22 +53,52 @@ function state(): State {
 
 const vm = (month: Month = 3) => buildWealthViewModel(state(), month)
 
-describe('mobileAccounts', () => {
-  it('lists every account of every group with its group and weight in it', () => {
-    const rows = mobileAccounts(vm(), 3, 'all')
+describe('mobileAccountGroups', () => {
+  it('gives every group with its total and its accounts as tiles', () => {
+    const groups = mobileAccountGroups(vm(), 3, 'all')
 
-    expect(rows.map((row) => [row.name, row.initial, row.note])).toEqual([
-      ['Banco', 'B', 'Efectivo · 97\u00a0%'],
-      ['Efectivo en mano', 'E', 'Efectivo · 3\u00a0%'],
-      ['Fondo', 'F', 'Inversión · 100\u00a0%'],
-      ['Coche', 'C', 'Pasivos · 100\u00a0%'],
+    expect(groups.map((group) => [group.title, group.total])).toEqual([
+      ['Efectivo', '1.650\u00a0€'],
+      ['Inversión', '2.000\u00a0€'],
+      ['Pasivos', '−500\u00a0€'],
     ])
-    expect(rows[0]).toMatchObject({ id: 'bank', kind: 'accounts', value: '1.600 €' })
+    expect(groups[0].tiles.map((tile) => [tile.name, tile.value])).toEqual([
+      ['Banco', '1.600\u00a0€'],
+      ['Efectivo en mano', '50\u00a0€'],
+    ])
+    expect(groups[0].tiles[0]).toMatchObject({ id: 'bank', kind: 'accounts' })
+  })
+
+  it('tells what each account moved since the month before, coloured only when it is big', () => {
+    const [cash, investment] = mobileAccountGroups(vm(), 3, 'all')
+    // The bank went from 1.200 to 1.600: big enough to take colour.
+    expect(cash.tiles[0].change).toEqual({ text: '+400\u00a0€', tone: 'gain' })
+    expect(cash.tiles[1].change).toEqual({ text: 'Sin cambios', tone: 'muted' })
+    expect(investment.tiles[0].change?.tone).toBe('muted')
+    expect(cash.tiles[0].aria).toBe('Banco: 1.600\u00a0€, +400\u00a0€ este mes. Ver mes a mes')
+  })
+
+  it('leaves out a group without accounts', () => {
+    const empty = state()
+    empty.liabilities = []
+    const view = buildWealthViewModel(empty, 3)
+    expect(mobileAccountGroups(view, 3, 'all').map((group) => group.kind)).toEqual([
+      'accounts',
+      'investments',
+    ])
+    expect(mobileAccountGroups(view, 3, 'liabilities')).toEqual([])
+  })
+
+  it('has no month before in January', () => {
+    const [cash] = mobileAccountGroups(vm(1), 1, 'all')
+    expect(cash.tiles[0].change).toBeNull()
   })
 
   it('keeps only the group that was picked', () => {
-    expect(mobileAccounts(vm(), 3, 'investments').map((row) => row.name)).toEqual(['Fondo'])
-    expect(mobileAccounts(vm(), 3, 'liabilities').map((row) => row.value)).toEqual(['−500 €'])
+    expect(mobileAccountGroups(vm(), 3, 'investments').map((group) => group.title)).toEqual([
+      'Inversión',
+    ])
+    expect(mobileAccountGroups(vm(), 3, 'liabilities')[0].tiles[0].value).toBe('−500\u00a0€')
   })
 
   it('offers the groups in the order of the cover', () => {

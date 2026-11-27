@@ -6,10 +6,9 @@ import NeonChartSeries from '../../ui/NeonChartSeries.vue'
 import type { AssetChart } from './asset-view-model'
 
 // The price of an asset against the operations that were made (#439, #440):
-// the line through each operation's price and today's, its area, the average
-// buy price dashed, a dot per operation (filled for a buy, hollow for a sale,
-// ringed in the accent while it is not declared) and the point being read.
-// `hot` is that point, null at rest (today). The arrow keys walk it; the
+// the line through each operation's price, its area, the average buy price
+// dashed, a dot per operation (filled for a buy, hollow for a sale) and the point being read. `hot` is that
+// point, null at rest (the newest operation, with no marker of its own). The arrow keys walk it; the
 // desktop reads it with the mouse, the `touch` one (mobile) with a finger
 // sliding sideways, the page still scrolling up and down, and draws a cursor.
 const props = withDefaults(defineProps<{ chart: AssetChart; touch?: boolean }>(), {
@@ -80,29 +79,28 @@ function onKey(event: KeyboardEvent): void {
         stroke-width="1"
         stroke-dasharray="4 4"
       />
-      <NeonChartSeries :line="chart.line" :area="chart.area" />
+      <!-- Price draws itself (`anim-draw`); the operations light up as it
+           reaches the newest (`anim-dot`). -->
+      <NeonChartSeries
+        class="motion-safe:animate-draw"
+        :style="{ animationDuration: '800ms', animationDelay: '60ms' }"
+        :line="chart.line"
+        :area="chart.area"
+      />
       <template v-for="(point, index) in points" :key="index">
         <circle
-          v-if="point.operation"
+          class="motion-safe:animate-dot origin-center [transform-box:fill-box]"
+          :style="{ animationDelay: '620ms' }"
           :cx="point.x"
           :cy="point.y"
           r="5.5"
           :fill="point.operation === 'sell' ? 'var(--color-bg)' : 'var(--color-text)'"
-          :stroke="point.declared ? 'var(--color-text)' : 'var(--color-accent)'"
-          :stroke-width="point.declared ? 2 : 3"
+          stroke="var(--color-text)"
+          stroke-width="2"
         />
       </template>
       <circle
-        v-if="hot === null"
-        :cx="reading.x"
-        :cy="reading.y"
-        r="5.5"
-        fill="var(--color-text)"
-        stroke="var(--color-bg)"
-        stroke-width="2.5"
-      />
-      <circle
-        v-else
+        v-if="hot !== null"
         :cx="reading.x"
         :cy="reading.y"
         r="6"

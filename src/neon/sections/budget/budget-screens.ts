@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 
 import type { Month } from '../../../lib/month'
+import type { StartMode } from './prepare-view-model'
 
 // Presentation state of the new Presupuesto (#433): which of its four screens
 // is showing, and what the user finished this session from the cover's
@@ -26,14 +27,36 @@ export interface PrepareOutcome {
   summary: string
 }
 
+function emptyPrepareDraft() {
+  return {
+    chosenStart: null as StartMode | null,
+    edited: {} as Record<string, number>,
+    drafts: {} as Record<string, string>,
+    repeat: false,
+    confirmation: '',
+  }
+}
+
 export const useNeonBudgetScreens = defineStore('neon-budget-screens', () => {
   const screen = ref<BudgetScreen>('month')
   const reviewed = ref<ReviewOutcome | null>(null)
   const prepared = ref<PrepareOutcome | null>(null)
+  const prepareDraft = reactive(emptyPrepareDraft())
+  let preparePeriod = ''
+
+  function setPreparePeriod(year: number, month: Month | null): void {
+    const period = `${year}-${month}`
+    if (preparePeriod === period) return
+    preparePeriod = period
+    Object.assign(prepareDraft, emptyPrepareDraft())
+  }
 
   function go(next: BudgetScreen): void {
+    if (screen.value === 'prepare' && next !== 'prepare') {
+      Object.assign(prepareDraft, emptyPrepareDraft())
+    }
     screen.value = next
   }
 
-  return { screen, reviewed, prepared, go }
+  return { screen, reviewed, prepared, prepareDraft, setPreparePeriod, go }
 })

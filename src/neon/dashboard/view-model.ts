@@ -1,4 +1,4 @@
-import { ALL_MONTHS, monthIndex, type Month } from '../../lib/month'
+import { ALL_MONTHS, asMonth, monthIndex, type Month } from '../../lib/month'
 import { getWealthByMonth } from '../../lib/finance-core'
 import {
   formatCompactMoney,
@@ -24,9 +24,9 @@ import { buildLineChart, type LabelledLineChart } from '../ui/line-chart'
  */
 
 /** The stretch the charts of the home draw, picked in the header. */
-/** A preset of the charts' range, or `from-N`: from month N of the accounting year until today. */
+
 export type ChartPreset = '1m' | '3m' | '6m' | '1a'
-export type ChartRange = ChartPreset | `from-${number}`
+export type ChartRange = ChartPreset | `from-${number}-${number}`
 /** Gain, loss or neither: the text color of a figure. */
 export type FigureTone = 'gain' | 'loss' | 'neutral'
 
@@ -56,6 +56,14 @@ export interface SpendingPace {
 
 export type DashboardChart = LabelledLineChart
 
+/** Expenses added up day by day: the month so far and the whole month before it. */
+export interface PaceChart {
+  /** Days of the shown month: the x axis runs from day 1 to this one. */
+  days: number
+  current: { name: string; values: number[]; texts: string[] }
+  previous: { name: string; values: number[]; texts: string[] }
+}
+
 export interface NeonDashboardViewModel {
   /** «Jueves, 9 de octubre» */
   date: string
@@ -63,24 +71,12 @@ export interface NeonDashboardViewModel {
   lede: string
   /** «ene – nov 2026»: the stretch the charts draw, beside the range picker. */
   rangeSpan: string
-  /**
-   * The picker's options: each preset with the months it would draw, as text
-   * and as positions 1–12 in the accounting year (for its little month strip).
-   */
+  /** The presets with the months each would draw. */
   rangeOptions: Array<{ value: ChartRange; label: string; span: string }>
   /** What the picker says for the range in use: «último año», «desde mayo». */
   rangeLabel: string
-  /**
-   * The accounting year's twelve months for the picker's ruler: the ones the
-   * charts draw are lit, and only months before this one can be a start.
-   */
-  rangeMonths: Array<{
-    value: ChartRange
-    initial: string
-    name: string
-    lit: boolean
-    disabled: boolean
-  }>
+  selectedRange: ChartRange
+  rangeBounds: { firstYear: number; endYear: number; endMonth: Month }
   month: {
     name: string
     status: string
@@ -95,6 +91,8 @@ export interface NeonDashboardViewModel {
     } | null
     rows: MonthRow[]
     pace: SpendingPace | null
+    /** Spending of the month day by day against the month before, for the mobile chart. */
+    paceChart: PaceChart | null
   }
   pending: {
     count: number
@@ -121,6 +119,12 @@ export interface NeonDashboardViewModel {
     invested: string | null
     positions: Array<{ name: string; weight: number; share: string }>
     chart: DashboardChart
+    /**
+     * Per chart point, the value against what had been put in by then (the mobile
+     * chart draws it over a zero line); null when the range reaches past this year,
+     * whose contributions the home does not have.
+     */
+    gains: { values: number[]; texts: string[]; invested: string[] } | null
     empty: boolean
   }
   recent: {
@@ -183,24 +187,43 @@ const PERIOD_LABEL: Record<ChartPreset, string> = {
 }
 const RANGE_POINTS: Record<ChartPreset, number> = { '1m': 2, '3m': 4, '6m': 7, '1a': 13 }
 
-/** The month a `from-N` range starts on, or null for a preset. */
-function customStart(range: ChartRange): Month | null {
-  return range.startsWith('from-') ? (Number(range.slice(5)) as Month) : null
+function customStart(range: ChartRange): Period | null {
+  if (!range.startsWith('from-')) return null
+  const [, year, rawMonth] = range.split('-')
+  const month = asMonth(Number(rawMonth))
+  return month ? { year: Number(year), month } : null
 }
 
-/** How many monthly points a range draws as of `month`. */
-function rangePoints(month: Month, range: ChartRange): number {
-  const from = customStart(range)
-  return from === null ? RANGE_POINTS[range as ChartPreset] : Math.max(month - from + 1, 1)
+export function parseDashboardRange(
+  input: string,
+  { firstYear, endYear, endMonth }: NeonDashboardViewModel['rangeBounds'],
+): ChartRange | null {
+  const match = /^(?:(0?[1-9]|1[0-2])\s*\/\s*)?([1-9][0-9]{3})$/.exec(input.trim())
+  if (!match) return null
+  const year = Number(match[2])
+  const month = Number(match[1] ?? 1)
+  if (year < firstYear || year > endYear || (year === endYear && month > endMonth)) return null
+  return `from-${year}-${month}`
 }
 
-/** «en lo que va de año», «desde mayo»: what the change since the range's start is labelled. */
-function periodLabel(range: ChartRange): string {
-  const from = customStart(range)
-  return from === null
-    ? PERIOD_LABEL[range as ChartPreset]
-    : `desde ${formatMonthName(from).toLocaleLowerCase('es')}`
+function rangePoints(period: Period, range: ChartRange): number {
+  const start = customStart(range)
+  if (!start) return RANGE_POINTS[range as ChartPreset]
+  return (period.year - start.year) * 12 + period.month - start.month + 1
 }
+
+function monthNameAt(period: Period, includeYear: boolean): string {
+  const month = formatMonthName(period.month)
+  return includeYear ? `${month} ${period.year}` : month
+}
+
+function periodLabel(period: Period, range: ChartRange): string {
+  const start = customStart(range)
+  return start
+    ? `desde ${monthNameAt(start, start.year !== period.year).toLocaleLowerCase('es')}`
+    : PERIOD_LABEL[range as ChartPreset]
+}
+
 const HISTORY_MONTHS = 6
 // Ceilings for the lists of the home: the widgets show as many rows as their
 // box fits (NeonFitList), so these only stop a very tall widget from running out.
@@ -265,6 +288,16 @@ export function buildNeonDashboardViewModel({
           pendingCount ? ` y ${pendingWords} por confirmar.` : '. No queda nada por confirmar.'
         }`
 
+  let firstYear = period.year
+  for (const tx of state.transactions)
+    firstYear = Math.min(firstYear, accountingYear(tx) ?? firstYear)
+  for (const year of Object.keys(state.historicalSnapshots ?? {}))
+    firstYear = Math.min(firstYear, Number(year))
+  const rangeBounds = { firstYear, endYear: period.year, endMonth: period.month }
+  const start = customStart(range)
+  if (start && !parseDashboardRange(`${start.month}/${start.year}`, rangeBounds)) range = '1a'
+  const history = historicalChartPoints(state, period, range)
+
   return {
     date: formatWeekdayDate(today),
     title: `${period.phase === 'closed' ? 'Así fue' : 'Así va'} ${monthName.toLowerCase()}`,
@@ -279,14 +312,9 @@ export function buildNeonDashboardViewModel({
         ? (CHART_RANGES.find((option) => option.value === range)?.label ?? '').toLocaleLowerCase(
             'es',
           )
-        : periodLabel(range),
-    rangeMonths: ALL_MONTHS.map((month) => ({
-      value: `from-${month}` as const,
-      initial: SHORT_MONTHS[monthIndex(month)].charAt(0).toLocaleUpperCase('es'),
-      name: formatMonthName(month),
-      lit: month >= rangeStart(period, range) && month <= period.month,
-      disabled: month >= period.month,
-    })),
+        : periodLabel(period, range),
+    selectedRange: range,
+    rangeBounds,
     month: {
       name: monthName,
       status: monthStatus(period),
@@ -297,6 +325,7 @@ export function buildNeonDashboardViewModel({
       split: incomeSplit(totals),
       rows: monthRows(state.transactions, period, money),
       pace: spendingPace(state.transactions, period, today),
+      paceChart: paceChart(state.transactions, period, today, money),
     },
     pending: {
       count: pendingCount,
@@ -312,25 +341,64 @@ export function buildNeonDashboardViewModel({
       }),
       moreLabel: pendingCount > PENDING_SHOWN ? `Ver los ${pendingCount} pendientes` : null,
     },
-    wealth: wealthBlock(state, period, range, money, signed),
-    investments: investmentsBlock(state, period, range, money, signed),
+    wealth: wealthBlock(state, period, range, history, money, signed),
+    investments: investmentsBlock(state, period, range, history, money, signed),
     recent: recentBlock(state.transactions, period, money, today),
     categories: categoriesBlock(state, period, money),
     goals: goalsBlock(state, period, money, today),
   }
 }
 
-/** The first month a range draws: as many back as it has points, never before the year's first. */
-function rangeStart(period: Period, range: ChartRange): Month {
-  return Math.max(1, period.month - (rangePoints(period.month, range) - 1)) as Month
+/** «sep – nov 2026», or both years when the range crosses January. */
+function rangeSpan(period: Period, range: ChartRange): string {
+  const start = customStart(range) ?? {
+    year: period.year,
+    month: Math.max(1, period.month - (rangePoints(period, range) - 1)) as Month,
+  }
+  const from = SHORT_MONTHS[monthIndex(start.month)]
+  const to = SHORT_MONTHS[monthIndex(period.month)]
+  if (start.year !== period.year) return `${from} ${start.year} – ${to} ${period.year}`
+  return from === to ? `${to} ${period.year}` : `${from} – ${to} ${period.year}`
 }
 
-/** «sep – nov 2026»: the months the range covers, inside the accounting year. */
-function rangeSpan(period: Period, range: ChartRange): string {
-  const first = rangeStart(period, range)
-  const from = SHORT_MONTHS[monthIndex(first)]
-  const to = SHORT_MONTHS[monthIndex(period.month)]
-  return from === to ? `${to} ${period.year}` : `${from} – ${to} ${period.year}`
+type HistoricalPoint = Period & { net: number; investment: number }
+
+function historicalChartPoints(state: State, period: Period, range: ChartRange): HistoricalPoint[] {
+  const start = customStart(range)
+  if (!start || start.year >= period.year) return []
+
+  const years = new Map<number, Transaction[]>()
+  for (const tx of state.transactions) {
+    const year = accountingYear(tx)
+    if (year === null || year < start.year || year >= period.year) continue
+    const transactions = years.get(year)
+    if (transactions) transactions.push(tx)
+    else years.set(year, [tx])
+  }
+
+  const points: HistoricalPoint[] = []
+  for (let year = start.year; year < period.year; year++) {
+    const transactions = years.get(year) ?? []
+    const snapshots = state.historicalSnapshots?.[year] ?? {}
+    for (const month of ALL_MONTHS.slice(year === start.year ? monthIndex(start.month) : 0)) {
+      const { net, investment } = getWealthByMonth(
+        month,
+        state.accounts,
+        state.investmentAssets,
+        state.liabilities,
+        transactions,
+        snapshots,
+        state.instruments,
+      )
+      points.push({ year, month, net, investment })
+    }
+  }
+  return points
+}
+
+function axisMonth(period: Period, includeYear: boolean): string {
+  const month = SHORT_MONTHS[monthIndex(period.month)]
+  return includeYear ? `${month} ${period.year}` : month
 }
 
 function monthStatus(period: ReturnType<typeof shownPeriod>): string {
@@ -431,6 +499,43 @@ function spendingPace(
   }
 }
 
+/** Spending added up day by day, through `upTo`, of the expenses counted in `target`. */
+function cumulativeSpending(transactions: Transaction[], target: Period, upTo: number): number[] {
+  const byDay = new Array<number>(upTo).fill(0)
+  for (const tx of transactions) {
+    if (tx.type !== 'expense' || !inPeriod(tx, target)) continue
+    const day = Math.min(Math.max(Number(tx.date.slice(8, 10)) || 1, 1), upTo)
+    byDay[day - 1] += Number(tx.amount || 0)
+  }
+  let total = 0
+  return byDay.map((amount) => (total = round2(total + amount)))
+}
+
+function daysIn({ year, month }: Period): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate()
+}
+
+function paceChart(
+  transactions: Transaction[],
+  period: ReturnType<typeof shownPeriod>,
+  today: string,
+  money: (value: number) => string,
+): PaceChart | null {
+  if (period.phase === 'coming') return null
+  const days = daysIn(period)
+  const before = previous(period)
+  const upTo = period.phase === 'open' ? Math.min(Number(today.slice(8, 10)), days) : days
+  const current = cumulativeSpending(transactions, period, upTo)
+  const earlier = cumulativeSpending(transactions, before, daysIn(before))
+  if (!current.at(-1) && !earlier.at(-1)) return null
+  const series = (target: Period, values: number[]) => ({
+    name: formatMonthName(target.month).toLowerCase(),
+    values,
+    texts: values.map(money),
+  })
+  return { days, current: series(period, current), previous: series(before, earlier) }
+}
+
 function chart(
   values: number[],
   labels: string[],
@@ -488,23 +593,30 @@ function wealthBlock(
   state: State,
   period: Period,
   range: ChartRange,
+  history: HistoricalPoint[],
   money: (value: number) => string,
   signed: (value: number) => string,
 ): NeonDashboardViewModel['wealth'] {
-  const months = ALL_MONTHS.filter((month) => month <= period.month)
-  const nets = months.map(
-    (month) =>
-      getWealthByMonth(
-        month,
-        state.accounts,
-        state.investmentAssets,
-        state.liabilities,
-        state.transactions,
-        state.snapshots,
-      ).net,
-  )
+  const months = ALL_MONTHS.slice(0, period.month).map((month) => ({ year: period.year, month }))
+  const periods = [...history, ...months]
+  const transactions = state.transactions.filter((tx) => accountingYear(tx) === period.year)
+  const nets = [
+    ...history.map((point) => point.net),
+    ...months.map(
+      ({ month }) =>
+        getWealthByMonth(
+          month,
+          state.accounts,
+          state.investmentAssets,
+          state.liabilities,
+          transactions,
+          state.snapshots,
+        ).net,
+    ),
+  ]
   const current = nets[nets.length - 1] ?? 0
-  const start = Math.max(0, nets.length - rangePoints(period.month, range))
+  const start = Math.max(0, nets.length - rangePoints(period, range))
+  const includeYear = history.length > 0
 
   // Today's point keeps the words the card shows at rest («este mes», «en lo que va de año»).
   const steps = nets.slice(start).map((net, index) => {
@@ -512,10 +624,10 @@ function wealthBlock(
     const today = at === nets.length - 1
     const monthLabel = today
       ? 'este mes'
-      : `en ${formatMonthName(months[at]).toLocaleLowerCase('es')}`
+      : `en ${monthNameAt(periods[at], includeYear).toLocaleLowerCase('es')}`
     const sinceLabel = today
-      ? periodLabel(range)
-      : `desde ${formatMonthName(months[start]).toLocaleLowerCase('es')}`
+      ? periodLabel(period, range)
+      : `desde ${monthNameAt(periods[start], includeYear).toLocaleLowerCase('es')}`
     return {
       month: at > 0 ? { ...change(net, nets[at - 1], signed), label: monthLabel } : null,
       period:
@@ -526,8 +638,8 @@ function wealthBlock(
   })
   const evolution = chart(
     nets.slice(start),
-    months.slice(start).map((month) => SHORT_MONTHS[monthIndex(month)]),
-    months.slice(start).map((month) => formatMonthName(month)),
+    periods.slice(start).map((point) => axisMonth(point, includeYear)),
+    periods.slice(start).map((point) => monthNameAt(point, includeYear)),
     money,
     (value) => formatCompactMoney(value, state.currency || 'EUR'),
     'del patrimonio',
@@ -547,7 +659,7 @@ function wealthBlock(
     monthChange: nets.length > 1 ? change(current, nets[nets.length - 2], signed) : null,
     periodChange:
       nets.length - start > 2
-        ? { ...shareChange(current, nets[start], signed), label: periodLabel(range) }
+        ? { ...shareChange(current, nets[start], signed), label: periodLabel(period, range) }
         : null,
     steps,
     chart: { ...evolution, readings },
@@ -558,10 +670,16 @@ function investmentsBlock(
   state: State,
   period: Period,
   range: ChartRange,
+  history: HistoricalPoint[],
   money: (value: number) => string,
   signed: (value: number) => string,
 ): NeonDashboardViewModel['investments'] {
-  const portfolio = buildInvestmentDashboardViewModel(state, period.month, 'simple')
+  const transactions = state.transactions.filter((tx) => accountingYear(tx) === period.year)
+  const portfolio = buildInvestmentDashboardViewModel(
+    { ...state, transactions },
+    period.month,
+    'simple',
+  )
   const ranked = portfolio.positions.filter((position) => position.weight > 0)
   const shown = ranked.slice(0, POSITION_LIMIT).map((position) => ({
     name: position.symbol || position.name,
@@ -570,12 +688,26 @@ function investmentsBlock(
   const rest = ranked.slice(POSITION_LIMIT).reduce((sum, position) => sum + position.weight, 0)
   if (rest > 0) shown.push({ name: 'Otros', weight: round2(rest) })
   const all = portfolio.valueSeries[0]?.values ?? []
-  const start = Math.max(0, all.length - rangePoints(period.month, range))
-  const values = all.slice(start)
-  // The first point is the start of the year, then one per month; the axis calls
-  // it «inicio» (reading it says «Inicio»).
-  const indexes = portfolio.chartLabels.map((_, index) => index).slice(start)
-  const labels = indexes.map((index) => (index === 0 ? 'inicio' : SHORT_MONTHS[(index - 1) % 12]))
+  const includeYear = history.length > 0
+  const start = includeYear ? 1 : Math.max(0, all.length - rangePoints(period, range))
+  const values = [...history.map((point) => point.investment), ...all.slice(start)]
+  const put = portfolio.valueSeries[1]?.values ?? []
+  const gains = history.length
+    ? null
+    : all.slice(start).map((value, index) => round2(value - (put[start + index] ?? 0)))
+  // A range spanning years uses only month-end points. The yearly preset also
+  // shows the accounting year's opening value.
+  const months = ALL_MONTHS.slice(Math.max(0, start - 1), period.month).map((month) => ({
+    year: period.year,
+    month,
+  }))
+  const periods = [...history, ...months]
+  const labels = periods.map((point) => axisMonth(point, includeYear))
+  const names = periods.map((point) => monthNameAt(point, includeYear))
+  if (start === 0) {
+    labels.unshift('inicio')
+    names.unshift('Inicio')
+  }
 
   return {
     value: money(portfolio.portfolioValue),
@@ -591,14 +723,22 @@ function investmentsBlock(
     chart: chart(
       values,
       labels,
-      indexes.map((index) =>
-        index === 0 ? 'Inicio' : formatMonthName(ALL_MONTHS[(index - 1) % 12]),
-      ),
+      names,
       money,
       (value) => formatCompactMoney(value, state.currency || 'EUR'),
       'de la cartera',
     ),
-    empty: portfolio.portfolioValue <= 0 && !ranked.length,
+    gains: gains && {
+      values: gains,
+      texts: gains.map(
+        (_, index) => change(all[start + index] ?? 0, put[start + index] ?? 0, signed).text,
+      ),
+      invested: put.slice(start).map(money),
+    },
+    empty:
+      portfolio.portfolioValue <= 0 &&
+      !ranked.length &&
+      !history.some((point) => point.investment > 0),
   }
 }
 

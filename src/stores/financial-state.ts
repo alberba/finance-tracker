@@ -47,7 +47,14 @@ export const useFinancialStateStore = defineStore('financial-state', () => {
 
   function patchState(mutator: (draft: State) => void): State {
     const draft = clone(state.value)
+    const previousYear = draft.year
     mutator(draft)
+    if (draft.year !== previousYear && draft.historicalSnapshots) {
+      if (Object.keys(draft.snapshots).length)
+        draft.historicalSnapshots[previousYear] = draft.snapshots
+      draft.snapshots = draft.historicalSnapshots[draft.year] ?? {}
+      delete draft.historicalSnapshots[draft.year]
+    }
     return replaceState(draft)
   }
 

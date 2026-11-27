@@ -1,8 +1,19 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 
 import { useEntrySheet } from '../../../composables/useEntrySheet'
+import { useStoredChoice } from '../../../composables/useStoredChoice'
+import {
+  BENCHMARKS,
+  cumulativeReturn,
+  DEFAULT_BENCHMARK,
+  findBenchmark,
+  sameMoneyInIndex,
+} from '../../../domain/investment/benchmarks'
+import { formatSignedMoney } from '../../../lib/format'
+import { runClientHttp } from '../../../lib/client/runtime'
+import { fetchBenchmarkCloses } from '../../../services/market-api'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
 import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { summarizeQuoteStatus } from '../../../domain/investment/quote-status'
@@ -14,6 +25,7 @@ import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useInvestmentStore } from '../../../stores/investment'
 import { useMarketStore } from '../../../stores/market'
 import { useUiStore } from '../../../stores/ui'
+import NeonBarTitle from '../../ui/NeonBarTitle.vue'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
@@ -23,10 +35,12 @@ import NeonInvestmentAsset from './NeonInvestmentAsset.vue'
 import NeonInvestmentAssetMobile from './NeonInvestmentAssetMobile.vue'
 import NeonInvestmentCards from './NeonInvestmentCards.vue'
 import NeonInvestmentChart from './NeonInvestmentChart.vue'
-import NeonInvestmentControls from './NeonInvestmentControls.vue'
 import NeonInvestmentMobile from './NeonInvestmentMobile.vue'
 import NeonInvestmentPositions from './NeonInvestmentPositions.vue'
+import NeonInvestmentScore from './NeonInvestmentScore.vue'
 import {
+  CHART_HEIGHT,
+  CHART_WIDTH,
   compactChart,
   dropRows,
   feeRows,
@@ -37,12 +51,13 @@ import {
   portfolioChart,
   positionRows,
   quoteNotice,
+  signedPct,
   sortPositions,
+  toneOf,
   twrSeries,
   type Card,
   type SortDirection,
   type SortKey,
-  TONE_TEXT,
 } from './view-model'
 
 // Inversión in the new design (artboard «Inversión · 2560 px», #437): the
@@ -71,7 +86,7 @@ const investmentStore = useInvestmentStore()
 const marketStore = useMarketStore()
 const ui = useUiStore().ui
 const { dashboardViewModel: vm } = storeToRefs(investmentStore)
-const { openEntrySheet } = useEntrySheet()
+const { openEntrySheet, openInvestmentEntry } = useEntrySheet()
 useLiveQuotes()
 
 const state = computed(() => financialStateStore.state)
@@ -87,22 +102,144 @@ const simpleVm = computed(() =>
     : buildInvestmentDashboardViewModel(state.value, month.value, 'simple'),
 )
 const drawdown = computed(() => maxDrawdown(twr.value))
+// Today's return under each method, for the mobile cover's method menu.
+const returns = computed(() => {
+  const simple = simpleVm.value.displayReturn
+  const timed = twr.value.at(-1) ?? 0
+  return {
+    simple: { text: signedPct(simple), tone: toneOf(simple) },
+    twr: { text: signedPct(timed), tone: toneOf(timed) },
+  }
+})
 
 const periods = computed(() => periodOptions(state.value.year, new Date()))
 const period = computed(() => periods.value.find((option) => option.value === month.value))
-const figures = computed(() =>
-  periodFigures(vm.value, method.value, {
+const figures = computed(() => {
+  const [result, value, invested] = periodFigures(vm.value, method.value, {
     latest: period.value?.latest ?? false,
     twr: twr.value.at(-1) ?? 0,
-  }),
+  })
+  return { result, value, invested }
+})
+// The index the chart compares the portfolio with, remembered on this device,
+// and its month closes for the year (empty if it fails: the chart then shows
+// the portfolio alone). While another index loads, the chart keeps the one it
+// has, so it changes once instead of losing a line and gaining it back.
+const benchmarkId = useStoredChoice(
+  'neon-investment-benchmark',
+  BENCHMARKS.map((benchmark) => benchmark.id),
+  DEFAULT_BENCHMARK,
 )
-const chart = computed(() => portfolioChart(vm.value, method.value, twr.value, drawdown.value))
+const loadedBenchmark = shallowRef<{ id: string; year: number; closes: number[] } | null>(null)
+watch(
+  [benchmarkId, () => state.value.year],
+  async ([id, year]) => {
+    let closes: number[] = []
+    try {
+      closes = await runClientHttp(fetchBenchmarkCloses(id, year))
+    } catch {
+      // No index: the chart draws the portfolio on its own.
+    }
+    if (id === benchmarkId.value && year === state.value.year) {
+      loadedBenchmark.value = { id, year, closes }
+    }
+  },
+  { immediate: true },
+)
+const benchmarkCloses = computed(() =>
+  loadedBenchmark.value?.year === state.value.year ? loadedBenchmark.value.closes : [],
+)
+const benchmarkLoading = computed(
+  () =>
+    loadedBenchmark.value?.id !== benchmarkId.value ||
+    loadedBenchmark.value?.year !== state.value.year,
+)
+// The chart waits a moment for its index before drawing, so the line doesn't
+// draw itself on one scale and jump to another when the index lands.
+const BENCHMARK_WAIT_MS = 400
+const waited = ref(false)
+const waitTimer = setTimeout(() => (waited.value = true), BENCHMARK_WAIT_MS)
+const chartReady = computed(() => waited.value || loadedBenchmark.value !== null)
+// In euros, what the same money would be worth in the index; in TWR, the
+// index's own cumulative return. Both on the chart's points.
+const benchmarkSeries = computed(() => {
+  const closes = benchmarkCloses.value
+  if (method.value === 'simple') {
+    const [value, invested] = vm.value.valueSeries
+    return sameMoneyInIndex(value.values, invested.values, closes)
+  }
+  return cumulativeReturn(closes).slice(0, twr.value.length)
+})
+const benchmark = computed(() => {
+  const found = loadedBenchmark.value && findBenchmark(loadedBenchmark.value.id)
+  return found && benchmarkSeries.value.length > 1
+    ? { name: found.name, values: benchmarkSeries.value }
+    : null
+})
+const difference = computed(() => {
+  const theirs = benchmarkSeries.value
+  const mine = method.value === 'simple' ? vm.value.valueSeries[0].values : twr.value
+  if (theirs.length < 2 || theirs.length !== mine.length) return null
+  const gap = mine[mine.length - 1] - theirs[theirs.length - 1]
+  return {
+    text:
+      method.value === 'simple'
+        ? formatSignedMoney(gap)
+        : signedPct(gap).replace(/\s%$/, '\u00a0pt'),
+    tone: toneOf(gap),
+  }
+})
+// Over the chart: the return, with what it is on (simple) or what the
+// portfolio is worth (TWR, whose chart has no euros).
+const score = computed(() => {
+  const { result, value, invested } = figures.value
+  return {
+    value: result.value,
+    caption:
+      method.value === 'simple'
+        ? `${result.sub} sobre ${invested.value}`
+        : `TWR · vale ${value.value}`,
+    tone: result.tone,
+  }
+})
+const chart = computed(() =>
+  portfolioChart(vm.value, method.value, twr.value, drawdown.value, benchmark.value),
+)
 const compact = computed(() => compactChart(vm.value, method.value, twr.value))
 const leadAt = (index: number | null) =>
   leadFigure(vm.value, method.value, twr.value, state.value.year, index)
 const desktopFrame = useMediaQuery(FRAME_QUERY)
+// Neither cover has a month picker: both always read up to today.
+watch(
+  periods,
+  (options) => {
+    const latest = options.at(-1)?.value
+    if (latest !== undefined && month.value !== latest) investmentStore.setMonth(latest)
+  },
+  { immediate: true },
+)
 const notice = computed(() => quoteNotice(summarizeQuoteStatus(marketStore.valuation.instruments)))
 const empty = computed(() => vm.value.positions.length === 0)
+
+// The cover comes in once each time it shows: blocks rise, rows follow. Past
+// that, the rows stop animating, so a row that moves (a new sort, a quote that
+// changes the weights) moves without coming in again.
+const ENTRANCE_MS = 1400
+const entering = ref(false)
+let entranceTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  () => props.isActive,
+  (active) => {
+    clearTimeout(entranceTimer)
+    entering.value = active
+    if (active) entranceTimer = setTimeout(() => (entering.value = false), ENTRANCE_MS)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => {
+  clearTimeout(entranceTimer)
+  clearTimeout(waitTimer)
+})
 
 const sortKey = ref<SortKey>('weight')
 const sortDirection = ref<SortDirection>('desc')
@@ -163,6 +300,7 @@ function sortBy(key: SortKey, direction: SortDirection): void {
     class="@container grid min-w-0 content-start gap-[26px]"
     aria-labelledby="investment-title"
   >
+    <NeonBarTitle v-if="isActive && !desktopFrame && !asset" title="Inversión" />
     <NeonInvestmentAssetMobile
       v-if="!desktopFrame && asset"
       :detail="asset"
@@ -170,25 +308,23 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       @back="route.close"
       @open-movements="route.openMovements"
       @close-movements="route.closeMovements"
-      @buy="openEntrySheet()"
-      @sell="openEntrySheet()"
-      @declare-all="investmentStore.markDeclared(asset.undeclared)"
+      @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
+      @sell="openInvestmentEntry({ side: 'sell', ...asset.entry }, $event)"
     />
 
     <NeonInvestmentMobile
       v-else-if="!desktopFrame"
       :empty="empty"
       :notice="notice"
-      :value-label="figures[1].label"
+      :value-label="figures.value.label"
       :lead-at="leadAt"
       :chart="compact"
-      :periods="periods"
-      :month="month"
       :method="method"
+      :returns="returns"
       :rows="rows"
       :cards="cards"
+      :entering="entering"
       @open="route.open"
-      @month="investmentStore.setMonth"
       @method="investmentStore.setReturnMode"
     />
 
@@ -196,24 +332,25 @@ function sortBy(key: SortKey, direction: SortDirection): void {
       v-else-if="asset"
       :detail="asset"
       @back="route.close"
-      @buy="openEntrySheet()"
-      @sell="openEntrySheet()"
-      @declare-all="investmentStore.markDeclared(asset.undeclared)"
+      @buy="openInvestmentEntry({ side: 'buy', ...asset.entry }, $event)"
+      @sell="openInvestmentEntry({ side: 'sell', ...asset.entry }, $event)"
     />
 
     <template v-else>
-      <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3.5">
-        <h1
-          id="investment-title"
-          tabindex="-1"
-          class="font-display text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
-        >
-          Inversión
-        </h1>
-        <div class="flex min-w-0 flex-col items-end gap-3">
+      <header
+        class="motion-safe:animate-rise mbe-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3"
+      >
+        <div class="grid min-w-0 gap-1.5">
+          <h1
+            id="investment-title"
+            tabindex="-1"
+            class="font-display text-[clamp(30px,3.2cqi,44px)] leading-[1.1] font-bold tracking-[-0.03em] outline-none"
+          >
+            Inversión
+          </h1>
           <p
             v-if="notice"
-            class="text-label tracking-label m-0 inline-flex items-center gap-2 text-end font-extrabold uppercase"
+            class="text-note m-0 inline-flex items-center gap-2 font-bold"
             :class="notice.late ? 'text-soft' : 'text-muted'"
             :role="notice.late ? 'status' : undefined"
             :title="notice.title"
@@ -226,83 +363,69 @@ function sortBy(key: SortKey, direction: SortDirection): void {
             ></span>
             {{ notice.text }}
           </p>
-          <NeonButton variant="primary" @click="openEntrySheet()">
-            <svg
-              class="size-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.6"
-              stroke-linecap="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Nueva operación
-          </NeonButton>
         </div>
+        <NeonButton variant="primary" @click="openEntrySheet">
+          <svg
+            class="size-[18px]"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.6"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nueva operación
+        </NeonButton>
       </header>
 
-      <NeonEmptyState v-if="empty">
+      <NeonEmptyState
+        v-if="empty"
+        class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
+      >
         Aún no tienes inversiones. Apunta una compra para empezar a seguir tu cartera.
       </NeonEmptyState>
 
       <template v-else>
-        <NeonInvestmentControls
-          :periods="periods"
-          :month="month"
-          :method="method"
-          @month="investmentStore.setMonth"
-          @method="investmentStore.setReturnMode"
-        />
-
-        <div
-          role="group"
-          aria-label="Cifras del periodo"
-          aria-live="polite"
-          class="grid min-w-0 grid-cols-3"
-          data-investment-figures
-        >
+        <div class="grid min-w-0 gap-5">
+          <NeonInvestmentScore
+            class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
+            :result="score"
+            :difference="difference"
+            :options="BENCHMARKS"
+            :selected="benchmarkId"
+            :loading="benchmarkLoading"
+            :available="benchmark !== null"
+            :method="method"
+            @select="benchmarkId = $event"
+            @method="investmentStore.setReturnMode"
+          />
+          <NeonInvestmentChart
+            v-if="chartReady"
+            class="motion-safe:animate-rise motion-safe:[animation-delay:150ms]"
+            :chart="chart"
+          />
           <div
-            v-for="(figure, index) in figures"
-            :key="figure.key"
-            class="grid min-w-0 content-start gap-1 px-5"
-            :class="index ? 'border-line border-s' : 'ps-0'"
-            :data-investment-figure="figure.key"
-          >
-            <span
-              class="text-muted text-label tracking-label inline-flex items-center gap-2 font-extrabold uppercase"
-            >
-              <span
-                v-if="index === 0"
-                class="bg-text size-2.5 flex-none rounded-full"
-                aria-hidden="true"
-              ></span>
-              {{ figure.label }}
-            </span>
-            <span
-              class="font-display text-figure-lg truncate font-semibold whitespace-nowrap tabular-nums"
-              :class="TONE_TEXT[figure.tone]"
-            >
-              {{ figure.value }}
-            </span>
-            <span class="text-note min-h-[1.4em] font-extrabold" :class="TONE_TEXT[figure.tone]">
-              {{ figure.sub }}
-            </span>
-          </div>
+            v-else
+            :style="{ aspectRatio: `${CHART_WIDTH} / ${CHART_HEIGHT}` }"
+            aria-hidden="true"
+          ></div>
         </div>
-
-        <NeonInvestmentChart :chart="chart" />
 
         <NeonInvestmentPositions
           :rows="rows"
           :sort-key="sortKey"
           :sort-direction="sortDirection"
+          :entering="entering"
           @open="route.open"
           @sort="sortBy"
         />
 
-        <NeonInvestmentCards :cards="cards" />
+        <NeonInvestmentCards
+          class="motion-safe:animate-rise motion-safe:[animation-delay:250ms]"
+          :cards="cards"
+        />
       </template>
     </template>
   </section>

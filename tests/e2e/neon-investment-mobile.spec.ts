@@ -118,7 +118,41 @@ test('cambia la rentabilidad de importe a TWR desde los chips', async ({ page })
   ).toHaveAccessibleName(/^Rentabilidad TWR acumulada/)
 })
 
+test.describe('selector de periodo en una pantalla estrecha', () => {
+  test.use({ fixedTime: '2026-11-27T12:00:00Z', reducedMotion: 'reduce' })
+
+  test('abre encima de la hoja y permite elegir un mes lejano con el teclado', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 })
+    const trigger = section(page).getByRole('button', { name: /^Periodo/ })
+    await expect(trigger).toBeInViewport({ ratio: 1 })
+    const before = await trigger.boundingBox()
+    if (!before) throw new Error('El selector de periodo no tiene caja')
+    await trigger.click()
+
+    const menu = page.getByRole('menu', { name: 'Periodo' })
+    const bounds = await menu.boundingBox()
+    if (!bounds) throw new Error('El menú de periodo no se ha abierto')
+    expect(bounds.x).toBeGreaterThanOrEqual(0)
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(320)
+    expect(bounds.y + bounds.height).toBeLessThan(before.y)
+    expect((await trigger.boundingBox())?.y).toBe(before.y)
+
+    await page.keyboard.press('End')
+    const november = menu.getByRole('menuitemradio', { name: 'Noviembre' })
+    await expect(november).toBeFocused()
+    await expect(november).toBeInViewport({ ratio: 1 })
+    await page.keyboard.press('Home')
+    await expect(menu.getByRole('menuitemradio', { name: 'Enero' })).toBeFocused()
+    await page.keyboard.press('Enter')
+
+    await expect(menu).toBeHidden()
+    await expect(section(page).getByRole('button', { name: 'Periodo · Enero' })).toBeFocused()
+    expect((await trigger.boundingBox())?.y).toBe(before.y)
+  })
+})
+
 test('las comisiones y las caídas se abren en su panel y se cierran', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 })
   await section(page).getByRole('button', { name: 'Comisiones' }).click()
   const fees = page.getByRole('dialog', { name: 'Comisiones' })
   await expect(fees).toBeVisible()

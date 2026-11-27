@@ -15,6 +15,13 @@ let pinia: Pinia
 const wrappers: { unmount(): void }[] = []
 
 beforeEach(() => {
+  // The desktop: a phone opens new movements on the keypad sheet instead.
+  vi.stubGlobal('matchMedia', (media: string) => ({
+    matches: media.includes('width >='),
+    media,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
   showToast.mockClear()
   pinia = createPinia()
   setActivePinia(pinia)
@@ -32,6 +39,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   useEntrySheet().closeEntrySheet()
+  vi.unstubAllGlobals()
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount())
 })
 
@@ -81,11 +89,11 @@ describe('NeonEntrySheet', () => {
     const wrapper = await openSheet()
     await wrapper.get('[data-entry-type="saving"]').trigger('click')
 
-    const options = wrapper
-      .get('[name="destinationAccountId"]')
-      .findAll('option')
-      .map((option) => option.element.value)
-    expect(options).toEqual(['hucha'])
+    const destination = wrapper
+      .findAllComponents({ name: 'NeonEntryPicker' })
+      .map((picker) => picker.props() as { label: string; options: { value: string }[] })
+      .find((picker) => picker.label === 'Cuenta destino')
+    expect(destination?.options.map((option) => option.value)).toEqual(['hucha'])
   })
 
   it('saves nothing on cancel and reopens empty', async () => {

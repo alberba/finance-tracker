@@ -13,7 +13,7 @@ const slot = useBarTitleSlot()
 <template>
   <Teleport v-if="slot" :to="slot">
     <p
-      class="font-display text-text truncate text-[30px] leading-[1.1] font-bold tracking-[-0.03em]"
+      class="font-display text-text truncate text-[clamp(22px,6.8vw,30px)] leading-[1.1] font-bold tracking-[-0.03em]"
       data-bar-title
       aria-hidden="true"
     >

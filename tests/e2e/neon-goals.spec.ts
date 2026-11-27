@@ -70,11 +70,22 @@ test.describe('Objetivos en el diseño nuevo', () => {
     await expect(column(page, 'Colchón').locator('[data-goal-percent]')).toHaveText('0 %')
 
     // A saving in the goal's category is what it adds up.
-    await page.locator('[data-sidebar-apuntar]').click()
-    const sheet = page.getByRole('dialog', { name: 'Apuntar' })
+    await tracker.openDashboard()
+    await page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true }).click()
+    const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
     await sheet.getByRole('radio', { name: 'Ahorro' }).click()
     await sheet.getByRole('textbox', { name: 'Importe' }).fill('250')
-    await sheet.getByLabel('Categoría').selectOption('Colchón')
+    await sheet.getByRole('button', { name: 'Categoría', exact: true }).click()
+    const categories = sheet.getByRole('dialog', { name: 'Categoría', exact: true })
+    const search = categories.getByRole('searchbox', { name: 'Buscar categoría' })
+    await search.fill('zzzz')
+    await expect(categories.getByRole('status')).toHaveText('No hay categorías que coincidan.')
+    await search.fill('colchon')
+    await search.press('ArrowDown')
+    const option = categories.getByRole('button', { name: 'Colchón', exact: true })
+    await expect(option).toBeFocused()
+    await option.press('Enter')
+    await expect(categories).toBeHidden()
     await sheet.getByLabel('Descripción').fill('e2e-aportacion')
     const saved = expectSyncCommand(
       page,
@@ -86,10 +97,18 @@ test.describe('Objetivos en el diseño nuevo', () => {
     await sheet.getByRole('button', { name: 'Guardar' }).click()
     await expect(sheet).toBeHidden()
     await saved
+    await tracker.openGoals()
 
     await expect(column(page, 'Colchón').locator('[data-goal-percent]')).toHaveText('25 %')
     await tracker.reload()
     await tracker.openGoals()
     await expect(column(page, 'Colchón').locator('[data-goal-percent]')).toHaveText('25 %')
+
+    await tracker.openDashboard()
+    await page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true }).click()
+    await sheet.getByRole('radio', { name: 'Ahorro' }).click()
+    await sheet.getByRole('button', { name: 'Categoría', exact: true }).click()
+    const recent = categories.getByRole('region', { name: 'Usadas recientemente' })
+    await expect(recent.getByRole('button', { name: 'Colchón', exact: true })).toBeVisible()
   })
 })

@@ -35,3 +35,16 @@ export const searchMarketSymbols = (
     { fallbackMessage: 'No se pudieron buscar símbolos' },
   ).pipe(Effect.map((body) => body.results || []))
 }
+
+/** An index's previous December close and then each month close of `year`. */
+export const fetchBenchmarkCloses = (
+  id: string,
+  year: number,
+): Effect.Effect<number[], ApiClientError, ClientHttp> => {
+  if (isDemoMode()) return Effect.succeed([])
+
+  const params = new URLSearchParams({ id, year: String(year) })
+  return requestApiJson<{ closes?: number[] }>(`/api/market/benchmark?${params.toString()}`, {
+    fallbackMessage: 'No se pudo cargar el índice',
+  }).pipe(Effect.map((body) => body.closes || []))
+}

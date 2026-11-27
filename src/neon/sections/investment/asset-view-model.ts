@@ -1,3 +1,4 @@
+import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
 import type {
   InvestmentDashboardViewModel,
   InvestmentPosition,
@@ -32,10 +33,12 @@ export interface AssetFigure {
   key: 'value' | 'result' | 'invested' | 'weight'
   label: string
   value: string
+  /** The result as a share of what went in, «+16,4 %». */
+  note?: string
   tone: Tone
 }
 
-/** A point of the price line: an operation, or today (`operation: null`). */
+/** A point of the price line: an operation. */
 export interface AssetPoint {
   /** Share of the width (0–100). */
   left: number
@@ -43,17 +46,15 @@ export interface AssetPoint {
   top: number
   x: number
   y: number
-  /** «Hoy», or the date of the operation. */
+  /** The date of the operation. */
   date: string
   price: string
   /** Against the average buy price: «+4,2 % frente a tu media». */
   delta: string
   deltaTone: Tone
-  /** «Compra del 3 mar 2026», empty for today. */
+  /** «Compra del 3 mar 2026». */
   note: string
-  operation: 'buy' | 'sell' | null
-  /** False for an operation not yet declared. */
-  declared: boolean
+  operation: 'buy' | 'sell'
 }
 
 export interface AssetChart {
@@ -64,7 +65,7 @@ export interface AssetChart {
   average: { d: string; top: number } | null
   /** Years (or months, in a short history) under the line. */
   ticks: Array<{ left: number; text: string }>
-  /** From the oldest operation to today. */
+  /** From the oldest operation to the newest. */
   points: AssetPoint[]
   label: string
 }
@@ -97,10 +98,11 @@ export interface AssetMovementRow {
   /** «Compra», «Venta» or, for a movement without operation, its description. */
   operation: string
   fee: string
+  /** A fee was charged: «Sin comisión» is not worth a line of its own. */
+  feeCharged: boolean
   /** «10 × 120,00 €». */
   quantity: string
   total: string
-  declared: boolean
 }
 
 export interface AssetYear {
@@ -122,9 +124,9 @@ export interface AssetDetail {
   units: { count: string; word: string } | null
   position: AssetPosition
   count: string
-  /** Ids of the operations not yet declared. */
-  undeclared: string[]
   years: AssetYear[]
+  /** What Comprar / Vender start with: the symbol, and the category, broker and currency of the last movement. */
+  entry: Omit<InvestmentEntryPreset, 'side'>
 }
 
 interface ChartFrame {
@@ -190,11 +192,11 @@ function movementRow(tx: Transaction): AssetMovementRow {
     side: operation ? (sell ? 'sell' : 'buy') : null,
     operation: title,
     fee: operation ? (fee > 0 ? `Comisión ${formatMoney(fee)}` : 'Sin comisión') : '',
+    feeCharged: operation && fee > 0,
     quantity: operation
       ? `${formatDecimal(units)} × ${formatMoney(Number(tx.unitPrice) || 0)}`
       : '',
     total,
-    declared: Boolean(tx.declared),
   }
 }
 
@@ -254,13 +256,14 @@ function tickLabels(first: number, last: number): Array<{ time: number; text: st
 }
 
 /**
- * The price line: one point per operation and today's, over time. Null when
- * there is no operation with a price, or all fall on the day the line ends.
+ * The price line: one point per operation, over time, ending at the newest.
+ * There is no point for today: the asset's value divided by its units is not a
+ * price (a movement without units inflates it), and the symbol's quote is not
+ * shown yet (#524). Null without two operations on different days.
  */
 export function assetChart(
   position: InvestmentPosition,
   movements: readonly Transaction[],
-  asOf: string,
   frame: ChartFrame = WIDE,
 ): AssetChart | null {
   const { width, height, pad: inset } = frame
@@ -268,18 +271,13 @@ export function assetChart(
     .filter((tx) => isOperation(tx) && Number(tx.unitPrice) > 0)
     .map((tx) => ({ tx, time: parseDay(tx.date), price: Number(tx.unitPrice) }))
     .sort((a, b) => a.time - b.time)
-  const units = heldUnits(position)
-  if (!operations.length || units === null) return null
-
-  const today = Math.max(parseDay(asOf) || 0, operations.at(-1)!.time)
-  if (today <= operations[0].time) return null
-  const todayPrice = position.value / units
+  if (!operations.length) return null
+  const last = operations.at(-1)!
+  const end = last.time
+  if (end <= operations[0].time) return null
   const average = position.averagePrice
 
-  const sequence = [
-    ...operations.map(({ tx, time, price }) => ({ tx, time, price })),
-    { tx: null, time: today, price: todayPrice },
-  ]
+  const sequence = operations
   const prices = sequence.map((point) => point.price)
   let low = Math.min(...prices, average ?? Infinity)
   let high = Math.max(...prices, average ?? -Infinity)
@@ -287,7 +285,7 @@ export function assetChart(
   low -= pad
   high += pad
   // Two nearly equal prices must not read as a wild swing: keep a minimum span.
-  const minSpan = todayPrice * 0.4
+  const minSpan = last.price * 0.4
   if (high - low < minSpan) {
     const middle = (high + low) / 2
     low = middle - minSpan / 2
@@ -297,37 +295,34 @@ export function assetChart(
   const first = operations[0].time
   const plotWidth = width - inset.left - inset.right
   const plotHeight = height - inset.top - inset.bottom
-  const x = (time: number) => round1(inset.left + ((time - first) / (today - first)) * plotWidth)
+  const x = (time: number) => round1(inset.left + ((time - first) / (end - first)) * plotWidth)
   const y = (price: number) => round1(inset.top + (1 - (price - low) / (high - low)) * plotHeight)
 
   const line = sequence
     .map((point, index) => `${index ? 'L' : 'M'}${x(point.time)} ${y(point.price)}`)
     .join(' ')
   const baseline = height - inset.bottom
-  const area = `${line} L${x(today)} ${baseline} L${x(first)} ${baseline} Z`
+  const area = `${line} L${x(end)} ${baseline} L${x(first)} ${baseline} Z`
 
   const points = sequence.map<AssetPoint>((point) => {
     const versusAverage = average ? (point.price / average - 1) * 100 : 0
-    const side = point.tx ? (point.tx.side === 'sell' ? 'sell' : 'buy') : null
+    const side = point.tx.side === 'sell' ? 'sell' : 'buy'
     return {
       x: x(point.time),
       y: y(point.price),
       left: share(x(point.time), width),
       top: share(y(point.price), height),
-      date: point.tx ? formatShortDate(point.tx.date) : 'Hoy',
+      date: formatShortDate(point.tx.date),
       price: formatMoney(round2(point.price)),
       delta: average ? `${signedPct(versusAverage)} frente a tu media` : '',
       deltaTone: toneOf(versusAverage),
-      note: point.tx
-        ? `${side === 'sell' ? 'Venta' : 'Compra'} del ${formatShortDate(point.tx.date)}`
-        : '',
+      note: side === 'sell' ? 'Venta' : 'Compra',
       operation: side,
-      declared: point.tx ? Boolean(point.tx.declared) : true,
     }
   })
 
   const averageInside = average !== null && average > low && average < high
-  const history = `${formatShortDate(operations[0].tx.date)} – hoy`
+  const history = `${formatShortDate(operations[0].tx.date)} – ${formatShortDate(last.tx.date)}`
   return {
     viewBox: `0 0 ${width} ${height}`,
     line,
@@ -338,50 +333,28 @@ export function assetChart(
           top: share(y(average), height),
         }
       : null,
-    ticks: tickLabels(first, today).map(({ time, text }) => ({
+    ticks: tickLabels(first, end).map(({ time, text }) => ({
       left: share(x(time), width),
       text,
     })),
     points,
-    label: `Precio de ${position.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(todayPrice))} hoy, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
+    label: `Precio de ${position.name} (${history}): ${formatMoney(round2(operations[0].price))} en la primera operación y ${formatMoney(round2(last.price))} en la última, con ${operations.length} ${operations.length === 1 ? 'operación marcada' : 'operaciones marcadas'}.`,
   }
 }
 
 function assetFacts(position: InvestmentPosition, movements: readonly Transaction[]): AssetFact[] {
   const operations = movements.filter(isOperation)
   const buys = operations.filter((tx) => tx.side !== 'sell')
-  const sells = operations.length - buys.length
-  const units = heldUnits(position)
   const average = position.averagePrice
   const fees = movements.reduce((sum, tx) => sum + (Number(tx.fee) || 0), 0)
-  const undeclared = operations.filter((tx) => !tx.declared).length
   const facts: AssetFact[] = []
   const fact = (label: string, value: string, note = '', tone: Tone = 'neutral') =>
     facts.push({ label, value, note, tone })
 
   if (average !== null) fact('Precio medio de compra', formatMoney(average))
-  if (units !== null && average !== null) {
-    const price = position.value / units
-    const versus = (price / average - 1) * 100
-    fact(
-      'Precio hoy',
-      formatMoney(round2(price)),
-      `${signedPct(versus)} sobre tu media`,
-      toneOf(versus),
-    )
-  }
   const firstBuy = buys.at(-1)
   if (firstBuy) fact('Primera compra', formatShortDate(firstBuy.date))
-  if (operations.length) {
-    fact(
-      'Operaciones',
-      `${buys.length} ${buys.length === 1 ? 'compra' : 'compras'}${
-        sells ? ` · ${sells} ${sells === 1 ? 'venta' : 'ventas'}` : ''
-      }`,
-    )
-  }
   fact('Comisiones pagadas', formatMoney(round2(fees)))
-  fact('Declaración', undeclared ? `${undeclared} sin declarar` : 'Al día')
   return facts
 }
 
@@ -437,8 +410,7 @@ export function assetDetail(
   if (!position) return null
   const movements = assetMovements(state, position)
   const operationCount = movements.length
-  // Only operations are declared; a contribution without titles has nothing to declare.
-  const undeclared = movements.filter((tx) => isOperation(tx) && !tx.declared).map((tx) => tx.id)
+  const last = movements.find(isOperation) ?? movements[0]
 
   return {
     id: position.id,
@@ -450,6 +422,7 @@ export function assetDetail(
         key: 'result',
         label: 'Resultado',
         value: formatSignedMoney(position.gain),
+        note: position.invested > 0 ? signedPct(position.returnPct) : '',
         tone: toneOf(position.gain),
       },
       {
@@ -465,14 +438,17 @@ export function assetDetail(
         tone: 'neutral',
       },
     ],
-    chart: assetChart(position, movements, vm.asOf, compact ? COMPACT : WIDE),
+    chart: assetChart(position, movements, compact ? COMPACT : WIDE),
     facts: assetFacts(position, movements),
     units: unitsHeld(position),
     position: assetPosition(position),
-    count: `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}${
-      undeclared.length ? ` · ${undeclared.length} sin declarar` : ''
-    }`,
-    undeclared,
+    count: `${operationCount} ${operationCount === 1 ? 'operación' : 'operaciones'}`,
+    entry: {
+      symbol: last?.symbol ?? position.symbol ?? '',
+      category: last?.category ?? position.name,
+      accountId: last?.accountId,
+      currency: last?.movementCurrency,
+    },
     years: groupByYear(movements),
   }
 }

@@ -108,24 +108,27 @@ describe('assetDetail', () => {
         side: 'sell',
         operation: 'Venta',
         fee: 'Comisión 1,00 €',
+        feeCharged: true,
         quantity: '5 × 130,00 €',
         total: '+649,00 €',
-        declared: true,
       },
-      expect.objectContaining({ id: 't2', side: 'buy', fee: 'Sin comisión', total: '1.200,00 €' }),
+      expect.objectContaining({
+        id: 't2',
+        side: 'buy',
+        fee: 'Sin comisión',
+        feeCharged: false,
+        total: '1.200,00 €',
+      }),
       expect.objectContaining({
         id: 't1',
         fee: 'Comisión 1,50 €',
         quantity: '10 × 100,00 €',
-        declared: false,
       }),
     ])
   })
 
-  it('cuenta las operaciones y señala las que faltan por declarar', () => {
-    const detail = detailOf('fondos')
-    expect(detail?.count).toBe('3 operaciones · 1 sin declarar')
-    expect(detail?.undeclared).toEqual(['t1'])
+  it('cuenta las operaciones', () => {
+    expect(detailOf('fondos')?.count).toBe('3 operaciones')
   })
 
   it('un movimiento sin títulos se lista con su descripción', () => {
@@ -134,53 +137,44 @@ describe('assetDetail', () => {
     expect(detailOf('oro')?.count).toBe('1 operación')
   })
 
-  it('resume en cifras el precio medio, el de hoy, la primera compra, las operaciones y las comisiones', () => {
+  it('resume en cifras el precio medio, la primera compra y las comisiones', () => {
+    // El precio de hoy no se repite: lo lee la gráfica.
     const facts = detailOf('fondos')?.facts
     expect(facts?.map((fact) => [fact.label, fact.value])).toEqual([
       ['Precio medio de compra', '110,00 €'],
-      ['Precio hoy', '132,00 €'],
       ['Primera compra', '10 ene 2026'],
-      ['Operaciones', '2 compras · 1 venta'],
       ['Comisiones pagadas', '2,50 €'],
-      ['Declaración', '1 sin declarar'],
     ])
-    expect(facts?.[1]).toMatchObject({ note: '+20,0 % sobre tu media', tone: 'gain' })
   })
 
-  it('con todo declarado, la declaración está al día', () => {
-    const state = portfolio()
-    state.transactions.forEach((tx) => (tx.declared = true))
-    expect(detailOf('fondos', state)?.facts.at(-1)).toMatchObject({
-      label: 'Declaración',
-      value: 'Al día',
-    })
+  it('el resultado lleva su porcentaje sobre lo puesto', () => {
+    const result = detailOf('fondos')?.figures.find((figure) => figure.key === 'result')
+    expect(result).toMatchObject({ tone: 'loss' })
+    expect(result?.note).toMatch(/^−30,5\s%$/)
   })
 })
 
 describe('assetDetail · gráfica de precio', () => {
-  it('dibuja un punto por operación y el de hoy, en orden de fecha', () => {
+  it('dibuja un punto por operación, en orden de fecha y sin punto de hoy', () => {
     const chart = detailOf('fondos')?.chart
     expect(chart?.points.map((point) => [point.date, point.price, point.operation])).toEqual([
       ['10 ene 2026', '100,00 €', 'buy'],
       ['15 feb 2026', '120,00 €', 'buy'],
       ['5 mar 2026', '130,00 €', 'sell'],
-      ['Hoy', '132,00 €', null],
     ])
-    expect(chart?.points[0].left).toBeLessThan(chart?.points[3].left ?? 0)
+    expect(chart?.points[0].left).toBeLessThan(chart?.points[2].left ?? 0)
   })
 
   it('compara cada precio con la media de compra', () => {
-    const [first, , , today] = detailOf('fondos')?.chart?.points ?? []
+    const [first, , sale] = detailOf('fondos')?.chart?.points ?? []
     expect(first.delta).toBe('−9,1 % frente a tu media')
     expect(first.deltaTone).toBe('loss')
-    expect(today.delta).toBe('+20,0 % frente a tu media')
-    expect(today.note).toBe('')
+    expect(sale.delta).toBe('+18,2 % frente a tu media')
+    expect(sale.note).toBe('Venta')
   })
 
-  it('marca la operación sin declarar y deja el precio medio como línea', () => {
+  it('deja el precio medio como línea', () => {
     const chart = detailOf('fondos')?.chart
-    expect(chart?.points[0].declared).toBe(false)
-    expect(chart?.points[1].declared).toBe(true)
     expect(chart?.average).not.toBeNull()
   })
 
@@ -190,7 +184,7 @@ describe('assetDetail · gráfica de precio', () => {
 
   it('el texto alternativo cuenta el recorrido del precio', () => {
     expect(detailOf('fondos')?.chart?.label).toBe(
-      'Precio de Fondos (10 ene 2026 – hoy): 100,00 € en la primera operación y 132,00 € hoy, con 3 operaciones marcadas.',
+      'Precio de Fondos (10 ene 2026 – 5 mar 2026): 100,00 € en la primera operación y 130,00 € en la última, con 3 operaciones marcadas.',
     )
   })
 })
@@ -237,7 +231,6 @@ describe('assetDetail · gráfica compacta', () => {
       '10 ene 2026',
       '15 feb 2026',
       '5 mar 2026',
-      'Hoy',
     ])
     for (const point of chart?.points ?? []) {
       expect(point.x).toBeGreaterThan(0)
