@@ -1,11 +1,5 @@
 import { asMonth, type Month } from '../../lib/month'
 import {
-  computeAccountBalance,
-  computeContributionMetrics as computeContributionMetricsCore,
-  computeInvestmentValue,
-  type ContributionEntry,
-} from '../../lib/finance-core'
-import {
   deriveContributionFlow,
   findLiquidityTargets,
   getFlowFromAllocations,
@@ -15,13 +9,11 @@ import {
 } from '../../scripts/contribution-workflow'
 import type {
   Contribution,
-  ContributionMetricRow,
-  Entity,
   SnapshotKind,
   SnapshotRow,
   State,
 } from '../../scripts/types'
-import { clone, monthFromISO, parseFloatSafe, parseIntSafe, round2, uid } from '../../scripts/utils'
+import { clone, parseFloatSafe, parseIntSafe, round2, uid } from '../../scripts/utils'
 
 export interface SnapshotInputValue {
   kind: SnapshotKind
@@ -57,18 +49,6 @@ function getPortfolioValueFromSnapshot(
     }, 0),
   )
   return round2(investmentValue + liquidityValue)
-}
-
-export function isAutomaticContributionDate(state: State, date: string): boolean {
-  const month = monthFromISO(date)
-  if (month === null) {
-    return false
-  }
-  return date === toSnapshotDate(state.year, month)
-}
-
-export function isManualContributionDate(state: State, date: string): boolean {
-  return !isAutomaticContributionDate(state, date)
 }
 
 export function getContributionEntriesFromSnapshots(state: State): Contribution[] {
@@ -161,125 +141,6 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
   return Array.from(rowsByDate.values()).sort((a, b) =>
     String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)),
   )
-}
-
-export function buildContributionMetricRows(state: State): ContributionMetricRow[] {
-  return computeContributionMetricsCore(
-    getContributionEntriesFromSnapshots(state) as ContributionEntry[],
-  ) as ContributionMetricRow[]
-}
-
-export interface WorkflowSnapshotState {
-  investments: Array<{ id: string; name: string; value: string }>
-  liquidity: Array<{ id: string; name: string; value: string }>
-  missingLiquidity: string[]
-  allocations: Array<{ accountId: string; name: string; amount: string }>
-}
-
-export function buildWorkflowSnapshotState(
-  state: State,
-  month: Month,
-  date: string,
-): WorkflowSnapshotState {
-  const { matched: liquidityAccounts, missing } = findLiquidityTargets(
-    state.accounts,
-    state.twrLiquidityAccountIds,
-  )
-  const snapshot = state.snapshots[String(month)]
-  const existing = state.contributions.find(
-    (item) => String(item.portfolioDate || item.date) === date,
-  )
-  const existingAllocations = sanitizeFlowAllocations(existing?.flowAllocations || [])
-  const allocationsByAccountId = new Map(
-    existingAllocations.map((item) => [item.accountId, item.amount]),
-  )
-
-  return {
-    investments: state.investmentAssets.map((asset: Entity) => ({
-      id: asset.id,
-      name: asset.name,
-      value: String(
-        snapshot?.investments[asset.id] ??
-          computeInvestmentValue(
-            asset.id,
-            month,
-            state.investmentAssets,
-            state.transactions,
-            state.snapshots,
-            state.instruments,
-          ),
-      ),
-    })),
-    liquidity: liquidityAccounts.map((account) => ({
-      id: account.id,
-      name: account.name,
-      value: String(
-        snapshot?.accounts[account.id] ??
-          computeAccountBalance(
-            account.id,
-            month,
-            state.accounts,
-            state.transactions,
-            state.snapshots,
-          ),
-      ),
-    })),
-    missingLiquidity: missing,
-    allocations: liquidityAccounts.map((account) => ({
-      accountId: account.id,
-      name: account.name,
-      amount: String(allocationsByAccountId.get(account.id) ?? 0),
-    })),
-  }
-}
-
-export function computeWorkflowWarnings(
-  state: State,
-  snapshotInputs: SnapshotInputValue[],
-  allocations: AllocationInputValue[],
-  total: number,
-  formatMoney: (value: number) => string,
-): string[] {
-  const warnings: string[] = []
-
-  const missingInvestment = snapshotInputs.filter(
-    (input) =>
-      input.kind === 'investments' && Number.isNaN(parseFloatSafe(input.value, Number.NaN)),
-  ).length
-  if (missingInvestment > 0) {
-    warnings.push(`Faltan snapshots de inversión: ${missingInvestment}`)
-  }
-
-  const missingLiquidity = snapshotInputs.filter(
-    (input) => input.kind === 'accounts' && Number.isNaN(parseFloatSafe(input.value, Number.NaN)),
-  ).length
-  if (missingLiquidity > 0) {
-    warnings.push(`Faltan snapshots de liquidez: ${missingLiquidity}`)
-  }
-
-  const { missing } = findLiquidityTargets(state.accounts, state.twrLiquidityAccountIds)
-  if (missing.length > 0) {
-    warnings.push(`Cuentas de liquidez no configuradas: ${missing.join(', ')}`)
-  }
-
-  const allocated = round2(
-    allocations.reduce((sum, item) => {
-      const value = round2(item.amount)
-      if (value <= 0 || Number.isNaN(value)) {
-        return sum
-      }
-      return sum + value
-    }, 0),
-  )
-  const delta = round2(total - allocated)
-  if (delta > 0) {
-    warnings.push(`Importe sin asignar: ${formatMoney(delta)}`)
-  }
-  if (delta < 0) {
-    warnings.push(`Importe sobreasignado: ${formatMoney(Math.abs(delta))}`)
-  }
-
-  return warnings
 }
 
 export interface ContributionSaveInput {
@@ -419,37 +280,4 @@ export function applyContributionSave(
   }
 
   return { ok: true, hadWarnings: input.warnings.length > 0, state: nextState }
-}
-
-export function upsertContributionFlow(draft: State, date: string, flow: number): void {
-  const entries = getContributionEntriesFromSnapshots(draft)
-  const current = entries.find((item) => item.date === date || item.portfolioDate === date)
-  if (!current) {
-    return
-  }
-  const existingIndex = draft.contributions.findIndex(
-    (item) => String(item.portfolioDate || item.date) === date,
-  )
-  const payload: Contribution = {
-    id: existingIndex >= 0 ? draft.contributions[existingIndex].id : uid('contrib'),
-    date,
-    amount: flow,
-    portfolioDate: date,
-    portfolioValue: current.portfolioValue,
-    flow,
-    flowAllocations: [],
-    flowSource: 'legacy',
-    warnings: [],
-  }
-  if (existingIndex >= 0) {
-    draft.contributions[existingIndex] = payload
-  } else {
-    draft.contributions.push(payload)
-  }
-}
-
-export function removeManualContribution(draft: State, date: string): void {
-  draft.contributions = draft.contributions.filter(
-    (item) => String(item.portfolioDate || item.date || '').trim() !== date,
-  )
 }

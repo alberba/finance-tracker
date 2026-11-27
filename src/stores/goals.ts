@@ -3,11 +3,7 @@ import { computed } from 'vue'
 
 import { useToast } from '../composables/useToast'
 import { buildGoalsViewModel, previewGoalEdit } from '../domain/goals/view-model'
-import {
-  resolveOrCreateCategoryId,
-  syncGoalUpsert,
-  syncListDiff,
-} from '../lib/client/command-mapping'
+import { resolveOrCreateCategoryId, syncListDiff } from '../lib/client/command-mapping'
 import type { Goal, GoalKey, SavingGoal } from '../scripts/types'
 import { round2, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
@@ -24,20 +20,6 @@ export const useGoalsStore = defineStore('goals', () => {
 
   function preview(key: GoalKey, draft: Goal) {
     return previewGoalEdit(financialStateStore.state, month.value, key, draft)
-  }
-
-  function saveGoal(key: GoalKey, goal: Goal): void {
-    financialStateStore.commitState((draft) => {
-      draft.goals[key] = {
-        name: goal.name.trim(),
-        targetYear: Math.trunc(goal.targetYear),
-        targetAmount: round2(Math.max(goal.targetAmount, 0)),
-      }
-    })
-
-    const saved = financialStateStore.goals[key]
-    void syncGoalUpsert(key, { key, ...saved, currency: financialStateStore.currency })
-    showToast('Objetivo guardado.')
   }
 
   /** A savings goal travels as a `goal` row tied to its saving category. */
@@ -153,7 +135,6 @@ export const useGoalsStore = defineStore('goals', () => {
     month,
     viewModel,
     preview,
-    saveGoal,
     addSavingGoal,
     updateSavingGoal,
     setSavingGoalMonthlyAmounts,

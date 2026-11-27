@@ -10,7 +10,6 @@ export type InvestmentSide = (typeof INVESTMENT_SIDES)[number]
 export type BudgetType = TransactionType
 export type TxSortColumn = 'date' | 'amount' | 'account' | 'type' | 'category' | 'description'
 export type SortDirection = 'asc' | 'desc'
-export type InvestmentSubTab = 'dashboard' | 'movements' | 'contributions' | 'recurring'
 export type TransactionsSubTab = 'registry' | 'subscriptions'
 export type SnapshotKind = 'accounts' | 'investments' | 'liabilities'
 export type EntityKey = 'accounts' | 'investmentAssets' | 'liabilities'
@@ -281,13 +280,6 @@ export interface State {
   recurringRules: RecurringRule[]
   pendingMovements: PendingMovement[]
   stockEvents: StockEventsSettings
-}
-
-export interface MonthTotals {
-  income: number
-  expense: number
-  saving: number
-  investment: number
 }
 
 export interface ContributionMetricRow {

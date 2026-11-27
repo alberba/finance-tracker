@@ -532,11 +532,6 @@ export async function syncCategoryRemove(kind: CategoryKind, name: string): Prom
   await syncRemoveByKey('category', categoryMatches(kind, name), name)
 }
 
-/** Create-if-absent / update-otherwise for a goal, addressed by its key. */
-export async function syncGoalUpsert(key: string, data: JsonRecord): Promise<void> {
-  await syncUpsertByKey('goal', (goal) => goal.key === key, data)
-}
-
 /**
  * Upserts one budget cell, addressed by the natural key that identifies it in
  * `budget_entries`: its category, year and month (ADR 0001). Its identity
@@ -625,34 +620,6 @@ export async function syncListDiff<T extends { id: string }>(
     }
   }
   return true
-}
-
-/**
- * Matches a synced Stock Events symbol row by the local symbol: rows
- * migrated from v1 carry it as `legacyId`, rows created from now on carry
- * the client-minted id but the same `legacyId` (ADR 0001).
- */
-function stockeventsMappingMatches(symbol: string): EntityMatch {
-  return (entity) =>
-    entity.legacyId === symbol || (entity.legacyId == null && entity.stockeventsSymbol === symbol)
-}
-
-/** Create-if-absent / update-otherwise for one Stock Events symbol mapping. */
-export async function syncStockeventsMappingUpsert(
-  symbol: string,
-  data: { stockeventsSymbol: string; sync: boolean; watchlistId: string | null; hidden: boolean },
-): Promise<void> {
-  await syncUpsertByKey(
-    'stockeventsMapping',
-    stockeventsMappingMatches(symbol),
-    { legacyId: symbol, categoryId: null, ...data },
-    { ...data },
-  )
-}
-
-/** Removes a Stock Events symbol mapping addressed by its local symbol. */
-export async function syncStockeventsMappingRemove(symbol: string): Promise<void> {
-  await syncRemoveByKey('stockeventsMapping', stockeventsMappingMatches(symbol), symbol)
 }
 
 /**

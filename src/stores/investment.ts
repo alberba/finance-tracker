@@ -10,26 +10,11 @@ import {
 } from '../domain/investment/calculations'
 import {
   applyContributionSave,
-  buildContributionMetricRows,
-  buildWorkflowSnapshotState,
-  computeWorkflowWarnings,
-  isManualContributionDate,
-  removeManualContribution,
-  upsertContributionFlow,
   type AllocationInputValue,
   type ContributionSaveResult,
   type SnapshotInputValue,
 } from '../domain/investment/contributions'
-import {
-  buildInvestmentDashboardViewModel,
-  buildInvestmentMovementRows,
-  groupInvestmentMovementsByMonth,
-  summarizeInvestmentYear,
-  buildInvestmentYearOptions,
-  type ReturnMode,
-  buildContributionLedger,
-  summarizeContributions,
-} from '../domain/investment/view-model'
+import { buildInvestmentDashboardViewModel, type ReturnMode } from '../domain/investment/view-model'
 import {
   computeInvestmentMovement,
   normalizeInvestmentSide,
@@ -39,8 +24,8 @@ import { symbolsMatchInstrument } from '../domain/investment/symbol-matching'
 import { resolveEntityId, syncListDiff } from '../lib/client/command-mapping'
 import { syncMovements } from '../lib/client/movement-commands'
 import { syncSnapshotBalances } from '../lib/client/wealth-snapshot'
-import type { Contribution, InvestmentSubTab, Transaction } from '../scripts/types'
-import { monthFromISO, round2, todayISO, uid } from '../scripts/utils'
+import type { Contribution, Transaction } from '../scripts/types'
+import { monthFromISO, todayISO, uid } from '../scripts/utils'
 import { useFinancialStateStore } from './financial-state'
 import { useStockEventsStore } from './stockevents'
 import { useUiStore } from './ui'
@@ -102,11 +87,6 @@ export const useInvestmentStore = defineStore('investment', () => {
   const accounts = computed(() => financialStateStore.accounts)
   const investmentCategories = computed(() => financialStateStore.state.investmentCategories)
 
-  function getAccountName(accountId: string): string {
-    const account = financialStateStore.accounts.find((item) => item.id === accountId)
-    return account ? account.name : accountId || '-'
-  }
-
   function findUniqueInstrumentId(symbol: string): string | undefined {
     const matches = financialStateStore.state.instruments.filter((instrument) =>
       symbolsMatchInstrument(symbol, instrument),
@@ -134,55 +114,12 @@ export const useInvestmentStore = defineStore('investment', () => {
     ),
   )
 
-  const yearOptions = computed(() => buildInvestmentYearOptions(financialStateStore.state))
-
-  const movementRows = computed(() =>
-    buildInvestmentMovementRows(
-      financialStateStore.state,
-      ui.investmentYearFilter,
-      ui.investmentOnlyUndeclared,
-      getAccountName,
-    ),
-  )
-
-  const movementMonthGroups = computed(() => groupInvestmentMovementsByMonth(movementRows.value))
-
-  const yearSummary = computed(() =>
-    summarizeInvestmentYear(financialStateStore.state, ui.investmentYearFilter),
-  )
-
-  const contributionRows = computed(() => buildContributionMetricRows(financialStateStore.state))
-
-  const contributionLedger = computed(() =>
-    buildContributionLedger(contributionRows.value, (date) =>
-      isManualContributionDate(financialStateStore.state, date),
-    ),
-  )
-
-  const contributionSummary = computed(() =>
-    summarizeContributions(contributionRows.value, financialStateStore.state.year),
-  )
-
-  function setTab(tab: InvestmentSubTab): void {
-    ui.investmentTab = tab
-  }
-
   function setReturnMode(mode: ReturnMode): void {
     ui.investmentReturnMode = mode
   }
 
   function setMonth(month: Month): void {
     ui.investmentMonth = month
-  }
-
-  function setYearFilter(year: number): void {
-    ui.investmentYearFilter = year
-    ui.investmentTxEditingId = ''
-  }
-
-  function setOnlyUndeclared(value: boolean): void {
-    ui.investmentOnlyUndeclared = value
-    ui.investmentTxEditingId = ''
   }
 
   function addMovement(input: NewInvestmentMovementInput): boolean {
@@ -254,133 +191,6 @@ export const useInvestmentStore = defineStore('investment', () => {
     return true
   }
 
-  function saveEditedMovement(id: string, input: NewInvestmentMovementInput): boolean {
-    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return false
-    const side = normalizeInvestmentSide(input.side)
-    const symbol = normalizeInvestmentSymbol(input.symbol)
-    const date = input.date.trim()
-    const time = input.time.trim()
-    const accountId = input.accountId.trim()
-    const movementCurrency = String(input.movementCurrency || financialStateStore.currency || 'EUR')
-      .trim()
-      .toUpperCase()
-      .slice(0, 3)
-
-    if (!date || !time || !symbol || !accountId) {
-      showToast('Completa fecha, hora, símbolo y broker.')
-      return false
-    }
-
-    const computed = computeInvestmentMovement({
-      side,
-      symbol,
-      units: Number(input.units) || 0,
-      unitPrice: Number(input.unitPrice) || 0,
-      fee: Number(input.fee) || 0,
-    })
-    if (
-      computed.normalizedUnits <= 0 ||
-      computed.normalizedUnitPrice <= 0 ||
-      computed.signedAmount === 0
-    ) {
-      showToast('Precio, títulos y gasto deben ser válidos.')
-      return false
-    }
-
-    const category = resolveInvestmentCategory(
-      accountId,
-      input.category.trim(),
-      computed.normalizedSymbol,
-    )
-
-    const before = financialStateStore.transactions
-    financialStateStore.commitState((draft) => {
-      const tx = draft.transactions.find(
-        (item): item is Transaction => item.id === id && item.type === 'investment',
-      )
-      if (!tx) {
-        return
-      }
-      tx.date = date
-      tx.month = monthFromISO(date) ?? tx.month
-      tx.time = time
-      tx.accountId = accountId
-      tx.side = side
-      tx.symbol = computed.normalizedSymbol
-      const instrumentId = findUniqueInstrumentId(computed.normalizedSymbol)
-      if (instrumentId) tx.instrumentId = instrumentId
-      else delete tx.instrumentId
-      tx.category = category
-      tx.unitPrice = computed.normalizedUnitPrice
-      tx.units = computed.normalizedUnits
-      tx.fee = computed.normalizedFee
-      tx.movementCurrency = movementCurrency
-      tx.description = computed.description
-      tx.amount = computed.signedAmount
-      tx.declared = input.declared
-    })
-    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
-    ui.investmentTxEditingId = ''
-    showToast('Movimiento de inversión actualizado.')
-    // Editing a movement that already exists in Stock Events cannot update the
-    // remote row (the API only creates), so the edit is re-sent to keep the
-    // remote side consistent with what the user just saved.
-    const updated = financialStateStore.transactions.find(
-      (item): item is Transaction => item.id === id && item.type === 'investment',
-    )
-    if (updated) {
-      void stockEventsStore.syncMovement(updated)
-    }
-    return true
-  }
-
-  /**
-   * Manual resend of one movement to Stock Events, for the case the automatic
-   * fire-and-forget sync skipped it (no mapping then, mapping now).
-   */
-  async function resyncMovement(transactionId: string): Promise<boolean> {
-    const tx = financialStateStore.transactions.find(
-      (item): item is Transaction => item.id === transactionId && item.type === 'investment',
-    )
-    if (!tx) {
-      showToast('Movimiento no encontrado.')
-      return false
-    }
-    const result = await stockEventsStore.syncMovement(tx)
-    if (result === 'skipped' && !stockEventsStore.isConnected) {
-      showToast('Activa la conexión con Stock Events para reenviar.')
-    }
-    return result === 'synced'
-  }
-
-  function deleteMovement(id: string): void {
-    if (financialStateStore.transactions.find((tx) => tx.id === id)?.remoteOperation) return
-    const before = financialStateStore.transactions
-    financialStateStore.commitState((draft) => {
-      draft.transactions = draft.transactions.filter((item) => item.id !== id)
-    })
-    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
-    ui.investmentTxEditingId = ''
-    showToast('Movimiento eliminado.')
-  }
-
-  function toggleDeclared(id: string): void {
-    let nowDeclared = false
-    const before = financialStateStore.transactions
-    financialStateStore.commitState((draft) => {
-      const tx = draft.transactions.find((item) => item.id === id && item.type === 'investment')
-      if (!tx) {
-        return
-      }
-      tx.declared = !tx.declared
-      nowDeclared = Boolean(tx.declared)
-    })
-    void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
-    showToast(
-      nowDeclared ? 'Movimiento marcado como declarado.' : 'Movimiento marcado como no declarado.',
-    )
-  }
-
   /** Marks several movements as declared in one step: one save, one sync, one toast. */
   function markDeclared(ids: readonly string[]): void {
     const wanted = new Set(ids)
@@ -392,59 +202,6 @@ export const useInvestmentStore = defineStore('investment', () => {
     })
     void syncMovements(before, financialStateStore.transactions, financialStateStore.currency)
     showToast('Movimientos marcados como declarados.')
-  }
-
-  function setContributionFlow(date: string, flow: number): void {
-    const before = financialStateStore.contributions
-    financialStateStore.commitState((draft) => {
-      upsertContributionFlow(draft, date, round2(flow))
-    })
-    void syncListDiff(
-      'contribution',
-      before,
-      financialStateStore.contributions,
-      (contribution) => ({
-        ...buildContributionData(contribution, financialStateStore.currency),
-        allocations: [],
-      }),
-    )
-  }
-
-  function isManualDate(date: string): boolean {
-    return isManualContributionDate(financialStateStore.state, date)
-  }
-
-  function deleteContribution(date: string): void {
-    if (!isManualDate(date)) {
-      return
-    }
-    const before = financialStateStore.contributions
-    financialStateStore.commitState((draft) => {
-      removeManualContribution(draft, date)
-    })
-    void syncListDiff('contribution', before, financialStateStore.contributions, (contribution) =>
-      buildContributionData(contribution, financialStateStore.currency),
-    )
-    showToast('Aporte manual eliminado.')
-  }
-
-  function buildWorkflowState(month: Month, date: string) {
-    return buildWorkflowSnapshotState(financialStateStore.state, month, date)
-  }
-
-  function workflowWarnings(
-    snapshotInputs: SnapshotInputValue[],
-    allocations: AllocationInputValue[],
-    total: number,
-    formatMoney: (value: number) => string,
-  ): string[] {
-    return computeWorkflowWarnings(
-      financialStateStore.state,
-      snapshotInputs,
-      allocations,
-      total,
-      formatMoney,
-    )
   }
 
   function saveContribution(
@@ -498,32 +255,12 @@ export const useInvestmentStore = defineStore('investment', () => {
     accounts,
     investmentCategories,
     dashboardViewModel,
-    yearOptions,
-    movementRows,
-    movementMonthGroups,
-    yearSummary,
-    contributionRows,
-    contributionLedger,
-    contributionSummary,
-    getAccountName,
     isBitvavoBrokerAccount,
     resolveInvestmentCategory,
-    setTab,
     setReturnMode,
     setMonth,
-    setYearFilter,
-    setOnlyUndeclared,
     addMovement,
-    saveEditedMovement,
-    resyncMovement,
-    deleteMovement,
-    toggleDeclared,
     markDeclared,
-    setContributionFlow,
-    isManualDate,
-    deleteContribution,
-    buildWorkflowState,
-    workflowWarnings,
     saveContribution,
   }
 })

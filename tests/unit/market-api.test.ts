@@ -6,11 +6,7 @@ vi.mock('../../src/scripts/demo-mode', () => demo)
 
 import { ApiClientError } from '../../src/lib/client/api-error'
 import { ClientHttp } from '../../src/lib/client/http'
-import {
-  fetchBenchmarkCloses,
-  fetchMarketQuotes,
-  searchMarketSymbols,
-} from '../../src/services/market-api'
+import { fetchBenchmarkCloses, fetchMarketQuotes } from '../../src/services/market-api'
 
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -101,33 +97,6 @@ describe('fetchMarketQuotes', () => {
     const request = vi.fn<typeof fetch>()
 
     await expect(run(fetchMarketQuotes(instruments, fallback), request)).resolves.toBe(fallback)
-    expect(request).not.toHaveBeenCalled()
-  })
-})
-
-describe('searchMarketSymbols', () => {
-  it('codifica la consulta y el proveedor y devuelve los resultados', async () => {
-    const results = [
-      { symbol: 'XDWH.DE', name: 'Fondo', exchange: 'XETRA', currency: '', type: 'ETF' },
-    ]
-    const request = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ results }))
-
-    await expect(run(searchMarketSymbols('MSCI World', 'yahoo'), request)).resolves.toEqual(results)
-
-    expect(request.mock.calls[0][0]).toBe('/api/market/search?q=MSCI+World&provider=yahoo')
-  })
-
-  it('devuelve vacío si la respuesta no trae resultados', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({}))
-
-    await expect(run(searchMarketSymbols('x', 'yahoo'), request)).resolves.toEqual([])
-  })
-
-  it('no busca en modo demo', async () => {
-    demo.isDemoMode.mockReturnValue(true)
-    const request = vi.fn<typeof fetch>()
-
-    await expect(run(searchMarketSymbols('x', 'yahoo'), request)).resolves.toEqual([])
     expect(request).not.toHaveBeenCalled()
   })
 })

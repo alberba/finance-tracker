@@ -14,7 +14,6 @@ function createDefaultUiState(): UiState {
 
   return {
     activeSection: 'dashboard',
-    month,
     txYear: new Date().getFullYear(),
     txFilterMonth: month,
     txSort: { column: 'date', direction: 'desc' },
@@ -27,20 +26,7 @@ function createDefaultUiState(): UiState {
     txTab: 'registry',
     snapshotMonth: month,
     investmentMonth: month,
-    wealthCalcTargetId: '',
-    wealthCalcTargetName: '',
-    investmentTab: 'dashboard',
-    investmentTxEditingId: '',
-    investmentYearFilter: new Date().getFullYear(),
-    investmentOnlyUndeclared: false,
     investmentReturnMode: 'simple',
-    contributionWorkflowStep: 1,
-    contributionWorkflowMonth: month,
-    contributionWorkflowDate: '',
-    contributionWorkflowAmount: 0,
-    contributionCalcTargetKind: '',
-    contributionCalcTargetId: '',
-    contributionCalcTargetName: '',
   }
 }
 
@@ -59,10 +45,6 @@ export const useUiStore = defineStore('ui', () => {
     page.value = nextPage
   }
 
-  function setDashboardMonth(month: Month): void {
-    ui.month = month
-  }
-
   function replaceUiState(nextUi: UiState): void {
     Object.assign(ui, nextUi)
   }
@@ -74,7 +56,6 @@ export const useUiStore = defineStore('ui', () => {
     setupAction,
     setActiveSection,
     setPage,
-    setDashboardMonth,
     replaceUiState,
   }
 })

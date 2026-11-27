@@ -6,6 +6,7 @@ import { useInvestmentStore } from '../../../../src/stores/investment'
 import { useSettingsStore } from '../../../../src/stores/settings'
 import { useWealthStore } from '../../../../src/stores/wealth'
 import { startRoundTrip, type RoundTrip } from './harness'
+import { setTwrLiquidity } from './twr-liquidity'
 
 describe('round trip: contribution wealth adjustment', () => {
   let trip: RoundTrip
@@ -28,8 +29,8 @@ describe('round trip: contribution wealth adjustment', () => {
     fundId = state.investmentAssets[0].id
     liabilityId = state.liabilities[0].id
     date = `${state.year}-04-15`
-    useSettingsStore().toggleTwrLiquidity(cashId, true)
-    useSettingsStore().toggleTwrLiquidity(otherId, true)
+    setTwrLiquidity(cashId, true)
+    setTwrLiquidity(otherId, true)
     const wealth = useWealthStore()
     wealth.setMonth(3)
     wealth.saveSnapshot([
@@ -42,22 +43,20 @@ describe('round trip: contribution wealth adjustment', () => {
   afterEach(() => trip.cleanup())
 
   function save(amount: number, accountId = cashId): void {
-    const investment = useInvestmentStore()
-    const workflow = investment.buildWorkflowState(3, date)
+    // The form starts from the saved balances, or the opening ones before any save.
+    const state = useFinancialStateStore().state
+    const snapshot = state.snapshots['3']
+    const openingOf = (id: string) => state.accounts.find((account) => account.id === id)!.openingBalance
     expect(
-      investment.saveContribution(
+      useInvestmentStore().saveContribution(
         date,
         3,
         [
-          ...workflow.investments.map((item) => ({
-            kind: 'investments' as const,
-            id: item.id,
-            value: item.value,
-          })),
-          ...workflow.liquidity.map((item) => ({
+          { kind: 'investments', id: fundId, value: String(snapshot?.investments[fundId] ?? 1000) },
+          ...state.twrLiquidityAccountIds.map((id) => ({
             kind: 'accounts' as const,
-            id: item.id,
-            value: item.value,
+            id,
+            value: String(snapshot?.accounts[id] ?? openingOf(id)),
           })),
         ],
         [{ accountId, amount }],
@@ -108,7 +107,7 @@ describe('round trip: contribution wealth adjustment', () => {
       (account) => account.name === 'New cash',
     )!.id
     await vi.waitFor(async () => expect(await trip.pending()).toHaveLength(1))
-    useSettingsStore().toggleTwrLiquidity(newAccountId, true)
+    setTwrLiquidity(newAccountId, true)
     save(100, newAccountId)
     await vi.waitFor(async () => expect(await trip.pending()).toHaveLength(4))
 

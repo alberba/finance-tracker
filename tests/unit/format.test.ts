@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  formatAxisLabel,
   formatCompactMoney,
   formatDayMonth,
   formatDecimal,
@@ -213,22 +212,6 @@ describe('formatMonthYear', () => {
 
   it('devuelve solo el año si el mes no existe', () => {
     expect(formatMonthYear(13 as Month, 2026)).toBe('2026')
-  })
-})
-
-describe('formatAxisLabel', () => {
-  it('abrevia los nombres de mes a tres letras', () => {
-    expect(formatAxisLabel('ENERO')).toBe('ENE')
-    expect(formatAxisLabel('Septiembre')).toBe('Sep')
-  })
-
-  it('no corta etiquetas de fecha', () => {
-    expect(formatAxisLabel('01/01')).toBe('01/01')
-    expect(formatAxisLabel('28/02')).toBe('28/02')
-  })
-
-  it('devuelve cadena vacía para etiquetas ausentes', () => {
-    expect(formatAxisLabel(undefined)).toBe('')
   })
 })
 

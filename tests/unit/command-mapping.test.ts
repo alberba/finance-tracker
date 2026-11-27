@@ -18,7 +18,6 @@ import {
   resolveCategoryId,
   resolveEntityId,
   resolveOrCreateCategoryId,
-  syncGoalUpsert,
   syncCreate,
   syncListDiff,
   syncRemove,
@@ -199,41 +198,6 @@ describe('command-mapping (WP7b)', () => {
       const entries = await listAll(outboxDb)
       expect(entries).toHaveLength(0)
       outboxDb.close()
-    })
-
-    it('syncGoalUpsert creates when unknown and updates when a server ref exists', async () => {
-      await initSyncStore()
-      await syncGoalUpsert('short', {
-        key: 'short',
-        name: 'Meta',
-        targetYear: 2030,
-        targetAmount: 1000,
-        currency: 'EUR',
-      })
-
-      const outboxDbFirst = await openStorage(USER_ID)
-      const firstEntries = await listAll(outboxDbFirst)
-      expect(firstEntries[0]?.command.action).toBe('create')
-      outboxDbFirst.close()
-
-      // Simulate the create having synced by seeding the cache directly
-      // (the natural-key lookup is checked before the still-pending outbox
-      // create, so this alone is enough to flip the next call onto the
-      // update path — no need to touch/close the outbox's live connection).
-      const cacheDb = await openStorage(USER_ID)
-      await putEntity(cacheDb, 'goal', { id: 'server-goal-1', key: 'short', version: 1 })
-      cacheDb.close()
-
-      await syncGoalUpsert('short', { key: 'short', name: 'Meta actualizada' })
-      const outboxDbSecond = await openStorage(USER_ID)
-      const secondEntries = await listAll(outboxDbSecond)
-      const update = secondEntries.find((entry) => entry.command.action === 'update')
-      expect(update?.command).toMatchObject({
-        action: 'update',
-        entityId: 'server-goal-1',
-        baseVersion: 1,
-      })
-      outboxDbSecond.close()
     })
 
     it('syncSettingsUpdate enqueues a settingsUpdate command', async () => {

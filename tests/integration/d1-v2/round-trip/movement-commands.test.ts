@@ -464,38 +464,6 @@ describe('round trip: shared movement commands (#263)', () => {
     expect(await trip.pending()).toEqual([])
   })
 
-  it('shows the edited operation after an offline restart', async () => {
-    useInvestmentStore().addMovement(investmentInput)
-    const first = await trip.reload()
-    trip.setOffline(true)
-    expect(
-      useInvestmentStore().saveEditedMovement(first.transactions[0].id, {
-        ...investmentInput,
-        side: 'sell',
-        units: '2',
-        unitPrice: '50',
-        fee: '2',
-        time: '11:45',
-        declared: false,
-      }),
-    ).toBe(true)
-    const offline = await trip.reloadOffline()
-    expect(offline.transactions[0]).toMatchObject({
-      symbol: 'VWCE',
-      side: 'sell',
-      units: 2,
-      unitPrice: 50,
-      fee: 2,
-      amount: -98,
-      movementCurrency: 'USD',
-      time: '11:45',
-      declared: false,
-      instrumentId,
-    })
-    trip.setOffline(false)
-    expect((await trip.reload()).transactions[0]).toMatchObject(offline.transactions[0])
-  })
-
   it('preserves an offline queued create when its local operation becomes incomplete', async () => {
     trip.setOffline(true)
     useInvestmentStore().addMovement(investmentInput)
@@ -634,7 +602,7 @@ describe('round trip: imported movement protections (#263)', () => {
 
   it('synchronizes declaration changes without sending immutable financial fields', async () => {
     const id = useFinancialStateStore().transactions[0].id
-    useInvestmentStore().toggleDeclared(id)
+    useInvestmentStore().markDeclared([id])
     const reloaded = await trip.reload()
     expect(reloaded.transactions[0]).toMatchObject({
       id,
@@ -659,19 +627,9 @@ describe('round trip: imported movement protections (#263)', () => {
         }),
     },
     {
-      action: 'editing from Inversión',
-      expectedResult: false,
-      run: (id: string) => useInvestmentStore().saveEditedMovement(id, investmentInput),
-    },
-    {
       action: 'deleting from Movimientos',
       expectedResult: false,
       run: (id: string) => useMovementsStore().deleteTransaction(id),
-    },
-    {
-      action: 'deleting from Inversión',
-      expectedResult: undefined,
-      run: (id: string) => useInvestmentStore().deleteMovement(id),
     },
     {
       action: 'bulk editing',

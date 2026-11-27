@@ -5,17 +5,14 @@ import {
   type ContributionEntry,
   type Entity,
 } from '../../lib/finance-core'
-import { parseTransactionYear } from '../../scripts/investment-movements'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
 import {
   MONTHS,
-  type ContributionMetricRow,
   type RecurringFrequency,
   type RecurringRule,
   type State,
-  type Transaction,
 } from '../../scripts/types'
-import { monthFromISO, round2 } from '../../scripts/utils'
+import { round2 } from '../../scripts/utils'
 import {
   computeInvestedCapital,
   computeInvestedCapitalByAsset,
@@ -215,123 +212,6 @@ export function buildInvestmentDashboardViewModel(
   }
 }
 
-export interface InvestmentMovementRow {
-  tx: Transaction
-  account: string
-  /** The traded symbol, or the category for movements saved without one. */
-  symbol: string
-  currency: string
-  sideLabel: string
-  declaredLabel: string
-  declared: boolean
-}
-
-export function buildInvestmentMovementRows(
-  state: State,
-  yearFilter: number,
-  onlyUndeclared: boolean,
-  getAccountName: (accountId: string) => string,
-): InvestmentMovementRow[] {
-  return state.transactions
-    .filter((item): item is Transaction => item.type === 'investment')
-    .filter((item) => {
-      const year = parseTransactionYear(item.date)
-      if (year === null || year !== yearFilter) return false
-      if (onlyUndeclared && item.declared) return false
-      return true
-    })
-    .sort((a, b) => {
-      const byDate = String(b.date).localeCompare(String(a.date))
-      if (byDate !== 0) return byDate
-      return String(b.time || '').localeCompare(String(a.time || ''))
-    })
-    .map((tx) => ({
-      tx,
-      account: getAccountName(tx.accountId),
-      symbol: tx.symbol || tx.category || '—',
-      currency: (tx.movementCurrency || 'EUR').toUpperCase(),
-      sideLabel: tx.side === 'sell' ? 'Venta' : 'Compra',
-      declaredLabel: tx.declared ? 'Sí' : 'No',
-      declared: Boolean(tx.declared),
-    }))
-}
-
-/**
- * Money a movement put into the portfolio: a purchase's stored amount (fee
- * included, see computeInvestmentMovement), negative for what a sale brought in.
- */
-function investedFlow(tx: Transaction): number {
-  const amount = Math.abs(Number(tx.amount) || 0)
-  return tx.side === 'sell' ? -amount : amount
-}
-
-export interface InvestmentYearSummary {
-  /** Spent on purchases, fees included. */
-  bought: number
-  /** Brought in by sales. */
-  sold: number
-  fees: number
-  /** Movements not declared yet. */
-  pending: number
-}
-
-/** The year's figures, regardless of the "only undeclared" filter. */
-export function summarizeInvestmentYear(state: State, year: number): InvestmentYearSummary {
-  const summary: InvestmentYearSummary = { bought: 0, sold: 0, fees: 0, pending: 0 }
-  for (const tx of state.transactions) {
-    if (tx.type !== 'investment' || parseTransactionYear(tx.date) !== year) continue
-    const flow = investedFlow(tx)
-    if (flow < 0) summary.sold -= flow
-    else summary.bought += flow
-    summary.fees += Number(tx.fee) || 0
-    if (!tx.declared) summary.pending += 1
-  }
-  return summary
-}
-
-export interface InvestmentMonthGroup {
-  month: Month
-  count: number
-  /** Purchases (fees included) minus what sales brought in. */
-  net: number
-  rows: InvestmentMovementRow[]
-}
-
-/** Rows (already sorted newest first) grouped by the month of their date. */
-export function groupInvestmentMovementsByMonth(
-  rows: InvestmentMovementRow[],
-): InvestmentMonthGroup[] {
-  const groups: InvestmentMonthGroup[] = []
-  for (const row of rows) {
-    const month = monthFromISO(row.tx.date) ?? row.tx.month
-    let group = groups.find((item) => item.month === month)
-    if (!group) {
-      group = { month, count: 0, net: 0, rows: [] }
-      groups.push(group)
-    }
-    group.net += investedFlow(row.tx)
-    group.count += 1
-    group.rows.push(row)
-  }
-  return groups.sort((a, b) => b.month - a.month)
-}
-
-export function buildInvestmentYearOptions(state: State): number[] {
-  const years = Array.from(
-    new Set(
-      state.transactions
-        .filter((item) => item.type === 'investment')
-        .map((item) => parseTransactionYear(item.date))
-        .filter((year): year is number => typeof year === 'number' && Number.isInteger(year))
-        .concat(state.year),
-    ),
-  ).sort((a, b) => b - a)
-  if (!years.length) {
-    years.push(state.year)
-  }
-  return years
-}
-
 /** Purchases a frequency makes in a year, before its interval. */
 const YEARLY_OCCURRENCES: Record<RecurringFrequency, number> = {
   daily: 365,
@@ -347,75 +227,4 @@ export function ruleMonthlyEquivalent(
 ): number {
   const interval = Math.max(1, Math.floor(rule.interval || 1))
   return round2((rule.amount * YEARLY_OCCURRENCES[rule.frequency]) / interval / 12)
-}
-
-export interface RecurringPlanSummary {
-  /** Monthly equivalent of the active rules. */
-  monthly: number
-  active: number
-  total: number
-  /** The active rule due first, with its date. */
-  next: { rule: RecurringRule; date: string } | null
-}
-
-export function summarizeRecurringPlan(rules: RecurringRule[]): RecurringPlanSummary {
-  const active = rules.filter((rule) => rule.active)
-  const next = active
-    .filter((rule) => rule.nextOccurrenceDate)
-    .sort((a, b) => String(a.nextOccurrenceDate).localeCompare(String(b.nextOccurrenceDate)))[0]
-  return {
-    monthly: round2(active.reduce((sum, rule) => sum + ruleMonthlyEquivalent(rule), 0)),
-    active: active.length,
-    total: rules.length,
-    next: next ? { rule: next, date: String(next.nextOccurrenceDate) } : null,
-  }
-}
-
-/** Where a close comes from: the first one, a month end or a manual contribution. */
-export type ContributionOrigin = 'base' | 'monthEnd' | 'manual'
-
-export interface ContributionLedgerRow extends ContributionMetricRow {
-  origin: ContributionOrigin
-}
-
-function originOf(index: number, manual: boolean): ContributionOrigin {
-  // A manual close stays manual even when it is the first: it can be deleted.
-  if (manual) return 'manual'
-  return index === 0 ? 'base' : 'monthEnd'
-}
-
-/** The closes (oldest first, as computed) newest first, each with its origin. */
-export function buildContributionLedger(
-  rows: ContributionMetricRow[],
-  isManual: (date: string) => boolean,
-): ContributionLedgerRow[] {
-  return rows
-    .map((row, index) => ({ ...row, origin: originOf(index, isManual(row.date)) }))
-    .reverse()
-}
-
-export interface ContributionSummary {
-  /** Contributed in the year. */
-  contributed: number
-  /** Net asset value, units and cumulative return of the latest close. */
-  nav: number | null
-  units: number | null
-  cumulativeReturn: number | null
-}
-
-export function summarizeContributions(
-  rows: ContributionMetricRow[],
-  year: number,
-): ContributionSummary {
-  const latest = rows.at(-1)
-  return {
-    contributed: round2(
-      rows
-        .filter((row) => parseTransactionYear(row.date) === year)
-        .reduce((sum, row) => sum + (Number(row.flow) || 0), 0),
-    ),
-    nav: latest?.nav ?? null,
-    units: latest?.unitsAfter ?? null,
-    cumulativeReturn: latest?.cumulativeReturn ?? null,
-  }
 }

@@ -3,7 +3,6 @@ import {
   buildInvestmentDescription,
   computeInvestmentMovement,
   normalizeInvestmentSide,
-  parseTransactionYear,
 } from '../../src/scripts/investment-movements'
 
 describe('investment-movements helpers', () => {
@@ -62,11 +61,9 @@ describe('investment-movements helpers', () => {
     expect(computed.signedAmount).toBe(0.82)
   })
 
-  it('normaliza side y extrae año desde ISO', () => {
+  it('normaliza side', () => {
     expect(normalizeInvestmentSide('sell')).toBe('sell')
     expect(normalizeInvestmentSide('otra-cosa')).toBe('buy')
-    expect(parseTransactionYear('2026-03-04')).toBe(2026)
-    expect(parseTransactionYear('04/03/2026')).toBeNull()
   })
 
   it('genera descripción para compra y venta', () => {

@@ -6,10 +6,6 @@ export function getRequiredElement<T extends Element>(id: string): T {
   return element as unknown as T
 }
 
-export function getEventElement(target: EventTarget | null): Element | null {
-  return target instanceof Element ? target : null
-}
-
 export function hasSelectionWithin(container: Element): boolean {
   const selection = window.getSelection()
   if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {

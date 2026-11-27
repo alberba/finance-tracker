@@ -66,66 +66,6 @@ export function slug(value: string): string {
   );
 }
 
-export function getMonthTotals(
-  transactions: Transaction[],
-  month: Month,
-): {
-  income: number;
-  expense: number;
-  saving: number;
-  investment: number;
-} {
-  return transactions
-    .filter((item) => Number(item.month) === month)
-    .reduce(
-      (acc, item) => {
-        const amount = Number(item.amount || 0);
-        if (item.type === "income") {
-          acc.income += amount;
-        }
-        if (item.type === "expense") {
-          acc.expense += amount;
-        }
-        if (item.type === "saving") {
-          acc.saving += amount;
-        }
-        if (item.type === "investment") {
-          acc.investment += amount;
-        }
-        return acc;
-      },
-      { income: 0, expense: 0, saving: 0, investment: 0 },
-    );
-}
-
-export function getCategoryActuals(
-  transactions: Transaction[],
-  type: TxType,
-  month: Month,
-  categories: string[],
-): Record<string, number> {
-  const map: Record<string, number> = {};
-
-  categories.forEach((category) => {
-    map[category] = 0;
-  });
-
-  transactions
-    .filter((item) => Number(item.month) === month && item.type === type)
-    .forEach((item) => {
-      if (!map[item.category]) {
-        map[item.category] = 0;
-      }
-      map[item.category] += Number(item.amount || 0);
-    });
-
-  Object.keys(map).forEach((key) => {
-    map[key] = round2(map[key]);
-  });
-
-  return map;
-}
-
 export function getSnapshotValue(
   snapshots: Record<string, Snapshot>,
   kind: "accounts" | "investments" | "liabilities",

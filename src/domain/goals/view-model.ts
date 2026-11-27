@@ -99,10 +99,6 @@ export function goalGroup(key: GoalKey): GoalGroup {
   return SLOTS[key].group
 }
 
-export function goalSlot(key: GoalKey): string {
-  return SLOTS[key].slot
-}
-
 function buildCurrentMap(state: State, month: Month): Record<GoalKey, number> {
   const wealth = getWealthByMonth(
     month,

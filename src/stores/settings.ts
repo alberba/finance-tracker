@@ -352,25 +352,6 @@ export const useSettingsStore = defineStore('settings', () => {
     showToast('Emoji restablecido.')
   }
 
-  function toggleTwrLiquidity(accountId: string, enabled: boolean): void {
-    const id = accountId.trim()
-    if (!id) {
-      return
-    }
-
-    financialStateStore.commitState((draft) => {
-      const selection = new Set((draft.twrLiquidityAccountIds || []).map((item) => String(item)))
-      if (enabled) {
-        selection.add(id)
-      } else {
-        selection.delete(id)
-      }
-      draft.twrLiquidityAccountIds = Array.from(selection)
-    })
-    void syncTwrLiquidityAccounts(financialStateStore.state.twrLiquidityAccountIds)
-    showToast('Configuración TWR actualizada.')
-  }
-
   return {
     viewModel,
     saveGeneral,
@@ -383,6 +364,5 @@ export const useSettingsStore = defineStore('settings', () => {
     reorderCategory,
     setCategoryEmoji,
     resetCategoryEmoji,
-    toggleTwrLiquidity,
   }
 })

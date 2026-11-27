@@ -1,7 +1,7 @@
 import type { Month } from '../../lib/month'
 import { round2 } from '../../lib/number'
 import type { TransactionSort } from '../../scripts/transactions'
-import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../scripts/types'
+import { TRANSACTION_TYPES, type Transaction } from '../../scripts/types'
 
 type Dated = Pick<Transaction, 'date' | 'month'>
 
@@ -169,32 +169,4 @@ export function registryYears(transactions: Transaction[], currentYear: number):
     if (year !== null) years.add(year)
   })
   return Array.from(years).sort((a, b) => b - a)
-}
-
-export interface CategoryShare {
-  category: string
-  amount: number
-  /** Share of the type's month total, 0–100. */
-  share: number
-}
-
-/** One type of a month split by category, largest first. */
-export function categoryBreakdown(
-  transactions: Transaction[],
-  year: number,
-  month: Month,
-  type: TransactionType,
-): CategoryShare[] {
-  const byCategory = new Map<string, number>()
-  transactions.forEach((tx) => {
-    if (tx.type !== type || !inMonth(tx, year, month)) return
-    const category = tx.category || 'Sin categoría'
-    byCategory.set(category, (byCategory.get(category) ?? 0) + Number(tx.amount || 0))
-  })
-  const total = Array.from(byCategory.values()).reduce((sum, amount) => sum + amount, 0)
-  return Array.from(byCategory, ([category, amount]) => ({
-    category,
-    amount: round2(amount),
-    share: total > 0 ? (amount / total) * 100 : 0,
-  })).sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category, 'es'))
 }
