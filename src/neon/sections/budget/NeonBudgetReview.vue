@@ -13,7 +13,7 @@ import {
 } from './review-view-model'
 import { useReviewSession } from './review-session'
 
-// «Revisar {mes}» in the new Presupuesto (artboard «Presupuesto · 2560 px»,
+// «Revisar {mes}» in Presupuesto (artboard «Presupuesto · 2560 px»,
 // #433): the month that just closed, category by category, with a suggestion
 // and a decision (keep, raise or lower) for each, and the summary of the
 // changes that «Aplicar cambios» writes from the current month through December.

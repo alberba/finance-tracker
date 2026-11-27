@@ -372,7 +372,7 @@ describe('round trip: ahorro', () => {
     await settled()
     expect((await trip.reload()).savingGoals[0].monthlyAmount).toBe(310.5)
 
-    // An edit that does not carry the plan (the old design's panel) keeps it.
+    // An edit that does not carry the plan (an older client) keeps it.
     useGoalsStore().updateSavingGoal(id, {
       name: 'Japón',
       category: 'Fondo de emergencia',

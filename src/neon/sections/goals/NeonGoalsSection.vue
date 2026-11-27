@@ -22,7 +22,7 @@ import {
   wholeEuros,
 } from './view-model'
 
-// Objetivos in the new design (artboard «Objetivos · 2560 px», #441): one
+// Objetivos (artboard «Objetivos · 2560 px», #441): one
 // column per savings goal, the most urgent first, and under them the selected
 // goal with the monthly amount it gets. «Repartir el ahorro» shares the
 // monthly saving among the goals; «Nuevo objetivo» adds one.

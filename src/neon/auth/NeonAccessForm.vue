@@ -9,10 +9,9 @@ import { accessErrorText } from './access-errors'
 import NeonProviderIcon from './NeonProviderIcon.vue'
 import NeonVerifyEmail from './NeonVerifyEmail.vue'
 
-// The login of the new design. No artboard: it is built from DESIGN.md
+// The login. No artboard: it is built from DESIGN.md
 // (Campo, Botón primario, Botón de icono, Segmentado, Estado vacío). The flow itself (modes,
-// codes, Better Auth calls) is the shared useAuthenticationForm, the same one
-// the old login uses, so both designs sign in the same way.
+// codes, Better Auth calls) is the shared useAuthenticationForm.
 const props = defineProps<{
   invitationError?: string
   googleEnabled: boolean

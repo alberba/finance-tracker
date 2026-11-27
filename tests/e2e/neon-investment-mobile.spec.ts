@@ -2,8 +2,8 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 /**
- * The cover of Inversión in the mobile frame of the new design (#438), and an
- * asset's detail (#440), in the mobile project. No cookie: the new design is the default. The clock sits on
+ * The cover of Inversión in the mobile frame (#438), and an
+ * asset's detail (#440), in the mobile project. The clock sits on
  * 20 March 2026, the newest month of the seed. Figures are the view-model's
  * unit tests'; here, what the user does and what they get.
  */

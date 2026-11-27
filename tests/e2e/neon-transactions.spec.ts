@@ -7,8 +7,7 @@ import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Movimientos in the new design (#431), desktop. No cookie: the new design is
- * the default. The clock sits in March 2026, the newest month of the seed.
+ * Movimientos (#431), desktop. The clock sits in March 2026, the newest month of the seed.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
@@ -49,7 +48,7 @@ async function addMovements(
   await tracker.open('transactions')
 }
 
-test.describe('Movimientos en el diseño nuevo', () => {
+test.describe('Movimientos', () => {
   test('busca un movimiento por texto y filtra por tipo', async ({ page, tracker }) => {
     await addMovements(page, tracker, [
       { id: 'e2e-filtro-ingreso', type: 'income', amount: 120, date: '2026-03-10' },

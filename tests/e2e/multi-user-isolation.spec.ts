@@ -63,13 +63,11 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
       amount: 42,
       description: 'Gasto exclusivo de A',
     })
-    // The transactions list defaults to filtering on the current month —
-    // point it at the month the seeded transaction actually falls in.
-    await trackerA.filterTransactionsMonth('ENERO')
     await trackerA.expectTransactionDescriptionVisible('Gasto exclusivo de A')
 
     const { tracker: trackerB } = await provisionUser(contextB, uniqueEmail('b'))
-    await trackerB.filterTransactionsMonth('ENERO')
+    await trackerB.openTransactions()
+    await trackerB.revealOlderTransactions()
 
     await expect(trackerB.transactionsSection.getByText('Gasto exclusivo de A')).toHaveCount(0)
   })
@@ -98,7 +96,6 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
       amount: 1500,
       description: 'Nómina de A',
     })
-    await trackerA.filterTransactionsMonth('ENERO')
     await trackerA.expectTransactionDescriptionVisible('Nómina de A')
 
     // A brand-new context re-authenticating as the *same* email must see the
@@ -107,7 +104,6 @@ test.describe('Aislamiento multiusuario (sync v2)', () => {
     const returningContext = await browser.newContext()
     try {
       const { tracker: returningTracker } = await provisionUser(returningContext, email)
-      await returningTracker.filterTransactionsMonth('ENERO')
       await returningTracker.expectTransactionDescriptionVisible('Nómina de A')
     } finally {
       await returningContext.close()

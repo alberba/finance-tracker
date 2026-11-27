@@ -99,9 +99,7 @@ export function createPlaywrightRuntime({
       (process.platform === 'linux' && existsSync('/dev/shm') ? '/dev/shm' : tmpdir()),
     `finance-e2e-${workerConfigId}-${port}`,
   )
-  if (!externalBaseURL) process.env.PLAYWRIGHT_PERSIST_PATH = persistPath
   const workerConfigPath = externalBaseURL ? undefined : localWorkerConfig(serverPort, localBaseURL)
-  if (workerConfigPath) process.env.PLAYWRIGHT_WRANGLER_CONFIG = workerConfigPath
   const serverCommand = `node scripts/e2e-server.mjs ${serverPort}`
 
   return {

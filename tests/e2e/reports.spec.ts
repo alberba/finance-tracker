@@ -266,7 +266,7 @@ test.describe('Reports E2E', () => {
     await expect(status).not.toContainText('Inicia sesión para continuar.')
   })
 
-  test('adjunta hasta tres capturas, las previsualiza, quita una y envía solo las vigentes', async ({
+  test('adjunta hasta tres capturas, las lista, quita una y envía solo las vigentes', async ({
     page,
     tracker,
   }) => {
@@ -293,11 +293,11 @@ test.describe('Reports E2E', () => {
       .setInputFiles([imageFile('uno.png'), imageFile('dos.png'), imageFile('tres.png')])
 
     const list = panel.locator('#issue-report-attachment-list')
-    await expect(list.getByRole('img')).toHaveCount(3)
-    await expect(list.getByRole('img', { name: 'Vista previa de dos.png' })).toBeVisible()
+    await expect(list.getByRole('listitem')).toHaveCount(3)
+    await expect(list.getByRole('listitem').filter({ hasText: 'dos.png' })).toBeVisible()
 
     await panel.getByRole('button', { name: 'Quitar dos.png' }).click()
-    await expect(list.getByRole('img')).toHaveCount(2)
+    await expect(list.getByRole('listitem')).toHaveCount(2)
 
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
 
@@ -320,7 +320,9 @@ test.describe('Reports E2E', () => {
     await input.setInputFiles([imageFile('a.png'), imageFile('b.png'), imageFile('c.png')])
     await input.setInputFiles(imageFile('d.png'))
     await expect(tracker.issueReportStatus()).toContainText('hasta 3')
-    await expect(panel.locator('#issue-report-attachment-list').getByRole('img')).toHaveCount(3)
+    await expect(panel.locator('#issue-report-attachment-list').getByRole('listitem')).toHaveCount(
+      3,
+    )
 
     await panel.getByRole('button', { name: 'Quitar a.png' }).click()
     await input.setInputFiles(imageFile('grande.png', 2 * 1024 * 1024 + 1))
@@ -415,7 +417,9 @@ test.describe('Mis reportes E2E', () => {
     await expect(tracker.reportsPage.getByText('Abierto').first()).toBeVisible()
     await tracker.reload()
     await expect(tracker.reportsPage.getByText('Se sigue en #887').first()).toBeVisible()
-    await expect(tracker.reportsPage.getByText('#901 · Cerrado como duplicado')).toBeVisible()
+    await expect(
+      tracker.reportsPage.getByText(/^Cerrado como duplicado · enviado el/),
+    ).toBeVisible()
   })
 
   test('avisa de novedades en el botón y en la entrada y las apaga al abrir', async ({
@@ -467,7 +471,7 @@ test.describe('Mis reportes E2E', () => {
     const sheet = page.getByRole('dialog', { name: 'Más secciones' })
     const row = sheet.getByRole('button', { name: /Mis reportes/ })
     await expect(row).toBeVisible()
-    await expect(sheet.locator('[data-reports-badge]')).toHaveText('1')
+    await expect(sheet.locator('[data-reports-count]')).toHaveText('1')
 
     await row.click()
     await expect(page).toHaveURL(/\/reportes$/)

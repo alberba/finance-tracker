@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Switch of the new design: a 46×28 track with a knob, in the accent color
+// Switch: a 46×28 track with a knob, in the accent color
 // when on. A real button with role=switch, named by `label`.
 defineProps<{ label: string }>()
 const on = defineModel<boolean>({ required: true })

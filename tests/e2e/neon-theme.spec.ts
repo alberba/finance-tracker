@@ -2,8 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 /**
- * Los cuatro temas del diseño nuevo (#445), en escritorio. Sin cookie: el
- * diseño nuevo es el de por defecto. Los valores de cada tema y su contraste
+ * Los cuatro temas (#445), en escritorio. Los valores de cada tema y su contraste
  * son del guard de styles-guards.test.ts; aquí, qué elige la persona y qué
  * conserva al recargar.
  */
@@ -18,7 +17,7 @@ const THEMES = [
   { id: 'claro-melocoton', label: 'Claro melocotón', canvas: 'rgb(247, 235, 226)' }, // #F7EBE2
 ]
 
-test.describe('Temas del diseño nuevo', () => {
+test.describe('Temas', () => {
   test('sin preferencia usa oscuro suave, o claro melocotón si el sistema pide claro', async ({
     page,
     tracker,
@@ -31,16 +30,6 @@ test.describe('Temas del diseño nuevo', () => {
     await expect(html(page)).toHaveAttribute('data-theme', 'claro-melocoton')
     await tracker.reload()
     await expect(html(page)).toHaveAttribute('data-theme', 'claro-melocoton')
-  })
-
-  test('el marco nuevo no tiene el selector sol/pantalla/luna de la cabecera', async ({
-    page,
-    tracker,
-  }) => {
-    await tracker.goto()
-
-    await expect(page.getByRole('group', { name: 'Tema' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Tema oscuro' })).toHaveCount(0)
   })
 
   test('elige cada tema en Configuración, se aplica al momento y se conserva al recargar', async ({

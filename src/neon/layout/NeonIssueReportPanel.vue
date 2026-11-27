@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, shallowRef } from 'vue'
+import { reactive, shallowRef, watch } from 'vue'
 
 import { useIssueReportContext } from '../../composables/useIssueReportContext'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
@@ -58,9 +58,24 @@ const successStatus = shallowRef<SuccessStatus | null>(null)
 const submitting = shallowRef(false)
 let nextId = 0
 
-/** Closes the panel before navigating: the detail mounts on the page. */
+// Set while the panel closes on its way to «Mis reportes»: the page is inert
+// until the dialog is gone, so the navigation waits for `closed` (and the
+// detail then takes the focus the panel hands back to its opener).
+let pendingReports: { issueNumber?: number } | null = null
+watch(open, (value) => {
+  if (value) pendingReports = null
+})
+
+/** Closes the panel, then navigates: the detail mounts on the page. */
 function openReports(issueNumber?: number): void {
+  pendingReports = { issueNumber }
   open.value = false
+}
+
+function onClosed(): void {
+  if (!pendingReports) return
+  const { issueNumber } = pendingReports
+  pendingReports = null
   navigateToReports(issueNumber)
 }
 
@@ -148,7 +163,12 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <NeonDetailPanel v-model:open="open" kicker="Ayuda a mejorar la app" title="Crear reporte">
+  <NeonDetailPanel
+    v-model:open="open"
+    kicker="Ayuda a mejorar la app"
+    title="Crear reporte"
+    @closed="onClosed"
+  >
     <p class="text-soft text-[15px] leading-relaxed">
       Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.
     </p>

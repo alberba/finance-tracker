@@ -16,7 +16,7 @@ import { FRAME_QUERY } from '../../ui/sheet-drag'
 import NeonRegistry from './NeonRegistry.vue'
 import NeonSubscriptions from './NeonSubscriptions.vue'
 
-// Movimientos in the new design (artboard «Movimientos · 2560 px», #431): the
+// Movimientos (artboard «Movimientos · 2560 px», #431): the
 // date label, the title and its lede with the primary action, the two tabs
 // (Registro and Suscripciones) and each tab's content. A new movement opens
 // the shared entry sheet; a new subscription, the subscriptions panel.

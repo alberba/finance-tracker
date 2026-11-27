@@ -3,7 +3,7 @@ import { formatMoney, formatMonthName, formatNumber } from '../../../lib/format'
 import { asMonth, atMonth, monthIndex, type Month } from '../../../lib/month'
 import { parseDecimal, round2 } from '../../../lib/number'
 
-// «Revisar {mes}», the month close review of the new Presupuesto (artboard
+// «Revisar {mes}», the month close review of Presupuesto (artboard
 // «Presupuesto · 2560 px», #433): how each expense category did in the month
 // that just closed, a suggestion for its budget and the changes to apply from
 // the current month through December. Pure functions over the budget view-model.

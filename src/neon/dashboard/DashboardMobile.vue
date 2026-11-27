@@ -17,7 +17,7 @@ import { sharedScale } from './mobile-chart'
 import { useNeonDashboardStore } from './store'
 import type { ChartPreset, NeonDashboardViewModel } from './view-model'
 
-// Home of the new design in the mobile frame (DESIGN.md, «Inicio en móvil»).
+// Home in the mobile frame (DESIGN.md, «Inicio en móvil»).
 // On top, three figures to swipe through, each with the chart that answers its
 // question: what is left this month (spent day by day against last month), net
 // worth (its evolution) and the portfolio (what it gains over what was put in).

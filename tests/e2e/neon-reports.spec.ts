@@ -9,8 +9,7 @@ import {
 } from './pages/reports-api'
 
 /**
- * «Mis reportes» in the new design (#448), desktop. No cookie: the new design
- * is the default. GitHub is never called: `/api/reports` is faked.
+ * «Mis reportes» (#448), desktop. GitHub is never called: `/api/reports` is faked.
  */
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -19,7 +18,7 @@ const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
 const section = (page: Page) => page.locator('#reports')
 const launcher = (page: Page) => page.locator('#global-report-trigger')
 
-test.describe('Mis reportes en el diseño nuevo', () => {
+test.describe('Mis reportes', () => {
   test(
     'crea un reporte, lo ve en la lista, abre su hilo y añade una aclaración',
     { tag: '@smoke' },

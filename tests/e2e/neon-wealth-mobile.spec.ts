@@ -2,8 +2,8 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 
 /**
- * Patrimonio en el diseño nuevo, marco móvil (#436), en el proyecto móvil.
- * Sin cookie: el diseño nuevo es el de por defecto. Las cifras las prueba el
+ * Patrimonio en el marco móvil (#436), en el proyecto móvil.
+ * Las cifras las prueba el
  * unit del view-model; aquí, el recorrido: abrir una cuenta en su hoja, leer
  * otro mes y volver, y que todo se pueda pulsar con el dedo.
  */

@@ -5,8 +5,7 @@ import { test, expect } from './fixtures'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
 
 /**
- * Datos in the new design (#446), desktop. No cookie: the new design is the
- * default. The seed has accounts and movements; each test adds one movement of
+ * Datos (#446), desktop. The seed has accounts and movements; each test adds one movement of
  * its own so the file it exports carries something recognizable.
  */
 const section = (page: Page) => page.locator('#data')
@@ -29,7 +28,7 @@ async function seedMovement(page: Page): Promise<void> {
   })
 }
 
-test.describe('Datos en el diseño nuevo', () => {
+test.describe('Datos', () => {
   test(
     'exporta la copia completa y los movimientos en CSV',
     { tag: '@smoke' },

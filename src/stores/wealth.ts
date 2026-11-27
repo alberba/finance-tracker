@@ -27,7 +27,7 @@ export const useWealthStore = defineStore('wealth', () => {
 
   /**
    * Stores the month's balances and syncs them. `notify: false` leaves the
-   * notice to the caller (the new design words it as closing the month).
+   * notice to the caller (Patrimonio words it as closing the month).
    */
   function saveSnapshot(
     edits: SnapshotCommitEdit[],

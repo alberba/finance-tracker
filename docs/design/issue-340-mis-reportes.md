@@ -720,7 +720,7 @@ fixtures para la E2E visual.
 
 ---
 
-## 9. Diseño de interfaz (skill `frontend-design`, restringida por `docs/architecture/design-language.md`)
+## 9. Diseño de interfaz (skill `frontend-design`, restringida por las pautas visuales de entonces, `design-language.md`, retirado en #453)
 
 ### 9.1 Dirección
 

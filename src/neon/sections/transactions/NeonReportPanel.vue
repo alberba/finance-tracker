@@ -16,9 +16,9 @@ import { useUiStore } from '../../../stores/ui'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 
-// «Exportar» of the registry in the new design: pick a period, see what it
-// covers and download it as a PDF or as the CSV of the same movements. Same
-// report as the old design (ADR 0009): it takes the registry's search, type and
+// «Exportar» of the registry: pick a period, see what it
+// covers and download it as a PDF or as the CSV of the same movements. The
+// report of ADR 0009: it takes the registry's search, type and
 // account filters and ignores its year.
 const open = defineModel<boolean>('open', { required: true })
 

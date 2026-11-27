@@ -16,7 +16,7 @@ import type {
 } from './view-model'
 
 /**
- * The site fonts, as the PDF names them. Each style maps to a file under
+ * The report's fonts, as the PDF names them. Each style maps to a file under
  * `assets/fonts/report` that the generator loads when the report is downloaded.
  */
 export const REPORT_FONT_FILES = {
@@ -26,7 +26,7 @@ export const REPORT_FONT_FILES = {
   DMMono: { normal: 'DMMono-Regular.ttf', bold: 'DMMono-Regular.ttf' },
 } as const
 
-/** The light theme's tokens (`src/styles/legacy.css`): the PDF is read on paper, whatever the app's theme. */
+/** The report's own light palette: the PDF is read on paper, whatever the app's theme. */
 const INK = '#0d1626'
 const MUTED = '#5a6678'
 const LINE = '#e4e8f1'

@@ -336,7 +336,7 @@ export const useMovementsStore = defineStore('movements', () => {
 
   /**
    * Deletes a movement. `notify: false` leaves the confirmation to the caller,
-   * as the new design's undo notice does. Returns whether it was deleted.
+   * as the undo notice does. Returns whether it was deleted.
    */
   function deleteTransaction(id: string, { notify = true }: { notify?: boolean } = {}): boolean {
     const target = financialStateStore.transactions.find((tx) => tx.id === id)

@@ -310,7 +310,7 @@ describe('monthTable', () => {
     expect(bank.cells.slice(0, 3).map((cell) => cell.tone)).toEqual(['plain', 'gain', 'muted'])
   })
 
-  it('names the groups as the new design does and keeps the debt negative', () => {
+  it('names the groups and keeps the debt negative', () => {
     const rows = monthTable(vm()).rows.filter((row) => row.kind === 'group')
     expect(rows.map((row) => row.label)).toEqual(['Efectivo', 'Inversión', 'Pasivos'])
     expect(rows[2].cells[0].text).toBe('−500')

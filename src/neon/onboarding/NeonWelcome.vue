@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+
 import { useSetupNavigation } from '../../composables/useSetupNavigation'
 import { useWelcome } from '../../composables/useWelcome'
 import { useUiStore } from '../../stores/ui'
@@ -18,20 +20,38 @@ function onOpenChange(value: boolean): void {
   if (!value) dismiss()
 }
 
-function account(): void {
+// A step closes the panel and goes on once it is gone: the page is inert while
+// the dialog is open, and the panel hands the focus back as it closes, so the
+// destination takes it after that (the new account's name, the entry sheet).
+let next: (() => void) | null = null
+watch(open, (value) => {
+  if (value) next = null
+})
+
+function closeThen(step: () => void): void {
+  next = step
   dismiss()
-  createAccount()
+}
+
+function onClosed(): void {
+  const step = next
+  next = null
+  step?.()
+}
+
+function account(): void {
+  closeThen(createAccount)
 }
 
 function movement(): void {
-  dismiss()
-  createMovement()
+  closeThen(createMovement)
 }
 
 function optional(section: 'budget' | 'investment' | 'settings'): void {
-  dismiss()
-  if (section === 'settings') uiStore.settingsTab = 'connections'
-  navigateTo(section)
+  closeThen(() => {
+    if (section === 'settings') uiStore.settingsTab = 'connections'
+    navigateTo(section)
+  })
 }
 
 const OPTIONAL = [
@@ -67,6 +87,7 @@ const done = 'text-gain text-[15px] font-extrabold'
       kicker="Tu punto de partida"
       title="Bienvenido a tus finanzas"
       @update:open="onOpenChange"
+      @closed="onClosed"
     >
       <p class="text-soft text-[16px] leading-normal">
         Empieza con una cuenta y un movimiento. Con eso ya puedes seguir tu día a día.

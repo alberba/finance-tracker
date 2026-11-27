@@ -48,7 +48,7 @@ function setup(
   return { controller, root, scheme, storage }
 }
 
-describe('new design theme controller', () => {
+describe('theme controller', () => {
   it('without a preference paints «oscuro suave», or «claro melocotón» if the system asks for light', () => {
     expect(setup({ prefersDark: true }).root.dataset.theme).toBe('oscuro-suave')
     expect(setup({ prefersDark: false }).root.dataset.theme).toBe('claro-melocoton')
@@ -64,7 +64,7 @@ describe('new design theme controller', () => {
     },
   )
 
-  it('reads an unknown stored value, such as the old design’s «dark», as no preference', () => {
+  it('reads an unknown stored value, such as «dark», as no preference', () => {
     const { controller } = setup({ stored: 'dark', prefersDark: false })
 
     expect(controller.getState()).toEqual({ preference: null, theme: 'claro-melocoton' })

@@ -6,8 +6,7 @@ import { typeOnKeypad } from './entry-keypad'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Datos in the mobile frame of the new design (#447), in the mobile project. No
- * cookie: the new design is the default. Each test that exports adds a movement
+ * Datos in the mobile frame (#447), in the mobile project. Each test that exports adds a movement
  * of its own so the file carries something recognizable. Wording and counts
  * are the view-model's unit tests'; here, what the user does and what they get.
  */

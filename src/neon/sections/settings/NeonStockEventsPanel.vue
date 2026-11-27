@@ -7,8 +7,8 @@ import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonSwitch from '../../ui/NeonSwitch.vue'
 
 // Stock Events: the API key, whether new movements are sent and whether trades
-// move the cash of the list. Which list and ticker each symbol uses is decided
-// in the old design's cards for now.
+// move the cash of the list. Which list and ticker each symbol uses has no
+// editor here: the mappings already saved keep applying.
 const open = defineModel<boolean>('open', { required: true })
 const store = useStockEventsStore()
 const apiKey = shallowRef('')

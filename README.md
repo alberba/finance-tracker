@@ -23,7 +23,7 @@ Tracker financiero web para presupuestos, patrimonio, inversiones y objetivos.
 - `src/lib/finance-core.ts`: lógica financiera tipada (TypeScript)
 - `src/data/seed.json`: datos semilla sintéticos y neutros
 - `src/data/seed.ts`: wrapper TypeScript para importar el seed desde cliente y servidor
-- `src/styles/`: `global.css` (entrada), `common.css` (fuentes, reset), `legacy.css` (tokens y `@theme` del diseño antiguo); los tokens del diseño nuevo, en `src/neon/styles/neon.css`
+- `src/styles/`: `global.css` (entrada) y `common.css` (fuentes, reset); los tokens, en `src/neon/styles/neon.css`
 - `scripts/extract_excel_seed.py`: script para regenerar el seed desde un `.xlsx`
 
 ## Ejecutar en OrbStack (Docker)
@@ -189,7 +189,7 @@ Estructura de tests:
 - `tests/component/`: contratos y estados visibles de componentes Vue
 - `tests/integration/`: repositorios, migraciones y SQLite real
 - `tests/e2e/pages/FinanceTrackerPage.ts`: Page Object Model
-- `tests/e2e/finance-tracker.spec.ts`: flujos E2E principales
+- `tests/e2e/`: recorridos E2E de cada sección (`neon-*.spec.ts`, escritorio y móvil)
 - `playwright.config.ts`: configuración de E2E y `webServer`
 
 La estrategia de Vitest y sus comandos están documentados en

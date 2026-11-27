@@ -3,8 +3,7 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Patrimonio in the new design (#435), desktop. No cookie: the new design is
- * the default. The clock sits on 20 March 2026: the seed closes January and
+ * Patrimonio (#435), desktop. The clock sits on 20 March 2026: the seed closes January and
  * February, and March is still open.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
@@ -22,7 +21,7 @@ function money(text: string): number {
   return Number(clean)
 }
 
-test.describe('Patrimonio en el diseño nuevo', () => {
+test.describe('Patrimonio', () => {
   test('consulta la evolución, fija un mes en la gráfica y cambia el rango', async ({
     page,
     tracker,

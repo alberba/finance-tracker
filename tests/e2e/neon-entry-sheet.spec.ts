@@ -4,7 +4,7 @@ import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import { expectSyncCommand } from './pages/sync'
 import { typeOnKeypad } from './entry-keypad'
 
-/** Alta y revisión de pendientes en el diseño neón. */
+/** Alta y revisión de pendientes. */
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Nuevo movimiento' })
 const MOBILE = { width: 393, height: 780 }
 const DESKTOP = { width: 1280, height: 800 }
@@ -191,7 +191,7 @@ test.describe('Mini modal de alta', () => {
     await expect(opener).toBeFocused()
   })
 
-  test('un importe vacío da el mismo error que el panel antiguo', async ({ page, tracker }) => {
+  test('un importe vacío avisa de que debe ser mayor que 0', async ({ page, tracker }) => {
     await page.setViewportSize(MOBILE)
     await tracker.goto()
 
@@ -203,7 +203,7 @@ test.describe('Mini modal de alta', () => {
   })
 })
 
-test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
+test.describe('Editar y confirmar un pendiente', () => {
   const editSheet = (page: Page) => page.getByRole('dialog', { name: 'Editar y confirmar' })
 
   async function openPendingEdit(page: Page, description: string): Promise<void> {

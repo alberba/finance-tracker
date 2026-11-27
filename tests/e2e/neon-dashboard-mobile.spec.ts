@@ -6,8 +6,8 @@ import type { RecurringRule } from '../../src/scripts/types'
 import { typeOnKeypad } from './entry-keypad'
 
 /**
- * Recorridos del dashboard nuevo en el marco móvil (#430), en el proyecto
- * móvil. Sin cookie: el diseño nuevo es el de por defecto. Las cifras las
+ * Recorridos del dashboard en el marco móvil (#430), en el proyecto
+ * móvil. Las cifras las
  * prueba el unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
 test.use({ fixedTime: '2026-07-10T10:00:00' })

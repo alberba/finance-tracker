@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { test, expect } from './fixtures'
 import { syncV2TestHeaders } from './seed-sync-v2'
 
-test('los requisitos bloquean solo las acciones afectadas y se resuelven al crear una cuenta', async ({
+test('sin cuentas no se apuntan movimientos, y crear una lo desbloquea', async ({
   page,
   tracker,
   testUserEmail,
@@ -29,54 +29,36 @@ test('los requisitos bloquean solo las acciones afectadas y se resuelven al crea
   expect(completed.ok(), await completed.text()).toBe(true)
   await tracker.reload()
 
+  const create = tracker.transactionsSection.getByRole('button', {
+    name: 'Nuevo movimiento',
+    exact: true,
+  })
+  const requirement = tracker.transactionsSection.getByText(
+    'Crea una cuenta en Configuración para registrar movimientos y suscripciones.',
+  )
   await tracker.openTransactions()
-  await expect(
-    tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento', exact: true }),
-  ).toBeDisabled()
-  await expect(
-    tracker.transactionsSection.locator('[data-setup-requirement]').filter({ visible: true }),
-  ).toContainText('Crea una cuenta')
+  await expect(create).toBeDisabled()
+  await expect(requirement).toBeVisible()
 
+  // Without accounts the budget still works: the reset leaves the default categories.
   await tracker.openBudget()
-  // La falta de cuentas no bloquea el presupuesto: el reset deja las categorías
-  // por defecto y este apartado sigue operativo.
-  await expect(
-    tracker.budgetSection.locator('[data-setup-requirement]').filter({ visible: true }),
-  ).toHaveCount(0)
-  await tracker.budgetSection.getByRole('tab', { name: /Ingresos/ }).click()
-  await expect(
-    tracker.budgetSection.getByRole('table', { name: 'Ingresos por categoría y mes' }),
-  ).toBeVisible()
+  await expect(tracker.budgetSection.getByText(/Crea una cuenta/)).toHaveCount(0)
 
-  await tracker.openWealth()
-  await expect(tracker.wealthSection.locator('[data-save-snapshot]')).toBeDisabled()
-  await tracker.wealthSection.getByRole('button', { name: 'Crear cuenta', exact: true }).click()
-  const panel = page.locator('#settings-account-panel')
-  await expect(panel).toBeVisible()
-  await panel.getByLabel('Nombre').fill('Cuenta inicial')
-  await panel.getByLabel('Saldo inicial (€)').fill('0')
-  await panel.getByRole('button', { name: 'Crear cuenta', exact: true }).click()
-  await expect(panel).toBeHidden()
-
+  await tracker.addAccount({ name: 'Cuenta inicial' })
   await tracker.openTransactions()
-  await expect(
-    tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento', exact: true }),
-  ).toBeEnabled()
-  await expect(tracker.transactionsSection.locator('[data-setup-requirement]')).toHaveCount(0)
-  await tracker.openWealth()
-  await expect(tracker.wealthSection.locator('[data-save-snapshot]')).toBeEnabled()
+  await expect(create).toBeEnabled()
+  await expect(requirement).toHaveCount(0)
 
-  await tracker.openSettingsCard('Cuentas', 'Cuenta inicial')
-  await panel.getByRole('button', { name: 'Eliminar', exact: true }).click()
+  await tracker.openSettings()
+  await tracker
+    .section('settings')
+    .getByRole('button', { name: 'Eliminar Cuenta inicial', exact: true })
+    .click()
   await page
     .getByRole('alertdialog', { name: '¿Eliminar esta cuenta?' })
     .getByRole('button', { name: 'Eliminar cuenta', exact: true })
     .click()
   await tracker.openTransactions()
-  await expect(
-    tracker.transactionsSection.getByRole('button', { name: 'Nuevo movimiento', exact: true }),
-  ).toBeDisabled()
-  await expect(
-    tracker.transactionsSection.getByRole('button', { name: 'Crear cuenta', exact: true }),
-  ).toBeVisible()
+  await expect(create).toBeDisabled()
+  await expect(requirement).toBeVisible()
 })

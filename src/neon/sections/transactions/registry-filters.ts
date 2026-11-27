@@ -14,8 +14,8 @@ const TYPE_DOT: Record<string, string> = {
 }
 
 /**
- * The registry's filters as choices: the type and the account (shared with the
- * old design, in the UI store) and the design's own `extra` (day, amounts,
+ * The registry's filters as choices: the type and the account (in the UI
+ * store) and the registry's own `extra` (day, amounts,
  * category). Each change swaps the ledger (ledger-swap.ts). Used by the chips
  * of the desktop and by the phone's filter sheet.
  */

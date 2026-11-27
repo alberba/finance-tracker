@@ -9,7 +9,7 @@ import NeonWealthHoldings from './NeonWealthHoldings.vue'
 import NeonWealthMix from './NeonWealthMix.vue'
 import { useWealthCover } from './wealth-cover'
 
-// The cover of the new Patrimonio: the title with the month's close beside it,
+// The cover of Patrimonio: the title with the month's close beside it,
 // the balance of the month as one bar, how the net worth went this year next to
 // where the assets are, and what you have, group by group. A row opens that
 // account's detail.

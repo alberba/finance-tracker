@@ -12,7 +12,7 @@ import { amountFilterLabel, hasExtraFilters, type ExtraFilters } from './registr
 // (Tipo, Cuenta, Fecha, Importe), each saying its value and opening its own
 // panel, so what narrows the list shows without opening anything. Search, type
 // and account are the registry's shared filters; the day and the amounts only
-// exist in the new design and come in as `extra`. The registry's own actions
+// exist and come in as `extra`. The registry's own actions
 // (select, export) go at the end of the row. `compact` is the phone: the search
 // shares its row with the actions (a «⋯» menu) and the chips slide sideways
 // under it, each opening its panel as a bottom sheet.

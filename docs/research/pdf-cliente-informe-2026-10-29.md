@@ -249,8 +249,8 @@ a mano. Descartadas: pdf-lib (sin tablas, sin releases desde 2021), @react-pdf/r
 
 Contexto nuevo: el PDF debe usar las mismas familias que la web y funcionar offline. Hoy se cargan desde
 Google Fonts en `src/components/FinanceTrackerShell.astro:88-91` (Syne `wght 400..800`; DM Sans
-`opsz 9..40`, pesos 400/500/600/700 y cursiva 400; DM Mono 400/500), de modo que no están en el repo. Los
-`docs/architecture/design-language.md` fijan Syne para títulos **y todas las cifras, siempre con
+`opsz 9..40`, pesos 400/500/600/700 y cursiva 400; DM Mono 400/500), de modo que no están en el repo. Las
+pautas visuales de entonces (`design-language.md`, retirado en #453) fijan Syne para títulos **y todas las cifras, siempre con
 `tabular-nums`**, DM Sans para el texto y DM Mono para etiquetas.
 
 Metodología: descargué los archivos reales de los repos oficiales a un directorio temporal (fuera del repo), los

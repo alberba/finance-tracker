@@ -9,7 +9,7 @@ import { useUiStore } from '../../stores/ui'
 import { buildNeonDashboardViewModel, type ChartRange } from './view-model'
 
 /**
- * Presentation state of the new dashboard. A store rather than component
+ * Presentation state of the dashboard. A store rather than component
  * state so the chart range survives leaving the section and coming back:
  * the section unmounts on every navigation, the store does not.
  */

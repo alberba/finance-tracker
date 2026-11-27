@@ -149,11 +149,14 @@ test.describe('Bienvenida (sync v2)', () => {
       await expect(
         welcome(page).getByText('Crea una cuenta para poder registrar movimientos.'),
       ).toBeVisible()
-      for (const theme of ['light', 'dark'] as const) {
-        await page.emulateMedia({ colorScheme: theme })
+      for (const [scheme, theme] of [
+        ['light', 'claro-melocoton'],
+        ['dark', 'oscuro-suave'],
+      ] as const) {
+        await page.emulateMedia({ colorScheme: scheme })
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
         await page.screenshot({
-          path: testInfo.outputPath(`welcome-${device}-${theme}.png`),
+          path: testInfo.outputPath(`welcome-${device}-${scheme}.png`),
           animations: 'disabled',
         })
       }
@@ -206,12 +209,15 @@ test.describe('Bienvenida (sync v2)', () => {
     await initialize(context.request)
     const tracker = await openWelcome(page)
     await welcome(page).getByRole('button', { name: 'Crear cuenta' }).click()
-    const account = page.getByRole('dialog', { name: 'Nueva cuenta', exact: true })
-    await expect(account).toBeVisible()
-    await account.getByLabel('Nombre').fill('Mi primera cuenta')
-    await account.getByLabel('Saldo inicial (€)').fill('100')
-    await account.getByRole('button', { name: 'Crear cuenta' }).click()
-    await expect(account).toBeHidden()
+    const settings = page.locator('#settings')
+    const name = settings.getByLabel('Nombre de la nueva cuenta')
+    await expect(name).toBeFocused()
+    await name.fill('Mi primera cuenta')
+    await settings.getByLabel('Saldo inicial de la nueva cuenta').fill('100')
+    await settings.getByRole('button', { name: 'Añadir' }).first().click()
+    await expect(
+      settings.getByRole('button', { name: 'Eliminar Mi primera cuenta', exact: true }),
+    ).toBeVisible()
     await expectSettings(context.request, {
       onboardingPresented: 1,
       onboardingDismissed: 1,
@@ -233,20 +239,18 @@ test.describe('Bienvenida (sync v2)', () => {
       await device.close()
     }
     await welcome(page).getByRole('button', { name: 'Registrar movimiento' }).click()
-    const movement = tracker.transactionPanel
+    const movement = tracker.entrySheet
     await expect(movement).toBeVisible()
+    await movement.getByRole('textbox', { name: 'Importe' }).fill('12')
+    await movement.getByRole('button', { name: 'Categoría', exact: true }).click()
     await movement
-      .getByRole('group', { name: 'Tipo de movimiento' })
-      .getByRole('button', { name: 'Gasto', exact: true })
+      .getByRole('dialog', { name: 'Categoría', exact: true })
+      .getByRole('button', { name: 'Alimentación', exact: true })
+      .last()
       .click()
-    await movement.getByLabel('Fecha').fill('2026-10-01')
-    await movement
-      .getByLabel('Cuenta', { exact: true })
-      .selectOption({ label: 'Mi primera cuenta' })
-    await movement.getByLabel('Categoría').selectOption({ label: 'Alimentación' })
     await movement.getByLabel('Descripción').fill('Mi primer movimiento')
-    await movement.getByLabel('Importe').fill('12')
-    await movement.getByRole('button', { name: 'Guardar movimiento' }).click()
+    await movement.getByRole('button', { name: 'Guardar' }).click()
+    await expect(movement).toBeHidden()
     await expectSettings(context.request, {
       onboardingAccountCompleted: 1,
       onboardingMovementCompleted: 1,
@@ -329,15 +333,16 @@ test.describe('Bienvenida (sync v2)', () => {
       await expectSettings(context.request, { onboardingDismissed: 1 })
       await expect(page.locator('#sidebar-sync-status')).toHaveText(/^Sincronizado ·/)
       await tracker.openData()
-      await page
+      const data = page.locator('#data')
+      await data.getByRole('button', { name: /Importar/ }).click()
+      await data
         .locator('#import-json')
         .setInputFiles({ name: 'copia.json', mimeType: 'application/json', buffer: backup })
-      const confirmation = page.getByRole('alertdialog', { name: '¿Importar esta copia?' })
       const imported = page.waitForResponse((response) =>
         response.url().includes('/api/data/import?mode=replace'),
       )
       const reloaded = page.waitForEvent('framenavigated', (frame) => frame === page.mainFrame())
-      await confirmation.getByRole('button', { name: 'Sustituir mis datos' }).click()
+      await data.getByRole('button', { name: 'Sustituir mis datos' }).click()
       const importResponse = await imported
       expect(importResponse.ok()).toBe(true)
       await reloaded

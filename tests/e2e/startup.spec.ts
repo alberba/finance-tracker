@@ -16,6 +16,6 @@ const test = base.extend({
 
 test('hydrates the workspace without client runtime errors', async ({ tracker }) => {
   await expect(
-    tracker.dashboardSection.getByRole('button', { name: 'Nuevo movimiento' }),
+    tracker.dashboardSection.getByRole('button', { name: 'Apuntar' }).first(),
   ).toBeEnabled()
 })

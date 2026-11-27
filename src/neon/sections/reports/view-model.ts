@@ -7,11 +7,10 @@ import type {
 import { describeReportStatus, issueStateWord } from '../../../domain/reports/report-status'
 import { formatLongDate, formatShortDate, formatStamp } from '../../../lib/format'
 
-// «Mis reportes» in the new design (artboards «Mis reportes · 2560 px» and
+// «Mis reportes» (artboards «Mis reportes · 2560 px» and
 // «· estados en escritorio», #448): the texts and states the list and the
-// detail paint. The wording of a status comes from `describeReportStatus`,
-// the same source as the old design; this file only decides what each block
-// of the new one says around it.
+// detail paint. The wording of a status comes from `describeReportStatus`;
+// this file only decides what each block says around it.
 
 /** The dot's color: the accent while open, green when done, grey otherwise. */
 export type DotTone = 'accent' | 'gain' | 'muted'

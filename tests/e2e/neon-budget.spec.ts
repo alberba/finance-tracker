@@ -6,8 +6,7 @@ import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Presupuesto in the new design (#433), desktop. No cookie: the new design is
- * the default. The clock sits on 20 March 2026, the newest month of the seed.
+ * Presupuesto (#433), desktop. The clock sits on 20 March 2026, the newest month of the seed.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
@@ -45,7 +44,7 @@ async function resetCategory(
   await tracker.openBudget()
 }
 
-test.describe('Presupuesto en el diseño nuevo', () => {
+test.describe('Presupuesto', () => {
   test(
     'fija el límite de una categoría y ve su progreso y lo que queda',
     { tag: '@smoke' },

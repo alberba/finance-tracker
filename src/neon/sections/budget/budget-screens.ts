@@ -4,7 +4,7 @@ import { reactive, ref } from 'vue'
 import type { Month } from '../../../lib/month'
 import type { StartMode } from './prepare-view-model'
 
-// Presentation state of the new Presupuesto (#433): which of its four screens
+// Presentation state of Presupuesto (#433): which of its four screens
 // is showing, and what the user finished this session from the cover's
 // entries, so «Revisar septiembre» reads «Septiembre revisado» with its undo.
 // Nothing here is persisted: the plans themselves go through the budget store.

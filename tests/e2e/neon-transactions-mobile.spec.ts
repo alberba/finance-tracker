@@ -7,8 +7,8 @@ import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * Movimientos del diseño nuevo en el marco móvil (#432), en el proyecto móvil.
- * Sin cookie: el diseño nuevo es el de por defecto. El reloj está en marzo de
+ * Movimientos en el marco móvil (#432), en el proyecto móvil.
+ * El reloj está en marzo de
  * 2026, el mes más reciente de la semilla. Las cifras las prueba el unit del
  * view-model; aquí, lo que hace el usuario y lo que obtiene.
  */

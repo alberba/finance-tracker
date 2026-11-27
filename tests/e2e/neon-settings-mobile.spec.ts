@@ -3,8 +3,8 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Configuración in the mobile frame of the new design (#444), in the mobile
- * project. No cookie: the new design is the default. The index opens each
+ * Configuración in the mobile frame (#444), in the mobile
+ * project. The index opens each
  * apartado on its own screen; the seed brings its accounts. Labels and counts
  * are the view-model's unit tests'; here, what the user does and what they get.
  */

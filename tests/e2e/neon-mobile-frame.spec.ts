@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import type { FinanceSectionId } from './pages/FinanceTrackerPage'
 
-/** Marco móvil del diseño nuevo (#425). No cookie: el diseño nuevo es el de por defecto. */
+/** Marco móvil (#425). */
 const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
 const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })

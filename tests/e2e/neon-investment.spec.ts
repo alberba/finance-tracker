@@ -3,8 +3,7 @@ import { test, expect } from './fixtures'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
- * The cover of Inversión in the new design (#437), desktop. No cookie: the new
- * design is the default. The clock sits on 20 March 2026, the newest month of
+ * The cover of Inversión (#437), desktop. The clock sits on 20 March 2026, the newest month of
  * the seed.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
@@ -45,7 +44,7 @@ async function serveLateQuotes(page: Page): Promise<void> {
   })
 }
 
-test.describe('Inversión en el diseño nuevo', () => {
+test.describe('Inversión', () => {
   test(
     'cambia la rentabilidad de importe a porcentaje y vuelve',
     { tag: '@smoke' },

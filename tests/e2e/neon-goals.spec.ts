@@ -3,8 +3,7 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Objetivos in the new design (#441), desktop. No cookie: the new design is
- * the default. The clock sits on 20 March 2026; the seed has no savings goals.
+ * Objetivos (#441), desktop. The clock sits on 20 March 2026; the seed has no savings goals.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
@@ -29,7 +28,7 @@ async function createGoal(page: Page, name: string, amount: string, when: string
   await created
 }
 
-test.describe('Objetivos en el diseño nuevo', () => {
+test.describe('Objetivos', () => {
   test('crea un objetivo y ve su progreso', { tag: '@smoke' }, async ({ page, tracker }) => {
     await tracker.openGoals()
     await expect(section(page).getByRole('heading', { name: 'Objetivos', level: 1 })).toBeVisible()

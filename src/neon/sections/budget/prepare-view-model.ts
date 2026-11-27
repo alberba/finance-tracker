@@ -4,7 +4,7 @@ import { ALL_MONTHS, asMonth, atMonth, type Month } from '../../../lib/month'
 import { round2 } from '../../../lib/number'
 import type { BudgetType } from '../../../scripts/types'
 
-// «Hacer el presupuesto» of the new Presupuesto (artboard «Presupuesto ·
+// «Hacer el presupuesto» of Presupuesto (artboard «Presupuesto ·
 // 2560 px», #433): the plan of next month, category by category, against what
 // comes in. Pure functions over the shared budget view-model; the screen only
 // holds the values being edited.

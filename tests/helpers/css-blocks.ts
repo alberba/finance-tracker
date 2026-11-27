@@ -7,7 +7,7 @@
  */
 
 export interface CssBlock {
-  /** Selector list or at-rule head: `[data-ui='neon'], …`, `@layer base`. */
+  /** Selector list or at-rule head: `:root, …`, `@layer base`. */
   prelude: string
   /** Preludes of the blocks around this one, outermost first. */
   ancestors: string[]

@@ -35,7 +35,7 @@ import {
   type SettingsPartId,
 } from './view-model'
 
-// Configuración in the new design (artboard «Configuración · 2560 px», #443):
+// Configuración (artboard «Configuración · 2560 px», #443):
 // one page with an index of its apartados on the left and, on the right, a
 // panel with each of them in turn. Tables edit in place; the index follows the
 // scroll and takes you to an apartado. The mobile frame gets its own
@@ -85,11 +85,20 @@ onMounted(async () => {
   // The watchlists feed the Stock Events lists the accounts and assets show.
   await stockEventsStore.initializeCredential()
   if (stockEventsStore.credentialConfigured) await stockEventsStore.loadWatchlists()
-  const target = FROM_TAB[uiStore.settingsTab]
+  // «Crear cuenta» in the welcome lands on the accounts, in the new account's name.
+  const creatingAccount = uiStore.setupAction === 'account'
+  if (creatingAccount) uiStore.setupAction = null
+  const target = creatingAccount ? 'cuentas' : FROM_TAB[uiStore.settingsTab]
   if (target && !desktopFrame.value) mobileView.value = target
   else if (target) {
     await nextTick()
     goTo(target)
+  }
+  if (creatingAccount) {
+    await nextTick()
+    document
+      .querySelector<HTMLInputElement>('#settings input[aria-label="Nombre de la nueva cuenta"]')
+      ?.focus({ preventScroll: desktopFrame.value })
   }
 })
 

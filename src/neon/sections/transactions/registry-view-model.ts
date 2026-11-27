@@ -12,12 +12,12 @@ import { ALL_MONTHS, type Month } from '../../../lib/month'
 import { parseDecimal, round2 } from '../../../lib/number'
 import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../../scripts/types'
 
-// What the new Movimientos registry shows (artboard «Movimientos · 2560 px»):
+// What Movimientos registry shows (artboard «Movimientos · 2560 px»):
 // the ledger by month and day, the filter summary in the aside and the detail
 // of one movement. Pure functions over the shared domain; the section only
 // wires them to the stores.
 
-/** Filters of «Más filtros» that only the new design has. Empty means no filter. */
+/** Filters of «Más filtros» beyond type and account. Empty means no filter. */
 export interface ExtraFilters {
   /** One exact day, ISO. */
   date: string

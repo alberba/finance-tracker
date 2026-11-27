@@ -7,7 +7,7 @@ import NeonDataSync from './NeonDataSync.vue'
 import NeonDataSyncLine from './NeonDataSyncLine.vue'
 import NeonDataTransfer from './NeonDataTransfer.vue'
 
-// Datos in the new design (artboard «Datos · 2560 px», #446): the page title,
+// Datos (artboard «Datos · 2560 px», #446): the page title,
 // then «Entrada y salida» (import, Bitvavo and export), «Sincronización» (the
 // state of the queue) and, when the space can be wiped, «Zona peligrosa».
 // The data, the files and the sync are the stores' (`useDataStore`,

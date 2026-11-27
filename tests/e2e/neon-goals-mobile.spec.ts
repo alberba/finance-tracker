@@ -3,8 +3,8 @@ import { test, expect } from './fixtures'
 import { expectSyncCommand } from './pages/sync'
 
 /**
- * Objetivos in the mobile frame of the new design (#442), in the mobile
- * project. No cookie: the new design is the default. The clock sits on 20
+ * Objetivos in the mobile frame (#442), in the mobile
+ * project. The clock sits on 20
  * March 2026; the seed has no savings goals. Figures are the view-model's unit
  * tests'; here, what the user does and what they get.
  */

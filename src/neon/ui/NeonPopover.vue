@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, useId, useTemplateRef, watch } from 'vue'
 
-// Popover of the new design (DESIGN.md, Popover): a short floating list anchored
+// Popover (DESIGN.md, Popover): a short floating list anchored
 // to its trigger («Por confirmar», range selector). The trigger comes in the
 // `trigger` slot with what it needs to wire itself (`toggle`, `expanded`,
 // `panelId`); the content is the default slot. It asks to close (`open = false`)

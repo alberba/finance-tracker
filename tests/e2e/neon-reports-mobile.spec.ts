@@ -3,8 +3,8 @@ import { test, expect } from './fixtures'
 import { mockReportsApi, reportEntry } from './pages/reports-api'
 
 /**
- * «Mis reportes» in the mobile frame of the new design (#449), in the mobile
- * project. No cookie: the new design is the default. GitHub is never called:
+ * «Mis reportes» in the mobile frame (#449), in the mobile
+ * project. GitHub is never called:
  * `/api/reports` is faked. Wording and counts are the view-model's unit tests';
  * here, what the person does and what they get.
  */

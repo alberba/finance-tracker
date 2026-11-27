@@ -9,7 +9,7 @@ import { ACCOUNT_FILTERS, mobileAccountGroups } from './mobile-view-model'
 import { useWealthCover } from './wealth-cover'
 import { useNeonWealthScreens } from './wealth-screens'
 
-// Cover of the new Patrimonio in the mobile frame: what you have, with the
+// Cover of Patrimonio in the mobile frame: what you have, with the
 // month's close beside it, then every account as a tile, group by group with
 // its total, filtered by group. A tile gives what the account holds and what it
 // moved since the month before, coloured only when the move is big. The chart

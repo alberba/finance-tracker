@@ -60,12 +60,11 @@ import {
   type SortKey,
 } from './view-model'
 
-// Inversión in the new design (artboard «Inversión · 2560 px», #437): the
+// Inversión (artboard «Inversión · 2560 px», #437): the
 // cover. How the portfolio did in the period, simple or TWR; its evolution
 // against what went in; each position, which opens its detail; the worst fall
 // and the fees. The header says how fresh the quotes are, and warns when some
-// are late. Return mode and month are the investment store's, shared with the
-// old design.
+// are late. Return mode and month are the investment store's.
 //
 // A position opens its detail, a history entry of its own at
 // `/inversion?activo=<id>`: the arrow and the browser's back button both return

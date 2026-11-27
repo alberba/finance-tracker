@@ -9,7 +9,7 @@ import {
   shouldCloseSheet,
 } from './sheet-drag'
 
-// Detail panel of the new design (DESIGN.md, Panel de detalle): the detail or
+// Detail panel (DESIGN.md, Panel de detalle): the detail or
 // edit view of one element of a section. A modal <dialog>: a full-height side
 // panel on the desktop frame, a bottom sheet below it. It closes with its
 // button, Escape, the scrim and, as a sheet, by dragging the grip or the
@@ -28,6 +28,8 @@ const props = defineProps<{
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
+/** `closed`: the exit finished and the focus is back where it belongs. */
+const emit = defineEmits<{ closed: [] }>()
 
 const EXIT_MS = 200
 const PANEL_EXIT_MS = 240
@@ -114,6 +116,7 @@ async function sync(shouldOpen: boolean): Promise<void> {
     element.style.transform = ''
     opener?.focus()
     opener = null
+    emit('closed')
   }
 }
 

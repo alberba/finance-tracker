@@ -68,9 +68,7 @@ un test sobrevive a un rediseño o refactor, y la estética se revisa a mano.
 
 [Issue #233](https://github.com/alberba/finance-tracker/issues/233) permite poner en cuarentena los
 casos afectados mientras se investiga su sincronización. Un caso en cuarentena usa `test.fixme`,
-conserva sus aserciones y no aumenta timeouts ni cambia workers. Ahora no hay ninguno: el último,
-«home no muestra bloque legacy de filtros en movimientos», se borró en #421 porque comprobaba un
-detalle del diseño antiguo, no un comportamiento.
+conserva sus aserciones y no aumenta timeouts ni cambia workers. Ahora no hay ninguno.
 
 Los escenarios autenticados usan identidad y estado aislados preparados por el runtime de
 pruebas. Para ejecutar la suite completa y mantener su presupuesto, consulta

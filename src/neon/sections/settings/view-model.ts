@@ -7,7 +7,7 @@ import { formatMoney, formatShortDate, formatSignedMoney } from '../../../lib/fo
 import { parseDecimal } from '../../../lib/number'
 import type { Entity, RecurringRule, State } from '../../../scripts/types'
 
-// Configuración in the new design (artboard «Configuración · 2560 px», #443):
+// Configuración (artboard «Configuración · 2560 px», #443):
 // the figures, states and labels its tables show. The components only paint
 // what these functions return.
 

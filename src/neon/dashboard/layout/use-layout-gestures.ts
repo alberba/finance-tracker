@@ -65,7 +65,7 @@ export function useLayoutGestures(grid: () => HTMLElement | null) {
     if (!element) return null
     const rect = element.getBoundingClientRect()
     // The gap comes in CSS px and the rect in screen px; they differ under the
-    // desktop zoom of the new design (`--ui-zoom`), so scale the gap to match.
+    // desktop zoom (`--ui-zoom`), so scale the gap to match.
     const scale = element.offsetWidth ? rect.width / element.offsetWidth : 1
     const gap = (Number.parseFloat(getComputedStyle(element).columnGap) || 0) * scale
     return gridMetrics(rect, gap)

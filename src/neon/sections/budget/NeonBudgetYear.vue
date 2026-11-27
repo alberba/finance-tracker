@@ -28,7 +28,7 @@ import {
   type YearView,
 } from './year-view-model'
 
-// «El año» in the new design (artboard «Presupuesto · 2560 px», #433): the
+// «El año» (artboard «Presupuesto · 2560 px», #433): the
 // plan against what was recorded, by category and month. Type tabs, the view
 // (year, quarter or month), the summary of the year and the grid or list, with
 // the per-category year plan in a detail panel.
