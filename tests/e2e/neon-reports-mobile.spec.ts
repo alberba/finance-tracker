@@ -8,10 +8,6 @@ import { mockReportsApi, reportEntry } from './pages/reports-api'
  * `/api/reports` is faked. Wording and counts are the view-model's unit tests';
  * here, what the person does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
 
 const section = (page: Page) => page.locator('#reports')

@@ -7,9 +7,7 @@ import { test, expect } from './fixtures'
  * 20 March 2026, the newest month of the seed. Figures are the view-model's
  * unit tests'; here, what the user does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#investment')
 const grip = (page: Page) => section(page).getByRole('button', { name: /la lista de posiciones$/ })

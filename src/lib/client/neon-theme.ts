@@ -1,13 +1,10 @@
 /**
- * Theme of the new design (DESIGN.md, Temas): one of four named themes. With
- * no choice stored the system decides: «oscuro suave», or «claro melocotón»
- * if it asks for light. The pre-paint script in FinanceTrackerShell.astro
- * (and the login page's) applies the same rule before the first frame; this
- * controller takes over once the app loads and is the only writer of
- * `data-theme` and the stored choice afterwards.
- *
- * The old design keeps its own controller (theme.ts) and its own storage key,
- * so a choice in one design never reaches the other.
+ * Theme of the app (DESIGN.md, Temas): one of four named themes. With no
+ * choice stored the system decides: «oscuro suave», or «claro melocotón» if it
+ * asks for light. The pre-paint script in src/neon/app/AppShell.astro (and the
+ * login page's) applies the same rule before the first frame; this controller
+ * takes over once the app loads and is the only writer of `data-theme` and the
+ * stored choice afterwards.
  */
 
 export const NEON_THEMES = [

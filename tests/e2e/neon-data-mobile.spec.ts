@@ -11,10 +11,6 @@ import { editScenarioState } from './seed-sync-v2'
  * of its own so the file carries something recognizable. Wording and counts
  * are the view-model's unit tests'; here, what the user does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const section = (page: Page) => page.locator('#data')
 const MOVEMENT = 'e2e-copia-movil'
 

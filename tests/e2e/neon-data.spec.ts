@@ -9,10 +9,6 @@ import { editScenarioState, readScenarioState } from './seed-sync-v2'
  * default. The seed has accounts and movements; each test adds one movement of
  * its own so the file it exports carries something recognizable.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const section = (page: Page) => page.locator('#data')
 const MOVEMENT = 'e2e-copia'
 

@@ -12,9 +12,7 @@ import {
  * «Mis reportes» in the new design (#448), desktop. No cookie: the new design
  * is the default. GitHub is never called: `/api/reports` is faked.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, viewport: { width: 1440, height: 900 } })
+test.use({ viewport: { width: 1440, height: 900 } })
 
 const GITHUB_ERROR = 'No se pudo consultar GitHub. Inténtalo de nuevo.'
 

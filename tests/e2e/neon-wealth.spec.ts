@@ -7,9 +7,7 @@ import { expectSyncCommand } from './pages/sync'
  * the default. The clock sits on 20 March 2026: the seed closes January and
  * February, and March is still open.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#wealth')
 const net = (page: Page) => section(page).locator('[data-wealth-net]')

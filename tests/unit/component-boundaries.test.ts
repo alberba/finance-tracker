@@ -11,7 +11,7 @@ import { join, relative } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const COMPONENTS_DIR = join(process.cwd(), 'src/components')
+const COMPONENTS_DIR = join(process.cwd(), 'src/neon')
 
 function componentFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {

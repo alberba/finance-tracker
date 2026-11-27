@@ -11,7 +11,7 @@ import {
 describe("issue context helper", () => {
   it("selecciona archivos candidatos por tokens", () => {
     const files = [
-      "src/components/FinanceTrackerShell.astro",
+      "src/neon/app/AppShell.astro",
       "src/scripts/transactions.ts",
       "tests/e2e/finance-tracker.spec.ts",
     ];

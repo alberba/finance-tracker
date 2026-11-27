@@ -2,24 +2,20 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The five families of the two designs ship with the app (#404): Syne, DM Sans
- * and DM Mono (old design), Unbounded and Manrope (new design, #424).
- * `src/styles/common.css` declares them, `public/fonts` holds the latin woff2 files and
- * the service worker precaches them so the app keeps its typography offline.
- * Vendoring the OFL licenses is part of the redistribution terms.
+ * Unbounded and Manrope ship with the app (#424). `src/styles/common.css`
+ * declares them, `public/fonts` holds the latin woff2 files and the service
+ * worker precaches them so the app keeps its typography offline. Vendoring the
+ * OFL licenses is part of the redistribution terms.
  */
 
 const root = new URL('../../', import.meta.url)
 const commonCss = readFileSync(new URL('src/styles/common.css', root), 'utf8')
 const serviceWorker = readFileSync(new URL('public/sw.js', root), 'utf8')
-const fontPreloads = readFileSync(new URL('src/components/layout/FontPreloads.astro', root), 'utf8')
-const neonFontPreloads = readFileSync(
+const fontPreloads = readFileSync(
   new URL('src/neon/layout/NeonFontPreloads.astro', root),
   'utf8',
 )
 
-const OLD_FAMILIES = ['Syne', 'DM Sans', 'DM Mono']
-const NEON_FAMILIES = ['Unbounded', 'Manrope']
 
 type FontFace = {
   family: string
@@ -52,16 +48,11 @@ const sourceFiles = (readdirSync(new URL('src/', root), { recursive: true }) as 
   }))
 
 describe('self-hosted fonts', () => {
-  it('declares the faces of both designs with the weights the app paints', () => {
+  it('declares the faces with the weights the app paints', () => {
     expect(
       fontFaces.map(({ family, style, weight }) => `${family} ${style} ${weight}`).sort(),
     ).toEqual(
       [
-        'Syne normal 400 800',
-        'DM Sans normal 400 700',
-        'DM Sans italic 400',
-        'DM Mono normal 400',
-        'DM Mono normal 500',
         'Unbounded normal 200 900',
         'Manrope normal 200 800',
       ].sort(),
@@ -78,24 +69,10 @@ describe('self-hosted fonts', () => {
     expect(declared).toEqual(vendored)
   })
 
-  it('preloads the faces the first screen of each design paints', () => {
-    const hrefsOf = (source: string) =>
-      new Set([...source.matchAll(/href="(\/fonts\/[^"]+)"/g)].map(([, href]) => href))
-    const declared = new Set(fontSources)
-    const paintedBy = (families: string[]) =>
-      fontFaces
-        .filter((face) => face.style !== 'italic' && families.includes(face.family))
-        .map((face) => face.source.match(/url\('(\/fonts\/[^']+)'\)/)?.[1])
-        .filter((source): source is string => Boolean(source))
-        .sort()
+  it('preloads every face the first screen paints', () => {
+    const preloads = [...fontPreloads.matchAll(/href="(\/fonts\/[^"]+)"/g)].map(([, href]) => href)
 
-    for (const preloads of [hrefsOf(fontPreloads), hrefsOf(neonFontPreloads)]) {
-      for (const href of preloads) {
-        expect(declared.has(href), `${href} is not declared`).toBe(true)
-      }
-    }
-    expect([...hrefsOf(fontPreloads)].sort()).toEqual(paintedBy(OLD_FAMILIES))
-    expect([...hrefsOf(neonFontPreloads)].sort()).toEqual(paintedBy(NEON_FAMILIES))
+    expect(preloads.sort()).toEqual([...new Set(fontSources)].sort())
   })
 
   it('precaches every font in the service worker shell', () => {
@@ -111,7 +88,7 @@ describe('self-hosted fonts', () => {
       file.startsWith('OFL-'),
     )
 
-    expect(licenses).toHaveLength(5)
+    expect(licenses).toHaveLength(2)
     for (const license of licenses) {
       expect(readFileSync(new URL(`public/fonts/${license}`, root), 'utf8')).toContain(
         'SIL OPEN FONT LICENSE',

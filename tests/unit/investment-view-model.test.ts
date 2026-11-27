@@ -202,15 +202,6 @@ describe('buildInvestmentDashboardViewModel · posiciones', () => {
       lastMovementDate: null,
     })
   })
-
-  it('asigna a cada posición un color de la paleta de series', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.positions.map((position) => position.color)).toEqual([
-      'var(--chart-series-1)',
-      'var(--chart-series-2)',
-    ])
-  })
 })
 
 describe('buildInvestmentDashboardViewModel · series', () => {

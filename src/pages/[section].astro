@@ -1,5 +1,5 @@
 ---
-import FinanceTrackerShell from "../components/FinanceTrackerShell.astro";
+import AppShell from "../neon/app/AppShell.astro";
 import { isSectionRoutePath } from "../scripts/app/dashboard-section-routing";
 
 if (!isSectionRoutePath(Astro.url.pathname)) {
@@ -7,4 +7,4 @@ if (!isSectionRoutePath(Astro.url.pathname)) {
 }
 ---
 
-<FinanceTrackerShell />
+<AppShell />

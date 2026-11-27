@@ -8,10 +8,6 @@ import { expectSyncCommand } from './pages/sync'
  * apartado on its own screen; the seed brings its accounts. Labels and counts
  * are the view-model's unit tests'; here, what the user does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const section = (page: Page) => page.locator('#settings')
 const index = (page: Page) => section(page).getByRole('navigation', { name: 'Ajustes' })
 

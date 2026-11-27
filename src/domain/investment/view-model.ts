@@ -7,7 +7,6 @@ import {
 } from '../../lib/finance-core'
 import { parseTransactionYear } from '../../scripts/investment-movements'
 import { toSnapshotDate } from '../../scripts/contribution-workflow'
-import { seriesColor } from '../../scripts/chart-theme'
 import {
   MONTHS,
   type ContributionMetricRow,
@@ -24,15 +23,20 @@ import {
   computeInvestmentValue,
 } from './calculations'
 import { getContributionEntriesFromSnapshots } from './contributions'
-import type { MultiLineSeries } from '../../scripts/charts'
 
 export type ReturnMode = 'simple' | 'twr'
+
+/** One line of a chart: a value per chart point. */
+export interface ChartSeries {
+  name: string
+  values: number[]
+  /** A reference line, such as contributed capital. */
+  dashed?: boolean
+}
 
 export interface InvestmentPosition {
   id: string
   name: string
-  /** Series color as a token reference, from `seriesColor`. */
-  color: string
   value: number
   invested: number
   gain: number
@@ -48,7 +52,7 @@ export interface InvestmentPosition {
   /** ISO date of the latest movement up to the month. */
   lastMovementDate: string | null
   /** Gain over invested capital per chart point, same labels as the portfolio chart. */
-  series: MultiLineSeries
+  series: ChartSeries
 }
 
 export interface InvestmentDashboardViewModel {
@@ -62,9 +66,9 @@ export interface InvestmentDashboardViewModel {
   returnLabel: string
   positions: InvestmentPosition[]
   /** € view: portfolio value against contributed capital. */
-  valueSeries: MultiLineSeries[]
+  valueSeries: ChartSeries[]
   /** % view: cumulative return of the portfolio. */
-  percentSeries: MultiLineSeries[]
+  percentSeries: ChartSeries[]
   chartLabels: string[]
 }
 
@@ -161,13 +165,11 @@ export function buildInvestmentDashboardViewModel(
     .sort((a, b) => b.value - a.value)
   const positionTotal = valued.reduce((sum, { value }) => sum + value, 0)
 
-  const positions: InvestmentPosition[] = valued.map(({ asset, value }, idx) => {
+  const positions: InvestmentPosition[] = valued.map(({ asset, value }) => {
     const invested = computeInvestedCapitalByAsset(state, asset.id, month)
-    const color = seriesColor(idx)
     return {
       id: asset.id,
       name: asset.name,
-      color,
       value,
       invested,
       gain: value - invested,
@@ -176,7 +178,6 @@ export function buildInvestmentDashboardViewModel(
       ...buildPositionDetail(state, asset as Entity, month),
       series: {
         name: asset.name,
-        color,
         values: chartPoints.map((m) =>
           toGainPercent(
             computeInvestmentValue(state, asset.id, m),
@@ -197,10 +198,9 @@ export function buildInvestmentDashboardViewModel(
     returnLabel: isTWR ? 'Rentabilidad TWR' : 'Rentabilidad estimada',
     positions,
     valueSeries: [
-      { name: 'Valor de cartera', color: 'var(--primary)', values: portfolioTotalValues },
+      { name: 'Valor de cartera', values: portfolioTotalValues },
       {
         name: 'Capital aportado',
-        color: 'var(--text-muted)',
         values: portfolioInvestedCapital,
         dashed: true,
       },
@@ -208,7 +208,6 @@ export function buildInvestmentDashboardViewModel(
     percentSeries: [
       {
         name: isTWR ? 'Cartera Total (TWR)' : 'Cartera Total',
-        color: 'var(--primary)',
         values: portfolioPercentages,
       },
     ],

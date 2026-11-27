@@ -8,9 +8,7 @@ import { expectSyncCommand } from './pages/sync'
  * March 2026; the seed has no savings goals. Figures are the view-model's unit
  * tests'; here, what the user does and what they get.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#goals')
 const column = (page: Page, name: string) => section(page).locator(`[data-goal-column="${name}"]`)

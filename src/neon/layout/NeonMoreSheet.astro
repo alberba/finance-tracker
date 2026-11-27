@@ -1,15 +1,13 @@
 ---
 import { APP_SECTIONS } from '../../config/app-sections'
-import type { Design } from '../../lib/design'
 import type { SectionId } from '../../scripts/types'
 import { BAR_SECTION_IDS } from './mobile-sections'
-import DesignToggle from './DesignToggle.vue'
 import NeonNavItem from './NeonNavItem.astro'
 
 /**
  * «Más» sheet of the mobile frame: every section the bottom bar leaves out and
- * the design toggle. The ids and data attributes are what src/scripts/shell.ts
- * binds to (same contract as the old design's sheet): it opens with
+ * the report actions. The ids and data attributes are what src/scripts/shell.ts
+ * binds to: it opens with
  * `showModal()` from `[data-mobile-more-trigger]` and closes on the scrim, on
  * `[data-mobile-more-close]` and on any `[data-section]` inside. «Reportes» holds the
  * two actions of the report flow (artboard «hoja «Más» con novedades · móvil»):
@@ -20,10 +18,9 @@ import NeonNavItem from './NeonNavItem.astro'
  */
 export interface Props {
   activeSection: SectionId | null
-  design: Design
 }
 
-const { activeSection, design } = Astro.props
+const { activeSection } = Astro.props
 const REPORT_ROW =
   'rounded-field outline-accent flex min-h-16 w-full items-center gap-4 px-3 py-1.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.97]'
 const REPORT_ICON = 'size-5.5 shrink-0'
@@ -124,13 +121,4 @@ const sections = APP_SECTIONS.filter((section) => !BAR_SECTION_IDS.includes(sect
     </ul>
   </section>
 
-  <section class="mbs-4 grid gap-2" aria-labelledby="mobile-design-title">
-    <h3
-      id="mobile-design-title"
-      class="text-muted text-label font-extrabold tracking-label uppercase"
-    >
-      Diseño
-    </h3>
-    <DesignToggle client:only="vue" design={design} />
-  </section>
 </dialog>

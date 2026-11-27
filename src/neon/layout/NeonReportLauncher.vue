@@ -3,12 +3,12 @@ import { computed, onMounted } from 'vue'
 
 import { useReportDialogTrigger } from '../../composables/useReportDialogTrigger'
 import { useReportsStore } from '../../stores/reports'
+import NeonIssueReportPanel from './NeonIssueReportPanel.vue'
 
 // «Reportar» button of the desktop frame (artboard «Mis reportes · 2560 px»):
 // a 48px round button at the bottom right that unfolds to its word on hover or
 // focus. A dot on it says that a report has news the person has not read. On
-// the mobile frame the «Más» sheet opens the report panel instead. The panel
-// itself comes in the default slot, so this file never imports the old design.
+// the mobile frame the «Más» sheet opens the report panel instead.
 const isOpen = defineModel<boolean>('open', { default: false })
 const reportsStore = useReportsStore()
 const hasUpdates = computed(() => reportsStore.unseenCount > 0)
@@ -62,5 +62,5 @@ onMounted(() => {
     >Hay novedades en tus reportes</span
   >
 
-  <slot />
+  <NeonIssueReportPanel v-model:open="isOpen" />
 </template>

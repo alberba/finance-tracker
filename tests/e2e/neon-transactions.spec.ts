@@ -10,9 +10,7 @@ import { editScenarioState } from './seed-sync-v2'
  * Movimientos in the new design (#431), desktop. No cookie: the new design is
  * the default. The clock sits in March 2026, the newest month of the seed.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#transactions')
 const ledger = (page: Page) => section(page).locator('[data-tx-ledger]')

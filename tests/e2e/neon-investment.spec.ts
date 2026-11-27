@@ -7,9 +7,7 @@ import { editScenarioState } from './seed-sync-v2'
  * design is the default. The clock sits on 20 March 2026, the newest month of
  * the seed.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#investment')
 const figure = (page: Page, key: string) =>

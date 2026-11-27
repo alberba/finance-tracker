@@ -12,9 +12,7 @@ import { editScenarioState } from './seed-sync-v2'
  * 2026, el mes más reciente de la semilla. Las cifras las prueba el unit del
  * view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#transactions')
 const ledger = (page: Page) => section(page).locator('[data-tx-ledger]')

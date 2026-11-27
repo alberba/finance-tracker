@@ -5,8 +5,6 @@ import { expectSyncCommand } from './pages/sync'
 import { typeOnKeypad } from './entry-keypad'
 
 /** Alta y revisión de pendientes en el diseño neón. */
-const NO_COOKIE = { cookies: [], origins: [] }
-
 const sheet = (page: Page) => page.getByRole('dialog', { name: 'Nuevo movimiento' })
 const MOBILE = { width: 393, height: 780 }
 const DESKTOP = { width: 1280, height: 800 }
@@ -19,8 +17,6 @@ const TYPES = [
 ] as const
 
 test.describe('Mini modal de alta', () => {
-  test.use({ storageState: NO_COOKIE })
-
   test('apunta cada tipo desde el botón «Apuntar» del móvil y sobrevive a recargar', async ({
     page,
     tracker,
@@ -208,8 +204,6 @@ test.describe('Mini modal de alta', () => {
 })
 
 test.describe('Editar y confirmar un pendiente en la hoja nueva', () => {
-  test.use({ storageState: NO_COOKIE })
-
   const editSheet = (page: Page) => page.getByRole('dialog', { name: 'Editar y confirmar' })
 
   async function openPendingEdit(page: Page, description: string): Promise<void> {

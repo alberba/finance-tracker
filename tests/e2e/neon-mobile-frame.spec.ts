@@ -3,8 +3,6 @@ import { test, expect } from './fixtures'
 import type { FinanceSectionId } from './pages/FinanceTrackerPage'
 
 /** Marco móvil del diseño nuevo (#425). No cookie: el diseño nuevo es el de por defecto. */
-const NO_COOKIE = { cookies: [], origins: [] }
-
 const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
 const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })
@@ -26,14 +24,11 @@ const MORE_SECTIONS: Array<[FinanceSectionId, string]> = [
 ]
 
 test.describe('Marco móvil nuevo', () => {
-  test.use({ storageState: NO_COOKIE })
-
   test.beforeEach(async ({ tracker }) => {
     await tracker.goto()
   })
 
   test('navega a cada sección desde la barra y desde «Más»', async ({ page, tracker }) => {
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
     await expect(bottomBar(page)).toBeVisible()
     await expect(page.getByRole('complementary')).toBeHidden()
 
@@ -66,27 +61,6 @@ test.describe('Marco móvil nuevo', () => {
 
     await moreSheet(page).getByRole('button', { name: 'Cerrar menú' }).click()
     await expect(moreSheet(page)).toBeHidden()
-  })
-
-  test('cambia de diseño desde «Más»', async ({ page, tracker }) => {
-    await moreTrigger(page).click()
-    const toggle = moreSheet(page).getByRole('group', { name: 'Diseño' })
-    await expect(toggle.getByRole('button', { name: 'Diseño nuevo' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await toggle.getByRole('button', { name: 'Diseño antiguo' }).click()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'legacy')
-
-    await tracker.reload()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'legacy')
-    await page.getByRole('button', { name: 'Más secciones' }).click()
-    await page
-      .getByRole('dialog', { name: 'Más secciones' })
-      .getByRole('group', { name: 'Diseño' })
-      .getByRole('button', { name: 'Diseño nuevo' })
-      .click()
-    await expect(page.locator('html')).toHaveAttribute('data-ui', 'neon')
   })
 
   test('«Por confirmar» abre una hoja que cierra con Escape y al pulsar fuera', async ({
@@ -153,7 +127,7 @@ test.describe('Marco móvil nuevo', () => {
 })
 
 test.describe('Marco móvil nuevo en un escritorio estrecho', () => {
-  test.use({ storageState: NO_COOKIE, hasTouch: false, isMobile: false })
+  test.use({ hasTouch: false, isMobile: false })
 
   test('con puntero fino y 900 px se ve el marco móvil', async ({ page, tracker }) => {
     await tracker.reload()

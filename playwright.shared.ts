@@ -5,7 +5,6 @@ import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { unstable_getVarsForDev, unstable_readConfig } from 'wrangler'
 import { browserConnectionOptions } from './playwright.browser'
-import { DESIGN_COOKIE } from './src/lib/design'
 
 type PlaywrightRuntimeOptions = {
   port: number
@@ -122,24 +121,6 @@ export function createPlaywrightRuntime({
     use: {
       connectOptions: browserConnectionOptions,
       baseURL,
-      // The new design is the default; the suites written for the old one keep
-      // it with the cookie the toggle writes (ADR 0010). A spec for the new
-      // design clears it: `test.use({ storageState: { cookies: [], origins: [] } })`.
-      storageState: {
-        cookies: [
-          {
-            name: DESIGN_COOKIE,
-            value: 'legacy',
-            domain: new URL(baseURL).hostname,
-            path: '/',
-            expires: -1,
-            httpOnly: false,
-            secure: false,
-            sameSite: 'Lax' as const,
-          },
-        ],
-        origins: [],
-      },
       locale: 'en-US',
       timezoneId: 'UTC',
       extraHTTPHeaders: {

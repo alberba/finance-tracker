@@ -9,9 +9,7 @@ import type { RecurringRule } from '../../src/scripts/types'
  * nuevo es el de por defecto. Las cifras y estados del bloque los prueba el
  * unit del view-model; aquí, lo que hace el usuario y lo que obtiene.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-07-10T10:00:00' })
+test.use({ fixedTime: '2026-07-10T10:00:00' })
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
 })

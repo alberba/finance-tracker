@@ -1,16 +1,9 @@
-/* Entry of the app stylesheet, in three parts (ADR 0010; ADR 0004 for what
-   lives in components):
+/* Entry of the app stylesheet (ADR 0004 for what lives in components):
 
-   - common.css: font faces, reset and the `neon:` variant. No tokens.
-   - legacy.css: token values and theme of the old design. Frozen.
-   - src/neon/styles/neon.css: token values of the new design, all under
-     `[data-ui="neon"]`, with the final names of DESIGN.md.
-
-   Order matters: the new tokens come last so that, inside `[data-ui="neon"]`,
-   they win over the old @theme names they share (--color-panel, --font-sans…).
-   Rules of the guards: tests/unit/styles-guards.test.ts. */
+   - common.css: font faces and reset. No tokens.
+   - src/neon/styles/neon.css: the tokens of DESIGN.md, their themes and the
+     utilities they register. */
 
 @import 'tailwindcss';
 @import './common.css';
-@import './legacy.css';
 @import '../neon/styles/neon.css';

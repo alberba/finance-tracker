@@ -26,7 +26,6 @@ const { theme } = useNeonTheme()
       @click="theme = choice.value"
     >
       <span
-        data-ui="neon"
         :data-theme="choice.value"
         class="bg-bg border-ctrl-line grid size-8 shrink-0 place-items-center rounded-full border"
         aria-hidden="true"

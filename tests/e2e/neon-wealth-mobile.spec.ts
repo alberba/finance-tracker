@@ -7,9 +7,7 @@ import { test, expect } from './fixtures'
  * unit del view-model; aquí, el recorrido: abrir una cuenta en su hoja, leer
  * otro mes y volver, y que todo se pueda pulsar con el dedo.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE, fixedTime: '2026-03-20T12:00:00Z' })
+test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#wealth')
 

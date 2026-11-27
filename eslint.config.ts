@@ -99,11 +99,10 @@ export default defineConfig([
     },
   },
   {
-    // ADR 0010: the new design (src/neon), the frozen old one and shared code
-    // never import each other, except at the named seams.
+    // Shared code (domain, sync, stores, libs…) never imports the design (src/neon).
     files: ['src/**/*.{js,mjs,cjs,ts,mts,cts,vue,astro}'],
     plugins: { 'design-boundary': designBoundary },
-    rules: { 'design-boundary/no-cross-design-imports': 'error' },
+    rules: { 'design-boundary/no-shared-to-design-imports': 'error' },
   },
   {
     files: ['tests/e2e/**/*.spec.ts'],

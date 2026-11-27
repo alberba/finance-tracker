@@ -7,10 +7,6 @@ import { test, expect } from './fixtures'
  * son del guard de styles-guards.test.ts; aquí, qué elige la persona y qué
  * conserva al recargar.
  */
-const NO_COOKIE = { cookies: [], origins: [] }
-
-test.use({ storageState: NO_COOKIE })
-
 const html = (page: Page) => page.locator('html')
 const picker = (page: Page) => page.locator('#settings').getByRole('group', { name: 'Tema' })
 const canvas = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor)

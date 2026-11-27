@@ -111,10 +111,10 @@ describe('new design theme controller', () => {
   })
 })
 
-describe('pre-paint scripts of the new design', () => {
+describe('pre-paint scripts', () => {
   // Inline scripts can't import the controller, so each one repeats the list
   // of themes; they must name exactly the themes the controller knows.
-  it.each(['components/FinanceTrackerShell.astro', 'neon/auth/NeonAccessPage.astro'])(
+  it.each(['neon/app/AppShell.astro', 'neon/auth/NeonAccessPage.astro'])(
     '%s lists the same themes as the controller',
     (path) => {
       const source = readFileSync(new URL(`../../src/${path}`, import.meta.url), 'utf8')
