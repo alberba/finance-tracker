@@ -48,9 +48,9 @@ test('crea un objetivo desde el móvil y lo ve en su columna', async ({ page, tr
   // 200 € a month from March 2026 arrives in September 2027, its deadline.
   await expect(islandia).toContainText('sep 2027')
   await expect(islandia.locator('[data-goal-verdict]')).toHaveText('Justo a tiempo')
-  await expect(
-    section(page).getByRole('region', { name: 'Objetivo seleccionado' }),
-  ).toContainText('Viaje a Islandia')
+  await expect(section(page).getByRole('region', { name: 'Objetivo seleccionado' })).toContainText(
+    'Viaje a Islandia',
+  )
 
   await tracker.reload()
   await tracker.openGoals()

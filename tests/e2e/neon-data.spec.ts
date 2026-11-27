@@ -134,7 +134,7 @@ test.describe('Datos en el diseño nuevo', () => {
     await expect(section(page).locator('[data-sync-label]')).toHaveText('Sin conexión')
 
     await page.locator('[data-sidebar-apuntar]').click()
-    const sheet = page.getByRole('dialog', { name: 'Apuntar' })
+    const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
     await sheet.getByRole('textbox', { name: 'Importe' }).fill('12,5')
     await sheet.getByLabel('Descripción').fill('e2e-cola')
     await sheet.getByRole('button', { name: 'Guardar' }).click()
