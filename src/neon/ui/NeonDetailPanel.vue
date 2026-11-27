@@ -30,6 +30,14 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { required: true })
 
 const EXIT_MS = 200
+const PANEL_EXIT_MS = 240
+const PANEL_EXIT_EASE = 'cubic-bezier(0.4, 0, 1, 1)'
+// The side panel's content arrives after the panel: the header, each block of
+// the body, the footer, 45ms apart from 120ms (DESIGN.md, `anim-panel`).
+const CONTENT_MS = 320
+const CONTENT_DELAY_MS = 120
+const CONTENT_STEP_MS = 45
+const CONTENT_STEPS = 7
 const RETURN_MS = 320
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)'
 const EASE_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)'
@@ -46,12 +54,38 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 
+/** As a side panel, brings its content in after the panel, block by block. */
+function animateContentIn(element: HTMLDialogElement): void {
+  if (isSheetLayout() || typeof element.animate !== 'function' || prefersReducedMotion()) return
+  const blocks = element.querySelectorAll<HTMLElement>(
+    '[data-sheet-handle], [data-detail-body] > *, [data-detail-footer]',
+  )
+  blocks.forEach((block, index) =>
+    block.animate(
+      { opacity: [0, 1], transform: ['translateX(16px)', 'none'] },
+      {
+        duration: CONTENT_MS,
+        delay: CONTENT_DELAY_MS + Math.min(index, CONTENT_STEPS) * CONTENT_STEP_MS,
+        easing: EASE_OUT,
+        fill: 'backwards',
+      },
+    ),
+  )
+}
+
 /** Slides the panel (and its scrim) out through where it came in, then resolves. */
 async function animateOut(element: HTMLDialogElement): Promise<void> {
   if (typeof element.animate !== 'function' || prefersReducedMotion()) return
   const options = { duration: EXIT_MS, easing: EASE_OUT }
   const keyframes = { opacity: [1, 0] }
   try {
+    if (!isSheetLayout()) {
+      // The side panel goes back out through its edge, whole and a bit faster.
+      const panel = { duration: PANEL_EXIT_MS, easing: PANEL_EXIT_EASE }
+      element.animate(keyframes, { ...panel, pseudoElement: '::backdrop' })
+      await element.animate({ transform: ['none', 'translateX(100%)'] }, panel).finished
+      return
+    }
     element.animate(keyframes, { ...options, pseudoElement: '::backdrop' })
     // From where a drag left it (inline transform), or from its place.
     const from = element.style.transform || 'translateY(0)'
@@ -72,6 +106,7 @@ async function sync(shouldOpen: boolean): Promise<void> {
     element.style.transform = ''
     element.showModal?.()
     if (scrollArea.value) scrollArea.value.scrollTop = 0
+    animateContentIn(element)
   } else if (!shouldOpen && element.open) {
     await animateOut(element)
     if (open.value) return
@@ -140,7 +175,7 @@ function onDragEnd(event: PointerEvent): void {
 <template>
   <dialog
     ref="dialog"
-    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-(--ui-dvh) frame:max-h-(--ui-dvh) frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:open:animate-sheet-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
+    class="bg-panel text-text rounded-t-sheet shadow-sheet frame:m-0 frame:ms-auto frame:h-(--ui-dvh) frame:max-h-(--ui-dvh) frame:w-[min(460px,100%)] frame:max-w-none frame:rounded-none frame:border-s frame:border-line frame:shadow-float motion-safe:max-frame:open:animate-sheet-in motion-safe:frame:open:animate-side-in motion-safe:backdrop:animate-fade-in mx-auto mbs-auto mbe-0 max-h-[88%] w-full max-w-140 overflow-hidden p-0 backdrop:bg-[oklch(0%_none_none/0.55)] open:flex open:flex-col"
     :aria-label="title"
     @cancel="onCancel"
     @click="onScrimClick"
@@ -199,6 +234,7 @@ function onDragEnd(event: PointerEvent): void {
       </div>
       <footer
         v-if="$slots.footer"
+        data-detail-footer
         class="border-line frame:px-6 frame:pbe-5 flex flex-wrap justify-end gap-2.5 border-t px-4 pbs-3.5 pbe-[calc(22px+env(safe-area-inset-bottom,0px))]"
       >
         <slot name="footer" />

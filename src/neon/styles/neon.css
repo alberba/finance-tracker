@@ -397,6 +397,8 @@
   --text-figure-hero--line-height: 1.05;
   --text-figure-hero--letter-spacing: -0.035em;
 
+  --radius-ticker: 8px;
+  --radius-tile: 18px;
   --radius-sheet: 28px;
   --radius-field: 14px;
   --radius-popover: 20px;
@@ -408,8 +410,14 @@
 
   /* Bottom sheets arrive from below (DESIGN.md, `anim-sheet`). */
   --animate-sheet-in: neon-sheet-in 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  /* The detail side panel slides in whole from the edge it lives on
+     (`anim-panel`); its content follows it, staggered by the panel itself. */
+  --animate-side-in: neon-side-in 400ms cubic-bezier(0.32, 0.72, 0, 1);
   /* Popovers (`anim-pop`, origin top right) and scrims (`anim-fade`). */
   --animate-pop-in: neon-pop-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* A popover beside a row comes out of its arrow, towards the end edge
+     (`anim-pop-side`); its transform origin is the arrow. */
+  --animate-pop-side: neon-pop-side 260ms cubic-bezier(0.22, 1, 0.36, 1);
   --animate-fade-in: neon-fade-in 260ms ease-out;
   /* Blocks rise 14px as they come in (`anim-rise`), staggered 70ms by the caller. */
   --animate-rise: neon-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -494,6 +502,12 @@
   }
 }
 
+@keyframes neon-side-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
 @keyframes neon-sheet-in {
   from {
     opacity: 0;
@@ -508,8 +522,127 @@
   }
 }
 
+@keyframes neon-pop-side {
+  from {
+    opacity: 0;
+    transform: translateX(var(--pop-side-x, -12px)) scale(0.92);
+  }
+}
+
 @keyframes neon-fade-in {
   from {
     opacity: 0;
+  }
+}
+
+/* A text field shows its focus in its own border, in the text color, not with
+   the accent ring the other controls carry (DESIGN.md, Foco). In the utilities
+   layer and more specific than `focus-visible:outline-2`, so it wins there. */
+@layer utilities {
+  [data-ui='neon']
+    :is(
+      input:not(
+        [type='checkbox'],
+        [type='radio'],
+        [type='range'],
+        [type='button'],
+        [type='submit']
+      ),
+      select,
+      textarea
+    ):focus-visible {
+    outline-style: none;
+    border-color: var(--color-text);
+  }
+}
+
+/* Scrollbars in the palette (DESIGN.md, Barras de desplazamiento): thin, no
+   track, a thumb in the control line that darkens while the pointer is over
+   the box it scrolls. `scrollbar-color` inherits; the width does not, so it goes
+   on every box. Safari reads the -webkit- pseudo-elements instead. */
+@layer base {
+  @supports (scrollbar-color: auto) {
+    [data-ui='neon'] {
+      scrollbar-color: var(--color-ctrl-line) transparent;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      [data-ui='neon'] *:hover {
+        scrollbar-color: var(--color-muted) transparent;
+      }
+    }
+  }
+
+  @supports (scrollbar-width: thin) {
+    [data-ui='neon'],
+    [data-ui='neon'] * {
+      scrollbar-width: thin;
+    }
+  }
+
+  [data-ui='neon'] ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: transparent;
+  }
+
+  [data-ui='neon'] ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: var(--color-ctrl-line) padding-box;
+  }
+
+  [data-ui='neon'] ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-muted);
+  }
+
+  [data-ui='neon'] ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* The list swap of a Movimientos filter (ledger-swap.ts): only the ledger
+   (view-transition-name tx-ledger, NeonRegistry.vue) crossfades; the rest of
+   the page changes in place. The snapshots keep their own height, pinned to the
+   top and clipped by the group, so neither list stretches while the ledger
+   eases to its new height. */
+/* eslint-disable css/use-baseline -- same-document View Transitions: Chrome 111, Safari 18, Firefox 144 (October 2025); without them the list changes at once. */
+[data-ui='neon']::view-transition-old(root),
+[data-ui='neon']::view-transition-new(root) {
+  animation: none;
+}
+
+[data-ui='neon']::view-transition-group(tx-ledger) {
+  overflow: clip;
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+[data-ui='neon']::view-transition-old(tx-ledger),
+[data-ui='neon']::view-transition-new(tx-ledger) {
+  block-size: auto;
+  object-fit: none;
+  object-position: top;
+}
+
+[data-ui='neon']::view-transition-old(tx-ledger) {
+  animation: neon-ledger-out 160ms ease-out both;
+}
+
+[data-ui='neon']::view-transition-new(tx-ledger) {
+  animation: neon-ledger-in 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+/* eslint-enable css/use-baseline */
+
+@keyframes neon-ledger-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes neon-ledger-in {
+  from {
+    opacity: 0;
+    filter: blur(3px);
   }
 }

@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue'
 
 import NeonChartSeries from './NeonChartSeries.vue'
+import { nearestPoint, useChartScrub } from './chart-scrub'
 import {
   CHART_HEIGHT,
   CHART_WIDTH,
@@ -25,7 +26,14 @@ const props = defineProps<{
    * reframes the line (DESIGN.md, «Cambio de periodo») instead of redrawing it.
    */
   reframe?: boolean
+  /** The resting point when the caller lets the user select one. */
+  selected?: number
+  /** On touch, a hold explores the chart without taking over vertical scroll. */
+  holdToExplore?: boolean
+  /** On narrow charts, let the caller supply shorter amounts and a smaller gutter. */
+  compact?: boolean
 }>()
+const emit = defineEmits<{ select: [index: number] }>()
 
 // Reframing: the line travels from the old frame to the new one in REFRAME_MS,
 // a frame at a time; the gridlines, the months and today's dot follow by CSS
@@ -121,19 +129,25 @@ const color = computed(() =>
 // CSS length (`--chart-gutter`, in rem so it grows with the text, and wide enough
 // for the longest value) that the line, the dots and the axis share.
 const svg = useTemplateRef<SVGSVGElement>('svg')
+const plot = useTemplateRef<HTMLElement>('plot')
 /** The point being read, or null at rest: the card follows it, swapping its figure for that value. */
 const active = defineModel<number | null>('active', { default: null })
 const reading = computed(() =>
   active.value === null ? null : (props.chart.readings[active.value] ?? null),
 )
-const marker = computed(() => (active.value === null ? null : props.chart.points[active.value]))
 const lastIndex = computed(() => props.chart.points.length - 1)
+const lastOpen = computed(() => props.chart.readings[lastIndex.value]?.open)
+const tail = computed(() => lastOpen.value && !travelling.value ? chartPaths(props.chart.points.slice(-2)).line : '')
+const solidLine = computed(() => tail.value ? chartPaths(props.chart.points.slice(0, -1)).line : shown.value.line)
+const current = computed(() => active.value ?? props.selected ?? lastIndex.value)
+const marker = computed(() =>
+  active.value === null && current.value === lastIndex.value ? null : props.chart.points[current.value],
+)
 /** Room for the longest gridline value plus a gap, so the last dot never lands on it. */
 const gutter = computed(() => {
   const longest = Math.max(0, ...props.chart.tickLabels.map((label) => label.length))
-  return `${Math.max(3.5, longest * 0.42 + 0.75).toFixed(2)}rem`
+  return `${Math.max(props.compact ? 2.5 : 3.5, longest * 0.42 + 0.75).toFixed(2)}rem`
 })
-const current = computed(() => active.value ?? lastIndex.value)
 // What a screen reader hears for the current point: its date and its value.
 const valueText = computed(() => {
   const read = props.chart.readings[current.value]
@@ -157,6 +171,15 @@ function labelX(index: number): number {
 
 /** Whether a narrow plot drops this label: every other one counting back from today,
  *  keeping «inicio» and dropping the month right after it, which would sit on top. */
+const axisLabels = computed(() => {
+  const labels = props.chart.labels
+  const entries = labels.map((label, index) => ({ label, index }))
+  if (labels.length <= 13) return entries
+  const last = labels.length - 1
+  const step = Math.ceil(last / 4)
+  return entries.filter(({ index }) => (last - index) % step === 0)
+})
+
 function thinned(index: number): boolean {
   const labels = props.chart.labels
   if (labels[0] === 'inicio')
@@ -166,18 +189,30 @@ function thinned(index: number): boolean {
 
 function nearest(clientX: number): number | null {
   const rect = svg.value?.getBoundingClientRect()
-  const points = props.chart.points
-  if (!rect || !points.length) return null
+  if (!rect || !positions.value.length) return null
   const percent = ((clientX - rect.left) / Math.max(rect.width, 1)) * 100
-  let best = 0
-  points.forEach((point, index) => {
-    if (Math.abs(point.x - percent) < Math.abs(points[best].x - percent)) best = index
-  })
-  return best
+  return nearestPoint(positions.value, percent)
 }
 
+const positions = computed(() => props.chart.points.map((point) => point.x))
+const touchHost = computed(() => props.holdToExplore ? plot.value : null)
+const { index: scrubbed } = useChartScrub(touchHost, svg, () => positions.value, (index) => {
+  if (props.selected !== undefined) emit('select', index)
+})
+watch(scrubbed, (index) => { active.value = index })
+
 function explore(event: PointerEvent): void {
+  if (props.holdToExplore && event.pointerType === 'touch') return
   active.value = nearest(event.clientX)
+}
+
+function release(event: PointerEvent): void {
+  if (event.pointerType === 'touch' && props.holdToExplore) return
+  if (props.selected !== undefined && event.button === 0) {
+    const index = nearest(event.clientX)
+    if (index !== null) emit('select', index)
+  }
+  if (event.pointerType === 'touch') leave()
 }
 
 function leave(): void {
@@ -203,6 +238,11 @@ function step(event: KeyboardEvent): void {
     active.value = null
     return
   }
+  if (props.selected !== undefined && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault()
+    emit('select', current.value)
+    return
+  }
   if (next === null) return
   event.preventDefault()
   active.value = next
@@ -213,14 +253,15 @@ function step(event: KeyboardEvent): void {
   <figure
     class="@container/chart m-0 flex min-h-32 flex-1 flex-col gap-2"
     :class="reframe && 'chart-reframe'"
-    :style="{ '--chart-gutter': gutter, '--plot-start': plotStart }"
+    :style="{ '--chart-gutter': gutter, '--plot-start': plotStart, '--chart-series': color }"
   >
     <div
+      ref="plot"
       class="outline-accent relative min-h-28 flex-1 cursor-crosshair touch-pan-y rounded-xs select-none focus-visible:outline-2 focus-visible:outline-offset-4"
       :class="travelling && 'overflow-y-clip'"
       tabindex="0"
       role="slider"
-      :aria-label="`${chart.label}. Flechas izquierda y derecha para recorrer los valores.`"
+      :aria-label="`${chart.label}. Flechas izquierda y derecha para recorrer los valores.${selected === undefined ? '' : ' Pulsa Intro para seleccionar el mes.'}`"
       aria-valuemin="0"
       :aria-valuemax="Math.max(lastIndex, 0)"
       :aria-valuenow="current"
@@ -229,7 +270,7 @@ function step(event: KeyboardEvent): void {
       @pointerdown="explore"
       @pointerleave="leave"
       @pointercancel="leave"
-      @pointerup="(event) => event.pointerType === 'touch' && leave()"
+      @pointerup="release"
       @keydown="step"
       @blur="leave"
     >
@@ -267,25 +308,27 @@ function step(event: KeyboardEvent): void {
         class="motion-safe:animate-draw absolute inset-y-0 inset-s-(--plot-start) h-full w-[calc(100%-var(--chart-gutter))] overflow-visible"
         :class="travelling && '[clip-path:inset(-10%_-2px_-10%_0)]'"
       >
-        <NeonChartSeries :line="shown.line" :area="shown.area" :color="color" />
+        <NeonChartSeries :line="solidLine" :area="shown.area" :tail="tail" :color="color" />
       </svg>
       <span
         v-if="chart.line"
         v-show="!marker"
         class="ring-panel motion-safe:animate-dot chart-glide absolute -ms-1.5 -mt-1.5 size-3 rounded-full ring-3"
-        :class="tone === 'lilac' ? 'bg-lilac' : 'bg-(--color-accent-bright)'"
+        :class="lastOpen ? 'border-(--chart-series) bg-panel border-2' : 'bg-(--chart-series)'"
         :style="{ insetInlineStart: at(100), top: `${chart.lastTop}%` }"
         aria-hidden="true"
       />
-      <template v-if="marker && reading">
-        <span
-          class="bg-ctrl-line pointer-events-none absolute inset-y-0 w-px"
-          :style="{ insetInlineStart: at(marker.x) }"
-          aria-hidden="true"
-        />
+      <span
+        v-if="marker || selected !== undefined"
+        class="pointer-events-none absolute inset-y-0"
+        :class="selected === undefined ? 'bg-ctrl-line w-px' : 'border-faint/60 border-s border-dashed'"
+        :style="{ insetInlineStart: at(marker?.x ?? 100) }"
+        aria-hidden="true"
+      />
+      <template v-if="marker">
         <span
           class="ring-panel pointer-events-none absolute -ms-1.5 -mt-1.5 size-3 rounded-full ring-3"
-          :class="tone === 'lilac' ? 'bg-lilac' : 'bg-(--color-accent-bright)'"
+          :class="chart.readings[current]?.open ? 'border-(--chart-series) bg-panel border-2' : 'bg-(--chart-series)'"
           :style="{
             insetInlineStart: at(marker.x),
             top: `${marker.top}%`,
@@ -301,14 +344,15 @@ function step(event: KeyboardEvent): void {
     >
       <TransitionGroup :css="false" @enter="axisEnter" @leave="axisLeave">
         <span
-          v-for="(label, index) in chart.labels"
+          v-for="{ label, index } in axisLabels"
           :key="reframe ? label : index"
           :data-back="chart.labels.length - 1 - index"
           class="chart-label absolute top-0 leading-4 whitespace-nowrap"
           :class="[
-            marker && Math.abs(labelX(index) - marker.x) < 12 && 'opacity-0',
+            reading && marker && Math.abs(labelX(index) - marker.x) < 12 && 'opacity-0',
             // Narrow plot: every other month, counting back from today, so they keep air.
-            thinned(index) &&
+            chart.labels.length <= 13 &&
+              thinned(index) &&
               (chart.labels.length > 11
                 ? '@max-[40rem]/chart:hidden'
                 : '@max-[26rem]/chart:hidden'),

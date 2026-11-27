@@ -65,7 +65,7 @@ function undo(): void {
     ref="toast"
     popover="manual"
     role="status"
-    class="neon-undo bg-text text-bg rounded-field frame:inset-x-auto frame:inset-e-24 frame:inset-be-6 frame:w-[min(420px,calc(100vw-120px))] fixed inset-x-4 inset-bs-auto inset-be-[118px] m-0 hidden min-h-[52px] items-center justify-between gap-3 border-0 ps-4.5 pe-1.5 text-[15px] font-bold open:flex"
+    class="neon-undo bg-text text-bg rounded-field frame:inset-x-auto frame:inset-e-24 frame:inset-be-6 frame:w-[min(420px,calc(100vw-120px))] fixed inset-x-4 inset-bs-auto inset-be-[calc(96px+env(safe-area-inset-bottom,0px))] m-0 hidden min-h-[52px] items-center justify-between gap-3 border-0 ps-4.5 pe-1.5 text-[15px] font-bold open:flex"
     data-undo-toast
   >
     <span class="min-w-0">{{ message }}</span>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { nearestPoint } from '../../src/neon/sections/wealth/chart-scrub'
+import { nearestPoint } from '../../src/neon/ui/chart-scrub'
 
 describe('nearestPoint', () => {
   const positions = [0, 25, 50, 97]
