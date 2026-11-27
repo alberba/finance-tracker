@@ -123,9 +123,12 @@ test('busca un movimiento desde la barra superior y llega a Movimientos filtrado
   await sheet.getByRole('searchbox', { name: 'Buscar movimientos' }).press('Enter')
 
   await expect(page).toHaveURL(/\/movimientos$/)
+  // The search shows as an active filter chip that takes it off.
   await expect(
-    tracker.transactionsSection.getByRole('searchbox', { name: 'Buscar movimientos' }),
-  ).toHaveValue('Compra semanal')
+    tracker.transactionsSection
+      .getByRole('group', { name: 'Filtros activos' })
+      .getByRole('button', { name: 'Quitar filtro: «Compra semanal»' }),
+  ).toBeVisible()
 })
 
 test('todos los controles del dashboard miden al menos 44 px con puntero táctil', async ({
@@ -139,22 +142,29 @@ test('todos los controles del dashboard miden al menos 44 px con puntero táctil
   await tracker.reload()
   expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true)
 
-  const tooSmall = (selector: string) =>
-    page.locator(selector).evaluateAll((controls) =>
-      controls
-        .filter((control) => control.getClientRects().length > 0)
-        .map((control) => {
-          const { width, height } = control.getBoundingClientRect()
-          const name = control.getAttribute('aria-label') || control.textContent?.trim()
-          return { name, width: Math.round(width), height: Math.round(height) }
-        })
-        .filter(({ width, height }) => width < 44 || height < 44),
+  const tooSmall = (selector: string, min = 44) =>
+    page.locator(selector).evaluateAll(
+      (controls, size) =>
+        controls
+          .filter((control) => control.getClientRects().length > 0)
+          .map((control) => {
+            const { width, height } = control.getBoundingClientRect()
+            const name = control.getAttribute('aria-label') || control.textContent?.trim()
+            return { name, width: Math.round(width), height: Math.round(height) }
+          })
+          .filter(({ width, height }) => width < size || height < size),
+      min,
     )
 
+  // DESIGN.md: segments are compact (36 px minimum); every other control is 44 px.
+  const SEGMENT = '[role="tab"], [role="group"] > button[aria-pressed]'
   const CONTROLS = 'button, a[href], input'
   expect(
-    await tooSmall(`#dashboard :is(${CONTROLS}), [data-mobile-app-bar] button, [data-fab-apuntar]`),
+    await tooSmall(
+      `#dashboard :is(${CONTROLS}):not(${SEGMENT}), [data-mobile-app-bar] button, [data-fab-apuntar]`,
+    ),
   ).toEqual([])
+  expect(await tooSmall(`#dashboard :is(${SEGMENT})`, 36)).toEqual([])
 
   await page.getByRole('button', { name: 'Buscar movimientos' }).click()
   await expect(page.getByRole('dialog', { name: 'Buscar movimientos' })).toBeVisible()

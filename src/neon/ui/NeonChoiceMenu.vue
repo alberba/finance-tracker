@@ -146,7 +146,7 @@ onBeforeUnmount(stopListening)
       v-if="look === 'link'"
       ref="trigger"
       type="button"
-      class="group outline-accent inline-flex items-center gap-1 rounded-[4px] font-extrabold whitespace-nowrap underline decoration-2 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+      class="group outline-accent inline-flex items-center gap-1 rounded-[4px] font-extrabold whitespace-nowrap underline pointer-coarse:min-h-11 decoration-2 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
       :class="
         open ? 'decoration-current' : 'decoration-ctrl-line pointer-fine:hover:decoration-current'
       "

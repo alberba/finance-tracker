@@ -11,6 +11,8 @@ test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#investment')
 const grip = (page: Page) => section(page).getByRole('button', { name: /la lista de posiciones$/ })
+// How the return is measured is the link at the end of the gain line.
+const method = (page: Page, name: string) => section(page).getByRole('button', { name })
 
 test.beforeEach(async ({ tracker }) => {
   await tracker.openInvestment()
@@ -62,25 +64,23 @@ test('abre un activo desde la portada, entra en sus movimientos y vuelve con atr
   await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
 })
 
-test('la hoja de posiciones oculta el gráfico y los chips al abrirla y los devuelve al cerrarla', async ({
+test('la hoja de posiciones oculta el gráfico al abrirla y lo devuelve al cerrarla', async ({
   page,
 }) => {
   const chart = section(page).locator('[data-investment-chart]')
-  const method = section(page).getByRole('button', { name: 'Rentabilidad simple' })
   await expect(chart).toBeVisible()
-  await expect(method).toBeVisible()
   await expect(grip(page)).toHaveAttribute('aria-expanded', 'false')
 
   await grip(page).click()
   await expect(grip(page)).toHaveAttribute('aria-expanded', 'true')
   await expect(chart).toBeHidden()
-  await expect(method).toBeHidden()
+  // The figures stay over the sheet, with their way of measuring the return.
+  await expect(method(page, 'sobre lo aportado')).toBeVisible()
   await expect(section(page).getByRole('button', { name: 'Ver Fondos Indexados' })).toBeVisible()
 
   await grip(page).click()
   await expect(grip(page)).toHaveAttribute('aria-expanded', 'false')
   await expect(chart).toBeVisible()
-  await expect(method).toBeVisible()
 })
 
 test('recorrer el gráfico enseña el valor de ese mes y al soltar vuelve a hoy', async ({
@@ -102,50 +102,52 @@ test('recorrer el gráfico enseña el valor de ese mes y al soltar vuelve a hoy'
   await expect(figures).toContainText('Vale hoy')
 })
 
-test('cambia la rentabilidad de importe a TWR desde los chips', async ({ page }) => {
+test('cambia la rentabilidad de importe a TWR desde el enlace de las cifras', async ({ page }) => {
   const figures = section(page).locator('[data-investment-figures]')
   await expect(figures).toContainText(/[+−]\d[\d.]*\s€/)
 
-  await section(page).getByRole('button', { name: 'Rentabilidad simple' }).click()
-  await page.getByRole('menuitemradio', { name: /^TWR/ }).click()
+  await method(page, 'sobre lo aportado').click()
+  await page.getByRole('menuitemradio', { name: /^Por tiempo \(TWR\)/ }).click()
 
-  await expect(section(page).getByRole('button', { name: 'Rentabilidad TWR' })).toBeVisible()
+  await expect(method(page, 'por tiempo (TWR)')).toBeVisible()
   await expect(figures).not.toContainText(/[+−]\d[\d.]*\s€/)
   await expect(
     section(page).locator('[data-investment-chart]').getByRole('img'),
   ).toHaveAccessibleName(/^Rentabilidad TWR acumulada/)
 })
 
-test.describe('selector de periodo en una pantalla estrecha', () => {
+test.describe('cómo medir la rentabilidad en una pantalla estrecha', () => {
   test.use({ fixedTime: '2026-11-27T12:00:00Z', reducedMotion: 'reduce' })
 
-  test('abre encima de la hoja y permite elegir un mes lejano con el teclado', async ({ page }) => {
+  test('abre bajo el enlace sin salirse de la pantalla y permite elegir con el teclado', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 320, height: 720 })
-    const trigger = section(page).getByRole('button', { name: /^Periodo/ })
+    const trigger = method(page, 'sobre lo aportado')
     await expect(trigger).toBeInViewport({ ratio: 1 })
     const before = await trigger.boundingBox()
-    if (!before) throw new Error('El selector de periodo no tiene caja')
+    if (!before) throw new Error('El enlace de la rentabilidad no tiene caja')
     await trigger.click()
 
-    const menu = page.getByRole('menu', { name: 'Periodo' })
+    const menu = page.getByRole('menu', { name: 'Cómo medir la rentabilidad' })
+    await expect(menu).toBeInViewport({ ratio: 1 })
     const bounds = await menu.boundingBox()
-    if (!bounds) throw new Error('El menú de periodo no se ha abierto')
+    if (!bounds) throw new Error('El menú de la rentabilidad no se ha abierto')
     expect(bounds.x).toBeGreaterThanOrEqual(0)
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(320)
-    expect(bounds.y + bounds.height).toBeLessThan(before.y)
+    expect(bounds.y).toBeGreaterThanOrEqual(before.y + before.height)
     expect((await trigger.boundingBox())?.y).toBe(before.y)
 
+    await expect(menu.getByRole('menuitemradio', { name: /^Sobre lo aportado/ })).toBeFocused()
     await page.keyboard.press('End')
-    const november = menu.getByRole('menuitemradio', { name: 'Noviembre' })
-    await expect(november).toBeFocused()
-    await expect(november).toBeInViewport({ ratio: 1 })
+    await expect(menu.getByRole('menuitemradio', { name: /^Por tiempo \(TWR\)/ })).toBeFocused()
     await page.keyboard.press('Home')
-    await expect(menu.getByRole('menuitemradio', { name: 'Enero' })).toBeFocused()
+    await expect(menu.getByRole('menuitemradio', { name: /^Sobre lo aportado/ })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
     await page.keyboard.press('Enter')
 
     await expect(menu).toBeHidden()
-    await expect(section(page).getByRole('button', { name: 'Periodo · Enero' })).toBeFocused()
-    expect((await trigger.boundingBox())?.y).toBe(before.y)
+    await expect(method(page, 'por tiempo (TWR)')).toBeFocused()
   })
 })
 
@@ -182,7 +184,7 @@ test('todos los controles de la portada miden al menos 44 px con puntero táctil
   const CONTROLS = 'button, a[href], input, [role="menuitemradio"]'
   expect(await tooSmall(`#investment :is(${CONTROLS})`)).toEqual([])
 
-  await section(page).getByRole('button', { name: 'Rentabilidad simple' }).click()
+  await method(page, 'sobre lo aportado').click()
   await expect(page.getByRole('menu', { name: 'Cómo medir la rentabilidad' })).toBeVisible()
   expect(await tooSmall(`#investment :is(${CONTROLS})`)).toEqual([])
   await page.keyboard.press('Escape')

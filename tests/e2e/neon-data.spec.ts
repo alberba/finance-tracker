@@ -128,13 +128,15 @@ test.describe('Datos', () => {
     await context.setOffline(true)
     await expect(section(page).locator('[data-sync-label]')).toHaveText('Sin conexión')
 
-    await page.locator('[data-sidebar-apuntar]').click()
-    const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+    await tracker.openEntrySheet()
+    const sheet = tracker.entrySheet
     await sheet.getByRole('textbox', { name: 'Importe' }).fill('12,5')
     await sheet.getByLabel('Descripción').fill('e2e-cola')
     await sheet.getByRole('button', { name: 'Guardar' }).click()
     await expect(sheet).toBeHidden()
 
+    // The sheet opens from Movimientos; the queue is back in Datos.
+    await tracker.openData()
     await expect(section(page).locator('[data-sync-pending]')).toHaveText('1')
     await expect(section(page).locator('[data-sync-queue]')).toContainText('e2e-cola')
     await expect(section(page).locator('[data-sync-queue]')).toContainText('Crear')

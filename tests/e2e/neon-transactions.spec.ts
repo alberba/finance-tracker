@@ -59,18 +59,25 @@ test.describe('Movimientos', () => {
     await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(2)
     await expect(section(page).locator('[data-registry-total]')).toHaveText('+90,00 €')
 
-    const types = section(page).getByRole('group', { name: 'Filtrar por tipo' })
-    await types.getByRole('button', { name: 'Gastos' }).click()
-    await expect(types.getByRole('button', { name: 'Gastos' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    // Each filter is a chip that says its value and opens a list of choices.
+    const type = section(page).getByRole('button', { name: /^Tipo: / })
+    await type.click()
+    await page
+      .getByRole('menu', { name: 'Tipo de movimiento' })
+      .getByRole('menuitemradio', { name: 'Gastos' })
+      .click()
+    await expect(type).toHaveAccessibleName('Tipo: Gastos')
     await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(1)
     await expect(row(page, 'e2e-filtro-gasto')).toBeVisible()
     await expect(section(page).locator('[data-registry-total]')).toHaveText('30,00 €')
 
-    // Pressing the chosen type again shows every type.
-    await types.getByRole('button', { name: 'Gastos' }).click()
+    // «Todos» shows every type again.
+    await type.click()
+    await page
+      .getByRole('menu', { name: 'Tipo de movimiento' })
+      .getByRole('menuitemradio', { name: 'Todos' })
+      .click()
+    await expect(type).toHaveAccessibleName('Tipo: Todos')
     await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(2)
 
     await search(page).fill('nada coincide con esto')
@@ -210,11 +217,9 @@ test.describe('Movimientos', () => {
     ])
     await search(page).fill('e2e-lote')
 
-    await section(page).getByRole('button', { name: 'Seleccionar', exact: true }).click()
+    // Pressing a row's icon selects it and enters the selection.
+    await ledger(page).getByRole('button', { name: 'Seleccionar e2e-lote-a' }).click()
     const bar = section(page).getByRole('region', { name: 'Acciones sobre la selección' })
-    await ledger(page)
-      .getByRole('checkbox', { name: /^e2e-lote-a/ })
-      .click()
     await ledger(page)
       .getByRole('checkbox', { name: /^e2e-lote-b/ })
       .click()
@@ -231,7 +236,7 @@ test.describe('Movimientos', () => {
     await tracker.reload()
     await search(page).fill('e2e-lote')
     await expect(row(page, 'Fondos Indexados')).toHaveCount(2)
-    await section(page).getByRole('button', { name: 'Seleccionar', exact: true }).click()
+    await ledger(page).getByRole('button', { name: 'Seleccionar e2e-lote-a' }).click()
     await section(page).getByRole('button', { name: 'Seleccionar todo' }).click()
 
     await bar.getByRole('button', { name: 'Eliminar', exact: true }).click()

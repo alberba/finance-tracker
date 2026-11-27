@@ -174,7 +174,7 @@ test('va a una sección desde el enlace de un bloque y vuelve con atrás', async
   await page.goBack()
   await expect(page).toHaveURL(/\/$/)
   await expect(
-    tracker.dashboardSection.getByRole('heading', { level: 1, name: 'Así va julio' }),
+    tracker.dashboardSection.getByRole('heading', { level: 1, name: 'Dashboard' }),
   ).toBeVisible()
 })
 

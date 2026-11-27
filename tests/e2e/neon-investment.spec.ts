@@ -134,24 +134,25 @@ test.describe('Inversión', () => {
     await tracker.openInvestment()
 
     const chart = section(page).locator('[data-investment-chart]').getByRole('img')
-    await expect(section(page).getByText(/sin datos para este periodo/i)).toBeVisible()
+    // The index is picked from the line under the figures, beside its difference.
+    const benchmark = section(page).locator('[data-investment-benchmark]')
+    await expect(benchmark).toContainText('sin datos')
     await expect(chart).toBeVisible()
 
-    const controls = section(page).getByRole('group', { name: 'Controles de la gráfica' })
-    await controls.getByRole('button', { name: 'Comparar con MSCI World' }).click()
-    const comparison = controls.getByRole('menu', { name: 'Comparar con un índice' })
+    await benchmark.getByRole('button', { name: 'Comparar con MSCI World' }).click()
+    const comparison = benchmark.getByRole('menu', { name: 'Comparar con un índice' })
     await expect(comparison.getByRole('menuitemradio', { name: 'MSCI World' })).toBeFocused()
     await page.keyboard.press('ArrowDown')
     await expect(comparison.getByRole('menuitemradio', { name: 'S&P 500' })).toBeFocused()
     await page.keyboard.press('Enter')
     try {
-      await expect(section(page).getByText('Cargando S&P 500…')).toBeVisible()
+      await expect(benchmark).toContainText('cargando')
     } finally {
       release.resolve()
     }
     await expect(comparison).toBeHidden()
-    await expect(controls.getByRole('button', { name: 'Comparar con S&P 500' })).toBeFocused()
-    await expect(controls.getByRole('paragraph')).toContainText(/Diferencia.*−[\d.,]+\s*€/s)
+    await expect(benchmark.getByRole('button', { name: 'Comparar con S&P 500' })).toBeFocused()
+    await expect(benchmark).toContainText(/Diferencia con S&P 500.*−[\d.,]+\s*€/s)
     await expect(chart).toHaveAccessibleName(/S&P 500/)
   })
 

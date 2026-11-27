@@ -287,7 +287,7 @@ const PRESS =
           v-for="(item, index) in SLIDES"
           :key="item.key"
           type="button"
-          class="outline-accent min-h-10 rounded-sm px-3 text-sm font-extrabold underline decoration-2 underline-offset-8 focus-visible:outline-2 motion-safe:transition-colors motion-safe:duration-200"
+          class="outline-accent min-h-11 rounded-sm px-3 text-sm font-extrabold underline decoration-2 underline-offset-8 focus-visible:outline-2 motion-safe:transition-colors motion-safe:duration-200"
           :class="
             slide === index ? 'text-text decoration-current' : 'text-muted decoration-transparent'
           "
