@@ -178,6 +178,15 @@ export function normalizeState(candidate: unknown): State {
     transactions: normalizeTransactions(input?.transactions || base.transactions || []),
     subscriptions: normalizeSubscriptions(input?.subscriptions || base.subscriptions || []),
     snapshots: normalizeSnapshots(input?.snapshots || base.snapshots || {}),
+    ...(input.historicalSnapshots
+      ? {
+          historicalSnapshots: Object.fromEntries(
+            Object.entries(asRecord(input.historicalSnapshots))
+              .filter(([key]) => /^[1-9][0-9]{3}$/.test(key) && Number(key) !== year)
+              .map(([key, snapshots]) => [key, normalizeSnapshots(snapshots)]),
+          ),
+        }
+      : {}),
     budget: normalizeBudget(input?.budget || base.budget || {}),
     goals: normalizeGoals(input?.goals || base.goals || {}, year),
     savingGoals: normalizeSavingGoals(input?.savingGoals || base.savingGoals || []),
