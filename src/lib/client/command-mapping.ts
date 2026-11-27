@@ -53,9 +53,6 @@
  *   server acknowledgement. Recurrence enqueues rule creates before their
  *   pending movements. A pending movement whose recurring-rule reference
  *   remains unresolved is not enqueued and returns failure.
- * - `investment.ts`'s `saveContribution` syncs the `contribution` row with
- *   its flow allocations nested under `data.allocations`; the snapshot
- *   balances touched by the workflow are synced through `wealth-snapshot.ts`.
  * - `settings.ts`'s TWR liquidity toggle sends the whole selection through
  *   `syncTwrLiquidityAccounts` (a `settingsUpdate`), resolved to server
  *   `account` ids.
@@ -620,37 +617,4 @@ export async function syncListDiff<T extends { id: string }>(
     }
   }
   return true
-}
-
-/**
- * Matches a synced contribution-cash entry by its natural key
- * (`contributionDate`, server `accountId`, `watchlistId`).
- */
-function stockeventsCashEntryMatches(
-  contributionDate: string,
-  accountId: string | null,
-  watchlistId: string,
-): EntityMatch {
-  return (entity) =>
-    entity.contributionDate === contributionDate &&
-    (entity.accountId ?? null) === (accountId ?? null) &&
-    entity.watchlistId === watchlistId
-}
-
-/** Create-if-absent / update-otherwise for one contribution-cash sync entry. */
-export async function syncStockeventsCashEntryUpsert(
-  contributionDate: string,
-  accountId: string | null,
-  watchlistId: string,
-  syncedAmount: number,
-  currency: string,
-): Promise<void> {
-  const matches = stockeventsCashEntryMatches(contributionDate, accountId, watchlistId)
-  await syncUpsertByKey('stockeventsCashEntry', matches, {
-    contributionDate,
-    accountId,
-    watchlistId,
-    syncedAmount,
-    currency,
-  })
 }

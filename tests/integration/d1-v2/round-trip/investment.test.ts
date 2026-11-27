@@ -369,38 +369,11 @@ describe('round trip: inversión', () => {
       fee: '1.20',
       movementCurrency: 'EUR',
       accountId,
-      declared: false,
+      declared: true,
     })
-    const first = await trip.reload()
-    const movementId = first.transactions.find((tx) => tx.type === 'investment')!.id
-
-    useInvestmentStore().markDeclared([movementId])
 
     const reloaded = await trip.reload()
 
-    expect(reloaded.transactions.find((tx) => tx.id === movementId)?.declared).toBe(true)
-  })
-
-  it("keeps how a contribution's flow was split across accounts (§5)", async () => {
-    const { useInvestmentStore } = await import('../../../../src/stores/investment')
-    const { useSettingsStore } = await import('../../../../src/stores/settings')
-    const { useFinancialStateStore } = await import('../../../../src/stores/financial-state')
-    useSettingsStore().addEntity('investmentAssets', 'Indexa', '0')
-    await trip.reload()
-    const investmentAccountId = useFinancialStateStore().investmentAssets[0].id
-    const saved = useInvestmentStore().saveContribution(
-      '2026-03-31',
-      2,
-      [{ kind: 'investments', id: investmentAccountId, value: '1000' }],
-      [{ accountId, amount: 200 }],
-      [],
-    )
-    expect(saved).toBe(true)
-
-    const reloaded = await trip.reload()
-
-    const contribution = reloaded.contributions.find((item) => item.date === '2026-03-31')
-    expect(contribution?.flowAllocations).toEqual([{ accountId, amount: 200 }])
-
+    expect(reloaded.transactions.find((tx) => tx.type === 'investment')?.declared).toBe(true)
   })
 })

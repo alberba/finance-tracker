@@ -11,9 +11,9 @@ export default defineConfig({
       provider: 'v8',
       enabled: false,
       // Coverage follows the code that carries rules, not presentation: the
-      // old component tree is frozen and the new UI is covered by E2E. Keep
-      // the new design's view models, persistence and API surface in scope so
-      // a regression in the logic is visible even if a template changes.
+      // components are covered by E2E. Keep the view models, persistence and
+      // API surface in scope so a regression in the logic is visible even if
+      // a template changes.
       include: [
         'src/composables/**/*.ts',
         'src/domain/**/*.ts',

@@ -600,17 +600,6 @@ describe('round trip: imported movement protections (#263)', () => {
   })
   afterEach(() => trip.cleanup())
 
-  it('synchronizes declaration changes without sending immutable financial fields', async () => {
-    const id = useFinancialStateStore().transactions[0].id
-    useInvestmentStore().markDeclared([id])
-    const reloaded = await trip.reload()
-    expect(reloaded.transactions[0]).toMatchObject({
-      id,
-      declared: true,
-      amount: 6.85,
-      remoteOperation,
-    })
-  })
 
   it.each([
     {

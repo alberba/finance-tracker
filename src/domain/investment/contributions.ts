@@ -1,30 +1,11 @@
-import { asMonth, type Month } from '../../lib/month'
+import { asMonth } from '../../lib/month'
 import {
   deriveContributionFlow,
   findLiquidityTargets,
-  getFlowFromAllocations,
-  sanitizeFlowAllocations,
   toSnapshotDate,
-  type ContributionFlowAllocation,
 } from '../../scripts/contribution-workflow'
-import type {
-  Contribution,
-  SnapshotKind,
-  SnapshotRow,
-  State,
-} from '../../scripts/types'
-import { clone, parseFloatSafe, parseIntSafe, round2, uid } from '../../scripts/utils'
-
-export interface SnapshotInputValue {
-  kind: SnapshotKind
-  id: string
-  value: string
-}
-
-export interface AllocationInputValue {
-  accountId: string
-  amount: number
-}
+import type { Contribution, SnapshotRow, State } from '../../scripts/types'
+import { parseFloatSafe, parseIntSafe, round2 } from '../../scripts/utils'
 
 function getInvestmentValueFromSnapshot(snapshot: SnapshotRow | undefined): number {
   return round2(
@@ -68,7 +49,7 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
     const existing = state.contributions.find(
       (item) => String(item.portfolioDate || item.date) === date,
     )
-    // `applyContributionSave` stores the portfolio value **before** the flow.
+    // A saved contribution stores the portfolio value **before** the flow.
     // The snapshot itself is already post-flow, so prefer the saved value:
     // using the snapshot total and adding the flow again double-counts it and
     // turns a flat month into a fake loss.
@@ -141,143 +122,4 @@ export function getContributionEntriesFromSnapshots(state: State): Contribution[
   return Array.from(rowsByDate.values()).sort((a, b) =>
     String(a.portfolioDate || a.date).localeCompare(String(b.portfolioDate || b.date)),
   )
-}
-
-export interface ContributionSaveInput {
-  date: string
-  month: Month
-  snapshotInputs: SnapshotInputValue[]
-  allocations: AllocationInputValue[]
-  warnings: string[]
-}
-
-export interface ContributionSaveResult {
-  ok: boolean
-  error?: string
-  hadWarnings: boolean
-  /**
-   * The resulting state, present only when `ok`. Never the same reference as
-   * the `draft` argument (see purity note on `applyContributionSave`).
-   */
-  state?: State
-}
-
-/**
- * Computes the guided-contribution save onto a state, mirroring the legacy
- * workflow: persist snapshots, derive the closing portfolio value (excluding the
- * contribution flow), fold allocation deltas into the liquidity snapshots and
- * upsert the contribution entry.
- *
- * Pure function: `draft` is never mutated. A deep clone is taken up front and
- * every derived write lands on that clone, which is returned as
- * `result.state` on success. This matters beyond the Pinia store's own
- * `commitState` (which already hands in a disposable clone) — a v2
- * repository (WP6) may call this against a state assembled from D1 rows that
- * must not be mutated as a side effect, per Contradiction #9 in
- * `docs/archive/work-packages.md`.
- */
-export function applyContributionSave(
-  draft: State,
-  input: ContributionSaveInput,
-): ContributionSaveResult {
-  const month = input.month
-  const date = input.date
-  const nextState = clone(draft)
-
-  if (!nextState.snapshots[String(month)]) {
-    nextState.snapshots[String(month)] = { month, accounts: {}, investments: {}, liabilities: {} }
-  }
-  const snapshot = nextState.snapshots[String(month)]
-
-  input.snapshotInputs.forEach((item) => {
-    const parsed = parseFloatSafe(item.value, Number.NaN)
-    if (Number.isNaN(parsed)) {
-      delete snapshot[item.kind][item.id]
-    } else {
-      snapshot[item.kind][item.id] = round2(parsed)
-    }
-  })
-
-  const flowAllocations = sanitizeFlowAllocations(input.allocations)
-  const existingIndex = nextState.contributions.findIndex(
-    (item) => String(item.portfolioDate || item.date) === date,
-  )
-  const previousAllocations =
-    existingIndex >= 0
-      ? sanitizeFlowAllocations(nextState.contributions[existingIndex].flowAllocations || [])
-      : []
-
-  const investmentValue = getInvestmentValueFromSnapshot(snapshot)
-  if (investmentValue <= 0) {
-    return {
-      ok: false,
-      error: 'Debes indicar al menos un snapshot de inversión para registrar el aporte.',
-      hadWarnings: false,
-    }
-  }
-
-  const liquidityTargetIds = new Set(
-    findLiquidityTargets(nextState.accounts, nextState.twrLiquidityAccountIds).matched.map(
-      (account) => String(account.id),
-    ),
-  )
-  const previousFlow = round2(
-    previousAllocations.reduce((sum, item) => {
-      if (!liquidityTargetIds.has(item.accountId)) {
-        return sum
-      }
-      return sum + item.amount
-    }, 0),
-  )
-  const portfolioValue = round2(
-    getPortfolioValueFromSnapshot(snapshot, liquidityTargetIds) - previousFlow,
-  )
-  if (portfolioValue <= 0) {
-    return {
-      ok: false,
-      error: 'El valor de cartera debe ser mayor que cero para registrar el aporte.',
-      hadWarnings: false,
-    }
-  }
-
-  const previousByAccount = new Map<string, number>(
-    previousAllocations.map((item) => [item.accountId, item.amount]),
-  )
-  flowAllocations.forEach((item: ContributionFlowAllocation) => {
-    const previous = previousByAccount.get(item.accountId) ?? 0
-    const delta = round2(item.amount - previous)
-    if (delta !== 0) {
-      const currentValue = round2(parseFloatSafe(snapshot.accounts[item.accountId], 0))
-      snapshot.accounts[item.accountId] = round2(currentValue + delta)
-    }
-    previousByAccount.delete(item.accountId)
-  })
-  previousByAccount.forEach((amount, accountId) => {
-    if (amount === 0) {
-      return
-    }
-    const currentValue = round2(parseFloatSafe(snapshot.accounts[accountId], 0))
-    snapshot.accounts[accountId] = round2(currentValue - amount)
-  })
-
-  const flow = getFlowFromAllocations(flowAllocations)
-  const payload: Contribution = {
-    id: existingIndex >= 0 ? nextState.contributions[existingIndex].id : uid('contrib'),
-    date,
-    amount: flow,
-    portfolioDate: date,
-    portfolioValue,
-    flow,
-    flowAllocations,
-    flowSource: 'allocations',
-    warnings: input.warnings,
-  }
-
-  if (existingIndex >= 0) {
-    nextState.contributions[existingIndex] = payload
-  } else {
-    nextState.contributions.push(payload)
-  }
-
-  return { ok: true, hadWarnings: input.warnings.length > 0, state: nextState }
 }
