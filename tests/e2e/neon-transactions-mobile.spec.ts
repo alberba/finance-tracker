@@ -73,6 +73,61 @@ test('busca, filtra por tipo y por importe con «Más filtros»', async ({ page,
   await expect(section(page).locator('[data-registry-total]')).toHaveText('300,00 €')
 })
 
+test('mantiene las pestañas en su sitio al alternar Registro y Suscripciones', async ({
+  page,
+  tracker,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await tracker.open('transactions')
+
+  const tabs = section(page).getByRole('tablist')
+  const registry = tabs.getByRole('tab', { name: /Registro/ })
+  const subscriptions = tabs.getByRole('tab', { name: /Suscripciones/ })
+  const initialPosition = await tabs.boundingBox()
+  expect(initialPosition).not.toBeNull()
+
+  await subscriptions.click()
+  const panel = section(page).getByRole('tabpanel', { name: /Suscripciones/ })
+  await expect(panel.getByRole('button', { name: 'Nueva suscripción' })).toBeVisible()
+  expect(await tabs.boundingBox()).toEqual(initialPosition)
+
+  await subscriptions.press('ArrowLeft')
+  await expect(registry).toBeFocused()
+  await expect(section(page).getByRole('tabpanel', { name: /Registro/ })).toBeVisible()
+  expect(await tabs.boundingBox()).toEqual(initialPosition)
+})
+
+test('mantiene la posición al pasar de movimientos a ningún resultado y volver', async ({
+  page,
+  tracker,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await addMovements(
+    page,
+    tracker,
+    Array.from({ length: 12 }, (_, index) => ({
+      id: `e2e-movil-scroll-${index}`,
+      type: 'expense',
+      amount: 30,
+      date: '2026-03-12',
+    })),
+  )
+
+  const filter = search(page)
+  await expect(filter).toBeVisible()
+  const scrollPosition = () => page.evaluate(() => window.scrollY)
+  await page.evaluate(() => window.scrollTo(0, 210))
+  await expect.poll(scrollPosition).toBe(210)
+
+  await filter.fill('sin coincidencias')
+  await expect(section(page).getByText(/Ningún movimiento de/)).toBeVisible()
+  expect(await scrollPosition()).toBe(210)
+
+  await filter.clear()
+  await expect(row(page, 'e2e-movil-scroll-0')).toBeVisible()
+  expect(await scrollPosition()).toBe(210)
+})
+
 test('abre un movimiento en la hoja, lo edita y el cambio sigue al recargar', async ({
   page,
   tracker,

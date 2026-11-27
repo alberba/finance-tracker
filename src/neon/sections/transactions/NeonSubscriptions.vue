@@ -19,26 +19,41 @@ import {
   subscriptionsSummary,
 } from './subscriptions-view-model'
 
-// «Suscripciones» of the new Movimientos: the list of subscriptions and, in
-// the aside, what they commit each month and the next 30 days of charges.
+// «Suscripciones» of the new Movimientos: a table that compares them by what
+// each costs per month (the active ones, with their total, then the paused
+// ones with what they save) and, in the aside, what they commit each month,
+// the charges of the next 12 months as bars and the next charge of each.
 // A row opens its detail in the shared panel, where it is paused, resumed,
 // edited or deleted; «Nueva suscripción» opens the same panel as a form. All
 // changes go through the movements store, with its validations and toasts.
 //
 // On the mobile frame (artboard «Movimientos · móvil», #432) the two figures
-// lead as a pair of tiles (monthly and yearly), and the next 30 days follow
-// the list in a card of their own.
+// lead as a pair of tiles (monthly and yearly), the table folds each row into
+// two lines (per month on the right, with non-monthly charges under it), and
+// the next charges come before the chart in their own card.
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
 const currency = computed(() => financialStateStore.currency || 'EUR')
 const desktopFrame = useMediaQuery(FRAME_QUERY)
 
 const rows = computed(() =>
-  subscriptionRows(movementsStore.subscriptions, movementsStore.getAccountName, currency.value),
+  subscriptionRows(
+    movementsStore.subscriptions,
+    movementsStore.getAccountName,
+    todayISO(),
+    currency.value,
+  ),
+)
+const groups = computed(() =>
+  [
+    { key: 'active', rows: rows.value.filter((row) => row.active) },
+    { key: 'paused', rows: rows.value.filter((row) => !row.active) },
+  ].filter((group) => group.rows.length),
 )
 const summary = computed(() =>
   subscriptionsSummary(movementsStore.subscriptions, todayISO(), currency.value),
 )
+const peakAmount = computed(() => summary.value.months.find((month) => month.height === 1)?.amount)
 
 type Mode = 'view' | 'edit' | 'new' | 'confirm-delete'
 const panelOpen = ref(false)
@@ -185,79 +200,185 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
       <section
         v-if="rows.length"
         aria-label="Tus suscripciones"
-        class="bg-panel border-line rounded-card min-w-0 overflow-hidden border"
+        class="subscriptions-table bg-panel border-line rounded-card min-w-0 overflow-hidden border"
         data-subscription-list
       >
-        <button
-          v-for="row in rows"
-          :key="row.id"
-          type="button"
-          class="border-line text-text outline-accent hover:bg-panel2/60 flex min-h-16 w-full min-w-0 items-center justify-between gap-3 border-t px-3.5 py-2.5 text-start first:border-t-0 focus-visible:outline-2 focus-visible:-outline-offset-2 @min-[560px]/subscriptions:px-6"
-          aria-haspopup="dialog"
-          :data-subscription-id="row.id"
-          @click="openDetail(row.id)"
+        <div
+          class="sub-grid text-muted text-label border-line hidden min-h-[46px] items-center border-b px-6 font-extrabold tracking-[0.08em] uppercase @min-[720px]/subscriptions:grid"
+          aria-hidden="true"
         >
-          <span class="grid min-w-0 gap-0.5">
-            <span class="truncate text-[16px] font-bold" :class="row.active ? '' : 'text-soft'">
-              {{ row.name }}
+          <span>Suscripción</span>
+          <span class="text-end">Cada</span>
+          <span class="text-end">Cobro</span>
+          <span class="text-end">Al mes</span>
+          <span class="text-end">Próximo</span>
+        </div>
+        <template v-for="(group, index) in groups" :key="group.key">
+          <div
+            v-if="group.key === 'paused'"
+            class="border-line flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-3.5 pbs-5 pbe-2 @min-[560px]/subscriptions:px-6"
+            :class="index > 0 && 'border-t'"
+          >
+            <h3 class="text-muted text-label font-extrabold tracking-[0.08em] uppercase">
+              En pausa
+            </h3>
+            <p class="text-muted text-[14px] font-bold">{{ summary.paused }}</p>
+          </div>
+          <button
+            v-for="row in group.rows"
+            :key="row.id"
+            type="button"
+            class="sub-row border-line text-text outline-accent hover:bg-panel2/60 grid min-h-16 w-full min-w-0 items-center gap-x-3 gap-y-0.5 border-t px-3.5 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 @min-[560px]/subscriptions:px-6"
+            :class="[group.key === 'active' && 'first-of-type:border-t-0', !row.active && 'text-muted']"
+            aria-haspopup="dialog"
+            :data-subscription-id="row.id"
+            @click="openDetail(row.id)"
+          >
+            <span class="sub-name grid min-w-0 gap-0.5">
+              <span class="truncate text-[16px] font-bold" :class="row.active ? '' : 'text-soft'">
+                {{ row.name }}
+              </span>
+              <span class="text-muted truncate text-[13px]">
+                <span class="hidden @min-[720px]/subscriptions:inline">{{ row.meta }}</span>
+                <span class="@min-[720px]/subscriptions:hidden">
+                  {{ row.active ? `Próximo ${row.next}` : 'En pausa' }}
+                </span>
+              </span>
             </span>
-            <span class="text-muted truncate text-[13px]">{{ row.meta }}</span>
-          </span>
-          <span class="grid shrink-0 justify-items-end gap-0.5">
             <span
-              class="font-display text-[16px] font-semibold tabular-nums"
-              :class="row.active ? '' : 'text-muted'"
+              class="sub-freq text-soft hidden text-end text-[14px] font-bold @min-[720px]/subscriptions:block"
+            >
+              {{ row.frequency }}
+            </span>
+            <span
+              class="sub-amount font-display hidden text-end text-[16px] font-semibold whitespace-nowrap tabular-nums @min-[720px]/subscriptions:block"
             >
               {{ row.amount }}
             </span>
-            <span
-              class="text-[13px] font-bold whitespace-nowrap"
-              :class="row.active ? 'text-soft' : 'text-muted'"
-            >
-              {{ row.status }}
+            <span class="sub-monthly grid justify-items-end gap-0.5">
+              <span class="font-display text-[16px] font-semibold whitespace-nowrap tabular-nums">
+                {{ row.monthly }}
+                <span class="text-muted font-sans text-[13px] font-bold @min-[720px]/subscriptions:hidden">
+                  al mes
+                </span>
+              </span>
+              <span
+                v-if="row.periodicCharge"
+                class="text-muted text-[13px] font-bold whitespace-nowrap @min-[720px]/subscriptions:hidden"
+              >
+                {{ row.periodicCharge }}
+              </span>
             </span>
-          </span>
-        </button>
+            <span
+              class="sub-next hidden text-end text-[14px] font-bold whitespace-nowrap @min-[720px]/subscriptions:grid"
+            >
+              {{ row.next }}
+              <span v-if="row.when" class="text-muted text-[13px] font-semibold">{{ row.when }}</span>
+            </span>
+          </button>
+          <div
+            v-if="group.key === 'active'"
+            class="sub-total bg-panel2 border-line hidden min-h-12 items-center gap-x-3 border-t px-3.5 text-[15px] font-extrabold @min-[560px]/subscriptions:px-6 @min-[720px]/subscriptions:grid"
+          >
+            <span>{{ group.rows.length }} {{ group.rows.length === 1 ? 'activa' : 'activas' }}</span>
+            <span class="sub-monthly font-display text-end font-semibold tabular-nums">
+              {{ summary.monthly }}
+              <span class="text-muted font-sans text-[13px] font-bold @min-[720px]/subscriptions:hidden">
+                al mes
+              </span>
+            </span>
+          </div>
+        </template>
       </section>
       <NeonEmptyState v-else role="status">
         Aún no tienes suscripciones. Apunta las que pagas cada mes para ver lo que comprometen.
       </NeonEmptyState>
 
       <aside
+        v-if="rows.some((row) => row.active)"
         aria-label="Resumen de suscripciones"
         class="subscriptions-aside bg-panel border-line rounded-card grid gap-5 self-start border px-3.5 py-4 @min-[560px]/subscriptions:px-6 @min-[560px]/subscriptions:py-[22px]"
       >
         <div v-if="desktopFrame" class="grid gap-2">
           <p class="text-muted text-[14px] font-bold">Comprometido al mes</p>
-          <p class="text-figure-lg font-semibold">
+          <p class="text-figure-lg font-semibold" data-subscriptions-monthly>
             <NeonFigure :value="summary.monthly" />
           </p>
           <p class="text-soft text-[15px]">{{ summary.line }}</p>
         </div>
-        <div class="grid gap-1" :class="desktopFrame && 'border-line border-t pbs-[18px]'">
-          <h3 class="mbe-1.5 text-[18px] font-extrabold">
-            Próximos 30 días
-            <span class="text-muted font-bold">· {{ summary.next30 }}</span>
+        <section
+          aria-labelledby="subscriptions-upcoming-title"
+          class="grid gap-1.5"
+          :class="desktopFrame && 'border-line order-last border-t pbs-5'"
+        >
+          <h3 id="subscriptions-upcoming-title" class="text-[18px] font-extrabold">
+            Próximos cobros
           </h3>
-          <div
-            v-for="charge in summary.upcoming"
-            :key="charge.id"
-            class="border-line flex min-w-0 items-center gap-3.5 border-t py-2.5"
-          >
-            <span
-              class="font-display min-w-14 shrink-0 text-[14px] font-semibold whitespace-nowrap tabular-nums"
+          <ul v-if="summary.upcoming.length" class="grid gap-1">
+            <li
+              v-for="charge in summary.upcoming"
+              :key="charge.id"
+              class="border-line flex min-w-0 items-center gap-3.5 py-2.5 [&+li]:border-t"
             >
-              {{ charge.date }}
-            </span>
-            <span class="grid min-w-0 flex-1 gap-0.5">
-              <span class="truncate text-[15px] font-bold">{{ charge.name }}</span>
-              <span class="text-muted text-[13px]">{{ charge.when }}</span>
-            </span>
-            <span class="font-display shrink-0 text-[15px] font-semibold tabular-nums">
-              {{ charge.amount }}
-            </span>
+              <span
+                class="font-display min-w-16 shrink-0 text-[14px] font-semibold whitespace-nowrap tabular-nums"
+              >
+                {{ charge.date }}
+              </span>
+              <span class="grid min-w-0 flex-1 gap-0.5">
+                <span class="truncate text-[15px] font-bold">{{ charge.name }}</span>
+                <span class="text-muted text-[13px]">{{ charge.when }}</span>
+              </span>
+              <span class="font-display shrink-0 text-[15px] font-semibold tabular-nums">
+                {{ charge.amount }}
+              </span>
+            </li>
+          </ul>
+          <p v-else class="text-muted text-[14px]">No hay cobros previstos en los próximos 12 meses.</p>
+        </section>
+
+        <section
+          aria-labelledby="subscriptions-months-title"
+          class="border-line grid gap-2 border-t pbs-5"
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h3 id="subscriptions-months-title" class="text-[18px] font-extrabold">
+              Próximos 12 meses
+            </h3>
+            <p v-if="peakAmount" class="text-muted text-[13px] font-bold">
+              Máximo
+              <span class="font-display text-text whitespace-nowrap tabular-nums">{{
+                peakAmount
+              }}</span>
+            </p>
           </div>
-        </div>
+          <ol
+            class="grid h-28 grid-cols-[repeat(12,minmax(0,1fr))] items-end gap-1.5"
+            aria-label="Cobros de cada mes"
+            data-subscription-months
+          >
+            <li
+              v-for="month in summary.months"
+              :key="month.key"
+              class="flex h-full flex-col items-center justify-end gap-1.5"
+              :aria-label="month.title"
+            >
+              <span
+                class="w-full rounded-t-[6px] rounded-b-[2px]"
+                :class="month.peak ? 'bg-text' : 'bg-neutral-bar'"
+                :style="{ blockSize: month.height ? `max(4px, ${month.height * 76}%)` : '2px' }"
+                aria-hidden="true"
+              ></span>
+              <span class="text-muted text-label font-extrabold uppercase" aria-hidden="true">
+                <span class="@min-[560px]/subscriptions:hidden">{{ month.label[0] }}</span>
+                <span class="hidden @min-[560px]/subscriptions:inline">{{ month.label }}</span>
+              </span>
+            </li>
+          </ol>
+          <p v-if="summary.partialMonth" class="text-muted text-[13px]">
+            {{ summary.partialMonth }} desde hoy.
+          </p>
+        </section>
       </aside>
     </div>
 
@@ -375,6 +496,24 @@ const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 </template>
 
 <style scoped>
+.sub-row,
+.sub-total {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@container subscriptions (min-width: 720px) {
+  .sub-grid,
+  .sub-row {
+    grid-template-columns: minmax(0, 1fr) 96px 112px 112px 120px;
+    column-gap: 16px;
+  }
+
+  .sub-total {
+    grid-template-columns: minmax(0, 1fr) 112px 120px;
+    column-gap: 16px;
+  }
+}
+
 @container subscriptions (min-width: 1040px) {
   .subscriptions-body {
     grid-template-columns: minmax(0, 1fr) 400px;

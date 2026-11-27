@@ -165,7 +165,7 @@ test.describe('Movimientos en el diseño nuevo', () => {
     await tracker.open('transactions')
 
     await section(page).getByRole('button', { name: 'Nuevo movimiento' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Apuntar' })
+    const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
     await sheet.getByRole('textbox', { name: 'Importe' }).fill('8,20')
     await sheet.getByLabel('Descripción').fill('e2e-alta-cabecera')
     await sheet.getByRole('button', { name: 'Guardar' }).click()

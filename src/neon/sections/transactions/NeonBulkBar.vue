@@ -1,26 +1,20 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 
-import { useMediaQuery } from '../../../composables/useMediaQuery'
-
 import type { TransactionType } from '../../../scripts/types'
 import { useFinancialStateStore } from '../../../stores/financial-state'
 import { useMovementsStore } from '../../../stores/movements'
 import NeonButton from '../../ui/NeonButton.vue'
-import { FRAME_QUERY } from '../../ui/sheet-drag'
 import { BULK_TYPES, bulkCategoryType, selectionSummary } from './registry-view-model'
 
 // Bulk actions of the registry while selecting rows: the count and signed sum
 // of the selection, change its type, account or category, select every row
 // shown or delete it after confirming (it cannot be undone, as in the old
-// design). «Listo», next to the filters, ends the selection. Sticks to
-// the bottom of the ledger column while the ledger scrolls under it. On the
-// mobile frame the month line scrolls far out of reach, so the bar carries
-// its own close button (artboard «Movimientos · móvil»).
+// design). Its close button ends the selection (pressing a row's icon starts
+// it). Sticks to the bottom of the ledger column while the ledger scrolls
+// under it.
 const props = defineProps<{ allShownSelected: boolean }>()
 const emit = defineEmits<{ selectAll: []; done: [] }>()
-
-const desktopFrame = useMediaQuery(FRAME_QUERY)
 
 const movementsStore = useMovementsStore()
 const financialStateStore = useFinancialStateStore()
@@ -76,14 +70,19 @@ const selectClass =
 
 <template>
   <div
-    class="neon-bulk bg-panel border-line rounded-card frame:inset-be-4 sticky inset-be-[118px] z-10 grid gap-3 border px-5 py-3.5"
+    class="neon-bulk motion-safe:animate-sheet-in bg-panel border-line rounded-card frame:inset-be-4 sticky inset-be-[118px] z-10 grid gap-3 border px-5 py-3.5"
     role="region"
     aria-label="Acciones sobre la selección"
     data-bulk-bar
   >
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <p class="flex items-baseline gap-3" aria-live="polite">
-        <span class="text-[15px] font-extrabold" data-bulk-count>{{ summary.count }}</span>
+        <span
+          :key="summary.count"
+          class="motion-safe:animate-swap inline-block text-[15px] font-extrabold"
+          data-bulk-count
+          >{{ summary.count }}</span
+        >
         <span class="font-display text-soft text-[15px] font-semibold tabular-nums">
           {{ summary.sum }}
         </span>
@@ -93,7 +92,6 @@ const selectClass =
           Seleccionar todo
         </NeonButton>
         <button
-          v-if="!desktopFrame"
           type="button"
           class="border-ctrl-line text-soft outline-accent grid size-11 shrink-0 place-items-center rounded-full border focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-140 motion-safe:active:scale-[0.97]"
           aria-label="Terminar la selección"

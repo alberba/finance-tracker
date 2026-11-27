@@ -8,7 +8,7 @@ import {
   formatPercent,
   formatSignedMoney,
 } from '../../../lib/format'
-import type { Month } from '../../../lib/month'
+import { ALL_MONTHS, type Month } from '../../../lib/month'
 import { parseDecimal, round2 } from '../../../lib/number'
 import { TRANSACTION_TYPES, type Transaction, type TransactionType } from '../../../scripts/types'
 
@@ -24,9 +24,16 @@ export interface ExtraFilters {
   /** Lowest and highest amount, as typed («12,50»). */
   min: string
   max: string
+  /** One category, picked from the summary's split («Sin categoría» for none). */
+  category: string
 }
 
-export const NO_EXTRA_FILTERS: ExtraFilters = { date: '', min: '', max: '' }
+export const NO_EXTRA_FILTERS: ExtraFilters = { date: '', min: '', max: '', category: '' }
+
+/** A movement's category as the split names it. */
+export function categoryName(tx: Transaction): string {
+  return tx.category || 'Sin categoría'
+}
 
 function amountBound(text: string): number | null {
   if (!text.trim()) return null
@@ -34,7 +41,7 @@ function amountBound(text: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-/** Whether a movement passes the exact day and the amount range. */
+/** Whether a movement passes the exact day, the amount range and the category. */
 export function extraMatcher(extra: ExtraFilters): (tx: Transaction) => boolean {
   const min = amountBound(extra.min)
   const max = amountBound(extra.max)
@@ -43,6 +50,7 @@ export function extraMatcher(extra: ExtraFilters): (tx: Transaction) => boolean 
     if (extra.date && tx.date !== extra.date) return false
     if (min !== null && amount < min) return false
     if (max !== null && amount > max) return false
+    if (extra.category && categoryName(tx) !== extra.category) return false
     return true
   }
 }
@@ -69,8 +77,19 @@ export function moreFiltersLabel(accountIds: string[], extra: ExtraFilters): str
   return count ? `Más filtros · ${count}` : 'Más filtros'
 }
 
+/** What the «Importe» chip says: the range typed, or «Cualquiera». */
+export function amountFilterLabel(extra: ExtraFilters, currency = 'EUR'): string {
+  const min = amountBound(extra.min)
+  const max = amountBound(extra.max)
+  if (min !== null && max !== null)
+    return `${formatMoney(min, currency)} – ${formatMoney(max, currency)}`
+  if (min !== null) return `desde ${formatMoney(min, currency)}`
+  if (max !== null) return `hasta ${formatMoney(max, currency)}`
+  return 'Cualquiera'
+}
+
 export function hasExtraFilters(extra: ExtraFilters): boolean {
-  return Boolean(extra.date || extra.min.trim() || extra.max.trim())
+  return Boolean(extra.date || extra.min.trim() || extra.max.trim() || extra.category)
 }
 
 /** The type chips: one type at a time, none chosen means every type. */
@@ -261,6 +280,8 @@ export function filterSummary(
 
 export interface BreakdownRow {
   name: string
+  /** How many movements it sums. */
+  count: number
   amount: string
   share: string
   /** Bar width, 0–100. */
@@ -287,10 +308,12 @@ export function categoryBreakdown(
 ): Breakdown {
   const type = chosenType(types) ?? 'expense'
   const totals = new Map<string, number>()
+  const counts = new Map<string, number>()
   rows.forEach((tx) => {
     if (tx.type !== type) return
-    const name = tx.category || 'Sin categoría'
+    const name = categoryName(tx)
     totals.set(name, (totals.get(name) ?? 0) + Math.abs(Number(tx.amount) || 0))
+    counts.set(name, (counts.get(name) ?? 0) + 1)
   })
   const total = Array.from(totals.values()).reduce((sum, amount) => sum + amount, 0)
   return {
@@ -301,6 +324,7 @@ export function categoryBreakdown(
         const share = total > 0 ? (amount / total) * 100 : 0
         return {
           name,
+          count: counts.get(name) ?? 0,
           amount: formatMoney(round2(amount), currency),
           share: formatPercent(share, { digits: 1 }),
           width: Math.round(share * 10) / 10,
@@ -424,6 +448,51 @@ export function movementDetail(
     sameTitle: `Más de ${description}`,
     same,
   }
+}
+
+// --- The phone's month line ---------------------------------------------------
+
+/** One month of the phone's month picker. */
+export interface MonthCell {
+  month: Month
+  /** «nov». */
+  name: string
+  /** The month's figure under the filters (as the month line's), or «—» without movements. */
+  total: string
+  /** The net went below zero; only while every type shows. */
+  negative: boolean
+  /** A month still to come: it cannot be picked. */
+  future: boolean
+}
+
+/** The twelve months of `year` with their figure under the filters (`groups`). */
+export function monthCells(
+  groups: readonly MonthGroup[],
+  year: number,
+  today: string,
+  types: string[],
+  currency = 'EUR',
+): MonthCell[] {
+  const todayYear = Number(today.slice(0, 4))
+  const todayMonth = Number(today.slice(5, 7))
+  return ALL_MONTHS.map((month) => {
+    const rows = groups.find((group) => group.month === month)?.rows ?? []
+    const net = round2(rows.reduce((sum, tx) => sum + signedAmount(tx), 0))
+    return {
+      month,
+      name: formatMonthName(month).slice(0, 3).toLowerCase(),
+      total: rows.length ? filterSummary(rows, types, currency).total : '—',
+      negative: !chosenType(types) && net < 0,
+      future: year > todayYear || (year === todayYear && month > todayMonth),
+    }
+  })
+}
+
+/** The month line's count; the type joins it only when one is chosen («4 movimientos · gastos»). */
+export function monthLineCount(rows: readonly Transaction[], types: string[]): string {
+  const type = chosenType(types)
+  const count = plural(rows.length, 'movimiento', 'movimientos')
+  return type ? `${count} · ${TYPE_NOUN[type]}` : count
 }
 
 // --- Selection and bulk actions ---------------------------------------------
