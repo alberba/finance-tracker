@@ -268,7 +268,10 @@ export class FinanceTrackerPage {
     await this.entrySheet.getByRole('button', { name: 'Fecha', exact: true }).click()
     const calendar = this.entrySheet.getByRole('dialog', { name: 'Fecha', exact: true })
     const field = calendar.getByRole('textbox', { name: 'Escribir fecha' })
+    // Opening moves focus to the calendar's day; typing before that races with it.
+    await expect(calendar.locator('[data-picker-focus]')).toBeFocused()
     await field.fill(typedDate(isoDate))
+    await expect(field).toHaveValue(typedDate(isoDate))
     await field.press('Enter')
     await expect(calendar).toBeHidden()
   }
