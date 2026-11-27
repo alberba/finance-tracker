@@ -164,7 +164,7 @@ const LABEL = 'text-muted grid min-w-0 gap-1.5 text-meta font-bold'
             </option>
           </select>
         </label>
-        <p v-else class="text-muted text-note">Nuevo movimiento · No declarado</p>
+        <p v-else class="text-muted text-note">Nuevo movimiento</p>
       </article>
       <ul v-if="preview.incompatible.length" class="text-muted text-note">
         <li v-for="operation in preview.incompatible" :key="operation.externalId">

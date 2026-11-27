@@ -7,6 +7,7 @@ import { assetHref } from './asset-route'
 import { type AssetDetail } from './asset-view-model'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
+import NeonInvestmentQuoteSoon from './NeonInvestmentQuoteSoon.vue'
 import { TONE_TEXT } from './view-model'
 
 // The detail of an asset in the mobile frame (artboard «Inversión · detalle de
@@ -26,9 +27,8 @@ const emit = defineEmits<{
   back: []
   openMovements: []
   closeMovements: []
-  buy: []
-  sell: []
-  declareAll: []
+  buy: [event: MouseEvent]
+  sell: [event: MouseEvent]
 }>()
 
 const RING = 2 * Math.PI * 45
@@ -52,6 +52,11 @@ function onBack(event: MouseEvent): void {
 
 // The page's own side padding: the chart and the sheet go over it, edge to edge.
 const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
+const ACTIONS = [
+  { side: 'buy', label: 'Comprar' },
+  { side: 'sell', label: 'Vender' },
+] as const
+
 const PRESS =
   'motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]'
 </script>
@@ -129,6 +134,8 @@ const PRESS =
       </button>
     </div>
 
+    <NeonInvestmentQuoteSoon />
+
     <section class="grid min-w-0 gap-3" aria-labelledby="asset-position-title">
       <h2 id="asset-position-title" class="text-block-title m-0 font-extrabold">Tu posición</h2>
       <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
@@ -203,46 +210,33 @@ const PRESS =
       <span class="text-muted text-label tracking-label font-extrabold uppercase">
         {{ detail.units?.word ?? detail.figures[0].label }}
       </span>
-      <div class="mbs-[22px] flex justify-center gap-5">
+      <div class="mbs-[22px] flex justify-center gap-7">
         <button
+          v-for="action in ACTIONS"
+          :key="action.side"
           type="button"
-          class="bg-accent text-on-accent outline-text grid size-16 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2"
+          class="group outline-accent rounded-tile grid justify-items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-4"
           :class="PRESS"
-          aria-label="Comprar"
-          @click="emit('buy')"
+          @click="action.side === 'buy' ? emit('buy', $event) : emit('sell', $event)"
         >
-          <svg
-            class="size-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+          <span
+            class="grid size-16 place-items-center rounded-full"
+            :class="action.side === 'buy' ? 'bg-accent text-on-accent' : 'bg-panel2 text-text'"
           >
-            <path :d="OPERATION_ICONS.buy" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="bg-panel2 text-text outline-accent grid size-16 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2"
-          :class="PRESS"
-          aria-label="Vender"
-          @click="emit('sell')"
-        >
-          <svg
-            class="size-6"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path :d="OPERATION_ICONS.sell" />
-          </svg>
+            <svg
+              class="size-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path :d="OPERATION_ICONS[action.side]" />
+            </svg>
+          </span>
+          <span class="text-soft text-[13px] font-extrabold">{{ action.label }}</span>
         </button>
       </div>
     </div>
@@ -260,15 +254,6 @@ const PRESS =
           Movimientos
           <span class="text-muted text-note font-bold" data-asset-count>{{ detail.count }}</span>
         </h2>
-        <button
-          v-if="detail.undeclared.length"
-          type="button"
-          class="text-text outline-accent rounded-pill text-note -me-4 inline-flex min-h-11 items-center px-4 font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
-          :class="PRESS"
-          @click="emit('declareAll')"
-        >
-          Marcar todas como declaradas
-        </button>
       </div>
       <NeonInvestmentAssetYears :years="detail.years" />
     </section>

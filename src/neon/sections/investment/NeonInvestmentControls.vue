@@ -6,10 +6,8 @@ import type { Month } from '../../../lib/month'
 import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
 import type { PeriodOption } from './view-model'
 
-// The two pills of the cover: the period the figures are measured at and how
-// the return is measured. On the desktop frame they sit at the end of a row;
-// on the mobile one (`compact`) they sit side by side in the middle, with
-// short texts, and each menu opens toward the middle of the screen.
+// The period and return method share a row with the benchmark on desktop.
+// On mobile the two menus open above their centered controls.
 const props = defineProps<{
   periods: readonly PeriodOption[]
   month: Month
@@ -44,12 +42,18 @@ const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
 
 <template>
   <div
-    :class="compact ? 'flex justify-center gap-2' : 'flex flex-wrap justify-end gap-x-5 gap-y-3'"
+    :class="
+      compact
+        ? 'relative z-20 flex flex-wrap gap-2 px-4'
+        : 'relative z-20 flex flex-wrap items-center gap-2'
+    "
+    role="group"
+    aria-label="Controles de la gráfica"
   >
     <NeonChoiceMenu
       :text="`Periodo · ${period?.label ?? ''}`"
-      :short-text="compact ? period?.label : undefined"
-      :placement="compact ? 'start' : 'end'"
+      :short-text="period?.label"
+      :placement="compact ? 'above-center' : 'start'"
       label="Periodo"
       :icon="ICON_PERIOD"
       :groups="periodGroups"
@@ -57,11 +61,13 @@ const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
     />
     <NeonChoiceMenu
       :text="method === 'twr' ? 'Rentabilidad TWR' : 'Rentabilidad simple'"
-      :short-text="compact ? (method === 'twr' ? 'TWR' : 'Simple') : undefined"
+      :short-text="method === 'twr' ? 'TWR' : 'Simple'"
+      :placement="compact ? 'above-center' : 'start'"
       label="Cómo medir la rentabilidad"
       :icon="ICON_METHOD"
       :groups="methodGroups"
       @select="(_, value) => emit('method', value)"
     />
+    <slot />
   </div>
 </template>

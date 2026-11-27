@@ -77,9 +77,9 @@ const simple = (state = portfolio(), month = 3 as Month) =>
   buildInvestmentDashboardViewModel(state, month, 'simple')
 
 describe('periodFigures', () => {
-  it('en simple da la rentabilidad con la ganancia debajo, lo que vale y lo que has puesto', () => {
+  it('en simple da la rentabilidad con la ganancia, lo que vale y lo que has puesto', () => {
     expect(periodFigures(simple(), 'simple', { latest: true, twr: 0 })).toEqual([
-      { key: 'return', label: 'Tu cartera', value: '+17,5 %', sub: '+420,00 €', tone: 'gain' },
+      { key: 'return', label: 'Rentabilidad', value: '+17,5 %', sub: '+420,00 €', tone: 'gain' },
       { key: 'value', label: 'Vale hoy', value: '2.820,00 €', sub: '', tone: 'neutral' },
       { key: 'invested', label: 'Has puesto', value: '2.400,00 €', sub: '', tone: 'neutral' },
     ])
@@ -88,7 +88,7 @@ describe('periodFigures', () => {
   it('en TWR la cifra es la TWR, sin importe debajo', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'twr')
     const [first] = periodFigures(vm, 'twr', { latest: true, twr: 20 })
-    expect(first).toMatchObject({ label: 'Tu cartera · TWR', value: '+20,0\u00a0%', tone: 'gain' })
+    expect(first).toMatchObject({ label: 'Rentabilidad TWR', value: '+20,0\u00a0%', tone: 'gain' })
     expect(first.sub).toBe('')
   })
 
@@ -359,6 +359,7 @@ describe('quoteNotice', () => {
     expect(quoteNotice(at('fresh'), 'Europe/Madrid')).toEqual({
       late: false,
       text: '9 oct, 17:45',
+      short: '9 oct, 17:45',
       title: 'Cotizaciones del 9 oct, 17:45',
     })
   })
@@ -367,6 +368,7 @@ describe('quoteNotice', () => {
     expect(quoteNotice(at('stale'), 'Europe/Madrid')).toEqual({
       late: true,
       text: 'Cotizaciones retrasadas · último precio del 9 oct, 17:45',
+      short: 'Retrasadas · 9 oct, 17:45',
       title: 'Alguna cotización llega con retraso: se muestra el último precio válido',
     })
   })

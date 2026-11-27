@@ -5,7 +5,7 @@ import NeonChartSeries from '../../ui/NeonChartSeries.vue'
 import type { CompactChart } from './view-model'
 
 // The cover's chart on the mobile frame (artboard «Inversión · móvil · Pixel
-// 10»): edge to edge and 266 px tall, the portfolio as a thick line over an
+// 10»): edge to edge and up to 266 px tall, the portfolio as a thick line over an
 // area that fades out, what went in as a dashed one, only the months on the
 // axis and today's dot. It is walked with the finger (or the mouse, or the
 // arrows): `hot` is the point being looked at, null at rest, with a cursor
@@ -52,13 +52,17 @@ function onKey(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <figure class="relative m-0 h-[min(266px,32dvh)] min-w-0" data-investment-chart>
+  <figure
+    class="relative m-0 h-[clamp(8.5rem,calc(66dvh-19.25rem),16.625rem)] min-w-0"
+    data-investment-chart
+  >
     <svg
       :viewBox="chart.viewBox"
       preserveAspectRatio="none"
       role="img"
       :aria-label="chart.label"
-      class="absolute inset-0 block size-full overflow-visible"
+      class="motion-safe:animate-draw absolute inset-0 block size-full overflow-visible"
+      :style="{ animationDuration: '800ms', animationDelay: '60ms' }"
     >
       <template v-for="line in chart.lines" :key="line.key">
         <NeonChartSeries v-if="!line.dashed" :line="line.d" :area="chart.area" />
@@ -82,16 +86,20 @@ function onKey(event: KeyboardEvent): void {
       aria-hidden="true"
     ></span>
     <span
-      class="bg-text border-bg pointer-events-none absolute -translate-1/2 rounded-full border-[3px]"
+      class="bg-text border-bg motion-safe:animate-dot pointer-events-none absolute -translate-1/2 rounded-full border-[3px]"
       :class="hot === null ? 'size-[18px]' : 'size-5'"
-      :style="{ insetInlineStart: `${point.left}%`, insetBlockStart: `${point.top}%` }"
+      :style="{
+        insetInlineStart: `${point.left}%`,
+        insetBlockStart: `${point.top}%`,
+        animationDelay: '620ms',
+      }"
       aria-hidden="true"
     ></span>
     <span
       v-for="month in months"
       :key="month.left"
       class="text-muted text-label pointer-events-none absolute inset-be-1.5 -translate-x-1/2 leading-none font-bold"
-      :style="{ insetInlineStart: `${month.left}%` }"
+      :style="{ insetInlineStart: `clamp(1rem, ${month.left}%, 100% - 1rem)` }"
       aria-hidden="true"
     >
       {{ month.text }}

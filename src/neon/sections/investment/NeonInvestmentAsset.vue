@@ -1,27 +1,27 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import NeonButton from '../../ui/NeonButton.vue'
 import NeonDetailHeader from '../../ui/NeonDetailHeader.vue'
 import { OPERATION_ICONS } from './asset-icons'
 import { type AssetDetail } from './asset-view-model'
 import NeonInvestmentAssetChart from './NeonInvestmentAssetChart.vue'
 import NeonInvestmentAssetYears from './NeonInvestmentAssetYears.vue'
+import NeonInvestmentQuoteSoon from './NeonInvestmentQuoteSoon.vue'
 import { TONE_TEXT } from './view-model'
 
-// The detail of an asset in the new Inversión (artboard «Inversión · detalle de
-// activo (VWCE) · 2560 px», #439), desktop. The header is the detail header
-// («‹ VWCE», DESIGN.md): the arrow and the symbol, nothing else. Under it, what
-// the asset is worth, its price against the operations that were made (the
-// chart reads with the mouse or the arrow keys), a few figures and the
-// operations by year.
+// The detail of an asset in the new Inversión (#439), desktop. The header is
+// the detail header («‹ VWCE», DESIGN.md): the arrow and the symbol, nothing
+// else. Under it two columns of cards: on the main one the price against the
+// operations that were made (the chart reads with the mouse or the arrow keys)
+// and the operations by year, with buying and selling; beside it, held in view
+// while the list scrolls, the position: what it is worth, its result and its
+// figures.
 const props = defineProps<{ detail: AssetDetail }>()
 
 const emit = defineEmits<{
   back: []
-  buy: []
-  sell: []
-  declareAll: []
+  buy: [event: MouseEvent]
+  sell: [event: MouseEvent]
 }>()
 
 // The chart rests on today's point; moving over it (or the arrow keys) reads
@@ -32,6 +32,20 @@ const reading = computed(() => {
   return points[hot.value ?? points.length - 1]
 })
 
+const value = computed(() => props.detail.figures.find((figure) => figure.key === 'value'))
+const result = computed(() => props.detail.figures.find((figure) => figure.key === 'result'))
+const rest = computed(() =>
+  props.detail.figures.filter((figure) => figure.key !== 'value' && figure.key !== 'result'),
+)
+
+const SIDES = [
+  { value: 'buy', label: 'Comprar' },
+  { value: 'sell', label: 'Vender' },
+] as const
+
+const CARD =
+  'bg-panel border-line rounded-card grid min-w-0 content-start gap-4 border px-7 pbs-6 pbe-5'
+
 function onBack(event: MouseEvent): void {
   event.preventDefault()
   emit('back')
@@ -39,8 +53,9 @@ function onBack(event: MouseEvent): void {
 </script>
 
 <template>
-  <div class="grid min-w-0 content-start gap-[26px]" data-investment-asset>
+  <div class="grid min-w-0 content-start gap-[22px]" data-investment-asset>
     <NeonDetailHeader
+      class="motion-safe:animate-rise"
       :label="detail.symbol"
       back-href="/inversion"
       back-label="Inversión"
@@ -49,91 +64,158 @@ function onBack(event: MouseEvent): void {
     />
 
     <div
-      role="group"
-      aria-label="Resumen del activo"
-      class="grid min-w-0 grid-cols-4 gap-y-[18px]"
-      data-asset-figures
+      class="grid min-w-0 grid-cols-1 items-start gap-[22px] @4xl:grid-cols-[minmax(0,1.85fr)_minmax(320px,1fr)]"
     >
-      <div
-        v-for="(figure, index) in detail.figures"
-        :key="figure.key"
-        class="grid min-w-0 content-start gap-1 px-5"
-        :class="index ? 'border-line border-s' : 'ps-0'"
-        :data-asset-figure="figure.key"
-      >
-        <span class="text-muted text-label tracking-label font-extrabold uppercase">
-          {{ figure.label }}
-        </span>
-        <span
-          class="font-display truncate text-[clamp(24px,2.4cqi,34px)] leading-[1.1] font-semibold tracking-[-0.03em] whitespace-nowrap tabular-nums"
-          :class="TONE_TEXT[figure.tone]"
+      <div class="grid min-w-0 gap-[22px]">
+        <section
+          :class="CARD"
+          class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
+          aria-labelledby="asset-chart-title"
         >
-          {{ figure.value }}
-        </span>
-      </div>
-    </div>
+          <header class="flex items-baseline justify-between gap-3">
+            <h2 id="asset-chart-title" class="text-block-title m-0 font-extrabold">
+              Precio y tus operaciones
+            </h2>
+            <span
+              v-if="detail.chart"
+              class="text-muted inline-flex items-center gap-3.5 text-xs font-bold"
+              aria-hidden="true"
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <span class="bg-text size-2.5 rounded-full"></span>
+                Compra
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="border-text size-2.5 rounded-full border-2"></span>
+                Venta
+              </span>
+            </span>
+          </header>
 
-    <div
-      class="grid min-w-0 grid-cols-1 items-start gap-x-14 gap-y-8 @4xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,1fr)]"
-    >
-      <section class="grid min-w-0 gap-2.5" aria-labelledby="asset-chart-title">
-        <h2
-          id="asset-chart-title"
-          class="text-block-title m-0 flex items-baseline justify-between gap-3 font-extrabold"
-        >
-          Precio y tus operaciones
-          <span
-            v-if="detail.chart"
-            class="text-muted inline-flex items-center gap-3.5 text-xs font-bold"
-            aria-hidden="true"
-          >
-            <span class="inline-flex items-center gap-1.5">
-              <span class="bg-text size-2.5 rounded-full"></span>
-              Compra
-            </span>
-            <span class="inline-flex items-center gap-1.5">
-              <span class="border-text size-2.5 rounded-full border-2"></span>
-              Venta
-            </span>
-          </span>
-        </h2>
-        <p
-          class="font-display text-figure-block m-0 leading-[1.15] font-bold tracking-[-0.03em]"
-          data-asset-name
-        >
-          {{ detail.name }}
-        </p>
-
-        <template v-if="detail.chart && reading">
-          <p
-            class="text-muted text-note m-0 flex min-h-[1.6em] flex-wrap items-baseline gap-x-3.5 gap-y-0.5 font-bold tabular-nums"
-            aria-live="polite"
-            data-asset-reading
-          >
-            <span class="text-text font-extrabold">{{ reading.date }}</span>
-            <span class="font-display text-figure-block text-text font-semibold tracking-[-0.02em]">
-              {{ reading.price }}
-            </span>
-            <span :class="TONE_TEXT[reading.deltaTone]">{{ reading.delta }}</span>
-            <span v-if="reading.note">{{ reading.note }}</span>
+          <template v-if="detail.chart && reading">
+            <p
+              class="m-0 flex min-h-[1.6em] flex-wrap items-baseline gap-x-3 gap-y-0.5 font-bold tabular-nums"
+              aria-live="polite"
+              data-asset-reading
+            >
+              <span
+                class="font-display text-[clamp(1.5rem,3cqi,2.25rem)] leading-[1.05] font-semibold tracking-[-0.03em]"
+              >
+                {{ reading.price }}
+              </span>
+              <span class="text-muted text-note">{{ reading.date }}</span>
+              <span class="text-note" :class="TONE_TEXT[reading.deltaTone]">
+                {{ reading.delta }}
+              </span>
+              <span v-if="reading.note" class="text-muted text-note">{{ reading.note }}</span>
+            </p>
+            <NeonInvestmentAssetChart v-model:hot="hot" :chart="detail.chart" />
+          </template>
+          <p v-else class="text-muted text-note m-0">
+            Aún no hay operaciones con precio para dibujar la gráfica.
           </p>
-          <NeonInvestmentAssetChart v-model:hot="hot" :chart="detail.chart" />
-        </template>
-        <p v-else class="text-muted text-note m-0">
-          Aún no hay operaciones con precio para dibujar la gráfica.
-        </p>
-      </section>
+        </section>
 
-      <section class="grid min-w-0 content-start gap-1.5" aria-labelledby="asset-facts-title">
-        <h2 id="asset-facts-title" class="text-block-title m-0 mb-2 font-extrabold">En cifras</h2>
-        <ul class="m-0 list-none p-0" data-asset-facts>
-          <li
+        <section
+          :class="CARD"
+          class="motion-safe:animate-rise motion-safe:[animation-delay:100ms]"
+          aria-labelledby="asset-movements-title"
+        >
+          <header class="flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5">
+            <h2
+              id="asset-movements-title"
+              class="text-block-title m-0 flex items-baseline gap-3 font-extrabold"
+            >
+              Movimientos
+              <span class="text-muted text-note font-bold" data-asset-count>
+                {{ detail.count }}
+              </span>
+            </h2>
+            <div class="flex items-center gap-2">
+              <button
+                v-for="side in SIDES"
+                :key="side.value"
+                type="button"
+                class="rounded-pill inline-flex min-h-11 items-center gap-2 ps-3.5 pe-[18px] text-[14px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]"
+                :class="
+                  side.value === 'buy'
+                    ? 'bg-accent text-on-accent outline-text'
+                    : 'bg-panel2 text-text outline-accent'
+                "
+                @click="side.value === 'buy' ? emit('buy', $event) : emit('sell', $event)"
+              >
+                <svg
+                  class="size-[18px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path :d="OPERATION_ICONS[side.value]" />
+                </svg>
+                {{ side.label }}
+              </button>
+            </div>
+          </header>
+
+          <NeonInvestmentAssetYears :years="detail.years" />
+        </section>
+      </div>
+
+      <section
+        :class="CARD"
+        class="motion-safe:animate-rise motion-safe:[animation-delay:150ms] @4xl:sticky @4xl:top-6"
+        aria-labelledby="asset-position-title"
+        data-asset-figures
+      >
+        <h2 id="asset-position-title" class="text-block-title m-0 font-extrabold" data-asset-name>
+          {{ detail.name }}
+        </h2>
+
+        <NeonInvestmentQuoteSoon />
+
+        <div v-if="value" class="grid gap-1" data-asset-figure="value">
+          <span class="text-muted text-meta font-bold">{{ value.label }}</span>
+          <span
+            class="font-display text-[clamp(1.75rem,3.4cqi,2.75rem)] leading-[1.05] font-semibold tracking-[-0.035em] whitespace-nowrap tabular-nums"
+          >
+            {{ value.value }}
+          </span>
+          <span
+            v-if="result"
+            class="font-display flex flex-wrap items-baseline gap-x-2.5 text-[15px] font-semibold tabular-nums"
+            :class="TONE_TEXT[result.tone]"
+            data-asset-figure="result"
+          >
+            {{ result.value }}
+            <span v-if="result.note">{{ result.note }}</span>
+          </span>
+        </div>
+
+        <dl class="m-0 grid" data-asset-facts>
+          <div
+            v-for="figure in rest"
+            :key="figure.key"
+            class="border-line flex items-baseline justify-between gap-3 border-t py-2.5"
+            :data-asset-figure="figure.key"
+          >
+            <dt class="text-soft text-row font-bold">{{ figure.label }}</dt>
+            <dd
+              class="font-display text-figure-row m-0 font-semibold whitespace-nowrap tabular-nums"
+            >
+              {{ figure.value }}
+            </dd>
+          </div>
+          <div
             v-for="fact in detail.facts"
             :key="fact.label"
-            class="border-line flex items-baseline justify-between gap-3 border-t py-2.5"
+            class="border-line flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t py-2.5"
           >
-            <span class="text-soft text-row font-bold">{{ fact.label }}</span>
-            <span class="grid min-w-0 justify-items-end gap-px">
+            <dt class="text-soft text-row font-bold">{{ fact.label }}</dt>
+            <dd class="m-0 grid min-w-0 justify-items-end gap-px">
               <span
                 class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
               >
@@ -146,67 +228,10 @@ function onBack(event: MouseEvent): void {
               >
                 {{ fact.note }}
               </span>
-            </span>
-          </li>
-        </ul>
+            </dd>
+          </div>
+        </dl>
       </section>
     </div>
-
-    <section class="grid min-w-0 gap-1.5" aria-labelledby="asset-movements-title">
-      <div class="mb-1.5 flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5">
-        <h2
-          id="asset-movements-title"
-          class="text-block-title m-0 flex items-baseline gap-3.5 font-extrabold"
-        >
-          Movimientos
-          <span class="text-muted text-note font-bold" data-asset-count>{{ detail.count }}</span>
-        </h2>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="bg-accent text-on-accent outline-text inline-grid size-11 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]"
-            aria-label="Comprar"
-            @click="emit('buy')"
-          >
-            <svg
-              class="size-[22px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path :d="OPERATION_ICONS.buy" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="bg-panel2 text-text outline-accent inline-grid size-11 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:active:scale-[0.97]"
-            aria-label="Vender"
-            @click="emit('sell')"
-          >
-            <svg
-              class="size-[22px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path :d="OPERATION_ICONS.sell" />
-            </svg>
-          </button>
-        </div>
-        <NeonButton v-if="detail.undeclared.length" @click="emit('declareAll')">
-          Marcar todas como declaradas
-        </NeonButton>
-      </div>
-
-      <NeonInvestmentAssetYears :years="detail.years" />
-    </section>
   </div>
 </template>

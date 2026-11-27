@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import { useMediaQuery } from '../../../composables/useMediaQuery'
 import type { ReturnMode } from '../../../domain/investment/view-model'
-import type { Month } from '../../../lib/month'
+import NeonChoiceMenu, { type ChoiceGroup } from '../../ui/NeonChoiceMenu.vue'
 import NeonDetailPanel from '../../ui/NeonDetailPanel.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
 import { listSheetGesture, releaseVelocity } from '../../ui/sheet-drag'
 import NeonInvestmentCardRows from './NeonInvestmentCardRows.vue'
 import NeonInvestmentCompactChart from './NeonInvestmentCompactChart.vue'
-import NeonInvestmentControls from './NeonInvestmentControls.vue'
 import {
   type Card,
   type CompactChart,
   type LeadFigure,
-  type PeriodOption,
   type PositionRow,
   type QuoteNotice,
   TONE_TEXT,
+  type Tone,
 } from './view-model'
 
 // The cover of Inversión in the mobile frame (artboard «Inversión · móvil ·
@@ -37,26 +37,72 @@ const props = defineProps<{
   /** The lead figure of a point of the chart, or of the period's close when null. */
   leadAt: (index: number | null) => LeadFigure
   chart: CompactChart
-  periods: readonly PeriodOption[]
-  month: Month
   method: ReturnMode
+  /** Today's return under each method, for the method menu. */
+  returns: Record<ReturnMode, { text: string; tone: Tone }>
   rows: readonly PositionRow[]
   cards: readonly Card[]
+  /** The cover is coming in: the rows follow the sheet (see the section). */
+  entering: boolean
 }>()
+
+// The rows come in with the sheet, 25ms apart (`anim-row`), only while
+// the cover comes in: a row that moves later just moves.
+const rowAt = (index: number) => 100 + Math.min(index, 8) * 25
 
 const emit = defineEmits<{
   open: [id: string]
-  month: [month: Month]
   method: [method: ReturnMode]
 }>()
 
 const hot = ref<number | null>(null)
 const lead = computed(() => props.leadAt(hot.value))
 
-// The dot of each position, from the portfolio's cool hues to the warm one.
-const DOTS = ['bg-lilac', 'bg-lilac2', 'bg-peach', 'bg-lilac3', 'bg-faint']
-const FALL_ICON = 'M3 7l6 6 4-4 8 8M15 17h6v-6'
-const FEES_ICON = 'M18 6.5a7 7 0 1 0 0 11M4 10h10M4 14h10'
+// How the return is measured is the tail of the gain line: «sobre lo aportado ▾»
+// or «por tiempo (TWR) ▾», a link that opens the two options, each with what
+// it measures and what it gives today, so the choice is made seeing both.
+const methodGroups = computed<ChoiceGroup<ReturnMode>[]>(() => [
+  {
+    key: 'method',
+    value: props.method,
+    options: [
+      {
+        value: 'simple',
+        label: 'Sobre lo aportado',
+        hint: 'Lo que has ganado con el dinero que has puesto.',
+        figure: props.returns.simple.text,
+        figureClass: TONE_TEXT[props.returns.simple.tone],
+      },
+      {
+        value: 'twr',
+        label: 'Por tiempo (TWR)',
+        hint: 'Cómo lo han hecho tus inversiones, sin contar cuándo aportaste. Se compara con un fondo.',
+        figure: props.returns.twr.text,
+        figureClass: TONE_TEXT[props.returns.twr.tone],
+      },
+    ],
+  },
+])
+
+// The short weight bar of each row, against the largest position.
+const maxWeight = computed(() => Math.max(1, ...props.rows.map((row) => row.weightPct)))
+
+// Each card at the foot of the sheet reads as one figure: its first row, with
+// the last one under it («Recuperación · 3 meses»). A card of a single row
+// (no fall worth telling) gives that row's label instead.
+const tiles = computed(() =>
+  props.cards.map((card) => {
+    const [first, ...rest] = card.rows
+    const last = rest.at(-1)
+    return {
+      id: card.id,
+      title: card.title,
+      value: first?.value ?? '—',
+      tone: first?.tone ?? 'neutral',
+      note: last ? `${last.label} · ${last.value}` : (first?.label ?? ''),
+    }
+  }),
+)
 const ARROW_UP = 'M7 17L17 7M8 7h9v9'
 const ARROW_DOWN = 'M7 7l10 10M17 8v9H8'
 
@@ -65,6 +111,7 @@ const expanded = ref(false)
 // The block that goes away is clipped while it shrinks or grows, and not
 // otherwise, so the pills' menus can open over what is under them.
 const clipped = ref(false)
+const motion = useMediaQuery('(prefers-reduced-motion: no-preference)')
 
 function onCollapseEnd(event: TransitionEvent): void {
   if (event.target === event.currentTarget && event.propertyName === 'grid-template-rows') {
@@ -73,8 +120,9 @@ function onCollapseEnd(event: TransitionEvent): void {
 }
 
 function setExpanded(value: boolean): void {
+  if (value === expanded.value) return
   expanded.value = value
-  clipped.value = true
+  clipped.value = value || motion.value
   hot.value = null
 }
 
@@ -133,13 +181,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
 
 <template>
   <div v-if="empty" class="grid min-w-0 gap-5">
-    <h1
-      id="investment-title"
-      tabindex="-1"
-      class="font-display px-2 pbs-1 text-[22px] leading-[1.15] font-bold tracking-[-0.03em] outline-none"
-    >
-      Inversión
-    </h1>
+    <h1 id="investment-title" tabindex="-1" class="sr-only">Inversión</h1>
     <NeonEmptyState>
       Aún no tienes inversiones. Apunta una compra para empezar a seguir tu cartera.
     </NeonEmptyState>
@@ -149,51 +191,33 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
        right on the bottom bar: the page's top padding is taken back, and its
        bottom one (which clears the bar) all but, so the frame's grid, which
        stretches its rows when it is shorter than the window, doesn't grow the
-       top bar. -->
+       top bar. The title is in the top bar (NeonBarTitle); the heading here is
+       for screen readers and focus. -->
   <div
     v-else
     class="-mt-[clamp(18px,2.6vw,36px)] -mb-5 flex h-[calc(100dvh-144px-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] min-h-136 min-w-0 flex-col"
   >
-    <header class="pointer-events-none relative z-10 grid gap-0.5 px-2 pbs-3">
-      <h1
-        id="investment-title"
-        tabindex="-1"
-        class="font-display text-[22px] leading-[1.15] font-bold tracking-[-0.03em] outline-none"
-      >
-        Inversión
-      </h1>
-      <p
-        v-if="notice"
-        class="text-label tracking-label m-0 inline-flex items-center gap-2 font-extrabold uppercase"
-        :class="notice.late ? 'text-soft' : 'text-muted'"
-        :role="notice.late ? 'status' : undefined"
-        :title="notice.title"
-        data-investment-quotes
-      >
-        <span
-          class="size-2 flex-none rounded-full"
-          :class="notice.late ? 'bg-peach' : 'bg-gain'"
-          aria-hidden="true"
-        ></span>
-        {{ notice.text }}
-      </p>
+    <h1 id="investment-title" tabindex="-1" class="sr-only">Inversión</h1>
+    <header
+      class="motion-safe:animate-rise pointer-events-none relative z-10 grid grid-cols-[minmax(0,1fr)_auto] px-2 pbs-1"
+    >
       <div
-        class="mbs-2 grid gap-0"
+        class="col-span-full row-start-1 grid gap-0.5"
         role="group"
         aria-label="Cifras del periodo"
         aria-live="polite"
         data-investment-figures
         data-investment-figure="return"
       >
-        <span class="sr-only">{{ lead.when ?? valueLabel }}</span>
+        <span class="text-muted text-note font-bold">{{ lead.when ?? valueLabel }}</span>
         <span
-          class="font-display text-[38px] leading-[1.05] font-bold tracking-[-0.035em] whitespace-nowrap tabular-nums"
+          class="font-display text-[clamp(1.75rem,11.5cqi,2.75rem)] leading-[1.05] font-bold tracking-[-0.04em] wrap-anywhere tabular-nums"
           data-investment-value
         >
           {{ lead.value }}
         </span>
         <span
-          class="inline-flex items-center gap-2 text-[14px] font-extrabold"
+          class="text-note relative flex flex-wrap items-center gap-x-1.5 font-extrabold"
           :class="TONE_TEXT[lead.tone]"
         >
           <svg
@@ -208,15 +232,39 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
           >
             <path :d="lead.falling ? ARROW_DOWN : ARROW_UP" />
           </svg>
-          {{ lead.gain }}
-          <span class="font-bold">{{ lead.ret }}</span>
+          <template v-if="lead.gain">{{ lead.gain }} ·</template>
+          {{ lead.ret }}
+          <NeonChoiceMenu
+            class="text-soft pointer-events-auto font-bold"
+            look="link"
+            placement="row-start"
+            :text="method === 'twr' ? 'por tiempo (TWR)' : 'sobre lo aportado'"
+            label="Cómo medir la rentabilidad"
+            :groups="methodGroups"
+            @select="(_, value) => emit('method', value)"
+          />
         </span>
       </div>
+      <p
+        v-if="notice"
+        class="text-meta col-start-2 row-start-1 m-0 inline-flex items-center gap-2 self-start pbs-0.5 font-bold whitespace-nowrap"
+        :class="notice.late ? 'text-soft' : 'text-muted'"
+        :role="notice.late ? 'status' : undefined"
+        :title="notice.title"
+        data-investment-quotes
+      >
+        <span
+          class="size-2 flex-none rounded-full"
+          :class="notice.late ? 'bg-peach' : 'bg-gain'"
+          aria-hidden="true"
+        ></span>
+        {{ notice.short }}
+      </p>
     </header>
 
     <div
-      class="grid flex-none transition-[grid-template-rows,opacity,visibility,margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:duration-1"
-      :class="expanded ? 'invisible mbs-0 grid-rows-[0fr] opacity-0' : '-mbs-9 grid-rows-[1fr]'"
+      class="grid flex-none motion-safe:transition-[grid-template-rows,opacity,visibility,margin] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]"
+      :class="expanded ? 'invisible mbs-0 grid-rows-[0fr] opacity-0' : '-mbs-6 grid-rows-[1fr]'"
       :inert="expanded ? true : undefined"
       :aria-hidden="expanded ? 'true' : undefined"
       data-investment-overview
@@ -224,27 +272,25 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
     >
       <!-- Wider than the column by the page's padding, so the chart bleeds and
            the clipping of the collapse doesn't cut it. -->
-      <div class="grid min-h-0 gap-1 pbe-2" :class="[BLEED, clipped && 'overflow-hidden']">
-        <NeonInvestmentCompactChart v-model:hot="hot" :chart="chart" :when="lead.when" />
-        <NeonInvestmentControls
-          compact
-          :periods="periods"
-          :month="month"
-          :method="method"
-          @month="emit('month', $event)"
-          @method="emit('method', $event)"
+      <div class="grid min-h-0 gap-1 pbe-3" :class="[BLEED, clipped && 'overflow-clip']">
+        <NeonInvestmentCompactChart
+          v-model:hot="hot"
+          class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
+          :chart="chart"
+          :when="lead.when"
         />
       </div>
     </div>
 
     <section
-      class="bg-panel rounded-t-sheet flex min-h-0 flex-1 flex-col gap-1.5 px-3.5 pbe-3.5"
+      class="bg-panel rounded-t-sheet motion-safe:animate-rise flex min-h-0 flex-1 flex-col px-4 pbe-3.5 motion-safe:[animation-delay:100ms]"
       :class="BLEED"
-      aria-label="Posiciones"
+      aria-labelledby="investment-positions-title"
       data-investment-positions
     >
+      <!-- The whole head drags the sheet; the grip is its button. -->
       <div
-        class="-mx-3.5 grid min-h-[30px] touch-none place-items-center pointer-coarse:min-h-11"
+        class="-mx-4 grid touch-none px-4 pbe-1.5"
         data-sheet-handle
         @pointerdown="onPress"
         @pointermove="onMove"
@@ -253,7 +299,7 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
       >
         <button
           type="button"
-          class="outline-accent grid size-full min-h-[inherit] place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
+          class="outline-accent grid min-h-9 w-full place-items-center rounded-full focus-visible:outline-2 focus-visible:-outline-offset-2"
           :aria-expanded="expanded"
           :aria-label="
             expanded ? 'Reducir la lista de posiciones' : 'Ampliar la lista de posiciones'
@@ -261,87 +307,98 @@ const BLEED = '-mx-[clamp(16px,2.6vw,40px)]'
           data-sheet-grip
           @click="onGripClick"
         >
-          <span class="bg-ctrl-line rounded-pill block h-[5px] w-11" aria-hidden="true"></span>
+          <span class="bg-ctrl-line rounded-pill block h-1 w-9" aria-hidden="true"></span>
         </button>
+        <h2 id="investment-positions-title" class="text-block-title m-0 font-extrabold">
+          Posiciones
+        </h2>
       </div>
       <ul
         class="m-0 min-h-0 flex-1 [scrollbar-width:none] list-none overflow-y-auto overscroll-contain p-0"
       >
-        <li v-for="(row, index) in rows" :key="row.id" class="border-line border-t">
+        <li
+          v-for="(row, index) in rows"
+          :key="row.id"
+          class="border-line border-bs last:border-be"
+          :class="entering && 'motion-safe:animate-row'"
+          :style="entering ? { animationDelay: `${rowAt(index)}ms` } : undefined"
+        >
           <button
             type="button"
-            class="outline-accent grid min-h-16 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 px-0.5 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
+            class="outline-accent grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto_3.6rem] items-baseline gap-x-2.5 gap-y-1 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.99]"
             :aria-label="row.openLabel"
             :data-investment-position="row.id"
             @click="emit('open', row.id)"
           >
+            <span class="text-row min-w-0 truncate font-bold">{{ row.name }}</span>
             <span
-              class="size-3 rounded-full"
-              :class="DOTS[index % DOTS.length]"
-              aria-hidden="true"
-            ></span>
-            <span class="grid min-w-0 gap-0.5">
-              <span class="text-row truncate font-bold">{{ row.symbol ?? row.name }}</span>
-              <span v-if="row.symbol" class="text-muted text-meta truncate">{{ row.name }}</span>
+              class="font-display text-figure-row col-span-2 text-end font-semibold whitespace-nowrap tabular-nums"
+            >
+              {{ row.value }}
             </span>
-            <span class="grid justify-items-end gap-0.5">
+            <span class="text-meta flex min-w-0 items-center gap-2">
               <span
-                class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
+                v-if="row.symbol"
+                class="text-muted font-mono text-[12px] font-bold tracking-[0.04em]"
               >
-                {{ row.value }}
+                {{ row.symbol }}
               </span>
-              <span class="text-note font-extrabold whitespace-nowrap" :class="TONE_TEXT[row.tone]">
-                {{ row.ret }}
+              <span class="bg-line rounded-pill h-[3px] w-11 flex-none" aria-hidden="true">
+                <span
+                  class="bg-neutral-bar rounded-pill block h-full"
+                  :style="{ inlineSize: `${(row.weightPct / maxWeight) * 100}%` }"
+                ></span>
               </span>
+              <span class="text-soft font-extrabold">{{ row.weight }}</span>
+            </span>
+            <span
+              class="text-meta text-end font-extrabold whitespace-nowrap tabular-nums"
+              :class="TONE_TEXT[row.tone]"
+            >
+              {{ row.gain }}
+            </span>
+            <span
+              class="text-meta text-end font-bold whitespace-nowrap tabular-nums"
+              :class="TONE_TEXT[row.tone]"
+            >
+              {{ row.ret }}
             </span>
           </button>
         </li>
       </ul>
-      <!-- On the left: the frame's «Apuntar» button floats over the right. -->
-      <div class="flex items-center gap-2">
+      <!-- The worst fall and the fees, one figure each; a tap opens its panel. -->
+      <div class="grid flex-none grid-cols-2 gap-2 pbs-2.5">
         <button
-          v-for="card in cards.slice(0, 1)"
-          :key="card.id"
+          v-for="tile in tiles"
+          :key="tile.id"
           type="button"
-          class="text-text outline-accent rounded-pill flex min-h-11 min-w-0 items-center gap-3 px-4 text-start text-[14px] font-extrabold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+          class="bg-panel2 outline-accent rounded-tile grid min-h-16 min-w-0 content-start gap-0.5 px-3.5 py-2.5 text-start focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
+          :aria-label="tile.title"
           aria-haspopup="dialog"
-          @click="openCard(card.id)"
+          @click="openCard(tile.id)"
         >
-          <svg
-            class="text-accent-text size-5 flex-none"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+          <span class="text-muted text-meta flex items-center justify-between gap-2 font-bold">
+            {{ tile.title }}
+            <svg
+              class="size-4 flex-none"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </span>
+          <span
+            class="font-display text-[17px] leading-[1.2] font-semibold whitespace-nowrap tabular-nums"
+            :class="TONE_TEXT[tile.tone]"
           >
-            <path :d="FALL_ICON" />
-          </svg>
-          {{ card.title }}
-        </button>
-        <button
-          v-for="card in cards.slice(1)"
-          :key="card.id"
-          type="button"
-          class="bg-panel2 text-text outline-accent grid size-11 flex-none place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:transition-transform motion-safe:duration-160 motion-safe:ease-out motion-safe:active:scale-[0.97]"
-          :aria-label="card.title"
-          aria-haspopup="dialog"
-          @click="openCard(card.id)"
-        >
-          <svg
-            class="size-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path :d="FEES_ICON" />
-          </svg>
+            {{ tile.value }}
+          </span>
+          <span class="text-muted text-[12px] leading-[1.3] text-pretty">{{ tile.note }}</span>
         </button>
       </div>
     </section>

@@ -22,6 +22,8 @@ const props = defineProps<{
   rows: readonly PositionRow[]
   sortKey: SortKey
   sortDirection: SortDirection
+  /** The cover is coming in: the rows follow its blocks (see the section). */
+  entering: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +36,21 @@ const TONE_STROKE: Record<Tone, string> = {
   loss: 'var(--color-loss)',
   neutral: 'var(--color-text)',
 }
-const COLUMNS = 'grid-cols-[minmax(220px,1fr)_120px_170px_150px_150px_220px]'
+// The table comes in with its head, at 200ms, its rows close behind one
+// another (`anim-row`, 25ms apart up to the ninth) and each weight bar drawing
+// itself, shorter than elsewhere, as its row lands: the cover is done in about
+// a second. Only while the cover comes in: a row that moves later just moves.
+const LIST_START = 200
+const rowAt = (index: number) => LIST_START + Math.min(index, 8) * 25
+const rowIn = (index: number) =>
+  props.entering ? { animationDelay: `${rowAt(index)}ms` } : undefined
+const barIn = (index: number) =>
+  props.entering
+    ? { animationDelay: `${rowAt(index) + 100}ms`, animationDuration: '600ms' }
+    : undefined
+
+const COLUMNS =
+  'grid-cols-[minmax(0,1.65fr)_minmax(0,0.72fr)_minmax(0,0.85fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-x-[clamp(0.625rem,1.5cqi,1.75rem)]'
 const SORT_ICON = 'M4 7h16M7 12h10M10 17h4'
 
 function sortGroups(): ChoiceGroup<SortKey | SortDirection>[] {
@@ -58,17 +74,27 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
 </script>
 
 <template>
-  <section class="flex min-w-0 flex-col" aria-label="Posiciones" data-investment-positions>
-    <NeonChoiceMenu
-      class="mbe-1.5 self-end"
-      :text="sortLabel(sortKey, sortDirection)"
-      label="Ordenar por"
-      :icon="SORT_ICON"
-      :groups="sortGroups()"
-      @select="onSort"
-    />
+  <section
+    class="flex min-w-0 flex-col"
+    aria-labelledby="investment-positions-title"
+    data-investment-positions
+  >
     <div
-      class="text-muted text-label tracking-label grid gap-x-7 pbe-2.5 font-extrabold uppercase"
+      class="motion-safe:animate-rise relative z-10 mbe-3 flex flex-wrap items-center justify-between gap-3 motion-safe:[animation-delay:200ms]"
+    >
+      <h2 id="investment-positions-title" class="font-display text-figure-block font-bold">
+        Posiciones
+      </h2>
+      <NeonChoiceMenu
+        :text="sortLabel(sortKey, sortDirection)"
+        label="Ordenar por"
+        :icon="SORT_ICON"
+        :groups="sortGroups()"
+        @select="onSort"
+      />
+    </div>
+    <div
+      class="text-muted text-label tracking-label motion-safe:animate-rise grid pbe-2.5 font-extrabold uppercase motion-safe:[animation-delay:200ms]"
       :class="COLUMNS"
       aria-hidden="true"
     >
@@ -81,71 +107,74 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
     </div>
     <ul class="m-0 list-none p-0">
       <li
-        v-for="row in rows"
+        v-for="(row, index) in rows"
         :key="row.id"
-        class="border-line hover:bg-panel grid cursor-pointer items-center gap-x-7 border-t py-4 motion-safe:transition-colors motion-safe:duration-160"
-        :class="COLUMNS"
+        class="border-line pointer-fine:hover:bg-panel grid cursor-pointer items-center border-t py-4 motion-safe:transition-colors motion-safe:duration-160"
+        :class="[COLUMNS, entering && 'motion-safe:animate-row']"
+        :style="rowIn(index)"
         :data-investment-position="row.id"
         @click="emit('open', row.id)"
       >
         <button
           type="button"
-          class="text-text outline-accent flex min-w-0 items-center gap-3 text-start focus-visible:outline-2 focus-visible:outline-offset-4"
+          class="text-text outline-accent flex min-w-0 items-center gap-2 text-start focus-visible:outline-2 focus-visible:outline-offset-4"
           :aria-label="row.openLabel"
           @click.stop="emit('open', row.id)"
         >
           <span
             v-if="hasTickers"
-            class="bg-panel2 text-meta w-16 flex-none rounded-[8px] px-2 py-0.5 text-center font-mono font-bold tracking-[0.04em]"
+            class="bg-panel2 text-meta w-16 max-w-[40%] flex-none truncate rounded-[8px] px-2 py-0.5 text-center font-mono font-bold tracking-[0.04em]"
             :class="row.symbol ? '' : 'invisible'"
           >
             {{ row.symbol ?? '·' }}
           </span>
-          <span class="text-row truncate font-bold">{{ row.name }}</span>
+          <span class="text-row line-clamp-2 font-bold wrap-anywhere">{{ row.name }}</span>
         </button>
-        <span class="min-w-0 text-end">
+        <span class="min-w-0 text-end wrap-anywhere">
           <template v-if="row.units">
-            <span
-              class="font-display text-figure-row block font-semibold whitespace-nowrap tabular-nums"
-            >
+            <span class="font-display text-figure-row block font-semibold tabular-nums">
               {{ row.units }}
             </span>
-            <span class="text-muted text-meta block whitespace-nowrap">{{ row.price }}</span>
+            <span class="text-muted text-meta block tabular-nums">{{ row.price }}</span>
           </template>
           <span v-else class="text-muted">—</span>
         </span>
-        <span class="flex min-w-0 items-center gap-3">
-          <span class="bg-line rounded-pill h-1.5 flex-auto overflow-clip" aria-hidden="true">
+        <span class="flex min-w-0 items-center gap-2">
+          <span
+            class="bg-line rounded-pill h-1.5 min-w-0 flex-auto overflow-clip"
+            aria-hidden="true"
+          >
             <span
               class="bg-neutral-bar rounded-pill block h-full"
-              :style="{ width: `${row.weightPct}%` }"
+              :class="entering && 'motion-safe:animate-wipe'"
+              :style="{ width: `${row.weightPct}%`, ...barIn(index) }"
             ></span>
           </span>
-          <span class="text-soft text-note min-w-[52px] flex-none text-end font-bold">
+          <span class="text-soft text-note flex-none text-end font-bold tabular-nums">
             {{ row.weight }}
           </span>
         </span>
         <span
-          class="font-display text-figure-row text-end font-semibold whitespace-nowrap tabular-nums"
+          class="font-display text-figure-row text-end font-semibold wrap-anywhere tabular-nums"
         >
           {{ row.value }}
         </span>
-        <span class="flex flex-col items-end gap-px text-end">
+        <span class="flex min-w-0 flex-col items-end gap-px text-end wrap-anywhere">
           <span
-            class="font-display text-figure-row font-semibold whitespace-nowrap tabular-nums"
+            class="font-display text-figure-row font-semibold tabular-nums"
             :class="TONE_TEXT[row.tone]"
           >
             {{ row.gain }}
           </span>
-          <span class="text-note font-extrabold whitespace-nowrap" :class="TONE_TEXT[row.tone]">
+          <span class="text-note font-extrabold tabular-nums" :class="TONE_TEXT[row.tone]">
             {{ row.ret }}
           </span>
         </span>
-        <span class="flex min-w-0 items-center gap-3" role="img" :aria-label="row.sparkLabel">
+        <span class="flex min-w-0 items-center gap-2" role="img" :aria-label="row.sparkLabel">
           <svg
             :viewBox="`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`"
             preserveAspectRatio="none"
-            class="block h-9 min-w-20 flex-auto overflow-visible"
+            class="block h-9 min-w-0 flex-1 overflow-visible"
             aria-hidden="true"
           >
             <path
@@ -159,7 +188,7 @@ function onSort(_group: string, value: SortKey | SortDirection): void {
             />
           </svg>
           <span
-            class="text-note min-w-16 flex-none text-end font-extrabold whitespace-nowrap"
+            class="text-note max-w-full flex-none text-end font-extrabold wrap-anywhere tabular-nums"
             :class="TONE_TEXT[row.changeTone]"
           >
             {{ row.change }}

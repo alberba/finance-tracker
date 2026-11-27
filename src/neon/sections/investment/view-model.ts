@@ -60,8 +60,8 @@ export interface PeriodFigure {
 }
 
 /**
- * The strip over the chart: the return of the period (simple, with the gain
- * under it, or TWR), what the portfolio is worth and what went into it.
+ * The chart summary: the return of the period (simple, with the gain in
+ * euros, or TWR), what the portfolio is worth and what went into it.
  * `latest` says the analysed month is the newest one, so the value is today's;
  * `twr` is the cumulative TWR at its close, from `twrSeries`.
  */
@@ -74,7 +74,7 @@ export function periodFigures(
   return [
     {
       key: 'return',
-      label: isSimple ? 'Tu cartera' : 'Tu cartera · TWR',
+      label: isSimple ? 'Rentabilidad' : 'Rentabilidad TWR',
       value: signedPct(isSimple ? vm.displayReturn : twr),
       sub: isSimple ? formatSignedMoney(vm.gain) : '',
       tone: toneOf(isSimple ? vm.gain : twr),
@@ -130,9 +130,17 @@ export interface Drawdown {
 }
 
 export interface ChartLine {
-  key: 'value' | 'invested'
+  key: 'value' | 'invested' | 'benchmark'
   d: string
   dashed: boolean
+}
+
+type EndTone = 'value' | 'invested' | 'benchmark'
+
+/** An index drawn against the portfolio, on the same points and scale. */
+export interface ChartBenchmark {
+  name: string
+  values: readonly number[]
 }
 
 export interface PortfolioChart {
@@ -141,13 +149,18 @@ export interface PortfolioChart {
   lines: ChartLine[]
   /** Round values with their gridline; `top` is the share of the height from above (0–100). */
   grid: Array<{ value: number; top: number; text: string }>
-  gridPath: string
   /** The zero line of the TWR view; null in euros. */
   zero: string | null
   /** Month under each month-end point; `left` is the share of the width (0–100). */
   months: Array<{ left: number; text: string }>
   /** What each line ends at, written after its last point. */
-  ends: Array<{ name: string; figure: string; top: number; tone: 'value' | 'invested' }>
+  ends: Array<{ name: string; figure: string; top: number; tone: EndTone }>
+  /**
+   * The space between the portfolio and the index, drawn where the portfolio is
+   * ahead (`above`) and where it is behind (`below`): `between` is that space,
+   * and each clip keeps the side of the index line it names. Null without index.
+   */
+  gap: { between: string; above: string; below: string } | null
   /** Today's point of the portfolio line. */
   dot: { x: number; y: number }
   /** The trough of the worst fall, with the fall written under it. */
@@ -158,6 +171,10 @@ export interface PortfolioChart {
 
 const round1 = (value: number) => Math.round(value * 10) / 10
 const share = (value: number, total: number) => Math.round((value / total) * 10000) / 100
+
+/** Where the gridlines start and end, in view box units. */
+export const GRID_START = PAD.left
+export const GRID_END = CHART_WIDTH - PAD.right
 
 /** Where the axis values end and the end labels start, as a share of the width. */
 export const AXIS_LABEL_LEFT = share(PAD.left - 8, CHART_WIDTH)
@@ -190,10 +207,12 @@ export function portfolioChart(
   method: ReturnMode,
   twr: readonly number[],
   drawdown: Drawdown | null,
+  benchmark: ChartBenchmark | null = null,
 ): PortfolioChart {
   const isSimple = method === 'simple'
   const { value, invested } = chartSeries(vm, method, twr)
-  const all = [...value, ...(invested ?? []), ...(isSimple ? [] : [0])]
+  const index = benchmark && benchmark.values.length > 1 ? benchmark.values : null
+  const all = [...value, ...(invested ?? []), ...(index ?? []), ...(isSimple ? [] : [0])]
   let low = Math.min(...all)
   let high = Math.max(...all)
   const step = niceStep((high - low || Math.abs(high) || 1) / 4)
@@ -222,7 +241,7 @@ export function portfolioChart(
   }
 
   const last = count - 1
-  const ends: Array<{ name: string; figure: string; y: number; tone: 'value' | 'invested' }> = [
+  const ends: Array<{ name: string; figure: string; y: number; tone: EndTone }> = [
     {
       name: 'Tu cartera',
       figure: isSimple ? formatMoney(vm.portfolioValue) : signedPct(value[last]),
@@ -230,7 +249,16 @@ export function portfolioChart(
       tone: 'value',
     },
   ]
-  if (invested) {
+  if (index && benchmark) {
+    const end = index.length - 1
+    ends.push({
+      name: benchmark.name,
+      figure: isSimple ? formatMoney(index[end]) : signedPct(index[end]),
+      y: y(index[end]),
+      tone: 'benchmark',
+    })
+  }
+  if (invested && !index) {
     ends.push({
       name: 'Has puesto',
       figure: formatMoney(vm.investedCapital),
@@ -245,17 +273,38 @@ export function portfolioChart(
 
   const lines: ChartLine[] = []
   if (invested) lines.push({ key: 'invested', d: path(invested), dashed: true })
+  if (index) lines.push({ key: 'benchmark', d: path(index), dashed: false })
   lines.push({ key: 'value', d: path(value), dashed: false })
+
+  let gap: PortfolioChart['gap'] = null
+  if (index) {
+    const shared = Math.min(index.length, count)
+    const mine = path(value.slice(0, shared))
+    const theirs = path(index.slice(0, shared))
+    const back = index
+      .slice(0, shared)
+      .map((amount, at) => `L${x(at)} ${y(amount)}`)
+      .reverse()
+      .join(' ')
+    const end = x(shared - 1)
+    gap = {
+      between: `${mine} ${back} Z`,
+      above: `${theirs} L${end} ${-CHART_HEIGHT} L${x(0)} ${-CHART_HEIGHT} Z`,
+      below: `${theirs} L${end} ${2 * CHART_HEIGHT} L${x(0)} ${2 * CHART_HEIGHT} Z`,
+    }
+  }
 
   // The fall is measured on the TWR index: on the line in euros, contributions
   // would hide it, so only the TWR view marks it.
   const trough = !isSimple && drawdown && drawdown.trough < count ? drawdown.trough : null
+  const label = chartLabel(vm, method, value)
+  const benchmarkEnd = ends.find((end) => end.tone === 'benchmark')
   return {
     viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
     lines,
     grid,
-    gridPath: grid.map((line) => hLine(line.value)).join(' '),
     zero: isSimple ? null : hLine(0),
+    gap,
     months: value.slice(1).map((_, index) => ({
       left: share(x(index + 1), CHART_WIDTH),
       text: MONTH_ABBR[index] ?? '',
@@ -277,7 +326,9 @@ export function portfolioChart(
             top: share(y(value[trough]) + 22, CHART_HEIGHT),
             text: signedPct(drawdown.depth * 100),
           },
-    label: chartLabel(vm, method, value),
+    label: benchmarkEnd
+      ? `${label} Último dato de ${benchmarkEnd.name}: ${benchmarkEnd.figure}.`
+      : label,
   }
 }
 
@@ -628,6 +679,8 @@ export interface QuoteNotice {
   late: boolean
   /** What the header shows next to the dot. */
   text: string
+  /** The same in one short line, for the mobile cover: «Retrasadas · 27 nov, 20:26». */
+  short: string
   /** The longer explanation, on hover. */
   title: string
 }
@@ -651,10 +704,11 @@ export function quoteNotice(
   if (!summary) return null
   const stamp = quoteStamp(summary.latest, timeZone)
   return summary.status === 'fresh'
-    ? { late: false, text: stamp, title: `Cotizaciones del ${stamp}` }
+    ? { late: false, text: stamp, short: stamp, title: `Cotizaciones del ${stamp}` }
     : {
         late: true,
         text: `Cotizaciones retrasadas · último precio del ${stamp}`,
+        short: `Retrasadas · ${stamp}`,
         title: 'Alguna cotización llega con retraso: se muestra el último precio válido',
       }
 }

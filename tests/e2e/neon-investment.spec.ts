@@ -53,24 +53,53 @@ test.describe('Inversión en el diseño nuevo', () => {
     { tag: '@smoke' },
     async ({ page, tracker }) => {
       await tracker.openInvestment()
-      await expect(figure(page, 'return')).toContainText('Tu cartera')
-      await expect(figure(page, 'return')).toContainText('€')
+      await expect(figure(page, 'return')).toContainText('Rentabilidad')
+      await expect(figure(page, 'return')).toContainText(/€ sobre /)
       const chart = section(page).locator('[data-investment-chart]').getByRole('img')
       await expect(chart).toHaveAccessibleName(/^Lo que vale tu cartera frente a lo que has puesto/)
 
-      await section(page).getByRole('button', { name: 'Rentabilidad simple' }).click()
-      await page.getByRole('menuitemradio', { name: /^TWR/ }).click()
-
-      await expect(figure(page, 'return')).toContainText('Tu cartera · TWR')
-      await expect(figure(page, 'return')).not.toContainText('€')
+      const methods = section(page).getByRole('group', { name: 'Cómo medir la rentabilidad' })
+      await methods.getByRole('button', { name: 'TWR', exact: true }).click()
+      await expect(methods.getByRole('button', { name: 'TWR', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      await expect(figure(page, 'return')).toContainText('TWR · vale')
       await expect(chart).toHaveAccessibleName(/^Rentabilidad TWR acumulada/)
 
-      await section(page).getByRole('button', { name: 'Rentabilidad TWR' }).click()
-      await page.getByRole('menuitemradio', { name: /^Simple/ }).click()
+      await methods.getByRole('button', { name: 'Simple', exact: true }).click()
       await expect(figure(page, 'return')).not.toContainText('TWR')
-      await expect(figure(page, 'return')).toContainText('€')
+      await expect(figure(page, 'return')).toContainText(/€ sobre /)
     },
   )
+
+  test('apunta una nueva operación sin elegir tipo: es una inversión', async ({
+    page,
+    tracker,
+  }) => {
+    await tracker.openInvestment()
+    await section(page).getByRole('button', { name: 'Nueva operación' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Nueva inversión' })
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByRole('radiogroup', { name: 'Tipo de movimiento' })).toHaveCount(0)
+    // The same fields as a purchase in Inversión › Movimientos.
+    await sheet.getByLabel('Símbolo').fill('vwce')
+    await sheet.getByLabel('Títulos').fill('3')
+    await sheet.getByLabel('Precio').fill('100')
+    await sheet.getByLabel('Comisión').fill('1')
+    await expect(sheet.locator('[data-investment-total]')).toContainText('301,00')
+    await sheet.getByRole('radio', { name: 'Venta' }).click()
+    await expect(sheet.locator('[data-investment-total]')).toContainText('299,00')
+    await sheet.getByRole('button', { name: 'Guardar venta' }).click()
+    await expect(sheet).toBeHidden()
+    await expect(page.getByText('Movimiento de inversión guardado.')).toBeVisible()
+
+    // Anywhere else, the sheet asks for the type again.
+    await tracker.openDashboard()
+    await page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true }).click()
+    const other = page.getByRole('dialog', { name: 'Nuevo movimiento' })
+    await expect(other.getByRole('radiogroup', { name: 'Tipo de movimiento' })).toBeVisible()
+  })
 
   test('avisa cuando el proveedor devuelve una cotización atrasada', async ({ page, tracker }) => {
     await serveLateQuotes(page)
@@ -96,6 +125,54 @@ test.describe('Inversión en el diseño nuevo', () => {
     await expect(notice).toContainText('último precio del 18 mar')
   })
 
+  test('distingue un índice sin datos de una comparación disponible', async ({ page, tracker }) => {
+    const release = Promise.withResolvers<void>()
+    await page.route('**/api/market/benchmark?*', async (route) => {
+      const { searchParams } = new URL(route.request().url())
+      const isSp500 = searchParams.get('id') === 'sp-500'
+      if (isSp500) await release.promise
+      const closes = isSp500 ? [100, 101, 102, 103] : []
+      await route.fulfill({ json: { closes } })
+    })
+    await tracker.openInvestment()
+
+    const chart = section(page).locator('[data-investment-chart]').getByRole('img')
+    await expect(section(page).getByText(/sin datos para este periodo/i)).toBeVisible()
+    await expect(chart).toBeVisible()
+
+    const controls = section(page).getByRole('group', { name: 'Controles de la gráfica' })
+    await controls.getByRole('button', { name: 'Comparar con MSCI World' }).click()
+    const comparison = controls.getByRole('menu', { name: 'Comparar con un índice' })
+    await expect(comparison.getByRole('menuitemradio', { name: 'MSCI World' })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(comparison.getByRole('menuitemradio', { name: 'S&P 500' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    try {
+      await expect(section(page).getByText('Cargando S&P 500…')).toBeVisible()
+    } finally {
+      release.resolve()
+    }
+    await expect(comparison).toBeHidden()
+    await expect(controls.getByRole('button', { name: 'Comparar con S&P 500' })).toBeFocused()
+    await expect(controls.getByRole('paragraph')).toContainText(/Diferencia.*−[\d.,]+\s*€/s)
+    await expect(chart).toHaveAccessibleName(/S&P 500/)
+  })
+
+  test('muestra la última columna de posiciones en escritorio estrecho', async ({
+    page,
+    tracker,
+  }) => {
+    await page.setViewportSize({ width: 1000, height: 800 })
+    await tracker.openInvestment()
+
+    const positions = section(page).getByRole('region', { name: 'Posiciones' })
+    const evolution = positions.getByText('Evolución', { exact: true })
+    await expect(evolution).toBeVisible()
+    await expect
+      .poll(() => positions.evaluate((list) => list.scrollWidth - list.clientWidth))
+      .toBeLessThanOrEqual(1)
+  })
+
   test('abre un activo, ve sus operaciones y vuelve con la flecha y con atrás', async ({
     page,
     tracker,
@@ -110,6 +187,8 @@ test.describe('Inversión en el diseño nuevo', () => {
     await expect(section(page).getByRole('heading', { level: 1 })).toBeVisible()
     await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
     await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
+    // The symbol's quote is not shown yet (#524): its place says it is coming.
+    await expect(section(page).locator('[data-asset-quote]')).toContainText('Próximamente')
 
     await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
     await expect(page).toHaveURL(/\/inversion$/)
