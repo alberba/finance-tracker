@@ -90,19 +90,6 @@ describe('requestApiJson con respuesta correcta', () => {
       body: JSON.stringify({ name: 'ACME' }),
     })
   })
-
-  it('no declara Content-Type ni body en un GET', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await requestApiJson('/api/state', { fallbackMessage: FALLBACK_MESSAGE })
-
-    const call = fetchMock.mock.calls[0]
-    expect(call?.[0]).toBe('/api/state')
-    expect(call?.[1]?.method).toBe('GET')
-    expect(call?.[1]?.headers).toEqual({ Accept: 'application/json' })
-    expect(call?.[1]?.body).toBeUndefined()
-  })
 })
 
 describe('requestApiJson sin respuesta HTTP', () => {

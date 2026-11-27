@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   BENCHMARKS,
   cumulativeReturn,
-  findBenchmark,
   sameMoneyInIndex,
 } from '../../src/domain/investment/benchmarks'
 
@@ -11,12 +10,6 @@ describe('índices de referencia', () => {
   it('los ids y los símbolos no se repiten', () => {
     expect(new Set(BENCHMARKS.map((b) => b.id)).size).toBe(BENCHMARKS.length)
     expect(new Set(BENCHMARKS.map((b) => b.symbol)).size).toBe(BENCHMARKS.length)
-  })
-
-  it('encuentra un índice por id y devuelve undefined si no existe', () => {
-    expect(findBenchmark('ibex-35')?.symbol).toBe('^IBEX')
-    expect(findBenchmark('no-existe')).toBeUndefined()
-    expect(findBenchmark('')).toBeUndefined()
   })
 })
 

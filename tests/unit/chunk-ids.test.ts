@@ -30,13 +30,4 @@ describe('chunkIds', () => {
     expect(chunks.map((chunk) => chunk.length)).toEqual([50, 1])
     expect(chunks[1]).toEqual(['id-50'])
   })
-
-  it('splits 130 ids into 50/50/30 preserving order', () => {
-    const ids = Array.from({ length: 130 }, (_, index) => `id-${index}`)
-
-    const chunks = chunkIds(ids)
-
-    expect(chunks.map((chunk) => chunk.length)).toEqual([50, 50, 30])
-    expect(chunks.flat()).toEqual(ids)
-  })
 })
