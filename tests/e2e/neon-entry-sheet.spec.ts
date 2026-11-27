@@ -2,11 +2,12 @@ import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
 import { editScenarioState, readScenarioState } from './seed-sync-v2'
 import { expectSyncCommand } from './pages/sync'
+import { typeOnKeypad } from './entry-keypad'
 
-/** Hoja de alta del diseño nuevo (#426). No cookie: el diseño nuevo es el de por defecto. */
+/** Alta y revisión de pendientes en el diseño neón. */
 const NO_COOKIE = { cookies: [], origins: [] }
 
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Apuntar' })
+const sheet = (page: Page) => page.getByRole('dialog', { name: 'Nuevo movimiento' })
 const MOBILE = { width: 393, height: 780 }
 const DESKTOP = { width: 1280, height: 800 }
 
@@ -17,7 +18,7 @@ const TYPES = [
   { label: 'Inversión', description: 'Hoja inversión' },
 ] as const
 
-test.describe('Hoja de alta nueva', () => {
+test.describe('Mini modal de alta', () => {
   test.use({ storageState: NO_COOKIE })
 
   test('apunta cada tipo desde el botón «Apuntar» del móvil y sobrevive a recargar', async ({
@@ -31,8 +32,9 @@ test.describe('Hoja de alta nueva', () => {
       await page.locator('[data-fab-apuntar]').click()
       await expect(sheet(page)).toBeVisible()
       await sheet(page).getByRole('radio', { name: label }).click()
-      await sheet(page).getByRole('textbox', { name: 'Importe' }).fill('12,34')
-      await sheet(page).getByLabel('Descripción').fill(description)
+      // On a phone the amount comes from the sheet's own keypad.
+      await typeOnKeypad(sheet(page), '12,34')
+      await sheet(page).getByLabel('Nota').fill(description)
       await sheet(page).getByRole('button', { name: 'Guardar' }).click()
       await expect(sheet(page)).toBeHidden()
     }
@@ -44,22 +46,54 @@ test.describe('Hoja de alta nueva', () => {
     }
   })
 
-  test('apunta un gasto desde la barra lateral de escritorio', async ({ page, tracker }) => {
+  test('guarda un gasto y su mes contable desde la cabecera del Dashboard', async ({
+    page,
+    tracker,
+  }) => {
     await page.setViewportSize(DESKTOP)
     await tracker.goto()
 
-    await page.locator('[data-sidebar-apuntar]').click()
+    await page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true }).click()
     await expect(sheet(page)).toBeVisible()
     await sheet(page).getByRole('textbox', { name: 'Importe' }).fill('7')
-    await sheet(page).getByLabel('Descripción').fill('Hoja escritorio')
+    await sheet(page).getByLabel('Descripción').fill('Gasto escritorio')
+    await sheet(page).getByText('Fecha y mes contable').click()
+    const dateTrigger = sheet(page).getByRole('button', { name: 'Fecha', exact: true })
+    await dateTrigger.click()
+    const calendar = sheet(page).getByRole('dialog', { name: 'Fecha', exact: true })
+    const typedDate = calendar.getByRole('textbox', { name: 'Escribir fecha' })
+    await typedDate.fill('31/02/2026')
+    await typedDate.press('Enter')
+    await expect(calendar.getByRole('alert')).toBeVisible()
+    await typedDate.fill('12/07/2026')
+    await typedDate.press('Enter')
+    await expect(calendar).toBeHidden()
+
+    await dateTrigger.click()
+    await calendar.getByRole('button', { name: '13 de julio de 2026', exact: true }).click()
+    await expect(calendar).toBeHidden()
+
+    await sheet(page).getByRole('button', { name: 'Cuenta en el mes' }).click()
+    await sheet(page)
+      .getByRole('dialog', { name: 'Cuenta en el mes' })
+      .getByRole('button', { name: 'Junio', exact: true })
+      .click()
+
+    const saved = expectSyncCommand(
+      page,
+      (command) => command.action === 'create' && command.entityType === 'transaction',
+    )
     await sheet(page).getByRole('button', { name: 'Guardar' }).click()
+    await saved
     await expect(sheet(page)).toBeHidden()
 
     await tracker.reload()
-    await tracker.openTransactions()
-    await expect(
-      tracker.transactionsSection.getByText('Hoja escritorio').locator('visible=true').first(),
-    ).toBeVisible()
+    const state = await readScenarioState(page)
+    expect(state.transactions.find((tx) => tx.description === 'Gasto escritorio')).toMatchObject({
+      amount: 7,
+      date: '2026-07-13',
+      month: 6,
+    })
   })
 
   test('cancelar no guarda nada y la hoja reabre vacía y arriba', async ({ page, tracker }) => {
@@ -68,16 +102,46 @@ test.describe('Hoja de alta nueva', () => {
 
     await page.locator('[data-fab-apuntar]').click()
     await sheet(page).getByRole('radio', { name: 'Ingreso' }).click()
-    await sheet(page).getByRole('textbox', { name: 'Importe' }).fill('99')
-    await sheet(page).getByLabel('Descripción').fill('Cancelado')
-    await sheet(page).getByLabel('Cuenta en el mes').scrollIntoViewIfNeeded()
-    await sheet(page).getByRole('button', { name: 'Cancelar' }).click()
+    await typeOnKeypad(sheet(page), '99')
+    await expect(sheet(page).locator('[data-entry-amount]')).toContainText('+99')
+    await sheet(page).getByLabel('Nota').fill('Cancelado')
+    const account = sheet(page).getByRole('button', { name: 'Cuenta', exact: true })
+    const previousAccount = await account.innerText()
+    await account.click()
+    const accounts = sheet(page).getByRole('dialog', { name: 'Cuenta', exact: true })
+    await expect(accounts.getByRole('button', { pressed: true })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    const focusedOption = accounts.getByRole('button').and(page.locator(':focus'))
+    await expect(focusedOption).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
+    await expect(focusedOption).toHaveCSS('text-decoration-line', 'underline')
+    await page.keyboard.press('Enter')
+    await expect(accounts).toBeHidden()
+    await expect(account).not.toHaveText(previousAccount)
+    await expect(account).toBeFocused()
+    await expect(account).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
+
+    await sheet(page).getByRole('button', { name: 'Categoría', exact: true }).click()
+    const categories = sheet(page).getByRole('dialog', { name: 'Categoría', exact: true })
+    await expect(categories.getByRole('searchbox', { name: 'Buscar categoría' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(categories).toBeHidden()
+
+    // The date's panel also chooses the accounting month.
+    await sheet(page).getByRole('button', { name: 'Fecha', exact: true }).click()
+    const date = sheet(page).getByRole('dialog', { name: 'Fecha', exact: true })
+    await date.getByRole('combobox', { name: 'Cuenta en el mes' }).selectOption({ label: 'Abril' })
+    await expect(date).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sheet(page).getByRole('button', { name: 'Fecha', exact: true })).toContainText(
+      'Hoy · Abril',
+    )
+    await page.keyboard.press('Escape')
     await expect(sheet(page)).toBeHidden()
 
     await page.locator('[data-fab-apuntar]').click()
     await expect(sheet(page)).toBeVisible()
-    await expect(sheet(page).getByRole('textbox', { name: 'Importe' })).toHaveValue('')
-    await expect(sheet(page).getByLabel('Descripción')).toHaveValue('')
+    await expect(sheet(page).locator('[data-entry-amount]')).toHaveText(/^0\s*€$/)
+    await expect(sheet(page).getByLabel('Nota')).toHaveValue('')
     await expect(sheet(page).getByRole('radio', { name: 'Gasto' })).toHaveAttribute(
       'aria-checked',
       'true',
@@ -87,31 +151,48 @@ test.describe('Hoja de alta nueva', () => {
       .evaluate((form) => form.scrollTop)
     expect(scrollTop).toBe(0)
 
-    await sheet(page).getByRole('button', { name: 'Cancelar' }).click()
+    await page.keyboard.press('Escape')
     await tracker.reload()
     await tracker.openTransactions()
     await expect(tracker.transactionsSection.getByText('Cancelado')).toHaveCount(0)
   })
 
-  test('el panel de escritorio queda pegado a la derecha y no desborda', async ({
+  test('el mini modal queda al lado del botón y Escape devuelve el foco', async ({
     page,
     tracker,
   }) => {
     await page.setViewportSize(DESKTOP)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await tracker.goto()
-    await page.locator('[data-sidebar-apuntar]').click()
-    await expect(sheet(page)).toBeVisible()
+    const opener = page.locator('#dashboard').getByRole('button', { name: 'Apuntar', exact: true })
+    const anchor = (await opener.boundingBox())!
+    await opener.click()
+    const amount = sheet(page).getByRole('textbox', { name: 'Importe' })
+    await expect(amount).toBeFocused()
+    await expect(amount).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
 
-    const box = await sheet(page).evaluate((dialog) => {
-      const rect = dialog.getBoundingClientRect()
-      const form = dialog.querySelector('form')!
-      return {
-        right: rect.right,
-        width: rect.width,
-        overflows: form.scrollWidth > form.clientWidth,
-      }
-    })
-    expect(box).toEqual({ right: DESKTOP.width, width: 380, overflows: false })
+    const box = (await sheet(page).boundingBox())!
+    expect(Math.abs(box.x + box.width - anchor.x - anchor.width)).toBeLessThan(2)
+    expect(box.y - (anchor.y + anchor.height)).toBeCloseTo(12, 0)
+    expect(box.y + box.height).toBeLessThan(DESKTOP.height)
+
+    await page.keyboard.press('Shift+Tab')
+    const type = sheet(page).getByRole('radio', { name: 'Inversión' })
+    await expect(type).toBeFocused()
+    await expect(type).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)')
+    await expect(type).toHaveCSS('text-decoration-line', 'underline')
+    const category = sheet(page).getByRole('button', { name: 'Categoría', exact: true })
+    await category.click()
+    const categories = sheet(page).getByRole('dialog', { name: 'Categoría', exact: true })
+    await expect(categories).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(categories).toBeHidden()
+    await expect(sheet(page)).toBeVisible()
+    await expect(category).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(sheet(page)).toBeHidden()
+    await expect(opener).toBeFocused()
   })
 
   test('un importe vacío da el mismo error que el panel antiguo', async ({ page, tracker }) => {

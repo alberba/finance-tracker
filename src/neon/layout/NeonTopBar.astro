@@ -5,7 +5,8 @@ import NeonSearchButton from './NeonSearchButton.vue'
 
 /**
  * Top bar of the mobile frame (DESIGN.md, «Barra superior móvil»): the brand on
- * the left, «Por confirmar» and search on the right. A section can put its
+ * the left, «Por confirmar» and search on the right, with a section's own
+ * button between them when it teleports one into `[data-bar-actions-slot]`. A section can put its
  * title where the brand is (`NeonBarTitle` teleports it into
  * `[data-bar-title-slot]`; while it is there the brand is hidden). A section can hand the
  * bar its figure for when the page scrolls: it teleports it into
@@ -56,6 +57,7 @@ const { detail } = Astro.props
       </div>
       <div class="flex group-has-[[data-bar-detail]]/bar:hidden">
         <NeonPendingMenu client:only="vue" />
+        <div class="flex" data-bar-actions-slot></div>
         <NeonSearchButton client:only="vue" />
       </div>
     </>
