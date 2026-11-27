@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildNeonDashboardViewModel } from '../../src/neon/dashboard/view-model'
+import {
+  buildNeonDashboardViewModel,
+  parseDashboardRange,
+} from '../../src/neon/dashboard/view-model'
 import type { PendingMovement, State, Transaction } from '../../src/scripts/types'
 
 /** Thursday 9 October 2026: a month of 31 days, 9 of them gone. */
@@ -340,7 +343,7 @@ describe('Patrimonio', () => {
 
   it('starts the range at a month picked by hand, up to today', () => {
     const snapshots = months([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => n * 1000))
-    const vm = build({ snapshots }, { range: 'from-5' })
+    const vm = build({ snapshots }, { range: 'from-2026-5' })
     expect(vm.rangeLabel).toBe('desde mayo')
     expect(vm.rangeSpan).toBe('may – oct 2026')
     expect(vm.wealth.chart.labels).toEqual(['may', 'jun', 'jul', 'ago', 'sep', 'oct'])
@@ -348,23 +351,44 @@ describe('Patrimonio', () => {
     expect(vm.wealth.periodChange).toEqual({ text: '+100,0 %', tone: 'gain', label: 'desde mayo' })
   })
 
-  it('lays the year out as months to start from: lit inside the range, closed from today on', () => {
-    const vm = build({}, { range: 'from-5' })
-    expect(vm.rangeMonths).toHaveLength(12)
-    expect(vm.rangeMonths.filter((m) => m.lit).map((m) => m.initial)).toEqual([
-      'M',
-      'J',
-      'J',
-      'A',
-      'S',
-      'O',
+  it('accepts a month and year or starts in January when given a year alone', () => {
+    const { rangeBounds } = build({ transactions: [tx('2025-02-10', 'income', 100)] })
+    expect(parseDashboardRange('05/2025', rangeBounds)).toBe('from-2025-5')
+    expect(parseDashboardRange('2025', rangeBounds)).toBe('from-2025-1')
+    expect(parseDashboardRange('11/2026', rangeBounds)).toBeNull()
+    expect(parseDashboardRange('13/2025', rangeBounds)).toBeNull()
+    expect(parseDashboardRange('2024', rangeBounds)).toBeNull()
+  })
+
+  it('uses each year’s balances and movements for both charts across January', () => {
+    const vm = build(
+      {
+        historicalSnapshots: {
+          2025: {
+            12: { month: 12, accounts: { bank: 450 }, investments: { fund: 100 }, liabilities: {} },
+          },
+        },
+        snapshots: {
+          1: { month: 1, accounts: { bank: 600 }, investments: { fund: 150 }, liabilities: {} },
+        },
+        investmentAssets: [{ id: 'fund', name: 'Fondo', openingBalance: 0 }],
+        transactions: [tx('2025-02-15', 'income', 900)],
+      },
+      { range: 'from-2025-12', today: '2026-02-10' },
+    )
+    expect(vm.rangeLabel).toBe('desde diciembre 2025')
+    expect(vm.rangeSpan).toBe('dic 2025 – feb 2026')
+    expect(vm.wealth.chart.labels).toEqual(['dic 2025', 'ene 2026', 'feb 2026'])
+    expect(vm.wealth.chart.readings.map(({ value }) => value)).toEqual([
+      '550,00 €',
+      '750,00 €',
+      '750,00 €',
     ])
-    expect(vm.rangeMonths.filter((m) => m.disabled).map((m) => m.value)).toEqual([
-      'from-10',
-      'from-11',
-      'from-12',
+    expect(vm.investments.chart.readings.map(({ value }) => value)).toEqual([
+      '100,00 €',
+      '150,00 €',
+      '150,00 €',
     ])
-    expect(build({}, { range: '1a' }).rangeLabel).toBe('último año')
   })
 
   it('names the evolution for screen readers', () => {

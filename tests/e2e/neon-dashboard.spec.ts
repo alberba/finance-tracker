@@ -35,7 +35,7 @@ test('apuntar un gasto desde «Apuntar» baja «Te quedan» ese importe', async 
   const before = amountOf(await left.innerText())
 
   await dashboard(page).getByRole('button', { name: 'Apuntar', exact: true }).click()
-  const sheet = page.getByRole('dialog', { name: 'Apuntar' })
+  const sheet = page.getByRole('dialog', { name: 'Nuevo movimiento' })
   await sheet.getByRole('textbox', { name: 'Importe' }).fill('12,34')
   await sheet.getByLabel('Descripción').fill('Café del dashboard')
   const created = expectSyncCommand(
@@ -126,19 +126,44 @@ test('busca un movimiento desde la cabecera y llega a Movimientos con la búsque
   await expect(tracker.transactionsSection.getByText('Nómina mensual')).toHaveCount(0)
 })
 
-test('el rango del patrimonio se conserva al salir de la sección y volver', async ({
+test('aplica una fecha de inicio de otro año y la conserva al volver al Dashboard', async ({
   page,
   tracker,
 }) => {
-  const range = card(page, 'Patrimonio').getByRole('group', { name: 'Rango del gráfico' })
-  await expect(range.getByRole('button', { name: '1A' })).toHaveAttribute('aria-pressed', 'true')
-  await range.getByRole('button', { name: '6M' }).click()
-  await expect(range.getByRole('button', { name: '6M' })).toHaveAttribute('aria-pressed', 'true')
+  await editScenarioState(page, (state) => {
+    state.transactions.push({
+      ...state.transactions[0],
+      id: 'previous-year-movement',
+      date: '2025-05-10',
+      month: 5,
+    })
+  })
+
+  const trigger = dashboard(page).getByRole('button', { name: /^Periodo de los gráficos:/ })
+  const picker = dashboard(page).getByRole('dialog', { name: 'Periodo de los gráficos' })
+  const start = picker.getByRole('textbox', { name: 'Desde', exact: true })
+
+  await trigger.click()
+  await start.fill('13/2025')
+  await start.press('Enter')
+  await expect(start).toHaveAttribute('aria-invalid', 'true')
+
+  await start.fill('05/2025')
+  await start.press('Enter')
+  await expect(picker).toBeHidden()
+  await expect(trigger).toHaveAccessibleName('Periodo de los gráficos: desde mayo 2025')
+  await expect(trigger).toBeFocused()
+  await expect(card(page, 'Patrimonio').getByRole('slider')).toHaveAccessibleName(/mayo 2025/)
+  await expect(card(page, 'Inversiones').getByRole('slider')).toHaveAccessibleName(/mayo 2025/)
 
   await tracker.openBudget()
   await tracker.openDashboard()
-  await expect(range.getByRole('button', { name: '6M' })).toHaveAttribute('aria-pressed', 'true')
-  await expect(range.getByRole('button', { name: '1A' })).toHaveAttribute('aria-pressed', 'false')
+  await trigger.click()
+  await expect(start).toHaveValue('05/2025')
+
+  await start.fill('2025')
+  await picker.getByRole('button', { name: 'Aplicar' }).click()
+  await expect(trigger).toHaveAccessibleName('Periodo de los gráficos: desde enero 2025')
 })
 
 test('va a una sección desde el enlace de un bloque y vuelve con atrás', async ({

@@ -1,25 +1,23 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue'
 
-import type { ChartRange, NeonDashboardViewModel } from './view-model'
+import { parseDashboardRange, type ChartRange, type NeonDashboardViewModel } from './view-model'
 
-// Range of the home's charts (DESIGN.md, Selector de periodo): it reads as part
-// of the title («Dashboard · último año») and opens the page's own panel (not
-// the system's): the presets with the months each draws, and under them the
-// year as a ruler of twelve months, where any past month can be the start
-// («desde mayo»). Escape or a press outside closes it; Escape and a pick give
-// the focus back to the title.
-defineProps<{
+const props = defineProps<{
   label: string
   options: NeonDashboardViewModel['rangeOptions']
-  months: NeonDashboardViewModel['rangeMonths']
+  rangeBounds: NeonDashboardViewModel['rangeBounds']
+  range: ChartRange
 }>()
-const range = defineModel<ChartRange>({ required: true })
+const emit = defineEmits<{ pick: [range: ChartRange] }>()
 
 const open = ref(false)
+const start = ref('')
+const invalidStart = ref(false)
 const root = useTemplateRef<HTMLElement>('root')
 const trigger = useTemplateRef<HTMLButtonElement>('trigger')
 const panelId = useId()
+const helpId = useId()
 
 function close(returnFocus: boolean): void {
   open.value = false
@@ -27,8 +25,14 @@ function close(returnFocus: boolean): void {
 }
 
 function pick(value: ChartRange): void {
-  range.value = value
+  emit('pick', value)
   close(true)
+}
+
+function pickStart(): void {
+  const value = parseDashboardRange(start.value, props.rangeBounds)
+  invalidStart.value = value === null
+  if (value) pick(value)
 }
 
 function onPointerDown(event: Event): void {
@@ -47,10 +51,15 @@ function stopListening(): void {
 
 watch(open, (isOpen) => {
   if (!isOpen) return stopListening()
+  const [, year, month] = props.range.split('-')
+  start.value = year ? `${month.padStart(2, '0')}/${year}` : ''
+  invalidStart.value = false
   document.addEventListener('pointerdown', onPointerDown)
   document.addEventListener('keydown', onKeyDown)
   void nextTick(() =>
-    root.value?.querySelector<HTMLElement>('[role="dialog"] [aria-pressed="true"]')?.focus(),
+    root.value
+      ?.querySelector<HTMLElement>('[role="dialog"] :is([aria-pressed="true"], input)')
+      ?.focus(),
   )
 })
 
@@ -62,7 +71,7 @@ onBeforeUnmount(stopListening)
     <button
       ref="trigger"
       type="button"
-      class="group outline-accent text-muted flex items-center gap-2 rounded-lg font-sans text-[26px] leading-[1.15] font-extrabold tracking-tight whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4"
+      class="group outline-accent text-muted motion-safe:animate-rise flex items-center gap-2 rounded-lg font-sans text-[26px] leading-[1.15] font-extrabold tracking-tight whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-4"
       aria-haspopup="dialog"
       :aria-expanded="open"
       :aria-controls="open ? panelId : undefined"
@@ -115,40 +124,35 @@ onBeforeUnmount(stopListening)
         </span>
         <span class="text-muted text-meta font-semibold tabular-nums">{{ option.span }}</span>
       </button>
-      <!-- The year as a ruler: a past month starts the range there, until today. -->
-      <div class="border-line mbs-1 grid gap-2 border-t px-1.5 pt-3 pb-1">
-        <span class="text-muted text-meta px-1.5 font-bold">Desde</span>
-        <div class="grid grid-cols-12">
+      <form
+        class="border-line mbs-1 grid gap-1.5 border-bs px-3 pbs-3 pbe-1.5"
+        novalidate
+        @submit.prevent="pickStart"
+      >
+        <label :for="`${panelId}-start`" class="text-muted text-[13px] font-bold">Desde</label>
+        <div class="flex items-center gap-2">
+          <input
+            :id="`${panelId}-start`"
+            v-model="start"
+            type="text"
+            placeholder="MM/AAAA o AAAA"
+            :aria-describedby="helpId"
+            :aria-invalid="invalidStart || undefined"
+            class="bg-panel border-ctrl-line text-text placeholder:text-muted outline-accent rounded-field min-h-[46px] w-full min-w-0 border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
+            @input="invalidStart = false"
+          />
           <button
-            v-for="month in months"
-            :key="month.value"
-            type="button"
-            :disabled="month.disabled"
-            :aria-pressed="month.value === range"
-            :aria-label="`Desde ${month.name.toLocaleLowerCase('es')}`"
-            class="outline-accent group/month enabled:hover:bg-panel2 grid min-h-11 content-center justify-items-center gap-1.5 rounded-[8px] px-px focus-visible:outline-2 focus-visible:-outline-offset-2 enabled:active:scale-[0.96]"
-            @click="pick(month.value)"
+            type="submit"
+            class="bg-panel2 border-ctrl-line text-text outline-accent rounded-field text-note active:bg-bg min-h-[46px] border px-3.5 font-bold focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            <span
-              class="text-meta font-bold"
-              :class="month.lit ? 'text-text' : month.disabled ? 'text-faint' : 'text-muted'"
-              aria-hidden="true"
-              >{{ month.initial }}</span
-            >
-            <span
-              class="h-1.5 w-full rounded-full"
-              :class="
-                month.lit
-                  ? 'bg-accent'
-                  : month.disabled
-                    ? 'border-line border border-dashed'
-                    : 'bg-ctrl-line group-hover/month:bg-soft'
-              "
-              aria-hidden="true"
-            />
+            Aplicar
           </button>
         </div>
-      </div>
+        <p :id="helpId" class="text-muted text-meta" :class="{ 'sr-only': !invalidStart }">
+          Usa MM/AAAA o AAAA, desde {{ rangeBounds.firstYear }} hasta
+          {{ String(rangeBounds.endMonth).padStart(2, '0') }}/{{ rangeBounds.endYear }}.
+        </p>
+      </form>
     </div>
   </div>
 </template>
