@@ -6,7 +6,6 @@ import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 import {
   accountDetail,
-  balanceDate,
   closeCard,
   coverMonth,
   closeAction,
@@ -18,7 +17,6 @@ import {
   evolution,
   holdings,
   monthTotals,
-  scrubReading,
 } from '../../src/neon/sections/wealth/view-model'
 
 /**
@@ -85,92 +83,22 @@ describe('closeStatus', () => {
 })
 
 describe('evolution', () => {
-  it('draws the net worth at the close of each month, hollow while the month is open', () => {
-    const chart = evolution(vm(), 'month', 'line')
-
-    expect(chart.points.map((point) => point.label)).toEqual([
-      'Ene',
-      'Feb',
-      'Mar',
-      'Abr',
-      'May',
-      'Jun',
-      'Jul',
-      'Ago',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dic',
+  it('keeps the monthly balances, marking months that are still open', () => {
+    const points = evolution(vm())
+    expect(points.map((point) => point.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    expect(points.slice(0, 3)).toEqual([
+      { month: 1, value: 2550, open: false, monthChange: null, yearChange: 0 },
+      { month: 2, value: 2750, open: false, monthChange: 200, yearChange: 200 },
+      { month: 3, value: 3150, open: true, monthChange: 400, yearChange: 600 },
     ])
-    expect(chart.points.slice(0, 3).map((point) => point.open)).toEqual([false, false, true])
-    expect(chart.note).toBe('+600,00\u00a0€ desde enero. El último dato aún no está cerrado.')
   })
 
-  it('reads the move since the first month in whole euros, with its tone', () => {
-    expect(evolution(vm(), 'month', 'line').delta).toEqual({
-      text: '+600\u00a0€',
-      since: 'desde enero',
-      tone: 'gain',
+  it('keeps January as the baseline even for a chart beginning later in the year', () => {
+    expect(evolution(vm()).slice(-6)[0]).toMatchObject({
+      month: 7,
+      monthChange: 0,
+      yearChange: 600,
     })
-  })
-
-  it('reads a point of the chart with its move since the first one', () => {
-    const chart = evolution(vm(), 'month', 'line')
-
-    expect(scrubReading(chart, 1, 'month')).toEqual({
-      name: 'Febrero',
-      value: 2750,
-      delta: { text: '+200\u00a0€', since: 'desde enero', tone: 'gain' },
-    })
-    expect(scrubReading(chart, 0, 'month')?.delta).toEqual({
-      text: '0\u00a0€',
-      since: 'desde enero',
-      tone: 'muted',
-    })
-    expect(scrubReading(chart, 99, 'month')).toBeNull()
-  })
-
-  it('names a quarter by its label when the chart is by quarters', () => {
-    const chart = evolution(vm(), 'quarter', 'line')
-
-    expect(scrubReading(chart, 0, 'quarter')?.name).toBe(chart.points[0].label)
-    expect(scrubReading(chart, 0, 'quarter')?.delta.since).toBe(`desde ${chart.points[0].label}`)
-  })
-
-  it('rounds the scale to at most four steps around the values', () => {
-    const chart = evolution(vm(), 'month', 'line')
-
-    expect(chart.ticks.map((tick) => tick.label)).toEqual([
-      '2,4\u00a0mil\u00a0€',
-      '2,6\u00a0mil\u00a0€',
-      '2,8\u00a0mil\u00a0€',
-      '3\u00a0mil\u00a0€',
-      '3,2\u00a0mil\u00a0€',
-    ])
-    // 2550 sits 150 above the 2400 floor of an 800-wide scale.
-    expect(chart.points[0].y).toBeCloseTo(81.25)
-  })
-
-  it('starts the bars at zero so their height reads as the amount', () => {
-    const chart = evolution(vm(), 'month', 'bars')
-
-    expect(chart.ticks[0].label).toBe('0\u00a0€')
-    // 2550 of a 0–4000 scale.
-    expect(chart.points[0].y).toBeCloseTo(36.25)
-  })
-
-  it('keeps the last month of each quarter and shows the value under few points', () => {
-    const chart = evolution(vm(), 'quarter', 'line')
-
-    expect(chart.points.map((point) => [point.label, point.sub])).toEqual([
-      ['T1', '3,2\u00a0mil\u00a0€'],
-      ['T2', '3,2\u00a0mil\u00a0€'],
-      ['T3', '3,2\u00a0mil\u00a0€'],
-      ['T4', '3,2\u00a0mil\u00a0€'],
-    ])
-    expect(chart.label).toBe(
-      'Patrimonio por trimestre: T1 3.150,00\u00a0€, T2 3.150,00\u00a0€, T3 3.150,00\u00a0€, T4 3.150,00\u00a0€',
-    )
   })
 })
 
@@ -185,7 +113,6 @@ describe('composition', () => {
       ['Banco', 'Efectivo', '44\u00a0%', 'lilac2'],
       ['Efectivo en mano', 'Efectivo', '1\u00a0%', 'lilac3'],
     ])
-    expect(mix.note).toBe('3.650,00\u00a0€ en activos. Fondo pesa más: 55\u00a0%.')
   })
 
   it('folds everything past the third biggest into one «Resto»', () => {
@@ -406,11 +333,5 @@ describe('cover texts', () => {
       note: 'Los saldos de febrero ya están apuntados. Puedes corregirlos o ver los meses anteriores.',
       action: 'Ver balance por meses',
     })
-  })
-
-  it('dates the balances today while the month runs, at its close otherwise', () => {
-    const today = new Date(2020, 2, 20)
-    expect(balanceDate(2020, 3, today)).toBe('Saldos calculados a 20 de marzo.')
-    expect(balanceDate(2019, 12, today)).toBe('Saldos al cierre de diciembre.')
   })
 })

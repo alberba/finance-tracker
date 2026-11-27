@@ -59,7 +59,9 @@ const SWATCH: Record<SnapshotKind, string> = {
       Patrimonio
     </button>
 
-    <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+    <header
+      class="motion-safe:animate-rise flex flex-wrap items-end justify-between gap-x-6 gap-y-3"
+    >
       <div class="grid min-w-0 gap-1">
         <p class="text-muted text-label tracking-label font-extrabold uppercase">
           Balance patrimonial · {{ year }}
@@ -77,10 +79,14 @@ const SWATCH: Record<SnapshotKind, string> = {
       </p>
     </header>
 
-    <NeonWealthEquation :totals="totals" :status="status" />
+    <NeonWealthEquation
+      :totals="totals"
+      :status="status"
+      class="motion-safe:animate-rise motion-safe:[animation-delay:70ms]"
+    />
 
     <div
-      class="grid min-w-0 grid-cols-1 items-stretch gap-8 @min-[1300px]:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]"
+      class="motion-safe:animate-rise grid min-w-0 grid-cols-1 items-stretch gap-8 motion-safe:[animation-delay:140ms] @min-[1300px]:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]"
     >
       <section
         aria-labelledby="wealth-close-title"

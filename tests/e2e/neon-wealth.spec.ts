@@ -25,6 +25,50 @@ function money(text: string): number {
 }
 
 test.describe('Patrimonio en el diseño nuevo', () => {
+  test('consulta la evolución, fija un mes en la gráfica y cambia el rango', async ({
+    page,
+    tracker,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await tracker.openWealth()
+    const evolution = section(page).getByRole('region', { name: 'Evolución del patrimonio' })
+    const line = evolution.getByRole('slider', { name: /^Patrimonio por mes/ })
+    await expect(line).toHaveAttribute('aria-valuetext', /Marzo: .*saldo sin cerrar/)
+    await expect(line.locator('path[stroke-dasharray]')).toHaveCount(1)
+
+    await line.press('Home')
+    await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)
+    await expect(evolution.locator('[data-wealth-month-change]')).toHaveText('—')
+    await line.press('Enter')
+    await line.press('Escape')
+    await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)
+    await expect(evolution.getByText('En enero', { exact: true })).toBeVisible()
+    await expect(evolution.getByText('Desde enero', { exact: true })).toBeVisible()
+
+    // The range is in the title: a tab of presets, with the year so far chosen.
+    const trigger = evolution.locator('[data-wealth-range]')
+    await expect(trigger).toHaveText('2026')
+    await trigger.click()
+    const ranges = page.getByRole('dialog', { name: 'Rango de la gráfica' })
+    await expect(ranges.getByRole('button', { name: 'En lo que va de año' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    // It stays open on a pick, to compare ranges one after another.
+    await ranges.getByRole('button', { name: 'Últimos 3 meses' }).click()
+    await expect(ranges).toBeVisible()
+    await expect(trigger).toHaveText('3 meses')
+    await expect(evolution.getByText('En 3 meses', { exact: true })).toBeVisible()
+    await expect(ranges.getByRole('button', { name: 'Últimos 3 meses' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Rango de la gráfica' })).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
+
   test('abre el detalle de una cuenta, lee otro mes y vuelve', async ({ page, tracker }) => {
     await tracker.openWealth()
     await expect(section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })).toBeVisible()
