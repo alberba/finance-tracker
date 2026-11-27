@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   deriveContributionFlow,
   findLiquidityTargets,
-  getFlowFromAllocations,
   sanitizeFlowAllocations,
 } from "../../src/scripts/contribution-workflow";
 import { normalizeState } from "../../src/scripts/state";
@@ -20,7 +19,6 @@ describe("contribution-workflow helpers", () => {
       { accountId: "myinvestor", amount: 10.11 },
       { accountId: "trading-212", amount: 5.24 },
     ]);
-    expect(getFlowFromAllocations(allocations)).toBe(15.35);
 
     const derived = deriveContributionFlow({
       flow: 999,

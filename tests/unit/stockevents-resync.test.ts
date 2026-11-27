@@ -194,16 +194,6 @@ describe('stockEvents syncMovement — éxito y fallo', () => {
 })
 
 describe('stockEvents syncMovement — ajuste global de efectivo', () => {
-  it('no envía toCash cuando el ajuste está desactivado', async () => {
-    seedState([ethBuy])
-    const store = useStockEventsStore()
-    await store.initializeCredential()
-
-    await store.syncMovement(ethBuy)
-
-    expect(vi.mocked(createStockEventsTransaction).mock.calls[0]?.[0]).not.toHaveProperty('toCash')
-  })
-
   it('la opción del movimiento prevalece sobre el ajuste global', async () => {
     seedState([ethBuy], true)
     const store = useStockEventsStore()

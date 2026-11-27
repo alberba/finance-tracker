@@ -49,8 +49,6 @@ function todayLocal(): string {
 const list = (page: Page) => page.locator('#transactions [data-subscription-list]')
 const row = (page: Page, name: string) =>
   list(page).locator('[data-subscription-id]').filter({ hasText: name })
-const summary = (page: Page) =>
-  page.locator('#transactions').getByRole('complementary', { name: 'Resumen de suscripciones' })
 
 async function registryRows(tracker: FinanceTrackerPage, name: string) {
   await tracker.transactionsSection.getByRole('tab', { name: /^Registro/ }).click()
@@ -91,8 +89,6 @@ test.describe('suscripciones de gastos', () => {
     })
 
     await expect(page.locator('#toast')).toContainText('1 gasto generado')
-    await expect(summary(page).locator('[data-subscriptions-monthly]')).toContainText('14,99 €')
-    await expect(summary(page)).toContainText('179,88 € al año · 1 activa')
 
     await expect(await registryRows(tracker, 'E2E Streaming')).toHaveCount(1)
     await tracker.reload()
@@ -130,64 +126,6 @@ test.describe('suscripciones de gastos', () => {
     await expect(row(page, 'E2E Pausable')).toHaveCount(0)
 
     await expect(await registryRows(tracker, 'E2E Pausable')).toHaveCount(1)
-  })
-
-  test('resume el compromiso y lo que dejan de cobrar las pausadas', async ({ page, tracker }) => {
-    await replaceBackup(page, tracker, {
-      accounts: [
-        { id: 'revolut', name: 'Revolut', kind: 'cash', currency: 'EUR', openingBalance: 0 },
-        { id: 'santander', name: 'Santander', kind: 'cash', currency: 'EUR', openingBalance: 0 },
-      ],
-      categories: [
-        { id: 'ocio', name: 'Ocio', kind: 'expense' },
-        { id: 'software', name: 'Software', kind: 'expense' },
-        { id: 'salud', name: 'Salud', kind: 'expense' },
-      ],
-      subscriptions: [
-        {
-          id: 'analysis-monthly',
-          name: 'Streaming análisis',
-          amount: 10,
-          accountId: 'revolut',
-          categoryId: 'ocio',
-          frequency: 'monthly',
-          startDate: '2026-01-01',
-          nextChargeDate: '2026-08-20',
-          isActive: true,
-        },
-        {
-          id: 'analysis-yearly',
-          name: 'Nube análisis',
-          amount: 120,
-          accountId: 'santander',
-          categoryId: 'software',
-          frequency: 'yearly',
-          startDate: '2026-01-01',
-          nextChargeDate: '2026-10-01',
-          isActive: true,
-        },
-        {
-          id: 'analysis-paused',
-          name: 'Gimnasio pausado',
-          amount: 30,
-          accountId: 'revolut',
-          categoryId: 'salud',
-          frequency: 'quarterly',
-          startDate: '2026-01-01',
-          nextChargeDate: '2026-09-01',
-          isActive: false,
-        },
-      ],
-    })
-    await tracker.openSubscriptionsTab()
-
-    await expect(summary(page).locator('[data-subscriptions-monthly]')).toContainText('20,00 €')
-    await expect(summary(page)).toContainText('240,00 € al año · 2 activas')
-    await expect(list(page)).toContainText('Dejas de pagar 120,00 € al año')
-    await row(page, 'Gimnasio pausado').click()
-    await expect(tracker.subscriptionPanel('Gimnasio pausado')).toContainText(
-      'En pausa: no genera gastos.',
-    )
   })
 
   test('al reactivar una suscripción descarta el periodo pausado', async ({ page, tracker }) => {

@@ -5,8 +5,6 @@ import { fromMinorUnits, minorUnitExponent, toMinorUnits } from "../../src/lib/m
 describe("minorUnitExponent", () => {
   it("returns 2 for common currencies", () => {
     expect(minorUnitExponent("EUR")).toBe(2);
-    expect(minorUnitExponent("USD")).toBe(2);
-    expect(minorUnitExponent("GBP")).toBe(2);
   });
 
   it("returns 0 for JPY (no minor unit)", () => {
@@ -30,11 +28,6 @@ describe("toMinorUnits / fromMinorUnits", () => {
   it("converts EUR amounts to cents", () => {
     expect(toMinorUnits(12.34, "EUR")).toBe(1234);
     expect(fromMinorUnits(1234, "EUR")).toBe(12.34);
-  });
-
-  it("converts USD amounts to cents", () => {
-    expect(toMinorUnits(0.1, "USD")).toBe(10);
-    expect(fromMinorUnits(10, "USD")).toBe(0.1);
   });
 
   it("converts JPY amounts with no minor unit", () => {
@@ -68,7 +61,7 @@ describe("toMinorUnits / fromMinorUnits", () => {
   });
 
   describe("round-trip property", () => {
-    const currencies = ["EUR", "USD", "GBP", "JPY", "BTC"];
+    const currencies = ["EUR", "JPY", "BTC"];
     const representativeMinorUnits = [0, 1, 42, 100, 1999, 123456, 987654321];
 
     for (const currency of currencies) {

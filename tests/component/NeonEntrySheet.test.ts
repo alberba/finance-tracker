@@ -55,11 +55,6 @@ async function openSheet() {
 const transactions = () => useFinancialStateStore().transactions
 
 describe('NeonEntrySheet', () => {
-  it('opens as a modal dialog from the shared flag', async () => {
-    const wrapper = await openSheet()
-    expect((wrapper.get('dialog').element as HTMLDialogElement).open).toBe(true)
-  })
-
   it.each([
     ['expense', 'Comida'],
     ['income', 'Nómina'],

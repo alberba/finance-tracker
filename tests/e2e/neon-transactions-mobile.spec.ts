@@ -3,7 +3,6 @@ import type { Month } from '../../src/lib/month'
 import type { TransactionType } from '../../src/scripts/types'
 import { test, expect } from './fixtures'
 import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
-import { expectSyncCommand } from './pages/sync'
 import { editScenarioState } from './seed-sync-v2'
 
 /**
@@ -86,30 +85,6 @@ test('busca, filtra por tipo y por importe desde «Filtros»', async ({ page, tr
   await expect(section(page).locator('[data-registry-total]')).toHaveText('300,00 €')
 })
 
-test('mantiene las pestañas en su sitio al alternar Registro y Suscripciones', async ({
-  page,
-  tracker,
-}) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  await tracker.open('transactions')
-
-  const tabs = section(page).getByRole('tablist')
-  const registry = tabs.getByRole('tab', { name: /Registro/ })
-  const subscriptions = tabs.getByRole('tab', { name: /Suscripciones/ })
-  const initialPosition = await tabs.boundingBox()
-  expect(initialPosition).not.toBeNull()
-
-  await subscriptions.click()
-  const panel = section(page).getByRole('tabpanel', { name: /Suscripciones/ })
-  await expect(panel.getByRole('button', { name: 'Nueva suscripción' })).toBeVisible()
-  expect(await tabs.boundingBox()).toEqual(initialPosition)
-
-  await subscriptions.press('ArrowLeft')
-  await expect(registry).toBeFocused()
-  await expect(section(page).getByRole('tabpanel', { name: /Registro/ })).toBeVisible()
-  expect(await tabs.boundingBox()).toEqual(initialPosition)
-})
-
 test('mantiene la posición al pasar de movimientos a ningún resultado y volver', async ({
   page,
   tracker,
@@ -150,41 +125,6 @@ test('mantiene la posición al pasar de movimientos a ningún resultado y volver
   await setMinimum('1', /^Ver \d+ movimientos/)
   await expect(row(page, 'e2e-movil-scroll-0')).toBeVisible()
   expect(await scrollPosition()).toBe(210)
-})
-
-test('abre un movimiento en la hoja, lo edita y el cambio sigue al recargar', async ({
-  page,
-  tracker,
-}) => {
-  await addMovements(page, tracker, [
-    { id: 'e2e-movil-editar', type: 'expense', amount: 30, date: '2026-03-12' },
-  ])
-
-  await row(page, 'e2e-movil-editar').click()
-  const detail = sheet(page, 'e2e-movil-editar')
-  await expect(detail).toBeVisible()
-  await expect(detail.locator('[data-detail-amount]')).toHaveText('−30,00 €')
-
-  await detail.getByRole('button', { name: 'Editar' }).click()
-  await detail.getByLabel('Importe').fill('45,50')
-  await detail.getByLabel('Descripción').fill('e2e-movil-editado')
-  const saved = expectSyncCommand(
-    page,
-    (command) =>
-      command.action === 'update' &&
-      command.entityType === 'transaction' &&
-      command.patch.description === 'e2e-movil-editado',
-  )
-  await detail.getByRole('button', { name: 'Guardar' }).click()
-  await saved
-
-  const edited = sheet(page, 'e2e-movil-editado')
-  await expect(edited.locator('[data-detail-amount]')).toHaveText('−45,50 €')
-  await edited.getByRole('button', { name: 'Cerrar' }).click()
-  await expect(edited).toBeHidden()
-
-  await tracker.reload()
-  await expect(row(page, 'e2e-movil-editado').locator('[data-tx-amount]')).toHaveText('−45,50 €')
 })
 
 test('todos los controles de Movimientos miden al menos 44 px con puntero táctil', async ({

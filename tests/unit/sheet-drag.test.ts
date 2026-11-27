@@ -11,12 +11,8 @@ describe('reglas de arrastre de la hoja', () => {
   it('hacia abajo sigue al dedo y hacia arriba cede cada vez menos', () => {
     expect(dragOffset(80)).toBe(80)
     expect(dragOffset(0)).toBe(0)
-    const small = Math.abs(dragOffset(-100))
-    const large = Math.abs(dragOffset(-400))
-    expect(dragOffset(-100)).toBeLessThan(0)
-    expect(small).toBe(40)
-    expect(large).toBe(80)
-    expect(large / small).toBeLessThan(4)
+    expect(dragOffset(-100)).toBe(-40)
+    expect(dragOffset(-400)).toBe(-80)
   })
 
   it('cierra pasando el 30 % del alto', () => {

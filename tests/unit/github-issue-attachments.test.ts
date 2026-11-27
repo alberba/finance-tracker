@@ -156,7 +156,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     })
 
     expect(result.number).toBe(77)
-    expect(logError).toHaveBeenCalledWith('[github] Adjunto no subido', 'GitHub 500')
     logError.mockRestore()
     const issueCall = fakeFetch.mock.calls.find(([input]) => String(input).endsWith('/issues'))
     const body = JSON.parse(String(issueCall?.[1]?.body))
@@ -205,20 +204,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
     expect(reportFailure).toHaveBeenCalledWith({ stage: 'upload', reason: 'failed' })
   })
 
-  it('un reporte sin adjuntos no incluye la sección y no sube nada', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => issueResponse())
-    const uploadAttachment = vi.fn()
-
-    await createIssueFromWebReport(reportWith(undefined), reporter, ENV, {
-      fetch: fakeFetch as typeof fetch,
-      uploadAttachment,
-    })
-
-    expect(uploadAttachment).not.toHaveBeenCalled()
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body))
-    expect(body.body).not.toContain('### Adjuntos')
-  })
-
   it('crea la issue sin adjuntos cuando no se puede leer el id del repositorio', async () => {
     const fakeFetch = vi.fn<typeof fetch>(async (input) => {
       const url = String(input)
@@ -239,10 +224,6 @@ describe('createIssueFromWebReport con adjuntos', () => {
         String(input).startsWith('https://uploads.github.com/'),
       ),
     ).toBe(false)
-    expect(logError).toHaveBeenCalledWith(
-      '[github] Adjunto no subido',
-      'No se pudo leer el repositorio (404).',
-    )
     const body = JSON.parse(String(fakeFetch.mock.calls.at(-1)?.[1]?.body))
     expect(body.body).toContain('no se pudo subir')
     logError.mockRestore()

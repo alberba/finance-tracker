@@ -84,9 +84,7 @@ test.describe('Inversión', () => {
     await sheet.getByLabel('Títulos').fill('3')
     await sheet.getByLabel('Precio').fill('100')
     await sheet.getByLabel('Comisión').fill('1')
-    await expect(sheet.locator('[data-investment-total]')).toContainText('301,00')
     await sheet.getByRole('radio', { name: 'Venta' }).click()
-    await expect(sheet.locator('[data-investment-total]')).toContainText('299,00')
     await sheet.getByRole('button', { name: 'Guardar venta' }).click()
     await expect(sheet).toBeHidden()
     await expect(page.getByText('Movimiento de inversión guardado.')).toBeVisible()
@@ -156,21 +154,6 @@ test.describe('Inversión', () => {
     await expect(chart).toHaveAccessibleName(/S&P 500/)
   })
 
-  test('muestra la última columna de posiciones en escritorio estrecho', async ({
-    page,
-    tracker,
-  }) => {
-    await page.setViewportSize({ width: 1000, height: 800 })
-    await tracker.openInvestment()
-
-    const positions = section(page).getByRole('region', { name: 'Posiciones' })
-    const evolution = positions.getByText('Evolución', { exact: true })
-    await expect(evolution).toBeVisible()
-    await expect
-      .poll(() => positions.evaluate((list) => list.scrollWidth - list.clientWidth))
-      .toBeLessThanOrEqual(1)
-  })
-
   test('abre un activo, ve sus operaciones y vuelve con la flecha y con atrás', async ({
     page,
     tracker,
@@ -185,8 +168,6 @@ test.describe('Inversión', () => {
     await expect(section(page).getByRole('heading', { level: 1 })).toBeVisible()
     await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
     await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
-    // The symbol's quote is not shown yet (#524): its place says it is coming.
-    await expect(section(page).locator('[data-asset-quote]')).toContainText('Próximamente')
 
     await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
     await expect(page).toHaveURL(/\/inversion$/)

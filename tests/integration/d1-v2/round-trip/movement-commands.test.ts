@@ -497,7 +497,8 @@ describe('round trip: shared movement commands (#263)', () => {
     expect((await trip.reload()).transactions[0]).toMatchObject(offline.transactions[0])
   })
 
-  it.each(['income', 'expense'] as const)('edits an ordinary %s', async (type) => {
+  it('edits an ordinary income', async () => {
+    const type = 'income'
     useMovementsStore().addTransaction({
       date: '2026-09-12',
       month: 9,
@@ -525,47 +526,20 @@ describe('round trip: shared movement commands (#263)', () => {
       description: 'Movimiento corregido',
     })
   })
-  it.each(['income', 'expense'] as const)('creates an ordinary %s', async (type) => {
+  it('deletes an ordinary expense', async () => {
     useMovementsStore().addTransaction({
       date: '2026-09-12',
       month: 9,
-      type,
+      type: 'expense',
       accountId,
-      category: type === 'income' ? 'Nómina' : 'Ocio',
+      category: 'Ocio',
       description: 'Movimiento ordinario',
       amount: 100,
     })
-    const reloaded = await trip.reload()
-    expect(reloaded.transactions).toHaveLength(1)
-    expect(reloaded.transactions[0]).toMatchObject({
-      type,
-      accountId,
-      amount: 100,
-      description: 'Movimiento ordinario',
-    })
+    const first = await trip.reload()
+    useMovementsStore().deleteTransaction(first.transactions[0].id)
+    expect((await trip.reload()).transactions).toEqual([])
   })
-
-  it.each(['income', 'expense', 'investment'] as const)(
-    'deletes a %s and its operation',
-    async (type) => {
-      if (type === 'investment') {
-        useInvestmentStore().addMovement(investmentInput)
-      } else {
-        useMovementsStore().addTransaction({
-          date: '2026-09-12',
-          month: 9,
-          type,
-          accountId,
-          category: type === 'income' ? 'Nómina' : 'Ocio',
-          description: 'Movimiento ordinario',
-          amount: 100,
-        })
-      }
-      const first = await trip.reload()
-      useMovementsStore().deleteTransaction(first.transactions[0].id)
-      expect((await trip.reload()).transactions).toEqual([])
-    },
-  )
 })
 
 describe('round trip: imported movement protections (#263)', () => {

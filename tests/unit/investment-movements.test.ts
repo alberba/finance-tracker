@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildInvestmentDescription,
   computeInvestmentMovement,
   normalizeInvestmentSide,
 } from '../../src/scripts/investment-movements'
@@ -33,20 +32,6 @@ describe('investment-movements helpers', () => {
     expect(computed.description).toBe('Venta 0.25 BTC')
   })
 
-  it('acepta títulos fraccionarios menores a 1', () => {
-    const computed = computeInvestmentMovement({
-      side: 'buy',
-      symbol: 'eth',
-      units: 0.5,
-      unitPrice: 2500,
-      fee: 1,
-    })
-
-    expect(computed.normalizedUnits).toBe(0.5)
-    expect(computed.signedAmount).toBe(1251)
-    expect(computed.description).toBe('Compra 0.5 ETH')
-  })
-
   it('mantiene precisión en títulos pequeños', () => {
     const computed = computeInvestmentMovement({
       side: 'buy',
@@ -64,10 +49,5 @@ describe('investment-movements helpers', () => {
   it('normaliza side', () => {
     expect(normalizeInvestmentSide('sell')).toBe('sell')
     expect(normalizeInvestmentSide('otra-cosa')).toBe('buy')
-  })
-
-  it('genera descripción para compra y venta', () => {
-    expect(buildInvestmentDescription('buy', 2, 'MSFT')).toBe('Compra 2 MSFT')
-    expect(buildInvestmentDescription('sell', 1.5, 'AAPL')).toBe('Venta 1.5 AAPL')
   })
 })

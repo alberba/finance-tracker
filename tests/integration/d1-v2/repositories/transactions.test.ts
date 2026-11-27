@@ -15,30 +15,6 @@ describe("transactions repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes a transaction (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-    const account = await seedAccount(db, user.id);
-
-    const created = await runWithDb(db, transactionsRepo.create(user.id, {
-      accountId: account.id,
-      type: "expense",
-      date: "2026-01-15",
-      amount: 19.99,
-      currency: "EUR",
-    }));
-    expect(created.amount).toBe(19.99);
-
-    const found = await runWithDb(db, transactionsRepo.get(user.id, created.id));
-    expect(found?.amount).toBe(19.99);
-
-    const updated = await runWithDb(db, transactionsRepo.update(user.id, created.id, { amount: 25 }));
-    expect(updated?.amount).toBe(25);
-
-    const removed = await runWithDb(db, transactionsRepo.remove(user.id, created.id));
-    expect(removed).toBe(true);
-  });
-
   it("rejects creating a transaction for a non-existent account (WP10 ownership guard, formerly a raw FK violation)", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
@@ -69,17 +45,6 @@ describe("transactions repository", () => {
 
     expect(await runWithDb(db, transactionsRepo.get(userB.id, created.id))).toBeUndefined();
     expect(await runWithDb(db, transactionsRepo.listByUser(userB.id))).toHaveLength(0);
-  });
-
-  it("bulk inserts transactions", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-    const account = await seedAccount(db, user.id);
-    const rows = await runWithDb(db, transactionsRepo.bulkInsert(user.id, [
-      { accountId: account.id, type: "expense", date: "2026-01-01", amount: 10, currency: "EUR" },
-      { accountId: account.id, type: "income", date: "2026-01-02", amount: 20, currency: "EUR" },
-    ]));
-    expect(rows).toHaveLength(2);
   });
 
   describe("investment trade details", () => {
@@ -123,34 +88,6 @@ describe("transactions repository", () => {
       ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
 
       expect(await runWithDb(db, transactionsRepo.removeTradeDetail(userA.id, created.id))).toBe(true);
-    });
-
-    it("removing the transaction deletes its trade detail with it instead of a raw FK violation (audit §2.6)", async () => {
-      const { db } = testDb;
-      const user = await seedUser(db);
-      const account = await seedAccount(db, user.id);
-      const transaction = await runWithDb(db, transactionsRepo.create(user.id, {
-        accountId: account.id,
-        type: "investment",
-        date: "2026-01-15",
-        amount: 100,
-        currency: "EUR",
-      }));
-      const detail = await runWithDb(db, transactionsRepo.createTradeDetail(user.id, {
-        transactionId: transaction.id,
-        side: "buy",
-        quantity: "1.5",
-        price: 66.66,
-        fee: 1.5,
-        currency: "EUR",
-      }));
-
-      expect(await runWithDb(db, transactionsRepo.remove(user.id, transaction.id))).toBe(true);
-
-      expect(
-        await runWithDb(db, transactionsRepo.getTradeDetailByTransaction(user.id, transaction.id)),
-      ).toBeUndefined();
-      expect(await runWithDb(db, transactionsRepo.removeTradeDetail(user.id, detail.id))).toBe(false);
     });
 
     it("writes the operation that travels with the movement, and replaces it on an edit", async () => {

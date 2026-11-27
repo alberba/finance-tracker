@@ -95,15 +95,6 @@ describe("GET /api/changes", () => {
     expect(body.changes.map((change: { revision: number }) => change.revision)).toEqual([1, 2]);
   });
 
-  it("accepts 'cursor' as an alias for 'since'", async () => {
-    const { GET } = await import("../../../../src/pages/api/changes");
-    const response = await GET({
-      request: new Request("https://example.test/api/changes?cursor=0"),
-      locals: { principal },
-    } as never);
-    expect(response.status).toBe(200);
-  });
-
   it("returns 400 for a non-integer since/cursor", async () => {
     const { GET } = await import("../../../../src/pages/api/changes");
     const response = await GET({

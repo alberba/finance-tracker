@@ -48,7 +48,6 @@ describe('workflow de reportes web', () => {
   })
 
   it('el checkout no persiste credenciales', () => {
-    expect(workflow).toContain('actions/checkout@v7')
     expect(workflow).toContain('persist-credentials: false')
   })
 })

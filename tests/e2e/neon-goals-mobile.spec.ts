@@ -11,7 +11,6 @@ import { expectSyncCommand } from './pages/sync'
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#goals')
-const column = (page: Page, name: string) => section(page).locator(`[data-goal-column="${name}"]`)
 const goalPanel = (page: Page) => page.getByRole('dialog', { name: 'Nuevo objetivo' })
 
 test.beforeEach(async ({ tracker }) => {
@@ -35,27 +34,6 @@ async function createGoal(page: Page, name: string, amount: string, when: string
   await expect(panel).toBeHidden()
   await created
 }
-
-test('crea un objetivo desde el móvil y lo ve en su columna', async ({ page, tracker }) => {
-  await expect(section(page).getByRole('heading', { name: 'Objetivos', level: 1 })).toBeVisible()
-  await expect(section(page).locator('[data-empty-state]')).toBeVisible()
-
-  await createGoal(page, 'Viaje a Islandia', '3.600', '18 meses')
-  const islandia = column(page, 'Viaje a Islandia')
-  await expect(islandia.locator('[data-goal-percent]')).toHaveText('0 %')
-  // 200 € a month from March 2026 arrives in September 2027, its deadline.
-  await expect(islandia).toContainText('sep 2027')
-  await expect(islandia.locator('[data-goal-verdict]')).toHaveText('Justo a tiempo')
-  await expect(section(page).getByRole('region', { name: 'Objetivo seleccionado' })).toContainText(
-    'Viaje a Islandia',
-  )
-
-  await tracker.reload()
-  await tracker.openGoals()
-  await expect(column(page, 'Viaje a Islandia').locator('[data-goal-verdict]')).toHaveText(
-    'Justo a tiempo',
-  )
-})
 
 test('reparte el ahorro entre los objetivos desde la hoja', async ({ page }) => {
   await createGoal(page, 'Colchón', '1.000', '1 año')

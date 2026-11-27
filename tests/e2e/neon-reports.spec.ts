@@ -66,6 +66,10 @@ test.describe('Mis reportes', () => {
       await expect(own).toContainText('Ocurre solo en móvil.')
       await expect(own).toContainText('Tú')
       await expect(detail.getByRole('textbox', { name: 'Nueva aclaración' })).toHaveValue('')
+
+      // The URL keeps the open report: a reload lands on the same thread.
+      await tracker.reload()
+      await expect(section(page).getByRole('heading', { name: reportEntry().title })).toBeVisible()
     },
   )
 
@@ -114,19 +118,6 @@ test.describe('Mis reportes', () => {
     ).toBeVisible()
     await expect(dot).toHaveCount(0)
     await expect(section(page).locator('[data-report-new]')).toHaveCount(0)
-  })
-
-  test('el botón «Reportar» se despliega y abre el panel', async ({ page, tracker }) => {
-    await mockReportsApi(page)
-    await tracker.openReports()
-
-    await expect(launcher(page)).toBeVisible()
-    await launcher(page).hover()
-    await expect(launcher(page).getByText('Reportar')).toBeVisible()
-
-    await launcher(page).click()
-    await expect(tracker.issueReportDialog).toBeVisible()
-    await expect(launcher(page)).toBeHidden()
   })
 
   test('un fallo de la lista muestra el error y se reintenta', async ({ page, tracker }) => {

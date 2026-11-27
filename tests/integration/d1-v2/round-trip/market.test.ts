@@ -92,7 +92,7 @@ describe('configuración de cotizaciones persistente', () => {
           },
         }),
       ),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/no existe o no pertenece/i)
     expect(
       await runWithDb(trip.testDb.db, marketRepository.listUserInstrumentsByUser(other.id)),
     ).toEqual([])

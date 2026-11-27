@@ -54,11 +54,6 @@ export async function openStorage(userId: string): Promise<TestStorage> {
   }
 }
 
-/** Only for the wrapper's error branches: opens one database on its own. */
-export const openIdbCache = (userId: string) => Effect.runPromise(cache.openIdbCache(userId))
-
-export const openOutbox = (userId: string) => Effect.runPromise(outbox.openOutbox(userId))
-
 // -- cache ---------------------------------------------------------------------
 
 export const getAllEntities = <T extends cache.CachedEntity = cache.CachedEntity>(

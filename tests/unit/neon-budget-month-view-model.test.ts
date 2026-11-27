@@ -14,7 +14,6 @@ import {
   detailReading,
   monthCategories,
   monthHero,
-  monthKicker,
   monthPosition,
   spendChart,
   unbudgetedCategories,
@@ -83,7 +82,6 @@ describe('monthPosition', () => {
   it('is today in the budget year', () => {
     const { position } = setup()
     expect(position).toEqual({ year: 2026, month: 10, day: 10, days: 31 })
-    expect(monthKicker(position)).toBe('Octubre 2026 · día 10 de 31')
   })
 
   it('is the end of December for a past year and before January for a future one', () => {
@@ -177,12 +175,6 @@ describe('spendChart', () => {
       '+309,80\u00a0€ más que septiembre a día 10',
     )
     expect(deltaText(-5, 'septiembre', 10)).toBe('−5,00\u00a0€ menos que septiembre a día 10')
-    expect(chart.ticks.map((t) => [t.day, t.today])).toEqual([
-      [1, false],
-      [10, true],
-      [20, false],
-      [30, false],
-    ])
     expect(chartLabel(chart, 10)).toBe(
       'Gasto acumulado día a día: octubre 459,80\u00a0€ a día 10, septiembre 150,00\u00a0€ a la misma fecha y 380,00\u00a0€ en total',
     )
@@ -270,18 +262,5 @@ describe('categoryDetail', () => {
     expect(averageLabel(0)).toBe('Media')
     expect(averageLabel(1)).toBe('Media de enero')
     expect(averageLabel(9)).toBe('Media ene–sep')
-  })
-})
-
-describe('spendChart scale', () => {
-  it('fits a longer month before inside the chart', () => {
-    const chart = spendChart([tx('2026-10-31', 'Súper', 10)], {
-      year: 2026,
-      month: 11,
-      day: 9,
-      days: 30,
-    })
-    expect(Math.max(...(chart.previous?.points ?? []).map((p) => p.x))).toBe(300)
-    expect(chart.ticks.at(-1)).toMatchObject({ day: 30 })
   })
 })

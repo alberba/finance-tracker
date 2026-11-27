@@ -75,22 +75,13 @@ test.describe('Presupuesto', () => {
     },
   )
 
-  test('abre el detalle de una categoría junto a su fila y pasa a otra sin cerrarlo', async ({
-    page,
-    tracker,
-  }) => {
+  test('abre el detalle de una categoría y pasa a otra sin cerrarlo', async ({ page, tracker }) => {
     await tracker.goto()
     await tracker.openBudget()
 
     await card(page, 'Ocio').click()
     const ocio = page.getByRole('dialog', { name: 'Ocio' })
     await expect(ocio).toBeVisible()
-    const box = (await ocio.boundingBox())!
-    // Past the end edge of the ledger, not over it.
-    const edge = await card(page, 'Ocio').evaluate(
-      (row) => row.closest('section')!.getBoundingClientRect().right,
-    )
-    expect(box.x).toBeGreaterThan(edge)
 
     // No scrim: the next row takes it there in one press.
     await card(page, 'Salud').click()

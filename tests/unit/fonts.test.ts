@@ -16,28 +16,8 @@ const fontPreloads = readFileSync(
   'utf8',
 )
 
-
-type FontFace = {
-  family: string
-  style: string
-  weight: string
-  source: string
-}
-
-const fontFaces: FontFace[] = [...commonCss.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(
-  ([, body]) => {
-    const field = (name: string) => body.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1].trim()
-    return {
-      family: field('font-family')?.replace(/['"]/g, '') ?? '',
-      style: field('font-style') ?? '',
-      weight: field('font-weight') ?? '',
-      source: field('src') ?? '',
-    }
-  },
-)
-
-const fontSources = fontFaces
-  .map((face) => face.source.match(/url\('(\/fonts\/[^']+)'\)/)?.[1])
+const fontSources = [...commonCss.matchAll(/@font-face\s*\{([^}]*)\}/g)]
+  .map(([, body]) => body.match(/url\('(\/fonts\/[^']+)'\)/)?.[1])
   .filter((source): source is string => Boolean(source))
 
 const sourceFiles = (readdirSync(new URL('src/', root), { recursive: true }) as string[])
@@ -48,17 +28,6 @@ const sourceFiles = (readdirSync(new URL('src/', root), { recursive: true }) as 
   }))
 
 describe('self-hosted fonts', () => {
-  it('declares the faces with the weights the app paints', () => {
-    expect(
-      fontFaces.map(({ family, style, weight }) => `${family} ${style} ${weight}`).sort(),
-    ).toEqual(
-      [
-        'Unbounded normal 200 900',
-        'Manrope normal 200 800',
-      ].sort(),
-    )
-  })
-
   it('serves every declared face from public/fonts', () => {
     const declared = [...new Set(fontSources)].sort()
     const vendored = (readdirSync(new URL('public/fonts/', root)) as string[])

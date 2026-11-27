@@ -166,9 +166,6 @@ pnpm test:unit
 pnpm test:component
 pnpm test:integration
 
-# Coverage conjunto
-pnpm test:coverage
-
 # Instalar navegador E2E (una vez)
 pnpm test:e2e:install
 

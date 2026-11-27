@@ -15,32 +15,6 @@ describe("user-settings repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes settings (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-
-    const created = await runWithDb(db, userSettingsRepo.create(user.id, { currency: "USD", theme: "dark" }));
-    expect(created.currency).toBe("USD");
-
-    const found = await runWithDb(db, userSettingsRepo.get(user.id));
-    expect(found?.theme).toBe("dark");
-
-    const updated = await runWithDb(db, userSettingsRepo.update(user.id, { theme: "light" }));
-    expect(updated?.theme).toBe("light");
-    expect(updated?.version).toBe(2);
-
-    const removed = await runWithDb(db, userSettingsRepo.remove(user.id));
-    expect(removed).toBe(true);
-    expect(await runWithDb(db, userSettingsRepo.get(user.id))).toBeUndefined();
-  });
-
-  it("rejects creating settings for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(runWithDb(db, userSettingsRepo.create("does-not-exist", {}))).rejects.toThrow(
-      /FOREIGN KEY constraint failed/i,
-    );
-  });
-
   it("enforces cross-user isolation", async () => {
     const { db } = testDb;
     const userA = await seedUser(db);

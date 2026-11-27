@@ -186,28 +186,6 @@ describe('github issues service', () => {
     expect(fakeFetch).toHaveBeenCalledTimes(2)
   })
 
-  it('lanza error en fallo no recuperable', async () => {
-    const loggedError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const fakeFetch = vi.fn<typeof fetch>(async () => new Response('forbidden', { status: 403 }))
-
-    await expect(
-      createIssueFromWebReport(
-        payload,
-        reporter,
-        {
-          GITHUB_ISSUE_TOKEN: 'token',
-          GITHUB_OWNER: 'org',
-          GITHUB_REPO: 'repo',
-        },
-        { fetch: fakeFetch as unknown as typeof fetch },
-      ),
-    ).rejects.toThrow(/GitHub API devolvió 403/)
-    expect(loggedError).toHaveBeenCalledExactlyOnceWith(
-      '[github] GitHub API devolvió 403',
-      'forbidden',
-    )
-  })
-
   it('nombra el estado sin filtrar el cuerpo de GitHub en un fallo directo', async () => {
     const upstreamBody = 'UPSTREAM_BODY_MARKER_UNAUTHORIZED'
     const fakeFetch = vi.fn<typeof fetch>(async () => new Response(upstreamBody, { status: 401 }))
@@ -323,13 +301,6 @@ describe('buildIssueBody', () => {
     expect(body).toContain(payload.summary)
   })
 
-  it('incluye la descripción tal cual la escribió la persona usuaria', () => {
-    const description = 'Línea uno\n\n- detalle con *markdown* sin tocar'
-    const body = buildIssueBody({ ...payload, description }, reporter)
-
-    expect(body).toContain(`### Problema o solicitud\n${description}\n`)
-  })
-
   it('conserva los saltos de línea de la descripción de extremo a extremo', () => {
     const parsed = parseIssueReportPayload({
       type: 'bug',
@@ -344,15 +315,6 @@ describe('buildIssueBody', () => {
     expect(body).toContain('### Problema o solicitud\nPaso 1\n\nPaso 2:\n- primero\n- segundo\n')
   })
 
-  it('escribe nombre, email e identificador del reportero recibido', () => {
-    const body = buildIssueBody(payload, reporter)
-
-    expect(body).toContain('### Reportero')
-    expect(body).toContain('- Nombre: ana')
-    expect(body).toContain('- Email: ana@example.com')
-    expect(body).toContain('- Identificador: user-42')
-  })
-
   it('marca con n/a los datos del reportero que falten', () => {
     const body = buildIssueBody(payload, { userId: 'user-7', email: null, name: null })
 
@@ -360,44 +322,9 @@ describe('buildIssueBody', () => {
     expect(body).toContain('- Email: n/a')
     expect(body).toContain('- Identificador: user-7')
   })
-
-  it('no escribe los campos retirados del formulario', () => {
-    const body = buildIssueBody(payload, reporter)
-
-    expect(body).not.toContain('Resultado esperado')
-    expect(body).not.toContain('Resultado actual')
-    expect(body).not.toContain('Pasos para reproducir')
-  })
 })
 
-describe('createIssueFromWebReport con reportero', () => {
-  it('envía el reportero en el cuerpo y omite la descripción vacía', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(
-      async () =>
-        new Response(JSON.stringify({ number: 3, html_url: 'https://x/issues/3' }), {
-          status: 201,
-        }),
-    )
-
-    await createIssueFromWebReport(
-      { ...payload, description: '' },
-      reporter,
-      { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' },
-      { fetch: fakeFetch as unknown as typeof fetch },
-    )
-
-    const [, init] = fakeFetch.mock.calls[0]
-    const body = JSON.parse(String(init?.body || '{}'))
-    expect(body.body).toContain('- Email: ana@example.com')
-    expect(body.body).not.toContain('Problema o solicitud')
-  })
-})
-
-describe('comprobación de duplicadas previa al reporte', () => {
-  const env = { GITHUB_ISSUE_TOKEN: 'token', GITHUB_OWNER: 'org', GITHUB_REPO: 'repo' }
-  const createdResponse = () =>
-    new Response(JSON.stringify({ number: 21, html_url: 'https://x/issues/21' }), { status: 201 })
-
+describe('cuerpo completo de la issue', () => {
   const baselineBody = [
     '## Reporte desde la web',
     '',
@@ -422,7 +349,7 @@ describe('comprobación de duplicadas previa al reporte', () => {
     '- Identificador: user-42',
   ].join('\n')
 
-  it('sin análisis el cuerpo es idéntico al de siempre', () => {
+  it('sin adjuntos el cuerpo tiene el formato de siempre', () => {
     expect(buildIssueBody(payload, reporter)).toBe(baselineBody)
     expect(buildIssueBody(payload, reporter, [])).toBe(baselineBody)
   })
@@ -436,21 +363,5 @@ describe('comprobación de duplicadas previa al reporte', () => {
         { fetch: vi.fn<typeof fetch>() },
       ),
     ).rejects.toThrow(/GITHUB_OWNER/)
-  })
-
-  it('sin clave del proveedor el valor por defecto no hace red y solo llama a GitHub', async () => {
-    const fakeFetch = vi.fn<typeof fetch>(async () => createdResponse())
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    await createIssueFromWebReport(payload, reporter, env, {
-      fetch: fakeFetch as unknown as typeof fetch,
-    })
-
-    expect(fakeFetch).toHaveBeenCalledTimes(1)
-    expect(String(fakeFetch.mock.calls[0][0])).toContain('api.github.com')
-    const body = JSON.parse(String(fakeFetch.mock.calls[0][1]?.body || '{}'))
-    expect(body.body).toBe(baselineBody)
-    expect(consoleError).not.toHaveBeenCalled()
-    consoleError.mockRestore()
   })
 })

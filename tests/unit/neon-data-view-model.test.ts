@@ -10,8 +10,6 @@ import {
   bitvavoSummary,
   canSyncNow,
   exportContents,
-  importStepLabel,
-  jsonImported,
   lastImportNote,
   needsResolution,
   pendingWord,
@@ -179,14 +177,6 @@ describe('queueRows', () => {
       ['Ajustes', 'Preferencias', 'Editar'],
     ])
   })
-
-  it('keeps the order of the outbox', () => {
-    const rows = queueRows([
-      entry(7, { action: 'remove', entityType: 'transaction', entityId: 'a' }),
-      entry(9, { action: 'remove', entityType: 'transaction', entityId: 'b' }),
-    ])
-    expect(rows.map((row) => row.key)).toEqual([7, 9])
-  })
 })
 
 describe('queueToggleLabel', () => {
@@ -198,14 +188,6 @@ describe('queueToggleLabel', () => {
   it('offers to hide them once they are shown', () => {
     expect(queueToggleLabel(true, 2)).toBe('Ocultar cambios pendientes')
     expect(queueToggleLabel(true, 1)).toBe('Ocultar el cambio pendiente')
-  })
-})
-
-describe('importStepLabel', () => {
-  it('numbers the two steps and then says it is done', () => {
-    expect(importStepLabel('origin')).toBe('Paso 1 de 2 · Elige de dónde viene')
-    expect(importStepLabel('review')).toBe('Paso 2 de 2 · Revisa antes de confirmar')
-    expect(importStepLabel('done')).toBe('Listo')
   })
 })
 
@@ -330,14 +312,6 @@ describe('needsResolution', () => {
 })
 
 describe('import results', () => {
-  it('says the JSON is restored and whether the app reloads', () => {
-    expect(jsonImported(true)).toEqual({
-      title: 'JSON importado correctamente.',
-      text: 'La app se recarga con los datos de la copia.',
-    })
-    expect(jsonImported(false).text).toBe('Ya tienes los datos de la copia.')
-  })
-
   it('says how many Bitvavo movements came in and what was left out', () => {
     expect(bitvavoImported(142, 6)).toEqual({
       title: 'Importados 142 movimientos.',

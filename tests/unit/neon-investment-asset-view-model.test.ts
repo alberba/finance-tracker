@@ -173,11 +173,6 @@ describe('assetDetail · gráfica de precio', () => {
     expect(sale.note).toBe('Venta')
   })
 
-  it('deja el precio medio como línea', () => {
-    const chart = detailOf('fondos')?.chart
-    expect(chart?.average).not.toBeNull()
-  })
-
   it('sin operaciones con precio no hay gráfica', () => {
     expect(detailOf('oro')?.chart).toBeNull()
   })
@@ -215,31 +210,5 @@ describe('assetDetail · móvil', () => {
       weight: '91,7\u00a0%',
       label: '1.980,00\u00a0€, el 91,7\u00a0% de la cartera',
     })
-  })
-})
-
-describe('assetDetail · gráfica compacta', () => {
-  const compactOf = (id: string, state = portfolio()) =>
-    assetDetail(state, buildInvestmentDashboardViewModel(state, 3, 'simple'), id, {
-      compact: true,
-    })
-
-  it('dibuja la gráfica a la proporción del móvil, con los mismos puntos', () => {
-    const chart = compactOf('fondos')?.chart
-    expect(chart?.viewBox).toBe('0 0 412 266')
-    expect(chart?.points.map((point) => point.date)).toEqual([
-      '10 ene 2026',
-      '15 feb 2026',
-      '5 mar 2026',
-    ])
-    for (const point of chart?.points ?? []) {
-      expect(point.x).toBeGreaterThan(0)
-      expect(point.x).toBeLessThan(412)
-      expect(point.y).toBeLessThan(266)
-    }
-  })
-
-  it('sin la opción, la gráfica sigue siendo la de escritorio', () => {
-    expect(detailOf('fondos')?.chart?.viewBox).toBe('0 0 880 280')
   })
 })

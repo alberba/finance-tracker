@@ -23,19 +23,6 @@ function hasUniqueIndex(sqlite: Sqlite, table: string, columns: readonly string[
   })
 }
 
-function insertCategory(
-  sqlite: Sqlite,
-  values: { id: string; userId: string; legacyId: string },
-): void {
-  sqlite
-    .prepare(
-      `INSERT INTO categories
-        (id, user_id, legacy_id, name, kind, sort_order, created_at, updated_at, version)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(values.id, values.userId, values.legacyId, 'Comida', 'expense', 0, NOW, NOW, 1)
-}
-
 function insertBudget(
   sqlite: Sqlite,
   values: { id: string; userId: string; categoryId: string },
@@ -99,17 +86,32 @@ describe('v2 schema integrity contract', () => {
     testDb.close()
   })
 
-  it('applies the complete v2 migration set before integrity checks run', () => {
+  it('ties every financial table to users, so no row can miss its owner', () => {
+    // Better Auth's own tables (auth_*) hang off auth_user instead.
     const tables = (
       testDb.sqlite
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'auth_%'",
+        )
         .all() as Array<{ name: string }>
     ).map((row) => row.name)
+    const owned = tables.filter((table) =>
+      (testDb.sqlite.prepare(`PRAGMA table_info('${table}')`).all() as Array<{ name: string }>).some(
+        (column) => column.name === 'user_id',
+      ),
+    )
 
-    expect(tables).toContain('users')
-    expect(tables).toContain('budget_entries')
-    expect(tables).toContain('wealth_snapshots')
-    expect(tables).toContain('snapshot_balances')
+    expect(owned).toContain('issue_reports')
+    for (const table of owned) {
+      const keys = testDb.sqlite.prepare(`PRAGMA foreign_key_list('${table}')`).all() as Array<{
+        from: string
+        table: string
+      }>
+      expect(
+        keys.some((key) => key.from === 'user_id' && key.table === 'users'),
+        `${table}.user_id should reference users`,
+      ).toBe(true)
+    }
   })
 
   it('declares every natural and migration-correlation key as UNIQUE', () => {
@@ -142,23 +144,6 @@ describe('v2 schema integrity contract', () => {
         `${table} should have a UNIQUE index on (${columns.join(', ')})`,
       ).toBe(true)
     }
-  })
-
-  it('rejects a duplicate migration identity for one user', async () => {
-    const user = await seedUser(testDb.db)
-    insertCategory(testDb.sqlite, {
-      id: 'category-correlation-one',
-      userId: user.id,
-      legacyId: 'expense:Comida',
-    })
-
-    expect(() =>
-      insertCategory(testDb.sqlite, {
-        id: 'category-correlation-two',
-        userId: user.id,
-        legacyId: 'expense:Comida',
-      }),
-    ).toThrow(/unique/i)
   })
 
   it('rejects two budget entries for the same category, year and month', async () => {

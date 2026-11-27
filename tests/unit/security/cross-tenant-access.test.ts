@@ -95,7 +95,7 @@ describe("apply-command cross-tenant isolation (WP10)", () => {
     } as never));
 
     expect(outcome.status).toBe("not_found");
-    expect(await runWithDb(db, transactionsRepository.get(userA.id, txA.id))).toBeDefined();
+    expect(await runWithDb(db, transactionsRepository.get(userA.id, txA.id))).toMatchObject({ id: txA.id });
   });
 
   it("does not leak user A's entity data into user B's create response by id guessing", async () => {

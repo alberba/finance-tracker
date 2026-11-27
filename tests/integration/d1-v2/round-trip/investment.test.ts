@@ -39,7 +39,7 @@ describe('round trip: inversión', () => {
     delete (window as Window & { __FINANCE_TODAY__?: string }).__FINANCE_TODAY__
   })
 
-  it('keeps symbol, units, unit price and side of a movement (§4.3)', async () => {
+  it('keeps symbol, units, unit price, side and declared flag of a movement (§4.3)', async () => {
     const { useInvestmentStore } = await import('../../../../src/stores/investment')
     expect(
       useInvestmentStore().addMovement({
@@ -53,15 +53,15 @@ describe('round trip: inversión', () => {
         fee: '1.20',
         movementCurrency: 'EUR',
         accountId,
-        declared: false,
+        declared: true,
       }),
     ).toBe(true)
 
     const reloaded = await trip.reload()
 
     const movement = reloaded.transactions.find((tx) => tx.type === 'investment')
-    expect(movement).toBeDefined()
     expect(movement).toMatchObject({
+      declared: true,
       symbol: 'VWCE',
       side: 'buy',
       units: 10,
@@ -353,27 +353,5 @@ describe('round trip: inversión', () => {
       fee: 1,
       time: '15:00',
     })
-  })
-
-  it('keeps the declared flag (§4.3)', async () => {
-    const { useInvestmentStore } = await import('../../../../src/stores/investment')
-    const investment = useInvestmentStore()
-    investment.addMovement({
-      date: '2026-09-12',
-      time: '10:30',
-      side: 'buy',
-      symbol: 'VWCE',
-      category: 'Acciones',
-      unitPrice: '120.50',
-      units: '10',
-      fee: '1.20',
-      movementCurrency: 'EUR',
-      accountId,
-      declared: true,
-    })
-
-    const reloaded = await trip.reload()
-
-    expect(reloaded.transactions.find((tx) => tx.type === 'investment')?.declared).toBe(true)
   })
 })

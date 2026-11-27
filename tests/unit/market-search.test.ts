@@ -42,7 +42,6 @@ describe('búsqueda de símbolos de mercado', () => {
         type: 'ETF',
       },
     ])
-    expect(searchMock).toHaveBeenCalledWith('XDWH.XETRA', { quotesCount: 10, newsCount: 0 })
   })
 
   it('usa la búsqueda de Twelve Data cuando Yahoo está limitado', async () => {

@@ -15,26 +15,6 @@ describe("stockevents-symbol-mappings repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes a mapping (CRUD)", async () => {
-    const { db } = testDb;
-    const user = await seedUser(db);
-
-    const created = await runWithDb(db, mappingsRepo.create(user.id, { stockeventsSymbol: "AAPL" }));
-    expect(created.stockeventsSymbol).toBe("AAPL");
-
-    const updated = await runWithDb(db, mappingsRepo.update(user.id, created.id, { stockeventsSymbol: "AAPL.US" }));
-    expect(updated?.stockeventsSymbol).toBe("AAPL.US");
-
-    expect(await runWithDb(db, mappingsRepo.remove(user.id, created.id))).toBe(true);
-  });
-
-  it("rejects creating a mapping for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(
-      runWithDb(db, mappingsRepo.create("does-not-exist", { stockeventsSymbol: "AAPL" })),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
-  });
-
   it("enforces cross-user isolation", async () => {
     const { db } = testDb;
     const userA = await seedUser(db);

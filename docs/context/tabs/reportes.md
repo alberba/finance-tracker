@@ -145,7 +145,7 @@ fechas son constantes y sirven de fixtures para la E2E.
 - `tests/unit/report-status.test.ts`, `reporter-comment.test.ts`, `report-updates.test.ts`,
   `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `issue-report-route.test.ts`.
 - `tests/integration/d1-v2/repositories/issue-reports.test.ts`, `api/reports.test.ts`,
-  `migrations/issue-reports.test.ts`, `reports-backfill.test.ts`.
+  `reports-backfill.test.ts`.
 - `tests/e2e/reports.spec.ts`: acuse y recarga, cierre como duplicada, hilo completo, solo lectura,
   error que conserva el texto, demo sin API y lista vacía real.
 

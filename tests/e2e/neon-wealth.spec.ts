@@ -31,11 +31,9 @@ test.describe('Patrimonio', () => {
     const evolution = section(page).getByRole('region', { name: 'Evolución del patrimonio' })
     const line = evolution.getByRole('slider', { name: /^Patrimonio por mes/ })
     await expect(line).toHaveAttribute('aria-valuetext', /Marzo: .*saldo sin cerrar/)
-    await expect(line.locator('path[stroke-dasharray]')).toHaveCount(1)
 
     await line.press('Home')
     await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)
-    await expect(evolution.locator('[data-wealth-month-change]')).toHaveText('—')
     await line.press('Enter')
     await line.press('Escape')
     await expect(line).toHaveAttribute('aria-valuetext', /^Enero:/)

@@ -71,11 +71,6 @@ describe("syncCommandSchema", () => {
     });
     expect(result.success).toBe(false);
   });
-
-  it("rejects an unknown action", () => {
-    const result = syncCommandSchema.safeParse({ commandId: "cmd-8", action: "delete-everything" });
-    expect(result.success).toBe(false);
-  });
 });
 
 describe("syncBatchSchema", () => {

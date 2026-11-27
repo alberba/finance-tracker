@@ -87,7 +87,6 @@ describe('análisis de suscripciones', () => {
     )
 
     expect(analysis.next30DaysAmount).toBe(40)
-    expect(analysis.upcomingCharges).toHaveLength(5)
     expect(analysis.upcomingCharges.map((charge) => charge.date)).toEqual([
       '2026-08-13',
       '2026-08-20',

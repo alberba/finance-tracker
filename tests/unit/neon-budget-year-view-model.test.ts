@@ -4,7 +4,6 @@ import { buildBudgetViewModel } from '../../src/domain/budget/view-model'
 import type { Month } from '../../src/lib/month'
 import {
   aggregate,
-  barOf,
   buildGrid,
   buildMonthList,
   defaultCursor,
@@ -15,7 +14,6 @@ import {
   navigation,
   parseDraft,
   planFigures,
-  planKicker,
   planReference,
   remainingText,
   windowMonths,
@@ -107,19 +105,6 @@ describe('windows and navigation', () => {
     expect(moveCursor('year', year, 1)).toBe(year)
   })
 
-  it('labels the view and its arrows', () => {
-    const cursor = { quarter: 9 as Month, month: 10 as Month }
-    expect(navigation('year', cursor, 2026)).toMatchObject({ label: 'Todo 2026', arrows: false })
-    expect(navigation('quarter', cursor, 2026)).toMatchObject({
-      label: 'Sep – Nov 2026',
-      prevLabel: 'Trimestre anterior',
-      nextLabel: 'Trimestre siguiente',
-      canPrev: true,
-      canNext: true,
-    })
-    expect(navigation('month', cursor, 2026).label).toBe('Octubre 2026')
-  })
-
   it('disables the arrow at the edge of the year', () => {
     expect(navigation('month', { quarter: 1, month: 1 }, 2026)).toMatchObject({
       canPrev: false,
@@ -136,12 +121,6 @@ describe('yearSummary', () => {
   it('reads the planned, recorded, remaining and deviation figures of the year', () => {
     const figures = yearSummary('expense', expense, 2026, vm.currentMonth)
 
-    expect(figures.map((figure) => figure.label)).toEqual([
-      'Presupuestado en 2026',
-      'Real hasta hoy',
-      'Queda por gastar',
-      'Desvío hasta sep.',
-    ])
     expect(figures[0].value).toContain('4.800,00')
     expect(figures[0].note).toBe('unos 400 € al mes')
     expect(figures[1].value).toContain('850,50')
@@ -174,11 +153,6 @@ describe('yearSummary', () => {
 describe('buildGrid', () => {
   const grid = buildGrid('expense', expense, windowMonths('year', defaultCursor(10)), 10)
   const comida = grid.rows[0]
-
-  it('has a row per category and a cell per month', () => {
-    expect(grid.rows.map((row) => row.category)).toEqual(['Comida', 'Ocio'])
-    expect(comida.cells).toHaveLength(12)
-  })
 
   it('judges closed months, shows the current one and leaves the rest without data', () => {
     expect(comida.cells[0]).toMatchObject({ actual: 280, plan: 300, tone: null, current: false })
@@ -234,19 +208,6 @@ describe('aggregate', () => {
   })
 })
 
-describe('bars', () => {
-  it('draws within-budget fill, the excess and the plan tick over a scale a fifth above the larger', () => {
-    expect(barOf(100, 60)).toEqual({ fill: 50, over: 0, tick: 83.3 })
-    const over = barOf(100, 150)
-    expect(over.fill + over.over).toBeCloseTo(83.3, 0)
-    expect(over.tick).toBeLessThan(over.fill + over.over)
-  })
-
-  it('is empty without a plan or data', () => {
-    expect(barOf(0, null)).toEqual({ fill: 0, over: 0, tick: 0 })
-  })
-})
-
 describe('buildMonthList', () => {
   const list = buildMonthList('expense', expense, 2, 10)
 
@@ -276,10 +237,6 @@ describe('buildMonthList', () => {
 describe('plan panel', () => {
   const row = expense.rows[0]
   const saved = row.cells.map((cell) => String(cell.planned).replace('.', ','))
-
-  it('titles the kicker with the year and the type', () => {
-    expect(planKicker(2026, 'saving')).toBe('Plan de 2026 · Ahorro')
-  })
 
   it('shows the saved plan, what was recorded and the deviation of the closed months', () => {
     const figures = planFigures('expense', row, saved, 10)

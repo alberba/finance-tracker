@@ -26,19 +26,10 @@ describe('sharedScale', () => {
     expect(lines[1].points.map((point) => point.top)).toEqual([50, 50])
   })
 
-  it('una serie puede parar antes del último hueco', () => {
-    const { lines } = sharedScale([{ values: [10, 20] }], 5)
-    expect(lines[0].points.map((point) => point.x)).toEqual([0, 25])
-  })
-
   it('mantiene la base dentro del rango y devuelve su altura', () => {
     const { lines, baseTop } = sharedScale([{ values: [100, 200] }], 2, 0)
     expect(baseTop).toBe(93.1)
     expect(lines[0].points[0].top).toBeLessThan(baseTop as number)
-  })
-
-  it('la base sola ya dibuja el rango', () => {
-    expect(sharedScale([], 3, 40)).toEqual({ lines: [], baseTop: 50 })
   })
 
   it('un valor constante usa una amplitud propia para no dividir entre cero', () => {

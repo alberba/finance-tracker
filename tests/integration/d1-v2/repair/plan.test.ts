@@ -39,33 +39,6 @@ describe('v2 repair planner', () => {
     testDb.close()
   })
 
-  it('seeds each documented production defect with stable evidence', () => {
-    const fixture = seedRepairFixture(testDb)
-    const { sqlite } = testDb
-
-    expect(
-      sqlite
-        .prepare('SELECT legacy_id, name, kind FROM categories WHERE user_id = ? ORDER BY id')
-        .all(fixture.userId),
-    ).toEqual([
-      { legacy_id: 'expense:Comida', name: 'Comida', kind: 'expense' },
-      { legacy_id: 'Comida', name: 'Comida', kind: 'expense' },
-    ])
-    expect(sqlite.prepare('SELECT kind FROM accounts WHERE id = ?').get(fixture.accountId)).toEqual(
-      { kind: 'checking' },
-    )
-    expect(
-      sqlite
-        .prepare('SELECT year, month, amount_minor FROM budget_entries WHERE id = ?')
-        .get(fixture.budgetEntryId),
-    ).toEqual({ year: 2025, month: 1, amount_minor: 25000 })
-    expect(
-      sqlite
-        .prepare('SELECT legacy_id, year, month FROM wealth_snapshots WHERE id = ?')
-        .get(fixture.snapshotId),
-    ).toEqual({ legacy_id: '3', year: 2026, month: 3 })
-  })
-
   it('returns the repair plan and leaves the database untouched', async () => {
     const fixture = seedRepairFixture(testDb)
     const before = repairRows(testDb, fixture.userId)

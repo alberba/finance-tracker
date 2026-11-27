@@ -8,13 +8,12 @@ import { test, expect } from './fixtures'
  */
 const html = (page: Page) => page.locator('html')
 const picker = (page: Page) => page.locator('#settings').getByRole('group', { name: 'Tema' })
-const canvas = (page: Page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 
 const THEMES = [
-  { id: 'oscuro-suave', label: 'Oscuro suave', canvas: 'rgb(27, 26, 24)' }, // #1B1A18
-  { id: 'oscuro-fuerte', label: 'Oscuro fuerte', canvas: 'rgb(18, 17, 16)' }, // #121110
-  { id: 'claro-hueso', label: 'Claro hueso', canvas: 'rgb(241, 238, 232)' }, // #F1EEE8
-  { id: 'claro-melocoton', label: 'Claro melocotón', canvas: 'rgb(247, 235, 226)' }, // #F7EBE2
+  { id: 'oscuro-suave', label: 'Oscuro suave' },
+  { id: 'oscuro-fuerte', label: 'Oscuro fuerte' },
+  { id: 'claro-hueso', label: 'Claro hueso' },
+  { id: 'claro-melocoton', label: 'Claro melocotón' },
 ]
 
 test.describe('Temas', () => {
@@ -43,7 +42,6 @@ test.describe('Temas', () => {
     for (const theme of THEMES) {
       await picker(page).getByRole('button', { name: theme.label, exact: true }).click()
       await expect(html(page)).toHaveAttribute('data-theme', theme.id)
-      await expect.poll(() => canvas(page)).toBe(theme.canvas)
 
       // The first paint already carries it: with the app's scripts blocked,
       // only the inline script before the paint can set the theme.

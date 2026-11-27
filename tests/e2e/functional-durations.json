@@ -28,11 +28,11 @@
     "tests": 2
   },
   "reports.spec.ts": {
-    "durationMs": 15839,
-    "tests": 9
+    "durationMs": 17599,
+    "tests": 10
   },
   "subscriptions.spec.ts": {
-    "durationMs": 14786,
-    "tests": 5
+    "durationMs": 11829,
+    "tests": 4
   }
 }

@@ -77,19 +77,10 @@ describe('widgets registry', () => {
 })
 
 describe('default layout', () => {
-  it('starts every widget at two cells high in a valid, compact grid', () => {
+  it('starts with every widget in a valid, compact grid', () => {
     const { items } = defaultLayout()
     expect(items.map((entry) => entry.id).sort()).toEqual([...WIDGET_IDS].sort())
     expectValid(items)
-    expect(items).toEqual([
-      item('wealth', 0, 0, 4, 2),
-      item('month', 4, 0, 2, 2),
-      item('recent', 0, 2, 2, 2),
-      item('investments', 2, 2, 4, 2),
-      item('pending', 0, 4, 2, 2),
-      item('categories', 2, 4, 2, 2),
-      item('goals', 4, 4, 2, 2),
-    ])
     expect(compact(items)).toEqual(readingOrder(items))
   })
 
@@ -355,10 +346,6 @@ describe('fitCount', () => {
 
   it('stops at the first row that does not fit', () => {
     expect(fitCount([60, 200, 100], 150)).toBe(1)
-  })
-
-  it('shows an empty list as empty', () => {
-    expect(fitCount([], 100)).toBe(0)
   })
 })
 

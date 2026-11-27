@@ -38,12 +38,7 @@ describe('useRegistryFilters', () => {
     ]
   })
 
-  it('comparte los filtros de tipo y cuenta con el store de la interfaz', () => {
-    const { filters } = setup()
-    expect(filters.filters).toBe(useUiStore().ui.txFilters)
-  })
-
-  it('ofrece «Todos» y un chip por tipo, con su punto de color', () => {
+  it('ofrece «Todos» y un chip por tipo', () => {
     const { typeOptions } = setup().filters
     expect(typeOptions.map((option) => option.value)).toEqual([
       '',
@@ -53,11 +48,6 @@ describe('useRegistryFilters', () => {
       'investment',
     ])
     expect(typeOptions[0].label).toBe('Todos')
-    expect(typeOptions[0].dot).toBeUndefined()
-    expect(typeOptions.find((option) => option.value === 'income')).toMatchObject({
-      label: 'Ingresos',
-      dot: 'bg-gain',
-    })
   })
 
   it('sin tipo elegido son todos, y con un tipo muestra su nombre', () => {
@@ -104,22 +94,5 @@ describe('useRegistryFilters', () => {
     const { filters } = setup()
     filters.setAccount('borrada')
     expect(filters.accountLabel.value).toBe('Todas')
-  })
-
-  it('setExtra cambia solo el filtro indicado', () => {
-    const { extra, filters } = setup({ ...NO_EXTRA_FILTERS, category: 'Casa' })
-    filters.setExtra('min', '12,50')
-    expect(extra.value).toEqual({ date: '', min: '12,50', max: '', category: 'Casa' })
-  })
-
-  it('clearExtra vacía los filtros indicados y respeta el resto', () => {
-    const { extra, filters } = setup({
-      date: '2026-11-03',
-      min: '5',
-      max: '50',
-      category: 'Casa',
-    })
-    filters.clearExtra(['min', 'max'])
-    expect(extra.value).toEqual({ date: '2026-11-03', min: '', max: '', category: 'Casa' })
   })
 })

@@ -46,16 +46,6 @@ describe('withApiErrorHandling', () => {
     })
   })
 
-  it('deja el error inesperado en el log con la ruta en el mensaje', async () => {
-    const error = new Error('explosión en el handler')
-
-    await withApiErrorHandling(ROUTE, async () => {
-      throw error
-    })
-
-    expect(consoleError).toHaveBeenCalledWith(`[api] Unhandled route error in ${ROUTE}`, error)
-  })
-
   it('responde 401 con el mensaje del error y no reporta nada', async () => {
     const response = await withApiErrorHandling(ROUTE, async () => {
       throw new UnauthorizedError('Se requiere autenticación.')

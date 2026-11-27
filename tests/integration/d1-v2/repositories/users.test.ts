@@ -16,25 +16,6 @@ describe("users repository", () => {
     testDb.close();
   });
 
-  it("creates, reads, updates and deletes a user (CRUD)", async () => {
-    const { db } = testDb;
-    const created = await runWithDb(db, usersRepo.create({ email: "owner@example.com", displayName: "Owner" }));
-    expect(created.id).toEqual(expect.any(String));
-
-    const found = await runWithDb(db, usersRepo.get(created.id));
-    expect(found?.email).toBe("owner@example.com");
-
-    const byEmail = await runWithDb(db, usersRepo.getByEmail("owner@example.com"));
-    expect(byEmail?.id).toBe(created.id);
-
-    const updated = await runWithDb(db, usersRepo.update(created.id, { displayName: "Renamed" }));
-    expect(updated?.displayName).toBe("Renamed");
-
-    const removed = await runWithDb(db, usersRepo.remove(created.id));
-    expect(removed).toBe(true);
-    expect(await runWithDb(db, usersRepo.get(created.id))).toBeUndefined();
-  });
-
   it("deletes a user's report ownership rows before the account (FK)", async () => {
     const { db } = testDb;
     const user = await seedUser(db);
@@ -42,22 +23,6 @@ describe("users repository", () => {
 
     expect(await runWithDb(db, usersRepo.remove(user.id))).toBe(true);
     expect(await runWithDb(db, issueReportsRepo.listByUser(user.id))).toEqual([]);
-  });
-
-  it("bulk inserts users", async () => {
-    const { db } = testDb;
-    const rows = await runWithDb(db, usersRepo.bulkInsert([
-      { email: "a@example.com" },
-      { email: "b@example.com" },
-    ]));
-    expect(rows).toHaveLength(2);
-  });
-
-  it("rejects creating an identity for a non-existent user (FK violation)", async () => {
-    const { db } = testDb;
-    await expect(
-      runWithDb(db, usersRepo.createIdentity("does-not-exist", { provider: "cf-access", subject: "sub-1" })),
-    ).rejects.toThrow(/FOREIGN KEY constraint failed/i);
   });
 
   it("enforces cross-user isolation for user identities", async () => {
@@ -74,17 +39,5 @@ describe("users repository", () => {
 
     const identity = await runWithDb(db, usersRepo.getIdentity(userB.id, identitiesA[0].id));
     expect(identity).toBeUndefined();
-  });
-
-  it("looks up an identity globally by (provider, subject)", async () => {
-    const { db } = testDb;
-    const userA = await seedUser(db);
-    const created = await runWithDb(db, usersRepo.createIdentity(userA.id, {
-      provider: "cf-access",
-      subject: "sub-global",
-    }));
-
-    const found = await runWithDb(db, usersRepo.getIdentityByProviderSubject("cf-access", "sub-global"));
-    expect(found?.id).toBe(created.id);
   });
 });

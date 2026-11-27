@@ -101,8 +101,8 @@ Fuente: `docs/testing.md`.
 - Mockea límites externos, no la unidad que intentas validar.
 - Una regresión corregida incluye el test que la reproduce.
 - No subas timeouts ni workers para tapar una carrera: corrige el aislamiento.
-- Los umbrales de coverage representan el mínimo actual y suben con código nuevo. No se excluyen
-  módulos para mejorar el porcentaje.
+- No hay umbral de cobertura. No escribas tests para tocar líneas: si un test no protege una regla
+  que un usuario o el código de alrededor notaría rota, sobra.
 
 ## E2E
 

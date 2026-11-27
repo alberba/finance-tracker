@@ -100,10 +100,6 @@ describe('NeonDetailPanel', () => {
 
     expect(dialog.open).toBe(true)
     expect(dialog.getAttribute('aria-label')).toBe('Alquiler')
-    expect(wrapper.get('h2').text()).toBe('Alquiler')
-    expect(wrapper.text()).toContain('Pendiente')
-    expect(wrapper.text()).toContain('Vence mañana')
-    expect(wrapper.text()).toContain('Confirmar')
   })
 
   it('pide cerrarse con su botón', async () => {

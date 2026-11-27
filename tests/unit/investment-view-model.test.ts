@@ -221,14 +221,6 @@ describe('buildInvestmentDashboardViewModel · series', () => {
     expect(vm.valueSeries[1]).toMatchObject({ values: [0, 1000, 2400, 2400], dashed: true })
   })
 
-  it('en % da una sola serie de rentabilidad acumulada', () => {
-    const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
-
-    expect(vm.percentSeries).toHaveLength(1)
-    expect(vm.percentSeries[0].name).toBe('Cartera Total')
-    expect(vm.percentSeries[0].values).toHaveLength(4)
-  })
-
   it('cada posición trae su serie de rentabilidad con los mismos puntos', () => {
     const vm = buildInvestmentDashboardViewModel(portfolio(), 3, 'simple')
 

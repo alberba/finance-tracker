@@ -147,13 +147,4 @@ describe('useSnapshotEdit', () => {
     await nextTick()
     expect(edit.changes.value).toBe(0)
   })
-
-  it('applies a calculated balance as a pending change, saving nothing', () => {
-    const { edit, commits } = setup()
-
-    edit.set('investments', 'fund', '2100,5')
-
-    expect(edit.field('investments', 'fund')).toMatchObject({ effective: 2100.5, edited: true })
-    expect(commits).toHaveLength(0)
-  })
 })

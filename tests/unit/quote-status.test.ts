@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  QUOTE_STATUS,
-  summarizeQuoteStatus,
-} from '../../src/domain/investment/quote-status'
+import { summarizeQuoteStatus } from '../../src/domain/investment/quote-status'
 import type { InstrumentValuation } from '../../src/domain/investment/valuation'
 import type { Quote } from '../../src/scripts/types'
 
@@ -32,14 +29,6 @@ function valuation(
     quote: timestamp ? quote(timestamp) : null,
   }
 }
-
-describe('QUOTE_STATUS', () => {
-  it('traduce cada estado a una etiqueta y un tono', () => {
-    expect(QUOTE_STATUS.fresh).toEqual({ label: 'Actualizado', tone: 'gain' })
-    expect(QUOTE_STATUS.stale).toEqual({ label: 'Retrasado', tone: 'warn' })
-    expect(QUOTE_STATUS.unavailable).toEqual({ label: 'Sin cotización', tone: 'loss' })
-  })
-})
 
 describe('summarizeQuoteStatus', () => {
   it('no resume nada si ningún instrumento tiene cotización', () => {

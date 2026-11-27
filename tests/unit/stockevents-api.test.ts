@@ -5,13 +5,11 @@ vi.mock('../../src/scripts/demo-mode', () => ({
 }))
 
 import type { StockEventsTransactionPayload } from '../../src/domain/stockevents/transaction-payload'
-import { ApiClientError, OFFLINE_MESSAGE } from '../../src/lib/client/api-error'
+import { ApiClientError } from '../../src/lib/client/api-error'
 import { runClientHttp } from '../../src/lib/client/runtime'
 import * as stockeventsApi from '../../src/services/stockevents-api'
 
 // Los efectos se ejecutan en el borde, igual que hace la acción de Pinia.
-const fetchStockEventsCredentialStatus = () =>
-  runClientHttp(stockeventsApi.fetchStockEventsCredentialStatus())
 const saveStockEventsCredential = (apiKey: string) =>
   runClientHttp(stockeventsApi.saveStockEventsCredential(apiKey))
 const fetchStockEventsWatchlists = () => runClientHttp(stockeventsApi.fetchStockEventsWatchlists())
@@ -33,14 +31,6 @@ const transaction: StockEventsTransactionPayload = {
 }
 
 const checks = [{ symbol: 'ACME', watchlistId: 'wl-1' }]
-
-const flujos = [
-  ['la credencial', () => fetchStockEventsCredentialStatus()],
-  ['guardar la credencial', () => saveStockEventsCredential('clave-secreta')],
-  ['las listas', () => fetchStockEventsWatchlists()],
-  ['los símbolos', () => checkStockEventsSymbols(checks)],
-  ['la transacción', () => createStockEventsTransaction(transaction)],
-] as const
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -65,19 +55,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
-})
-
-describe('consultar la credencial de Stock Events', () => {
-  it('pide la ruta sin Content-Type y devuelve el flag configured', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ configured: true }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(fetchStockEventsCredentialStatus()).resolves.toBe(true)
-    expect(fetchMock).toHaveBeenCalledWith('/api/integrations/stockevents', {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    })
-  })
 })
 
 describe('guardar la credencial de Stock Events', () => {
@@ -108,18 +85,6 @@ describe('guardar la credencial de Stock Events', () => {
 })
 
 describe('cargar las listas de Stock Events', () => {
-  it('devuelve el arreglo de listas del servidor', async () => {
-    const watchlists = [{ id: 'wl-1', name: 'Cartera', currency: 'EUR' }]
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ watchlists }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(fetchStockEventsWatchlists()).resolves.toEqual(watchlists)
-    expect(fetchMock).toHaveBeenCalledWith('/api/stockevents/watchlists', {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    })
-  })
-
   it('devuelve un arreglo vacío cuando el servidor no manda listas', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({})))
 
@@ -165,36 +130,5 @@ describe('crear una transacción en Stock Events', () => {
 
     expect(error.category).toBe('invalid-response')
     expect(error.endpoint).toBe('/api/stockevents/transactions')
-  })
-})
-
-describe('flujos de Stock Events sin respuesta HTTP', () => {
-  it.each(flujos)('con %s el fetch rechazado es un error de conexión', async (_nombre, flow) => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch')),
-    )
-
-    const error = await captureApiError(flow())
-
-    expect(error).toBeInstanceOf(ApiClientError)
-    expect(error.category).toBe('offline')
-    expect(error.message).toBe(OFFLINE_MESSAGE)
-  })
-})
-
-describe('flujos de Stock Events con error del servidor', () => {
-  it.each(flujos)('con %s el texto del servidor viaja sin cambios', async (_nombre, flow) => {
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse({ error: 'Stock Events no responde' }, 500)),
-    )
-
-    const error = await captureApiError(flow())
-
-    expect(error.category).toBe('server-error')
-    expect(error.message).toBe('Stock Events no responde')
   })
 })

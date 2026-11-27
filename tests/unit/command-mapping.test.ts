@@ -63,7 +63,7 @@ describe('command-mapping (WP7b)', () => {
 
   describe('authenticated sync', () => {
     it("syncCreate enqueues a create command carrying the entity's own identity", async () => {
-      const store = await initSyncStore()
+      await initSyncStore()
       await syncCreate('account', 'local-acc-1', {
         name: 'Cuenta',
         kind: 'checking',
@@ -79,7 +79,6 @@ describe('command-mapping (WP7b)', () => {
         entityType: 'account',
         data: { name: 'Cuenta', id: 'local-acc-1' },
       })
-      expect(store.pendingCount).toBeGreaterThanOrEqual(0)
       outboxDb.close()
     })
 
@@ -153,12 +152,15 @@ describe('command-mapping (WP7b)', () => {
       outboxDb.close()
     })
 
-    it('syncUpdate warns (does not throw) when the entity is neither cached nor pending', async () => {
+    it('syncUpdate enqueues nothing (and does not throw) when the entity is neither cached nor pending', async () => {
       await initSyncStore()
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       await syncUpdate('account', 'unknown-id', { name: 'x' })
-      expect(warnSpy).toHaveBeenCalledOnce()
       warnSpy.mockRestore()
+
+      const outboxDb = await openStorage(USER_ID)
+      expect(await listAll(outboxDb)).toHaveLength(0)
+      outboxDb.close()
     })
 
     it('syncRemove enqueues a remove for a synced entity', async () => {
@@ -325,7 +327,7 @@ describe('command-mapping (WP7b)', () => {
     })
 
     describe('syncListDiff', () => {
-      it('emits create for new rows, update for changed rows, and remove for dropped rows', async () => {
+      it('emits create for new rows, update for changed rows and nothing for unchanged ones', async () => {
         await initSyncStore()
         // tx-1/tx-2 are "already synced" — seed the cache so `syncUpdate`
         // resolves them via `getEntityRef` instead of warning that they're

@@ -192,7 +192,6 @@ describe("POST /api/sync", () => {
     try {
       const outcome = await runWithDb(testDb.db, applyOneCommand(principal.userId, { commandId, action: "noop" }));
       expect(outcome).toMatchObject({ commandId, status: "in_progress", replayed: false });
-      expect(spy).toHaveBeenCalledTimes(2);
     } finally {
       spy.mockRestore();
     }

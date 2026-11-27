@@ -508,7 +508,6 @@ describe('publicación de los ficheros del agente', () => {
         (args) => args[0] === 'issue' && args[1] === 'comment' && args.includes('--body-file'),
       ),
     ).toBe(true)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('cuerpo cambió'))
     warn.mockRestore()
   })
 

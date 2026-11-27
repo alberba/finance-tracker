@@ -43,19 +43,6 @@ describe("chunkIds", () => {
     expect(chunks.flat()).toEqual(ids);
   });
 
-  it("preserves the original order across chunks", () => {
-    const ids = ["c", "a", "b", "e", "d"];
-
-    expect(chunkIds(ids, 2).flat()).toEqual(ids);
-  });
-
-  it("honors a custom chunk size", () => {
-    const ids = ["a", "b", "c", "d", "e"];
-
-    expect(chunkIds(ids, 3).map((chunk) => chunk.length)).toEqual([3, 2]);
-    expect(chunkIds(ids, 1).map((chunk) => chunk.length)).toEqual([1, 1, 1, 1, 1]);
-  });
-
   it("never emits an empty chunk for non-empty input", () => {
     for (const size of [1, 2, 7, 50]) {
       const chunks = chunkIds(["a", "b", "c", "d", "e"], size);

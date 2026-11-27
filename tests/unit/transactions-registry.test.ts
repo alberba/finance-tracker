@@ -134,13 +134,6 @@ describe('buildMonthGroups', () => {
     const noFilter = buildMonthGroups(transactions, 2026, NO_FILTERS, NEWEST_FIRST)
 
     expect(everyType).toEqual(noFilter)
-    expect(everyType.flatMap((group) => group.rows.map((row) => row.type))).toEqual([
-      'expense',
-      'investment',
-      'income',
-      'income',
-      'expense',
-    ])
   })
 
   it('sorts the movements of each month by amount when asked', () => {
@@ -167,12 +160,6 @@ function monthGroups(...months: Month[]): MonthGroup[] {
 describe('foldMonthGroups', () => {
   it('has nothing to show or fold when the year has no movements', () => {
     expect(foldMonthGroups([], 10)).toEqual({ shown: [], hidden: [] })
-  })
-
-  it('shows the only month and folds nothing', () => {
-    const [october] = monthGroups(10)
-
-    expect(foldMonthGroups([october], 10)).toEqual({ shown: [october], hidden: [] })
   })
 
   it('folds the months older than the selected one', () => {

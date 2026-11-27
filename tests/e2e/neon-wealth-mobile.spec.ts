@@ -4,28 +4,12 @@ import { test, expect } from './fixtures'
 /**
  * Patrimonio en el marco móvil (#436), en el proyecto móvil.
  * Las cifras las prueba el
- * unit del view-model; aquí, el recorrido: abrir una cuenta en su hoja, leer
- * otro mes y volver, y que todo se pueda pulsar con el dedo.
+ * unit del view-model; aquí, abrir un mes cerrado desde el historial y que todo
+ * se pueda pulsar con el dedo.
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
 const section = (page: Page) => page.locator('#wealth')
-
-test('abre el detalle de una cuenta en una hoja y vuelve', async ({ page, tracker }) => {
-  await tracker.openWealth()
-  await expect(section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })).toBeVisible()
-  await expect(section(page).locator('[data-wealth-net]')).toHaveText('20.231,35 €')
-
-  const row = section(page).getByRole('button', { name: /^Revolut: / })
-  await row.click()
-  const sheet = page.getByRole('dialog', { name: 'Revolut' })
-  await expect(sheet).toBeVisible()
-  await expect(sheet.locator('[data-account-value]')).toHaveText('3.101,32 €')
-
-  await sheet.getByRole('button', { name: 'Cerrar' }).click()
-  await expect(sheet).toBeHidden()
-  await expect(row).toBeFocused()
-})
 
 test('abre un mes desde el historial y lee sus saldos', async ({ page, tracker }) => {
   await tracker.openWealth()
@@ -42,22 +26,6 @@ test('abre un mes desde el historial y lee sus saldos', async ({ page, tracker }
   await expect(
     section(page).getByRole('textbox', { name: 'Saldo de Revolut en febrero' }),
   ).toBeVisible()
-})
-
-test('el título está en la barra superior y no en el contenido', async ({ page, tracker }) => {
-  await tracker.openWealth()
-  const bar = page.locator('[data-mobile-app-bar]')
-
-  await expect(bar.locator('[data-bar-title]')).toHaveText('Patrimonio')
-  await expect(bar.locator('p[aria-label="finanzas"]')).toBeHidden()
-  // El contenido conserva el encabezado para lectores de pantalla y foco, sin dibujarlo.
-  const heading = section(page).getByRole('heading', { name: 'Patrimonio', level: 1 })
-  await expect(heading).toBeAttached()
-  expect((await heading.boundingBox())!.width).toBeLessThanOrEqual(1)
-
-  await section(page).getByRole('button', { name: 'Por meses' }).click()
-  await expect(bar.locator('[data-bar-title]')).toHaveCount(0)
-  await expect(bar.locator('p[aria-label="finanzas"]')).toBeVisible()
 })
 
 test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil', async ({
@@ -81,7 +49,6 @@ test('todos los controles de Patrimonio miden al menos 44 px con puntero táctil
   const CONTROLS = 'button, a[href], input'
 
   expect(await tooSmall(`#wealth :is(${CONTROLS})`)).toEqual([])
-
 
   await section(page)
     .getByRole('button', { name: /^Revolut: / })

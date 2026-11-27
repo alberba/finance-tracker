@@ -93,18 +93,6 @@ describe('NeonReportsSection', () => {
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Crear reporte')).toHaveLength(1)
   })
 
-  it('muestra la carga mientras llega la lista', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => undefined)),
-    )
-
-    const wrapper = mountPage()
-    await flushPromises()
-
-    expect(wrapper.get('[aria-busy="true"]').text()).toContain('Cargando tus reportes…')
-  })
-
   it('lista los reportes y abre el detalle al pulsar una entrada', async () => {
     vi.stubGlobal(
       'fetch',

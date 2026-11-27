@@ -8,7 +8,6 @@ import type {
 } from '../../src/domain/reports/report-entry'
 import {
   composerNote,
-  countsLine,
   detailStatus,
   reportRow,
   threadNote,
@@ -185,12 +184,5 @@ describe('textos del hilo', () => {
   it('sin principal, el hilo es el del propio reporte', () => {
     expect(threadNote(entry())).toBe('Respuestas del mantenedor y tus aclaraciones.')
     expect(composerNote(entry())).toBe('Se añade al hilo de #901 en GitHub.')
-  })
-})
-
-describe('countsLine', () => {
-  it('cuenta los enviados y, si los hay, los que traen novedades', () => {
-    expect(countsLine(6, 0)).toEqual({ sent: 6, news: null })
-    expect(countsLine(6, 2)).toEqual({ sent: 6, news: 2 })
   })
 })

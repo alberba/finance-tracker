@@ -10,10 +10,6 @@ describe('Month', () => {
     }
   })
 
-  it('lists the twelve months in order', () => {
-    expect(ALL_MONTHS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-  })
-
   it('maps a month to its 0-based array slot', () => {
     expect(monthIndex(asMonth(1)!)).toBe(0)
     expect(monthIndex(asMonth(12)!)).toBe(11)

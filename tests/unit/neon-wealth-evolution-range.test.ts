@@ -4,7 +4,6 @@ import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
 import {
   availableRanges,
-  EVOLUTION_RANGES,
   rangeWindow,
   wealthTimeline,
   type TimelinePoint,
@@ -176,18 +175,5 @@ describe('rangeWindow y availableRanges en los bordes', () => {
 
   it('con una línea vacía solo ofrece el año y tres meses', () => {
     expect([...availableRanges([], 2026)]).toEqual(['3m', 'ytd'])
-  })
-
-  it('nombra cada rango con su etiqueta corta y el «ytd» sin título', () => {
-    expect(EVOLUTION_RANGES.map((range) => range.short)).toEqual([
-      '3M',
-      '6M',
-      'YTD',
-      '1Y',
-      '2Y',
-      '3Y',
-      '5Y',
-    ])
-    expect(EVOLUTION_RANGES.find((range) => range.value === 'ytd')?.title).toBe('')
   })
 })

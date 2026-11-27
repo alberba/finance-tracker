@@ -6,8 +6,6 @@ import type { FinanceSectionId } from './pages/FinanceTrackerPage'
 const bottomBar = (page: Page) => page.getByRole('navigation', { name: 'Navegación principal' })
 const moreTrigger = (page: Page) => page.getByRole('button', { name: 'Más secciones' })
 const moreSheet = (page: Page) => page.getByRole('dialog', { name: 'Más secciones' })
-// The desktop sidebar has its own «Apuntar»: the mobile frame is told apart by the FAB.
-const fab = (page: Page) => page.locator('[data-fab-apuntar]')
 const current = (page: Page) => page.locator('#nav-tabs [aria-current="page"]:visible')
 
 const BAR_SECTIONS: Array<[FinanceSectionId, string]> = [
@@ -47,20 +45,6 @@ test.describe('Marco móvil nuevo', () => {
       await expect(tracker.section(id)).toBeVisible()
       await expect(moreTrigger(page)).toHaveAttribute('data-active', 'true')
     }
-  })
-
-  test('la hoja «Más» solo lleva lo que la barra no tiene, y cierra con su botón', async ({
-    page,
-  }) => {
-    await moreTrigger(page).click()
-    const names = await moreSheet(page)
-      .getByRole('navigation', { name: 'Más secciones' })
-      .getByRole('button')
-      .allTextContents()
-    expect(names.map((name) => name.trim())).toEqual(MORE_SECTIONS.map(([, label]) => label))
-
-    await moreSheet(page).getByRole('button', { name: 'Cerrar menú' }).click()
-    await expect(moreSheet(page)).toBeHidden()
   })
 
   test('«Por confirmar» abre una hoja que cierra con Escape y al pulsar fuera', async ({
@@ -108,29 +92,17 @@ test.describe('Marco móvil nuevo', () => {
       )
     expect(small).toEqual([])
   })
-
-  test('el marco lo decide el ancho de ventana, también en un escritorio estrecho', async ({
-    page,
-    tracker,
-  }) => {
-    await page.setViewportSize({ width: 1200, height: 800 })
-    await expect(page.getByRole('complementary')).toBeVisible()
-    await expect(bottomBar(page)).toBeHidden()
-    await expect(fab(page)).toBeHidden()
-
-    await page.setViewportSize({ width: 900, height: 800 })
-    await expect(page.getByRole('complementary')).toBeHidden()
-    await expect(bottomBar(page)).toBeVisible()
-    await expect(fab(page)).toBeVisible()
-    await tracker.open('dashboard')
-  })
 })
 
 test.describe('Marco móvil nuevo en un escritorio estrecho', () => {
   test.use({ hasTouch: false, isMobile: false })
 
-  test('con puntero fino y 900 px se ve el marco móvil', async ({ page, tracker }) => {
+  test('el marco lo decide el ancho de ventana, no el puntero', async ({ page, tracker }) => {
     await tracker.reload()
+    await page.setViewportSize({ width: 1200, height: 800 })
+    await expect(page.getByRole('complementary')).toBeVisible()
+    await expect(bottomBar(page)).toBeHidden()
+
     await page.setViewportSize({ width: 900, height: 800 })
     await expect(bottomBar(page)).toBeVisible()
     await expect(page.getByRole('complementary')).toBeHidden()

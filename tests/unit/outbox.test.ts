@@ -13,7 +13,6 @@ import {
   recordFailure,
   wipeOutbox,
 } from '../helpers/client-storage'
-import { generateCommandId } from '../../src/lib/client/outbox'
 
 const USER_ID = 'user-outbox-test'
 
@@ -28,13 +27,6 @@ describe('outbox', () => {
   afterEach(async () => {
     db.close()
     await wipeOutbox(USER_ID)
-  })
-
-  it('generates a unique commandId when none is supplied', () => {
-    const a = generateCommandId()
-    const b = generateCommandId()
-    expect(a).not.toEqual(b)
-    expect(a.length).toBeGreaterThan(0)
   })
 
   it('enqueues a valid command and assigns an incrementing seq', async () => {

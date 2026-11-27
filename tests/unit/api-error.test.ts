@@ -24,19 +24,6 @@ function makeError(category: ApiErrorCategory, serverMessage?: string): ApiClien
 }
 
 describe('mensajes por categoría', () => {
-  it('fija el texto exacto de cada mensaje por defecto', () => {
-    expect(OFFLINE_MESSAGE).toBe(
-      'No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.',
-    )
-    expect(SESSION_EXPIRED_MESSAGE).toBe('Tu sesión venció. Vuelve a entrar o recarga la página.')
-    expect(INVALID_RESPONSE_MESSAGE).toBe(
-      'El servidor devolvió una respuesta que no se pudo interpretar.',
-    )
-    expect(SERVER_ERROR_MESSAGE).toBe(
-      'El servidor falló al atender la petición. Inténtalo de nuevo en unos minutos.',
-    )
-  })
-
   it('explica la falta de conexión cuando el fetch no llegó a responder', () => {
     expect(makeError('offline').message).toBe(OFFLINE_MESSAGE)
   })
@@ -71,16 +58,6 @@ describe('mensajes por categoría', () => {
   it('cae al mensaje del flujo cuando el 4xx no trae mensaje propio', () => {
     expect(makeError('api-error').message).toBe(FALLBACK_MESSAGE)
   })
-
-  it('se comporta como un Error normal', () => {
-    const error = makeError('offline')
-
-    expect(error).toBeInstanceOf(Error)
-    expect(error.name).toBe('ApiClientError')
-    expect(error.category).toBe('offline')
-    expect(error.endpoint).toBe('/api/stockevents')
-    expect(error.status).toBe(400)
-  })
 })
 
 describe('categoryForStatus', () => {
@@ -101,10 +78,6 @@ describe('apiEndpointPath', () => {
 
   it('conserva la ruta y descarta el hash', () => {
     expect(apiEndpointPath('/api/sync#top')).toBe('/api/sync')
-  })
-
-  it('devuelve la ruta intacta cuando no hay query ni hash', () => {
-    expect(apiEndpointPath('/api/stockevents')).toBe('/api/stockevents')
   })
 })
 

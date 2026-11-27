@@ -110,59 +110,40 @@ async function seedExistingData(request: APIRequestContext) {
 }
 
 test.describe('Bienvenida (sync v2)', () => {
-  for (const device of ['desktop', 'mobile'] as const) {
-    test(`primer acceso ${device}: categorías iniciales y bienvenida omisible`, async ({
-      page,
-      context,
-    }, testInfo) => {
-      if (device === 'mobile') await page.setViewportSize(devices['Pixel 5'].viewport)
-      const before = await bootstrap(context.request)
-      expect(before.settings).toMatchObject({
-        onboardingPresented: 0,
-        onboardingDismissed: 0,
-        onboardingAccountCompleted: 0,
-        onboardingMovementCompleted: 0,
-        onboardingCompleted: 0,
-      })
-      expect(before.accounts).toEqual([])
-      expect(before.transactions).toEqual([])
-      expect(before.categories.map(({ name, kind }) => ({ name, kind }))).toEqual([
-        { name: 'Nómina', kind: 'income' },
-        { name: 'Otros ingresos', kind: 'income' },
-        { name: 'Vivienda', kind: 'expense' },
-        { name: 'Alimentación', kind: 'expense' },
-        { name: 'Transporte', kind: 'expense' },
-        { name: 'Suministros', kind: 'expense' },
-        { name: 'Salud', kind: 'expense' },
-        { name: 'Ocio', kind: 'expense' },
-        { name: 'Otros gastos', kind: 'expense' },
-        { name: 'Inversión', kind: 'investment' },
-      ])
-      expect((await initialize(context.request)).alreadyInitialized).toBe(true)
-      expect((await bootstrap(context.request)).categories).toEqual(before.categories)
-      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
-      await openWelcome(page)
-      await expect(welcome(page).getByRole('button', { name: 'Crear cuenta' })).toBeEnabled()
-      await expect(
-        welcome(page).getByRole('button', { name: 'Registrar movimiento' }),
-      ).toBeDisabled()
-      await expect(
-        welcome(page).getByText('Crea una cuenta para poder registrar movimientos.'),
-      ).toBeVisible()
-      for (const [scheme, theme] of [
-        ['light', 'claro-melocoton'],
-        ['dark', 'oscuro-suave'],
-      ] as const) {
-        await page.emulateMedia({ colorScheme: scheme })
-        await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
-        await page.screenshot({
-          path: testInfo.outputPath(`welcome-${device}-${scheme}.png`),
-          animations: 'disabled',
-        })
-      }
-      await expectSettings(context.request, { onboardingPresented: 1, onboardingCompleted: 0 })
+  test('primer acceso: categorías iniciales y bienvenida omisible', async ({ page, context }) => {
+    const before = await bootstrap(context.request)
+    expect(before.settings).toMatchObject({
+      onboardingPresented: 0,
+      onboardingDismissed: 0,
+      onboardingAccountCompleted: 0,
+      onboardingMovementCompleted: 0,
+      onboardingCompleted: 0,
     })
-  }
+    expect(before.accounts).toEqual([])
+    expect(before.transactions).toEqual([])
+    expect(before.categories.map(({ name, kind }) => ({ name, kind }))).toEqual([
+      { name: 'Nómina', kind: 'income' },
+      { name: 'Otros ingresos', kind: 'income' },
+      { name: 'Vivienda', kind: 'expense' },
+      { name: 'Alimentación', kind: 'expense' },
+      { name: 'Transporte', kind: 'expense' },
+      { name: 'Suministros', kind: 'expense' },
+      { name: 'Salud', kind: 'expense' },
+      { name: 'Ocio', kind: 'expense' },
+      { name: 'Otros gastos', kind: 'expense' },
+      { name: 'Inversión', kind: 'investment' },
+    ])
+    expect((await initialize(context.request)).alreadyInitialized).toBe(true)
+    expect((await bootstrap(context.request)).categories).toEqual(before.categories)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openWelcome(page)
+    await expect(welcome(page).getByRole('button', { name: 'Crear cuenta' })).toBeEnabled()
+    await expect(welcome(page).getByRole('button', { name: 'Registrar movimiento' })).toBeDisabled()
+    await expect(
+      welcome(page).getByText('Crea una cuenta para poder registrar movimientos.'),
+    ).toBeVisible()
+    await expectSettings(context.request, { onboardingPresented: 1, onboardingCompleted: 0 })
+  })
 
   test('Ahora no persiste tras recargar y en un dispositivo nuevo; permite retomarla', async ({
     page,

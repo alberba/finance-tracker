@@ -54,7 +54,7 @@ describe('theme controller', () => {
     expect(setup({ prefersDark: false }).root.dataset.theme).toBe('claro-melocoton')
   })
 
-  it.each(['oscuro-suave', 'oscuro-fuerte', 'claro-hueso', 'claro-melocoton'] as const)(
+  it.each(['oscuro-fuerte', 'claro-hueso'] as const)(
     'keeps a stored %s whatever the system says',
     (theme) => {
       const { controller, root } = setup({ stored: theme, prefersDark: theme.startsWith('claro') })

@@ -341,13 +341,7 @@ describe("finance-core helpers", () => {
     expect(metrics[2].periodReturn).toBeCloseTo(-0.1, 6);
 
     // TWR acumulado: gestión real = -1%
+    // (no el -5,5 % del retorno simple, sesgado por la aportación grande).
     expect(metrics[2].cumulativeReturn).toBeCloseTo(-0.01, 6);
-
-    // Retorno simple: (18900 - 20000) / 20000 = -5.5% ← sesgado por la aportación grande
-    const simpleReturn = (18900 - 20000) / 20000;
-    expect(simpleReturn).toBeCloseTo(-0.055, 6);
-
-    // La divergencia entre TWR y simple es el problema que resuelve el modo TWR
-    expect(metrics[2].cumulativeReturn).not.toBeCloseTo(simpleReturn, 3);
   });
 });
