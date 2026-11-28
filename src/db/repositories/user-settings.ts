@@ -18,6 +18,8 @@ export interface CreateUserSettingsInput {
   onboardingDismissed?: boolean
   onboardingCompleted?: boolean
   onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -31,6 +33,8 @@ export interface UpdateUserSettingsInput {
   onboardingDismissed?: boolean
   onboardingCompleted?: boolean
   onboardingStep?: number
+  tourDesktopSeen?: boolean
+  tourMobileSeen?: boolean
   stockeventsEnabled?: boolean
   stockeventsTradesToCash?: boolean
 }
@@ -58,6 +62,8 @@ async function createSql(
       onboardingDismissed: input.onboardingDismissed ? 1 : 0,
       onboardingCompleted: input.onboardingCompleted ? 1 : 0,
       onboardingStep: input.onboardingStep ?? 0,
+      tourDesktopSeen: input.tourDesktopSeen ? 1 : 0,
+      tourMobileSeen: input.tourMobileSeen ? 1 : 0,
       stockeventsEnabled: input.stockeventsEnabled ? 1 : 0,
       stockeventsTradesToCash: input.stockeventsTradesToCash ? 1 : 0,
       createdAt: now,
@@ -116,6 +122,18 @@ async function updateSql(
             ? 1
             : 0,
       onboardingStep: input.onboardingStep ?? existing.onboardingStep,
+      tourDesktopSeen:
+        input.tourDesktopSeen === undefined
+          ? existing.tourDesktopSeen
+          : input.tourDesktopSeen
+            ? 1
+            : 0,
+      tourMobileSeen:
+        input.tourMobileSeen === undefined
+          ? existing.tourMobileSeen
+          : input.tourMobileSeen
+            ? 1
+            : 0,
       updatedAt: nowIso(),
       version: existing.version + 1,
     })

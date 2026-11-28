@@ -110,4 +110,28 @@ describe("round trip: sincronización", () => {
 
     toast.remove();
   });
+
+  it("reapplies two settings changes queued back to back without the notice: the conflict is with this device's own (#527)", async () => {
+    const toast = document.createElement("div");
+    toast.id = "toast";
+    document.body.append(toast);
+    const { syncSettingsUpdate } = await import("../../../../src/lib/client/command-mapping");
+    // The settings row exists and this device holds its version.
+    await syncSettingsUpdate({ theme: "claro-hueso" });
+    await trip.reload();
+
+    // The setup wizard saves one change per step: both read the same cached
+    // version, so the second one conflicts with the first on the server.
+    trip.setOffline(true);
+    await syncSettingsUpdate({ onboardingStep: 2 });
+    await syncSettingsUpdate({ currency: "USD" });
+    trip.setOffline(false);
+
+    const state = await trip.reload();
+    expect(await trip.pending()).toHaveLength(0);
+    expect(state).toMatchObject({ onboardingStep: 2, currency: "USD" });
+    expect(toast.textContent).not.toContain("se reaplicó");
+
+    toast.remove();
+  });
 });

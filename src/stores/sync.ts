@@ -562,6 +562,9 @@ export const useSyncStore = defineStore('sync', () => {
       // moving, instead of parking the command and freezing everything
       // behind it (audit §2.4).
       const retries: OutboxCommandInput[] = []
+      // Whether a retry deserves the notice: any of them but a settings
+      // change that only collided with this device's own.
+      let noticed = false
       let lastDropMessage: string | null = null
       // Another request still holds this command's reservation; the server
       // halted the batch there, so the entry stays queued and is resent
@@ -597,6 +600,7 @@ export const useSyncStore = defineStore('sync', () => {
           if (command.action === 'update' || command.action === 'remove') {
             acked.push(entry.seq)
             const baseVersion = result.currentVersion ?? command.baseVersion
+            noticed = true
             retries.push(
               command.action === 'update'
                 ? {
@@ -618,6 +622,15 @@ export const useSyncStore = defineStore('sync', () => {
             // version instead of leaving the entry queued, where a stale
             // `baseVersion` would conflict forever.
             acked.push(entry.seq)
+            // Two settings changes queued back to back (the setup wizard
+            // saves one per step) both read the same cached version, so the
+            // later one conflicts with this device's own earlier one. When
+            // the server is at the version this device already holds,
+            // nobody else touched the settings: reapply without the notice.
+            const cached = yield* getCachedSettings<{ version?: unknown } | null>()
+            if (result.currentVersion === undefined || cached?.version !== result.currentVersion) {
+              noticed = true
+            }
             retries.push({
               action: 'settingsUpdate',
               baseVersion: result.currentVersion ?? command.baseVersion,
@@ -655,7 +668,7 @@ export const useSyncStore = defineStore('sync', () => {
       // a hard failure, that more actionable message is the one left on
       // screen — `showToast` is a single shared banner (`useToast.ts`), so
       // whichever call lands last wins the visible text.
-      if (retries.length > 0) {
+      if (noticed) {
         showToast('Un cambio tuyo se reaplicó sobre la versión más reciente del servidor.')
       }
       if (lastDropMessage) {

@@ -444,6 +444,9 @@ export const settingsUpdateCommandSchema = validator(
       onboardingCompleted: optionalBoolean,
       /** The setup wizard's step to resume at. */
       onboardingStep: Schema.optional(nonNegativeInt),
+      /** The guided tour, seen or skipped, on each frame. */
+      tourDesktopSeen: optionalBoolean,
+      tourMobileSeen: optionalBoolean,
       dashboardLayout: Schema.optional(Schema.NullOr(dashboardLayoutSchema)),
       currency: Schema.optional(nonEmpty),
       locale: optionalText,

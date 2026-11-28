@@ -69,6 +69,8 @@ export const useDataStore = defineStore('data', () => {
             onboardingDismissed,
             onboardingCompleted,
             onboardingStep,
+            tourDesktopSeen,
+            tourMobileSeen,
           } = financialStateStore.state
           financialStateStore.replaceState({
             ...data,
@@ -76,6 +78,8 @@ export const useDataStore = defineStore('data', () => {
             onboardingDismissed,
             onboardingCompleted,
             onboardingStep,
+            tourDesktopSeen,
+            tourMobileSeen,
           })
           showToast('JSON importado correctamente.')
           resolve(true)

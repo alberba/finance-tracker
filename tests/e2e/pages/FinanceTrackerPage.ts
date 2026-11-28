@@ -44,7 +44,7 @@ function typedDate(isoDate: string): string {
 export class FinanceTrackerPage {
   constructor(
     private readonly page: Page,
-    private readonly options: { preserveSetup?: boolean } = {},
+    private readonly options: { preserveSetup?: boolean; preserveTour?: boolean } = {},
   ) {}
 
   get dashboardSection(): Locator {
@@ -106,7 +106,7 @@ export class FinanceTrackerPage {
   async goto() {
     await this.page.goto('/')
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await this.dismissSetupIfNeeded()
+    await this.dismissIntroIfNeeded()
     await expect(
       this.dashboardSection.getByRole('heading', { name: SECTION_CONFIG.dashboard.headingText }),
     ).toBeVisible()
@@ -115,7 +115,7 @@ export class FinanceTrackerPage {
   async reload() {
     await this.page.reload()
     await expect(this.page.locator('html[data-finance-ready="true"]')).toBeVisible()
-    await this.dismissSetupIfNeeded()
+    await this.dismissIntroIfNeeded()
     await expect(this.page.locator('[data-finance-workspace]')).toBeVisible()
   }
 
@@ -449,16 +449,24 @@ export class FinanceTrackerPage {
     await expect(panel).toBeHidden()
   }
 
-  async dismissSetupIfNeeded() {
-    if (this.options.preserveSetup) return
+  /** Closes the setup wizard and skips the guided tour that follows it, unless preserved. */
+  async dismissIntroIfNeeded() {
     // Readiness precedes the setup island's watcher. Wait for its decision
     // rather than racing an isVisible() check against the first presentation.
     const state = this.page.locator('[data-setup-state]')
     await expect(state).not.toHaveAttribute('data-setup-state', 'loading')
     if ((await state.getAttribute('data-setup-state')) === 'open') {
+      if (this.options.preserveSetup) return
       const setup = this.page.locator('dialog[data-setup]')
       await setup.getByRole('button', { name: 'Ahora no' }).first().click()
       await expect(setup).toBeHidden()
+    }
+    if (this.options.preserveTour) return
+    const tour = this.page.locator('[data-tour-state]')
+    await expect(tour).not.toHaveAttribute('data-tour-state', 'waiting')
+    if ((await tour.getAttribute('data-tour-state')) === 'open') {
+      await this.page.getByRole('button', { name: 'Saltar el recorrido' }).click()
+      await expect(tour).toHaveAttribute('data-tour-state', 'idle')
     }
   }
 
