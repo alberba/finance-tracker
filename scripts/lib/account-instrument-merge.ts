@@ -27,7 +27,6 @@ import {
   investmentTradeDetails,
   marketInstruments,
   snapshotBalances,
-  syncChanges,
   transactions,
   userInstruments,
   wealthSnapshots,
@@ -36,13 +35,19 @@ import { runWithDb } from '../../src/db/database'
 import * as accountsRepository from '../../src/db/repositories/accounts'
 import * as contributionsRepository from '../../src/db/repositories/contributions'
 import * as marketRepository from '../../src/db/repositories/market'
-import * as syncRepository from '../../src/db/repositories/sync'
 import * as transactionsRepository from '../../src/db/repositories/transactions'
 import * as wealthRepository from '../../src/db/repositories/wealth'
 import { nowIso, runInTransaction, type Db } from '../../src/db/repositories/shared'
+import { normalizeName, publishSyncChange, resolveActiveAccountByName, sameName } from './repair-shared'
+import { normalizeSymbol } from '../../src/domain/investment/symbol-matching'
 import { buildBootstrapPayload } from '../../src/lib/server/bootstrap-payload'
 import { projectSyncV2State, type SyncV2Bootstrap } from '../../src/lib/client/v2-state-projection'
-import { computeInvestmentValue, getWealthByMonth } from '../../src/lib/finance-core'
+import {
+  computeInvestmentValue,
+  getWealthByMonth,
+  movementBelongsToInvestmentAsset,
+  type Entity,
+} from '../../src/lib/finance-core'
 import { toMinorUnits } from '../../src/lib/money'
 import type { Month } from '../../src/lib/month'
 import type { State } from '../../src/scripts/types'
@@ -139,15 +144,6 @@ export interface MergeInvariants {
 
 type AccountRow = typeof accounts.$inferSelect
 
-const norm = (value: string | null | undefined): string =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase()
-
-function sameName(left: string, right: string): boolean {
-  return norm(left) === norm(right)
-}
-
 interface Resolved {
   broker: AccountRow | null
   brokerName: string
@@ -167,40 +163,38 @@ function resolveMerges(rows: readonly AccountRow[], merges: readonly AccountMerg
     const matches = rows.filter(
       (row) => sameName(row.name, merge.accountName) && row.kind === 'investment',
     )
-    const active = matches.filter((row) => !row.isArchived)
-    if (active.length > 1) {
-      throw new Error(
-        `Hay ${active.length} cuentas de inversión activas llamadas '${merge.accountName}'; no se sabe cuál fusionar.`,
-      )
+    if (matches.length === 0) {
+      throw new Error(`No hay ninguna cuenta de inversión llamada '${merge.accountName}'.`)
     }
-    if (active.length === 0) {
-      if (matches.length === 0) {
-        throw new Error(`No hay ninguna cuenta de inversión llamada '${merge.accountName}'.`)
-      }
+    const legacy = resolveActiveAccountByName(matches, merge.accountName, {
+      several: (count) =>
+        `Hay ${count} cuentas de inversión activas llamadas '${merge.accountName}'; no se sabe cuál fusionar.`,
+    })
+    if (!legacy) {
       alreadyMerged.push(matches[0].name)
       continue
     }
 
-    const key = norm(merge.brokerName)
+    const key = normalizeName(merge.brokerName)
     let target = brokers.get(key)
     if (!target) {
-      const candidates = rows.filter(
-        (row) => sameName(row.name, merge.brokerName) && row.kind === 'investment' && !row.isArchived,
+      const broker = resolveActiveAccountByName(
+        rows.filter((row) => row.kind === 'investment'),
+        merge.brokerName,
+        {
+          several: (count) =>
+            `Hay ${count} cuentas de inversión activas llamadas '${merge.brokerName}'; no se sabe en cuál fusionar.`,
+        },
       )
-      if (candidates.length > 1) {
-        throw new Error(
-          `Hay ${candidates.length} cuentas de inversión activas llamadas '${merge.brokerName}'; no se sabe en cuál fusionar.`,
-        )
-      }
-      target = { broker: candidates[0] ?? null, brokerName: merge.brokerName.trim(), legacy: [] }
+      target = { broker, brokerName: merge.brokerName.trim(), legacy: [] }
       brokers.set(key, target)
     }
-    if (active[0].currency !== (target.broker?.currency ?? target.legacy[0]?.currency ?? active[0].currency)) {
+    if (legacy.currency !== (target.broker?.currency ?? target.legacy[0]?.currency ?? legacy.currency)) {
       blockers.push(
-        `La cuenta '${active[0].name}' está en ${active[0].currency}, distinta de la de '${target.brokerName}'.`,
+        `La cuenta '${legacy.name}' está en ${legacy.currency}, distinta de la de '${target.brokerName}'.`,
       )
     }
-    target.legacy.push(active[0])
+    target.legacy.push(legacy)
   }
   return { brokers: [...brokers.values()], alreadyMerged, blockers }
 }
@@ -422,9 +416,9 @@ export async function buildAccountMergePlan(
     .leftJoin(investmentTradeDetails, eq(investmentTradeDetails.transactionId, transactions.id))
     .where(and(eq(transactions.userId, userId), eq(transactions.type, 'investment')))
     .orderBy(asc(transactions.date), asc(transactions.id))
-  const accountById = new Map(accountRows.map((row) => [row.id, row]))
+  const ownerOf = legacyOwnerResolver(accountRows, [...legacyById.values()], trackedRows, categoryById)
   for (const movement of movementRows) {
-    const legacy = ownerOfMovement(movement, accountById, legacyById, trackedRows, categoryById)
+    const legacy = ownerOf(movement)
     if (!legacy) continue
     const instruments = instrumentsOf.get(legacy.id) ?? []
     const entry: MovementPlan = {
@@ -436,11 +430,11 @@ export async function buildAccountMergePlan(
       brokerName: brokerOf.get(legacy.id)!.brokerName,
     }
     if (movement.hasDetail && movement.instrumentId === null) {
-      const symbol = String(movement.symbol ?? '').trim().toUpperCase()
+      const symbol = normalizeSymbol(movement.symbol)
       const target =
         instruments.length === 1
           ? instruments[0]
-          : instruments.find((item) => item.symbol.toUpperCase() === symbol)
+          : instruments.find((item) => normalizeSymbol(item.symbol) === symbol)
       if (target) entry.instrument = { from: null, to: { id: target.id, symbol: target.symbol } }
     }
     plan.movements.push(entry)
@@ -449,44 +443,41 @@ export async function buildAccountMergePlan(
 }
 
 /**
- * La cuenta heredada a la que pertenece un movimiento de inversión, con la misma regla que el
- * cliente (`movementBelongsToInvestmentAsset`): cuenta destino explícita, luego la cuenta de su
- * instrumento y por último la categoría (legacy).
+ * Resuelve la cuenta heredada a la que pertenece un movimiento de inversión con la regla del
+ * cliente (`movementBelongsToInvestmentAsset`), no con una copia a mano: las filas se pasan al
+ * espacio de ids del cliente (el `legacyId` de cada cuenta, como hace `projectSyncV2State`).
  */
-function ownerOfMovement(
-  movement: {
+function legacyOwnerResolver(
+  accountRows: readonly AccountRow[],
+  legacyRows: readonly AccountRow[],
+  tracked: readonly { instrumentId: string; alias: string | null }[],
+  categoryById: ReadonlyMap<string, { name: string }>,
+) {
+  const clientId = (row: AccountRow) => row.legacyId || row.id
+  const clientIdOf = new Map(accountRows.map((row) => [row.id, clientId(row)]))
+  const asEntity = (row: AccountRow): Entity => ({ id: clientId(row), name: row.name, openingBalance: 0 })
+  const assets = accountRows.filter((row) => row.kind === 'investment').map(asEntity)
+  const links = tracked.map((row) => ({
+    id: row.instrumentId,
+    investmentAssetId: clientIdOf.get(String(row.alias)) || String(row.alias ?? ''),
+  }))
+  const legacy = legacyRows.map((row) => ({ row, asset: asEntity(row) }))
+
+  return (movement: {
     categoryId: string | null
     destinationAccountId: string | null
     instrumentId: string | null
-  },
-  accountById: ReadonlyMap<string, AccountRow>,
-  legacyById: ReadonlyMap<string, AccountRow>,
-  tracked: readonly { instrumentId: string; alias: string | null }[],
-  categoryById: ReadonlyMap<string, { name: string; legacyId: string | null }>,
-): AccountRow | null {
-  const destination = movement.destinationAccountId
-    ? accountById.get(movement.destinationAccountId)
-    : undefined
-  if (destination?.kind === 'investment') return legacyById.get(destination.id) ?? null
-
-  const instrument = movement.instrumentId
-    ? tracked.find((row) => row.instrumentId === movement.instrumentId)
-    : undefined
-  if (instrument) {
+  }): AccountRow | null => {
+    const tx = {
+      category: (movement.categoryId && categoryById.get(movement.categoryId)?.name) || 'Sin categoría',
+      instrumentId: movement.instrumentId ?? undefined,
+      destinationAccountId:
+        (movement.destinationAccountId && clientIdOf.get(movement.destinationAccountId)) || undefined,
+    }
     return (
-      [...legacyById.values()].find(
-        (row) => instrument.alias === row.id || (row.legacyId && instrument.alias === row.legacyId),
-      ) ?? null
+      legacy.find(({ asset }) => movementBelongsToInvestmentAsset(tx, asset, assets, links))?.row ?? null
     )
   }
-
-  const category = movement.categoryId ? categoryById.get(movement.categoryId) : undefined
-  if (!category) return null
-  return (
-    [...legacyById.values()].find(
-      (row) => sameName(row.name, category.name) || (row.legacyId && row.legacyId === category.legacyId),
-    ) ?? null
-  )
 }
 
 const money = (minor: number) => (minor / 100).toFixed(2)
@@ -845,18 +836,8 @@ async function publishChanges(
   },
   now: string,
 ): Promise<void> {
-  const publish = async (entityType: string, entityId: string, payload: unknown) => {
-    const { revision } = await runWithDb(db, syncRepository.bumpRevision(userId))
-    await db.insert(syncChanges).values({
-      userId,
-      revision,
-      entityType,
-      entityId,
-      changeType: 'upsert',
-      payload: JSON.stringify(payload),
-      createdAt: now,
-    })
-  }
+  const publish = (entityType: string, entityId: string, payload: unknown) =>
+    publishSyncChange(db, userId, { entityType, entityId, payload }, now)
   for (const id of touched.accounts) {
     await publish('account', id, await runWithDb(db, accountsRepository.get(userId, id)))
   }
