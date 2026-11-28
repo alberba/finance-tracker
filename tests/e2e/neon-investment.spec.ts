@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import type { FinanceTrackerPage } from './pages/FinanceTrackerPage'
 import { expectSyncCommand } from './pages/sync'
 import { editScenarioState, holdVwceInFondos } from './seed-sync-v2'
 
@@ -9,9 +10,8 @@ import { editScenarioState, holdVwceInFondos } from './seed-sync-v2'
  */
 test.use({ fixedTime: '2026-03-20T12:00:00Z' })
 
-const section = (page: Page) => page.locator('#investment')
-const figure = (page: Page, key: string) =>
-  section(page).locator(`[data-investment-figure="${key}"]`)
+const figure = (tracker: FinanceTrackerPage, key: string) =>
+  tracker.investmentSection.locator(`[data-investment-figure="${key}"]`)
 
 /** Answers every quote request with a price taken two days ago, flagged as late. */
 async function serveLateQuotes(page: Page): Promise<void> {
@@ -49,25 +49,27 @@ test.describe('Inversión', () => {
   test(
     'cambia la rentabilidad de importe a porcentaje y vuelve',
     { tag: '@smoke' },
-    async ({ page, tracker }) => {
+    async ({ tracker }) => {
       await tracker.openInvestment()
-      await expect(figure(page, 'return')).toContainText('Rentabilidad')
-      await expect(figure(page, 'return')).toContainText(/€ sobre /)
-      const chart = section(page).locator('[data-investment-chart]').getByRole('img')
+      await expect(figure(tracker, 'return')).toContainText('Rentabilidad')
+      await expect(figure(tracker, 'return')).toContainText(/€ sobre /)
+      const chart = tracker.investmentSection.locator('[data-investment-chart]').getByRole('img')
       await expect(chart).toHaveAccessibleName(/^Lo que vale tu cartera frente a lo que has puesto/)
 
-      const methods = section(page).getByRole('group', { name: 'Cómo medir la rentabilidad' })
+      const methods = tracker.investmentSection.getByRole('group', {
+        name: 'Cómo medir la rentabilidad',
+      })
       await methods.getByRole('button', { name: 'TWR', exact: true }).click()
       await expect(methods.getByRole('button', { name: 'TWR', exact: true })).toHaveAttribute(
         'aria-pressed',
         'true',
       )
-      await expect(figure(page, 'return')).toContainText('TWR · vale')
+      await expect(figure(tracker, 'return')).toContainText('TWR · vale')
       await expect(chart).toHaveAccessibleName(/^Rentabilidad TWR acumulada/)
 
       await methods.getByRole('button', { name: 'Simple', exact: true }).click()
-      await expect(figure(page, 'return')).not.toContainText('TWR')
-      await expect(figure(page, 'return')).toContainText(/€ sobre /)
+      await expect(figure(tracker, 'return')).not.toContainText('TWR')
+      await expect(figure(tracker, 'return')).toContainText(/€ sobre /)
     },
   )
 
@@ -76,7 +78,7 @@ test.describe('Inversión', () => {
     tracker,
   }) => {
     await tracker.openInvestment()
-    await section(page).getByRole('button', { name: 'Nueva operación' }).click()
+    await tracker.investmentSection.getByRole('button', { name: 'Nueva operación' }).click()
     const sheet = page.getByRole('dialog', { name: 'Nueva inversión' })
     await expect(sheet).toBeVisible()
     await expect(sheet.getByRole('radiogroup', { name: 'Tipo de movimiento' })).toHaveCount(0)
@@ -116,7 +118,7 @@ test.describe('Inversión', () => {
     })
     await tracker.openInvestment()
 
-    const notice = section(page).getByRole('status')
+    const notice = tracker.investmentSection.getByRole('status')
     await expect(notice).toContainText('Cotizaciones retrasadas')
     await expect(notice).toContainText('último precio del 18 mar')
   })
@@ -132,9 +134,9 @@ test.describe('Inversión', () => {
     })
     await tracker.openInvestment()
 
-    const chart = section(page).locator('[data-investment-chart]').getByRole('img')
+    const chart = tracker.investmentSection.locator('[data-investment-chart]').getByRole('img')
     // The index is picked from the line under the figures, beside its difference.
-    const benchmark = section(page).locator('[data-investment-benchmark]')
+    const benchmark = tracker.investmentSection.locator('[data-investment-benchmark]')
     await expect(benchmark).toContainText('sin datos')
     await expect(chart).toBeVisible()
 
@@ -160,25 +162,39 @@ test.describe('Inversión', () => {
     tracker,
   }) => {
     await tracker.openInvestment()
-    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Inversión', level: 1 }),
+    ).toBeVisible()
 
-    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await tracker.investmentSection.getByRole('button', { name: 'Ver Fondos Indexados' }).click()
     await expect(page).toHaveURL(/\/inversion\?activo=/)
     // The detail header: the arrow and the asset, no section title.
-    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeHidden()
-    await expect(section(page).getByRole('heading', { level: 1 })).toBeVisible()
-    await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
-    await expect(section(page).getByText('Aportación fondo indexado').first()).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Inversión', level: 1 }),
+    ).toBeHidden()
+    await expect(tracker.investmentSection.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Movimientos' }),
+    ).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByText('Aportación fondo indexado').first(),
+    ).toBeVisible()
 
-    await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
+    await tracker.investmentSection.getByRole('link', { name: 'Volver a Inversión' }).click()
     await expect(page).toHaveURL(/\/inversion$/)
-    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Inversión', level: 1 }),
+    ).toBeVisible()
 
-    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-    await expect(section(page).getByRole('heading', { name: 'Movimientos' })).toBeVisible()
+    await tracker.investmentSection.getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Movimientos' }),
+    ).toBeVisible()
     await page.goBack()
     await expect(page).toHaveURL(/\/inversion$/)
-    await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Inversión', level: 1 }),
+    ).toBeVisible()
   })
 
   test('abre un instrumento desde las posiciones de su cuenta, vuelve a la cuenta y sobrevive a la recarga', async ({
@@ -190,26 +206,32 @@ test.describe('Inversión', () => {
     await holdVwceInFondos(page)
     await tracker.openInvestment()
 
-    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-    await section(page).getByRole('link', { name: 'VWCE' }).click()
+    await tracker.investmentSection.getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await tracker.investmentSection.getByRole('link', { name: 'VWCE' }).click()
     await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
-    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
-    await expect(section(page).getByRole('heading', { name: 'Cotización' })).toBeVisible()
-    const positions = section(page).locator('[data-instrument-position]')
+    await expect(tracker.investmentSection.getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Cotización' }),
+    ).toBeVisible()
+    const positions = tracker.investmentSection.locator('[data-instrument-position]')
     await expect(positions).toContainText('Fondos Indexados')
     await expect(positions).toContainText('15')
-    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
-    await expect(section(page).locator('[data-instrument-count]')).toHaveText('2 operaciones')
-    await expect(section(page).getByText('Compra 5 VWCE')).toHaveCount(0)
+    await expect(tracker.instrumentTotal).toContainText('1.950,00')
+    await expect(tracker.investmentSection.locator('[data-instrument-count]')).toHaveText(
+      '2 operaciones',
+    )
+    await expect(tracker.investmentSection.getByText('Compra 5 VWCE')).toHaveCount(0)
 
     await tracker.reload()
-    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
-    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
+    await expect(tracker.investmentSection.getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(tracker.instrumentTotal).toContainText('1.950,00')
 
     // The reload kept the history entry: the arrow still goes back to the account it came from.
-    await section(page).getByRole('link', { name: 'Volver a Inversión' }).click()
+    await tracker.investmentSection.getByRole('link', { name: 'Volver a Inversión' }).click()
     await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
-    await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Posiciones' }),
+    ).toBeVisible()
   })
 
   test('el atrás del navegador del instrumento vuelve al detalle de su cuenta', async ({
@@ -221,13 +243,15 @@ test.describe('Inversión', () => {
     await holdVwceInFondos(page)
     await tracker.openInvestment()
 
-    await section(page).getByRole('button', { name: 'Ver Fondos Indexados' }).click()
-    await section(page).getByRole('link', { name: 'VWCE' }).click()
+    await tracker.investmentSection.getByRole('button', { name: 'Ver Fondos Indexados' }).click()
+    await tracker.investmentSection.getByRole('link', { name: 'VWCE' }).click()
     await expect(page).toHaveURL(/instrumento=[^&]+/)
 
     await page.goBack()
     await expect(page).toHaveURL(/\/inversion\?activo=[^&]+$/)
-    await expect(section(page).getByRole('heading', { name: 'Posiciones' })).toBeVisible()
+    await expect(
+      tracker.investmentSection.getByRole('heading', { name: 'Posiciones' }),
+    ).toBeVisible()
   })
 
   test('agrupa la portada por instrumento y por tipo, recuerda la elección y abre el instrumento', async ({
@@ -239,7 +263,7 @@ test.describe('Inversión', () => {
     await holdVwceInFondos(page)
     await tracker.openInvestment()
 
-    const accounts = section(page).locator('[data-investment-accounts]')
+    const accounts = tracker.investmentAccounts
     await expect(accounts).toHaveAttribute('data-investment-grouping', 'account')
     await expect(accounts.getByRole('heading', { name: 'Cuentas' })).toBeVisible()
 
@@ -255,7 +279,7 @@ test.describe('Inversión', () => {
       .click()
     await saved
     await expect(accounts.getByRole('heading', { name: 'Instrumentos' })).toBeVisible()
-    const vwce = accounts.locator('[data-investment-instrument]')
+    const vwce = tracker.investmentInstrumentRows
     await expect(vwce).toHaveCount(1)
     await expect(vwce).toContainText('VWCE')
     await expect(vwce).toContainText('1 cuenta')
@@ -275,7 +299,7 @@ test.describe('Inversión', () => {
 
     await etf.getByRole('button', { name: 'Ver VWCE' }).click()
     await expect(page).toHaveURL(/\/inversion\?instrumento=[^&]+$/)
-    await expect(section(page).getByRole('heading', { level: 1 })).toHaveText('VWCE')
-    await expect(section(page).locator('[data-instrument-total]')).toContainText('1.950,00')
+    await expect(tracker.investmentSection.getByRole('heading', { level: 1 })).toHaveText('VWCE')
+    await expect(tracker.instrumentTotal).toContainText('1.950,00')
   })
 })
