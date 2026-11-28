@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { instrumentHref } from './asset-route'
-import type { PositionLine } from './asset-view-model'
+import type { PositionLine, UninstrumentedLine } from './asset-view-model'
 import { SPARK_HEIGHT, SPARK_WIDTH, TONE_STROKE, TONE_TEXT } from './view-model'
 
 // What an investment account holds: one line per instrument (a position, ADR
@@ -10,14 +10,18 @@ import { SPARK_HEIGHT, SPARK_WIDTH, TONE_STROKE, TONE_TEXT } from './view-model'
 // A position with no quote says so, quietly: its value is an estimate. The
 // symbol of each one is a link to its instrument's detail (#561): a real
 // address, so it opens in a tab and survives a reload, and it stretches over
-// the whole row so the row is the tap target.
+// the whole row so the row is the tap target. What the account holds with no
+// instrument (movements without units) closes the list as «Sin instrumento»,
+// with no link: there is no detail to open.
 withDefaults(
   defineProps<{
     positions: readonly PositionLine[]
+    /** What the account holds with no instrument, as one more row; null when negligible. */
+    uninstrumented?: UninstrumentedLine | null
     note: string | null
     stacked?: boolean
   }>(),
-  { stacked: false },
+  { stacked: false, uninstrumented: null },
 )
 
 const emit = defineEmits<{ open: [instrumentId: string] }>()
@@ -96,6 +100,26 @@ const COLUMNS =
             vector-effect="non-scaling-stroke"
           />
         </svg>
+      </li>
+      <li
+        v-if="uninstrumented"
+        class="border-line grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 border-t py-2.5"
+        data-asset-uninstrumented
+      >
+        <span class="text-row text-soft min-w-0 truncate font-bold">Sin instrumento</span>
+        <span class="font-display text-figure-row text-end font-semibold tabular-nums">
+          {{ uninstrumented.value }}
+        </span>
+        <span class="text-muted text-meta min-w-0 font-bold tabular-nums">
+          Has puesto {{ uninstrumented.invested }}
+        </span>
+        <span
+          class="text-meta text-end font-extrabold tabular-nums"
+          :class="TONE_TEXT[uninstrumented.tone]"
+        >
+          {{ uninstrumented.gain }}
+          <span v-if="uninstrumented.ret">{{ uninstrumented.ret }}</span>
+        </span>
       </li>
     </ul>
 
@@ -180,6 +204,33 @@ const COLUMNS =
           />
         </svg>
           </span>
+        </li>
+        <li
+          v-if="uninstrumented"
+          class="border-line grid items-center border-t py-3.5"
+          :class="COLUMNS"
+          data-asset-uninstrumented
+        >
+          <span class="text-soft text-row min-w-0 truncate font-bold">Sin instrumento</span>
+          <span class="text-muted text-note text-end font-bold">—</span>
+          <span class="text-muted text-note text-end font-bold">—</span>
+          <span class="font-display text-figure-row text-end font-semibold tabular-nums">
+            {{ uninstrumented.value }}
+          </span>
+          <span class="text-soft text-note text-end font-bold tabular-nums">{{
+            uninstrumented.invested
+          }}</span>
+          <span
+            class="flex flex-col items-end gap-px text-end tabular-nums"
+            :class="TONE_TEXT[uninstrumented.tone]"
+          >
+            <span class="text-note font-semibold">{{ uninstrumented.gain }}</span>
+            <span v-if="uninstrumented.ret" class="text-meta font-extrabold">{{
+              uninstrumented.ret
+            }}</span>
+          </span>
+          <span class="text-muted text-note text-end font-bold">—</span>
+          <span></span>
         </li>
       </ul>
     </template>

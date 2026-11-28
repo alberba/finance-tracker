@@ -2,6 +2,11 @@ export function round2(value: unknown): number {
   return Math.round(Number(value || 0) * 100) / 100
 }
 
+/** Rounds to the 8 decimals a crypto unit carries. */
+export function round8(value: number): number {
+  return Math.round((Number(value) || 0) * 100_000_000) / 100_000_000
+}
+
 /** An amount as the text a field shows to edit it ("64,32"); the inverse of `parseDecimal`. */
 export function formatDecimalInput(value: number): string {
   return String(round2(value)).replace('.', ',')

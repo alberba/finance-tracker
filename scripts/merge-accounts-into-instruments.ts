@@ -29,12 +29,8 @@
  *   --help               Muestra esta ayuda
  */
 
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { runWithDb } from '../src/db/database'
-import { usersRepository } from '../src/db/repositories'
-import { openLocalV2Db } from './lib/local-v2-db'
+import { COMMON_CLI_OPTIONS, runRepairCli, runWhenMain } from './lib/repair-cli'
 import {
   applyAccountMergePlan,
   buildAccountMergePlan,
@@ -98,79 +94,34 @@ export async function runMergeAccountsCli(argv: string[]): Promise<{
 }> {
   const { values } = parseArgs({
     args: argv,
-    options: {
-      'v2-sqlite': { type: 'string', default: '.data/finance-tracker-v2.sqlite' },
-      email: { type: 'string' },
-      'user-id': { type: 'string' },
-      merge: { type: 'string', multiple: true, default: [] },
-      execute: { type: 'boolean', default: false },
-      'dry-run': { type: 'boolean', default: false },
-      json: { type: 'boolean', default: false },
-      help: { type: 'boolean', default: false },
-    },
+    options: { ...COMMON_CLI_OPTIONS, merge: { type: 'string', multiple: true, default: [] } },
   })
   if (values.help) {
     console.log(HELP)
     return { plan: EMPTY_PLAN, executed: false }
   }
-
-  // Con --json, stdout es un único documento JSON: el resto va a stderr.
-  const log = values.json ? console.error : console.log
-  const execute = values.execute && !values['dry-run']
-  const requestedUserId = values['user-id']?.trim()
-  const requestedEmail = values.email?.trim()
-  if (!requestedUserId && !requestedEmail) {
-    throw new Error('Pasa --email=<email> o --user-id=<id> explícitamente para seleccionar el usuario.')
-  }
   const options = { merges: parseMerges(values.merge) }
 
-  // `openLocalV2Db` crea una base vacía si la ruta no existe: aquí sería un error de ruta.
-  const dbPath = resolve(values['v2-sqlite'] as string)
-  if (!existsSync(dbPath)) throw new Error(`La base de datos no existe: ${dbPath}`)
-  const { db, sqlite, close } = openLocalV2Db(dbPath)
-
-  try {
-    let userId = requestedUserId
-    if (!userId) {
-      const user = await runWithDb(db, usersRepository.getByEmail(requestedEmail!))
-      if (!user) throw new Error(`No se encontró ningún usuario con el email '${requestedEmail}'.`)
-      userId = user.id
-    }
-
-    const plan = await buildAccountMergePlan(db, userId, options)
-    log(formatAccountMergePlan(plan))
-
-    if (!execute) {
-      log('\n[SIMULACIÓN] No se ha escrito nada. Para aplicar el plan, ejecuta con --execute.')
-      if (values.json) console.log(JSON.stringify({ simulation: true, plan }, null, 2))
-      return { plan, executed: false }
-    }
-    if (plan.blockers.length > 0) {
-      throw new Error(`El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`)
-    }
-
-    const backupPath = `${dbPath}.antes-fusion-cuentas-${new Date().toISOString().replace(/[:.]/g, '-')}`
-    await sqlite.backup(backupPath)
-    log(`\nCopia de seguridad escrita en ${backupPath}`)
-
-    const report = await applyAccountMergePlan(db, userId, plan, options)
-    log(`Cuentas archivadas: ${report.accountsArchived}`)
-    log(`Instrumentos pasados a la cuenta de inversión: ${report.instrumentsMoved}`)
-    log(`Cierres mensuales fusionados: ${report.closesMerged}`)
-    log(`Aportes fusionados: ${report.allocationsMerged}`)
-    log(`Movimientos reasignados: ${report.movementsReassigned}`)
-    log('Patrimonio de cada mes y capital aportado: idénticos a antes de la fusión.')
-    if (values.json) console.log(JSON.stringify({ simulation: false, plan, report, backupPath }, null, 2))
-    return { plan, executed: true, report, backupPath }
-  } finally {
-    close()
-  }
+  return runRepairCli(values, {
+    backupLabel: 'fusion-cuentas',
+    buildPlan: (db, userId) => buildAccountMergePlan(db, userId, options),
+    formatPlan: formatAccountMergePlan,
+    assertExecutable: (plan) => {
+      if (plan.blockers.length > 0) {
+        throw new Error(`El plan no se puede ejecutar:\n${plan.blockers.map((item) => `  - ${item}`).join('\n')}`)
+      }
+    },
+    apply: (db, userId, plan) => applyAccountMergePlan(db, userId, plan, options),
+    reportLines: (report) => [
+      `Cuentas archivadas: ${report.accountsArchived}`,
+      `Instrumentos pasados a la cuenta de inversión: ${report.instrumentsMoved}`,
+      `Cierres mensuales fusionados: ${report.closesMerged}`,
+      `Aportes fusionados: ${report.allocationsMerged}`,
+      `Movimientos reasignados: ${report.movementsReassigned}`,
+      'Patrimonio de cada mes y capital aportado: idénticos a antes de la fusión.',
+    ],
+  })
 }
 
 // Solo se ejecuta cuando se lanza directamente desde la CLI.
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runMergeAccountsCli(process.argv.slice(2)).catch((error) => {
-    console.error(`\nError: ${(error as Error).message}`)
-    process.exitCode = 1
-  })
-}
+runWhenMain(import.meta.url, () => runMergeAccountsCli(process.argv.slice(2)))

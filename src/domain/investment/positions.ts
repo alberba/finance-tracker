@@ -1,9 +1,10 @@
-import { round2 } from '../../lib/number'
+import { round2, round8 } from '../../lib/number'
 import { movementBelongsToInvestmentAsset, type Entity } from '../../lib/finance-core'
 import type { MonthOrStart } from '../../lib/month'
 import type { Instrument, InstrumentType, State, Transaction } from '../../scripts/types'
 import { computeInvestmentValue } from './calculations'
 import { symbolsMatchInstrument } from './symbol-matching'
+import { returnPercent } from './return-percent'
 import { quoteUnitPrice } from './valuation'
 
 // Posiciones (ADR 0011): lo que se tiene de un instrumento en una cuenta de
@@ -48,7 +49,19 @@ export interface PositionOptions {
    * so a past month can be valued at its own close.
    */
   unitPrices?: Record<string, number>
+  /** Only this account: the others are not computed. */
+  accountId?: string
 }
+
+/** What an account holds with no instrument: capital and the part of its value that goes with it. */
+export interface UninstrumentedHolding {
+  accountId: string
+  invested: number
+  value: number
+}
+
+/** Below this many currency units a leftover is rounding dust, not a holding to show. */
+const NEGLIGIBLE_AMOUNT = 0.5
 
 interface Holding {
   accountId: string
@@ -59,8 +72,6 @@ interface Holding {
   invested: number
   lastMovementDate: string
 }
-
-const round8 = (value: number): number => Math.round(value * 1e8) / 1e8
 
 /**
  * The investment account a movement belongs to: its explicit destination
@@ -100,15 +111,30 @@ export function instrumentOfMovement(
   )
 }
 
-function collectHoldings(state: State, month: MonthOrStart): Holding[] {
-  const holdings = new Map<string, Holding>()
-  const movements = state.transactions
+interface AccountMovements {
+  holdings: Holding[]
+  /** Opening balance plus every investment movement up to the month, by account. */
+  invested: Map<string, number>
+}
+
+/** One pass over the movements up to the month: what each account holds and what went into it. */
+function collectMovements(state: State, month: MonthOrStart): AccountMovements {
+  const invested = new Map<string, number>(
+    state.investmentAssets.map((asset) => [asset.id, Number(asset.openingBalance || 0)]),
+  )
+  const owned = state.transactions
     .filter((tx) => tx.type === 'investment' && Number(tx.month) <= month)
-    .toSorted((a, b) => String(a.date).localeCompare(String(b.date)))
-  for (const tx of movements) {
+    .map((tx) => ({ tx, accountId: accountOfMovement(state, tx) }))
+  for (const { tx, accountId } of owned) {
+    if (accountId)
+      invested.set(accountId, (invested.get(accountId) ?? 0) + (Number(tx.amount) || 0))
+  }
+
+  const holdings = new Map<string, Holding>()
+  const byDate = owned.toSorted((a, b) => String(a.tx.date).localeCompare(String(b.tx.date)))
+  for (const { tx, accountId } of byDate) {
     const units = Number(tx.units)
     if (!tx.side || !Number.isFinite(units) || units <= 0) continue
-    const accountId = accountOfMovement(state, tx)
     if (!accountId) continue
     const instrument = instrumentOfMovement(state, tx, accountId)
     if (!instrument) continue
@@ -133,35 +159,36 @@ function collectHoldings(state: State, month: MonthOrStart): Holding[] {
       holding.boughtCost += units * Number(tx.unitPrice || 0)
     }
   }
-  return [...holdings.values()].filter((holding) => round8(holding.units) > 0)
+  return {
+    holdings: [...holdings.values()].filter((holding) => round8(holding.units) > 0),
+    invested,
+  }
 }
 
-function toReturnPct(gain: number, invested: number): number {
-  return invested <= 0 ? 0 : (gain / invested) * 100
+interface AccountBreakdown {
+  positions: AccountPosition[]
+  other: UninstrumentedHolding
 }
 
 /**
- * The positions of every investment account at the end of a month, by account
- * in the state's order and by value within it.
- *
- * Movements without an instrument or without units add to the account's value
- * and capital but make no position; a position left with no units is not listed.
- * A position with a quote is worth units × price; the rest share what the
- * quoted ones leave of the account's value in proportion to what they cost
- * (the capital of movements that are no position keeps its own share).
+ * Splits each investment account's value between its positions and what no
+ * position explains. A position with a quote is worth units × price; the rest
+ * share what the quoted ones leave of the account's value in proportion to what
+ * they cost, and the capital of movements that are no position keeps its own
+ * share.
  */
-export function buildAccountPositions(
+function breakdownAccounts(
   state: State,
   month: MonthOrStart,
-  options: PositionOptions = {},
-): AccountPosition[] {
+  options: PositionOptions,
+): AccountBreakdown[] {
   const baseCurrency = String(state.currency || 'EUR').toUpperCase()
-  const holdings = collectHoldings(state, month)
-  const positions: AccountPosition[] = []
+  const { holdings, invested } = collectMovements(state, month)
+  const breakdowns: AccountBreakdown[] = []
 
   for (const account of state.investmentAssets) {
+    if (options.accountId !== undefined && account.id !== options.accountId) continue
     const own = holdings.filter((holding) => holding.accountId === account.id)
-    if (!own.length) continue
 
     const unitPrices = own.map((holding) => {
       const given = options.unitPrices?.[holding.instrument.id]
@@ -182,16 +209,7 @@ export function buildAccountPositions(
     const positionalInvested = own.reduce((sum, holding) => sum + holding.invested, 0)
     // Capital the account carries that no position explains: the opening balance
     // and the movements without instrument or units.
-    const accountInvested = state.transactions.reduce(
-      (sum, tx) =>
-        tx.type === 'investment' &&
-        Number(tx.month) <= month &&
-        accountOfMovement(state, tx) === account.id
-          ? sum + (Number(tx.amount) || 0)
-          : sum,
-      Number(account.openingBalance || 0),
-    )
-    const otherInvested = accountInvested - positionalInvested
+    const otherInvested = (invested.get(account.id) ?? 0) - positionalInvested
     const unquotedInvested = own.reduce(
       (sum, holding, index) =>
         unitPrices[index] === null ? sum + Math.max(0, holding.invested) : sum,
@@ -200,15 +218,13 @@ export function buildAccountPositions(
     const accountValue = computeInvestmentValue(state, account.id, month)
     const estimate = Math.max(0, accountValue - quotedValue)
     const estimateBase = unquotedInvested + Math.max(0, otherInvested)
+    const estimated = (capital: number) =>
+      estimateBase > 0 ? (estimate * Math.max(0, capital)) / estimateBase : 0
 
     const rows = own.map((holding, index) => {
       const price = unitPrices[index]
       const priced = price !== null
-      const value = priced
-        ? holding.units * price
-        : estimateBase > 0
-          ? (estimate * Math.max(0, holding.invested)) / estimateBase
-          : 0
+      const value = priced ? holding.units * price : estimated(holding.invested)
       const gain = round2(value - holding.invested)
       return {
         accountId: account.id,
@@ -221,14 +237,67 @@ export function buildAccountPositions(
         value: round2(value),
         priced,
         gain,
-        returnPct: toReturnPct(gain, holding.invested),
+        returnPct: returnPercent(gain, holding.invested),
         weight: 0,
         lastMovementDate: holding.lastMovementDate,
       }
     })
     const total = rows.reduce((sum, row) => sum + row.value, 0)
     for (const row of rows) row.weight = total > 0 ? (row.value / total) * 100 : 0
-    positions.push(...rows.toSorted((a, b) => b.value - a.value))
+    breakdowns.push({
+      positions: rows.toSorted((a, b) => b.value - a.value),
+      other: {
+        accountId: account.id,
+        invested: round2(otherInvested),
+        value: round2(estimated(otherInvested)),
+      },
+    })
   }
-  return positions
+  return breakdowns
+}
+
+/**
+ * The positions of every investment account at the end of a month, by account
+ * in the state's order and by value within it, and what the accounts hold that
+ * no position explains.
+ *
+ * Movements without an instrument or without units add to the account's value
+ * and capital but make no position: they come back as `uninstrumented`, for the
+ * accounts where it is not negligible (the opening balance counts with them).
+ * A position left with no units is not listed.
+ */
+export function buildAccountHoldings(
+  state: State,
+  month: MonthOrStart,
+  options: PositionOptions = {},
+): { positions: AccountPosition[]; uninstrumented: UninstrumentedHolding[] } {
+  const breakdowns = breakdownAccounts(state, month, options)
+  return {
+    positions: breakdowns.flatMap(({ positions }) => positions),
+    uninstrumented: breakdowns
+      .map(({ other }) => other)
+      .filter(
+        (other) =>
+          Math.abs(other.invested) >= NEGLIGIBLE_AMOUNT ||
+          Math.abs(other.value) >= NEGLIGIBLE_AMOUNT,
+      ),
+  }
+}
+
+/** The positions alone (see `buildAccountHoldings`). */
+export function buildAccountPositions(
+  state: State,
+  month: MonthOrStart,
+  options: PositionOptions = {},
+): AccountPosition[] {
+  return buildAccountHoldings(state, month, options).positions
+}
+
+/** What accounts hold with no instrument alone (see `buildAccountHoldings`). */
+export function buildUninstrumentedHoldings(
+  state: State,
+  month: MonthOrStart,
+  options: PositionOptions = {},
+): UninstrumentedHolding[] {
+  return buildAccountHoldings(state, month, options).uninstrumented
 }

@@ -29,6 +29,21 @@ describe('projectSyncV2State', () => {
     })])
   })
 
+  it('marks an archived investment account but keeps it, so its history still resolves', () => {
+    const b = bootstrap()
+    b.accounts.push(
+      { id: 'server-etf', legacyId: 'etf', name: 'ETF', kind: 'investment', openingBalance: 0, isArchived: true },
+      { id: 'server-tr', legacyId: 'tr', name: 'Trade Republic', kind: 'investment', openingBalance: 0, isArchived: false },
+    )
+
+    const state = projectSyncV2State(b)
+
+    expect(state.investmentAssets).toEqual([
+      { id: 'etf', name: 'ETF', openingBalance: 0, archived: true },
+      { id: 'tr', name: 'Trade Republic', openingBalance: 0 },
+    ])
+  })
+
   it('preserves snapshots from other years outside the active month map', () => {
     const data = bootstrap()
     data.wealthSnapshots = [2025, 2026].map((year) => ({

@@ -82,12 +82,13 @@ function onBack(event: MouseEvent): void {
     >
       <div class="grid min-w-0 gap-[22px]">
         <section
-          v-if="detail.positions.length"
+          v-if="detail.positions.length || detail.uninstrumented"
           :class="CARD"
           class="motion-safe:animate-rise motion-safe:[animation-delay:50ms]"
         >
           <NeonInvestmentAssetPositions
             :positions="detail.positions"
+            :uninstrumented="detail.uninstrumented"
             :note="detail.unpricedNote"
             @open="emit('openInstrument', $event)"
           />

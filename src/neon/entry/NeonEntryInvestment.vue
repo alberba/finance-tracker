@@ -39,6 +39,11 @@ function nowTime(): string {
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
+/** The id when it is an investment account still offered for new movements. */
+function activeInvestmentAccountId(id: string | undefined): string | undefined {
+  return financialStateStore.activeInvestmentAssets.find((asset) => asset.id === id)?.id
+}
+
 const form = reactive({
   side: (props.preset?.side ?? 'buy') as InvestmentSide,
   symbol: props.preset?.symbol ?? '',
@@ -48,11 +53,13 @@ const form = reactive({
     investmentStore.accounts[0]?.id ??
     '',
   investmentAccountId:
-    financialStateStore.investmentAssets.find(
-      (asset) => asset.id === props.preset?.destinationAccountId,
-    )?.id ??
-    (props.preset?.symbol ? investmentStore.defaultInvestmentAccountId(props.preset.symbol) : '') ??
-    financialStateStore.investmentAssets[0]?.id ??
+    activeInvestmentAccountId(props.preset?.destinationAccountId) ??
+    activeInvestmentAccountId(
+      props.preset?.symbol
+        ? investmentStore.defaultInvestmentAccountId(props.preset.symbol)
+        : undefined,
+    ) ??
+    financialStateStore.activeInvestmentAssets[0]?.id ??
     '',
   units: '',
   unitPrice: '',
@@ -71,7 +78,7 @@ watch(
   () => form.symbol,
   (symbol) => {
     if (investmentAccountPicked) return
-    const account = investmentStore.defaultInvestmentAccountId(symbol)
+    const account = activeInvestmentAccountId(investmentStore.defaultInvestmentAccountId(symbol))
     if (account) form.investmentAccountId = account
   },
 )
@@ -87,7 +94,7 @@ const brokerOptions = computed(() =>
   investmentStore.accounts.map((account) => ({ value: account.id, label: account.name })),
 )
 const investmentAccountOptions = computed(() =>
-  financialStateStore.investmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
+  financialStateStore.activeInvestmentAssets.map((asset) => ({ value: asset.id, label: asset.name })),
 )
 const categoryOptions = computed(() =>
   (isBitvavo.value ? ['Crypto'] : investmentStore.investmentCategories).map((name) => ({
@@ -150,7 +157,7 @@ function save(): boolean {
     fee: asInput(form.fee) || '0',
     movementCurrency: form.movementCurrency,
     accountId: form.accountId,
-    destinationAccountId: form.investmentAccountId,
+    destinationAccountId: form.investmentAccountId || undefined,
     declared: form.declared,
     toCash: canSync.value && form.toCash,
   })

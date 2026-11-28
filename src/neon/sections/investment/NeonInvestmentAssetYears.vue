@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { OPERATION_ICONS } from './asset-icons'
-import type { AssetYear } from './asset-view-model'
+import type { AssetYear } from './movements'
 
 // The operations of an asset by year, newest first: each year with what was
 // bought and sold in it, and a row per movement. The day leads (in a run of

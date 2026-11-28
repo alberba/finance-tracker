@@ -18,7 +18,12 @@ import {
   computeInvestmentValue,
 } from './calculations'
 import { getContributionEntriesFromSnapshots } from './contributions'
-import { buildAccountPositions, type AccountPosition, type PositionOptions } from './positions'
+import {
+  buildAccountHoldings,
+  type AccountPosition,
+  type PositionOptions,
+  type UninstrumentedHolding,
+} from './positions'
 
 export type ReturnMode = 'simple' | 'twr'
 
@@ -61,6 +66,8 @@ export interface InvestmentDashboardViewModel {
   accounts: InvestmentAccount[]
   /** What each account holds, one entry per account × instrument (see `buildAccountPositions`). */
   positions: AccountPosition[]
+  /** What accounts hold with no instrument, when it is not negligible (see `buildUninstrumentedHoldings`). */
+  uninstrumented: UninstrumentedHolding[]
   /** € view: portfolio value against contributed capital. */
   valueSeries: ChartSeries[]
   /** % view: cumulative return of the portfolio. */
@@ -150,7 +157,7 @@ export function buildInvestmentDashboardViewModel(
     returnIsGood: displayReturn >= 0,
     returnLabel: isTWR ? 'Rentabilidad TWR' : 'Rentabilidad estimada',
     accounts,
-    positions: buildAccountPositions(state, month, positionOptions),
+    ...buildAccountHoldings(state, month, positionOptions),
     valueSeries: [
       { name: 'Valor de cartera', values: portfolioTotalValues },
       {

@@ -1,6 +1,7 @@
 import { round2 } from '../../lib/number'
 import type { InstrumentType } from '../../scripts/types'
 import type { AccountPosition } from './positions'
+import { returnPercent } from './return-percent'
 
 // Agrupar posiciones (ADR 0011): la portada de Inversión puede mostrar la
 // cartera por cuenta, por instrumento o por tipo de instrumento. Por cuenta ya
@@ -42,8 +43,13 @@ export interface TypeGroup {
   instruments: InstrumentGroup[]
 }
 
-const returnOf = (gain: number, invested: number): number =>
-  invested <= 0 ? 0 : (gain / invested) * 100
+/** What went in and what it is worth, summed; the gain and return come from the rounded sums. */
+function sumFigures(items: readonly { invested: number; value: number }[]) {
+  const invested = round2(items.reduce((sum, item) => sum + item.invested, 0))
+  const value = round2(items.reduce((sum, item) => sum + item.value, 0))
+  const gain = round2(value - invested)
+  return { invested, value, gain, returnPct: returnPercent(gain, invested) }
+}
 
 /** One row per instrument, by value; the positions of an instrument in several accounts add up. */
 export function groupByInstrument(positions: readonly AccountPosition[]): InstrumentGroup[] {
@@ -56,21 +62,14 @@ export function groupByInstrument(positions: readonly AccountPosition[]): Instru
   const total = positions.reduce((sum, position) => sum + position.value, 0)
   return [...byInstrument.values()]
     .map((own) => {
-      const sum = (pick: (position: AccountPosition) => number) =>
-        own.reduce((acc, position) => acc + pick(position), 0)
-      const invested = round2(sum((position) => position.invested))
-      const value = round2(sum((position) => position.value))
-      const gain = round2(value - invested)
+      const figures = sumFigures(own)
       return {
         instrumentId: own[0].instrumentId,
         symbol: own[0].symbol,
         instrumentType: own[0].instrumentType,
-        units: sum((position) => position.units),
-        invested,
-        value,
-        gain,
-        returnPct: returnOf(gain, invested),
-        weight: total > 0 ? (value / total) * 100 : 0,
+        units: own.reduce((sum, position) => sum + position.units, 0),
+        ...figures,
+        weight: total > 0 ? (figures.value / total) * 100 : 0,
         accounts: own.length,
         priced: own.every((position) => position.priced),
       }
@@ -88,15 +87,9 @@ export function groupByType(positions: readonly AccountPosition[]): TypeGroup[] 
   }
   return [...byType.entries()]
     .map(([type, instruments]) => {
-      const invested = round2(instruments.reduce((sum, item) => sum + item.invested, 0))
-      const value = round2(instruments.reduce((sum, item) => sum + item.value, 0))
-      const gain = round2(value - invested)
       return {
         type,
-        invested,
-        value,
-        gain,
-        returnPct: returnOf(gain, invested),
+        ...sumFigures(instruments),
         weight: instruments.reduce((sum, item) => sum + item.weight, 0),
         instruments,
       }

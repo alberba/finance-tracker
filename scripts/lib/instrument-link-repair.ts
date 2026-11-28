@@ -19,14 +19,14 @@ import {
   accounts,
   investmentTradeDetails,
   marketInstruments,
-  syncChanges,
   transactions,
   userInstruments,
 } from '../../src/db/schema'
 import { runWithDb } from '../../src/db/database'
-import * as syncRepository from '../../src/db/repositories/sync'
 import * as transactionsRepository from '../../src/db/repositories/transactions'
 import { chunkIds, nowIso, runInTransaction, type Db } from '../../src/db/repositories/shared'
+import { normalizeSymbol } from '../../src/domain/investment/symbol-matching'
+import { publishSyncChange, resolveActiveAccountByName } from './repair-shared'
 
 /** Compras de un símbolo que deben constar en la cuenta con ese nombre. */
 export interface AccountMove {
@@ -76,12 +76,6 @@ export interface InstrumentLinkRepairPlan {
 export interface InstrumentLinkRepairReport {
   instrumentsLinked: number
   accountsMoved: number
-}
-
-function normalizeSymbol(value: string | null | undefined): string {
-  return String(value ?? '')
-    .trim()
-    .toUpperCase()
 }
 
 async function investmentMovements(db: Db, userId: string) {
@@ -139,21 +133,17 @@ async function resolveMoveTargets(
   moves: readonly AccountMove[],
 ): Promise<Map<string, AccountRef>> {
   const rows = await db
-    .select({ id: accounts.id, name: accounts.name })
+    .select({ id: accounts.id, name: accounts.name, isArchived: accounts.isArchived })
     .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.isArchived, 0)))
+    .where(eq(accounts.userId, userId))
   const targets = new Map<string, AccountRef>()
   for (const move of moves) {
-    const wanted = move.accountName.trim().toLowerCase()
-    const matches = rows.filter((row) => row.name.trim().toLowerCase() === wanted)
-    if (matches.length !== 1) {
-      throw new Error(
-        matches.length === 0
-          ? `No hay ninguna cuenta activa llamada '${move.accountName}' para las compras de ${move.symbol}.`
-          : `Hay ${matches.length} cuentas activas llamadas '${move.accountName}'; no se sabe a cuál pasar las compras de ${move.symbol}.`,
-      )
-    }
-    targets.set(normalizeSymbol(move.symbol), matches[0])
+    const target = resolveActiveAccountByName(rows, move.accountName, {
+      none: `No hay ninguna cuenta activa llamada '${move.accountName}' para las compras de ${move.symbol}.`,
+      several: (count) =>
+        `Hay ${count} cuentas activas llamadas '${move.accountName}'; no se sabe a cuál pasar las compras de ${move.symbol}.`,
+    })!
+    targets.set(normalizeSymbol(move.symbol), { id: target.id, name: target.name })
   }
   return targets
 }
@@ -315,16 +305,16 @@ export async function applyInstrumentLinkRepairPlan(
         db,
         transactionsRepository.getTradeDetailByTransaction(userId, movement.transactionId),
       )
-      const { revision } = await runWithDb(db, syncRepository.bumpRevision(userId))
-      await db.insert(syncChanges).values({
+      await publishSyncChange(
+        db,
         userId,
-        revision,
-        entityType: 'transaction',
-        entityId: movement.transactionId,
-        changeType: 'upsert',
-        payload: JSON.stringify({ ...updated, tradeDetail }),
-        createdAt: now,
-      })
+        {
+          entityType: 'transaction',
+          entityId: movement.transactionId,
+          payload: { ...updated, tradeDetail },
+        },
+        now,
+      )
     }
 
     return { instrumentsLinked, accountsMoved }

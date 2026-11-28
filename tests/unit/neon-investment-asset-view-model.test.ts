@@ -128,6 +128,17 @@ describe('assetDetail', () => {
     expect(detail?.unpricedNote).toBeNull()
   })
 
+  it('muestra «sin instrumento» cuando la cuenta tiene capital que ninguna posición explica', () => {
+    expect(detailOf('oro')?.uninstrumented).toEqual({
+      value: '180,00\u00a0€',
+      invested: '200,00\u00a0€',
+      gain: '−20,00\u00a0€',
+      ret: '−10,0\u00a0%',
+      tone: 'loss',
+    })
+    expect(detailOf('fondos')?.uninstrumented).toBeNull()
+  })
+
   it('una cuenta con varios instrumentos no tiene un recuento único de títulos', () => {
     const state = portfolio({
       instruments: [

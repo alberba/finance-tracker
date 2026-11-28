@@ -31,7 +31,11 @@ test('abre un activo desde la portada, entra en sus movimientos y vuelve con atr
   await expect(bar.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(section(page).getByRole('heading', { name: 'Inversión', level: 1 })).toHaveCount(0)
   await expect(section(page).getByRole('heading', { name: 'Tu posición' })).toBeVisible()
-  await expect(section(page).getByText('Has puesto')).toBeVisible()
+  await expect(section(page).getByText('Has puesto', { exact: true })).toBeVisible()
+  // The movements with no instrument close the account's positions as one row.
+  await expect(section(page).locator('[data-asset-uninstrumented]')).toContainText(
+    'Sin instrumento',
+  )
 
   await section(page)
     .getByRole('button', { name: /^Ver tus movimientos/ })

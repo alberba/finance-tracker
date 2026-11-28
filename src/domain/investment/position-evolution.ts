@@ -48,9 +48,7 @@ export function buildPositionEvolution(
       unitPrices[instrumentId] =
         close * getExchangeRate(currency || baseCurrency, baseCurrency, options.fxRates ?? {})
     }
-    const positions = buildAccountPositions(state, month as 0, { unitPrices }).filter(
-      (position) => position.accountId === accountId,
-    )
+    const positions = buildAccountPositions(state, month as 0, { unitPrices, accountId })
     for (const position of positions) {
       const line = evolution.get(position.instrumentId) ?? {
         instrumentId: position.instrumentId,
