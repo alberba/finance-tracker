@@ -129,7 +129,9 @@ export function persistState(state: State): string {
   }
 
   state.meta.savedAt = new Date().toISOString()
-  localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(state))
+  // The StockEvents API key is a secret: never write it to localStorage.
+  const persisted = { ...state, stockEvents: { ...state.stockEvents, apiKey: '' } }
+  localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(persisted))
   return state.meta.savedAt
 }
 

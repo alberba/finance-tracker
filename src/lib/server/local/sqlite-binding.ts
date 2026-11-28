@@ -48,7 +48,7 @@ class SqliteStatement {
     // Only the connection owner may control transaction lifetime, including
     // commands preceded by SQL comments or empty statements.
     if (
-      /^(?:\s|;|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*(begin|savepoint|commit|rollback|release|end)\b/i.test(
+      /^(?:\s|;|--[^\n]*(?:\n|$)|\/\*(?:[^*]|\*(?!\/))*\*\/)*(begin|savepoint|commit|rollback|release|end)\b/i.test(
         this.#sql,
       )
     ) {
