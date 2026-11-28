@@ -368,25 +368,32 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 // panel and the content fades in. Closing runs it back into the button. A sheet
 // dragged down leaves by its edge instead. The side panel has no morph.
 const MORPH_EASE = 'cubic-bezier(0.2, 0, 0, 1)'
-const MORPH_IN_MS = { mini: 220, sheet: 380 }
-const MORPH_OUT_MS = { mini: 180, sheet: 260 }
+// Durations mirror DESIGN.md («Hoja / panel de alta»); the no-opener fallback
+// keyframes at the end of the stylesheet carry the mini modal's 220/180ms too.
+const MORPH_MS = { mini: { in: 220, out: 180 }, sheet: { in: 380, out: 260 } }
 let morphing: Animation[] = []
 
 function morphKeyframes(
   element: HTMLElement,
 ): { shape: Keyframe[]; colour: Keyframe[]; content: Keyframe[] } | null {
-  if ((sheet.value && !narrow.value) || !opener?.isConnected) return null
-  const from = opener.getBoundingClientRect()
+  const sidePanel = sheet.value && !narrow.value
+  // Focus can rest on the page itself: that is no button to grow from.
+  const origin = opener === document.body || opener === document.documentElement ? null : opener
+  if (sidePanel || !origin?.isConnected) return null
+  const from = origin.getBoundingClientRect()
   if (!from.width || !from.height) return null
   const box = element.getBoundingClientRect()
-  const openerStyle = getComputedStyle(opener)
+  const openerStyle = getComputedStyle(origin)
   const radius = Math.min(parseFloat(openerStyle.borderTopLeftRadius) || 0, from.height / 2)
   const surfaceRadius = parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0
   const panel = getComputedStyle(element).backgroundColor
   const colour = /rgba?\(.*,\s*0\)$|transparent/.test(openerStyle.backgroundColor)
     ? panel
     : openerStyle.backgroundColor
-  const start = `inset(${from.top - box.top}px ${box.right - from.right}px ${box.bottom - from.bottom}px ${from.left - box.left}px round ${radius}px)`
+  // Bounds are viewport pixels; clip-path lengths are scaled by the frame's zoom.
+  const zoom = Number(getComputedStyle(element).getPropertyValue('--ui-zoom')) || 1
+  const inset = (distance: number) => `${distance / zoom}px`
+  const start = `inset(${inset(from.top - box.top)} ${inset(box.right - from.right)} ${inset(box.bottom - from.bottom)} ${inset(from.left - box.left)} round ${radius}px)`
   const end = sheet.value
     ? `inset(0px 0px 0px 0px round ${surfaceRadius}px ${surfaceRadius}px 0px 0px)`
     : `inset(0px 0px 0px 0px round ${surfaceRadius}px)`
@@ -414,7 +421,7 @@ function morphIn(element: HTMLElement): boolean {
   const frames = morphKeyframes(element)
   if (!frames) return false
   element.setAttribute('data-morph', '')
-  const duration = MORPH_IN_MS[sheet.value ? 'sheet' : 'mini']
+  const duration = MORPH_MS[sheet.value ? 'sheet' : 'mini'].in
   morphing = [
     element.animate(frames.shape, { duration, easing: MORPH_EASE }),
     element.animate(frames.colour, { duration, easing: 'linear' }),
@@ -433,7 +440,7 @@ function morphOut(element: HTMLElement, done: () => void): boolean {
   stopMorph()
   element.setAttribute('data-morph', '')
   const options = {
-    duration: MORPH_OUT_MS[sheet.value ? 'sheet' : 'mini'],
+    duration: MORPH_MS[sheet.value ? 'sheet' : 'mini'].out,
     easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
     fill: 'forwards',
   } as const
@@ -1284,7 +1291,7 @@ const labelClass = ENTRY_LABEL_CLASS
     animation: none;
   }
 
-  /* The veil fades in and out (260ms/200ms on desktop, 240ms/200ms on phone). */
+  /* The veil fades in and out (durations in DESIGN.md). */
   .neon-entry::backdrop {
     animation: neon-fade-in 240ms ease-out;
   }
@@ -1319,7 +1326,7 @@ const labelClass = ENTRY_LABEL_CLASS
   }
 }
 
-/* No opener: centred, fading and popping in/out. */
+/* No opener: the mini modal, centred, fades and pops in and out (`--entry-from-*` is 0.97 then). */
 @keyframes neon-mini-in {
   from {
     opacity: 0;
