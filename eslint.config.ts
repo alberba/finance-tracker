@@ -32,7 +32,6 @@ export default defineConfig([
   {
     ignores: [
       'dist/**',
-      'coverage/**',
       '.astro/**',
       '.wrangler/**',
       '.scratch/**',
