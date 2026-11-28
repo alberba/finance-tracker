@@ -9,6 +9,10 @@ import type { Instrument, InstrumentType } from '../scripts/types'
 import { newId } from '../lib/client/ids'
 import { resolveEntityId, syncCreate, syncUpdate, syncRemove } from '../lib/client/command-mapping'
 import { isReadOnlyDemoActive } from '../lib/client/demo-source'
+import {
+  linkInstrumentMovements,
+  type InstrumentLinkAcceptance,
+} from '../lib/client/instrument-link'
 import { useFinancialStateStore } from './financial-state'
 import { useSyncStore } from './sync'
 
@@ -193,6 +197,20 @@ export const useMarketStore = defineStore('market', () => {
     }
   }
 
+  /**
+   * Links this instrument's unlinked movements as one durable intent (#487):
+   * accepted once it is stored on this device; its progress and any failure
+   * show in the sync status.
+   */
+  function linkExistingMovements(instrumentId: string): Promise<InstrumentLinkAcceptance> {
+    return linkInstrumentMovements({
+      instrumentId,
+      onError: (message) => {
+        errorMessage.value = message
+      },
+    })
+  }
+
   return {
     instruments,
     quotes,
@@ -201,6 +219,7 @@ export const useMarketStore = defineStore('market', () => {
     lastRefreshAt,
     addInstrument,
     removeInstrument,
+    linkExistingMovements,
     refreshQuotes,
     tickClock,
     startClock,

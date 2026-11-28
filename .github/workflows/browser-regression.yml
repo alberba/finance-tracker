@@ -19,7 +19,6 @@ env:
   GIT_CONFIG_KEY_0: init.defaultBranch
   GIT_CONFIG_VALUE_0: main
 
-# Keep this image aligned with @playwright/test in package.json.
 # These jobs never trigger production deployment.
 jobs:
   vitest:
@@ -35,9 +34,6 @@ jobs:
     name: Full E2E shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 6
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --shm-size=1g
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +42,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
-          playwright: container
+          playwright: true
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Run functional E2E shard
@@ -65,14 +61,11 @@ jobs:
     name: Sync v2 E2E
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --shm-size=1g
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
-          playwright: container
+          playwright: true
       - name: Enable the test auth shim
         run: printf 'TEST_AUTH_ENABLED=true\n' > .dev.vars
       - name: Generate an ephemeral integration encryption key
@@ -93,14 +86,11 @@ jobs:
     name: Better Auth Worker and browser contracts
     runs-on: ubuntu-latest
     timeout-minutes: 6
-    container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
-      options: --shm-size=1g
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
         with:
-          playwright: container
+          playwright: true
       - name: Run isolated Better Auth Worker E2E
         run: pnpm test:e2e:auth --reporter=dot,html
       - name: Upload authentication report

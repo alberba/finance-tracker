@@ -2,8 +2,11 @@
 /**
  * User menu at the foot of the sidebar: who is signed in, sync status, demo
  * mode and logout. The ids and data attributes are what src/scripts/shell.ts
- * binds to.
+ * binds to; the intent surface shows a change kept on this device that could
+ * not be completed, with its retry and discard.
  */
+const ACTION =
+  'bg-panel2 text-text rounded-field outline-accent min-h-9 px-3 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 motion-safe:transition-transform motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]'
 const ITEM =
   'rounded-field outline-accent flex min-h-11 w-full items-start gap-3 px-3 py-2.5 text-start focus-visible:outline-2 focus-visible:-outline-offset-2 pointer-fine:hover:bg-panel2 motion-safe:transition-[transform,background-color] motion-safe:duration-140 motion-safe:ease-out motion-safe:active:scale-[0.96]'
 ---
@@ -61,6 +64,18 @@ const ITEM =
     >
       Sincronizado
     </span>
+    <div
+      id="sidebar-intent-status"
+      class="border-line grid gap-2 border-b px-3 pt-1 pb-3"
+      data-intent-surface
+      hidden
+    >
+      <p class="text-soft text-meta" data-intent-message>Guardado en este dispositivo</p>
+      <div class="flex flex-wrap gap-2" data-intent-actions>
+        <button class={ACTION} type="button" data-intent-retry>Reintentar</button>
+        <button class={ACTION} type="button" data-intent-discard>Descartar</button>
+      </div>
+    </div>
     <button
       id="demo-mode-menu-action"
       class={ITEM}

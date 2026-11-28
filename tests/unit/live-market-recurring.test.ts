@@ -261,7 +261,7 @@ describe('reglas recurrentes y pendientes', () => {
 
       const store = useRecurringStore()
       expect(
-        store.addRule({
+        await store.addRule({
           type: 'investment',
           accountId: 'broker',
           category: 'Fondos Indexados',
@@ -278,10 +278,10 @@ describe('reglas recurrentes y pendientes', () => {
           startDate: '2024-02-01',
         }),
       ).toBe(true)
-      store.refreshPending('2024-02-20')
+      await store.refreshPending('2024-02-20')
       const pendingId = store.openPendingMovements[0]?.id
       expect(pendingId).toBeTruthy()
-      expect(store.confirmPending(pendingId as string)).toBe(true)
+      expect((await store.confirmPending(pendingId as string)).accepted).toBe(true)
 
       await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
       expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/stockevents/transactions')
@@ -299,7 +299,6 @@ describe('reglas recurrentes y pendientes', () => {
         feesCurrency: 'EUR',
         type: 'buy',
       })
-      await new Promise((resolve) => setTimeout(resolve, 0))
     } finally {
       vi.unstubAllGlobals()
     }

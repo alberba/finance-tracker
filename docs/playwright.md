@@ -1,12 +1,13 @@
 # Playwright
 
-La suite de navegador se divide en recorridos funcionales, smoke y escenarios especializados de
-sync v2. Cada E2E prueba un recorrido; las reglas están en los
-[criterios E2E de los estándares](../CODING_STANDARDS.md#e2e). Todo cliente autenticado usa sync v2.
-Funcional ejecuta el build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1
-local, y autenticación ejecuta otro Worker compilado con proveedores simulados.
-`playwright.shared.ts` configura los dos primeros runtimes. Los tres conservan usuarios aislados y
-las APIs reales de inicialización/importación.
+Las reglas de test y E2E están en [TESTING_STANDARDS.md](../TESTING_STANDARDS.md);
+este documento es el runbook de la suite de navegador. Si hay contradicción, manda el estándar.
+
+La suite de navegador se divide en recorridos funcionales, smoke y escenarios especializados
+de sync v2. Todo cliente autenticado usa sync v2. Funcional ejecuta el
+build Node + SQLite de producción; sync-v2 ejecuta el Worker compilado con D1 local, y autenticación
+ejecuta otro Worker compilado con proveedores simulados. `playwright.shared.ts` configura los dos primeros
+runtimes. Los tres conservan usuarios aislados y las APIs reales de inicialización/importación.
 
 ## Comandos
 
@@ -31,8 +32,12 @@ con su Node y sus addons nativos; Playwright conecta Chromium por WebSocket y ex
 loopback del cliente. Así macOS y Linux ejecutan el mismo Chromium sin sustituir el addon SQLite
 del desarrollador. Requiere dependencias instaladas y Docker arrancado;
 descarga la imagen la primera vez. Prepara esa imagen antes de medir (el equivalente a instalar
-Chromium): `docker pull mcr.microsoft.com/playwright:v1.64.1-noble`. La descarga inicial no es una
-medición de la suite. En CI usa directamente el contenedor del job.
+Chromium) con la etiqueta que deriva el script de la versión instalada:
+
+`docker pull mcr.microsoft.com/playwright:v$(node -p 'require("@playwright/test/package.json").version')-noble`
+
+La descarga inicial no es una medición de la suite. En CI cada job instala el Chromium de la versión
+de `@playwright/test` del lockfile y lo restaura de una caché cuya clave es esa versión.
 
 El comando devuelve error si hay fallos o supera 360 segundos. Guarda el resultado, los tiempos
 por fase, las fases fallidas y la carga media de la máquina (al empezar y al acabar) en
@@ -110,12 +115,14 @@ los fallos programados quedan visibles en Actions y en las notificaciones de Git
 Antes de abrir la PR, aplica la [validación según el cambio](../CONTRIBUTING.md#antes-de-abrir-el-pr):
 solo texto documental requiere revisión de enlaces, instrucciones, formato y diff;
 código, configuración o contenido ejecutable requieren gate y smoke en secuencia.
-Los jobs de navegador corren dentro de la imagen oficial de Playwright
-(`mcr.microsoft.com/playwright:v1.64.1-noble`), que ya trae Chromium y sus librerías: sin
-`apt-get` por ejecución. Esa etiqueta debe seguir a `@playwright/test` en `package.json`. El setup
-común (pnpm, Node e install con lockfile, incluido el addon SQLite precompilado) vive en
-`.github/actions/setup`. El job final comprueba el tiempo desde el inicio del workflow, incluida
-la preparación y espera de runners, contra el presupuesto de 360 segundos.
+Los jobs de navegador corren en `ubuntu-latest` e instalan con `playwright install --with-deps` el
+Chromium que corresponde a `@playwright/test` en el lockfile: no hay etiqueta de imagen que
+actualizar, así que un bump del paquete trae su navegador solo. Las fuentes de la interfaz se sirven
+desde `public/fonts`, así que el render no depende de las fuentes del sistema. El setup común (pnpm,
+Node, install con lockfile, incluido el addon SQLite precompilado, y la caché de Chromium por
+versión de Playwright) vive en `.github/actions/setup`. El job final comprueba el tiempo desde el
+inicio del workflow, incluida la preparación y espera de runners, contra el presupuesto de
+360 segundos.
 La auditoría de dependencias vive en `audit.yml` (semanal y manual).
 
 Los cuatro shards funcionales se asignan por duración, manteniendo cada spec en un runner. El historial

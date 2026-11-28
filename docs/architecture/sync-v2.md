@@ -6,9 +6,13 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 ## Ida: de la UI a D1
 
 1. **Comando del movimiento**: `syncMovements` (`src/lib/client/movement-commands.ts`) recibe
-   las listas antes/después y la moneda general. Inversión, Movimientos y confirmación de
-   pendientes usan la misma conversión y encolado. Su promesa termina al encolar, antes de que
-   el servidor confirme:
+   las listas antes/después y la moneda general. Inversión, Movimientos, confirmación de
+   pendientes y `Vincular movimientos` usan la misma conversión y publicación. Cada comando se
+   construye releyendo el movimiento actual, no la copia de la lista, y se escribe junto a su
+   **generación persistida** en una sola transacción de IndexedDB de la cola
+   (`src/lib/client/movement-publication.ts`): así una edición o un borrado posterior —también
+   desde otra pestaña, sin Web Locks— no se sobrescribe con una instantánea antigua. Su promesa
+   termina al publicar, antes de que el servidor confirme:
    - Resuelve cuenta y categoría; conserva las cuentas con identidad pendiente y omite el comando
      si la cuenta requerida no se puede resolver.
    - Resuelve los instrumentos del bootstrap en caché por su id propio o su id de correlación de
@@ -29,8 +33,14 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
    - Los ajustes van por `syncSettingsUpdate` (`src/lib/client/command-mapping.ts`).
 2. `src/lib/client/command-mapping.ts`: `syncListDiff` / `syncCreate` / `syncUpdate` convierten el
    antes/después en comandos.
-3. `src/stores/sync.ts` `enqueueCommand` → `src/lib/client/outbox.ts` `enqueue`: valida contra los
-   esquemas Effect Schema y guarda en IndexedDB. `flush` envía a `POST /api/sync`.
+3. `src/stores/sync.ts` `enqueueCommand` / `publishMovementCommands` → `src/lib/client/outbox.ts`
+   `enqueue` y `src/lib/client/movement-publication.ts`: validan contra los esquemas Effect Schema
+   y guardan en IndexedDB. La base `finance-tracker-outbox-v2` es la versión 3: cada subida solo
+   añade tiendas (`movementPublications`, `intents`, `intentProgress`) sin tocar `commands`, de
+   modo que una cola pendiente de la versión anterior sobrevive; una conexión antigua que bloquee
+   la subida produce un error tipado y visible en vez de esperar indefinidamente. Los comandos
+   siguen siendo byte-compatibles con `/api/sync`: la intención viaja solo en la entrada de la cola.
+   `flush` envía a `POST /api/sync`.
 4. `src/lib/server/sync/command-schemas.ts`: esquema (Effect Schema) del comando. Lo comparten cliente y
    servidor. Los objetos son `.strict()`: un campo que falte aquí hace que la cola rechace el
    comando al encolarlo.
@@ -56,6 +66,61 @@ ellos, se pierde o el comando se rechaza; #205 fue un constructor que no lo llev
 y `src/pages/api/data/import.ts` las recrea campo a campo, así que un campo nuevo también se
 añade ahí. `tests/integration/d1-v2/api/data-export-import.test.ts` (`seedFullDataset`) comprueba
 que exportar → importar → exportar no pierde nada: rellena el campo nuevo en la semilla.
+
+La vinculación de movimientos a una cotización fija sus ids objetivo al pulsar Vincular
+(`src/lib/client/instrument-link.ts`) y se acepta solo después de persistir la intención y esos ids
+en la base de la cola. Arranque y reconexión reconstruyen cada objetivo desde el estado **actual**
+del movimiento (nunca desde una instantánea guardada) y publican comando y progreso en la misma
+transacción; un paso ya encolado por otra pestaña se omite en vez de duplicarse. Tras un conflicto
+el módulo relee el movimiento y genera otro intento con identidad nueva; el resto de comandos
+conserva el rebase automático de ADR 0003. El registro de objetivos pendientes que reconoce un
+desvínculo explícito es de la página y está aislado por usuario: se reinicia al cambiar de sesión y
+olvida sus ids cuando la intención termina, para que un usuario no marque publicaciones de otro.
+
+La caché sigue siendo una proyección reconstruible en otra base: las confirmaciones se incorporan
+antes de retirar el comando, y la retirada del comando y el avance del paso de la intención se
+confirman juntos en la base de la cola. Si la respuesta se pierde o el proceso se interrumpe entre
+esos pasos, el mismo comando (mismo `commandId` y contenido) queda disponible para un reenvío
+idempotente; un cambio de contenido o un reintento explícito tras un rechazo definitivo usan un
+`commandId` nuevo conservando la identidad del movimiento. Los estados visibles distinguen guardado
+local, espera de conexión o dependencia, pendiente, confirmado, fallo definitivo y resultado
+parcial; el fallo permite reintentar o descartar, y el descarte solo cancela lo que aún no se ha
+reclamado, reconciliando antes un envío incierto. Los registros `intents`/`intentProgress` guardan
+la dependencia de configuración (#491) y las confirmaciones recurrentes (#492).
+
+La confirmación de un pendiente (`src/lib/client/recurring-write.ts`) persiste una reserva única
+por pendiente con la edición resuelta, un solo id de movimiento y sus marcas; el alta del
+movimiento se publica en la misma transacción que acepta la intención. La actualización del
+pendiente solo se construye después de que el servidor confirme ese movimiento, para que nunca
+referencie un movimiento que no pudo existir. Recargar, repetir desde otra pestaña o reintentar
+reutiliza la reserva y la identidad; un rechazo definitivo espera un reintento explícito, que
+emite un `commandId` nuevo conservando el movimiento. Descartar no revierte un movimiento ya
+confirmado: el pendiente se conserva confirmado y enlazado a ese movimiento en la proyección (no se
+reabre, para no habilitar una segunda confirmación), la reserva permanece para impedir otra
+identidad y el resultado parcial se muestra; una reserva ya enlazada y confirmada se olvida para no
+crecer sin límite.
+
+El guardado de una regla (`src/lib/client/recurring-rule-write.ts`) usa el mismo protocolo con pasos
+nombrados: publica el comando de la regla, después un paso por cada ocurrencia generada y solo al
+final el avance del calendario; una recarga retoma el paso pendiente con los ids ya aceptados y sin
+esperar confirmación remota. La regla se direcciona por su id propio o por el `legacyId` de una
+fila migrada. Las escrituras de una misma regla se publican en orden de aceptación y ninguna edición
+se publica mientras otra anterior siga sin resolver, para que un comando antiguo reenviado no pise
+la edición aceptada (ADR 0003 solo rebasa contra la versión, no contra una edición posterior).
+Eliminar una regla publica únicamente su `remove` —el servidor borra sus pendientes en cascada— y
+descarta antes las intenciones pendientes de esa regla, para no encolar actualizaciones condenadas a
+`not_found`. Un `not_found` de actualización de un pendiente cuya regla ya no existe en el servidor
+se trata como dependencia resuelta: no produce el aviso global, aunque la intención conserve su
+estado parcial. La unicidad de una ocurrencia por regla+fecha se comprueba **dentro** de la misma
+transacción que publica el comando, no con una lectura previa, de modo que dos pestañas no pueden
+encolar dos pendientes para el mismo vencimiento. Las acciones de reintentar/descartar de la barra
+lateral enrutan las intenciones recurrentes al módulo recurrente; el descarte parcial conserva el
+pendiente confirmado, su enlace y el reintento visible.
+
+Los módulos `recurring-write.ts`, `recurring-rule-write.ts` e `instrument-link.ts` son el borde de
+acciones de Pinia que ejecuta las promesas (ADR 0006); los primitivos `Effect` —transacciones,
+reservas y publicación atómica— permanecen en `durable-intents.ts`, `movement-publication.ts` y
+`outbox.ts`, y la presentación (toasts) queda en el store o en el shell, nunca en estos módulos.
 
 Las cotizaciones se configuran por símbolo con `userInstrument.quoteConfig`: símbolo visible,
 ticker de consulta opcional (`quoteSymbol`), proveedor,

@@ -1,10 +1,18 @@
 import { useAuthenticationAction } from './useAuthenticationAction'
 import { computed, shallowRef, watch } from 'vue'
-import {
-  authentication,
-  openFinanzas,
-  requireAuthenticationResult,
-} from '../lib/client/authentication'
+type AuthenticationModule = typeof import('../lib/client/authentication')
+let authPromise: Promise<AuthenticationModule> | null = null
+function loadAuth(): Promise<AuthenticationModule> {
+  authPromise ??= import('../lib/client/authentication')
+  return authPromise
+}
+function warmAuth(): void {
+  if (typeof window === 'undefined') return
+  const load = () => void loadAuth()
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(load)
+  else window.setTimeout(load, 1500)
+}
+warmAuth()
 export type AccessMode = 'code' | 'password' | 'register' | 'verify' | 'recover'
 export function useAuthenticationForm(
   options: { verifyEmail?: string; initialError?: string } = {},
@@ -39,6 +47,7 @@ export function useAuthenticationForm(
     const recipient = email.value
     const requestedMode = mode.value
     return run(async () => {
+      const { authentication, requireAuthenticationResult } = await loadAuth()
       await requireAuthenticationResult(
         await authentication.emailOtp.sendVerificationOtp({
           email: recipient,
@@ -58,6 +67,7 @@ export function useAuthenticationForm(
   function submit() {
     if (needsCode.value && (!sent.value || !/^[0-9]{6}$/.test(otp.value))) return
     return run(async () => {
+      const { authentication, requireAuthenticationResult, openFinanzas } = await loadAuth()
       if (mode.value === 'register') {
         await requireAuthenticationResult(
           await authentication.signUp.email({
@@ -116,6 +126,7 @@ export function useAuthenticationForm(
   }
   function social(provider: 'google' | 'github') {
     return run(async () => {
+      const { authentication, requireAuthenticationResult } = await loadAuth()
       await requireAuthenticationResult(
         await authentication.signIn.social({
           provider,
@@ -127,6 +138,7 @@ export function useAuthenticationForm(
   }
   function passkey() {
     return run(async () => {
+      const { authentication, requireAuthenticationResult, openFinanzas } = await loadAuth()
       await requireAuthenticationResult(await authentication.signIn.passkey())
       openFinanzas()
     })

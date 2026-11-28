@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
 /**
- * WP5 — separate config for the real-D1 (better-sqlite3-backed) test tier.
+ * WP5 — separate config for the real-persistence test tier: real D1
+ * (better-sqlite3-backed) plus `tests/integration/client-storage/`, which
+ * runs the client queue/cache against `fake-indexeddb` (TESTING_STANDARDS 11).
  *
  * Kept apart from `vitest.config.ts` (which scopes `tests/unit/**` only,
  * per the `tests-tooling` map) because these tests spin up an actual

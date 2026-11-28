@@ -1,6 +1,5 @@
 import { Effect } from 'effect'
 
-import { authentication, requireAuthenticationResult } from '../../lib/client/authentication'
 import { wipeAllClientData, wipeLegacyClientData } from '../../lib/client/wipe'
 import { pinia } from '../../stores/pinia'
 import { useSyncStore } from '../../stores/sync'
@@ -28,6 +27,11 @@ export async function logOut(session: LogoutSession | null): Promise<boolean> {
       if (!discardPending) return false
     }
   }
+  // The auth client (better-auth + passkey) is only needed to sign out;
+  // loading it with the startup shell made every page pay for it.
+  const { authentication, requireAuthenticationResult } = await import(
+    '../../lib/client/authentication'
+  )
   await requireAuthenticationResult(await authentication.signOut())
   if (syncStore.userId) await syncStore.logout({ discardPending: true })
   else if (session?.user?.id) await Effect.runPromise(wipeAllClientData(session.user.id))

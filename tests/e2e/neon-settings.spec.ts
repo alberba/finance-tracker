@@ -137,12 +137,13 @@ test.describe('Configuración', () => {
 
     const rule = section(page).locator('[data-settings-rule-id]').filter({ hasText: 'Alquiler' })
     await expect(rule.locator('[data-settings-rule-amount]')).toContainText('800,00')
-    const paused = expectSyncCommand(
-      page,
-      (command) => command.action === 'update' && command.entityType === 'recurringRule',
-    )
+    // The pause may race the rule's own calendar step; the durable rule write
+    // rebuilds and resends it, so what counts is the state after the sync.
     await rule.getByRole('switch', { name: 'Regla Alquiler activa' }).click()
-    await paused
+    await expect(rule).toContainText('Pausada')
+    await tracker.waitForSync()
+    await tracker.reload()
+    await tracker.openSettings()
     await expect(rule).toContainText('Pausada')
   })
 

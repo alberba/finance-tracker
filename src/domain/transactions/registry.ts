@@ -151,7 +151,9 @@ export function buildMonthGroups(
   transactions.forEach((tx) => {
     if (accountingYear(tx) !== year || !matches(tx)) return
     const month = tx.month
-    byMonth.set(month, [...(byMonth.get(month) ?? []), tx])
+    const bucket = byMonth.get(month)
+    if (bucket) bucket.push(tx)
+    else byMonth.set(month, [tx])
   })
   return Array.from(byMonth, ([month, rows]) => ({
     month,

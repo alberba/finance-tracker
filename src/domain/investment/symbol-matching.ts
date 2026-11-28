@@ -37,6 +37,25 @@ export function isUnlinkedMovementForInstrument(
   return !transaction.symbol && Boolean(assetName && transaction.category === assetName)
 }
 
+/**
+ * The ids a "Vincular movimientos" request fixes at click time (#489). It is
+ * computed once, from the state the user is looking at, so a late resolution
+ * can never add a movement created afterwards.
+ */
+export function unlinkedMovementIdsForInstrument<
+  T extends {
+    id: string
+    type: string
+    symbol?: string
+    category: string
+    instrumentId?: string
+  },
+>(transactions: readonly T[], instrument: Instrument, assetName?: string): string[] {
+  return transactions
+    .filter((transaction) => isUnlinkedMovementForInstrument(transaction, instrument, assetName))
+    .map((transaction) => transaction.id)
+}
+
 /** A symbol as stored and compared: trimmed and upper case. */
 export function normalizeSymbol(value: unknown): string {
   return String(value || '')
