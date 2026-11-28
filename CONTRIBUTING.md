@@ -14,7 +14,7 @@ pnpm setup:worktree
 pnpm dev
 ```
 
-`pnpm setup:worktree` crea `.dev.vars` y aplica las migraciones D1 locales; cómo entrar en local
+`pnpm setup:worktree` crea `.dev.vars` (con el `BETTER_AUTH_URL` del worktree) y aplica las migraciones D1 locales; cómo entrar en local
 con identidad local de pruebas está en el [README](./README.md#ejecutar-en-local-astro). Para Playwright,
 una sola vez: `pnpm test:e2e:install`.
 
