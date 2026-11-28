@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import type { ScreenDiagnostic } from '../../../domain/reports/diagnostic'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useTemplateRef, watch } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { useMovementDetailRequest } from '../../../composables/useMovementDetailRequest'
-import { foldMonthGroups, hasTypeRestriction } from '../../../domain/transactions/registry'
+import {
+  buildMonthGroups,
+  foldMonthGroups,
+  hasTypeRestriction,
+} from '../../../domain/transactions/registry'
 import { formatMonthYear } from '../../../lib/format'
 import { atMonth, type Month } from '../../../lib/month'
 import type { Transaction } from '../../../scripts/types'
@@ -103,6 +109,38 @@ const filtering = computed(() => {
 const fold = computed(() =>
   foldMonthGroups(groups.value, ui.txFilterMonth, filtering.value || showOlder.value),
 )
+useScreenDiagnostic('transactions', () => {
+  if (ui.txTab !== 'registry') return { subview: 'subscriptions', checks: ['insufficient'] }
+  const options: NonNullable<ScreenDiagnostic['options']> = []
+  const checks: ScreenDiagnostic['checks'] = []
+  if (ui.txFilters.search.trim()) options.push('search')
+  if (hasTypeRestriction(ui.txFilters.types)) options.push('type')
+  if (ui.txFilters.accountIds.length) options.push('account')
+  if (extra.value.category) options.push('category')
+  if (extra.value.date) options.push('date')
+  if (showOlder.value) options.push('older')
+  const count = (all: typeof groups.value) =>
+    all.reduce((total, group) => total + group.rows.length, 0)
+  if (filtering.value) {
+    const unfiltered = buildMonthGroups(
+      financialStateStore.transactions,
+      ui.txYear,
+      {
+        search: '',
+        types: [],
+        accountIds: [],
+      },
+      ui.txSort,
+    )
+    checks.push(count(unfiltered) > count(groups.value) ? 'filters-reduce' : 'filters-active')
+  } else {
+    checks.push('filters-none')
+  }
+  if (fold.value.hidden.length > 0) checks.push('registry-folded')
+  if (count(fold.value.shown) === 0) checks.push('registry-empty', 'insufficient')
+  return { subview: 'registry', year: ui.txYear, month: ui.txFilterMonth, options, checks }
+})
+
 const today = todayISO()
 const months = computed(() =>
   buildLedgerMonths(fold.value.shown, {

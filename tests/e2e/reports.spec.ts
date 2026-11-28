@@ -36,6 +36,52 @@ test.describe('Reports E2E', () => {
     await expect(trigger).toBeFocused()
   })
 
+  test('retiene la captura de arranque incompleto aunque el estado cambie antes de enviarla', async ({
+    page,
+    tracker,
+  }) => {
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    await page.route('**/api/session', async (route) => {
+      started.resolve()
+      await release.promise
+      await route.continue()
+    })
+    const submitted = Promise.withResolvers<unknown>()
+    await page.route('**/api/issues/report', (route) => {
+      submitted.resolve(route.request().postDataJSON())
+      return route.fulfill({
+        status: 201,
+        json: {
+          ok: true,
+          issueNumber: 557,
+          issueUrl: 'https://github.com/example/repo/issues/557',
+          tracked: true,
+        },
+      })
+    })
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await started.promise
+    try {
+      await tracker.openGlobalReportDialog()
+      const diagnostic = await tracker.reviewDiagnostic()
+      await expect(diagnostic).toContainText('Arranque incompleto')
+      await expect(diagnostic).toContainText('Evidencia insuficiente')
+      release.resolve()
+      await expect(page.locator('html[data-finance-ready="true"]')).toBeAttached()
+      await expect(diagnostic).toContainText('Arranque incompleto')
+      const panel = tracker.issueReportDialog
+      await panel.getByRole('checkbox', { name: /Adjuntar diagnóstico/ }).check()
+      await panel.getByLabel('Resumen').fill('Arranque detenido')
+      await panel.getByRole('button', { name: 'Crear reporte' }).click()
+      expect(await submitted.promise).toMatchObject({
+        diagnostic: { load: 'starting', sync: null, section: { checks: ['insufficient'] } },
+      })
+    } finally {
+      release.resolve()
+    }
+  })
+
   test('avisa honestamente cuando el reporte no quedó registrado en Mis reportes', async ({
     page,
     tracker,
@@ -53,7 +99,7 @@ test.describe('Reports E2E', () => {
     )
     await tracker.submitIssueReport({ type: 'bug', summary: 'El guardado no persiste' })
     const status = tracker.issueReportStatus()
-    await expect(status).toContainText('No pudimos añadirlo a Mis reportes todavía')
+    await expect(status).toContainText('Tu borrador sigue en el formulario.')
     await expect(status).not.toContainText('Reporte creado:')
   })
 
@@ -80,8 +126,10 @@ test.describe('Reports E2E', () => {
     const panel = tracker.issueReportDialog
     await expect(panel.getByLabel('Resultado esperado')).toHaveCount(0)
     await expect(panel.getByLabel('Resultado actual')).toHaveCount(0)
-    await expect(panel.locator('#issue-report-notice')).toContainText('repositorio público')
-    await expect(panel.locator('#issue-report-notice')).toContainText('email')
+    await expect(
+      panel.getByText('GitHub recibirá este resumen técnico y la referencia del caso.'),
+    ).toBeVisible()
+    await expect(panel.getByRole('checkbox', { name: /Adjuntar diagnóstico/ })).not.toBeChecked()
     await panel.getByLabel('Resumen').fill('El filtro no guarda el valor')
 
     await panel.getByRole('button', { name: 'Crear reporte' }).click()
@@ -92,6 +140,7 @@ test.describe('Reports E2E', () => {
       summary: 'El filtro no guarda el valor',
     })
     expect(submittedPayload).not.toHaveProperty('description')
+    expect(submittedPayload).not.toHaveProperty('diagnostic')
     for (const retired of ['expectedResult', 'actualResult', 'stepsToReproduce']) {
       expect(submittedPayload).not.toHaveProperty(retired)
     }
@@ -115,6 +164,9 @@ test.describe('Reports E2E', () => {
     await expect(tracker.issueReportStatus()).toContainText(
       'No se pudo crear la issue: GitHub no disponible',
     )
+    const panel = tracker.issueReportDialog
+    await expect(panel.getByLabel('Resumen')).toHaveValue('Error en endpoint')
+    await expect(panel.getByRole('button', { name: 'Copiar resumen técnico' })).toBeVisible()
   })
 
   test('adjunta hasta tres capturas, las lista, quita una y envía solo las vigentes', async ({

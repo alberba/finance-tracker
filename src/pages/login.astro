@@ -11,8 +11,9 @@ const invitation = Astro.url.searchParams.get('invitation')
 let invitationError = ''
 let verifyEmail: string | undefined
 const cookieHeader = Astro.request.headers.get('cookie') ?? ''
-const hasSessionCookie =
-  /(?:^|;\s*)(?:__Secure-)?better-auth\.session_token(?:\.\d+)?=/.test(cookieHeader)
+const hasSessionCookie = /(?:^|;\s*)(?:__Secure-)?better-auth\.session_token(?:\.\d+)?=/.test(
+  cookieHeader,
+)
 if (hasSessionCookie) {
   try {
     const session = await createAuthentication(getDb(Astro.locals), env).api.getSession({
@@ -27,6 +28,9 @@ if (hasSessionCookie) {
 const initialError = Astro.url.searchParams.has('error')
   ? 'No se pudo completar el acceso con ese proveedor. Inténtalo de nuevo o entra con un código por correo para vincularlo desde ajustes.'
   : undefined
+const reference = Astro.url.searchParams.get('ref')
+const initialReference =
+  initialError && reference && /^[a-f0-9]{32}$/.test(reference) ? reference : undefined
 if (invitation) {
   try {
     await runServer(getDb(Astro.locals), registrationInvitation(invitation))
@@ -47,6 +51,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer')
 const access = {
   verifyEmail,
   initialError,
+  initialReference,
   invitationError,
   googleEnabled: Boolean(env.GOOGLE_CLIENT_ID),
   githubEnabled: Boolean(env.GITHUB_CLIENT_ID),

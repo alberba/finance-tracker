@@ -53,6 +53,36 @@ test('private pages and financial APIs require a Better Auth session @smoke', as
   expect((await page.request.get('/api/bootstrap')).status()).toBe(401)
 })
 
+test('shows a copyable technical reference for a failed provider callback', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const reference = 'a1234567890abcdef1234567890abcde'
+  await new AuthenticationPage(page).goto(`/login?error=oauth_error&ref=${reference}`)
+  await expect(page.getByRole('alert')).toContainText('No se pudo completar el acceso')
+  await page.getByRole('button', { name: 'Copiar referencia técnica' }).click()
+  await expect(page.getByRole('status')).toHaveText('Copiado.')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(reference)
+})
+
+test('shows a technical reference when the sign-in server is unavailable', async ({ page }) => {
+  const reference = 'abcdef0123456789abcdef0123456789'
+  await page.route('**/api/auth/sign-in/email', (route) =>
+    route.fulfill({
+      status: 503,
+      json: { message: 'El acceso no está disponible. Inténtalo de nuevo.', reference },
+    }),
+  )
+  const access = new AuthenticationPage(page)
+  await access.goto()
+  await access.submitPassword('access-failure@example.test', 'test-password')
+  await expect(page.getByRole('alert')).toHaveText(
+    'El acceso no está disponible. Inténtalo de nuevo.',
+  )
+  await expect(page.getByText(reference, { exact: true })).toBeVisible()
+})
+
 test('the login shows the error for wrong credentials and stays on /login @smoke', async ({
   page,
 }) => {
@@ -60,9 +90,7 @@ test('the login shows the error for wrong credentials and stays on /login @smoke
   seedAdministrator(email)
   const access = new AuthenticationPage(page)
   await access.goto()
-  await page.getByLabel('Correo electrónico').fill(email)
-  await page.getByLabel('Contraseña', { exact: true }).fill('not-the-password')
-  await page.getByRole('button', { name: 'Entrar en Finanzas', exact: true }).click()
+  await access.submitPassword(email, 'not-the-password')
   await expect(page.getByRole('alert')).toHaveText('El correo o la contraseña no son correctos.')
   await expect(page).toHaveURL(/\/login$/)
   expect((await page.request.get('/api/session')).status()).toBe(401)

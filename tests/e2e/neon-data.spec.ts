@@ -113,6 +113,15 @@ test.describe('Datos', () => {
 
     await tracker.openTransactions()
     await expect(tracker.transactionsSection.getByText(MOVEMENT).first()).toBeVisible()
+
+    const query = 'consulta privada sin coincidencias'
+    await tracker.transactionSearch.fill(query)
+    await expect(tracker.transactionsSection.getByText(MOVEMENT)).toHaveCount(0)
+    await tracker.openGlobalReportDialog()
+    const diagnostic = await tracker.reviewDiagnostic()
+    await expect(diagnostic).toContainText('Los filtros ocultan movimientos')
+    await expect(diagnostic).toContainText('Importación completada → Datos → Movimientos')
+    await expect(diagnostic).not.toContainText(query)
   })
 
   test('muestra lo que espera en la cola sin conexión y lo envía al sincronizar', async ({

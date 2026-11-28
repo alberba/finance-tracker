@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { DiagnosticCode } from '../../../domain/reports/diagnostic'
+import { lastReportOutcome } from '../../../lib/client/report-observations'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
 import { onMounted, ref, watch } from 'vue'
 
 import { useReportsRoute } from '../../../composables/useReportsRoute'
@@ -21,6 +24,24 @@ const reportsStore = useReportsStore()
 const { selectedNumber, select, backToList, focusEntry } = useReportsRoute()
 const { detail, status, error, pending, load, addComment, updateComment, removeComment } =
   useReportThread(selectedNumber)
+useScreenDiagnostic('reports', () => {
+  const checks: DiagnosticCode[] = []
+  if (lastReportOutcome('reports') === 'reports-create-failed') checks.push('reports-create-failed')
+  const report = detail.value?.report
+  if (
+    reportsStore.status === 'error' ||
+    reportsStore.loadMoreError ||
+    (report && !report.unavailable && report.duplicateLinkUnavailable)
+  )
+    checks.push('reports-follow-failed')
+  if (error.value || status.value === 'error' || status.value === 'unavailable') {
+    checks.push('reports-thread-failed')
+  }
+  return {
+    subview: selectedNumber.value === null ? 'list' : 'thread',
+    checks: checks.length > 0 ? checks : ['insufficient'],
+  }
+})
 const editingCommentId = ref<number | null>(null)
 const composerResetSignal = ref(0)
 

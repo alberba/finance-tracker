@@ -6,6 +6,9 @@ import { useSetupNavigation } from '../../../composables/useSetupNavigation'
 import { BUDGET_TYPES } from '../../../domain/budget/view-model'
 import { atMonth, type Month } from '../../../lib/month'
 import type { BudgetType } from '../../../scripts/types'
+import { useFinancialStateStore } from '../../../stores/financial-state'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
+import { diagnoseBudget } from './budget-diagnostic'
 import { useBudgetStore } from '../../../stores/budget'
 import NeonButton from '../../ui/NeonButton.vue'
 import NeonEmptyState from '../../ui/NeonEmptyState.vue'
@@ -65,6 +68,17 @@ const monthList = computed(() =>
 )
 const planRow = computed(
   () => current.value.rows.find((row) => row.category === planCategory.value) ?? null,
+)
+
+const financial = useFinancialStateStore()
+useScreenDiagnostic('budget', () =>
+  diagnoseBudget(viewModel.value, financial.transactions, {
+    subview:
+      view.value === 'year' ? 'year' : view.value === 'quarter' ? 'year-quarter' : 'year-month',
+    months: view.value === 'year' && !planOpen.value ? undefined : months.value,
+    type: type.value,
+    category: planOpen.value ? planCategory.value : null,
+  }),
 )
 
 const TONE_TEXT = { gain: 'text-gain', loss: 'text-loss' } as const

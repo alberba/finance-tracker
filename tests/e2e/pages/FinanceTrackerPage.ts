@@ -55,6 +55,10 @@ export class FinanceTrackerPage {
     return this.page.locator('#transactions')
   }
 
+  get transactionSearch(): Locator {
+    return this.transactionsSection.getByRole('searchbox', { name: 'Buscar movimientos' })
+  }
+
   get budgetSection(): Locator {
     return this.page.locator('#budget')
   }
@@ -210,6 +214,11 @@ export class FinanceTrackerPage {
         .click()
     }
     await expect(this.issueReportDialog).toBeVisible()
+  }
+
+  async reviewDiagnostic() {
+    await this.issueReportDialog.getByText('Revisar diagnóstico', { exact: true }).click()
+    return this.issueReportDialog.getByRole('group', { name: 'Diagnóstico privado' })
   }
 
   async submitIssueReport(params: {

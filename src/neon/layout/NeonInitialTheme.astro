@@ -1,0 +1,33 @@
+<script is:inline>
+  // Theme before the first paint, the rule of the shell
+  // (src/neon/app/AppShell.astro): a stored theme name wins, otherwise
+  // «oscuro suave», or «claro melocotón» if the system asks for light.
+  ;(function () {
+    const root = document.documentElement
+    try {
+      const prefersDark =
+        window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      // Blocked storage still honours the system.
+      let stored = null
+      try {
+        stored = localStorage.getItem('neon-theme')
+      } catch {
+        /* Storage blocked: no stored choice. */
+      }
+      root.dataset.theme = [
+        'oscuro-suave',
+        'oscuro-fuerte',
+        'claro-hueso',
+        'claro-melocoton',
+      ].includes(stored)
+        ? stored
+        : prefersDark
+          ? 'oscuro-suave'
+          : 'claro-melocoton'
+    } catch {
+      root.dataset.theme = 'oscuro-suave'
+    }
+    const meta = document.querySelector('meta[name="color-scheme"]')
+    if (meta) meta.content = root.dataset.theme.startsWith('oscuro') ? 'dark' : 'light'
+  })()
+</script>

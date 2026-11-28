@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { useBudgetStore } from '../../../stores/budget'
+import { useFinancialStateStore } from '../../../stores/financial-state'
+import { useScreenDiagnostic } from '../../reports/use-report-diagnostic'
+import { monthPosition } from './month-view-model'
+import { prepareTarget } from './prepare-view-model'
+import { reviewPosition } from './review-view-model'
 import { storeToRefs } from 'pinia'
 import { nextTick, watch } from 'vue'
 
 import { useMediaQuery } from '../../../composables/useMediaQuery'
 import { FRAME_QUERY } from '../../ui/sheet-drag'
+import { diagnoseBudget } from './budget-diagnostic'
 import { useNeonBudgetScreens } from './budget-screens'
 import NeonBudgetMonth from './NeonBudgetMonth.vue'
 import NeonBudgetMonthMobile from './NeonBudgetMonthMobile.vue'
@@ -27,6 +34,24 @@ const props = withDefaults(defineProps<{ isActive?: boolean }>(), { isActive: fa
 const screens = useNeonBudgetScreens()
 const { screen } = storeToRefs(screens)
 const desktopFrame = useMediaQuery(FRAME_QUERY)
+const budget = useBudgetStore()
+const financial = useFinancialStateStore()
+useScreenDiagnostic('budget', () => {
+  const view = budget.viewModel
+  const subview = screen.value
+  if (subview === 'year') return undefined
+  const month = {
+    month: () => monthPosition(view, new Date()).month,
+    review: () => reviewPosition(view)?.closed,
+    prepare: () => prepareTarget(view) ?? undefined,
+  }[subview]()
+  if (month === undefined) return { subview, year: view.year, checks: ['insufficient'] }
+  return diagnoseBudget(view, financial.transactions, {
+    subview,
+    months: [month],
+    type: subview === 'month' ? 'expense' : undefined,
+  })
+})
 
 watch(screen, async () => {
   window.scrollTo?.({ top: 0 })

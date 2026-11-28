@@ -116,6 +116,11 @@ function buildPositionDetail(state: State, asset: Entity, month: Month): Positio
   }
 }
 
+/** Value used to decide if the asset has a position row for this month. */
+export function positionValue(state: State, asset: Entity, month: Month): number {
+  return computeInvestmentValue(state, asset.id, month)
+}
+
 export function buildInvestmentDashboardViewModel(
   state: State,
   month: Month,
@@ -157,7 +162,7 @@ export function buildInvestmentDashboardViewModel(
     : portfolioTotalValues.map((value, idx) => toGainPercent(value, portfolioInvestedCapital[idx]))
 
   const valued = state.investmentAssets
-    .map((asset) => ({ asset, value: computeInvestmentValue(state, asset.id, month) }))
+    .map((asset) => ({ asset, value: positionValue(state, asset, month) }))
     .filter(({ value }) => value > 0)
     .sort((a, b) => b.value - a.value)
   const positionTotal = valued.reduce((sum, { value }) => sum + value, 0)

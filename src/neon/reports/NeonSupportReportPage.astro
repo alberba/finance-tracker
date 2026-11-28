@@ -1,0 +1,114 @@
+---
+import { describeDiagnostic } from '../../domain/reports/diagnostic'
+import type { SupportReportCase } from '../../domain/reports/report-entry'
+import NeonInitialTheme from '../layout/NeonInitialTheme.astro'
+import NeonButton from '../ui/NeonButton.vue'
+import NeonFontPreloads from '../layout/NeonFontPreloads.astro'
+
+interface Props {
+  number: string | undefined
+  report: SupportReportCase | null
+  failed: boolean
+}
+
+const { number, report, failed } = Astro.props
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <NeonInitialTheme />
+    <NeonFontPreloads />
+    <title>Consultar caso · Finanzas</title>
+  </head>
+  <body>
+    <main class="mx-auto grid w-full max-w-3xl min-w-0 gap-5 px-4 py-8">
+      <h1 class="font-display text-h1 font-bold">Consultar caso</h1>
+      <form
+        class="bg-panel border-line rounded-card flex flex-wrap items-end gap-3 border p-4"
+        method="get"
+      >
+        <label class="text-note grid flex-1 gap-2 font-bold">
+          Número de reporte
+          <input
+            class="bg-panel2 border-ctrl-line rounded-field outline-accent min-h-11 w-full border px-3 focus-visible:outline-2"
+            name="numero"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{1,9}"
+            required
+            value={number}
+          />
+        </label>
+        <NeonButton variant="primary" type="submit">
+          Consultar
+        </NeonButton>
+      </form>
+
+      {number && !report && (
+        <p role="status">{failed ? 'No se pudo consultar el caso.' : 'Caso no disponible.'}</p>
+      )}
+      {report && (
+        <section class="bg-panel border-line rounded-card grid min-w-0 gap-5 border p-4">
+          <header class="grid gap-1">
+            <p class="text-muted text-note">Reporte #{report.issueNumber}</p>
+            <h2 class="font-display text-block-title font-bold wrap-break-word">
+              {report.title ?? 'Reporte'}
+            </h2>
+          </header>
+          {report.original && (
+            <p class="text-soft wrap-break-word whitespace-pre-wrap">{report.original}</p>
+          )}
+          {report.attachments.length > 0 && (
+            <ul aria-label="Capturas privadas" class="grid gap-1">
+              {report.attachments.map((file) => (
+                <li>
+                  <a class="text-accent-text underline" href={file.url}>
+                    {file.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          <section class="grid gap-2" aria-labelledby="diagnostic-heading">
+            <h3 id="diagnostic-heading" class="font-bold">
+              Diagnóstico privado
+            </h3>
+            {report.diagnostic ? (
+              <pre class="text-muted text-note font-sans wrap-break-word whitespace-pre-wrap">{describeDiagnostic(report.diagnostic)}</pre>
+            ) : (
+              <p class="text-muted text-note">
+                Evidencia insuficiente. No hay una captura disponible para este caso.
+              </p>
+            )}
+          </section>
+          {report.comments.length > 0 && (
+            <section class="grid gap-2" aria-labelledby="comments-heading">
+              <h3 id="comments-heading" class="font-bold">
+                Aclaraciones privadas
+              </h3>
+              <ol class="grid gap-3">
+                {report.comments.map((comment) => (
+                  <li class="border-line grid gap-1 border-bs pt-2">
+                    <time class="text-muted text-note" datetime={comment.createdAt}>
+                      {comment.createdAt.slice(0, 10)}
+                    </time>
+                    <p class="text-soft wrap-break-word whitespace-pre-wrap">{comment.text}</p>
+                    {comment.attachments.map((file) => (
+                      <a class="text-accent-text underline" href={file.url}>
+                        {file.name}
+                      </a>
+                    ))}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+        </section>
+      )}
+    </main>
+  </body>
+</html>

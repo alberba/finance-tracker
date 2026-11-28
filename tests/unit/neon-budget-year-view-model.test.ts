@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildBudgetViewModel } from '../../src/domain/budget/view-model'
+import { diagnoseBudget } from '../../src/neon/sections/budget/budget-diagnostic'
 import type { Month } from '../../src/lib/month'
 import {
   aggregate,
@@ -61,6 +62,39 @@ const plain = (text: string) => text.replace(/\u00a0/g, ' ')
 
 const vm = buildBudgetViewModel(state(), NOW)
 const expense = vm.types.expense
+
+it('reports evidence from the chosen category and accounting window in the annual budget view', () => {
+  const data = state()
+  const movements = data.transactions.map((item) => ({
+    ...item,
+    date: item.month === 2 ? '2026-01-31' : `2026-${String(item.month).padStart(2, '0')}-01`,
+  }))
+  const view = buildBudgetViewModel(data, NOW)
+
+  expect(
+    diagnoseBudget(view, movements, {
+      subview: 'year-quarter',
+      months: [1, 2, 3],
+      type: 'expense',
+      category: 'Comida',
+    }),
+  ).toMatchObject({
+    fromYear: 2026,
+    fromMonth: 1,
+    year: 2026,
+    month: 3,
+    options: ['expense'],
+    checks: ['budget-categorized', 'budget-accounting-month'],
+  })
+  expect(
+    diagnoseBudget(view, movements, {
+      subview: 'year-month',
+      months: [2],
+      type: 'expense',
+      category: 'Ocio',
+    }).checks,
+  ).toContain('insufficient')
+})
 
 describe('deviationTone', () => {
   it('paints spending over the plan as a loss and nothing for under it', () => {

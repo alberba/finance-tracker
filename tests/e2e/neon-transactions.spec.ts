@@ -21,7 +21,6 @@ const month = (page: Page, title: string) =>
     .filter({
       has: page.getByRole('heading', { name: title, exact: true }),
     })
-const search = (page: Page) => section(page).getByRole('searchbox', { name: 'Buscar movimientos' })
 const detail = (page: Page, title: string) => page.getByRole('dialog', { name: title })
 
 async function addMovements(
@@ -55,7 +54,7 @@ test.describe('Movimientos', () => {
       { id: 'e2e-filtro-gasto', type: 'expense', amount: 30, date: '2026-03-11' },
     ])
 
-    await search(page).fill('e2e-filtro')
+    await tracker.transactionSearch.fill('e2e-filtro')
     await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(2)
     await expect(section(page).locator('[data-registry-total]')).toHaveText('+90,00 €')
 
@@ -80,7 +79,7 @@ test.describe('Movimientos', () => {
     await expect(type).toHaveAccessibleName('Tipo: Todos')
     await expect(ledger(page).locator('[data-tx-id]')).toHaveCount(2)
 
-    await search(page).fill('nada coincide con esto')
+    await tracker.transactionSearch.fill('nada coincide con esto')
     await expect(section(page).getByText('Ningún movimiento de 2026 coincide')).toBeVisible()
   })
 
@@ -195,7 +194,7 @@ test.describe('Movimientos', () => {
       { id: 'e2e-lote-a', type: 'expense', amount: 11, date: '2026-03-11' },
       { id: 'e2e-lote-b', type: 'expense', amount: 12, date: '2026-03-12' },
     ])
-    await search(page).fill('e2e-lote')
+    await tracker.transactionSearch.fill('e2e-lote')
 
     // Pressing a row's icon selects it and enters the selection.
     await ledger(page).getByRole('button', { name: 'Seleccionar e2e-lote-a' }).click()
@@ -214,7 +213,7 @@ test.describe('Movimientos', () => {
 
     // The change stays after reloading.
     await tracker.reload()
-    await search(page).fill('e2e-lote')
+    await tracker.transactionSearch.fill('e2e-lote')
     await expect(row(page, 'Fondos Indexados')).toHaveCount(2)
     await ledger(page).getByRole('button', { name: 'Seleccionar e2e-lote-a' }).click()
     await section(page).getByRole('button', { name: 'Seleccionar todo' }).click()
@@ -231,7 +230,7 @@ test.describe('Movimientos', () => {
     await expect(ledger(page)).toHaveCount(0)
 
     await tracker.reload()
-    await search(page).fill('e2e-lote')
+    await tracker.transactionSearch.fill('e2e-lote')
     await expect(ledger(page)).toHaveCount(0)
   })
 })

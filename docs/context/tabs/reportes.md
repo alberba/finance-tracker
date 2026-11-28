@@ -4,7 +4,8 @@
 
 «Mis reportes» convierte el acuse momentáneo del alta en una página de seguimiento (`/reportes`).
 Cada cuenta ve sus reportes con el estado nativo de GitHub, el hilo de aclaraciones y avisos de
-novedades. GitHub es la fuente de verdad; la app solo guarda propiedad y última lectura.
+novedades. GitHub aporta el estado y las respuestas de mantenedores. La app conserva el contenido
+privado, la propiedad y la última lectura.
 
 Rutas:
 
@@ -25,18 +26,35 @@ Identificadores clave en UI:
 
 ## Flujo funcional
 
-1. La persona envía un reporte desde el panel. `POST /api/issues/report` crea siempre la issue
-   (ya no hay comprobación previa de duplicadas) y registra la propiedad en `issue_reports`.
-2. El acuse muestra `Reporte creado: #N` y un enlace «Ver en Mis reportes». Si el registro falló,
-   muestra que aparecerá en cuanto se recupere y el POST responde `tracked: false`.
-3. `/reportes` pide `GET /api/reports`: consultas GraphQL con alias por número (≤50 por petición) y
-   páginas de 20 entradas con «Cargar más reportes». Los cierres asíncronos del workflow aparecen en la
-   siguiente carga, sin sondeos ni caché de estado.
-4. Al abrir un detalle se pide `GET /api/reports/:n`, que resuelve la cadena de duplicadas y lee el
-   hilo de la issue seguida, y devuelve `original` (lo que escribió la persona al crear el reporte) e
-   `issueDescription` (el cuerpo actual de la issue propia si difiere; `null` al seguir una principal). El cliente marca la lectura con `POST /api/reports/:n/seen`.
-5. Las aclaraciones propias se publican, editan y borran con `POST`/`PATCH`/`DELETE` sobre
-   `/api/reports/:n/comments`. Solo se permiten con el hilo abierto.
+1. Al abrir **Reportar** se toma una captura en memoria. La persona puede revisar la sección,
+   el periodo, las opciones activas, el estado de carga y de sincronización, las comprobaciones
+   y los últimos pasos observados. La casilla de adjuntar viene desmarcada.
+2. `POST /api/issues/report` envía a GitHub el resumen técnico revisado y una referencia opaca.
+   El título escrito, la descripción y las capturas quedan en la app. En un fallo se conserva
+   el borrador y se puede copiar el resumen técnico. Si GitHub creó la issue pero falló el
+   guardado privado, el alta devuelve `tracked: false`. El formulario puede guardar el borrador
+   en el mismo caso durante las 24 horas siguientes.
+3. `GET /api/reports` sigue consultando el estado en GitHub y pagina de 20 en 20.
+   `GET /api/reports/:n` mezcla el hilo de mantenedores de la issue seguida con las aclaraciones
+   privadas del reporte original. El cliente marca la lectura con `POST /api/reports/:n/seen`.
+4. La persona puede retirar el diagnóstico en el detalle de su reporte. La retirada borra la
+   captura. El plazo de 30 días empieza al enviar el reporte; vencido el plazo, la consulta
+   deja de devolverla. Una nueva alta purga las capturas vencidas.
+
+## Consulta de soporte
+
+- En `/soporte/reportes`, introduce el número de la issue de GitHub. La consulta es de solo
+  lectura y requiere rol de administrador y un permiso para ese caso.
+- Otra persona administradora habilita el permiso con `POST /api/support/reports/:n/grant`.
+  Envía JSON con `supportUserId` (identificador interno de la persona de soporte) y
+  `enabled: true`. Usa `enabled: false` para revocarlo. Cada concesión, revocación, lectura
+  y retirada queda en `report_support_audit`.
+- La misma consulta está disponible en `GET /api/support/reports/:n`. Los adjuntos se entregan
+  desde la app con los permisos del caso. Un número o una referencia de GitHub nunca concede
+  acceso por sí solo.
+- Acceso muestra una referencia copiable si un fallo del servidor o del callback de proveedor
+  generó un evento de Sentry.
+  Si el navegador ya registró un fallo técnico en la pantalla, la captura puede incluir su ID.
 
 ## Estados
 
@@ -53,22 +71,13 @@ Identificadores clave en UI:
 
 ## Aclaraciones
 
-- Se publican con el token del bot y un marcador oculto
-  `<!-- finance-tracker:reporter-comment user=<userId> -->` más la cabecera visible.
-- Solo son editables si el marcador coincide con el principal **y** el autor es el login del bot
-  (`GITHUB_BOT_LOGIN` o `GET /user`). Un marcador con otro autor se oculta.
-- La automatización (cualquier autor `*[bot]`, como `github-actions[bot]`, o los marcadores históricos
-  `<!-- web-report-agent-brief -->` y `<!-- web-report-enriched -->`)
-  y las aclaraciones de otras personas no salen del servidor. Un comentario sin marcador solo cuenta
-  como mantenedor si `authorAssociation` es `OWNER`, `MEMBER` o `COLLABORATOR`; los de terceros se
-  ocultan. El login del bot se compara normalizado (`app[bot]` en REST, `app` en GraphQL).
-- Los adjuntos comparten límites y validación con el alta (`src/domain/reports/issue-attachments.ts`)
-  y se enlazan tras un segundo marcador. Quitar uno de la aclaración no lo borra de GitHub; la UI lo
-  avisa.
-- El texto se sanea (comentarios HTML y menciones) y el Markdown se renderiza por AST, sin `v-html`.
-  Enlaces solo `http(s)`; imágenes solo de hosts de GitHub.
-- Con el hilo cerrado, el compositor se sustituye por un aviso de solo lectura.
-- Un fallo de GitHub se muestra como error y conserva el texto y los adjuntos del borrador.
+- Las nuevas aclaraciones y sus adjuntos se guardan, editan y borran en la app mientras el hilo
+  seguido está abierto. El texto del borrador se conserva ante un fallo.
+- El hilo sigue mostrando respuestas de mantenedores y las aclaraciones históricas propias de
+  GitHub. Las históricas se pueden eliminar mientras el hilo está abierto. El marcador y el
+  login del bot siguen siendo necesarios para comprobar autoría.
+- El Markdown se renderiza por AST. Las capturas subidas en el formulario se sirven con
+  autorización de cuenta o permiso de soporte por caso.
 
 ## Novedades
 
@@ -143,9 +152,9 @@ fechas son constantes y sirven de fixtures para la E2E.
   `tests/component/NeonReportsSection.test.ts`, `tests/e2e/neon-reports.spec.ts` (con la API simulada
   de `tests/e2e/pages/reports-api.ts`, compartida con `reports.spec.ts`).
 - `tests/unit/report-status.test.ts`, `reporter-comment.test.ts`, `report-updates.test.ts`,
-  `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `issue-report-route.test.ts`.
+  `report-markdown.test.ts`, `reports-backfill-plan.test.ts`, `report-diagnostic.test.ts`.
 - `tests/integration/d1-v2/repositories/issue-reports.test.ts`, `api/reports.test.ts`,
-  `reports-backfill.test.ts`.
+  `reports-backfill.test.ts`, `api/private-reports.test.ts`.
 - `tests/e2e/reports.spec.ts`: acuse y recarga, cierre como duplicada, hilo completo, solo lectura,
   error que conserva el texto, demo sin API y lista vacía real.
 

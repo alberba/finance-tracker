@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
+import { useCopyText } from '../../composables/useCopyText'
 import { useAuthenticationForm, type AccessMode } from '../../composables/useAuthenticationForm'
 import { markAuthenticationReady } from '../../lib/client/authentication-ready'
 import NeonButton from '../ui/NeonButton.vue'
@@ -18,6 +19,7 @@ const props = defineProps<{
   githubEnabled: boolean
   verifyEmail?: string
   initialError?: string
+  initialReference?: string
 }>()
 
 const {
@@ -29,6 +31,7 @@ const {
   busy,
   message,
   error,
+  reference,
   needsCode,
   needsPassword,
   changeMode,
@@ -36,7 +39,11 @@ const {
   submit,
   social,
   passkey,
-} = useAuthenticationForm({ verifyEmail: props.verifyEmail, initialError: props.initialError })
+} = useAuthenticationForm({
+  verifyEmail: props.verifyEmail,
+  initialError: props.initialError,
+  initialReference: props.initialReference,
+})
 
 const COPY: Record<AccessMode, { heading: string; lede: string; submit: string }> = {
   password: {
@@ -65,6 +72,7 @@ const COPY: Record<AccessMode, { heading: string; lede: string; submit: string }
     submit: 'Recuperar acceso',
   },
 }
+const { copyText, copyStatus } = useCopyText()
 const copy = computed(() => COPY[mode.value])
 
 /** Password or code: the two ways into an existing account, as a segmented control. */
@@ -137,6 +145,15 @@ onMounted(markAuthenticationReady)
     <p v-if="error" class="text-note text-loss font-bold" role="alert">
       {{ accessErrorText(error) }}
     </p>
+    <div v-if="error && reference" class="text-muted text-note grid gap-1">
+      <p>
+        Referencia técnica <code class="text-soft break-all">{{ reference }}</code>
+      </p>
+      <NeonButton class="justify-self-start" @click="copyText(reference)">
+        Copiar referencia técnica
+      </NeonButton>
+      <p v-if="copyStatus" role="status">{{ copyStatus }}</p>
+    </div>
     <p v-if="invitationError" class="text-note text-loss font-bold" role="alert">
       {{ invitationError }}
     </p>

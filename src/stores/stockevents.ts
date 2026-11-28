@@ -1,3 +1,4 @@
+import { observeReportOutcome } from '../lib/client/report-observations'
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
 
@@ -18,9 +19,7 @@ import {
   type SymbolCheckResult,
 } from '../services/stockevents-api'
 import type { Transaction } from '../scripts/types'
-import {
-  syncSettingsUpdate,
-} from '../lib/client/command-mapping'
+import { syncSettingsUpdate } from '../lib/client/command-mapping'
 import { useFinancialStateStore } from './financial-state'
 
 export interface StockEventsSymbolRow {
@@ -148,12 +147,14 @@ export const useStockEventsStore = defineStore('stockEvents', () => {
       financialStateStore.patchState((draft) => {
         draft.stockEvents.apiKey = ''
       })
+      observeReportOutcome('settings', 'settings-saved', 'connections')
       showToast(
         credentialConfigured.value
           ? 'API key de Stock Events guardada de forma segura.'
           : 'API key de Stock Events eliminada.',
       )
     } catch (error) {
+      observeReportOutcome('settings', 'settings-rejected', 'connections')
       connectionError.value =
         error instanceof Error ? error.message : 'No se pudo guardar la API key de Stock Events'
     } finally {

@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { reactive, shallowRef, watch } from 'vue'
+import { computed, reactive, shallowRef, watch } from 'vue'
 
-import { useIssueReportContext } from '../../composables/useIssueReportContext'
+import { useCopyText } from '../../composables/useCopyText'
+import {
+  describeDiagnostic,
+  publicReportSummary,
+  reportTopics,
+  type ReportDiagnostic,
+  type ReportTopic,
+} from '../../domain/reports/diagnostic'
+import { observeReportOutcome } from '../../lib/client/report-observations'
+import { useReportDiagnostic } from '../reports/use-report-diagnostic'
 import { useSectionNavigation } from '../../composables/useSectionNavigation'
 import { getAttachmentError } from '../../domain/reports/issue-attachments'
 import { getValidationError, normalizeText } from '../../domain/reports/issue-report'
@@ -11,7 +20,6 @@ import {
   type ReportPayload,
   type ReportType,
 } from '../../services/issue-report-api'
-import { useUiStore } from '../../stores/ui'
 import {
   ATTACHMENT_LIMITS,
   encodeAttachmentFile,
@@ -47,24 +55,54 @@ const fieldClass =
   'min-w-0 bg-panel border-ctrl-line text-text outline-accent rounded-field placeholder:text-faint min-h-[46px] w-full border px-3.5 text-[16px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2'
 const labelClass = 'text-muted grid min-w-0 gap-1.5 text-[13px] font-bold'
 
-const uiStore = useUiStore()
-const { getIssueReportContext } = useIssueReportContext()
+const { capture } = useReportDiagnostic()
+const { copyText, copyStatus } = useCopyText()
 const { navigateToReports } = useSectionNavigation()
 
-const form = reactive({ type: 'bug' as ReportType, summary: '', description: '' })
+const form = reactive({
+  type: 'bug' as ReportType,
+  summary: '',
+  description: '',
+  topic: '' as '' | ReportTopic,
+})
 const files = shallowRef<DraftFile[]>([])
 const statusMessage = shallowRef('')
 const successStatus = shallowRef<SuccessStatus | null>(null)
 const submitting = shallowRef(false)
+const submissionFailed = shallowRef(false)
+const retryReceipt = shallowRef<string>()
+const publishedSummary = shallowRef<string>()
+const diagnostic = shallowRef<ReportDiagnostic | null>(null)
+const attachDiagnostic = shallowRef(false)
+const reviewedSummary = computed(
+  () =>
+    publishedSummary.value ??
+    publicReportSummary(form.type, diagnostic.value?.screen ?? 'unknown', form.topic || undefined),
+)
+const diagnosticText = computed(() =>
+  diagnostic.value ? describeDiagnostic(diagnostic.value) : '',
+)
+
 let nextId = 0
 
 // Set while the panel closes on its way to «Mis reportes»: the page is inert
 // until the dialog is gone, so the navigation waits for `closed` (and the
 // detail then takes the focus the panel hands back to its opener).
 let pendingReports: { issueNumber?: number } | null = null
-watch(open, (value) => {
-  if (value) pendingReports = null
-})
+watch(
+  open,
+  (value) => {
+    if (value) {
+      pendingReports = null
+      diagnostic.value = capture()
+      attachDiagnostic.value = false
+    } else {
+      diagnostic.value = null
+      attachDiagnostic.value = false
+    }
+  },
+  { flush: 'sync' },
+)
 
 /** Closes the panel, then navigates: the detail mounts on the page. */
 function openReports(issueNumber?: number): void {
@@ -107,6 +145,7 @@ function resetForm(): void {
   form.type = 'bug'
   form.summary = ''
   form.description = ''
+  form.topic = ''
   files.value = []
 }
 
@@ -127,11 +166,15 @@ async function onSubmit(): Promise<void> {
     summary,
     // Without a description the field is not sent: the server leaves it empty.
     description: description || undefined,
-    section: uiStore.ui.activeSection,
-    context: getIssueReportContext(),
+    section: diagnostic.value?.screen ?? 'unknown',
+    receipt: retryReceipt.value,
+    topic: form.type === 'bug' ? form.topic || undefined : undefined,
+    diagnostic: attachDiagnostic.value ? (diagnostic.value ?? undefined) : undefined,
   }
 
+  const publicSummary = reviewedSummary.value
   submitting.value = true
+  copyStatus.value = ''
   successStatus.value = null
   statusMessage.value = 'Creando reporte…'
 
@@ -143,6 +186,8 @@ async function onSubmit(): Promise<void> {
     }
     const result = await runClientHttp(submitIssueReport(payload))
     if (!result.ok) {
+      submissionFailed.value = true
+      observeReportOutcome('reports', 'reports-create-failed')
       statusMessage.value = `No se pudo crear la issue: ${result.error}`
       return
     }
@@ -152,8 +197,21 @@ async function onSubmit(): Promise<void> {
       issueUrl: result.issueUrl,
       tracked: result.tracked,
     }
-    resetForm()
+    submissionFailed.value = !result.tracked
+    if (result.tracked) {
+      retryReceipt.value = undefined
+      publishedSummary.value = undefined
+      observeReportOutcome('reports', 'reports-create-complete')
+      resetForm()
+      attachDiagnostic.value = false
+    } else {
+      retryReceipt.value = result.receipt ?? retryReceipt.value
+      publishedSummary.value = publicSummary
+      observeReportOutcome('reports', 'reports-create-failed')
+    }
   } catch (error) {
+    submissionFailed.value = true
+    observeReportOutcome('reports', 'reports-create-failed')
     const message = error instanceof Error ? error.message : 'Error inesperado.'
     statusMessage.value = `No se pudo crear la issue: ${message}`
   } finally {
@@ -170,7 +228,7 @@ async function onSubmit(): Promise<void> {
     @closed="onClosed"
   >
     <p class="text-soft text-[15px] leading-relaxed">
-      Describe el error o la mejora y lo enviaremos como issue con el contexto justo para revisarlo.
+      Describe el error o la mejora. Tu descripción y las capturas se guardan de forma privada.
     </p>
 
     <p class="text-muted text-note">
@@ -211,6 +269,16 @@ async function onSubmit(): Promise<void> {
           </button>
         </div>
       </div>
+
+      <label v-if="form.type === 'bug'" :class="labelClass">
+        Tipo de incidencia (opcional)
+        <select v-model="form.topic" :class="fieldClass">
+          <option value="">Otra incidencia</option>
+          <option v-for="(label, topic) in reportTopics" :key="topic" :value="topic">
+            {{ label }}
+          </option>
+        </select>
+      </label>
 
       <label :class="labelClass">
         Resumen
@@ -263,10 +331,49 @@ async function onSubmit(): Promise<void> {
         </div>
       </div>
 
-      <p id="issue-report-notice" class="text-muted text-meta leading-relaxed">
-        Este reporte se publica en un repositorio público, junto con tu nombre, tu email y el
-        identificador de tu cuenta. No escribas datos que no quieras compartir.
-      </p>
+      <fieldset
+        v-if="diagnostic"
+        class="border-line bg-panel2 rounded-field grid min-w-0 gap-2 border p-3"
+      >
+        <legend class="text-soft text-note px-1 font-extrabold">Diagnóstico privado</legend>
+        <details class="min-w-0">
+          <summary
+            class="text-accent-text outline-accent text-note flex min-h-11 cursor-pointer items-center font-bold focus-visible:outline-2"
+          >
+            Revisar diagnóstico
+          </summary>
+          <pre class="text-muted text-meta font-sans break-words whitespace-pre-wrap">{{
+            diagnosticText
+          }}</pre>
+        </details>
+        <label class="text-soft text-note flex min-h-11 items-center gap-2 font-bold">
+          <input
+            v-model="attachDiagnostic"
+            type="checkbox"
+            class="accent-accent outline-accent size-4 focus-visible:outline-2"
+          />
+          Adjuntar diagnóstico durante 30 días
+        </label>
+      </fieldset>
+
+      <div class="text-muted text-meta grid gap-1.5 leading-relaxed">
+        <p>
+          {{
+            publishedSummary
+              ? 'Resumen técnico enviado a GitHub.'
+              : 'GitHub recibirá este resumen técnico y la referencia del caso.'
+          }}
+        </p>
+        <p class="text-soft font-bold">{{ reviewedSummary }}</p>
+        <NeonButton
+          v-if="submissionFailed"
+          class="justify-self-start"
+          @click="copyText(reviewedSummary)"
+        >
+          Copiar resumen técnico
+        </NeonButton>
+        <p v-if="copyStatus" role="status">{{ copyStatus }}</p>
+      </div>
     </form>
 
     <p
@@ -295,7 +402,14 @@ async function onSubmit(): Promise<void> {
           >
         </template>
         <template v-else>
-          No pudimos añadirlo a Mis reportes todavía; aparecerá en cuanto se recupere.
+          No pudimos guardar el reporte privado del caso
+          <a
+            :href="successStatus.issueUrl"
+            target="_blank"
+            rel="noreferrer"
+            class="text-accent-text underline"
+            >#{{ successStatus.issueNumber }}</a
+          >. Tu borrador sigue en el formulario.
         </template>
       </template>
       <template v-else>{{ statusMessage }}</template>
@@ -308,9 +422,9 @@ async function onSubmit(): Promise<void> {
         variant="primary"
         type="submit"
         :form="FORM_ID"
-        :disabled="submitting"
+        :disabled="submitting || (successStatus?.tracked === false && !retryReceipt)"
       >
-        Crear reporte
+        {{ retryReceipt ? 'Guardar reporte privado' : 'Crear reporte' }}
       </NeonButton>
     </template>
   </NeonDetailPanel>
