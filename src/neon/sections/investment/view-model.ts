@@ -561,10 +561,16 @@ export interface AccountRow {
   changeValue: number
 }
 
+export const TONE_STROKE: Record<Tone, string> = {
+  gain: 'var(--color-gain)',
+  loss: 'var(--color-loss)',
+  neutral: 'var(--color-text)',
+}
+
 export const SPARK_WIDTH = 120
 export const SPARK_HEIGHT = 36
 
-function sparkPath(values: readonly number[]): string {
+export function sparkPath(values: readonly number[]): string {
   if (values.length < 2) return ''
   const min = Math.min(...values)
   const range = Math.max(...values) - min || 1

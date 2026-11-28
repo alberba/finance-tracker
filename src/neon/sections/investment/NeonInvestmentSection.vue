@@ -13,9 +13,10 @@ import {
 } from '../../../domain/investment/benchmarks'
 import { formatSignedMoney } from '../../../lib/format'
 import { runClientHttp } from '../../../lib/client/runtime'
-import { fetchBenchmarkCloses } from '../../../services/market-api'
+import { fetchBenchmarkCloses, fetchInstrumentCloses } from '../../../services/market-api'
 import { useLiveQuotes } from '../../../composables/useLiveQuotes'
 import { useMediaQuery } from '../../../composables/useMediaQuery'
+import { buildPositionEvolution } from '../../../domain/investment/position-evolution'
 import { summarizeQuoteStatus } from '../../../domain/investment/quote-status'
 import {
   buildInvestmentDashboardViewModel,
@@ -260,9 +261,52 @@ const cards = computed<Card[]>(() => [
 ])
 
 const route = useAssetRoute()
+
+// The evolution of each position of the open account: its units at each month
+// close by the instrument's monthly close of the year. An instrument whose
+// closes fail to load, or that has none, takes a share of the account's value
+// instead (the domain's rule), so the detail draws without them meanwhile.
+const loadedCloses = shallowRef<{ key: string; closes: Record<string, number[]> } | null>(null)
+watch(
+  [() => route.selected.value, () => state.value.year, () => vm.value.positions.length],
+  async ([accountId, year]) => {
+    if (!accountId) return
+    const key = `${accountId}:${year}`
+    if (loadedCloses.value?.key === key) return
+    const held = vm.value.positions.filter((position) => position.accountId === accountId)
+    // A direct link can open the detail before the state is in: wait for the positions.
+    if (!held.length) return
+    const found: Record<string, number[]> = {}
+    await Promise.all(
+      held.map(async ({ instrumentId }) => {
+        const instrument = state.value.instruments.find((item) => item.id === instrumentId)
+        if (!instrument) return
+        try {
+          const closes = await runClientHttp(fetchInstrumentCloses(instrument, year))
+          if (closes.length) found[instrumentId] = closes
+        } catch {
+          // No history for this instrument: its line is the account's share.
+        }
+      }),
+    )
+    if (route.selected.value === accountId && state.value.year === year) {
+      loadedCloses.value = { key, closes: found }
+    }
+  },
+  { immediate: true },
+)
+const evolution = computed(() => {
+  const accountId = route.selected.value
+  const loaded = loadedCloses.value
+  if (!accountId || loaded?.key !== `${accountId}:${state.value.year}`) return []
+  return buildPositionEvolution(state.value, accountId, month.value, loaded.closes)
+})
 const asset = computed(() =>
   route.selected.value
-    ? assetDetail(state.value, vm.value, route.selected.value, { compact: !desktopFrame.value })
+    ? assetDetail(state.value, vm.value, route.selected.value, {
+        compact: !desktopFrame.value,
+        evolution: evolution.value,
+      })
     : null,
 )
 

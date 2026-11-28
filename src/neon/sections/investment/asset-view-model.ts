@@ -1,4 +1,5 @@
 import type { InvestmentEntryPreset } from '../../../composables/useEntrySheet'
+import type { PositionEvolution } from '../../../domain/investment/position-evolution'
 import type { AccountPosition } from '../../../domain/investment/positions'
 import type {
   InvestmentAccount,
@@ -15,7 +16,7 @@ import {
   formatSignedMoney,
 } from '../../../lib/format'
 import type { State, Transaction } from '../../../scripts/types'
-import { signedPct, toneOf, type Tone } from './view-model'
+import { signedPct, sparkPath, toneOf, type Tone } from './view-model'
 
 // The detail of an asset in Inversión (artboard «Inversión · detalle de
 // activo (VWCE) · 2560 px», #439): what it is worth and how it did, its price
@@ -133,6 +134,18 @@ export interface PositionLine {
   weightPct: number
   /** The value is an estimate: the instrument has no quote. */
   estimated: boolean
+  /** Month by month value of the position; null while it is not known or has no two points. */
+  evolution: PositionEvolutionLine | null
+}
+
+/** The monthly evolution of a position, drawn as a line in the sparkline's box. */
+export interface PositionEvolutionLine {
+  /** `d` of the line. */
+  path: string
+  /** «Evolución de BTC: de 1.900,00 € en ene a 10.000,00 € en mar». */
+  label: string
+  /** The line is a share of the account's value: the instrument has no quote history. */
+  approximate: boolean
 }
 
 export interface AssetDetail {
@@ -385,7 +398,22 @@ function unitsHeld(single: AccountPosition | null): AssetDetail['units'] {
     : null
 }
 
-function positionLine(position: AccountPosition): PositionLine {
+function evolutionLine(evolution: PositionEvolution | undefined): PositionEvolutionLine | null {
+  if (!evolution) return null
+  const { values } = evolution
+  const start = values.findIndex((value) => value > 0)
+  if (start < 0 || values.length < 2) return null
+  const month = (index: number) => (index === 0 ? 'dic' : MONTHS[index - 1])
+  const last = values.length - 1
+  const approximate = !evolution.priced
+  return {
+    path: sparkPath(values),
+    approximate,
+    label: `Evolución${approximate ? ' aproximada' : ''} de ${evolution.symbol}: de ${formatMoney(values[start])} en ${month(start)} a ${formatMoney(values[last])} en ${month(last)}`,
+  }
+}
+
+function positionLine(position: AccountPosition, evolution: PositionEvolution[]): PositionLine {
   return {
     instrumentId: position.instrumentId,
     symbol: position.symbol,
@@ -399,6 +427,7 @@ function positionLine(position: AccountPosition): PositionLine {
     weight: formatPercent(position.weight, { digits: 1 }),
     weightPct: position.weight,
     estimated: !position.priced,
+    evolution: evolutionLine(evolution.find((item) => item.instrumentId === position.instrumentId)),
   }
 }
 
@@ -441,7 +470,10 @@ export function assetDetail(
   state: State,
   vm: InvestmentDashboardViewModel,
   positionId: string,
-  { compact = false }: { compact?: boolean } = {},
+  {
+    compact = false,
+    evolution = [],
+  }: { compact?: boolean; evolution?: PositionEvolution[] } = {},
 ): AssetDetail | null {
   const position = vm.accounts.find((candidate) => candidate.id === positionId)
   if (!position) return null
@@ -455,7 +487,7 @@ export function assetDetail(
   return {
     id: position.id,
     name: position.name,
-    positions: positions.map(positionLine),
+    positions: positions.map((held) => positionLine(held, evolution)),
     unpricedNote: positions.some((held) => !held.priced)
       ? 'Sin cotización: el valor es la parte que le toca del valor de la cuenta.'
       : null,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PositionLine } from './asset-view-model'
-import { TONE_TEXT } from './view-model'
+import { SPARK_HEIGHT, SPARK_WIDTH, TONE_STROKE, TONE_TEXT } from './view-model'
 
 // What an investment account holds: one line per instrument (a position, ADR
 // 0011) with units, average buy price, value, what went in, the result and the
@@ -17,7 +17,7 @@ withDefaults(
 )
 
 const COLUMNS =
-  'grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-[clamp(0.625rem,1.5cqi,1.75rem)]'
+  'grid-cols-[minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.1fr)] gap-x-[clamp(0.625rem,1.5cqi,1.75rem)]'
 </script>
 
 <template>
@@ -52,6 +52,27 @@ const COLUMNS =
         >
           Sin cotización
         </span>
+        <svg
+          v-if="line.evolution"
+          :viewBox="`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`"
+          preserveAspectRatio="none"
+          class="block overflow-visible"
+          :class="'col-span-2 h-8 w-full'"
+          role="img"
+          :aria-label="line.evolution.label"
+          :data-position-evolution="line.symbol"
+        >
+          <path
+            :d="line.evolution.path"
+            fill="none"
+            :stroke="TONE_STROKE[line.tone]"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            :stroke-dasharray="line.evolution.approximate ? '3 3' : undefined"
+            vector-effect="non-scaling-stroke"
+          />
+        </svg>
       </li>
     </ul>
 
@@ -68,6 +89,7 @@ const COLUMNS =
         <span class="text-end">Invertido</span>
         <span class="text-end">Ganancia</span>
         <span class="text-end">Peso</span>
+        <span class="text-end">Evolución</span>
       </div>
       <ul class="m-0 list-none p-0">
         <li
@@ -105,6 +127,29 @@ const COLUMNS =
             <span v-if="line.ret" class="text-meta font-extrabold">{{ line.ret }}</span>
           </span>
           <span class="text-soft text-note text-end font-bold tabular-nums">{{ line.weight }}</span>
+          <span class="flex justify-end">
+            <svg
+          v-if="line.evolution"
+          :viewBox="`0 0 ${SPARK_WIDTH} ${SPARK_HEIGHT}`"
+          preserveAspectRatio="none"
+          class="block overflow-visible"
+          :class="'h-7 w-full max-w-28'"
+          role="img"
+          :aria-label="line.evolution.label"
+          :data-position-evolution="line.symbol"
+        >
+          <path
+            :d="line.evolution.path"
+            fill="none"
+            :stroke="TONE_STROKE[line.tone]"
+            stroke-width="2"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            :stroke-dasharray="line.evolution.approximate ? '3 3' : undefined"
+            vector-effect="non-scaling-stroke"
+          />
+        </svg>
+          </span>
         </li>
       </ul>
     </template>
