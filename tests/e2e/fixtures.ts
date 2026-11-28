@@ -26,6 +26,15 @@ export const test = base.extend<Fixtures>({
   extraHTTPHeaders: async ({ testUserEmail }, use) => {
     await use({ 'X-Test-User-Email': testUserEmail })
   },
+  // The demo keeps the guided tour's flags in the browser: seen, as for the
+  // fixture's user, so it does not cover the page in unrelated journeys.
+  context: async ({ context }, use) => {
+    await context.addInitScript(() => {
+      window.localStorage.setItem('finance-tour-desktop-seen', '1')
+      window.localStorage.setItem('finance-tour-mobile-seen', '1')
+    })
+    await use(context)
+  },
   fixedTime: [undefined, { option: true }],
   tracker: async ({ page, context, fixedTime, testUserEmail }, use) => {
     if (fixedTime) {
@@ -42,8 +51,9 @@ export const test = base.extend<Fixtures>({
       `No se pudo inicializar la identidad E2E (${initialization.status()})`,
     ).toBe(true)
     await seedSyncV2User(context.request, email)
-    // Unrelated journeys start after the setup wizard; the onboarding spec
-    // provisions untouched sync-v2 users and exercises the real first show.
+    // Unrelated journeys start after the setup wizard and the guided tour; the
+    // onboarding and tour specs provision untouched users and exercise the
+    // real first show.
     const completed = await context.request.post('/api/sync', {
       headers: await syncV2TestHeaders(context.request, email),
       data: {
@@ -51,7 +61,12 @@ export const test = base.extend<Fixtures>({
           {
             commandId: randomUUID(),
             action: 'settingsUpdate',
-            patch: { onboardingPresented: true, onboardingCompleted: true },
+            patch: {
+              onboardingPresented: true,
+              onboardingCompleted: true,
+              tourDesktopSeen: true,
+              tourMobileSeen: true,
+            },
           },
         ],
       },

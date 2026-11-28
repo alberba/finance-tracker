@@ -9,6 +9,8 @@ const progress = {
   onboardingPresented: true,
   onboardingDismissed: true,
   onboardingCompleted: true,
+  tourDesktopSeen: true,
+  tourMobileSeen: true,
 }
 
 describe('onboarding settings round trip', () => {

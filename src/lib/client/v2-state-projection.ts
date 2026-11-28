@@ -111,6 +111,8 @@ export function projectSyncV2State(
     onboardingDismissed: bootstrap.settings?.onboardingDismissed === 1,
     onboardingCompleted: bootstrap.settings?.onboardingCompleted === 1,
     onboardingStep: bootstrap.settings?.onboardingStep ?? 0,
+    tourDesktopSeen: bootstrap.settings?.tourDesktopSeen === 1,
+    tourMobileSeen: bootstrap.settings?.tourMobileSeen === 1,
     theme: bootstrap.settings?.theme ?? null,
     dashboardLayout: bootstrap.settings?.dashboardLayout ?? null,
     twrLiquidityAccountIds: [],

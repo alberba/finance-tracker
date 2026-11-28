@@ -246,8 +246,11 @@ export interface State {
   onboardingPresented: boolean
   onboardingDismissed: boolean
   onboardingCompleted: boolean
-  /** The setup wizard's step to resume at (0 «Cómo empiezas» … 7 «Listo»). */
+  /** The setup wizard's step to resume at (0 «Cómo empiezas» … 6 «Listo»). */
   onboardingStep: number
+  /** The guided tour (#527), seen or skipped, on the desktop and on the mobile frame. */
+  tourDesktopSeen: boolean
+  tourMobileSeen: boolean
   /** The theme chosen by the user, shared by their devices; `null` lets each device decide. */
   theme: string | null
 

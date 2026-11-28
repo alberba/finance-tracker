@@ -295,6 +295,8 @@ export function buildDemoSeed(now: Date = new Date()): State {
     onboardingDismissed: false,
     onboardingCompleted: false,
     onboardingStep: 0,
+    tourDesktopSeen: false,
+    tourMobileSeen: false,
     theme: null,
     year,
     currency: 'EUR',

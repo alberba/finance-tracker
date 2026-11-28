@@ -544,6 +544,12 @@ function performMutation(
           ...(typeof settingsPatch.onboardingCompleted === 'boolean'
             ? { onboardingCompleted: settingsPatch.onboardingCompleted ? 1 : 0 }
             : {}),
+          ...(typeof settingsPatch.tourDesktopSeen === 'boolean'
+            ? { tourDesktopSeen: settingsPatch.tourDesktopSeen ? 1 : 0 }
+            : {}),
+          ...(typeof settingsPatch.tourMobileSeen === 'boolean'
+            ? { tourMobileSeen: settingsPatch.tourMobileSeen ? 1 : 0 }
+            : {}),
 
           ...(typeof settingsPatch.stockeventsEnabled === 'boolean'
             ? { stockeventsEnabled: settingsPatch.stockeventsEnabled ? 1 : 0 }
